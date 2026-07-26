@@ -298,6 +298,7 @@ describe('surface coordination outbox recovery', () => {
         text: 'replay me',
       })
     );
+    withExecutionContext('surface_runtime', () => safeUnlinkSync(replayPath));
     const replayAgainPath = replaySurfaceDeadLetter(testSurface, deadLetter!.dead_letter_id, {
       operatorId: 'operator-test-2',
     });

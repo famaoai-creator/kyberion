@@ -171,8 +171,8 @@ const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => 
     title: uxText('chronos_qa_prepare_title', locale),
     hint: uxText('chronos_qa_prepare_hint', locale),
     icon: ClipboardCheck,
-    accent: 'from-emerald-400/16 via-emerald-300/8 to-transparent',
-    accentText: 'text-emerald-200/85',
+    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accentText: 'kb-status-positive',
     actions: [
       {
         label: uxText('chronos_qa_action_prereq_check', locale),
@@ -204,8 +204,8 @@ const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => 
     title: uxText('chronos_qa_schedule_title', locale),
     hint: uxText('chronos_qa_schedule_hint', locale),
     icon: CalendarClock,
-    accent: 'from-violet-400/16 via-violet-300/8 to-transparent',
-    accentText: 'text-violet-200/85',
+    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accentText: 'kb-status-info',
     actions: [
       {
         label: uxText('chronos_qa_action_schedule_tick', locale),
@@ -225,8 +225,8 @@ const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => 
     title: uxText('chronos_qa_observe_title', locale),
     hint: uxText('chronos_qa_observe_hint', locale),
     icon: Radar,
-    accent: 'from-cyan-400/16 via-cyan-300/8 to-transparent',
-    accentText: 'text-cyan-200/85',
+    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accentText: 'kb-text-accent',
     actions: [
       {
         label: uxText('chronos_qa_action_dashboard', locale),
@@ -264,8 +264,8 @@ const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => 
     title: uxText('chronos_qa_verify_title', locale),
     hint: uxText('chronos_qa_verify_hint', locale),
     icon: ActivitySquare,
-    accent: 'from-amber-300/18 via-amber-200/8 to-transparent',
-    accentText: 'text-amber-200/85',
+    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accentText: 'kb-status-warning',
     actions: [
       {
         label: uxText('chronos_qa_action_vital_check', locale),
@@ -297,8 +297,8 @@ const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => 
     title: uxText('chronos_qa_operate_title', locale),
     hint: uxText('chronos_qa_operate_hint', locale),
     icon: Wrench,
-    accent: 'from-rose-400/16 via-orange-300/8 to-transparent',
-    accentText: 'text-orange-200/85',
+    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accentText: 'kb-status-warning',
     actions: [
       {
         label: uxText('chronos_qa_action_build_test', locale),
@@ -335,7 +335,7 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     value: uxText('chronos_sc_needs_attention_value', locale),
     detail: uxText('chronos_sc_needs_attention_detail', locale),
     icon: Shield,
-    accent: 'border-amber-200/16 bg-amber-300/8 text-amber-100',
+    accent: 'kb-status-warning-border kb-status-warning-surface kb-status-warning',
     targetId: 'mission-control-plane',
   },
   {
@@ -343,7 +343,7 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     value: uxText('chronos_sc_toolchain_value', locale),
     detail: uxText('chronos_sc_toolchain_detail', locale),
     icon: ClipboardCheck,
-    accent: 'border-emerald-200/16 bg-emerald-300/8 text-emerald-100',
+    accent: 'kb-status-positive-border kb-status-positive-surface kb-status-positive',
     targetId: 'operator-quick-actions',
   },
   {
@@ -351,7 +351,7 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     value: uxText('chronos_sc_schedules_value', locale),
     detail: uxText('chronos_sc_schedules_detail', locale),
     icon: CalendarClock,
-    accent: 'border-violet-200/16 bg-violet-300/8 text-violet-100',
+    accent: 'kb-status-info-border kb-status-info-surface kb-status-info',
     targetId: 'operator-quick-actions',
   },
   {
@@ -359,7 +359,7 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     value: uxText('chronos_sc_runtime_governance_value', locale),
     detail: uxText('chronos_sc_runtime_governance_detail', locale),
     icon: Bot,
-    accent: 'border-cyan-200/16 bg-cyan-300/8 text-cyan-100',
+    accent: 'kb-border-accent kb-surface-accent kb-text-accent',
     targetId: 'runtime-lease-doctor',
   },
   {
@@ -367,7 +367,7 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     value: uxText('chronos_sc_delivery_value', locale),
     detail: uxText('chronos_sc_delivery_detail', locale),
     icon: Radar,
-    accent: 'border-rose-200/16 bg-rose-300/8 text-rose-100',
+    accent: 'kb-status-negative-border kb-status-negative-surface kb-status-negative',
     targetId: 'recent-surface-outbox',
   },
 ];
@@ -1191,31 +1191,36 @@ export default function ChronosMirrorV2() {
   const webTheme = webDesignSystem.theme.theme;
   const webLayout = webDesignSystem.layout;
   const isLightTheme = themeMode === 'light';
-  const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'text-white';
-  const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/40';
-  const shellSubtleClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/60';
-  const shellTitleClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'text-white/90';
+  const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'kb-text-primary';
+  const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-muted';
+  const shellSubtleClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-secondary';
+  const shellTitleClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'kb-text-primary';
   // Tone-colored chips were authored for the dark console only: a 100-level
   // text on a 400/10 wash measures ~1.7:1 once the panel underneath is light.
   // Light mode needs the ink darkened, not just the panel lightened.
   const toneChipClass = (tone: 'approve' | 'reject' | 'info' | 'alert' | 'neutral'): string => {
     if (isLightTheme) {
       return {
-        approve: 'border-emerald-600/30 bg-emerald-500/12 text-emerald-800 hover:bg-emerald-500/20',
-        reject: 'border-rose-600/30 bg-rose-500/12 text-rose-800 hover:bg-rose-500/20',
-        info: 'border-sky-600/30 bg-sky-500/12 text-sky-800 hover:bg-sky-500/20',
-        alert: 'border-amber-600/35 bg-amber-500/15 text-amber-900 hover:bg-amber-500/22',
+        approve:
+          'kb-status-positive-border kb-status-positive-surface kb-status-positive hover:kb-status-positive-surface',
+        reject:
+          'kb-status-negative-border kb-status-negative-surface kb-status-negative hover:kb-status-negative-surface',
+        info: 'kb-status-info-border kb-status-info-surface kb-status-info hover:kb-status-info-surface',
+        alert:
+          'kb-status-warning-border kb-status-warning-surface kb-status-warning hover:kb-status-warning-surface',
         neutral:
-          'border-[color:var(--kb-border)] bg-black/[0.04] text-[var(--kb-text-primary)] hover:bg-black/[0.07]',
+          'border-[color:var(--kb-border)] kb-surface-well text-[var(--kb-text-primary)] hover:kb-surface-well',
       }[tone];
     }
     return {
       approve:
-        'border-emerald-400/20 bg-emerald-400/10 text-emerald-100/80 hover:bg-emerald-400/16',
-      reject: 'border-rose-400/20 bg-rose-400/10 text-rose-100/80 hover:bg-rose-400/16',
-      info: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100/80 hover:bg-cyan-400/16',
-      alert: 'border-amber-400/25 bg-amber-400/12 text-amber-100/85 hover:bg-amber-400/20',
-      neutral: 'border-white/10 bg-black/20 text-white/78 hover:bg-white/10',
+        'kb-status-positive-border kb-status-positive-surface kb-status-positive hover:kb-status-positive-surface',
+      reject:
+        'kb-status-negative-border kb-status-negative-surface kb-status-negative hover:kb-status-negative-surface',
+      info: 'kb-border-accent kb-surface-accent kb-text-accent hover:kb-surface-accent',
+      alert:
+        'kb-status-warning-border kb-status-warning-surface kb-status-warning hover:kb-status-warning-surface',
+      neutral: 'kb-border-subtle kb-surface-sunken kb-text-secondary hover:kb-surface-raised',
     }[tone];
   };
 
@@ -1233,9 +1238,9 @@ export default function ChronosMirrorV2() {
         style={{ ...(webDesignSystem.css_vars as CSSProperties), ...tenantCssVars }}
       >
         <div className="absolute inset-0 pointer-events-none opacity-60">
-          <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
-          <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-cyan-400/5 blur-[150px]" />
-          <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-slate-500/5 blur-[160px]" />
+          <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full kb-surface-accent blur-[160px]" />
+          <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full kb-surface-accent blur-[150px]" />
+          <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full kb-surface-sunken blur-[160px]" />
         </div>
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
@@ -1244,8 +1249,8 @@ export default function ChronosMirrorV2() {
           <header className="px-1 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10">
-                  <Shield className="h-5 w-5 text-cyan-400" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border kb-border-accent kb-surface-accent">
+                  <Shield className="h-5 w-5 kb-text-accent" />
                 </div>
                 <div>
                   <div
@@ -1258,7 +1263,7 @@ export default function ChronosMirrorV2() {
                   </h1>
                 </div>
                 <div
-                  className={`ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-cyan-100/70'}`}
+                  className={`ml-2 rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-accent'}`}
                   title={locale === 'ja' ? 'このサーフェスの役割' : 'What this surface is for'}
                 >
                   {locale === 'ja'
@@ -1268,13 +1273,13 @@ export default function ChronosMirrorV2() {
                 <button
                   type="button"
                   onClick={() => setShowOpsBoards((current) => !current)}
-                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-100' : isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10'}`}
+                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'kb-border-accent kb-surface-accent kb-text-accent' : isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised'}`}
                 >
                   {locale === 'ja' ? 'エージェント/看板' : 'Agents / Boards'}
                 </button>
               </div>
               {tenantLabel ? (
-                <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/80">
+                <div className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] kb-text-accent">
                   {tenantLabel}
                 </div>
               ) : null}
@@ -1284,7 +1289,7 @@ export default function ChronosMirrorV2() {
                   type="button"
                   onClick={() => setThemeModePreference(nextChronosThemeMode)}
                   aria-label={`Chronos theme: ${themeModePreference}`}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised hover:kb-text-accent'}`}
                 >
                   <Palette size={12} />
                   <span>{themeModePreference}</span>
@@ -1295,7 +1300,7 @@ export default function ChronosMirrorV2() {
                   aria-label={
                     locale === 'ja' ? 'Switch language to English' : '言語を日本語に切り替え'
                   }
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised hover:kb-text-accent'}`}
                 >
                   <span>{locale === 'ja' ? 'JA' : 'EN'}</span>
                 </button>
@@ -1303,7 +1308,7 @@ export default function ChronosMirrorV2() {
                 <button
                   type="button"
                   onClick={() => setAgentPanelOpen(true)}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised hover:kb-text-accent'}`}
                 >
                   <Cpu size={12} />
                   <span>{uxText('chronos_agent_runtimes', locale)}</span>
@@ -1316,7 +1321,7 @@ export default function ChronosMirrorV2() {
               and counters that double as navigation. This is deliberately the
               first thing on the page — the design-system panel that used to own
               this slot moved into the sidebar's reference drawer. */}
-          <section className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+          <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-3xl">
                 <div
@@ -1353,13 +1358,13 @@ export default function ChronosMirrorV2() {
             </div>
 
             {operatorHomeError ? (
-              <div className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+              <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                 {operatorHomeError}
               </div>
             ) : null}
 
             {homePrimaryAction ? (
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.07] px-4 py-4">
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border kb-border-accent kb-surface-accent px-4 py-4">
                 <div className="min-w-0">
                   <div
                     className={`text-[10px] font-bold uppercase tracking-[0.22em] ${shellMutedClass}`}
@@ -1429,13 +1434,13 @@ export default function ChronosMirrorV2() {
           <FirstRunBanner />
 
           <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
-            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
                     SU history
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                     Mission history
                   </h2>
                 </div>
@@ -1444,12 +1449,12 @@ export default function ChronosMirrorV2() {
                     value={missionHistoryQuery}
                     onChange={(event) => setMissionHistoryQuery(event.target.value)}
                     placeholder="search"
-                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                    className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                   />
                   <select
                     value={missionHistoryStatus}
                     onChange={(event) => setMissionHistoryStatus(event.target.value)}
-                    className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none focus:border-cyan-300/25"
+                    className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
                   >
                     <option value="">{uxText('chronos_mh_all_statuses', locale)}</option>
                     <option value="completed">completed</option>
@@ -1460,7 +1465,7 @@ export default function ChronosMirrorV2() {
                   <select
                     value={missionHistoryTier}
                     onChange={(event) => setMissionHistoryTier(event.target.value)}
-                    className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none focus:border-cyan-300/25"
+                    className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
                   >
                     <option value="">all tiers</option>
                     <option value="public">public</option>
@@ -1470,13 +1475,13 @@ export default function ChronosMirrorV2() {
                 </div>
               </div>
               {missionHistoryError ? (
-                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                   {missionHistoryError}
                 </div>
               ) : null}
               <div className="mt-4 max-h-[420px] overflow-y-auto pr-1 chronos-scroll space-y-3">
                 {missionHistory.length === 0 ? (
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
                     {uxText('chronos_mh_no_match', locale)}
                   </div>
                 ) : (
@@ -1487,27 +1492,27 @@ export default function ChronosMirrorV2() {
                       onClick={() => setSelectedMissionId(mission.missionId)}
                       className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                         selectedMissionId === mission.missionId
-                          ? 'border-cyan-400/25 bg-cyan-400/10'
-                          : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                          ? 'kb-border-accent kb-surface-accent'
+                          : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             {mission.missionId}
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-white/90">
+                          <div className="mt-1 text-sm font-semibold kb-text-primary">
                             {mission.goalSummary ||
                               mission.intentText ||
                               mission.missionType ||
                               'Mission'}
                           </div>
                         </div>
-                        <div className="text-right text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                        <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
                           {mission.status}
                         </div>
                       </div>
-                      <div className="mt-2 grid gap-2 text-[10px] text-white/52 sm:grid-cols-2">
+                      <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
                         <div>tier {mission.tier}</div>
                         <div>artifacts {mission.artifactCount}</div>
                         <div>updated {mission.updatedAt || mission.startedAt || '-'}</div>
@@ -1516,7 +1521,7 @@ export default function ChronosMirrorV2() {
                         </div>
                       </div>
                       {mission.successCondition ? (
-                        <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
                           {mission.successCondition}
                         </div>
                       ) : null}
@@ -1527,60 +1532,60 @@ export default function ChronosMirrorV2() {
             </div>
 
             <div className="grid gap-4">
-              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                    <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
                       SU cost
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                       Cost visibility
                     </h2>
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                  <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
                     {selectedMissionId ? selectedMissionId : 'today'}
                   </div>
                 </div>
                 {costSummaryError ? (
-                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                     {costSummaryError}
                   </div>
                 ) : null}
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">usd</div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">usd</div>
+                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
                       {typeof costSummary?.totalUsd === 'number'
                         ? `$${costSummary.totalUsd.toFixed(3)}`
                         : '-'}
                     </div>
-                    <div className="mt-1 text-[10px] text-white/48">
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       {costSummary?.entryCount || 0} entries
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       tokens
                     </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
                       {typeof costSummary?.totalTokens === 'number'
                         ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
                         : '-'}
                     </div>
-                    <div className="mt-1 text-[10px] text-white/48">
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       {costSummary?.missionCount || 0} missions
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       budget
                     </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
                       {typeof costSummary?.budgetUsd === 'number'
                         ? `$${costSummary.budgetUsd.toFixed(3)}`
                         : 'n/a'}
                     </div>
-                    <div className="mt-1 text-[10px] text-white/48">
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       {typeof costSummary?.remainingUsd === 'number'
                         ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
                         : 'no spend guard configured'}
@@ -1593,7 +1598,7 @@ export default function ChronosMirrorV2() {
                     {costSummary.missionBreakdown.slice(0, 4).map((item: any) => (
                       <div
                         key={item.missionId}
-                        className="rounded-xl border border-white/8 bg-black/18 px-3 py-2 text-[10px] text-white/58"
+                        className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] kb-text-muted"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <button
@@ -1603,13 +1608,13 @@ export default function ChronosMirrorV2() {
                                 item.missionId === 'UNASSIGNED' ? null : item.missionId
                               )
                             }
-                            className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/70"
+                            className="font-mono text-[10px] uppercase tracking-[0.16em] kb-text-accent"
                           >
                             {item.missionId}
                           </button>
-                          <div className="text-white/80">${item.usd.toFixed(3)}</div>
+                          <div className="kb-text-primary">${item.usd.toFixed(3)}</div>
                         </div>
-                        <div className="mt-1 text-white/42">
+                        <div className="mt-1 kb-text-muted">
                           {item.tokens.toLocaleString(chronosSpeechLocale())} tokens ·{' '}
                           {item.entryCount} entries
                         </div>
@@ -1619,13 +1624,13 @@ export default function ChronosMirrorV2() {
                 ) : null}
               </div>
 
-              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                    <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
                       SU approvals
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                       Approval queue
                     </h2>
                   </div>
@@ -1633,42 +1638,42 @@ export default function ChronosMirrorV2() {
                     value={approvalQueueQuery}
                     onChange={(event) => setApprovalQueueQuery(event.target.value)}
                     placeholder="search"
-                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                    className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                   />
                 </div>
                 {approvalQueueError ? (
-                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                     {approvalQueueError}
                   </div>
                 ) : null}
                 <div className="mt-4 max-h-[310px] overflow-y-auto pr-1 chronos-scroll space-y-3">
                   {approvalQueue.length === 0 ? (
-                    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
                       No pending approvals.
                     </div>
                   ) : (
                     approvalQueue.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+                        className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                               {item.kind} · {item.channel}
                             </div>
-                            <div className="mt-1 text-sm font-semibold text-white/90">
+                            <div className="mt-1 text-sm font-semibold kb-text-primary">
                               {item.title}
                             </div>
                           </div>
-                          <div className="text-right text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                          <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
                             {item.status}
                           </div>
                         </div>
-                        <div className="mt-2 text-[11px] leading-6 text-slate-200/58">
+                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
                           {item.summary}
                         </div>
-                        <div className="mt-2 grid gap-2 text-[10px] text-white/48 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
                           <div>mission {item.missionId || '-'}</div>
                           <div>service {item.serviceId || '-'}</div>
                           <div>risk {item.riskLevel || '-'}</div>
@@ -1693,8 +1698,8 @@ export default function ChronosMirrorV2() {
                           </button>
                         </div>
                         {approvalAskWhyId === item.id ? (
-                          <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/8 px-4 py-3">
-                            <div className="text-[11px] text-amber-100/80">
+                          <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3">
+                            <div className="text-[11px] kb-status-warning">
                               どこが期待と違いましたか？（1問だけ・スキップ可）
                             </div>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -1740,13 +1745,13 @@ export default function ChronosMirrorV2() {
                 </div>
               </div>
 
-              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                    <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
                       SU connections
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                       Connection review
                     </h2>
                   </div>
@@ -1754,11 +1759,11 @@ export default function ChronosMirrorV2() {
                     value={connectionsQuery}
                     onChange={(event) => setConnectionsQuery(event.target.value)}
                     placeholder="search"
-                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                    className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                   />
                 </div>
                 {connectionsError ? (
-                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                     {connectionsError}
                   </div>
                 ) : null}
@@ -1790,24 +1795,24 @@ export default function ChronosMirrorV2() {
                         }}
                         className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                           selectedConnectionId === item.binding_id
-                            ? 'border-cyan-400/25 bg-cyan-400/10'
-                            : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                            ? 'kb-border-accent kb-surface-accent'
+                            : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                               {item.service_type || 'service'} · {item.binding_id}
                             </div>
-                            <div className="mt-1 text-sm font-semibold text-white/90">
+                            <div className="mt-1 text-sm font-semibold kb-text-primary">
                               {item.service_id || item.target}
                             </div>
                           </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
                             {item.reviewAction || 'pending'}
                           </div>
                         </div>
-                        <div className="mt-2 grid gap-2 text-[10px] text-white/52 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
                           <div>scope {item.scope}</div>
                           <div>target {item.target}</div>
                           <div>policy {Object.keys(item.approval_policy || {}).length}</div>
@@ -1817,14 +1822,14 @@ export default function ChronosMirrorV2() {
                     ))}
                 </div>
                 {selectedConnectionId ? (
-                  <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.05] p-4">
+                  <div className="mt-4 rounded-2xl border kb-border-accent kb-surface-accent p-4">
                     {(() => {
                       const selected = connections.find(
                         (item) => item.binding_id === selectedConnectionId
                       );
                       if (!selected)
                         return (
-                          <div className="text-[11px] text-white/50">
+                          <div className="text-[11px] kb-text-muted">
                             Selected connection not found.
                           </div>
                         );
@@ -1832,14 +1837,14 @@ export default function ChronosMirrorV2() {
                         <>
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                              <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
                                 review
                               </div>
-                              <div className="mt-1 text-sm font-semibold text-white/90">
+                              <div className="mt-1 text-sm font-semibold kb-text-primary">
                                 {selected.service_id || selected.binding_id}
                               </div>
                             </div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                               {selected.reviewAction || 'pending'}
                             </div>
                           </div>
@@ -1847,7 +1852,7 @@ export default function ChronosMirrorV2() {
                             value={connectionReviewNote}
                             onChange={(event) => setConnectionReviewNote(event.target.value)}
                             placeholder="review note"
-                            className="mt-3 min-h-[80px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+                            className="mt-3 min-h-[80px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
                           />
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
@@ -1893,13 +1898,13 @@ export default function ChronosMirrorV2() {
           </section>
 
           <section className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
                     SU workbench
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                     Plan preview and approval
                   </h2>
                 </div>
@@ -1908,7 +1913,7 @@ export default function ChronosMirrorV2() {
                     type="button"
                     onClick={runPlanPreview}
                     disabled={planPreviewBusy}
-                    className="rounded-lg border border-cyan-300/18 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-cyan-100/82 transition hover:bg-cyan-400/16 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {planPreviewBusy ? 'previewing' : 'preview'}
                   </button>
@@ -1916,14 +1921,14 @@ export default function ChronosMirrorV2() {
                     type="button"
                     onClick={approvePlanAndStart}
                     disabled={planApprovalBusy || !planPreview || planPreviewIsStale}
-                    className="rounded-lg border border-emerald-300/18 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-emerald-100/82 transition hover:bg-emerald-400/16 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {planApprovalBusy ? 'starting' : 'approve & start'}
                   </button>
                 </div>
               </div>
               {planPreview && planPreviewIsStale ? (
-                <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-[11px] text-amber-100/80">
+                <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3 text-[11px] kb-status-warning">
                   Preview is stale. Re-run preview before approving.
                 </div>
               ) : null}
@@ -1931,33 +1936,33 @@ export default function ChronosMirrorV2() {
                 value={planRequestText}
                 onChange={(event) => setPlanRequestText(event.target.value)}
                 placeholder="例: 来週までに顧客向け提案資料を作って、承認前にレビューしたい"
-                className="mt-4 min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+                className="mt-4 min-h-[120px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
               />
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                   mission type
                   <input
                     value={planMissionType}
                     onChange={(event) => setPlanMissionType(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
                   />
                 </label>
-                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                   persona
                   <input
                     value={planPersona}
                     onChange={(event) => setPlanPersona(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
                   />
                 </label>
-                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                   tier
                   <select
                     value={planTier}
                     onChange={(event) =>
                       setPlanTier(event.target.value as 'personal' | 'confidential' | 'public')
                     }
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
                   >
                     <option value="personal">personal</option>
                     <option value="confidential">confidential</option>
@@ -1966,49 +1971,49 @@ export default function ChronosMirrorV2() {
                 </label>
               </div>
               {planPreviewError ? (
-                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                   {planPreviewError}
                 </div>
               ) : null}
               {planApprovalMessage ? (
-                <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-[11px] text-emerald-100/80">
+                <div className="mt-3 rounded-xl border kb-status-positive-border kb-status-positive-surface px-4 py-3 text-[11px] kb-status-positive">
                   {planApprovalMessage}
                 </div>
               ) : null}
               {planPreview ? (
                 <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,0.85fr]">
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       goal
                     </div>
-                    <div className="mt-2 text-sm font-semibold text-white/90">
+                    <div className="mt-2 text-sm font-semibold kb-text-primary">
                       {planPreview.goal?.summary}
                     </div>
-                    <div className="mt-2 text-[11px] leading-6 text-white/58">
+                    <div className="mt-2 text-[11px] leading-6 kb-text-muted">
                       {planPreview.goal?.successCondition}
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-[10px] text-white/52">
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-[10px] kb-text-muted">
                       <div>
                         delivery mode{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {planPreview.delivery?.mode}
                         </span>
                       </div>
                       <div>
                         clarification{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {planPreview.delivery?.clarificationNeeded ? 'needed' : 'clear'}
                         </span>
                       </div>
                       <div>
                         execution{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {planPreview.execution?.shape}
                         </span>
                       </div>
                       <div>
                         confidence{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {Math.round((Number(planPreview.confidence) || 0) * 100)}%
                         </span>
                       </div>
@@ -2039,11 +2044,11 @@ export default function ChronosMirrorV2() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       team + workflow
                     </div>
-                    <div className="mt-2 text-[11px] text-white/55">
+                    <div className="mt-2 text-[11px] kb-text-muted">
                       {planPreview.team?.assignments?.length || 0} assignments ·{' '}
                       {planPreview.team?.team_governance?.composition?.required_roles?.length || 0}{' '}
                       required roles
@@ -2052,33 +2057,33 @@ export default function ChronosMirrorV2() {
                       {(planPreview.team?.assignments || []).slice(0, 5).map((assignment: any) => (
                         <div
                           key={`${assignment.team_role}-${assignment.agent_id || 'unfilled'}`}
-                          className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-2"
+                          className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/44">
+                            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                               {assignment.team_role}
                             </div>
-                            <div className="text-[9px] uppercase tracking-[0.16em] text-white/34">
+                            <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                               {assignment.status}
                             </div>
                           </div>
-                          <div className="mt-1 font-mono text-[10px] text-white/78">
+                          <div className="mt-1 font-mono text-[10px] kb-text-secondary">
                             {assignment.agent_id || 'unfilled'}
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                       workflow steps
                     </div>
                     <div className="mt-2 space-y-2">
                       {(planPreview.workflow || []).slice(0, 5).map((step: any) => (
                         <div
                           key={step.id}
-                          className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-2"
+                          className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
                         >
-                          <div className="text-[10px] text-white/82">{step.label}</div>
-                          <div className="mt-1 text-[9px] leading-5 text-white/48">
+                          <div className="text-[10px] kb-text-primary">{step.label}</div>
+                          <div className="mt-1 text-[9px] leading-5 kb-text-muted">
                             {step.description}
                           </div>
                         </div>
@@ -2089,13 +2094,13 @@ export default function ChronosMirrorV2() {
               ) : null}
             </div>
 
-            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
                     SU inbox
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                     Deliverables
                   </h2>
                 </div>
@@ -2103,11 +2108,11 @@ export default function ChronosMirrorV2() {
                   value={deliverablesQuery}
                   onChange={(event) => setDeliverablesQuery(event.target.value)}
                   placeholder="search"
-                  className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                  className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                 />
               </div>
               {deliverablesError ? (
-                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                   {deliverablesError}
                 </div>
               ) : null}
@@ -2127,7 +2132,7 @@ export default function ChronosMirrorV2() {
               ) : null}
               <div className="mt-4 max-h-[540px] overflow-y-auto pr-1 chronos-scroll space-y-3">
                 {visibleDeliverables.length === 0 ? (
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
                     {deliverables.length === 0
                       ? 'No deliverables found yet.'
                       : uxText('chronos_dl_none_live', locale)}
@@ -2167,14 +2172,14 @@ export default function ChronosMirrorV2() {
                 )}
               </div>
               {selectedDeliverableId ? (
-                <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.05] p-4">
+                <div className="mt-4 rounded-2xl border kb-border-accent kb-surface-accent p-4">
                   {(() => {
                     const selected = deliverables.find(
                       (item) => item.artifactId === selectedDeliverableId
                     );
                     if (!selected) {
                       return (
-                        <div className="text-[11px] text-white/50">
+                        <div className="text-[11px] kb-text-muted">
                           Selected deliverable not found.
                         </div>
                       );
@@ -2183,36 +2188,36 @@ export default function ChronosMirrorV2() {
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                            <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
                               review
                             </div>
-                            <div className="mt-1 text-sm font-semibold text-white/90">
+                            <div className="mt-1 text-sm font-semibold kb-text-primary">
                               {selected.artifactId}
                             </div>
                           </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             {selected.reviewVerdict
                               ? `latest ${selected.reviewVerdict}`
                               : 'not reviewed'}
                           </div>
                         </div>
-                        <div className="mt-2 text-[11px] leading-6 text-slate-200/62">
+                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
                           {selected.previewText || selected.kind}
                         </div>
                         <textarea
                           value={deliverableReviewComment}
                           onChange={(event) => setDeliverableReviewComment(event.target.value)}
                           placeholder="review comment"
-                          className="mt-3 min-h-[88px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+                          className="mt-3 min-h-[88px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
                         />
                         {deliverableReviewError ? (
-                          <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                          <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
                             {deliverableReviewError}
                           </div>
                         ) : null}
                         {deliverableAskWhyVerdict ? (
-                          <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/8 px-4 py-3">
-                            <div className="text-[11px] text-amber-100/80">
+                          <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3">
+                            <div className="text-[11px] kb-status-warning">
                               どこが期待と違いましたか？（1問だけ・スキップ可）
                             </div>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -2280,7 +2285,7 @@ export default function ChronosMirrorV2() {
                             reject
                           </button>
                         </div>
-                        <div className="mt-3 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                        <div className="mt-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                           version {selected.reviewVersion || 1}
                           {selected.reviewCurrentArtifactId &&
                           selected.reviewCurrentArtifactId !== selected.artifactId
@@ -2301,17 +2306,17 @@ export default function ChronosMirrorV2() {
                 {/* The single primary entry point. Everything else in this
                     sidebar is a drawer below it. */}
                 <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
-                  <div className="kyberion-glass rounded-[24px] border border-cyan-300/20 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
+                  <div className="kyberion-glass rounded-[24px] border kb-border-accent bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
                     <div className="flex items-end justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-200/75">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.28em] kb-text-accent">
                           {uxText('chronos_nav_start_here', locale)}
                         </div>
-                        <div className="mt-1 text-sm text-slate-200/65">
+                        <div className="mt-1 text-sm kb-text-secondary">
                           {uxText('chronos_nav_start_here_hint', locale)}
                         </div>
                       </div>
-                      <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
+                      <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
                         1-7
                       </div>
                     </div>
@@ -2329,42 +2334,42 @@ export default function ChronosMirrorV2() {
                             onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
                             className={`rounded-2xl border px-3 py-3 text-left transition ${
                               active
-                                ? 'border-cyan-400/30 bg-cyan-400/10'
-                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                                ? 'kb-border-accent kb-surface-accent'
+                                : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
                             }`}
                           >
                             {/* Stacked, not side-by-side: this list lives in a
                                 280px column, where a right-aligned action label
                                 collided with the scenario name. */}
                             <div className="flex items-center gap-2">
-                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border kb-border-subtle kb-surface-sunken text-[9px] uppercase tracking-[0.16em] kb-text-secondary">
                                 {index + 1}
                               </div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/78">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] kb-text-secondary">
                                 {scenario.label}
                               </div>
                             </div>
-                            <div className="mt-1.5 text-[11px] leading-5 text-slate-200/56">
+                            <div className="mt-1.5 text-[11px] leading-5 kb-text-secondary">
                               {scenario.detail}
                             </div>
-                            <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/70">
+                            <div className="mt-2 text-[10px] uppercase tracking-[0.16em] kb-text-accent">
                               {scenario.actionLabel} →
                             </div>
                           </button>
                         );
                       })}
                     </div>
-                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
                         Scenarios · 1-7
                       </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
                         Thread · T / C
                       </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
                         Sessions · 1-9 / J K
                       </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
                         Traces · 1-9 / J K / R
                       </div>
                     </div>
@@ -2372,7 +2377,7 @@ export default function ChronosMirrorV2() {
                         grid — a fourth navigation system saying "jump to
                         section". Same destinations, one line each, inside the
                         one place an operator is meant to start. */}
-                    <div className="mt-4 border-t border-white/8 pt-3">
+                    <div className="mt-4 border-t kb-border-subtle pt-3">
                       <div className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}>
                         {uxText('chronos_jump_to_section', locale)}
                       </div>
@@ -2397,21 +2402,21 @@ export default function ChronosMirrorV2() {
                   </div>
 
                   {activeScenario ? (
-                    <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-                      <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                    <section className="kyberion-glass rounded-[24px] border kb-border-accent kb-surface-accent p-4">
+                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
                         Current
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-white/90">
+                      <div className="mt-1 text-sm font-semibold kb-text-primary">
                         {activeScenario.label}
                       </div>
-                      <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
-                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                      <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
                           Next
                         </div>
-                        <div className="mt-1 text-[11px] leading-5 text-white/72">
+                        <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
                           {activeScenario.nextStep}
                         </div>
-                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
+                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
                           Hotkey{' '}
                           {OPERATOR_SCENARIO_PRESETS.findIndex(
                             (scenario) => scenario.label === activeScenario.label
@@ -2422,7 +2427,7 @@ export default function ChronosMirrorV2() {
                         <button
                           type="button"
                           onClick={() => setMissionIntelligenceFocus(null)}
-                          className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                          className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
                         >
                           Clear
                         </button>
@@ -2431,11 +2436,11 @@ export default function ChronosMirrorV2() {
                   ) : null}
                 </section>
 
-                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
                   <button
                     onClick={() => toggleSection('views')}
                     aria-expanded={expandedSections.views}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                   >
                     <span>{uxText('chronos_nav_focus_views', locale)}</span>
                     {expandedSections.views ? (
@@ -2446,7 +2451,7 @@ export default function ChronosMirrorV2() {
                   </button>
                   {expandedSections.views && (
                     <>
-                      <div className="mt-2 text-sm text-slate-200/68">
+                      <div className="mt-2 text-sm kb-text-secondary">
                         {uxText('chronos_nav_focus_views_hint', locale)}
                       </div>
                       <div className="mt-4 grid gap-2">
@@ -2455,14 +2460,14 @@ export default function ChronosMirrorV2() {
                           onClick={() => setFocusedOperatorView(null)}
                           className={`rounded-2xl border px-3 py-3 text-left transition ${
                             focusedOperatorView === null
-                              ? 'border-cyan-400/30 bg-cyan-400/10'
-                              : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                              ? 'kb-border-accent kb-surface-accent'
+                              : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
                           }`}
                         >
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             {uxText('chronos_nav_full_console', locale)}
                           </div>
-                          <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                          <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                             {uxText('chronos_nav_full_console_hint', locale)}
                           </div>
                         </button>
@@ -2473,14 +2478,14 @@ export default function ChronosMirrorV2() {
                             onClick={() => handleOperatorViewOpen(view.targetId)}
                             className={`rounded-2xl border px-3 py-3 text-left transition ${
                               focusedOperatorView === view.targetId
-                                ? 'border-cyan-400/30 bg-cyan-400/10'
-                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                                ? 'kb-border-accent kb-surface-accent'
+                                : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
                             }`}
                           >
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                               {view.label}
                             </div>
-                            <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                               {view.detail}
                             </div>
                           </button>
@@ -2495,7 +2500,7 @@ export default function ChronosMirrorV2() {
                     menus. Collapsed until something looks wrong. */}
                 <section
                   id="operator-quick-actions"
-                  className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
+                  className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
                 >
                   <button
                     type="button"
@@ -2504,10 +2509,10 @@ export default function ChronosMirrorV2() {
                     className={`flex w-full items-center justify-between gap-3 text-left transition ${shellTitleClass}`}
                   >
                     <div>
-                      <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
+                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
                         {uxText('chronos_nav_checks', locale)}
                       </div>
-                      <div className="mt-1 text-sm text-slate-200/65">
+                      <div className="mt-1 text-sm kb-text-secondary">
                         {uxText('chronos_nav_checks_hint', locale)}
                       </div>
                     </div>
@@ -2524,11 +2529,11 @@ export default function ChronosMirrorV2() {
                       return (
                         <div
                           key={group.title}
-                          className="overflow-hidden rounded-2xl border border-white/8 bg-black/20"
+                          className="overflow-hidden rounded-2xl border kb-border-subtle kb-surface-sunken"
                         >
                           <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
                             <div className="flex items-start gap-3">
-                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/6">
+                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border kb-border-subtle kb-surface-raised/6">
                                 <Icon size={14} className={group.accentText} />
                               </div>
                               <div>
@@ -2537,7 +2542,7 @@ export default function ChronosMirrorV2() {
                                 >
                                   {group.title}
                                 </div>
-                                <div className="mt-1 text-[11px] leading-5 text-slate-200/58">
+                                <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
                                   {group.hint}
                                 </div>
                               </div>
@@ -2549,20 +2554,20 @@ export default function ChronosMirrorV2() {
                               <button
                                 key={action.label}
                                 onClick={() => handleQuickAction(action.query)}
-                                className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/55 px-3 py-2 text-left transition hover:border-white/18 hover:bg-slate-900/80"
+                                className="flex items-center justify-between rounded-xl border kb-border-subtle kb-surface-well px-3 py-2 text-left transition hover:kb-border-subtle hover:kb-surface-well"
                               >
                                 <div className="flex items-center gap-3">
                                   <div className="text-sm">{action.icon}</div>
                                   <div>
-                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/88">
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] kb-text-primary">
                                       {action.label}
                                     </div>
-                                    <div className="text-[10px] uppercase tracking-[0.14em] text-slate-400/70">
+                                    <div className="text-[10px] uppercase tracking-[0.14em] kb-text-secondary">
                                       {action.tone}
                                     </div>
                                   </div>
                                 </div>
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">
+                                <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
                                   Run
                                 </div>
                               </button>
@@ -2574,11 +2579,11 @@ export default function ChronosMirrorV2() {
                   </div>
                 </section>
 
-                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
                   <button
                     onClick={() => toggleSection('taxonomy')}
                     aria-expanded={expandedSections.taxonomy}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                   >
                     <span>Surface Taxonomy</span>
                     {expandedSections.taxonomy ? (
@@ -2589,7 +2594,7 @@ export default function ChronosMirrorV2() {
                   </button>
                   {expandedSections.taxonomy && (
                     <>
-                      <div className="mt-2 text-sm text-slate-200/68">
+                      <div className="mt-2 text-sm kb-text-secondary">
                         Every surface connects people and agent execution in a different mode.
                         Chronos is the control surface, while A2UI provides drill-down work
                         surfaces.
@@ -2598,17 +2603,17 @@ export default function ChronosMirrorV2() {
                         {SURFACE_ROLES.map((role) => (
                           <div
                             key={role.label}
-                            className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
+                            className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                                 {role.label}
                               </div>
-                              <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
                                 {role.value}
                               </div>
                             </div>
-                            <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
+                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                               {role.detail}
                             </div>
                           </div>
@@ -2618,11 +2623,11 @@ export default function ChronosMirrorV2() {
                   )}
                 </section>
 
-                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
                   <button
                     onClick={() => toggleSection('cycle')}
                     aria-expanded={expandedSections.cycle}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                   >
                     <span>Mission Cycle</span>
                     {expandedSections.cycle ? (
@@ -2633,7 +2638,7 @@ export default function ChronosMirrorV2() {
                   </button>
                   {expandedSections.cycle && (
                     <>
-                      <div className="mt-2 text-sm text-slate-200/68">
+                      <div className="mt-2 text-sm kb-text-secondary">
                         Kyberion should always make this loop legible: a request becomes a mission,
                         execution stays explainable, and the result remains inspectable and
                         reusable.
@@ -2642,17 +2647,17 @@ export default function ChronosMirrorV2() {
                         {MISSION_CYCLE.map((step, index) => (
                           <div
                             key={step.label}
-                            className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
+                            className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-[10px] font-semibold text-cyan-400">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full border kb-border-accent kb-surface-accent text-[10px] font-semibold kb-text-accent">
                                 {index + 1}
                               </div>
-                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                                 {step.label}
                               </div>
                             </div>
-                            <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
+                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                               {step.detail}
                             </div>
                           </div>
@@ -2665,11 +2670,11 @@ export default function ChronosMirrorV2() {
                 {/* Relocated from the top of the page. It describes how the
                     surface is themed — reference material for whoever is
                     styling it, never the operator's first question. */}
-                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
                   <button
                     onClick={() => toggleSection('designSystem')}
                     aria-expanded={expandedSections.designSystem}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                   >
                     <span>{uxText('chronos_nav_design_system', locale)}</span>
                     {expandedSections.designSystem ? (
@@ -2690,7 +2695,7 @@ export default function ChronosMirrorV2() {
                         <span>{webTheme.colors.accent}</span>
                       </div>
                       <div className="mt-3 grid gap-2">
-                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
                           <div
                             className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
                           >
@@ -2701,7 +2706,7 @@ export default function ChronosMirrorV2() {
                             {webDesignSystem.theme.web.snapshot_summary}
                           </div>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
                           <div
                             className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
                           >
@@ -2713,7 +2718,7 @@ export default function ChronosMirrorV2() {
                             {webLayout.container_max_width} · {webLayout.section_gap} section gap
                           </div>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
                           <div
                             className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
                           >
@@ -2724,7 +2729,7 @@ export default function ChronosMirrorV2() {
                             {webTheme.fonts.heading}
                           </div>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
                           <div
                             className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
                           >
@@ -2754,18 +2759,18 @@ export default function ChronosMirrorV2() {
 
             <section
               ref={mainSurfaceRef}
-              className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
+              className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
             >
-              <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
+              <div className="flex items-center justify-between border-b kb-border-subtle px-5 py-4 md:px-6">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.34em] text-stone-200/42">
+                  <div className="text-[10px] uppercase tracking-[0.34em] kb-text-muted">
                     Active Surface
                   </div>
-                  <div className="mt-1 text-lg font-semibold tracking-tight text-white/92">
+                  <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                     {activeSurfaceTitle}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-white/8 bg-black/25 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
+                <div className="flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.22em] kb-text-secondary">
                   <PanelsTopLeft size={12} />
                   <span>
                     {surface
@@ -2826,7 +2831,7 @@ export default function ChronosMirrorV2() {
                 ) : (
                   <div className="flex flex-col gap-6">
                     {a2uiActionNotice ? (
-                      <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-[11px] text-cyan-100/80">
+                      <div className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] kb-text-accent">
                         {a2uiActionNotice}
                       </div>
                     ) : null}

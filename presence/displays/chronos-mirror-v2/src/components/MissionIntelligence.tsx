@@ -812,10 +812,10 @@ function ActionStatusBadge({ action }: { action: ControlActionSummary }) {
     <div
       className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
         action.status === 'completed'
-          ? 'bg-green-500/15 text-green-300'
+          ? 'kb-status-positive-surface kb-status-positive'
           : action.status === 'failed'
-            ? 'bg-red-500/15 text-red-300'
-            : 'bg-yellow-500/10 text-yellow-200'
+            ? 'kb-status-negative-surface kb-status-negative'
+            : 'kb-status-warning-surface kb-status-warning'
       }`}
     >
       {action.operation} · {action.status}
@@ -824,9 +824,10 @@ function ActionStatusBadge({ action }: { action: ControlActionSummary }) {
 }
 
 function messageToneClass(tone: AgentMessageSummary['tone']): string {
-  if (tone === 'request') return 'border-cyan-300/15 bg-cyan-400/8 text-cyan-100/80';
-  if (tone === 'response') return 'border-emerald-300/15 bg-emerald-400/8 text-emerald-100/80';
-  return 'border-amber-300/15 bg-amber-400/8 text-amber-100/80';
+  if (tone === 'request') return 'kb-border-accent kb-surface-accent kb-text-accent';
+  if (tone === 'response')
+    return 'kb-status-positive-border kb-status-positive-surface kb-status-positive';
+  return 'kb-status-warning-border kb-status-warning-surface kb-status-warning';
 }
 
 function messageTypeLabel(type: AgentMessageSummary['type']): string {
@@ -886,44 +887,47 @@ function ActionDetailList({
   if (!actionId) return null;
   const entries = details[actionId] || [];
   return (
-    <div className="mt-3 space-y-2 rounded-lg border border-white/6 bg-black/25 px-3 py-3">
+    <div className="mt-3 space-y-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
       {entries.length === 0 ? (
-        <div className="text-[10px] text-white/40">No detail observations recorded yet.</div>
+        <div className="text-[10px] kb-text-muted">No detail observations recorded yet.</div>
       ) : (
         entries.map((detail, detailIndex) => (
           <div
             key={`${actionId}-${detail.ts}-${detailIndex}`}
-            className="border-l border-white/10 pl-3"
+            className="border-l kb-border-subtle pl-3"
           >
-            <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
               {detail.decision}
             </div>
             {detail.decision === 'next_action_executed' ||
             detail.decision === 'memory_promote_pending_applied' ? (
-              <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+              <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                 <div>
                   operation:{' '}
-                  <span className="font-mono text-white/75">{detail.operation || '-'}</span>
+                  <span className="font-mono kb-text-secondary">{detail.operation || '-'}</span>
                 </div>
                 <div>
                   target:{' '}
-                  <span className="font-mono text-white/75">{detail.resource_id || '-'}</span>
+                  <span className="font-mono kb-text-secondary">{detail.resource_id || '-'}</span>
                 </div>
                 {detail.action_id ? (
                   <div className="col-span-2">
-                    action id: <span className="font-mono text-white/75">{detail.action_id}</span>
+                    action id:{' '}
+                    <span className="font-mono kb-text-secondary">{detail.action_id}</span>
                   </div>
                 ) : null}
                 {detail.outcome ? (
                   <div>
-                    outcome: <span className="font-mono text-white/75">{detail.outcome}</span>
+                    outcome: <span className="font-mono kb-text-secondary">{detail.outcome}</span>
                   </div>
                 ) : null}
               </div>
             ) : null}
-            {detail.why && <div className="mt-1 text-[10px] text-white/60">{detail.why}</div>}
-            {detail.error && <div className="mt-1 text-[10px] text-red-200/70">{detail.error}</div>}
-            <div className="mt-1 text-[9px] font-mono text-white/25">
+            {detail.why && <div className="mt-1 text-[10px] kb-text-secondary">{detail.why}</div>}
+            {detail.error && (
+              <div className="mt-1 text-[10px] kb-status-negative">{detail.error}</div>
+            )}
+            <div className="mt-1 text-[9px] font-mono kb-text-muted">
               {new Date(detail.ts).toLocaleString(chronosSpeechLocale())}
             </div>
           </div>
@@ -953,17 +957,17 @@ function ActionGuidance({
   if (!shouldShow) return null;
 
   return (
-    <div className="mt-3 rounded-lg border border-white/6 bg-black/25 px-3 py-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">operator guidance</div>
+    <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
+      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">operator guidance</div>
       {currentAction?.disabledReason && (
-        <div className="mt-2 text-[10px] text-white/55">
-          disabled reason: <span className="text-white/75">{currentAction.disabledReason}</span>
+        <div className="mt-2 text-[10px] kb-text-muted">
+          disabled reason: <span className="kb-text-secondary">{currentAction.disabledReason}</span>
         </div>
       )}
       {nextValidActions.length > 0 && (
-        <div className="mt-2 text-[10px] text-white/55">
+        <div className="mt-2 text-[10px] kb-text-muted">
           next valid actions:{' '}
-          <span className="text-white/75">
+          <span className="kb-text-secondary">
             {nextValidActions.map((action) => action.label).join(', ')}
           </span>
         </div>
@@ -971,7 +975,7 @@ function ActionGuidance({
       {latestAction.status === 'failed' &&
         nextValidActions.length === 0 &&
         !currentAction?.enabled && (
-          <div className="mt-2 text-[10px] text-amber-200/75">
+          <div className="mt-2 text-[10px] kb-status-warning">
             No immediate retry path is available from the current target state.
           </div>
         )}
@@ -981,9 +985,9 @@ function ActionGuidance({
 
 function actionButtonClass(kind: 'safe' | 'risky'): string {
   if (kind === 'risky') {
-    return 'rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40';
+    return 'rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40';
   }
-  return 'rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40';
+  return 'rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40';
 }
 
 export interface DangerousActionPrompt {
@@ -1009,10 +1013,10 @@ export function buildDangerousActionPrompt(
 }
 
 function missionSummaryBadgeClass(tone: MissionSummary['controlTone']): string {
-  if (tone === 'pending') return 'bg-violet-500/15 text-violet-200';
-  if (tone === 'ready') return 'bg-cyan-500/15 text-cyan-200';
-  if (tone === 'attention') return 'bg-yellow-500/10 text-yellow-200';
-  return 'bg-green-500/15 text-green-300';
+  if (tone === 'pending') return 'kb-status-info-surface kb-status-info';
+  if (tone === 'ready') return 'kb-surface-accent kb-text-accent';
+  if (tone === 'attention') return 'kb-status-warning-surface kb-status-warning';
+  return 'kb-status-positive-surface kb-status-positive';
 }
 
 function buildMissionIntentSummary(data: IntelligencePayload, mission: MissionSummary): string {
@@ -1026,19 +1030,20 @@ function buildMissionIntentSummary(data: IntelligencePayload, mission: MissionSu
 }
 
 function surfaceSummaryBadgeClass(tone: SurfaceSummary['controlTone']): string {
-  if (tone === 'pending') return 'bg-violet-500/15 text-violet-200';
-  if (tone === 'stable') return 'bg-green-500/15 text-green-300';
-  if (tone === 'offline') return 'bg-white/10 text-white/65';
-  return 'bg-yellow-500/10 text-yellow-200';
+  if (tone === 'pending') return 'kb-status-info-surface kb-status-info';
+  if (tone === 'stable') return 'kb-status-positive-surface kb-status-positive';
+  if (tone === 'offline') return 'kb-surface-raised kb-text-secondary';
+  return 'kb-status-warning-surface kb-status-warning';
 }
 
 function workCoordinationStatusBadgeClass(status: string): string {
-  if (status === 'blocked') return 'bg-red-500/15 text-red-200';
-  if (status === 'in_progress') return 'bg-cyan-500/15 text-cyan-200';
-  if (status === 'review') return 'bg-amber-500/15 text-amber-100';
-  if (status === 'done' || status === 'archived') return 'bg-green-500/15 text-green-300';
-  if (status === 'ready') return 'bg-violet-500/15 text-violet-200';
-  return 'bg-white/10 text-white/65';
+  if (status === 'blocked') return 'kb-status-negative-surface kb-status-negative';
+  if (status === 'in_progress') return 'kb-surface-accent kb-text-accent';
+  if (status === 'review') return 'kb-status-warning-surface kb-status-warning';
+  if (status === 'done' || status === 'archived')
+    return 'kb-status-positive-surface kb-status-positive';
+  if (status === 'ready') return 'kb-status-info-surface kb-status-info';
+  return 'kb-surface-raised kb-text-secondary';
 }
 
 function formatWorkCoordinationAttemptLabel(item: WorkCoordinationItemSummary): string {
@@ -2274,32 +2279,34 @@ export function MissionIntelligence({
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
       {dangerousAction ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
+          className="fixed inset-0 z-50 flex items-center justify-center kb-surface-well px-4 py-6"
           onClick={clearDangerousAction}
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b1020] p-5 shadow-2xl shadow-black/40"
+            className="w-full max-w-lg rounded-2xl border kb-border-subtle bg-[#0b1020] p-5 shadow-2xl shadow-black/40"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="chronos-dangerous-action-title"
           >
-            <div className="text-[10px] uppercase tracking-[0.26em] text-red-200/70">
+            <div className="text-[10px] uppercase tracking-[0.26em] kb-status-negative">
               risky action confirmation
             </div>
             <div
               id="chronos-dangerous-action-title"
-              className="mt-2 text-lg font-semibold tracking-tight text-white/92"
+              className="mt-2 text-lg font-semibold tracking-tight kb-text-primary"
             >
               {dangerousAction.title}
             </div>
-            <div className="mt-3 text-[12px] leading-6 text-white/68">{dangerousAction.detail}</div>
+            <div className="mt-3 text-[12px] leading-6 kb-text-secondary">
+              {dangerousAction.detail}
+            </div>
             <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={clearDangerousAction}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/72 transition hover:bg-white/10"
+                className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
               >
                 {dangerousAction.cancelLabel}
               </button>
@@ -2318,13 +2325,13 @@ export function MissionIntelligence({
       {!selectedProject && !selectedMissionId && (
         <section className="flex flex-col gap-8 py-4">
           <div className="flex flex-col gap-2">
-            <div className="text-[12px] uppercase tracking-[0.4em] text-cyan-400 font-bold">
+            <div className="text-[12px] uppercase tracking-[0.4em] kb-text-accent font-bold">
               Sovereign Command
             </div>
-            <h2 className="text-3xl font-bold tracking-tight text-white/90">
+            <h2 className="text-3xl font-bold tracking-tight kb-text-primary">
               Welcome to the Mirror.
             </h2>
-            <p className="text-sm text-white/50 max-w-2xl leading-relaxed">
+            <p className="text-sm kb-text-muted max-w-2xl leading-relaxed">
               Chronos is your operational管制塔. Use the tiles below to start monitoring or
               intervene in active agent workflows.
             </p>
@@ -2337,16 +2344,16 @@ export function MissionIntelligence({
                   .getElementById('mission-control-plane')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-cyan-400/50 transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-border-accent transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl bg-cyan-400/10 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl kb-surface-accent flex items-center justify-center kb-text-accent mb-6 group-hover:scale-110 transition-transform">
                 <Radar size={28} />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Monitor Missions</h3>
-              <p className="text-xs text-white/40 leading-relaxed">
+              <h3 className="text-xl font-bold kb-text-primary mb-2">Monitor Missions</h3>
+              <p className="text-xs kb-text-muted leading-relaxed">
                 Observe real-time intent execution and artifact delivery across all active agents.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[10px] uppercase tracking-widest kb-text-accent font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 Open Dashboard →
               </div>
             </button>
@@ -2357,16 +2364,16 @@ export function MissionIntelligence({
                   .getElementById('runtime-lease-doctor')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-amber-400/50 transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-status-warning-border transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl bg-amber-400/10 flex items-center justify-center text-amber-400 mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl kb-status-warning-surface flex items-center justify-center kb-status-warning mb-6 group-hover:scale-110 transition-transform">
                 <Activity size={28} />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">System Health</h3>
-              <p className="text-xs text-white/40 leading-relaxed">
+              <h3 className="text-xl font-bold kb-text-primary mb-2">System Health</h3>
+              <p className="text-xs kb-text-muted leading-relaxed">
                 Inspect runtime leases, remediation findings, and supervisor-level governance.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[10px] uppercase tracking-widest kb-status-warning font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 Check Vitals →
               </div>
             </button>
@@ -2377,29 +2384,29 @@ export function MissionIntelligence({
                   .getElementById('recent-surface-outbox')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-rose-400/50 transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-status-negative-border transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl bg-rose-400/10 flex items-center justify-center text-rose-400 mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl kb-status-negative-surface flex items-center justify-center kb-status-negative mb-6 group-hover:scale-110 transition-transform">
                 <ShieldAlert size={28} />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Intervention</h3>
-              <p className="text-xs text-white/40 leading-relaxed">
+              <h3 className="text-xl font-bold kb-text-primary mb-2">Intervention</h3>
+              <p className="text-xs kb-text-muted leading-relaxed">
                 Resolve blocked deliveries, approve sensitive requests, and manage exceptions.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-rose-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[10px] uppercase tracking-widest kb-status-negative font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 View Outbox →
               </div>
             </button>
           </div>
 
-          <div className="kyberion-glass p-6 rounded-[24px] border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <div className="kyberion-glass p-6 rounded-[24px] kb-border-subtle flex items-center justify-between kb-surface-raised">
             <div className="flex items-center gap-4">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 pulse-animation" />
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
-                System Status: <span className="text-cyan-400 font-bold">Nominal</span>
+              <div className="w-2 h-2 rounded-full kb-surface-accent pulse-animation" />
+              <div className="text-[11px] uppercase tracking-[0.2em] kb-text-secondary">
+                System Status: <span className="kb-text-accent font-bold">Nominal</span>
               </div>
             </div>
-            <div className="text-[10px] text-white/30 font-mono">
+            <div className="text-[10px] kb-text-muted font-mono">
               Ready for operator commands via Sovereign Link or Quick Actions.
             </div>
           </div>
@@ -2407,16 +2414,16 @@ export function MissionIntelligence({
       )}
 
       {focusedView && (
-        <section className="rounded-[24px] border border-cyan-300/12 bg-cyan-400/[0.06] px-5 py-4">
+        <section className="rounded-[24px] border kb-border-accent kb-surface-accent px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/58">
+              <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
                 Focused Operator View
               </div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/90">
+              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {focusTitle}
               </div>
-              <div className="mt-1 text-[11px] leading-5 text-white/58">
+              <div className="mt-1 text-[11px] leading-5 kb-text-muted">
                 The main console is showing one operator view at full width.
               </div>
             </div>
@@ -2424,7 +2431,7 @@ export function MissionIntelligence({
               <button
                 type="button"
                 onClick={onClearFocus}
-                className="self-start rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-white/75 transition hover:bg-white/10"
+                className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.2em] kb-text-secondary transition hover:kb-surface-raised"
               >
                 Show Full Console
               </button>
@@ -2432,60 +2439,60 @@ export function MissionIntelligence({
           </div>
         </section>
       )}
-      <section className="rounded-[26px] border border-kyberion-warning/15 bg-gradient-to-br from-kyberion-warning/10 via-black/10 to-cyan-950/20 px-5 py-5">
+      <section className="rounded-[26px] border kb-status-warning-border bg-gradient-to-br from-[var(--kb-status-warning-surface)] via-[var(--kb-surface-raised)] to-[var(--kb-surface-sunken)] px-5 py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">
+            <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">
               {mt('chronos_operator_console', 'Operator Console')}
             </div>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight text-white/90">
+            <h2 className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
               {mt(
                 'chronos_mission_hero_title',
                 'Start with exceptions, then intervene only where mission flow or runtime governance needs help.'
               )}
             </h2>
-            <p className="mt-2 max-w-3xl text-[12px] leading-6 text-white/52">
+            <p className="mt-2 max-w-3xl text-[12px] leading-6 kb-text-muted">
               {mt(
                 'chronos_mission_hero_description',
                 'Chronos is the operational mirror for Kyberion. Confirm what is active, identify what is blocked, open A2UI drill-downs when you need detail, and keep control actions deliberate and minimal.'
               )}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] text-white/48 sm:grid-cols-4">
-            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
+          <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-4">
+            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
               <div>needs attention</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">
+              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {attentionItems.length}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
+            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
               <div>missions</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">
+              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {data.activeMissions.length}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
+            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
               <div>runtime incidents</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">
+              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {data.runtimeDoctor.length}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
+            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
               <div>delivery queue</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">
+              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
               </div>
             </div>
           </div>
         </div>
         {actionResult && (
-          <div className="mt-4 rounded-xl border border-cyan-300/15 bg-cyan-400/8 px-3 py-2 text-[11px] text-cyan-100/80">
+          <div className="mt-4 rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] kb-text-accent">
             {mt('chronos_last_action', 'last action')}: {actionResult}
           </div>
         )}
-        <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-white/60">
+        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary">
           {mt('chronos_access', 'access')}:{' '}
-          <span className="font-mono text-white/85">{data.accessRole}</span>
+          <span className="font-mono kb-text-primary">{data.accessRole}</span>
           {data.accessRole === 'readonly'
             ? mt(
                 'chronos_control_actions_disabled',
@@ -2494,56 +2501,58 @@ export function MissionIntelligence({
             : mt('chronos_control_actions_enabled', ' · control actions enabled.')}
         </div>
         {data.company && (
-          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-cyan-100/50">
+          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+            <div className="text-[10px] uppercase tracking-[0.24em] kb-text-accent">
               Company Context
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/82">
-              <span className="font-semibold text-white/92">{data.company.name}</span>
-              <span className="text-white/35">·</span>
-              <span className="font-mono text-white/68">{data.company.companyId}</span>
-              <span className="text-white/35">·</span>
-              <span className="text-white/70">sovereign {data.company.sovereign || 'unknown'}</span>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] kb-text-primary">
+              <span className="font-semibold kb-text-primary">{data.company.name}</span>
+              <span className="kb-text-muted">·</span>
+              <span className="font-mono kb-text-secondary">{data.company.companyId}</span>
+              <span className="kb-text-muted">·</span>
+              <span className="kb-text-secondary">
+                sovereign {data.company.sovereign || 'unknown'}
+              </span>
             </div>
-            <div className="mt-2 text-[11px] leading-5 text-white/72">
-              vision <span className="font-mono text-white/86">{data.company.visionRef}</span>
-              <span className="mx-2 text-white/35">·</span>
+            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+              vision <span className="font-mono kb-text-primary">{data.company.visionRef}</span>
+              <span className="mx-2 kb-text-muted">·</span>
               <span>{data.company.vision.title || data.company.vision.sourcePath}</span>
             </div>
-            <div className="mt-2 text-[11px] leading-5 text-white/70">
+            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
               org chart {data.company.orgChart.positionCount} positions /{' '}
               {data.company.orgChart.domainCount} domains
               {data.company.orgChart.topLevelRoles.length > 0 ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   top roles {data.company.orgChart.topLevelRoles.join(', ')}
                 </>
               ) : null}
             </div>
-            <div className="mt-2 text-[11px] leading-5 text-white/68">
+            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
               decision rights {data.company.decisionRights.ruleCount} rules
               {data.company.decisionRights.sourceKind ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.decisionRights.sourceKind}
                 </>
               ) : null}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               financial {data.company.financial.exists ? 'available' : 'missing'}
               {data.company.financial.exists ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.financial.periodCount} period
                   {data.company.financial.periodCount === 1 ? '' : 's'}
                   {data.company.financial.latestPeriodId ? (
                     <>
-                      <span className="mx-2 text-white/35">·</span>
+                      <span className="mx-2 kb-text-muted">·</span>
                       latest {data.company.financial.latestPeriodId}
                     </>
                   ) : null}
                   {typeof data.company.financial.latestGrossProfitJpy === 'number' ? (
                     <>
-                      <span className="mx-2 text-white/35">·</span>
+                      <span className="mx-2 kb-text-muted">·</span>
                       gross profit ¥
                       {data.company.financial.latestGrossProfitJpy.toLocaleString(
                         chronosSpeechLocale()
@@ -2552,105 +2561,105 @@ export function MissionIntelligence({
                   ) : null}
                 </>
               ) : null}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               finance controller {data.company.financeController.mode}
               {data.company.financeController.shouldCutCosts ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   cost cutting
                 </>
               ) : null}
               {data.company.financeController.reasons.length > 0 ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.financeController.reasons.length} reason
                   {data.company.financeController.reasons.length === 1 ? '' : 's'}
                 </>
               ) : null}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               OKR {data.company.okr.exists ? 'available' : 'missing'}
               {data.company.okr.exists ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.okr.objectiveCount} objective
                   {data.company.okr.objectiveCount === 1 ? '' : 's'}
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.okr.keyResultCount} KR
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   {data.company.okr.progressPercent}% progress
                   {data.company.okr.latestObjective ? (
                     <>
-                      <span className="mx-2 text-white/35">·</span>
+                      <span className="mx-2 kb-text-muted">·</span>
                       latest {data.company.okr.latestObjective}
                     </>
                   ) : null}
                 </>
               ) : null}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               audit {data.company.approvalAudit.total}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               allowed {data.company.approvalAudit.allowed}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               denied {data.company.approvalAudit.denied}
               {data.company.approvalAudit.latestCorrelationId ? (
                 <>
-                  <span className="mx-2 text-white/35">·</span>
+                  <span className="mx-2 kb-text-muted">·</span>
                   latest {data.company.approvalAudit.latestCorrelationId}
                 </>
               ) : null}
-              <span className="mx-2 text-white/35">·</span>
+              <span className="mx-2 kb-text-muted">·</span>
               audit drilldown {data.company.approvalAuditDrilldown.byDecisionType.length} types /{' '}
               {data.company.approvalAuditDrilldown.byCorrelationId.length} chains
             </div>
           </div>
         )}
         {selectedProject && (
-          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
             project focus:{' '}
-            <span className="font-semibold text-white/90">{selectedProject.name}</span>
-            <span className="mx-2 text-white/40">·</span>
-            <span className="font-mono text-white/70">{selectedProject.project_id}</span>
+            <span className="font-semibold kb-text-primary">{selectedProject.name}</span>
+            <span className="mx-2 kb-text-muted">·</span>
+            <span className="font-mono kb-text-secondary">{selectedProject.project_id}</span>
             <button
               type="button"
               onClick={() => setSelectedProjectId(null)}
-              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
             >
               clear focus
             </button>
           </div>
         )}
         {selectedMission && (
-          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
             mission focus:{' '}
-            <span className="font-semibold text-white/90">{selectedMission.missionId}</span>
-            <span className="mx-2 text-white/40">·</span>
-            <span className="text-white/80">
+            <span className="font-semibold kb-text-primary">{selectedMission.missionId}</span>
+            <span className="mx-2 kb-text-muted">·</span>
+            <span className="kb-text-primary">
               {buildMissionIntentSummary(data, selectedMission)}
             </span>
             <button
               type="button"
               onClick={() => setSelectedMissionId(null)}
-              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
             >
               clear focus
             </button>
           </div>
         )}
         {selectedTrack && (
-          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
-            track focus: <span className="font-semibold text-white/90">{selectedTrack.name}</span>
-            <span className="mx-2 text-white/40">·</span>
-            <span className="font-mono text-white/70">{selectedTrack.track_id}</span>
+          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+            track focus: <span className="font-semibold kb-text-primary">{selectedTrack.name}</span>
+            <span className="mx-2 kb-text-muted">·</span>
+            <span className="font-mono kb-text-secondary">{selectedTrack.track_id}</span>
             <button
               type="button"
               onClick={() => setSelectedTrackId(null)}
-              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
             >
               clear focus
             </button>
           </div>
         )}
-        <div className="mt-3 rounded-xl border border-amber-200/10 bg-stone-100/[0.035] px-3 py-3 text-[11px] leading-5 text-stone-100/68">
+        <div className="mt-3 rounded-xl border kb-status-warning-border kb-surface-raised-subtle px-3 py-3 text-[11px] leading-5 kb-text-secondary">
           Surfaces are the explainable boundary between people and agent execution. Chronos is the
           control surface: it should clarify mission flow, runtime risk, and intervention points
           before it offers controls.
@@ -2693,7 +2702,7 @@ export function MissionIntelligence({
       </div>
 
       <Panel id="work-coordination" title="Work Coordination">
-        <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+        <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
           This view shows durable work item state, including current attempts, to make handoff,
           blocking, and completion visible before they turn into surprise fixes.
         </div>
@@ -2725,7 +2734,7 @@ export function MissionIntelligence({
         </div>
         <div className="mt-4 space-y-2">
           {workCoordination.recentItems.length === 0 ? (
-            <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] text-white/45">
+            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] kb-text-muted">
               No work items have been imported into the coordination store yet.
             </div>
           ) : (
@@ -2734,15 +2743,15 @@ export function MissionIntelligence({
               return (
                 <div
                   key={item.item_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-[11px] font-semibold tracking-[0.04em] text-white/90">
+                      <div className="truncate text-[11px] font-semibold tracking-[0.04em] kb-text-primary">
                         {item.title}
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.18em] text-white/38">
-                        <span className="font-mono text-white/62">{item.item_id}</span>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
+                        <span className="font-mono kb-text-secondary">{item.item_id}</span>
                         <span>{item.project_id}</span>
                         <span>{item.source_ref}</span>
                       </div>
@@ -2753,23 +2762,23 @@ export function MissionIntelligence({
                       {item.status}
                     </div>
                   </div>
-                  <div className="mt-3 grid gap-2 text-[10px] text-white/55 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
                     <div>
-                      priority: <span className="font-mono text-white/78">{item.priority}</span>
+                      priority: <span className="font-mono kb-text-secondary">{item.priority}</span>
                     </div>
                     <div>
                       attempts:{' '}
-                      <span className="font-mono text-white/78">{item.attempt_count}</span>
+                      <span className="font-mono kb-text-secondary">{item.attempt_count}</span>
                     </div>
                     <div className="sm:col-span-2">
                       updated:{' '}
-                      <span className="font-mono text-white/78">
+                      <span className="font-mono kb-text-secondary">
                         {new Date(item.updated_at).toLocaleString(chronosSpeechLocale())}
                       </span>
                     </div>
                   </div>
                   {attemptSummary ? (
-                    <div className="mt-2 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2 text-[10px] text-white/65">
+                    <div className="mt-2 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] kb-text-secondary">
                       {attemptSummary}
                     </div>
                   ) : null}
@@ -2782,66 +2791,68 @@ export function MissionIntelligence({
 
       <section className="grid gap-4">
         <Panel id="next-actions" title="Recommended Next Actions">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             These actions are generated from current control-plane state. Execute only what is
             necessary to unblock mission flow.
           </div>
-          <div className="mb-4 rounded-xl border border-cyan-300/10 bg-cyan-400/[0.04] px-4 py-3 text-[10px] leading-5 text-cyan-50/75">
+          <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[10px] leading-5 kb-text-accent">
             mission seed assessment: eligible{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.eligible ?? 0}
             </span>
             {' · '}
             flagged{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.flagged ?? 0}
             </span>
             {' · '}
             promotable{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.promotable ?? 0}
             </span>
           </div>
           <div className="space-y-3">
             {nextActions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No immediate next actions recommended.
               </div>
             ) : (
               nextActions.map((action) => (
                 <div
                   key={action.action_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                       {action.action_id}
                     </div>
-                    <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
                       {action.next_action_type}
                     </div>
                   </div>
-                  <div className="mt-2 text-[10px] text-white/70">{action.reason}</div>
-                  <div className="mt-2 text-[10px] text-white/50">
-                    risk: <span className="font-mono text-white/75">{action.risk}</span>
-                    <span className="mx-2 text-white/35">·</span>
+                  <div className="mt-2 text-[10px] kb-text-secondary">{action.reason}</div>
+                  <div className="mt-2 text-[10px] kb-text-muted">
+                    risk: <span className="font-mono kb-text-secondary">{action.risk}</span>
+                    <span className="mx-2 kb-text-muted">·</span>
                     approval required:{' '}
-                    <span className="font-mono text-white/75">
+                    <span className="font-mono kb-text-secondary">
                       {action.approval_required ? 'yes' : 'no'}
                     </span>
                   </div>
                   {resolveNextActionRoute(action) ? (
-                    <div className="mt-1 text-[10px] text-white/45">
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       route:{' '}
-                      <span className="font-mono text-white/70">
+                      <span className="font-mono kb-text-secondary">
                         {resolveNextActionRoute(action)?.label}
                       </span>
                     </div>
                   ) : null}
                   {action.suggested_command ? (
-                    <div className="mt-1 text-[10px] text-white/45">
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       command:{' '}
-                      <span className="font-mono text-white/70">{action.suggested_command}</span>
+                      <span className="font-mono kb-text-secondary">
+                        {action.suggested_command}
+                      </span>
                     </div>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -2849,7 +2860,7 @@ export function MissionIntelligence({
                       <button
                         type="button"
                         onClick={() => jumpToNextActionRoute(action)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         jump
                       </button>
@@ -2858,7 +2869,7 @@ export function MissionIntelligence({
                       type="button"
                       onClick={() => runNextAction(action)}
                       disabled={nextActionTarget === action.action_id}
-                      className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {nextActionTarget === action.action_id
                         ? mt('chronos_processing', 'processing')
@@ -2869,7 +2880,7 @@ export function MissionIntelligence({
                         type="button"
                         onClick={() => runMemoryPromotion(true)}
                         disabled={memoryPromotionTarget !== null}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {memoryPromotionTarget === 'dry-run'
                           ? mt('chronos_processing', 'processing')
@@ -2884,14 +2895,14 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="needs-attention" title="Needs Attention">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Start here. These are the items most likely to block mission progress or degrade
             operator trust. Use the action only when the control plane does not self-heal.
           </div>
           <div className="grid gap-3 lg:grid-cols-[1.15fr,0.85fr]">
             <div className="space-y-3">
               {attentionItems.length === 0 ? (
-                <div className="rounded-xl border border-emerald-300/10 bg-emerald-400/[0.04] px-4 py-3 text-[11px] text-emerald-100/70">
+                <div className="rounded-xl border kb-status-positive-border kb-status-positive-surface px-4 py-3 text-[11px] kb-status-positive">
                   No immediate operator intervention is recommended. Stay in observe mode and use
                   A2UI drill-downs for detail.
                 </div>
@@ -2901,28 +2912,28 @@ export function MissionIntelligence({
                     key={item.id}
                     className={`rounded-xl border px-4 py-3 ${
                       item.tone === 'critical'
-                        ? 'border-red-400/20 bg-red-950/12'
+                        ? 'kb-status-negative-border kb-status-negative-surface'
                         : item.tone === 'warning'
-                          ? 'border-amber-300/18 bg-amber-400/[0.06]'
-                          : 'border-cyan-300/16 bg-cyan-400/[0.06]'
+                          ? 'kb-status-warning-border kb-status-warning-surface'
+                          : 'kb-border-accent kb-surface-accent'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                         {item.tone === 'critical'
                           ? 'critical'
                           : item.tone === 'warning'
                             ? 'warning'
                             : 'info'}
                       </div>
-                      <div className="text-[10px] font-mono text-white/40">{item.title}</div>
+                      <div className="text-[10px] font-mono kb-text-muted">{item.title}</div>
                     </div>
-                    <div className="mt-2 text-[11px] text-white/78">{item.reason}</div>
+                    <div className="mt-2 text-[11px] kb-text-secondary">{item.reason}</div>
                     {item.actionLabel && (
                       <button
                         type="button"
                         onClick={() => runAttentionAction(item)}
-                        className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10"
+                        className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {item.actionLabel}
                       </button>
@@ -2963,7 +2974,7 @@ export function MissionIntelligence({
 
       <section className="grid gap-4 lg:grid-cols-[1.25fr,1fr,1fr]">
         <Panel id="mission-control-plane" title="Mission Control">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_mission_control_description',
               'Confirm which durable work items are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.'
@@ -2972,12 +2983,12 @@ export function MissionIntelligence({
           {selectedProject &&
           filteredMissions.length === 0 &&
           selectedProjectBootstrapItems.length > 0 ? (
-            <div className="mb-4 rounded-xl border border-cyan-300/10 bg-cyan-400/5 px-4 py-3 text-[11px] leading-5 text-cyan-100/75">
+            <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] leading-5 kb-text-accent">
               {mt(
                 'chronos_project_bootstrap_notice',
                 'This project does not have active missions yet. Current bootstrap work:'
               )}
-              <div className="mt-2 text-[10px] text-cyan-100/70">
+              <div className="mt-2 text-[10px] kb-text-accent">
                 {selectedProjectBootstrapItems
                   .slice(0, 4)
                   .map((item) => `${item.title} [${item.status}]`)
@@ -2987,7 +2998,7 @@ export function MissionIntelligence({
           ) : null}
           <div className="space-y-3">
             {filteredMissions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">No active missions.</div>
+              <div className="text-[11px] italic kb-status-warning">No active missions.</div>
             ) : (
               filteredMissions.map((mission) => {
                 const progress = data.missionProgress.find(
@@ -3004,7 +3015,7 @@ export function MissionIntelligence({
                   <div
                     id={toDomId('mission', mission.missionId)}
                     key={mission.missionId}
-                    className={`rounded-xl border bg-black/20 px-4 py-3 ${effectiveMissionId === mission.missionId ? 'border-cyan-300/20 shadow-[0_0_0_1px_rgba(34,211,238,0.08)]' : 'border-white/5'}`}
+                    className={`rounded-xl border kb-surface-sunken px-4 py-3 ${effectiveMissionId === mission.missionId ? 'kb-border-accent shadow-[0_0_0_1px_rgba(34,211,238,0.08)]' : 'kb-border-subtle'}`}
                   >
                     {(() => {
                       const latestAction = getLatestMissionControlAction(
@@ -3012,8 +3023,8 @@ export function MissionIntelligence({
                         mission.missionId
                       );
                       return latestAction ? (
-                        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             latest intervention
                           </div>
                           <ActionStatusBadge action={latestAction} />
@@ -3022,15 +3033,15 @@ export function MissionIntelligence({
                     })()}
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[12px] font-semibold tracking-[0.03em] text-white/90">
+                        <div className="text-[12px] font-semibold tracking-[0.03em] kb-text-primary">
                           {missionIntent}
                         </div>
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/35">
+                        <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
                           {mission.missionType || 'development'} · {mission.tier} ·{' '}
                           {mission.missionId}
                         </div>
                         {mission.projectId || mission.trackId ? (
-                          <div className="mt-1 text-[10px] text-white/42">
+                          <div className="mt-1 text-[10px] kb-text-muted">
                             {mission.projectId ? `project ${mission.projectId}` : null}
                             {mission.projectId && mission.trackId ? ' · ' : null}
                             {mission.trackId
@@ -3042,8 +3053,8 @@ export function MissionIntelligence({
                       <div
                         className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                           mission.planReady
-                            ? 'bg-green-500/15 text-green-300'
-                            : 'bg-yellow-500/10 text-yellow-200'
+                            ? 'kb-status-positive-surface kb-status-positive'
+                            : 'kb-status-warning-surface kb-status-warning'
                         }`}
                       >
                         {mission.planReady ? 'plan ready' : mission.status}
@@ -3055,23 +3066,23 @@ export function MissionIntelligence({
                       >
                         {mission.controlSummary}
                       </div>
-                      <div className="text-[10px] text-white/45">current state</div>
+                      <div className="text-[10px] kb-text-muted">current state</div>
                       {mission.controlRequestedBy && (
-                        <div className="text-[10px] text-white/35">
+                        <div className="text-[10px] kb-text-muted">
                           requested by{' '}
-                          <span className="font-mono text-white/60">
+                          <span className="font-mono kb-text-secondary">
                             {mission.controlRequestedBy}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="mt-3 grid gap-2 text-[10px] text-white/55">
+                    <div className="mt-3 grid gap-2 text-[10px] kb-text-muted">
                       <div>
-                        intent: <span className="text-white/80">{missionIntent}</span>
+                        intent: <span className="kb-text-primary">{missionIntent}</span>
                       </div>
                       <div>
                         plan:{' '}
-                        <span className="text-white/80">
+                        <span className="kb-text-primary">
                           {mission.planReady
                             ? 'ready to execute or continue'
                             : 'still being aligned'}
@@ -3079,31 +3090,31 @@ export function MissionIntelligence({
                       </div>
                       <div>
                         result:{' '}
-                        <span className="text-white/80">
+                        <span className="kb-text-primary">
                           {latestAsset ? latestAsset.path.split('/').pop() : 'No artifact yet'}
                         </span>
                       </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                       <div>
                         open work:{' '}
-                        <span className="font-mono text-white/80">{mission.nextTaskCount}</span>
+                        <span className="font-mono kb-text-primary">{mission.nextTaskCount}</span>
                       </div>
                       <div>
                         plan:{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {mission.planReady ? 'ready' : 'pending'}
                         </span>
                       </div>
                       <div>
                         results:{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {progress?.generatedAssets?.length ?? 0}
                         </span>
                       </div>
                       <div>
                         latest artifact:{' '}
-                        <span className="font-mono text-white/80">
+                        <span className="font-mono kb-text-primary">
                           {latestAsset ? latestAsset.path.split('/').pop() : 'none'}
                         </span>
                       </div>
@@ -3112,11 +3123,11 @@ export function MissionIntelligence({
                       <button
                         type="button"
                         onClick={() => focusMissionThread(mission.missionId)}
-                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                       >
                         <span className="inline-flex items-center gap-2">
                           <span>Thread</span>
-                          <span className="rounded-full border border-cyan-200/20 bg-cyan-200/10 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-cyan-50/80">
+                          <span className="rounded-full border kb-border-accent kb-surface-accent px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-accent">
                             T
                           </span>
                         </span>
@@ -3124,11 +3135,11 @@ export function MissionIntelligence({
                       <button
                         type="button"
                         onClick={() => focusMissionCard(mission.missionId)}
-                        className="ml-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+                        className="ml-2 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         <span className="inline-flex items-center gap-2">
                           <span>Card</span>
-                          <span className="rounded-full border border-white/15 bg-white/8 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-white/60">
+                          <span className="rounded-full border kb-border-subtle kb-surface-raised/8 px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-secondary">
                             C
                           </span>
                         </span>
@@ -3155,7 +3166,7 @@ export function MissionIntelligence({
                                     : latestAction.event_id || null
                                 )
                               }
-                              className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                             >
                               {expandedMissionCardActionId === latestAction.event_id
                                 ? 'hide latest action'
@@ -3173,7 +3184,7 @@ export function MissionIntelligence({
                                     `${mission.missionId}:${latestAction.operation}`
                                 }
                                 title={retryAction?.disabledReason}
-                                className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 {missionActionTarget ===
                                 `${mission.missionId}:${latestAction.operation}`
@@ -3184,8 +3195,8 @@ export function MissionIntelligence({
                           </>
                         );
                       })()}
-                      <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-300/10 bg-emerald-400/[0.04] px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">
+                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
+                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
                           safe actions
                         </div>
                         {safeMissionActions.map((action) => (
@@ -3206,13 +3217,13 @@ export function MissionIntelligence({
                           </button>
                         ))}
                         {safeDisabledReason && (
-                          <div className="w-full text-[10px] text-white/40">
+                          <div className="w-full text-[10px] kb-text-muted">
                             {safeDisabledReason}
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">
+                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
+                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
                           risky actions · approval required
                         </div>
                         {riskyMissionActions.map((action) => (
@@ -3245,7 +3256,7 @@ export function MissionIntelligence({
                           </button>
                         ))}
                         {riskyDisabledReason && (
-                          <div className="w-full text-[10px] text-white/40">
+                          <div className="w-full text-[10px] kb-text-muted">
                             {riskyDisabledReason}
                           </div>
                         )}
@@ -3278,15 +3289,15 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="runtime-topology-map" title="Runtime Topology Map">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             This map shows what the supervisor daemon is currently holding: who owns each runtime,
             which runtimes are active, and which agent-to-agent or owner-to-agent flows were seen
             recently.
           </div>
           <div className="grid gap-3">
             <div className="grid gap-3 lg:grid-cols-[0.9fr,1.1fr]">
-              <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
-                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">
+              <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                   owners
                 </div>
                 <div className="space-y-2">
@@ -3301,17 +3312,17 @@ export function MissionIntelligence({
                     data.runtimeTopology.owners.map((owner) => (
                       <div
                         key={`${owner.type}:${owner.id}`}
-                        className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                       >
-                        <div className="text-[10px] font-mono text-white/78">{owner.id}</div>
-                        <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-white/38">
+                        <div className="text-[10px] font-mono kb-text-secondary">{owner.id}</div>
+                        <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                           {owner.type} · runtimes {owner.runtimeCount}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {owner.runtimeIds.map((runtimeId) => (
                             <span
                               key={runtimeId}
-                              className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[9px] font-mono text-white/58"
+                              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-muted"
                             >
                               {runtimeId}
                             </span>
@@ -3322,8 +3333,8 @@ export function MissionIntelligence({
                   )}
                 </div>
               </div>
-              <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
-                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">
+              <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                   managed runtimes
                 </div>
                 <div className="space-y-2">
@@ -3338,41 +3349,41 @@ export function MissionIntelligence({
                     data.runtimeTopology.runtimes.map((runtime) => (
                       <div
                         key={runtime.agentId}
-                        className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                       >
                         {(() => {
                           const resolution = providerResolutionSummary(runtime.metadata);
                           return (
                             <>
                               <div className="flex items-center justify-between gap-3">
-                                <div className="text-[10px] font-mono text-white/82">
+                                <div className="text-[10px] font-mono kb-text-primary">
                                   {runtime.agentId}
                                 </div>
                                 <div
                                   className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${
                                     runtime.status === 'ready'
-                                      ? 'bg-green-500/15 text-green-300'
+                                      ? 'kb-status-positive-surface kb-status-positive'
                                       : runtime.status === 'busy'
-                                        ? 'bg-amber-400/12 text-amber-100'
+                                        ? 'kb-status-warning-surface kb-status-warning'
                                         : runtime.status === 'error'
-                                          ? 'bg-red-500/15 text-red-300'
-                                          : 'bg-white/10 text-white/65'
+                                          ? 'kb-status-negative-surface kb-status-negative'
+                                          : 'kb-surface-raised kb-text-secondary'
                                   }`}
                                 >
                                   {runtime.status}
                                 </div>
                               </div>
-                              <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-white/38">
+                              <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                                 {runtime.provider}
                                 {runtime.modelId ? `/${runtime.modelId}` : ''} · {runtime.ownerType}
                                 :{runtime.ownerId}
                               </div>
                               {resolution ? (
-                                <div className="mt-1 text-[9px] text-white/45">
+                                <div className="mt-1 text-[9px] kb-text-muted">
                                   preferred {resolution.preferred} · strategy {resolution.strategy}
                                 </div>
                               ) : null}
-                              <div className="mt-2 flex flex-wrap gap-2 text-[9px] text-white/42">
+                              <div className="mt-2 flex flex-wrap gap-2 text-[9px] kb-text-muted">
                                 {runtime.leaseKind && <span>lease {runtime.leaseKind}</span>}
                                 {runtime.requestedBy && (
                                   <span>requested by {runtime.requestedBy}</span>
@@ -3389,30 +3400,30 @@ export function MissionIntelligence({
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">
+            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                 recent flow
               </div>
               <div className="space-y-2">
                 {data.runtimeTopology.flows.length === 0 ? (
-                  <div className="text-[10px] text-white/35">
+                  <div className="text-[10px] kb-text-muted">
                     No recent A2A or agent-message flow observed.
                   </div>
                 ) : (
                   data.runtimeTopology.flows.map((flow) => (
                     <div
                       key={flow.id}
-                      className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2"
+                      className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-[10px] font-mono text-white/80">
+                        <div className="text-[10px] font-mono kb-text-primary">
                           {flow.from} → {flow.to}
                         </div>
-                        <div className="text-[9px] uppercase tracking-[0.16em] text-white/38">
+                        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                           {flow.kind}
                         </div>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] text-white/42">
+                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] kb-text-muted">
                         <span>count {flow.count}</span>
                         {flow.channel && <span>channel {flow.channel}</span>}
                         {flow.thread && <span>thread {flow.thread}</span>}
@@ -3429,14 +3440,14 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="runtime-lease-doctor" title="Runtime Governance">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Managed runtimes are part of operations, not a separate playground. Use this section to
             resolve stale leases, errored runtimes, and ownership drift without over-restarting
             healthy agents.
           </div>
           <div className="space-y-3">
             {data.runtimeDoctor.length === 0 ? (
-              <div className="text-[11px] italic text-emerald-300/40">
+              <div className="text-[11px] italic kb-status-positive">
                 No stale or orphaned runtime leases detected.
               </div>
             ) : (
@@ -3445,22 +3456,22 @@ export function MissionIntelligence({
                   key={`${finding.agentId}-${index}`}
                   className={`rounded-xl border px-3 py-3 ${
                     finding.severity === 'critical'
-                      ? 'border-red-500/20 bg-red-950/10'
-                      : 'border-yellow-500/20 bg-yellow-950/10'
+                      ? 'kb-status-negative-border kb-status-negative-surface'
+                      : 'kb-status-warning-border kb-status-warning-surface'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em]">
                     <span
                       className={
-                        finding.severity === 'critical' ? 'text-red-300/80' : 'text-yellow-200/80'
+                        finding.severity === 'critical' ? 'kb-status-negative' : 'kb-status-warning'
                       }
                     >
                       {finding.severity}
                     </span>
-                    <span className="font-mono text-white/45">{finding.agentId}</span>
+                    <span className="font-mono kb-text-muted">{finding.agentId}</span>
                   </div>
-                  <div className="mt-2 text-[10px] text-white/65">owner: {finding.ownerId}</div>
-                  <div className="mt-1 text-[10px] text-white/55">{finding.reason}</div>
+                  <div className="mt-2 text-[10px] kb-text-secondary">owner: {finding.ownerId}</div>
+                  <div className="mt-1 text-[10px] kb-text-muted">{finding.reason}</div>
                   <button
                     type="button"
                     onClick={() => {
@@ -3481,7 +3492,7 @@ export function MissionIntelligence({
                       );
                     }}
                     disabled={remediationTarget === finding.agentId}
-                    className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {remediationTarget === finding.agentId
                       ? 'remediating'
@@ -3493,22 +3504,22 @@ export function MissionIntelligence({
               ))
             )}
 
-            <div className="border-t border-white/5 pt-3">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/35">
+            <div className="border-t kb-border-subtle pt-3">
+              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                 Managed Runtime Leases
               </div>
               <div className="space-y-2">
                 {data.runtimeLeases.slice(0, 6).map((lease) => (
                   <div
                     key={`${lease.agent_id}-${lease.owner_id}`}
-                    className="rounded-xl border border-white/5 bg-black/20 px-3 py-2"
+                    className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2"
                   >
-                    <div className="text-[10px] font-mono text-white/75">{lease.agent_id}</div>
-                    <div className="mt-1 text-[10px] text-white/45">
+                    <div className="text-[10px] font-mono kb-text-secondary">{lease.agent_id}</div>
+                    <div className="mt-1 text-[10px] kb-text-muted">
                       {lease.owner_type}: {lease.owner_id}
                     </div>
                     {typeof lease.metadata?.team_role === 'string' && (
-                      <div className="mt-1 text-[10px] text-white/35">
+                      <div className="mt-1 text-[10px] kb-text-muted">
                         team_role: {lease.metadata.team_role}
                       </div>
                     )}
@@ -3520,13 +3531,13 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="recent-surface-outbox" title="Delivery Exceptions">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Outbox items are operator-facing delivery residue. Resolve them here only when the
             autonomous path has already stalled or a human-visible queue needs cleanup.
           </div>
           <div className="space-y-3">
             {data.recentSurfaceOutbox.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt(
                   'chronos_no_recent_surface_outbox',
                   'No pending or recent surface outbox messages.'
@@ -3536,20 +3547,20 @@ export function MissionIntelligence({
               data.recentSurfaceOutbox.map((message) => (
                 <div
                   key={message.message_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       {message.surface} · {message.source} · {message.channel}
                     </div>
-                    <div className="text-[9px] font-mono text-white/30">
+                    <div className="text-[9px] font-mono kb-text-muted">
                       {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
-                  <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/28">
+                  <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
                     {mt('chronos_correlation', 'correlation')}: {message.correlation_id}
                   </div>
-                  <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
+                  <div className="mt-2 text-[11px] kb-text-primary">{message.text}</div>
                   <button
                     type="button"
                     onClick={() => {
@@ -3563,7 +3574,7 @@ export function MissionIntelligence({
                       );
                     }}
                     disabled={outboxTarget === message.message_id}
-                    className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {outboxTarget === message.message_id
                       ? mt('chronos_clearing', 'clearing')
@@ -3576,7 +3587,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title={mt('chronos_projects', 'Projects')}>
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_projects_description',
               'Projects hold the long-lived intent context. Use this panel to see which durable work, bindings, and results already have a parent container before creating new missions.'
@@ -3594,7 +3605,7 @@ export function MissionIntelligence({
               data.projects.map((project) => (
                 <div
                   key={project.project_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   {(() => {
                     const learnedRefs = learnedProjectRefs(project.project_id);
@@ -3603,42 +3614,42 @@ export function MissionIntelligence({
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                            <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                               {project.name}
                             </div>
-                            <div className="mt-1 text-[10px] text-white/45">
+                            <div className="mt-1 text-[10px] kb-text-muted">
                               {project.project_id} · {project.tier}
                             </div>
                           </div>
                           <div
                             className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                               project.status === 'active'
-                                ? 'bg-green-500/15 text-green-300'
+                                ? 'kb-status-positive-surface kb-status-positive'
                                 : project.status === 'draft'
-                                  ? 'bg-cyan-500/15 text-cyan-200'
-                                  : 'bg-white/10 text-white/65'
+                                  ? 'kb-surface-accent kb-text-accent'
+                                  : 'kb-surface-raised kb-text-secondary'
                             }`}
                           >
                             {project.status}
                           </div>
                         </div>
-                        <div className="mt-3 text-[10px] text-white/70">{project.summary}</div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div className="mt-3 text-[10px] kb-text-secondary">{project.summary}</div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                           <div>
                             {mt('chronos_missions', 'missions')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {project.active_missions?.length ?? 0}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_bindings', 'bindings')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {project.service_bindings?.length ?? 0}
                             </span>
                           </div>
                         </div>
                         {project.bootstrap_work_items?.length ? (
-                          <div className="mt-3 text-[10px] text-white/58">
+                          <div className="mt-3 text-[10px] kb-text-muted">
                             {mt('chronos_next_work', 'next work')}:{' '}
                             {project.bootstrap_work_items
                               .slice(0, 3)
@@ -3647,46 +3658,46 @@ export function MissionIntelligence({
                           </div>
                         ) : null}
                         {project.kickoff_task_session_id ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             {mt('chronos_kickoff', 'kickoff')}:{' '}
-                            <span className="font-mono text-white/70">
+                            <span className="font-mono kb-text-secondary">
                               {project.kickoff_task_session_id}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             work loop
                           </div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
-                            <span className="text-white/80">{workLoop.intent}</span>
+                            <span className="kb-text-primary">{workLoop.intent}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_context', 'context')}:{' '}
-                            <span className="text-white/80">{workLoop.context}</span>
+                            <span className="kb-text-primary">{workLoop.context}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_resolution', 'resolution')}:{' '}
-                            <span className="font-mono text-white/80">{workLoop.resolution}</span>
+                            <span className="font-mono kb-text-primary">{workLoop.resolution}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_outcome', 'outcome')}:{' '}
-                            <span className="text-white/80">{workLoop.outcome}</span>
+                            <span className="kb-text-primary">{workLoop.outcome}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_team', 'team')}:{' '}
-                            <span className="text-white/80">{workLoop.team}</span>
+                            <span className="kb-text-primary">{workLoop.team}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_authority', 'authority')}:{' '}
-                            <span className="text-white/80">{workLoop.authority}</span>
+                            <span className="kb-text-primary">{workLoop.authority}</span>
                           </div>
                         </div>
                         {learnedRefs.length ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             {mt('chronos_learned', 'learned')}:{' '}
-                            <span className="text-white/70">
+                            <span className="kb-text-secondary">
                               {learnedRefs.map((candidate) => candidate.title).join(', ')}
                             </span>
                           </div>
@@ -3703,7 +3714,7 @@ export function MissionIntelligence({
                                 (project.active_missions && project.active_missions[0]) || 'all'
                               );
                             }}
-                            className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                            className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                           >
                             {selectedProjectId === project.project_id
                               ? mt('chronos_focused', 'focused')
@@ -3720,7 +3731,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title={mt('chronos_tracks', 'Tracks')}>
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_tracks_description',
               'Tracks are the SDLC and gating lanes inside a project. Focus a track to review evidence, approvals, and durable work without assuming one project equals one lifecycle.'
@@ -3728,37 +3739,37 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {hydratedTracks.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt('chronos_no_tracks', 'No tracks registered yet.')}
               </div>
             ) : (
               hydratedTracks.map((track) => (
                 <div
                   key={track.track_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                      <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                         {track.name}
                       </div>
-                      <div className="mt-1 text-[10px] text-white/45">
+                      <div className="mt-1 text-[10px] kb-text-muted">
                         {track.track_id} · {track.track_type} · {track.lifecycle_model}
                       </div>
                     </div>
-                    <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                    <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
                       {track.status}
                     </div>
                   </div>
-                  <div className="mt-3 text-[10px] text-white/70">{track.summary}</div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div className="mt-3 text-[10px] kb-text-secondary">{track.summary}</div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                     <div>
                       {mt('chronos_project', 'project')}:{' '}
-                      <span className="font-mono text-white/80">{track.project_id}</span>
+                      <span className="font-mono kb-text-primary">{track.project_id}</span>
                     </div>
                     <div>
                       {mt('chronos_required_artifacts', 'required artifacts')}:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {track.required_artifacts?.length ?? 0}
                       </span>
                     </div>
@@ -3766,14 +3777,14 @@ export function MissionIntelligence({
                       <>
                         <div>
                           {mt('chronos_gate_readiness', 'gate readiness')}:{' '}
-                          <span className="font-mono text-white/80">
+                          <span className="font-mono kb-text-primary">
                             {track.gate_readiness.ready_gate_count}/
                             {track.gate_readiness.total_gate_count}
                           </span>
                         </div>
                         <div>
                           {mt('chronos_current_gate', 'current gate')}:{' '}
-                          <span className="font-mono text-white/80">
+                          <span className="font-mono kb-text-primary">
                             {track.gate_readiness.current_gate_id ||
                               (track.gate_readiness.ready ? 'ready' : '-')}
                           </span>
@@ -3782,9 +3793,9 @@ export function MissionIntelligence({
                     ) : null}
                   </div>
                   {track.gate_readiness?.next_required_artifacts?.length ? (
-                    <div className="mt-2 text-[10px] text-white/45">
+                    <div className="mt-2 text-[10px] kb-text-muted">
                       {mt('chronos_next_required', 'next required')}:{' '}
-                      <span className="font-mono text-white/75">
+                      <span className="font-mono kb-text-secondary">
                         {track.gate_readiness.next_required_artifacts
                           .map((artifact) => artifact.artifact_id)
                           .join(', ')}
@@ -3792,8 +3803,9 @@ export function MissionIntelligence({
                     </div>
                   ) : null}
                   {track.release_id ? (
-                    <div className="mt-2 text-[10px] text-white/45">
-                      release: <span className="font-mono text-white/70">{track.release_id}</span>
+                    <div className="mt-2 text-[10px] kb-text-muted">
+                      release:{' '}
+                      <span className="font-mono kb-text-secondary">{track.release_id}</span>
                     </div>
                   ) : null}
                   <div className="mt-3">
@@ -3801,7 +3813,7 @@ export function MissionIntelligence({
                       <button
                         type="button"
                         onClick={() => setSelectedTrackId(track.track_id)}
-                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                       >
                         {selectedTrackId === track.track_id
                           ? mt('chronos_focused', 'focused')
@@ -3819,7 +3831,7 @@ export function MissionIntelligence({
                           !track.gate_readiness?.next_required_artifacts?.length ||
                           trackSeedTarget === track.track_id
                         }
-                        className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {trackSeedTarget === track.track_id
                           ? 'seeding'
@@ -3834,7 +3846,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title={mt('chronos_service_bindings', 'Service Bindings')}>
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_service_bindings_description',
               'Bindings define where Kyberion can read from or deliver to. This is the governed edge for GitHub, Slack, Drive, search, and other external systems.'
@@ -3842,33 +3854,33 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredServiceBindings.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No service bindings registered yet.
               </div>
             ) : (
               filteredServiceBindings.slice(0, 8).map((binding) => (
                 <div
                   key={binding.binding_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                       {binding.binding_id}
                     </div>
-                    <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                    <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
                       {binding.auth_mode || 'none'}
                     </div>
                   </div>
-                  <div className="mt-2 text-[10px] text-white/55">
+                  <div className="mt-2 text-[10px] kb-text-muted">
                     {binding.service_type} · {binding.scope} · {binding.target}
                   </div>
-                  <div className="mt-2 text-[10px] text-white/45">
+                  <div className="mt-2 text-[10px] kb-text-muted">
                     actions:{' '}
-                    <span className="text-white/70">
+                    <span className="kb-text-secondary">
                       {binding.allowed_actions.slice(0, 4).join(', ') || 'none'}
                     </span>
                     {binding.allowed_actions.length > 4 ? (
-                      <span className="text-white/45"> +{binding.allowed_actions.length - 4}</span>
+                      <span className="kb-text-muted"> +{binding.allowed_actions.length - 4}</span>
                     ) : null}
                   </div>
                 </div>
@@ -3878,41 +3890,41 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="mission-seeds" title="Mission Seeds">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Proposed durable work can stay here before it becomes a full mission. Use this panel to
             confirm bootstrap output is structured and attributable.
           </div>
-          <div className="mb-4 rounded-xl border border-cyan-300/10 bg-cyan-400/[0.04] px-4 py-3 text-[10px] leading-5 text-cyan-50/75">
+          <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[10px] leading-5 kb-text-accent">
             assessment: eligible{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.eligible ?? 0}
             </span>
             {' · '}
             flagged{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.flagged ?? 0}
             </span>
             {' · '}
             unassessed{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.unassessed ?? 0}
             </span>
             {' · '}
             promotable{' '}
-            <span className="font-mono text-cyan-100">
+            <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.promotable ?? 0}
             </span>
           </div>
           <div className="space-y-3">
             {filteredMissionSeedsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No mission seeds recorded yet.
               </div>
             ) : (
               filteredMissionSeedsByTrack.slice(0, 8).map((seed) => (
                 <div
                   key={seed.seed_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   {(() => {
                     const learnedRefs = learnedMissionSeedRefs(
@@ -3924,105 +3936,105 @@ export function MissionIntelligence({
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                             {seed.title}
                           </div>
-                          <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                          <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
                             {seed.status}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] text-white/70">{seed.summary}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div className="mt-2 text-[10px] kb-text-secondary">{seed.summary}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                           <div>
                             project:{' '}
-                            <span className="font-mono text-white/80">{seed.project_id}</span>
+                            <span className="font-mono kb-text-primary">{seed.project_id}</span>
                           </div>
                           <div>
                             specialist:{' '}
-                            <span className="font-mono text-white/80">{seed.specialist_id}</span>
+                            <span className="font-mono kb-text-primary">{seed.specialist_id}</span>
                           </div>
                           <div>
                             work:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {seed.source_work_id || '-'}
                             </span>
                           </div>
                           <div>
                             type:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {seed.mission_type_hint || '-'}
                             </span>
                           </div>
                         </div>
                         {typeof seed.metadata?.template_ref === 'string' ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             template:{' '}
                             <button
                               type="button"
                               onClick={() =>
                                 openKnowledgeReference(seed.metadata?.template_ref as string)
                               }
-                              className="font-mono text-cyan-200/80 transition hover:text-cyan-100"
+                              className="font-mono kb-text-accent transition hover:kb-text-accent"
                             >
                               {seed.metadata.template_ref}
                             </button>
                           </div>
                         ) : null}
                         {typeof seed.metadata?.skeleton_path === 'string' ? (
-                          <div className="mt-1 text-[10px] text-white/45">
+                          <div className="mt-1 text-[10px] kb-text-muted">
                             skeleton:{' '}
                             <button
                               type="button"
                               onClick={() =>
                                 openRuntimeReference(seed.metadata?.skeleton_path as string)
                               }
-                              className="font-mono text-cyan-200/80 transition hover:text-cyan-100"
+                              className="font-mono kb-text-accent transition hover:kb-text-accent"
                             >
                               {seed.metadata.skeleton_path}
                             </button>
                           </div>
                         ) : null}
                         {seed.promoted_mission_id ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             mission:{' '}
-                            <span className="font-mono text-white/75">
+                            <span className="font-mono kb-text-secondary">
                               {seed.promoted_mission_id}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             work loop
                           </div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
-                            <span className="text-white/80">{workLoop.intent}</span>
+                            <span className="kb-text-primary">{workLoop.intent}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_context', 'context')}:{' '}
-                            <span className="text-white/80">{workLoop.context}</span>
+                            <span className="kb-text-primary">{workLoop.context}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_resolution', 'resolution')}:{' '}
-                            <span className="font-mono text-white/80">{workLoop.resolution}</span>
+                            <span className="font-mono kb-text-primary">{workLoop.resolution}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_outcome', 'outcome')}:{' '}
-                            <span className="text-white/80">{workLoop.outcome}</span>
+                            <span className="kb-text-primary">{workLoop.outcome}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_team', 'team')}:{' '}
-                            <span className="text-white/80">{workLoop.team}</span>
+                            <span className="kb-text-primary">{workLoop.team}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_authority', 'authority')}:{' '}
-                            <span className="text-white/80">{workLoop.authority}</span>
+                            <span className="kb-text-primary">{workLoop.authority}</span>
                           </div>
                         </div>
                         {learnedRefs.length ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             {mt('chronos_learned', 'learned')}:{' '}
-                            <span className="text-white/70">
+                            <span className="kb-text-secondary">
                               {learnedRefs.map((candidate) => candidate.title).join(', ')}
                             </span>
                           </div>
@@ -4046,7 +4058,7 @@ export function MissionIntelligence({
                             disabled={
                               seed.status === 'promoted' || missionSeedTarget === seed.seed_id
                             }
-                            className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {missionSeedTarget === seed.seed_id
                               ? 'promoting'
@@ -4066,7 +4078,7 @@ export function MissionIntelligence({
 
         <Panel title={mt('chronos_skeleton_detail', 'Skeleton Detail')}>
           {!selectedReferencePath || !referenceDetail ? (
-            <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
               {mt(
                 'chronos_skeleton_detail_empty',
                 'Select a track-generated skeleton to inspect its title, metadata, overview, and sections without leaving Chronos.'
@@ -4074,24 +4086,24 @@ export function MissionIntelligence({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+              <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                     {referenceDetail.title || 'reference'}
                   </div>
-                  <div className="font-mono text-[10px] text-white/45">
+                  <div className="font-mono text-[10px] kb-text-muted">
                     {selectedReferencePath.split('/').slice(-2).join('/')}
                   </div>
                 </div>
-                <div className="mt-2 text-[10px] text-white/70">
+                <div className="mt-2 text-[10px] kb-text-secondary">
                   {referenceDetail.summary || mt('chronos_no_summary', 'No summary available yet.')}
                 </div>
-                <div className="mt-2 text-[10px] text-white/45">
-                  path: <span className="font-mono text-white/70">{selectedReferencePath}</span>
+                <div className="mt-2 text-[10px] kb-text-muted">
+                  path: <span className="font-mono kb-text-secondary">{selectedReferencePath}</span>
                 </div>
                 <div className="mt-2 text-[10px]">
                   <a
-                    className="text-cyan-200/80 transition hover:text-cyan-100"
+                    className="kb-text-accent transition hover:kb-text-accent"
                     href={`${referenceDetail.endpoint}?path=${encodeURIComponent(selectedReferencePath)}`}
                     target="_blank"
                     rel="noreferrer"
@@ -4102,16 +4114,16 @@ export function MissionIntelligence({
                 </div>
                 {selectedReferenceSeed ? (
                   <>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/45">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                       <div>
                         seed:{' '}
-                        <span className="font-mono text-white/75">
+                        <span className="font-mono kb-text-secondary">
                           {selectedReferenceSeed.seed_id}
                         </span>
                       </div>
                       <div>
                         track:{' '}
-                        <span className="font-mono text-white/75">
+                        <span className="font-mono kb-text-secondary">
                           {selectedReferenceSeed.track_name ||
                             selectedReferenceSeed.track_id ||
                             '-'}
@@ -4123,7 +4135,7 @@ export function MissionIntelligence({
                         <button
                           type="button"
                           onClick={() => setSelectedTrackId(selectedReferenceSeed.track_id || null)}
-                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                          className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
                         >
                           {mt('chronos_focus_track', 'focus track')}
                         </button>
@@ -4137,7 +4149,7 @@ export function MissionIntelligence({
                               selectedReferenceSeed.metadata?.template_ref as string
                             )
                           }
-                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
                         >
                           {mt('chronos_open_template', 'open template')}
                         </button>
@@ -4151,7 +4163,7 @@ export function MissionIntelligence({
                               selectedReferenceSeed.metadata?.skeleton_path as string
                             )
                           }
-                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
                         >
                           {mt('chronos_open_skeleton', 'open skeleton')}
                         </button>
@@ -4175,7 +4187,7 @@ export function MissionIntelligence({
                           selectedReferenceSeed.status === 'promoted' ||
                           missionSeedTarget === selectedReferenceSeed.seed_id
                         }
-                        className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {missionSeedTarget === selectedReferenceSeed.seed_id
                           ? mt('chronos_processing', 'processing')
@@ -4189,14 +4201,14 @@ export function MissionIntelligence({
               </div>
 
               {referenceMetadataEntries.length ? (
-                <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                     {mt('chronos_metadata', 'Metadata')}
                   </div>
                   <div className="mt-2 space-y-1">
                     {referenceMetadataEntries.map(([key, value]) => (
-                      <div key={key} className="text-[10px] text-white/55">
-                        <span className="font-mono text-white/70">{key}</span>: {String(value)}
+                      <div key={key} className="text-[10px] kb-text-muted">
+                        <span className="font-mono kb-text-secondary">{key}</span>: {String(value)}
                       </div>
                     ))}
                   </div>
@@ -4204,8 +4216,8 @@ export function MissionIntelligence({
               ) : null}
 
               {referenceDetail.body ? (
-                <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                     {mt('chronos_overview', 'Overview')}
                   </div>
                   <div className="mt-2 space-y-1">
@@ -4214,7 +4226,7 @@ export function MissionIntelligence({
                       .filter((line) => line.trim())
                       .slice(0, 8)
                       .map((line, index) => (
-                        <div key={`${line}-${index}`} className="text-[10px] text-white/55">
+                        <div key={`${line}-${index}`} className="text-[10px] kb-text-muted">
                           {line}
                         </div>
                       ))}
@@ -4225,9 +4237,9 @@ export function MissionIntelligence({
               {referenceSections.map((section) => (
                 <div
                   key={section.title}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                     {section.title || 'Section'}
                   </div>
                   <div className="mt-2 space-y-1">
@@ -4237,13 +4249,13 @@ export function MissionIntelligence({
                       .map((line, index) => (
                         <div
                           key={`${section.title}-${index}`}
-                          className="text-[10px] text-white/55"
+                          className="text-[10px] kb-text-muted"
                         >
                           {line}
                         </div>
                       ))}
                     {!section.lines.some((line) => line.trim()) ? (
-                      <div className="text-[10px] text-white/45">
+                      <div className="text-[10px] kb-text-muted">
                         {mt('chronos_no_detail', 'No detail.')}
                       </div>
                     ) : null}
@@ -4257,7 +4269,7 @@ export function MissionIntelligence({
 
       <section className="grid gap-4">
         <Panel id="approvals" title={mt('chronos_approvals', 'Approvals')}>
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_approvals_description',
               'Approvals keep authority explicit. Review pending risky actions here before they cross a governed boundary.'
@@ -4265,85 +4277,85 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredPendingApprovalsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt('chronos_no_pending_approvals', 'No pending approvals.')}
               </div>
             ) : (
               filteredPendingApprovalsByTrack.map((approval) => (
                 <div
                   key={approval.id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   {(() => {
                     const workLoop = buildApprovalWorkLoopPreview(approval);
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                             {approval.title}
                           </div>
-                          <div className="rounded-full bg-red-500/12 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-red-200">
+                          <div className="rounded-full kb-status-negative-surface px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-status-negative">
                             {approval.riskLevel}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] text-white/70">{approval.summary}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div className="mt-2 text-[10px] kb-text-secondary">{approval.summary}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                           <div>
                             {mt('chronos_channel', 'channel')}:{' '}
-                            <span className="font-mono text-white/80">{approval.channel}</span>
+                            <span className="font-mono kb-text-primary">{approval.channel}</span>
                           </div>
                           <div>
                             {mt('chronos_kind', 'kind')}:{' '}
-                            <span className="font-mono text-white/80">{approval.kind}</span>
+                            <span className="font-mono kb-text-primary">{approval.kind}</span>
                           </div>
                           <div>
                             {mt('chronos_service', 'service')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {approval.serviceId || '-'}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_mission', 'mission')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {approval.missionId || '-'}
                             </span>
                           </div>
                         </div>
                         {approval.pendingRoles.length > 0 ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             pending roles:{' '}
-                            <span className="text-white/70">
+                            <span className="kb-text-secondary">
                               {approval.pendingRoles.join(', ')}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             work loop
                           </div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
-                            <span className="text-white/80">{workLoop.intent}</span>
+                            <span className="kb-text-primary">{workLoop.intent}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_context', 'context')}:{' '}
-                            <span className="text-white/80">{workLoop.context}</span>
+                            <span className="kb-text-primary">{workLoop.context}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_resolution', 'resolution')}:{' '}
-                            <span className="font-mono text-white/80">{workLoop.resolution}</span>
+                            <span className="font-mono kb-text-primary">{workLoop.resolution}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_outcome', 'outcome')}:{' '}
-                            <span className="text-white/80">{workLoop.outcome}</span>
+                            <span className="kb-text-primary">{workLoop.outcome}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_team', 'team')}:{' '}
-                            <span className="text-white/80">{workLoop.team}</span>
+                            <span className="kb-text-primary">{workLoop.team}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_authority', 'authority')}:{' '}
-                            <span className="text-white/80">{workLoop.authority}</span>
+                            <span className="kb-text-primary">{workLoop.authority}</span>
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -4351,7 +4363,7 @@ export function MissionIntelligence({
                             type="button"
                             onClick={() => decideApproval(approval, 'approved')}
                             disabled={approvalTarget === approval.id}
-                            className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {approvalTarget === approval.id
                               ? mt('chronos_processing', 'processing')
@@ -4361,7 +4373,7 @@ export function MissionIntelligence({
                             type="button"
                             onClick={() => decideApproval(approval, 'rejected')}
                             disabled={approvalTarget === approval.id}
-                            className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {approvalTarget === approval.id
                               ? mt('chronos_processing', 'processing')
@@ -4378,93 +4390,93 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title="Recent Artifacts">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Outcomes should stay attributable. This panel shows the latest recorded artifacts with
             their project, mission, task, and storage placement.
           </div>
           <div className="space-y-3">
             {filteredRecentArtifactsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No governed artifacts recorded yet.
               </div>
             ) : (
               filteredRecentArtifactsByTrack.map((artifact) => (
                 <div
                   key={artifact.artifact_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   {(() => {
                     const workLoop = buildArtifactWorkLoopPreview(artifact);
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                             {artifact.artifact_id}
                           </div>
-                          <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                          <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
                             {artifact.kind}
                           </div>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                           <div>
                             project:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {artifact.project_id || 'standalone'}
                             </span>
                           </div>
                           <div>
                             mission:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {artifact.mission_id || '-'}
                             </span>
                           </div>
                           <div>
                             task:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {artifact.task_session_id || '-'}
                             </span>
                           </div>
                           <div>
                             storage:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {artifact.storage_class}
                             </span>
                           </div>
                         </div>
                         {(artifact.path || artifact.external_ref || artifact.preview_text) && (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             {artifact.preview_text ||
                               artifact.external_ref ||
                               artifact.path?.split('/').pop()}
                           </div>
                         )}
-                        <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             work loop
                           </div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
-                            <span className="text-white/80">{workLoop.intent}</span>
+                            <span className="kb-text-primary">{workLoop.intent}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_context', 'context')}:{' '}
-                            <span className="text-white/80">{workLoop.context}</span>
+                            <span className="kb-text-primary">{workLoop.context}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_resolution', 'resolution')}:{' '}
-                            <span className="font-mono text-white/80">{workLoop.resolution}</span>
+                            <span className="font-mono kb-text-primary">{workLoop.resolution}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_outcome', 'outcome')}:{' '}
-                            <span className="text-white/80">{workLoop.outcome}</span>
+                            <span className="kb-text-primary">{workLoop.outcome}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_team', 'team')}:{' '}
-                            <span className="text-white/80">{workLoop.team}</span>
+                            <span className="kb-text-primary">{workLoop.team}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_authority', 'authority')}:{' '}
-                            <span className="text-white/80">{workLoop.authority}</span>
+                            <span className="kb-text-primary">{workLoop.authority}</span>
                           </div>
                         </div>
                       </>
@@ -4477,7 +4489,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title={mt('chronos_distill_candidates', 'Distill Candidates')}>
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_distill_candidates_description',
               'Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.'
@@ -4485,119 +4497,123 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredDistillCandidatesByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt('chronos_no_distill_candidates', 'No distill candidates recorded yet.')}
               </div>
             ) : (
               filteredDistillCandidatesByTrack.slice(0, 10).map((candidate) => (
                 <div
                   key={candidate.candidate_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   {(() => {
                     const workLoop = buildDistillCandidateWorkLoopPreview(candidate);
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                             {candidate.title}
                           </div>
-                          <div className="rounded-full bg-violet-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-violet-200">
+                          <div className="rounded-full kb-status-info-surface px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-status-info">
                             {candidate.target_kind}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] text-white/70">{candidate.summary}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div className="mt-2 text-[10px] kb-text-secondary">
+                          {candidate.summary}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                           <div>
                             {mt('chronos_source', 'source')}:{' '}
-                            <span className="font-mono text-white/80">{candidate.source_type}</span>
+                            <span className="font-mono kb-text-primary">
+                              {candidate.source_type}
+                            </span>
                           </div>
                           <div>
                             {mt('chronos_project', 'project')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {candidate.project_id || 'standalone'}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_mission', 'mission')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {candidate.mission_id || '-'}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_task', 'task')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {candidate.task_session_id || '-'}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_status', 'status')}:{' '}
-                            <span className="font-mono text-white/80">{candidate.status}</span>
+                            <span className="font-mono kb-text-primary">{candidate.status}</span>
                           </div>
                           <div>
                             {mt('chronos_specialist', 'specialist')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {candidate.specialist_id || '-'}
                             </span>
                           </div>
                           <div>
                             {mt('chronos_tier', 'tier')}:{' '}
-                            <span className="font-mono text-white/80">
+                            <span className="font-mono kb-text-primary">
                               {candidate.tier || 'confidential'}
                             </span>
                           </div>
                         </div>
                         {candidate.artifact_ids && candidate.artifact_ids.length ? (
-                          <div className="mt-2 text-[10px] text-white/45">
+                          <div className="mt-2 text-[10px] kb-text-muted">
                             artifacts:{' '}
-                            <span className="text-white/70">
+                            <span className="kb-text-secondary">
                               {candidate.artifact_ids.join(', ')}
                             </span>
                           </div>
                         ) : null}
                         {candidate.evidence_refs && candidate.evidence_refs.length ? (
-                          <div className="mt-1 text-[10px] text-white/45">
+                          <div className="mt-1 text-[10px] kb-text-muted">
                             evidence:{' '}
-                            <span className="text-white/70">
+                            <span className="kb-text-secondary">
                               {candidate.evidence_refs.join(', ')}
                             </span>
                           </div>
                         ) : null}
                         {candidate.promoted_ref ? (
-                          <div className="mt-1 text-[10px] text-white/45">
+                          <div className="mt-1 text-[10px] kb-text-muted">
                             promoted ref:{' '}
-                            <span className="font-mono text-white/70">
+                            <span className="font-mono kb-text-secondary">
                               {candidate.promoted_ref}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             work loop
                           </div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
-                            <span className="text-white/80">{workLoop.intent}</span>
+                            <span className="kb-text-primary">{workLoop.intent}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_context', 'context')}:{' '}
-                            <span className="text-white/80">{workLoop.context}</span>
+                            <span className="kb-text-primary">{workLoop.context}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_resolution', 'resolution')}:{' '}
-                            <span className="font-mono text-white/80">{workLoop.resolution}</span>
+                            <span className="font-mono kb-text-primary">{workLoop.resolution}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_outcome', 'outcome')}:{' '}
-                            <span className="text-white/80">{workLoop.outcome}</span>
+                            <span className="kb-text-primary">{workLoop.outcome}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_team', 'team')}:{' '}
-                            <span className="text-white/80">{workLoop.team}</span>
+                            <span className="kb-text-primary">{workLoop.team}</span>
                           </div>
                           <div className="mt-1">
                             {mt('chronos_authority', 'authority')}:{' '}
-                            <span className="text-white/80">{workLoop.authority}</span>
+                            <span className="kb-text-primary">{workLoop.authority}</span>
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -4608,7 +4624,7 @@ export function MissionIntelligence({
                               candidate.status !== 'proposed' ||
                               distillCandidateTarget === candidate.candidate_id
                             }
-                            className="rounded-lg border border-violet-300/15 bg-violet-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-violet-100/80 transition hover:bg-violet-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-info-border kb-status-info-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-info transition hover:kb-status-info-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {distillCandidateTarget === candidate.candidate_id
                               ? mt('chronos_processing', 'processing')
@@ -4621,7 +4637,7 @@ export function MissionIntelligence({
                               candidate.status !== 'proposed' ||
                               distillCandidateTarget === candidate.candidate_id
                             }
-                            className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {distillCandidateTarget === candidate.candidate_id
                               ? mt('chronos_processing', 'processing')
@@ -4638,7 +4654,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="memory-promotion-queue" title="Memory Promotion Queue">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Approved memory candidates can be promoted into governed knowledge in bulk. Run a
             dry-run first to inspect queue scope, then execute promotion.
           </div>
@@ -4647,7 +4663,7 @@ export function MissionIntelligence({
               type="button"
               onClick={() => runMemoryPromotion(true)}
               disabled={memoryPromotionTarget !== null}
-              className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               {memoryPromotionTarget === 'dry-run'
                 ? mt('chronos_processing', 'processing')
@@ -4657,7 +4673,7 @@ export function MissionIntelligence({
               type="button"
               onClick={() => runMemoryPromotion(false)}
               disabled={memoryPromotionTarget !== null}
-              className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
             >
               {memoryPromotionTarget === 'promote'
                 ? mt('chronos_processing', 'processing')
@@ -4666,49 +4682,51 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredMemoryCandidatesByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No memory candidates queued.
               </div>
             ) : (
               filteredMemoryCandidatesByTrack.slice(0, 12).map((candidate) => (
                 <div
                   key={candidate.candidate_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                       {candidate.candidate_id}
                     </div>
-                    <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
                       {candidate.status}
                     </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                     <div>
                       kind:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {candidate.proposed_memory_kind}
                       </span>
                     </div>
                     <div>
                       tier:{' '}
-                      <span className="font-mono text-white/80">{candidate.sensitivity_tier}</span>
+                      <span className="font-mono kb-text-primary">
+                        {candidate.sensitivity_tier}
+                      </span>
                     </div>
                     <div className="col-span-2">
                       source:{' '}
-                      <span className="font-mono text-white/80">{candidate.source_ref}</span>
+                      <span className="font-mono kb-text-primary">{candidate.source_ref}</span>
                     </div>
                     <div className="col-span-2">
                       evidence:{' '}
-                      <span className="text-white/70">
+                      <span className="kb-text-secondary">
                         {candidate.evidence_refs?.join(', ') || '-'}
                       </span>
                     </div>
                   </div>
                   {candidate.promoted_ref ? (
-                    <div className="mt-2 text-[10px] text-white/45">
+                    <div className="mt-2 text-[10px] kb-text-muted">
                       promoted ref:{' '}
-                      <span className="font-mono text-white/70">{candidate.promoted_ref}</span>
+                      <span className="font-mono kb-text-secondary">{candidate.promoted_ref}</span>
                     </div>
                   ) : null}
                 </div>
@@ -4722,25 +4740,25 @@ export function MissionIntelligence({
         <Panel title="Recent Control Actions">
           <div className="space-y-3">
             {data.controlActions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No recent mission or surface control actions.
               </div>
             ) : (
               data.controlActions.map((action, index) => (
                 <div
                   key={`${action.event_id || action.ts}-${index}`}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       {action.kind} · {action.operation}
                     </div>
                     <ActionStatusBadge action={action} />
                   </div>
-                  <div className="mt-2 text-[11px] text-white/80">{action.target}</div>
-                  <div className="mt-1 text-[10px] text-white/45">
+                  <div className="mt-2 text-[11px] kb-text-primary">{action.target}</div>
+                  <div className="mt-1 text-[10px] kb-text-muted">
                     requested_by:{' '}
-                    <span className="font-mono text-white/70">{action.requested_by}</span>
+                    <span className="font-mono kb-text-secondary">{action.requested_by}</span>
                   </div>
                   {action.event_id && (
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -4751,7 +4769,7 @@ export function MissionIntelligence({
                             current === action.event_id ? null : action.event_id || null
                           )
                         }
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {expandedActionId === action.event_id ? 'hide details' : 'show details'}
                       </button>
@@ -4759,7 +4777,7 @@ export function MissionIntelligence({
                         <button
                           type="button"
                           onClick={() => jumpToTarget(action)}
-                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
                         >
                           jump to target
                         </button>
@@ -4773,9 +4791,9 @@ export function MissionIntelligence({
                     />
                   )}
                   {action.error && (
-                    <div className="mt-2 text-[10px] text-red-200/70">{action.error}</div>
+                    <div className="mt-2 text-[10px] kb-status-negative">{action.error}</div>
                   )}
-                  <div className="mt-2 text-[9px] font-mono text-white/25">
+                  <div className="mt-2 text-[9px] font-mono kb-text-muted">
                     {new Date(action.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
@@ -4788,24 +4806,24 @@ export function MissionIntelligence({
         <Panel title="Orchestration Audit">
           <div className="space-y-3">
             {data.recentEvents.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 No orchestration events yet.
               </div>
             ) : (
               data.recentEvents.map((event, index) => (
                 <div
                   key={`${event.ts}-${index}`}
-                  className="border-l border-kyberion-warning/20 pl-3"
+                  className="border-l kb-status-warning-border pl-3"
                 >
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/45">
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                     <Activity size={10} />
                     <span>{event.decision}</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-white/80">
+                  <div className="mt-1 text-[11px] kb-text-primary">
                     {event.mission_id || 'system'}
                   </div>
-                  {event.why && <div className="mt-1 text-[10px] text-white/45">{event.why}</div>}
-                  <div className="mt-1 text-[9px] font-mono text-white/25">
+                  {event.why && <div className="mt-1 text-[10px] kb-text-muted">{event.why}</div>}
+                  <div className="mt-1 text-[9px] font-mono kb-text-muted">
                     {new Date(event.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
@@ -4816,39 +4834,37 @@ export function MissionIntelligence({
         <Panel id="owner-summaries" title="Owner Summaries">
           <div className="space-y-3">
             {data.ownerSummaries.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
-                No owner summaries yet.
-              </div>
+              <div className="text-[11px] italic kb-status-warning">No owner summaries yet.</div>
             ) : (
               data.ownerSummaries.map((summary, index) => (
                 <div
                   key={`${summary.mission_id}-${summary.ts}-${index}`}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                       {summary.mission_id}
                     </div>
-                    <div className="text-[9px] font-mono text-white/30">
+                    <div className="text-[9px] font-mono kb-text-muted">
                       {new Date(summary.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/60">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-secondary">
                     <div>
                       accepted:{' '}
-                      <span className="font-mono text-white/80">{summary.accepted_count}</span>
+                      <span className="font-mono kb-text-primary">{summary.accepted_count}</span>
                     </div>
                     <div>
                       reviewed:{' '}
-                      <span className="font-mono text-white/80">{summary.reviewed_count}</span>
+                      <span className="font-mono kb-text-primary">{summary.reviewed_count}</span>
                     </div>
                     <div>
                       completed:{' '}
-                      <span className="font-mono text-white/80">{summary.completed_count}</span>
+                      <span className="font-mono kb-text-primary">{summary.completed_count}</span>
                     </div>
                     <div>
                       requested:{' '}
-                      <span className="font-mono text-white/80">{summary.requested_count}</span>
+                      <span className="font-mono kb-text-primary">{summary.requested_count}</span>
                     </div>
                   </div>
                 </div>
@@ -4858,7 +4874,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel id="runtime-summary" title="Operator Summary">
-          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/48">
+          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Keep the operator loop narrow: look at exceptions first, then mission readiness, then
             runtime and delivery counters. When these stay green, use quick actions to open governed
             A2UI drill-downs rather than adding more controls here.
@@ -4888,49 +4904,52 @@ export function MissionIntelligence({
               data.browserSessions.map((session) => (
                 <div
                   key={session.session_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                      <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                         {session.session_id}
                       </div>
-                      <div className="mt-1 text-[10px] text-white/45">
+                      <div className="mt-1 text-[10px] kb-text-muted">
                         active tab:{' '}
-                        <span className="font-mono text-white/70">{session.active_tab_id}</span> ·
-                        tabs: <span className="font-mono text-white/70">{session.tab_count}</span>
+                        <span className="font-mono kb-text-secondary">{session.active_tab_id}</span>{' '}
+                        · tabs:{' '}
+                        <span className="font-mono kb-text-secondary">{session.tab_count}</span>
                       </div>
                     </div>
                     <div
                       className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                         session.lease_status === 'active'
-                          ? 'bg-cyan-500/15 text-cyan-200'
+                          ? 'kb-surface-accent kb-text-accent'
                           : session.lease_status === 'expired'
-                            ? 'bg-yellow-500/10 text-yellow-200'
-                            : 'bg-white/10 text-white/65'
+                            ? 'kb-status-warning-surface kb-status-warning'
+                            : 'kb-surface-raised kb-text-secondary'
                       }`}
                     >
                       {session.lease_status}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                     <div>
                       retained:{' '}
-                      <span className="font-mono text-white/80">{String(session.retained)}</span>
+                      <span className="font-mono kb-text-primary">{String(session.retained)}</span>
                     </div>
                     <div>
                       trail:{' '}
-                      <span className="font-mono text-white/80">{session.action_trail_count}</span>
+                      <span className="font-mono kb-text-primary">
+                        {session.action_trail_count}
+                      </span>
                     </div>
                     <div>
                       updated:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
                       </span>
                     </div>
                     <div>
                       lease expires:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {session.lease_expires_at
                           ? new Date(session.lease_expires_at).toLocaleTimeString(
                               chronosSpeechLocale()
@@ -4940,9 +4959,9 @@ export function MissionIntelligence({
                     </div>
                   </div>
                   {session.last_trace_path && (
-                    <div className="mt-2 text-[10px] text-white/40">
+                    <div className="mt-2 text-[10px] kb-text-muted">
                       trace:{' '}
-                      <span className="font-mono text-white/60">{session.last_trace_path}</span>
+                      <span className="font-mono kb-text-secondary">{session.last_trace_path}</span>
                     </div>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -4955,7 +4974,7 @@ export function MissionIntelligence({
                         browserSessionTarget === `${session.session_id}:close_browser_session` ||
                         session.lease_status !== 'active'
                       }
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {browserSessionTarget === `${session.session_id}:close_browser_session`
                         ? 'closing'
@@ -4969,7 +4988,7 @@ export function MissionIntelligence({
                       disabled={
                         browserSessionTarget === `${session.session_id}:restart_browser_session`
                       }
-                      className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {browserSessionTarget === `${session.session_id}:restart_browser_session`
                         ? 'restarting'
@@ -4977,41 +4996,42 @@ export function MissionIntelligence({
                     </button>
                   </div>
                   <div className="mt-3 space-y-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
+                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                       recent browser trail
                     </div>
                     {session.recent_actions.length === 0 ? (
-                      <div className="text-[10px] text-white/35">No recorded browser actions.</div>
+                      <div className="text-[10px] kb-text-muted">No recorded browser actions.</div>
                     ) : (
                       session.recent_actions.map((action, index) => (
                         <div
                           key={`${session.session_id}-${action.ts}-${index}`}
-                          className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2"
+                          className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">
+                            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                               {action.kind} · {action.op}
                             </div>
-                            <div className="text-[9px] font-mono text-white/30">
+                            <div className="text-[9px] font-mono kb-text-muted">
                               {new Date(action.ts).toLocaleTimeString(chronosSpeechLocale())}
                             </div>
                           </div>
-                          <div className="mt-1 text-[10px] text-white/45">
+                          <div className="mt-1 text-[10px] kb-text-muted">
                             {action.tab_id && (
                               <span className="mr-2">
                                 tab:{' '}
-                                <span className="font-mono text-white/65">{action.tab_id}</span>
+                                <span className="font-mono kb-text-secondary">{action.tab_id}</span>
                               </span>
                             )}
                             {action.ref && (
                               <span className="mr-2">
-                                ref: <span className="font-mono text-white/65">{action.ref}</span>
+                                ref:{' '}
+                                <span className="font-mono kb-text-secondary">{action.ref}</span>
                               </span>
                             )}
                             {action.selector && (
                               <span>
                                 selector:{' '}
-                                <span className="font-mono text-white/55">{action.selector}</span>
+                                <span className="font-mono kb-text-muted">{action.selector}</span>
                               </span>
                             )}
                           </div>
@@ -5026,7 +5046,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title="Browser Guidance">
-          <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/50">
+          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Browser sessions stay fast only while they are leased. Prefer `snapshot + ref`, then
             export recorded trails as Playwright specs in either strict or hint mode.
           </div>
@@ -5070,55 +5090,57 @@ export function MissionIntelligence({
               data.browserConversationSessions.map((session) => (
                 <div
                   key={session.session_id}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                      <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                         {session.session_id}
                       </div>
-                      <div className="mt-1 text-[10px] text-white/45">
-                        surface: <span className="font-mono text-white/70">{session.surface}</span>{' '}
-                        · mode: <span className="font-mono text-white/70">{session.mode}</span>
+                      <div className="mt-1 text-[10px] kb-text-muted">
+                        surface:{' '}
+                        <span className="font-mono kb-text-secondary">{session.surface}</span> ·
+                        mode: <span className="font-mono kb-text-secondary">{session.mode}</span>
                       </div>
                     </div>
                     <div
                       className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                         session.status === 'completed'
-                          ? 'bg-green-500/15 text-green-300'
+                          ? 'kb-status-positive-surface kb-status-positive'
                           : session.status === 'awaiting_confirmation'
-                            ? 'bg-yellow-500/10 text-yellow-200'
+                            ? 'kb-status-warning-surface kb-status-warning'
                             : session.status === 'failed'
-                              ? 'bg-red-500/15 text-red-200'
-                              : 'bg-cyan-500/15 text-cyan-200'
+                              ? 'kb-status-negative-surface kb-status-negative'
+                              : 'kb-surface-accent kb-text-accent'
                       }`}
                     >
                       {session.status}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                     <div>
-                      intent: <span className="text-white/80">{session.goal_summary || 'n/a'}</span>
+                      intent:{' '}
+                      <span className="kb-text-primary">{session.goal_summary || 'n/a'}</span>
                     </div>
                     <div>
                       current step:{' '}
-                      <span className="text-white/80">{session.active_step || 'n/a'}</span>
+                      <span className="kb-text-primary">{session.active_step || 'n/a'}</span>
                     </div>
                     <div>
                       waiting for confirmation:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {String(session.pending_confirmation)}
                       </span>
                     </div>
                     <div>
                       available actions:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {session.candidate_target_count}
                       </span>
                     </div>
                     <div>
                       updated:{' '}
-                      <span className="font-mono text-white/80">
+                      <span className="font-mono kb-text-primary">
                         {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
                       </span>
                     </div>
@@ -5143,7 +5165,7 @@ export function MissionIntelligence({
                 : null;
               return latestAction ? (
                 <>
-                  <div className="mr-2 flex items-center rounded-lg border border-white/6 bg-white/[0.03] px-3 py-1.5 text-[10px] text-white/55">
+                  <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[10px] kb-text-muted">
                     {mt('chronos_surfaces', 'surfaces')}
                     <span className="ml-2">{latestAction.operation}</span>
                     <span className="ml-2">
@@ -5158,7 +5180,7 @@ export function MissionIntelligence({
                           current === latestAction.event_id ? null : latestAction.event_id || null
                         )
                       }
-                      className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                     >
                       {expandedGlobalSurfaceActionId === latestAction.event_id
                         ? mt('chronos_hide_latest_action', 'hide latest action')
@@ -5174,7 +5196,7 @@ export function MissionIntelligence({
                         surfaceActionTarget === `all:${latestAction.operation}`
                       }
                       title={retryAction?.disabledReason}
-                      className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {surfaceActionTarget === `all:${latestAction.operation}`
                         ? mt('chronos_retrying', 'retrying')
@@ -5191,13 +5213,13 @@ export function MissionIntelligence({
                 onClick={() => runSurfaceControl(null, action.operation)}
                 disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
                 title={action.disabledReason}
-                className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {surfaceActionTarget === `all:${action.operation}` ? 'working' : action.label}
               </button>
             ))}
             {getSharedDisabledReason(data.controlActionAvailability.globalSurface) && (
-              <div className="w-full text-[10px] text-white/40">
+              <div className="w-full text-[10px] kb-text-muted">
                 {getSharedDisabledReason(data.controlActionAvailability.globalSurface)}
               </div>
             )}
@@ -5220,7 +5242,7 @@ export function MissionIntelligence({
           })()}
           <div className="space-y-3">
             {data.surfaces.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
               </div>
             ) : (
@@ -5234,7 +5256,7 @@ export function MissionIntelligence({
                   <div
                     id={toDomId('surface', surface.id)}
                     key={surface.id}
-                    className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                    className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                   >
                     {(() => {
                       const latestAction = getLatestSurfaceControlAction(
@@ -5242,8 +5264,8 @@ export function MissionIntelligence({
                         surface.id
                       );
                       return latestAction ? (
-                        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                             {mt('chronos_last_control_action', 'last control action')}
                           </div>
                           <ActionStatusBadge action={latestAction} />
@@ -5252,10 +5274,10 @@ export function MissionIntelligence({
                     })()}
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">
+                        <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
                           {surface.id}
                         </div>
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/35">
+                        <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
                           {surface.kind} ·{' '}
                           {surface.startupMode || mt('chronos_background', 'background')} ·{' '}
                           {surface.running
@@ -5266,22 +5288,22 @@ export function MissionIntelligence({
                       <div
                         className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                           surface.health === 'healthy'
-                            ? 'bg-green-500/15 text-green-300'
+                            ? 'kb-status-positive-surface kb-status-positive'
                             : surface.health === 'unhealthy'
-                              ? 'bg-red-500/15 text-red-300'
-                              : 'bg-yellow-500/10 text-yellow-200'
+                              ? 'kb-status-negative-surface kb-status-negative'
+                              : 'kb-status-warning-surface kb-status-warning'
                         }`}
                       >
                         {surface.health}
                       </div>
                     </div>
-                    <div className="mt-2 text-[10px] text-white/50">
-                      pid: <span className="font-mono text-white/75">{surface.pid ?? '-'}</span>
+                    <div className="mt-2 text-[10px] kb-text-muted">
+                      pid: <span className="font-mono kb-text-secondary">{surface.pid ?? '-'}</span>
                       {surface.detail ? (
                         <>
                           {' '}
                           · {mt('chronos_detail', 'detail')}:{' '}
-                          <span className="font-mono text-white/75">{surface.detail}</span>
+                          <span className="font-mono kb-text-secondary">{surface.detail}</span>
                         </>
                       ) : null}
                     </div>
@@ -5291,13 +5313,13 @@ export function MissionIntelligence({
                       >
                         {surface.controlSummary}
                       </div>
-                      <div className="text-[10px] text-white/45">
+                      <div className="text-[10px] kb-text-muted">
                         {mt('chronos_control_summary', 'control summary')}
                       </div>
                       {surface.controlRequestedBy && (
-                        <div className="text-[10px] text-white/35">
+                        <div className="text-[10px] kb-text-muted">
                           {mt('chronos_requested_by', 'requested by')}{' '}
-                          <span className="font-mono text-white/60">
+                          <span className="font-mono kb-text-secondary">
                             {surface.controlRequestedBy}
                           </span>
                         </div>
@@ -5324,7 +5346,7 @@ export function MissionIntelligence({
                                     : latestAction.event_id || null
                                 )
                               }
-                              className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                             >
                               {expandedSurfaceCardActionId === latestAction.event_id
                                 ? mt('chronos_hide_latest_action', 'hide latest action')
@@ -5341,7 +5363,7 @@ export function MissionIntelligence({
                                   surfaceActionTarget === `${surface.id}:${latestAction.operation}`
                                 }
                                 title={retryAction?.disabledReason}
-                                className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 {surfaceActionTarget === `${surface.id}:${latestAction.operation}`
                                   ? mt('chronos_retrying', 'retrying')
@@ -5351,8 +5373,8 @@ export function MissionIntelligence({
                           </>
                         );
                       })()}
-                      <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-300/10 bg-emerald-400/[0.04] px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">
+                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
+                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
                           {mt('chronos_safe_actions', 'safe actions')}
                         </div>
                         {safeSurfaceActions.map((action) => (
@@ -5373,13 +5395,13 @@ export function MissionIntelligence({
                           </button>
                         ))}
                         {safeDisabledReason && (
-                          <div className="w-full text-[10px] text-white/40">
+                          <div className="w-full text-[10px] kb-text-muted">
                             {safeDisabledReason}
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">
+                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
+                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
                           {mt(
                             'chronos_risky_actions_approval_required',
                             'risky actions · approval required'
@@ -5415,7 +5437,7 @@ export function MissionIntelligence({
                           </button>
                         ))}
                         {riskyDisabledReason && (
-                          <div className="w-full text-[10px] text-white/40">
+                          <div className="w-full text-[10px] kb-text-muted">
                             {riskyDisabledReason}
                           </div>
                         )}
@@ -5448,7 +5470,7 @@ export function MissionIntelligence({
         </Panel>
 
         <Panel title={mt('chronos_control_model', 'Control Model')}>
-          <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-4 text-[11px] leading-6 text-white/55">
+          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] leading-6 kb-text-muted">
             {mt(
               'chronos_control_model_description',
               'Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.'
@@ -5468,8 +5490,8 @@ export function MissionIntelligence({
               }}
               className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.18em] transition ${
                 messageMissionFilter === 'all'
-                  ? 'border-cyan-300/20 bg-cyan-400/10 text-cyan-100/85'
-                  : 'border-white/10 bg-white/5 text-white/45 hover:bg-white/10'
+                  ? 'kb-border-accent kb-surface-accent kb-text-accent'
+                  : 'kb-border-subtle kb-surface-raised/5 kb-text-muted hover:kb-surface-raised'
               }`}
             >
               {mt('chronos_all_missions', 'all missions')}
@@ -5484,8 +5506,8 @@ export function MissionIntelligence({
                 }}
                 className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.18em] transition ${
                   messageMissionFilter === mission.missionId
-                    ? 'border-cyan-300/20 bg-cyan-400/10 text-cyan-100/85'
-                    : 'border-white/10 bg-white/5 text-white/45 hover:bg-white/10'
+                    ? 'kb-border-accent kb-surface-accent kb-text-accent'
+                    : 'kb-border-subtle kb-surface-raised/5 kb-text-muted hover:kb-surface-raised'
                 }`}
               >
                 {mission.missionId}
@@ -5494,7 +5516,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredAgentMessages.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-warning/30">
+              <div className="text-[11px] italic kb-status-warning">
                 {mt(
                   'chronos_no_mission_scoped_messages',
                   'No mission-scoped agent messages observed yet.'
@@ -5504,7 +5526,7 @@ export function MissionIntelligence({
               filteredAgentMessages.map((message, index) => (
                 <div
                   key={`${message.agentId}-${message.ts}-${index}`}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <div
@@ -5512,23 +5534,25 @@ export function MissionIntelligence({
                     >
                       {messageTypeLabel(message.type)}
                     </div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] kb-text-secondary">
                       {message.agentId}
                     </div>
                     {message.teamRole && (
-                      <div className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/45">
+                      <div className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                         {message.teamRole}
                       </div>
                     )}
                     {message.missionId && (
-                      <div className="text-[10px] text-white/35">{message.missionId}</div>
+                      <div className="text-[10px] kb-text-muted">{message.missionId}</div>
                     )}
-                    <div className="ml-auto text-[9px] font-mono text-white/30">
+                    <div className="ml-auto text-[9px] font-mono kb-text-muted">
                       {new Date(message.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
-                  <div className="mt-2 text-[11px] leading-6 text-white/82">{message.content}</div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
+                  <div className="mt-2 text-[11px] leading-6 kb-text-primary">
+                    {message.content}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                     <span>
                       {mt('chronos_owner', 'owner')}: {message.ownerType}/{message.ownerId}
                     </span>
@@ -5551,7 +5575,7 @@ export function MissionIntelligence({
 
         <div ref={missionThreadPanelRef}>
           <Panel title={mt('chronos_selected_mission_thread', 'Selected Mission Thread')}>
-            <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
               <span>
                 {effectiveMissionId
                   ? `thread · ${effectiveMissionId}`
@@ -5560,18 +5584,18 @@ export function MissionIntelligence({
                       'select a mission to inspect the thread'
                     )}
               </span>
-              <span className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] tracking-[0.16em] text-white/55">
+              <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] tracking-[0.16em] kb-text-muted">
                 {missionPinStatusLabel}
               </span>
               {effectiveMissionId ? (
                 <button
                   type="button"
                   onClick={() => focusMissionCard(effectiveMissionId)}
-                  className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[9px] tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/14"
+                  className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 text-[9px] tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                 >
                   <span className="inline-flex items-center gap-2">
                     <span>Card</span>
-                    <span className="rounded-full border border-cyan-200/20 bg-cyan-200/10 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-cyan-50/80">
+                    <span className="rounded-full border kb-border-accent kb-surface-accent px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-accent">
                       C
                     </span>
                   </span>
@@ -5590,7 +5614,7 @@ export function MissionIntelligence({
                 missionThread.map((entry, index) => (
                   <div
                     key={`${entry.type}-${entry.agentId}-${entry.ts}-${index}`}
-                    className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                    className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <div
@@ -5598,20 +5622,22 @@ export function MissionIntelligence({
                       >
                         {messageTypeLabel(entry.type)}
                       </div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] kb-text-secondary">
                         {entry.label}
                       </div>
                       {entry.teamRole && (
-                        <div className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/45">
+                        <div className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                           {entry.teamRole}
                         </div>
                       )}
-                      <div className="ml-auto text-[9px] font-mono text-white/30">
+                      <div className="ml-auto text-[9px] font-mono kb-text-muted">
                         {new Date(entry.ts).toLocaleString(chronosSpeechLocale())}
                       </div>
                     </div>
-                    <div className="mt-2 text-[11px] leading-6 text-white/82">{entry.content}</div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
+                    <div className="mt-2 text-[11px] leading-6 kb-text-primary">
+                      {entry.content}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                       {entry.channel && (
                         <span>
                           {mt('chronos_channel', 'channel')}: {entry.channel}
@@ -5643,25 +5669,25 @@ export function MissionIntelligence({
               filteredA2AHandoffs.map((handoff, index) => (
                 <div
                   key={`${handoff.sender}-${handoff.receiver}-${handoff.ts}-${index}`}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[9px] uppercase tracking-[0.2em] text-cyan-100/80">
+                    <div className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.2em] kb-text-accent">
                       a2a handoff
                     </div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] kb-text-secondary">
                       {handoff.sender} → {handoff.receiver}
                     </div>
                     {handoff.teamRole && (
-                      <div className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/45">
+                      <div className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                         {handoff.teamRole}
                       </div>
                     )}
-                    <div className="ml-auto text-[9px] font-mono text-white/30">
+                    <div className="ml-auto text-[9px] font-mono kb-text-muted">
                       {new Date(handoff.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
-                  <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-white/35">
+                  <div className="mt-2 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
                     {mt('chronos_mission', 'mission')}: {handoff.missionId}
                     {handoff.intent
                       ? ` · ${mt('chronos_intent', 'intent')}: ${handoff.intent}`
@@ -5669,11 +5695,11 @@ export function MissionIntelligence({
                     {handoff.performative ? ` · ${handoff.performative}` : ''}
                   </div>
                   {handoff.promptExcerpt && (
-                    <div className="mt-2 text-[11px] leading-6 text-white/80">
+                    <div className="mt-2 text-[11px] leading-6 kb-text-primary">
                       {handoff.promptExcerpt}
                     </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
+                  <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
                     {handoff.channel && (
                       <span>
                         {mt('chronos_channel', 'channel')}: {handoff.channel}
@@ -5707,13 +5733,13 @@ function MetricCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/5 bg-black/25 px-4 py-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-white/40">
+    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] kb-text-muted">
         {icon}
         <span>{label}</span>
       </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-white/90">{value}</div>
-      <div className="mt-1 text-[10px] text-white/35">{detail}</div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight kb-text-primary">{value}</div>
+      <div className="mt-1 text-[10px] kb-text-muted">{detail}</div>
     </div>
   );
 }
@@ -5730,24 +5756,22 @@ function MiniSummaryCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/42">
+    <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] kb-text-muted">
         {icon}
         <span>{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-white/88">{value}</div>
-      <div className="mt-1 text-[10px] text-white/38">{detail}</div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight kb-text-primary">{value}</div>
+      <div className="mt-1 text-[10px] kb-text-muted">{detail}</div>
     </div>
   );
 }
 
 function Panel({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <div id={id} className="rounded-2xl border border-white/5 bg-black/25 p-4 scroll-mt-6">
+    <div id={id} className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4 scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">
-          {title}
-        </div>
+        <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">{title}</div>
       </div>
       {children}
     </div>
@@ -5764,15 +5788,15 @@ function RuntimeCell({
   accent: 'emerald' | 'gold' | 'red' | 'cyan';
 }) {
   const accentClass = {
-    emerald: 'text-emerald-300/80',
-    gold: 'text-kyberion-warning/80',
-    red: 'text-red-300/80',
-    cyan: 'text-cyan-300/80',
+    emerald: 'kb-status-positive',
+    gold: 'kb-status-warning',
+    red: 'kb-status-negative',
+    cyan: 'kb-text-accent',
   }[accent];
 
   return (
-    <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
-      <div className="text-[9px] uppercase tracking-[0.22em] text-white/35">{label}</div>
+    <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+      <div className="text-[9px] uppercase tracking-[0.22em] kb-text-muted">{label}</div>
       <div className={`mt-2 text-lg font-semibold ${accentClass}`}>{value}</div>
     </div>
   );

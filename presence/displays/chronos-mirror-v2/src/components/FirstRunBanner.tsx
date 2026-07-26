@@ -67,36 +67,36 @@ export function FirstRunBanner() {
   const ja = locale === 'ja';
 
   return (
-    <div className="mx-1 mt-2 flex items-start gap-3 rounded-2xl border border-cyan-400/25 bg-gradient-to-r from-cyan-500/10 via-cyan-400/5 to-transparent p-4">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-cyan-300">
+    <div className="mx-1 mt-2 flex items-start gap-3 rounded-2xl border kb-border-accent bg-gradient-to-r from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent p-4">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full kb-surface-accent kb-text-accent">
         <Sparkles size={14} />
       </div>
-      <div className="flex-1 text-[12px] leading-relaxed text-white/80">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/80">First Run</div>
-        <div className="mt-1 text-white/85">
+      <div className="flex-1 text-[12px] leading-relaxed kb-text-primary">
+        <div className="text-[10px] uppercase tracking-[0.3em] kb-text-accent">First Run</div>
+        <div className="mt-1 kb-text-primary">
           {ja ? (
             <>
-              ようこそ、<span className="font-semibold text-white">{name}</span>{' '}
-              さん。アイデンティティは <span className="font-mono text-cyan-300">{agentId}</span>{' '}
+              ようこそ、<span className="font-semibold kb-text-primary">{name}</span>{' '}
+              さん。アイデンティティは <span className="font-mono kb-text-accent">{agentId}</span>{' '}
               として確定していますが、agent runtime はまだ起動していません。
             </>
           ) : (
             <>
-              Welcome, <span className="font-semibold text-white">{name}</span>. Identity is sealed
-              as <span className="font-mono text-cyan-300">{agentId}</span>, but no agent runtime is
-              live yet.
+              Welcome, <span className="font-semibold kb-text-primary">{name}</span>. Identity is
+              sealed as <span className="font-mono kb-text-accent">{agentId}</span>, but no agent
+              runtime is live yet.
             </>
           )}
         </div>
-        <ol className="mt-2 list-decimal pl-4 text-white/65 text-[11.5px] space-y-0.5">
+        <ol className="mt-2 list-decimal pl-4 kb-text-secondary text-[11.5px] space-y-0.5">
           {ja ? (
             <>
               <li>
-                左レールの <span className="font-bold text-white/85">Prereq Check</span> と{' '}
-                <span className="font-bold text-white/85">Setup Report</span> を実行する。
+                左レールの <span className="font-bold kb-text-primary">Prereq Check</span> と{' '}
+                <span className="font-bold kb-text-primary">Setup Report</span> を実行する。
               </li>
               <li>
-                右上の <span className="font-bold text-white/85">Agent Runtimes</span>{' '}
+                右上の <span className="font-bold kb-text-primary">Agent Runtimes</span>{' '}
                 を開き、最初のエージェントを起動する。
               </li>
               <li>Verify チェック(Vital Check / Diagnostics)でエコシステムの健全性を確認する。</li>
@@ -105,12 +105,12 @@ export function FirstRunBanner() {
           ) : (
             <>
               <li>
-                Run <span className="font-bold text-white/85">Prereq Check</span> and{' '}
-                <span className="font-bold text-white/85">Setup Report</span> from the left rail.
+                Run <span className="font-bold kb-text-primary">Prereq Check</span> and{' '}
+                <span className="font-bold kb-text-primary">Setup Report</span> from the left rail.
               </li>
               <li>
-                Open <span className="font-bold text-white/85">Agent Runtimes</span> (top-right) and
-                Spawn First Agent.
+                Open <span className="font-bold kb-text-primary">Agent Runtimes</span> (top-right)
+                and Spawn First Agent.
               </li>
               <li>
                 Run a Verify check (Vital Check / Diagnostics) to confirm the ecosystem is healthy.

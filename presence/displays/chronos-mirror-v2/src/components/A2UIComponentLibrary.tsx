@@ -43,7 +43,11 @@ export const KyberionGauge = ({
   const tx = useA2UIText();
   const percentage = Math.min(100, Math.max(0, value));
   const color =
-    percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-kyberion-warning' : 'bg-red-500';
+    percentage >= 80
+      ? 'kb-status-positive-surface'
+      : percentage >= 50
+        ? 'kb-status-warning-surface'
+        : 'kb-status-negative-surface';
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="flex justify-between text-[10px] uppercase tracking-widest opacity-60">
@@ -53,7 +57,7 @@ export const KyberionGauge = ({
           {unit}
         </span>
       </div>
-      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+      <div className="h-1.5 w-full kb-surface-raised/5 rounded-full overflow-hidden border kb-border-subtle">
         <div
           className={`h-full ${color} transition-all duration-1000 ease-out`}
           style={{ width: `${percentage}%` }}
@@ -76,15 +80,12 @@ export const KyberionLog = ({
   const tx = useA2UIText();
   return (
     <div className="flex flex-col gap-3 w-full">
-      <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2 text-slate-300/80">
+      <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2 kb-text-secondary">
         <Info size={12} /> {tx(titleKey, title)}
       </div>
-      <div className="bg-slate-950/70 rounded-2xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[320px] border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="kb-surface-well rounded-2xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[320px] border kb-border-subtle shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         {lines.map((line, i) => (
-          <div
-            key={i}
-            className="opacity-70 border-l border-cyan-200/20 pl-3 leading-5 break-words"
-          >
+          <div key={i} className="opacity-70 border-l kb-border-accent pl-3 leading-5 break-words">
             {line}
           </div>
         ))}
@@ -109,18 +110,18 @@ export const KyberionTable = ({
   return (
     <div className="flex flex-col gap-3 w-full">
       {title && (
-        <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">
+        <div className="text-[10px] uppercase tracking-widest opacity-60 kb-text-secondary">
           {tx(titleKey, title)}
         </div>
       )}
-      <div className="bg-slate-950/70 rounded-2xl border border-white/8 overflow-hidden overflow-x-auto shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="kb-surface-well rounded-2xl border kb-border-subtle overflow-hidden overflow-x-auto shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="border-b border-white/10 bg-white/[0.03]">
+            <tr className="border-b kb-border-subtle kb-surface-raised">
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className="px-4 py-3 text-left uppercase tracking-widest text-slate-400/85 font-bold whitespace-nowrap"
+                  className="px-4 py-3 text-left uppercase tracking-widest kb-text-secondary font-bold whitespace-nowrap"
                 >
                   {h}
                 </th>
@@ -129,9 +130,9 @@ export const KyberionTable = ({
           </thead>
           <tbody>
             {rows.map((row, ri) => (
-              <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.03] transition">
+              <tr key={ri} className="border-b kb-border-subtle hover:kb-surface-raised transition">
                 {(Array.isArray(row) ? row : Object.values(row)).map((cell: any, ci: number) => (
-                  <td key={ci} className="px-4 py-3 text-slate-100/75 align-top">
+                  <td key={ci} className="px-4 py-3 kb-text-secondary align-top">
                     {typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}
                   </td>
                 ))}
@@ -159,35 +160,35 @@ export const KyberionStatus = ({
   const tx = useA2UIText();
   const config: Record<string, { icon: React.ReactNode; border: string }> = {
     ok: {
-      icon: <CheckCircle size={14} className="text-green-500" />,
-      border: 'border-green-500/20',
+      icon: <CheckCircle size={14} className="kb-status-positive" />,
+      border: 'kb-status-positive-border',
     },
     warning: {
-      icon: <AlertTriangle size={14} className="text-yellow-500" />,
-      border: 'border-yellow-500/20',
+      icon: <AlertTriangle size={14} className="kb-status-warning" />,
+      border: 'kb-status-warning-border',
     },
     error: {
-      icon: <AlertTriangle size={14} className="text-red-500" />,
-      border: 'border-red-500/20',
+      icon: <AlertTriangle size={14} className="kb-status-negative" />,
+      border: 'kb-status-negative-border',
     },
     pending: {
-      icon: <Activity size={14} className="text-gray-500 animate-pulse" />,
-      border: 'border-gray-500/20',
+      icon: <Activity size={14} className="kb-text-secondary animate-pulse" />,
+      border: 'kb-border-subtle',
     },
   };
   const c = config[status] || config.pending;
   return (
     <div
-      className={`flex items-center gap-3 p-3 bg-slate-950/55 rounded-xl border ${c.border} shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]`}
+      className={`flex items-center gap-3 p-3 kb-surface-well rounded-xl border ${c.border} shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]`}
     >
       {c.icon}
       <div className="flex-1">
-        <div className="text-[10px] uppercase tracking-widest text-white/78 font-bold">
+        <div className="text-[10px] uppercase tracking-widest kb-text-secondary font-bold">
           {tx(labelKey, label)}
         </div>
-        {detail && <div className="text-[9px] text-slate-300/45 mt-0.5">{detail}</div>}
+        {detail && <div className="text-[9px] kb-text-secondary mt-0.5">{detail}</div>}
       </div>
-      <div className="text-[9px] uppercase tracking-widest text-slate-300/45">{status}</div>
+      <div className="text-[9px] uppercase tracking-widest kb-text-secondary">{status}</div>
     </div>
   );
 };
@@ -202,7 +203,7 @@ export const KyberionKeyValue = ({
 }) => (
   <div className="flex flex-col gap-3 w-full">
     {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
-    <div className="bg-black/40 rounded-xl p-4 border border-white/5 space-y-2">
+    <div className="kb-surface-well rounded-xl p-4 border kb-border-subtle space-y-2">
       {(entries || []).map((entry, i) => (
         <div key={i} className="flex justify-between text-[10px]">
           <span className="opacity-40 uppercase tracking-widest">{entry.key}</span>
@@ -229,21 +230,21 @@ export const KyberionMetric = ({
 }) => {
   const trendIcon =
     trend === 'up' ? (
-      <ArrowUp size={12} className="text-green-400" />
+      <ArrowUp size={12} className="kb-status-positive" />
     ) : trend === 'down' ? (
-      <ArrowDown size={12} className="text-red-400" />
+      <ArrowDown size={12} className="kb-status-negative" />
     ) : (
       <Minus size={12} className="opacity-30" />
     );
   return (
-    <div className="bg-slate-950/60 rounded-2xl p-4 border border-white/8 flex flex-col gap-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="text-[9px] uppercase tracking-widest text-slate-400/85">{label}</div>
+    <div className="kb-surface-well rounded-2xl p-4 border kb-border-subtle flex flex-col gap-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="text-[9px] uppercase tracking-widest kb-text-secondary">{label}</div>
       <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold font-mono text-white/90">{value}</span>
-        {unit && <span className="text-[10px] text-slate-400/70 mb-1">{unit}</span>}
+        <span className="text-2xl font-bold font-mono kb-text-primary">{value}</span>
+        {unit && <span className="text-[10px] kb-text-secondary mb-1">{unit}</span>}
         {trend && <span className="mb-1">{trendIcon}</span>}
       </div>
-      {description && <div className="text-[9px] text-slate-300/35 mt-1">{description}</div>}
+      {description && <div className="text-[9px] kb-text-secondary mt-1">{description}</div>}
     </div>
   );
 };
@@ -284,20 +285,20 @@ export const KyberionTimeline = ({
       </div>
     )}
     <div className="relative pl-6 space-y-4">
-      <div className="absolute left-2 top-1 bottom-1 w-px bg-kyberion-warning/20" />
+      <div className="absolute left-2 top-1 bottom-1 w-px kb-status-warning-surface" />
       {events.map((event, i) => {
         const dotColor =
           event.status === 'error'
-            ? 'bg-red-500'
+            ? 'kb-status-negative-surface'
             : event.status === 'warning'
-              ? 'bg-yellow-500'
+              ? 'kb-status-warning-surface'
               : event.status === 'ok'
-                ? 'bg-green-500'
-                : 'bg-kyberion-warning/40';
+                ? 'kb-status-positive-surface'
+                : 'kb-status-warning-surface';
         return (
           <div key={i} className="relative">
             <div
-              className={`absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full ${dotColor} border-2 border-black`}
+              className={`absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full ${dotColor} border-2 kb-border-subtle`}
             />
             <div className="text-[9px] font-mono opacity-40">{event.time}</div>
             <div className="text-[10px] opacity-70 font-bold">{event.label}</div>
@@ -323,10 +324,10 @@ export const KyberionProgress = ({
       {steps.map((step, i) => {
         const bg =
           step.status === 'done'
-            ? 'bg-green-500/80'
+            ? 'kb-status-positive-surface'
             : step.status === 'active'
-              ? 'bg-kyberion-warning/80 animate-pulse'
-              : 'bg-white/10';
+              ? 'kb-status-warning-surface animate-pulse'
+              : 'kb-surface-raised';
         const textColor = step.status === 'pending' ? 'opacity-30' : 'opacity-80';
         return (
           <React.Fragment key={i}>
@@ -359,27 +360,27 @@ export const KyberionAlert = ({
     { border: string; bg: string; text: string; icon: React.ReactNode }
   > = {
     info: {
-      border: 'border-blue-500/30',
-      bg: 'bg-blue-900/20',
-      text: 'text-blue-400',
+      border: 'kb-border-accent',
+      bg: 'kb-surface-accent',
+      text: 'kb-text-accent',
       icon: <Info size={14} />,
     },
     warning: {
-      border: 'border-yellow-500/30',
-      bg: 'bg-yellow-900/20',
-      text: 'text-yellow-400',
+      border: 'kb-status-warning-border',
+      bg: 'kb-status-warning-surface',
+      text: 'kb-status-warning',
       icon: <AlertTriangle size={14} />,
     },
     error: {
-      border: 'border-red-500/30',
-      bg: 'bg-red-900/20',
-      text: 'text-red-400',
+      border: 'kb-status-negative-border',
+      bg: 'kb-status-negative-surface',
+      text: 'kb-status-negative',
       icon: <AlertTriangle size={14} />,
     },
     success: {
-      border: 'border-green-500/30',
-      bg: 'bg-green-900/20',
-      text: 'text-green-400',
+      border: 'kb-status-positive-border',
+      bg: 'kb-status-positive-surface',
+      text: 'kb-status-positive',
       icon: <CheckCircle size={14} />,
     },
   };
@@ -407,19 +408,19 @@ export const KyberionHero = ({
   eyebrow?: string;
   status?: string;
 }) => (
-  <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+  <div className="rounded-[24px] border kb-border-subtle bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
     {eyebrow && (
-      <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">{eyebrow}</div>
+      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">{eyebrow}</div>
     )}
     <div className="mt-2 flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-white/92">{title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight kb-text-primary">{title}</h2>
         {description && (
-          <p className="mt-2 text-[12px] leading-6 text-slate-200/62">{description}</p>
+          <p className="mt-2 text-[12px] leading-6 kb-text-secondary">{description}</p>
         )}
       </div>
       {status && (
-        <div className="rounded-full border border-amber-200/15 bg-amber-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-100/80">
+        <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-3 py-1 text-[10px] uppercase tracking-[0.2em] kb-status-warning">
           {status}
         </div>
       )}
@@ -436,17 +437,17 @@ export const KyberionBadges = ({
   items: { label: string; tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' }[];
 }) => {
   const toneClass: Record<string, string> = {
-    neutral: 'border-white/10 bg-white/5 text-slate-200/75',
-    info: 'border-cyan-200/20 bg-cyan-300/10 text-cyan-100/85',
-    success: 'border-emerald-200/20 bg-emerald-300/10 text-emerald-100/85',
-    warning: 'border-amber-200/20 bg-amber-300/10 text-amber-100/85',
-    danger: 'border-rose-200/20 bg-rose-300/10 text-rose-100/85',
+    neutral: 'kb-border-subtle kb-surface-raised/5 kb-text-secondary',
+    info: 'kb-border-accent kb-surface-accent kb-text-accent',
+    success: 'kb-status-positive-border kb-status-positive-surface kb-status-positive',
+    warning: 'kb-status-warning-border kb-status-warning-surface kb-status-warning',
+    danger: 'kb-status-negative-border kb-status-negative-surface kb-status-negative',
   };
 
   return (
     <div className="flex flex-col gap-3 w-full">
       {title && (
-        <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">
+        <div className="text-[10px] uppercase tracking-widest opacity-60 kb-text-secondary">
           {title}
         </div>
       )}
@@ -474,11 +475,11 @@ export const KyberionSection = ({
   description?: string;
   items: { type: string; props: Record<string, any> }[];
 }) => (
-  <div className="flex flex-col gap-4 rounded-[24px] border border-white/8 bg-slate-950/50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+  <div className="flex flex-col gap-4 rounded-[24px] border kb-border-subtle kb-surface-well p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
     <div>
-      <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">{title}</div>
+      <div className="text-[10px] uppercase tracking-[0.24em] kb-text-muted">{title}</div>
       {description && (
-        <div className="mt-1 text-[11px] leading-5 text-slate-200/52">{description}</div>
+        <div className="mt-1 text-[11px] leading-5 kb-text-secondary">{description}</div>
       )}
     </div>
     <div className="flex flex-col gap-4">
@@ -507,7 +508,7 @@ export const KyberionCode = ({
         {language && <span className="font-mono">{language}</span>}
       </div>
     )}
-    <pre className="bg-black/60 rounded-xl p-4 font-mono text-[10px] overflow-x-auto border border-white/5 text-green-300/70 whitespace-pre-wrap">
+    <pre className="kb-surface-well rounded-xl p-4 font-mono text-[10px] overflow-x-auto border kb-border-subtle kb-status-positive whitespace-pre-wrap">
       {code}
     </pre>
   </div>
@@ -527,7 +528,7 @@ export const KyberionList = ({
       {items.map((item, i) => (
         <div
           key={i}
-          className="flex items-start gap-2 p-2 rounded-lg hover:bg-white/[0.02] transition"
+          className="flex items-start gap-2 p-2 rounded-lg hover:kb-surface-raised transition"
         >
           <span className="text-[11px] mt-0.5">{item.icon || '▸'}</span>
           <div className="flex-1">
@@ -552,14 +553,14 @@ export const KyberionCard = ({
   icon?: string;
   footer?: string;
 }) => (
-  <div className="bg-black/30 rounded-xl p-5 border border-white/5 flex flex-col gap-2">
+  <div className="kb-surface-well rounded-xl p-5 border kb-border-subtle flex flex-col gap-2">
     <div className="flex items-center gap-2">
       {icon && <span className="text-lg">{icon}</span>}
       <div className="text-[11px] font-bold uppercase tracking-widest opacity-70">{title}</div>
     </div>
     {description && <div className="text-[10px] opacity-50 leading-relaxed">{description}</div>}
     {footer && (
-      <div className="text-[8px] opacity-30 mt-2 pt-2 border-t border-white/5 font-mono">
+      <div className="text-[8px] opacity-30 mt-2 pt-2 border-t kb-border-subtle font-mono">
         {footer}
       </div>
     )}
@@ -595,7 +596,7 @@ export const KbLayoutGrid = ({
   variant?: string;
 }) => (
   <div
-    className={`grid ${variant === 'mission-focus' ? 'p-6 bg-slate-900/20' : ''}`}
+    className={`grid ${variant === 'mission-focus' ? 'p-6 kb-surface-well' : ''}`}
     style={{ gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}
   >
     {(items || []).map((item, i) => (
@@ -621,11 +622,11 @@ export const KbStatusOrbit = ({
     <div className="flex flex-col items-center gap-6 py-8">
       <div className="relative w-48 h-48 flex items-center justify-center">
         {/* Static Background Ring */}
-        <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+        <div className="absolute inset-0 rounded-full border-2 kb-border-subtle" />
 
         {/* Dynamic Pulse Ring */}
         <div
-          className={`absolute inset-0 rounded-full border-2 border-cyan-400/30 ${status === 'running' ? 'animate-ping' : ''}`}
+          className={`absolute inset-0 rounded-full border-2 kb-border-accent ${status === 'running' ? 'animate-ping' : ''}`}
         />
 
         {/* Phase Indicators */}
@@ -645,14 +646,14 @@ export const KbStatusOrbit = ({
               <div
                 className={`w-3 h-3 rounded-full border-2 ${
                   isCurrent
-                    ? 'bg-cyan-400 border-cyan-400 shadow-[0_0_10px_#00f2ff]'
+                    ? 'kb-surface-accent kb-border-accent shadow-[0_0_10px_#00f2ff]'
                     : isActive
-                      ? 'bg-cyan-900 border-cyan-400'
-                      : 'bg-slate-800 border-white/20'
+                      ? 'kb-surface-accent kb-border-accent'
+                      : 'kb-surface-well kb-border-subtle'
                 }`}
               />
               <div
-                className={`absolute top-5 left-1/2 -translate-x-1/2 text-[8px] uppercase tracking-tighter ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}
+                className={`absolute top-5 left-1/2 -translate-x-1/2 text-[8px] uppercase tracking-tighter ${isActive ? 'kb-text-accent' : 'kb-text-secondary'}`}
               >
                 {phase}
               </div>
@@ -664,7 +665,7 @@ export const KbStatusOrbit = ({
         <div className="text-center px-4">
           <div className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-1">Status</div>
           <div
-            className={`text-sm font-bold uppercase tracking-widest ${status === 'running' ? 'pulse-animation text-cyan-400' : 'text-white'}`}
+            className={`text-sm font-bold uppercase tracking-widest ${status === 'running' ? 'pulse-animation kb-text-accent' : 'kb-text-primary'}`}
           >
             {label}
           </div>
@@ -689,32 +690,32 @@ export const KbMissionCard = ({
   priority: string;
 }) => {
   const priorityColors = {
-    low: 'text-slate-400',
-    medium: 'text-cyan-400',
-    high: 'text-amber-400',
-    critical: 'text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]',
+    low: 'kb-text-secondary',
+    medium: 'kb-text-accent',
+    high: 'kb-status-warning',
+    critical: 'kb-status-negative shadow-[0_0_10px_rgba(239,68,68,0.3)]',
   };
 
   return (
-    <div className="kyberion-glass p-4 rounded-xl flex flex-col gap-3 group hover:border-cyan-400/30 transition-all">
+    <div className="kyberion-glass p-4 rounded-xl flex flex-col gap-3 group hover:kb-border-accent transition-all">
       <div className="flex justify-between items-start">
-        <div className="text-[10px] font-mono text-cyan-400/60 uppercase">{missionId}</div>
+        <div className="text-[10px] font-mono kb-text-accent uppercase">{missionId}</div>
         <div
           className={`text-[9px] uppercase font-bold tracking-widest ${(priorityColors as any)[priority] || priorityColors.medium}`}
         >
           {priority}
         </div>
       </div>
-      <div className="text-sm font-bold text-white/90 group-hover:text-cyan-400 transition-colors">
+      <div className="text-sm font-bold kb-text-primary group-hover:kb-text-accent transition-colors">
         {title}
       </div>
       <div className="flex items-center gap-2 opacity-40 text-[10px]">
         <Activity size={10} /> {owner}
       </div>
       <div className="mt-2">
-        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+        <div className="h-1 w-full kb-surface-raised/5 rounded-full overflow-hidden">
           <div
-            className="h-full bg-cyan-400 transition-all duration-1000"
+            className="h-full kb-surface-accent transition-all duration-1000"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -771,28 +772,28 @@ export const KbArtifactTile = ({
   const fileName = path.split('/').filter(Boolean).pop() || path;
   const icon = ARTIFACT_KIND_ICON[type.toLowerCase()] || '📦';
   return (
-    <div className="bg-slate-950/40 border border-white/5 rounded-lg p-3 transition hover:bg-slate-900/60">
+    <div className="kb-surface-well border kb-border-subtle rounded-lg p-3 transition hover:kb-surface-well">
       <button type="button" onClick={onSelect || onPreview || onOpen} className="w-full text-left">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-7 h-7 rounded bg-cyan-400/10 flex items-center justify-center text-[14px]">
+          <div className="w-7 h-7 rounded kb-surface-accent flex items-center justify-center text-[14px]">
             {icon}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-white/85">{fileName}</div>
-            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.14em] text-slate-500">
+            <div className="truncate text-[12px] font-semibold kb-text-primary">{fileName}</div>
+            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.14em] kb-text-secondary">
               <span>{type}</span>
               {missionId ? <span className="truncate">· {missionId}</span> : null}
               {updatedAt ? <span>· {updatedAt.slice(0, 10)}</span> : null}
             </div>
           </div>
           {missing ? (
-            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-amber-200/90">
+            <span className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] kb-status-warning">
               file missing
             </span>
           ) : null}
         </div>
-        <div className="mb-2 truncate text-[9px] font-mono text-slate-500/80">{path}</div>
-        <div className="bg-black/40 p-2 rounded text-[9px] font-mono text-slate-500 line-clamp-3">
+        <div className="mb-2 truncate text-[9px] font-mono kb-text-secondary">{path}</div>
+        <div className="kb-surface-well p-2 rounded text-[9px] font-mono kb-text-secondary line-clamp-3">
           {previewContent}
         </div>
       </button>
@@ -802,7 +803,7 @@ export const KbArtifactTile = ({
             <button
               type="button"
               onClick={onPreview}
-              className="rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16"
+              className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
             >
               preview
             </button>
@@ -811,7 +812,7 @@ export const KbArtifactTile = ({
             <button
               type="button"
               onClick={onOpen}
-              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+              className="rounded border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
             >
               open
             </button>
@@ -819,7 +820,7 @@ export const KbArtifactTile = ({
         </div>
       )}
       {missing ? (
-        <div className="mt-2 text-[9px] text-amber-200/70">
+        <div className="mt-2 text-[9px] kb-status-warning">
           元ファイルは掃除済みです(記録のみ残っています)
         </div>
       ) : null}
@@ -844,13 +845,13 @@ export const KbInterventionPanel = ({
   }) => void;
 }) => (
   <div
-    className={`p-6 rounded-2xl border-2 ${isBlocking ? 'border-amber-500/50 bg-amber-950/20' : 'border-cyan-500/50 bg-cyan-950/20'} shadow-2xl`}
+    className={`p-6 rounded-2xl border-2 ${isBlocking ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-accent kb-surface-accent'} shadow-2xl`}
   >
     <div className="flex items-center gap-3 mb-4">
-      <AlertTriangle className={isBlocking ? 'text-amber-500' : 'text-cyan-400'} />
+      <AlertTriangle className={isBlocking ? 'kb-status-warning' : 'kb-text-accent'} />
       <div className="text-xs font-bold uppercase tracking-[0.2em]">Intervention Required</div>
     </div>
-    <p className="text-sm text-white/80 mb-6 leading-relaxed">{reason}</p>
+    <p className="text-sm kb-text-primary mb-6 leading-relaxed">{reason}</p>
     <div className="flex gap-3">
       {(options || []).map((opt, i) => (
         <button
@@ -859,10 +860,10 @@ export const KbInterventionPanel = ({
           onClick={() => onSelectOption?.(opt)}
           className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-all ${
             opt.variant === 'primary'
-              ? 'bg-cyan-500 text-black hover:bg-cyan-400'
+              ? 'kb-surface-accent kb-text-inverse hover:kb-surface-accent'
               : opt.variant === 'danger'
-                ? 'bg-red-500 text-white hover:bg-red-400'
-                : 'bg-white/10 text-white hover:bg-white/20'
+                ? 'kb-status-negative-surface kb-text-primary hover:kb-status-negative-surface'
+                : 'kb-surface-raised kb-text-primary hover:kb-surface-raised'
           }`}
         >
           {opt.label}

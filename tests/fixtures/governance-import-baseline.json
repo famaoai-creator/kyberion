@@ -148,6 +148,7 @@
     "libs/core/virtual-audio-input-recording-bridge.ts",
     "satellites/voice-hub/server.ts",
     "scripts/check_catalog_integrity.test.ts",
+    "scripts/check_chronos_dom_contrast.ts",
     "scripts/check_contract_schemas.test.ts",
     "scripts/check_doc_examples.ts",
     "scripts/dependency_resolver.ts",
