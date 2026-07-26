@@ -60,15 +60,18 @@
 >    **2026-07-26追記(SO 実装)**: SO-01〜05 の全 5 件をサブエージェント委譲 + オーケストレータレビュー方式で実装し DONE へ更新(4 wave、各タスクをレビュー・独立再検証してタスク毎コミット)。最終ゲート: 937 テストファイル / 6,032 テスト全緑・typecheck / フルビルド緑。レビュー層が検出・修正した実問題: (1) SO-05 エスカレーションの undefined 応答クラッシュ(fail-open 化)、(2) SO-02 読み取りキャッシュのプロセス間鮮度問題(毎回 journal 再投影へ)、(3) XP-02 env allowlist の MISSION_ROLE 継承による owner 権限リーク(allowlist から除去 + 境界テスト固定)、(4) SO-04 承認実行時の権限再検証欠落(実行直前の再アサート + apply_failed 記録)、(5) steering テストの並列破壊(telegram surface + RUN_ID 隔離)。残注記: agent-runtime spawn 経路(agent-adapter / acp-mediator の ENV_WHITELIST)の MISSION_ROLE は別信頼面のため未変更 — 別途評価が必要。DONE 122 / PARTIAL 30 / TODO 7 へ更新。
 >    **2026-07-26追記**: 成果物・エージェントライフサイクル統治計画 AL-01〜04・NI-01〜05 を新設([ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md](./ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)。実コード突合に基づく2欠陥の解消: (AL) スコープ階層(tenant/project/mission/task/session)がアクセス制御・配置には在るのに保持に接続されておらず、purgeMissions の ADF パス誤りで自動アーカイブが事実上死亡・janitor 不稼働・sharedTmp 直書き63箇所・runtime/ 43サブディレクトリ中 TTL 3つのみ — を保持カタログ正本 + スコープ連動 GC で体系化。(NI) エージェント識別が agentId/role/persona/provider/peer_id/resource_id の6系統に分裂し永続台帳・actor 検証・trace 帰属が無い — を NHI(Non-Human Identity)業界合意(OWASP NHI Top 10 2025・SPIFFE/WIMSE・RFC 8693/8707・Entra Agent ID)へ写像可能な journal-backed AgentIdentity レジストリ + 委譲チェーン + task 粒度短命グラント + 自動オフボーディングで実装。AO-05/CO-06 の概念、SO-02 の event sourcing パターン、AA-03 の署名基盤を前提とする)。全件 TODO として追加し、DONE 122 / PARTIAL 30 / TODO 16 へ更新。
 >    **2026-07-26追記(AL/NI 実装)**: AL-01〜04・NI-01〜05 の全 9 件を実装・検証し DONE へ更新。保持面は「宣言(カタログ)+ イベント連動 GC + 復元可能な削除」で閉じた(未宣言 runtime ディレクトリ 0 / review_required 25 を実 dry-run で確認、削除は storage-retention.jsonl へ監査、soft-delete は trash index の trashed_at 起算 — rename が mtime を保つため mtime 起算では猶予が成立しない点を実装中に検出・修正)。識別面は台帳(NI-01)→ actor 検証(NI-02)→ 委譲チェーン(NI-03)→ タスク粒度グラント(NI-04)→ 自動オフボード + 孤児検出(NI-05)まで一本化し、mission finish/archive と tenant/project オフボードが保持と identity の双方を閉じる。オフボード動詞は `pnpm cli offboard` として operator 表面にも接続(既定ドライラン、--execute は --approved-by + --purpose 必須の二重 fail-closed、help は vocabulary catalog 経由で ja/en)。最終ゲート: core/integration 773 ファイル + scripts/tests 226 ファイル全緑・typecheck / lint 緑。DONE 131 / PARTIAL 30 / TODO 7 へ更新。
+>    **2026-07-26追記**: 国際化・多言語対応計画 I18N-01〜08 を新設([INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)。UX-03(ja↔en の一貫性回復、DONE)の後続として「第3言語をデータ追加だけで足せる状態」への構造転換を扱う。実測: 語彙カタログは 305キー/en・ja 欠落0・スキーマはロケール open と健全な一方、ロケール解決が5系統・env 3種・既定値が `ja`/`en` に分裂、`'ja'|'en'` リテラル型22箇所、コード直書き日本語 139ファイル/1,975行、`'ja-JP'` 直書き102箇所 + 引数なし `toLocaleString()` 32箇所(hermetic テスト方針とも衝突)、LLM 出力言語の制御3方式併存、新規ハードコードを止める lint 不在。「①言語を1箇所で決める→②文言をコードから出す→③新規を入れさせない→④疑似ロケールで実証」の順で構造から直す)。全件 TODO として追加。
+>    **2026-07-26追記(サマリ表の正本化)**: サマリ表が長期にわたり実表と乖離していた(表 122/30/16 に対し AL/NI 追記は 131/30/7)。**全計画表を ID 単位で機械集計して突合**した結果、各節の表どうしに**矛盾は 0 件**(同一 ID が異なる状態で二重掲載されている箇所は無い)であり、乖離はサマリ表の更新漏れのみと判明。実表を正としてサマリ表を **DONE 139 / PARTIAL 31 / TODO 15(計 185 件)** へ正本化した(I18N-01〜08 の新規 8 件を含む)。以後、各節の表を更新したら同時にサマリ表も更新すること。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
-| 判定    | 件数 |
-| ------- | ---- |
-| DONE    | 122  |
-| PARTIAL | 30   |
-| TODO    | 16   |
+| 判定     | 件数    |
+| -------- | ------- |
+| DONE     | 139     |
+| PARTIAL  | 31      |
+| TODO     | 15      |
+| **合計** | **185** |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -429,6 +432,21 @@
 | NI-03 | DONE | 2026-07-26 実装・検証済: DelegationChain(RFC 8693 nested-act 同型、root-first・不変 append)+ attenuation 検証(KD-05 権限順を profile registry から導出、drift テストつき)・mission worker dispatch で 2 リンク発生(trace onBehalfOf = root、ledger + task contract 埋込)・delegateTask は dispatch 前に sub-worker リンク追記と attenuation 検証(不正チェーンも fail-closed)・A2A は delegation_chain ヘッダを HMAC 対象化 + route 側検証と監査                                                                                                   |
 | NI-04 | DONE | 2026-07-26 実装・検証済: task-scoped grant(grantee_nhi_id + audience {mission_id, task_id?} + 必須 expires_at、RFC 8707 audience 拘束の内部版)を append-only JSONL 台帳で実装・TTL は clamp(要求/デッドライン/24h 上限の最小)・authority.resolveIdentityContext が audience 検証つきで capability→Authority 変換(SUDO は決して付与しない。authority.ts は secure-io 循環のため意図的な raw-read twin)・work-item dispatch で発行、done/blocked で自動収回、残りは lazy expiry・監査は発行/収回/audience 不一致 deny の 3 種                       |
 | NI-05 | DONE | 2026-07-26 実装・検証済: retireIdentitiesForScope(mission/project/tenant、冪等、権限不足は escalate せず skip 報告)を AL-03 finish closure・両 archive 動詞・AL-04 オフボード動詞にフック(全て best-effort)・孤児 NHI 検出(所属スコープが消えた非 retired identity)を baseline-check L9 として追加(needs_attention + レポートに nhi.orphans を明示。Layer union/ORDER を L9 へ拡張)・NHI 台帳レポートを operator packet(OperatorHomeSummary.nhiLedger)へ・写像文書 docs/developer/NHI_IDENTITY_MAPPING.md + GLOSSARY 4 項目                       |
+
+### I18N(国際化・多言語対応)
+
+正本: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)
+
+| ID      | 状態 | 残作業                                                                                                                                                                                                                                                                                          |
+| ------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I18N-01 | TODO | ロケール解決の単一正本化。実測5系統(`resolveOperatorLocale`/`resolveVocabularyLocale`/`cli.ts:resolveLocale`/`resolveQuestionLocale`/`normalizeChronosLocale`)・env 3種(`KYBERION_LOCALE`/`KYBERION_UI_LOCALE`/`LANG`)・既定値が `ja`/`en` に分裂しているのを `libs/core/locale.ts` 1関数へ統合 |
+| I18N-02 | TODO | 語彙カタログのメッセージ基盤化。305キーの `domains.ux` フラット同居を namespace 分割、ICU サブセットのプレースホルダ規約、キー型生成つき `t()`、`check:catalogs` の全ロケール網羅・双方向突合。`'ja'\|'en'` リテラル22箇所を除去                                                                |
+| I18N-03 | TODO | ハードコード禁止の ratchet。`check:i18n` を新設し baseline 凍結(実測 139ファイル/1,975行)+ 新規のみ fail を CI 接続。現行 `status-vocabulary-bypass` は1ファイルの呼び出し回数を数えるのみ                                                                                                      |
+| I18N-04 | TODO | 表面別の文言移行(ブリッジ4種 → concierge → chronos → libs/core オペレータ文言 → scripts → voice-hub → 残3表面)。既定ロケールでは出力文字列不変を原則にテスト破壊を回避                                                                                                                          |
+| I18N-05 | TODO | 日時・数値書式の国際化。`'ja-JP'`/`'en-US'` 直書き102箇所と引数なし `toLocaleString()` 32箇所を core の locale/timeZone 必須引数の formatter へ。PPTX/XLSX の書式固定も対象。hermetic テスト方針との衝突解消を兼ねる                                                                            |
+| I18N-06 | TODO | LLM 出力言語の契約化。3方式併存(「ユーザーの言語で返す」指示 / 日本語文言の prompt 埋め込み / 日本語固定テンプレート応答6箇所)を単一のプロンプト断片へ統一し、STT/TTS 言語も同一解決へ接続                                                                                                      |
+| I18N-07 | TODO | 第3言語での実証(proof-of-locale)。疑似ロケール `qps-ploc` を生成スクリプトで追加し、**実装コード変更ゼロ**で CLI/chronos/ブリッジが切り替わることを CI で検証。本計画成功の唯一の客観証拠                                                                                                       |
+| I18N-08 | TODO | 翻訳運用フローと drift 監査。キー追加儀式の practices 登録、ロケール別カバレッジレポート、`pipelines/i18n-drift-audit.json`(週次)、DOCUMENTATION_LOCALIZATION_POLICY の Vocabulary Rule 更新                                                                                                    |
 
 ### CO(Company OS)
 
