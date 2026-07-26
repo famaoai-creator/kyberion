@@ -24,7 +24,15 @@ function* walkFiles(dir: string): Generator<string> {
 
 describe('chronos ux vocabulary contract (UX-03)', () => {
   it('every uxText/uxLabel key referenced in chronos exists in the catalog', () => {
-    const ux = (vocabulary as any).domains?.ux ?? {};
+    // I18N-02: the catalog moved from a single flat `domains.ux` to
+    // namespaced domains. chronos's uxText/uxLabel still resolve by bare
+    // (unqualified) key across every namespace, so this contract flattens
+    // all namespaces the same way before checking membership.
+    const domains = (vocabulary as any).domains ?? {};
+    const flatKeys = new Set<string>();
+    for (const entries of Object.values(domains) as Array<Record<string, unknown>>) {
+      for (const key of Object.keys(entries || {})) flatKeys.add(key);
+    }
     const missing: string[] = [];
     let referenced = 0;
 
@@ -32,7 +40,7 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
       const source = safeReadFile(file, { encoding: 'utf8' }) as string;
       for (const match of source.matchAll(/ux(?:Text|Label)\(\s*'([^']+)'/g)) {
         referenced += 1;
-        if (!ux[match[1]]) {
+        if (!flatKeys.has(match[1])) {
           missing.push(`${path.relative(process.cwd(), file)}: ${match[1]}`);
         }
       }

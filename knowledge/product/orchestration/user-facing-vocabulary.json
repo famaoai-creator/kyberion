@@ -16,6 +16,10 @@
         "en": "Active Missions",
         "ja": "Active Missions"
       },
+      "chronos_agent_catalog_refreshed": {
+        "en": "Agent catalog refreshed. {manifests} manifests, {runtimes} active runtimes.",
+        "ja": "agent catalog を更新しました。manifests={manifests}、active runtimes={runtimes} です。"
+      },
       "chronos_agent_registry": {
         "en": "Agent Registry",
         "ja": "Agent Registry"
@@ -32,6 +36,10 @@
         "en": "all missions",
         "ja": "all missions"
       },
+      "chronos_audit_events_loaded": {
+        "en": "Recent orchestration and mission audit events loaded.",
+        "ja": "最近の orchestration と mission audit event を読み込みました。"
+      },
       "chronos_background": {
         "en": "background",
         "ja": "background"
@@ -39,6 +47,14 @@
       "chronos_bindings": {
         "en": "bindings",
         "ja": "bindings"
+      },
+      "chronos_build_test_completed": {
+        "en": "Build and test completed.",
+        "ja": "build と test が完了しました。"
+      },
+      "chronos_capability_audit_complete": {
+        "en": "Capability audit complete. {manifests} agent manifests were scanned.",
+        "ja": "capability audit が完了しました。{manifests} 件の agent manifest を確認しました。"
       },
       "chronos_channel": {
         "en": "channel",
@@ -148,6 +164,14 @@
         "en": "Close",
         "ja": "閉じる"
       },
+      "chronos_command_completed": {
+        "en": "{title} completed.",
+        "ja": "{title} が完了しました。"
+      },
+      "chronos_command_completed_with_warnings": {
+        "en": "{title} completed with warnings.",
+        "ja": "{title} が完了しました（警告あり）。"
+      },
       "chronos_control_actions_disabled": {
         "en": " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.",
         "ja": " · localadmin token が与えられるか localhost auto-admin が有効になるまで control action は無効です。"
@@ -176,13 +200,25 @@
         "en": "Custom",
         "ja": "Custom"
       },
+      "chronos_dashboard_ready": {
+        "en": "Dashboard ready. {missions} missions, {runtimes} agent runtimes, {pendingOutbox} pending outbox messages.",
+        "ja": "Dashboard を更新しました。missions={missions}、agent runtimes={runtimes}、pending outbox={pendingOutbox} です。"
+      },
       "chronos_detail": {
         "en": "detail",
         "ja": "detail"
       },
+      "chronos_diagnostics_loaded": {
+        "en": "Diagnostics loaded. {problematic} non-ready agent runtimes and {readyTools}/{totalTools} governed tool runtimes ready.",
+        "ja": "diagnostics を読み込みました。non-ready agent runtime は {problematic} 件、tool runtime は {readyTools}/{totalTools} ready です。"
+      },
       "chronos_durable_contracts_in_execution": {
         "en": "Durable contracts in execution",
         "ja": "実行中の durable contract"
+      },
+      "chronos_error_missing_query": {
+        "en": "Missing query",
+        "ja": "query がありません"
       },
       "chronos_focus_project": {
         "en": "focus project",
@@ -224,6 +260,10 @@
         "en": "kickoff",
         "ja": "kickoff"
       },
+      "chronos_knowledge_refreshed": {
+        "en": "Public knowledge surface refreshed.",
+        "ja": "public knowledge surface を更新しました。"
+      },
       "chronos_last_action": {
         "en": "last action",
         "ja": "last action"
@@ -244,9 +284,21 @@
         "en": "mission",
         "ja": "mission"
       },
+      "chronos_mission_confirm_alert_message": {
+        "en": "1) create 2) cancel — send the number or `yes`/`no` to start the mission.",
+        "ja": "1) 作成する 2) やめる — 番号か `はい` / `yes` を送るとミッションを開始します。"
+      },
+      "chronos_mission_confirm_instruction": {
+        "en": "1) create 2) cancel — reply with the number or `yes`/`no`.",
+        "ja": "1) 作成する 2) やめる — 番号か `はい` / `yes` で返信してください。"
+      },
       "chronos_mission_control_description": {
         "en": "Confirm which durable work items are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.",
         "ja": "どの durable work が active で、どこが blocked で、次に安全に介入すべき場所がどこかを確認します。mission を pin すると、下の unified thread をその文脈に絞れます。"
+      },
+      "chronos_mission_discarded": {
+        "en": "Understood — the mission proposal has been discarded. Nothing was created.",
+        "ja": "了解しました。ミッション提案は破棄しました(何も作成していません)。"
       },
       "chronos_mission_hero_description": {
         "en": "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.",
@@ -259,6 +311,10 @@
       "chronos_mission_intelligence": {
         "en": "Mission Intelligence",
         "ja": "ミッション・インテリジェンス"
+      },
+      "chronos_mission_list_refreshed": {
+        "en": "Mission list refreshed from active mission state. {missions} missions are visible to Chronos.",
+        "ja": "active mission state から mission list を更新しました。Chronos から {missions} 件の mission が見えています。"
       },
       "chronos_mission_loading": {
         "en": "Loading mission intelligence...",
@@ -308,6 +364,14 @@
         "en": "owner",
         "ja": "owner"
       },
+      "chronos_pipeline_completed": {
+        "en": "Pipeline {pipeline} completed.",
+        "ja": "Pipeline {pipeline} の実行が完了しました。"
+      },
+      "chronos_policy_loaded": {
+        "en": "Chronos operator policy loaded.",
+        "ja": "Chronos operator policy を読み込みました。"
+      },
       "chronos_project_bootstrap_notice": {
         "en": "This project does not have active missions yet. Current bootstrap work:",
         "ja": "この project にはまだ active mission がありません。現在の bootstrap work:"
@@ -319,6 +383,10 @@
       "chronos_projects_description": {
         "en": "Projects hold the long-lived intent context. Use this panel to see which durable work, bindings, and results already have a parent container before creating new missions.",
         "ja": "Project は長期の intent context を保持します。新しい mission を切る前に、どの durable work・binding・result が既に親 container を持つかをここで確認します。"
+      },
+      "chronos_provider_inventory_loaded": {
+        "en": "Provider inventory loaded for {manifests} manifests.",
+        "ja": "{manifests} 件の manifest について provider inventory を読み込みました。"
       },
       "chronos_qa_action_agents": {
         "en": "Agents",
@@ -536,6 +604,14 @@
         "en": "Preflight",
         "ja": "事前確認"
       },
+      "chronos_schedule_completed": {
+        "en": "Schedule {action} completed.",
+        "ja": "schedule {action} が完了しました。"
+      },
+      "chronos_schedule_failed": {
+        "en": "Schedule {action} failed.",
+        "ja": "schedule {action} に失敗しました。"
+      },
       "chronos_select_agent_definition": {
         "en": "Select Agent Definition",
         "ja": "Agent Definition を選択"
@@ -571,6 +647,10 @@
       "chronos_thread": {
         "en": "thread",
         "ja": "thread"
+      },
+      "chronos_vital_check_complete": {
+        "en": "Vital check complete. {missions} missions, {readyRuntimes}/{totalRuntimes} runtimes ready, {pendingOutbox} pending outbox messages.",
+        "ja": "vital check が完了しました。missions={missions}、ready runtimes={readyRuntimes}/{totalRuntimes}、pending outbox={pendingOutbox} です。"
       },
       "chronos_working": {
         "en": "working",
@@ -1236,7 +1316,12 @@
       }
     },
     "bridge": {},
-    "concierge": {},
+    "concierge": {
+      "concierge_escalation_hold_reply": {
+        "en": "We will confirm and get back to you shortly.",
+        "ja": "確認して回答します"
+      }
+    },
     "onboarding": {}
   }
 }

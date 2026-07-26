@@ -1,5 +1,6 @@
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
+import { renderMessage } from '@agent/core/message-format';
 
 /**
  * I18N-01: the canonical `SupportedLocale` type and normalization rules come
@@ -145,4 +146,29 @@ export function uxTextOr(key: string, fallback: string, locale = resolveChronosL
   const entry = lookupVocabularyEntry(key);
   if (!entry) return fallback;
   return entry[locale] || entry[catalog.default_locale] || fallback;
+}
+
+/**
+ * Interpolating variant — for messages that carry runtime values.
+ *
+ * `uxTextOr` alone is a trap for these: the catalog entry replaces the
+ * template, so any `${...}` the caller baked into its fallback silently
+ * disappears the moment the key resolves. "Dashboard を更新しました。
+ * missions=3、agent runtimes=5" becomes "Dashboard を更新しました。" — the
+ * message still reads as a sentence, so nothing looks broken, but every
+ * number the operator needed is gone.
+ *
+ * Catalog entries here use ICU-lite `{name}` placeholders, rendered by the
+ * shared `@agent/core/message-format` (import-free, hence browser-bundle
+ * safe — the same reason `locale-normalize` is split out).
+ */
+export function uxMessage(
+  key: string,
+  params: Record<string, string | number>,
+  fallback: string,
+  locale = resolveChronosLocale()
+): string {
+  const entry = lookupVocabularyEntry(key);
+  const template = entry ? entry[locale] || entry[catalog.default_locale] : undefined;
+  return renderMessage(template ?? fallback, params);
 }

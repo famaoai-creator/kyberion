@@ -1389,7 +1389,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6919,
+      "size": 6920,
       "type": "json"
     },
     {
@@ -4587,7 +4587,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 50607,
+      "size": 55185,
       "type": "json"
     },
     {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-26T10:47:00.630Z",
+  "generated_at": "2026-07-26T11:58:35.289Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -67,7 +67,7 @@
     "libs/core/capability-bundle-registry.ts": 2,
     "libs/core/capture-photo-task-session-executor.ts": 2,
     "libs/core/ceo-surface-summary.ts": 14,
-    "libs/core/customer-conversation.ts": 3,
+    "libs/core/customer-conversation.ts": 1,
     "libs/core/deal-documents.ts": 12,
     "libs/core/deal-store.ts": 3,
     "libs/core/environment-capability-probes.ts": 6,
@@ -137,7 +137,6 @@
     "satellites/imessage-bridge/src/index.ts": 1,
     "satellites/slack-bridge/src/index.ts": 7,
     "satellites/voice-hub/server.ts": 142,
-    "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts": 28,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 5,
     "presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts": 1,
     "presence/displays/chronos-mirror-v2/src/app/page.tsx": 37,

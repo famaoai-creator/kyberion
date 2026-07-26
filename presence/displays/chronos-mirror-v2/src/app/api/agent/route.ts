@@ -7,7 +7,12 @@ import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 import { guardRequest } from '../../../lib/api-guard';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
-import { normalizeChronosLocale, selectChronosLocaleText } from '../../../lib/ux-vocabulary';
+import {
+  normalizeChronosLocale,
+  uxMessage,
+  uxTextOr,
+  type SupportedLocale,
+} from '../../../lib/ux-vocabulary';
 
 async function loadChronosCore() {
   const [
@@ -394,11 +399,7 @@ async function issueChronosMissionFromProposal(
   };
 }
 
-function l(locale: 'en' | 'ja', en: string, ja: string): string {
-  return selectChronosLocaleText(locale, { en, ja });
-}
-
-async function tryHandleDeterministicPipelineQuery(query: string, locale: 'en' | 'ja') {
+async function tryHandleDeterministicPipelineQuery(query: string, locale: SupportedLocale) {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
@@ -412,10 +413,11 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: 'en' |
 
   return {
     status: 'ok',
-    response: l(
-      locale,
+    response: uxMessage(
+      'chronos_pipeline_completed',
+      { pipeline: match[1] },
       `Pipeline ${match[1]} completed.`,
-      `Pipeline ${match[1]} の実行が完了しました。`
+      locale
     ),
     a2ui: [
       {
@@ -444,7 +446,7 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: 'en' |
   };
 }
 
-async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
+async function tryHandleChronosQuickAction(query: string, locale: SupportedLocale) {
   const match = query.match(QUICK_ACTION_PATTERN);
   if (!match) return null;
 
@@ -509,10 +511,14 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
     const ok = result.status === 0;
     return {
       status: ok ? 'ok' : 'warning',
-      response: l(
-        locale,
+      // Two keys rather than one with an embedded conditional: the original
+      // spliced '（警告あり）' into the template with a ternary, which cannot
+      // be expressed in the catalog without putting Japanese back into code.
+      response: uxMessage(
+        ok ? 'chronos_command_completed' : 'chronos_command_completed_with_warnings',
+        { title },
         `${title} completed${ok ? '' : ' with warnings'}.`,
-        `${title} が完了しました${ok ? '' : '（警告あり）'}。`
+        locale
       ),
       a2ui: [
         {
@@ -553,7 +559,12 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const serialized = JSON.stringify(result, null, 2);
       return {
         status: 'ok',
-        response: l(locale, `Schedule ${action} completed.`, `schedule ${action} が完了しました。`),
+        response: uxMessage(
+          'chronos_schedule_completed',
+          { action },
+          `Schedule ${action} completed.`,
+          locale
+        ),
         a2ui: [
           {
             type: 'display:hero',
@@ -581,7 +592,12 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const message = String(err?.message || err || 'schedule action failed');
       return {
         status: 'warning',
-        response: l(locale, `Schedule ${action} failed.`, `schedule ${action} に失敗しました。`),
+        response: uxMessage(
+          'chronos_schedule_failed',
+          { action },
+          `Schedule ${action} failed.`,
+          locale
+        ),
         a2ui: [
           {
             type: 'display:hero',
@@ -662,10 +678,15 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
 
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_dashboard_ready',
+          {
+            missions: missions.length,
+            runtimes: runtime.length,
+            pendingOutbox,
+          },
           `Dashboard ready. ${missions.length} missions, ${runtime.length} agent runtimes, ${pendingOutbox} pending outbox messages.`,
-          `Dashboard を更新しました。missions=${missions.length}、agent runtimes=${runtime.length}、pending outbox=${pendingOutbox} です。`
+          locale
         ),
         a2ui: [
           {
@@ -718,10 +739,11 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const missions = collectActiveMissions();
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_mission_list_refreshed',
+          { missions: missions.length },
           `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`,
-          `active mission state から mission list を更新しました。Chronos から ${missions.length} 件の mission が見えています。`
+          locale
         ),
         a2ui: [
           {
@@ -759,10 +781,11 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry]));
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_agent_catalog_refreshed',
+          { manifests: manifests.length, runtimes: runtimes.length },
           `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`,
-          `agent catalog を更新しました。manifests=${manifests.length}、active runtimes=${runtimes.length} です。`
+          locale
         ),
         a2ui: [
           {
@@ -805,10 +828,16 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
         core.listSurfaceOutboxMessages('chronos').length;
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_vital_check_complete',
+          {
+            missions: missions.length,
+            readyRuntimes: readyCount,
+            totalRuntimes: runtimes.length,
+            pendingOutbox,
+          },
           `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`,
-          `vital check が完了しました。missions=${missions.length}、ready runtimes=${readyCount}/${runtimes.length}、pending outbox=${pendingOutbox} です。`
+          locale
         ),
         a2ui: [
           {
@@ -862,10 +891,15 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
         .slice(-10);
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_diagnostics_loaded',
+          {
+            problematic: problematic.length,
+            readyTools: readyToolRuntimes.length,
+            totalTools: toolRuntimes.items.length,
+          },
           `Diagnostics loaded. ${problematic.length} non-ready agent runtimes and ${readyToolRuntimes.length}/${toolRuntimes.items.length} governed tool runtimes ready.`,
-          `diagnostics を読み込みました。non-ready agent runtime は ${problematic.length} 件、tool runtime は ${readyToolRuntimes.length}/${toolRuntimes.items.length} ready です。`
+          locale
         ),
         a2ui: [
           {
@@ -936,10 +970,11 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
         .map(([capability, count]) => [capability, String(count)]);
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_capability_audit_complete',
+          { manifests: manifests.length },
           `Capability audit complete. ${manifests.length} agent manifests were scanned.`,
-          `capability audit が完了しました。${manifests.length} 件の agent manifest を確認しました。`
+          locale
         ),
         a2ui: [
           {
@@ -971,10 +1006,11 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       );
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxMessage(
+          'chronos_provider_inventory_loaded',
+          { manifests: manifests.length },
           `Provider inventory loaded for ${manifests.length} manifests.`,
-          `${manifests.length} 件の manifest について provider inventory を読み込みました。`
+          locale
         ),
         a2ui: [
           {
@@ -1042,10 +1078,10 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       }
       return {
         status: 'ok',
-        response: l(
-          locale,
-          `Recent orchestration and mission audit events loaded.`,
-          `最近の orchestration と mission audit event を読み込みました。`
+        response: uxTextOr(
+          'chronos_audit_events_loaded',
+          'Recent orchestration and mission audit events loaded.',
+          locale
         ),
         a2ui: [
           {
@@ -1067,11 +1103,7 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const chronosPolicy = securityPolicy.authority_role_permissions?.chronos_operator || {};
       return {
         status: 'ok',
-        response: l(
-          locale,
-          'Chronos operator policy loaded.',
-          'Chronos operator policy を読み込みました。'
-        ),
+        response: uxTextOr('chronos_policy_loaded', 'Chronos operator policy loaded.', locale),
         a2ui: [
           {
             type: 'display:hero',
@@ -1111,10 +1143,10 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
         .slice(0, 24);
       return {
         status: 'ok',
-        response: l(
-          locale,
+        response: uxTextOr(
+          'chronos_knowledge_refreshed',
           'Public knowledge surface refreshed.',
-          'public knowledge surface を更新しました。'
+          locale
         ),
         a2ui: [
           {
@@ -1133,7 +1165,7 @@ async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
       const testOutput = core.safeExec('pnpm', ['test'], { cwd: PROJECT_ROOT });
       return {
         status: 'ok',
-        response: l(locale, 'Build and test completed.', 'build と test が完了しました。'),
+        response: uxTextOr('chronos_build_test_completed', 'Build and test completed.', locale),
         a2ui: [
           {
             type: 'display:section',
@@ -1190,7 +1222,7 @@ export async function POST(req: NextRequest) {
 
     if (!query) {
       return NextResponse.json(
-        { error: l(locale, 'Missing query', 'query がありません') },
+        { error: uxTextOr('chronos_error_missing_query', 'Missing query', locale) },
         { status: 400 }
       );
     }
@@ -1199,10 +1231,10 @@ export async function POST(req: NextRequest) {
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: 'ok',
-        response: l(
-          locale,
+        response: uxTextOr(
+          'chronos_mission_discarded',
           'Understood — the mission proposal has been discarded. Nothing was created.',
-          '了解しました。ミッション提案は破棄しました(何も作成していません)。'
+          locale
         ),
         timestamp: new Date().toISOString(),
       });
@@ -1307,8 +1339,13 @@ export async function POST(req: NextRequest) {
       cwd: PROJECT_ROOT,
       missionId,
       teamRole,
+      // I18N-06: English instruction text — the output-language contract
+      // itself is injected once, centrally, by
+      // `runSurfaceConversation`/`buildOutputLanguageInstruction` in
+      // `surface-runtime-orchestrator.ts`, so this no longer needs (and must
+      // not hardcode) a target language.
       delegationSummaryInstruction:
-        '以下は委任先エージェントからの回答です。ユーザーに分かりやすくまとめて表示してください。必要なら A2UI を使ってください。追加の A2A は出力しないでください。',
+        'Below are delegated responses. Summarize them clearly for the user, using A2UI blocks where helpful. Do not emit any additional A2A blocks.',
     });
     scheduleChronosShutdown();
 
@@ -1345,7 +1382,11 @@ export async function POST(req: NextRequest) {
       const confirmationText = [
         conversation.text || 'I can turn this into a mission.',
         '',
-        '1) 作成する 2) やめる — 番号か `はい` / `yes` で返信してください。',
+        uxTextOr(
+          'chronos_mission_confirm_instruction',
+          '1) create 2) cancel — reply with the number or `yes`/`no`.',
+          locale
+        ),
       ]
         .join('\n')
         .trim();
@@ -1388,8 +1429,11 @@ export async function POST(req: NextRequest) {
                   props: {
                     severity: 'info',
                     title: 'Reply with confirmation',
-                    message:
-                      '1) 作成する 2) やめる — 番号か `はい` / `yes` を送るとミッションを開始します。',
+                    message: uxTextOr(
+                      'chronos_mission_confirm_alert_message',
+                      '1) create 2) cancel — send the number or `yes`/`no` to start the mission.',
+                      locale
+                    ),
                   },
                 },
               ],
