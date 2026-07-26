@@ -217,6 +217,23 @@ export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-id
 // I18N-01: single source of truth for locale resolution.
 export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
 export type { SupportedLocale, LocaleContext } from './locale.js';
+// I18N-05: single source of truth for locale/timeZone-aware date, number,
+// currency, and relative-time formatting.
+export {
+  formatDateTime,
+  formatNumber,
+  formatCurrency,
+  formatRelativeTime,
+  resolveTimeZone,
+} from './format.js';
+export type {
+  DateTimeFormatStyle,
+  FormatDateTimeOptions,
+  FormatNumberOptions,
+  FormatCurrencyOptions,
+  FormatRelativeTimeOptions,
+  ResolveTimeZoneContext,
+} from './format.js';
 export * from './company.js';
 export * from './financial-model.js';
 export * from './finance-controller.js';

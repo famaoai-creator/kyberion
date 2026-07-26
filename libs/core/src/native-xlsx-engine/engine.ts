@@ -153,7 +153,7 @@ export async function generateNativeXlsx(
     if (drawingIdx > 0 && sheet.drawing) {
       zip.addFile(
         `xl/drawings/drawing${drawingIdx}.xml`,
-        Buffer.from(generateDrawing(sheet.drawing), 'utf8')
+        Buffer.from(generateDrawing(sheet.drawing, protocol.locale), 'utf8')
       );
     }
 
