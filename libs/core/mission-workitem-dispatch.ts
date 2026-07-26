@@ -54,6 +54,8 @@ import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { findMissionPath } from './path-resolver.js';
 import { closeTaskArtifacts } from './mission-artifact-closure.js';
+import { deriveAgentNhiId } from './agent-identity.js';
+import { issueTaskGrantBestEffort, revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
 import type { MissionState } from './mission-types.js';
 import {
@@ -1221,6 +1223,16 @@ async function reflectTicketOutcome(input: {
     }
   }
 
+  // NI-04: task completion ('done') and failure ('blocked') auto-revoke the
+  // short-lived task grants issued at dispatch — no standing authority
+  // survives the task contract. A 'review' outcome keeps the contract open,
+  // so its grants are left to lazy expiry instead. Best-effort next to
+  // AL-03's GC above: revocation must never fail the reflection that already
+  // recorded the outcome.
+  if (ticketState === 'done' || ticketState === 'blocked') {
+    revokeGrantsForTaskBestEffort(input.missionId, taskId, `task ${ticketState}`);
+  }
+
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {
     const githubIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(githubPath);
@@ -2207,6 +2219,29 @@ async function dispatchMissionWorkItemsRound(
           '\n'
         )
       : dispatchContext.prompt;
+
+    // NI-04: short-lived, audience-bound task grant for the dispatched
+    // worker (RFC 8707 analogue — see task-scoped-grants.ts). Grantee = the
+    // assignee's agent-registry runtime identity mapped to its NI-01 nhi_id
+    // (the same slug the NI-03 delegation chain's worker link carries);
+    // audience = this mission/task. Work item contracts declare no
+    // capability needs today, so the scope is empty: the grant proves task
+    // membership without conferring extra authorities. Best-effort — a grant
+    // failure never blocks the dispatch itself. Revoked at
+    // reflectTicketOutcome (done/blocked); lazy expiry covers the rest.
+    const grantTaskId = getWorkItemTaskId(item);
+    const granteeNhiId = assigneePeerId ? deriveAgentNhiId(assigneePeerId) : null;
+    if (grantTaskId && granteeNhiId) {
+      const taskGrant = issueTaskGrantBestEffort({
+        granteeNhiId,
+        audience: { missionId, taskId: grantTaskId },
+        scope: {},
+        issuedBy: 'workitem-dispatch',
+      });
+      if (taskGrant) {
+        record.notes.push(`task grant issued: ${taskGrant.grant_id}`);
+      }
+    }
 
     const response = await obtainTaskResultResponse({
       missionId,
