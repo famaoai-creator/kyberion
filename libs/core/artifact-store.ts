@@ -170,6 +170,16 @@ function sanitizeScopeSegment(value: string, label: string): string {
   return cleaned;
 }
 
+/**
+ * Canonical directory name for a task's scoped artifacts
+ * (`<missionDir>/artifacts/<class>/task-<taskId>/`). Exported so AL-03 GC
+ * (`mission-artifact-closure.ts`) resolves the same directory a
+ * `writeScopedArtifact` task-scope write produced, using the same sanitizer.
+ */
+export function scopedTaskArtifactDirName(taskId: string): string {
+  return `task-${sanitizeScopeSegment(taskId, 'task')}`;
+}
+
 function sanitizeArtifactName(name: string): string {
   const segments = String(name ?? '')
     .split('/')
@@ -300,7 +310,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
       ? path.join(
           artifactsRoot,
           input.artifact_class,
-          `task-${sanitizeScopeSegment(input.scope.task as string, 'task')}`
+          scopedTaskArtifactDirName(input.scope.task as string)
         )
       : path.join(artifactsRoot, input.artifact_class);
   const absolutePath = path.join(targetDir, ...name.split('/'));

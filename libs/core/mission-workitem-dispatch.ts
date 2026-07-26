@@ -53,6 +53,7 @@ import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { findMissionPath } from './path-resolver.js';
+import { closeTaskArtifacts } from './mission-artifact-closure.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
 import type { MissionState } from './mission-types.js';
 import {
@@ -1207,6 +1208,18 @@ async function reflectTicketOutcome(input: {
     },
     ticketState
   );
+
+  // AL-03: `done` is where this task contract's completion is finalized
+  // (ticket manifest + NEXT_TASKS both advanced above) — GC the task's
+  // disposable scoped artifacts (cache/tmp classes; evidence untouched).
+  // Best-effort: task GC must never fail the reflection that already
+  // recorded the outcome (closeTaskArtifacts itself never throws).
+  if (ticketState === 'done') {
+    const taskGc = closeTaskArtifacts(input.missionId, taskId, { missionDir: input.missionPath });
+    if (taskGc.status === 'error') {
+      notes.push(`task artifact GC skipped: ${taskGc.error || 'unknown error'}`);
+    }
+  }
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {

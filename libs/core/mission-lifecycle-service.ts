@@ -30,6 +30,8 @@ import { auditChain } from './audit-chain.js';
 import { buildMissionStatusView, listMissionSummaries } from './mission-read-model.js';
 import type { MissionStatusView, MissionSummary } from './mission-read-model.js';
 import { releaseOrchestratorSessionForMissionBestEffort } from './orchestrator-session.js';
+import { archiveMissionById } from './mission-maintenance.js';
+import type { ArchiveMissionByIdResult, PurgeMissionsResult } from './mission-maintenance.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -150,7 +152,19 @@ export type MissionLifecycleUnderlyingSystem = Pick<
   | 'dispatchMissionWorkItems'
   | 'pauseMission'
   | 'resumeMission'
+  | 'purgeMissions'
 >;
+
+export interface MissionLifecycleArchiveOptions extends MissionLifecycleVerbOptions {
+  /**
+   * Explicit operator targeting: archive this single completed/failed
+   * mission now, regardless of age. Omit for the policy-driven sweep
+   * (`purgeMissions`).
+   */
+  missionId?: string;
+  /** Policy-driven sweep only: preview candidates without moving anything. */
+  dryRun?: boolean;
+}
 
 /**
  * Governed facade instance bound to a specific mission root. Mirrors
@@ -178,7 +192,13 @@ function resolveSystem(
   return system ?? missionSystem;
 }
 
-export function buildMissionLifecycleService(explicitSystem?: MissionLifecycleUnderlyingSystem) {
+export function buildMissionLifecycleService(
+  explicitSystem?: MissionLifecycleUnderlyingSystem,
+  overrides?: {
+    /** Test seam for the targeted single-mission archive implementation. */
+    archiveMissionById?: typeof archiveMissionById;
+  }
+) {
   return {
     async create(
       id: string,
@@ -291,6 +311,27 @@ export function buildMissionLifecycleService(explicitSystem?: MissionLifecycleUn
           finalStatus: options?.finalStatus,
         })
       );
+    },
+
+    /**
+     * AL-03: governed archive verb. Without `missionId` it runs the
+     * policy-driven sweep (`purgeMissions` — completed/aged missions per the
+     * lifecycle ADF). With `missionId` it archives that single
+     * completed/failed mission immediately regardless of age (explicit
+     * operator action). Both paths are idempotent: re-archiving an
+     * already-archived or missing mission returns a structured no-op.
+     */
+    async archive(
+      options?: MissionLifecycleArchiveOptions
+    ): Promise<ArchiveMissionByIdResult | PurgeMissionsResult> {
+      const targeted = normalizeMissionId(options?.missionId);
+      return runGovernedVerb('archive', targeted, options, async () => {
+        if (targeted) {
+          const archiveOne = overrides?.archiveMissionById ?? archiveMissionById;
+          return archiveOne(targeted);
+        }
+        return resolveSystem(explicitSystem).purgeMissions(options?.dryRun ?? false);
+      });
     },
 
     async pause(id: string, note?: string, options?: MissionLifecycleVerbOptions) {

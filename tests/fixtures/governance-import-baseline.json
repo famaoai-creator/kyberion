@@ -24,6 +24,7 @@
     "libs/core/ledger.test.ts",
     "libs/core/meeting-participation-coordinator.test.ts",
     "libs/core/metrics.test.ts",
+    "libs/core/mission-artifact-closure.test.ts",
     "libs/core/mission-evidence-doc.test.ts",
     "libs/core/mission-hygiene.test.ts",
     "libs/core/mission-lifecycle-service.test.ts",

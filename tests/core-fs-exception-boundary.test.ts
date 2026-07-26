@@ -43,6 +43,8 @@ const allowedCoreFsImports = [
   'libs/core/output-artifacts.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission-maintenance.purge.test.ts',
+  // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.
+  'libs/core/mission-artifact-closure.test.ts',
   'libs/core/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',

@@ -456,6 +456,185 @@ describe('mission lifecycle finish gate', () => {
     ).toBe(true);
   });
 
+  it('AL-03: finish closes the mission tree — cache deleted, report/evidence kept, git bundled + .git removed, closure audited', async () => {
+    prepareMissionState('completed', undefined, undefined, {
+      requested_result: 'Mission closeout complete.',
+      success_criteria: ['The closeout note is saved'],
+      deliverable_kind: 'markdown',
+      evidence_required: true,
+      expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+      verification_method: 'self_check',
+    });
+    seedMissionEvidence('closeout.md', '# Closeout\nMission closeout complete.');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-1',
+            status: 'completed',
+            assigned_to: { role: 'operator', agent_id: 'implementation-architect' },
+            description: 'Close out the mission',
+            deliverable: 'evidence/closeout.md',
+            target_path: 'evidence/closeout.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    // Disposable + keepable scoped artifacts (AL-02 layout) and their index.
+    safeMkdir(`${missionPath}/artifacts/cache/tool-output`, { recursive: true });
+    safeWriteFile(`${missionPath}/artifacts/cache/tool-output/big.log`, 'x'.repeat(64));
+    safeMkdir(`${missionPath}/artifacts/report`, { recursive: true });
+    safeWriteFile(`${missionPath}/artifacts/report/final.md`, '# Final deliverable');
+    const missionRel = `active/missions/public/${missionId}`;
+    safeWriteFile(
+      `${missionPath}/artifacts/artifacts-index.jsonl`,
+      [
+        JSON.stringify({
+          name: 'tool-output/big.log',
+          artifact_class: 'cache',
+          path: `${missionRel}/artifacts/cache/tool-output/big.log`,
+          scope: { mission: missionId },
+          scope_kind: 'mission',
+          written_at: new Date().toISOString(),
+        }),
+        JSON.stringify({
+          name: 'final.md',
+          artifact_class: 'report',
+          path: `${missionRel}/artifacts/report/final.md`,
+          scope: { mission: missionId },
+          scope_kind: 'mission',
+          written_at: new Date().toISOString(),
+        }),
+      ].join('\n') + '\n'
+    );
+    // Real per-mission git repo so the KM-04 bundle step is exercised end to end.
+    safeExec('git', ['init', '-q'], { cwd: missionPath });
+    safeExec('git', ['add', '.'], { cwd: missionPath });
+    safeExec(
+      'git',
+      ['-c', 'user.name=al03', '-c', 'user.email=al03@test', 'commit', '-q', '-m', 'init'],
+      { cwd: missionPath }
+    );
+    // The quality gate requires mission-state latest_commit == mission repo HEAD.
+    const missionHead = safeExec('git', ['rev-parse', 'HEAD'], { cwd: missionPath }).trim();
+    const seededState = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    seededState.git.latest_commit = missionHead;
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(seededState, null, 2));
+
+    await finishMission(missionId, false, {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    });
+
+    const archivePath = pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`);
+    // Disposable classes deleted; deliverable/evidence kept; index rewritten.
+    expect(safeExistsSync(`${archivePath}/artifacts/cache`)).toBe(false);
+    expect(safeExistsSync(`${archivePath}/artifacts/report/final.md`)).toBe(true);
+    expect(safeExistsSync(`${archivePath}/evidence/closeout.md`)).toBe(true);
+    const archivedIndex = String(
+      safeReadFile(`${archivePath}/artifacts/artifacts-index.jsonl`, { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(archivedIndex).toHaveLength(1);
+    expect(archivedIndex[0].artifact_class).toBe('report');
+    // KM-04: git history preserved as a bundle, nested .git removed.
+    expect(safeExistsSync(`${archivePath}/evidence/mission-repo.bundle`)).toBe(true);
+    expect(safeExistsSync(`${archivePath}/.git`)).toBe(false);
+    // Idempotency marker travels with the archive.
+    expect(safeExistsSync(`${archivePath}/evidence/mission-closure.json`)).toBe(true);
+
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('archived');
+    expect(state.context.mission_artifact_closure).toMatchObject({
+      status: 'closed',
+      bundle_status: 'bundled',
+    });
+
+    // Deletion batch audited with the retention-catalog policy reference.
+    const closureAudit = String(
+      safeReadFile(pathResolver.sharedLogsAudit('mission-closure.jsonl'), { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .filter((line) => line.mission === missionId);
+    expect(closureAudit.length).toBeGreaterThan(0);
+    const lastAudit = closureAudit[closureAudit.length - 1];
+    expect(lastAudit).toMatchObject({
+      event: 'MISSION_ARTIFACTS_CLOSED',
+      policy_ref: 'knowledge/product/governance/storage-retention-catalog.json',
+    });
+    expect(lastAudit.deleted_directories).toContain(`${missionRel}/artifacts/cache`);
+  });
+
+  it('AL-03: a blocked finish (pending tasks) leaves the mission tree untouched — no closure, no marker, no audit', async () => {
+    prepareMissionState('completed', undefined, undefined, {
+      requested_result: 'Mission closeout complete.',
+      success_criteria: ['The closeout note is saved'],
+      deliverable_kind: 'markdown',
+      evidence_required: true,
+      expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+      verification_method: 'self_check',
+    });
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'pending-task',
+            status: 'planned',
+            assigned_to: { role: 'implementer' },
+            description: 'Not done yet',
+            deliverable: 'evidence/never-written.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeMkdir(`${missionPath}/artifacts/cache/tool-output`, { recursive: true });
+    safeWriteFile(`${missionPath}/artifacts/cache/tool-output/big.log`, 'keep-me-on-failure');
+    const auditPath = pathResolver.sharedLogsAudit('mission-closure.jsonl');
+    const auditLinesBefore = safeExistsSync(auditPath)
+      ? String(safeReadFile(auditPath, { encoding: 'utf8' }))
+          .trim()
+          .split('\n').length
+      : 0;
+
+    await finishMission(missionId, false, {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    });
+
+    // The finish was blocked by the exit gate: tree stays in place, cache
+    // intact, no closure marker, no new audit record.
+    expect(safeExistsSync(`${missionPath}/artifacts/cache/tool-output/big.log`)).toBe(true);
+    expect(safeExistsSync(`${missionPath}/evidence/mission-closure.json`)).toBe(false);
+    const auditLinesAfter = safeExistsSync(auditPath)
+      ? String(safeReadFile(auditPath, { encoding: 'utf8' }))
+          .trim()
+          .split('\n').length
+      : 0;
+    expect(auditLinesAfter).toBe(auditLinesBefore);
+  });
+
   it('goal satisfaction loop: dispatches gap tasks instead of completing, and escalates after max rounds', async () => {
     prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Deliver the launch summary report',

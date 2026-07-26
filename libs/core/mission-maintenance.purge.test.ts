@@ -178,4 +178,75 @@ describe('purgeMissions (AL-01)', () => {
     // The surviving active mission is still untouched.
     expect(fs.existsSync(path.join(tmpRoot, 'active', 'missions', 'MSN-OLD-ACTIVE'))).toBe(true);
   });
+
+  // AL-03: explicit operator-targeted archive (`archive --mission <ID>`).
+  it('archiveMissionById archives a young failed mission regardless of age, with an explicit audit record', async () => {
+    const youngFailedDir = seedMission('MSN-YOUNG-FAILED', 'failed', 1); // too young for purge-orphaned (>30d)
+
+    // The policy sweep must NOT take it (age condition unmet)…
+    const sweep = await mod.purgeMissions(tmpRoot, true);
+    expect(sweep.candidates.map((c) => c.mission)).not.toContain('MSN-YOUNG-FAILED');
+
+    // …but the explicit verb archives it now.
+    const result = await mod.archiveMissionById('msn-young-failed');
+    expect(result.status).toBe('archived');
+    expect(result.policy).toBe('purge-orphaned');
+    const target = path.join(tmpRoot, 'active', 'archive', 'failed_missions', 'MSN-YOUNG-FAILED');
+    expect(result.to).toBe(target);
+    expect(fs.existsSync(path.join(target, 'mission-state.json'))).toBe(true);
+    expect(fs.existsSync(youngFailedDir)).toBe(false);
+
+    const auditPath = path.join(
+      tmpRoot,
+      'active',
+      'shared',
+      'logs',
+      'audit',
+      'mission-purge.jsonl'
+    );
+    const entries = fs
+      .readFileSync(auditPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const entry = entries.find((e) => e.mission === 'MSN-YOUNG-FAILED');
+    expect(entry).toMatchObject({
+      event: 'MISSION_PURGE_ARCHIVED',
+      policy: 'purge-orphaned',
+      explicit: true,
+      to: target,
+    });
+  });
+
+  it('archiveMissionById is idempotent: an already-archived mission is a structured no-op', async () => {
+    const again = await mod.archiveMissionById('MSN-YOUNG-FAILED');
+    expect(again.status).toBe('already_archived');
+    expect(again.to).toBe(
+      path.join(tmpRoot, 'active', 'archive', 'failed_missions', 'MSN-YOUNG-FAILED')
+    );
+    // The archived copy is untouched.
+    expect(
+      fs.existsSync(
+        path.join(
+          tmpRoot,
+          'active',
+          'archive',
+          'failed_missions',
+          'MSN-YOUNG-FAILED',
+          'mission-state.json'
+        )
+      )
+    ).toBe(true);
+  });
+
+  it('archiveMissionById returns not_found for an unknown mission and not_archivable for a live one', async () => {
+    const missing = await mod.archiveMissionById('MSN-DOES-NOT-EXIST');
+    expect(missing.status).toBe('not_found');
+
+    const activeDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OLD-ACTIVE');
+    const live = await mod.archiveMissionById('MSN-OLD-ACTIVE');
+    expect(live.status).toBe('not_archivable');
+    expect(live.reason).toContain("'active'");
+    expect(fs.existsSync(activeDir)).toBe(true); // untouched
+  });
 });
