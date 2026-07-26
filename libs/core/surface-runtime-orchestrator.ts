@@ -7,7 +7,8 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
 import { safeExec, safeWriteFile } from './secure-io.js';
-import { resolveOperatorLocale } from './operator-identity.js';
+import { resolveLocale } from './locale.js';
+import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
@@ -1907,11 +1908,59 @@ export function shouldForceSlackDelegation(text: string): boolean {
   return shouldForceSurfaceDelegationFromProviderPolicy('slack', text);
 }
 
+const OUTPUT_LANGUAGE_NAMES: Readonly<Partial<Record<SupportedLocale, string>>> = {
+  en: 'English',
+  ja: 'Japanese',
+};
+
+/**
+ * I18N-06: the single prompt fragment answering "which language should this
+ * generation reply in". Modeled on the slack-bridge wording that already
+ * worked (`Produce the final Slack reply in the user language.`), but made
+ * deterministic by naming the resolved locale explicitly instead of relying
+ * on the model to infer it from context.
+ *
+ * Every surface-facing generation call site should inject this exactly
+ * once. Callers that already know the target language for this specific
+ * generation (a customer's bound language, a bridge's per-message derived
+ * language) pass it explicitly; omitting it resolves the operator's own
+ * locale via `resolveLocale()` — the right default for operator-facing
+ * surfaces (chronos, the internal bridges) where there is no separate
+ * "customer" whose language could differ from the operator's.
+ */
+export function buildOutputLanguageInstruction(locale?: string | null): string {
+  const resolved = normalizeLocale(locale) ?? resolveLocale();
+  const languageName = OUTPUT_LANGUAGE_NAMES[resolved] || resolved;
+  return `Produce the final reply in ${languageName}. Keep it concise and channel-appropriate.`;
+}
+
+/**
+ * I18N-06 task 4: `user_language` / "Derived language" signals (this file's
+ * own message-content heuristic, and `parseSlackSurfacePrompt`'s twin in
+ * `surface-runtime-router.ts`) are derived from what the user actually
+ * typed, not from `resolveLocale()` (onboarding identity / env / OS locale).
+ * The two usually agree; when they don't — e.g. an operator whose identity
+ * says `ja` writes one message in English — we must not silently pick a
+ * winner. This only warns; the derived value keeps deciding downstream
+ * behavior exactly as before (see call sites).
+ */
+function warnOnUserLanguageDisagreement(derivedLanguage: string | undefined, source: string): void {
+  const derived = normalizeLocale(derivedLanguage);
+  if (!derived) return;
+  const resolved = resolveLocale();
+  if (derived !== resolved) {
+    logger.warn(
+      `[i18n] user_language signal disagrees with resolveLocale(): derived="${derived}" (${source}) vs resolved="${resolved}" (operator identity/env). Keeping the derived value — resolveLocale() does not override it.`
+    );
+  }
+}
+
 export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   const threadTs = input.threadTs || input.ts || 'unknown';
   const channelType = input.channelType || 'unknown';
   const normalizedText = input.text.trim();
   const language = /[ぁ-んァ-ン一-龯]/.test(normalizedText) ? 'ja' : 'en';
+  warnOnUserLanguageDisagreement(language, 'buildSlackSurfacePrompt content heuristic');
   const executionMode = deriveSlackExecutionMode(normalizedText);
   return [
     'You are handling a Slack conversation as the Slack Surface Agent.',
@@ -2028,6 +2077,10 @@ async function routeSlackForcedDelegation(
   if (!parsed) {
     return routeForcedDelegation(receiver, query, senderAgentId, missionId);
   }
+  warnOnUserLanguageDisagreement(
+    parsed.derivedLanguage,
+    'parseSlackSurfacePrompt content heuristic'
+  );
 
   try {
     const response = await a2aBridge.route(
@@ -2314,7 +2367,7 @@ export async function runSurfaceConversation(
     return attachRoutingDecision(
       {
         text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, {
-          locale: resolveOperatorLocale(),
+          locale: resolveLocale(),
         }),
         a2uiMessages: [],
         a2aMessages: [],
@@ -2444,9 +2497,18 @@ export async function runSurfaceConversation(
     );
   }
 
-  const summaryInstruction = input.delegationSummaryInstruction
-    ? `${input.delegationSummaryInstruction}\n\n${buildDelegationSummaryInstruction()}`
-    : buildDelegationSummaryInstruction();
+  // I18N-06: the output-language fragment is injected here — the single
+  // choke point every surface (slack, chronos, discord, telegram,
+  // imessage) already funnels delegation-summary generation through —
+  // instead of each surface hardcoding (or omitting) its own language
+  // instruction.
+  const summaryInstruction = [
+    input.delegationSummaryInstruction,
+    buildDelegationSummaryInstruction(),
+    buildOutputLanguageInstruction(),
+  ]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join('\n\n');
 
   const summaryPrompt = `${summaryInstruction}\n\n${buildDelegationSummaryContext({
     originalQuery: routingText,

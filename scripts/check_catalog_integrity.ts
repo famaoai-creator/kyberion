@@ -1,11 +1,14 @@
 import * as AjvModule from 'ajv';
 import * as path from 'node:path';
 import {
+  extractPlaceholderNames,
   loadActuatorManifestCatalog,
   pathResolver,
+  resolveVocabularyEntry,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
+  safeStat,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { generateIndex } from './generate_knowledge_index.js';
@@ -79,7 +82,7 @@ function readJson<T>(relativePath: string): T {
   return readJsonFile(fullPath);
 }
 
-function validateCatalog(check: CatalogCheck, violations: string[]) {
+function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
   const schema = readJson<Record<string, unknown>>(check.schemaPath);
   const data = readJson<Record<string, unknown>>(check.dataPath);
   const validate = ajv.compile(schema);
@@ -195,24 +198,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   }
 
   if (check.id === 'user-facing-vocabulary') {
-    const typed = data as {
-      default_locale?: string;
-      domains?: Record<string, Record<string, Record<string, string>>>;
-    };
-    const defaultLocale = String(typed.default_locale || '');
-    const domains = typed.domains || {};
-    if (!defaultLocale) {
-      violations.push('user-facing-vocabulary: default_locale must not be empty');
-    }
-    for (const [domainName, domainEntries] of Object.entries(domains)) {
-      for (const [entryKey, localized] of Object.entries(domainEntries || {})) {
-        if (!localized[defaultLocale]) {
-          violations.push(
-            `user-facing-vocabulary: ${domainName}.${entryKey} must define the default locale "${defaultLocale}"`
-          );
-        }
-      }
-    }
+    validateUserFacingVocabulary(data, violations, warnings);
   }
 
   if (check.id === 'specialist-catalog') {
@@ -271,6 +257,187 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       violations.push('specialist-catalog: directory specialists must match snapshot specialists');
     }
   }
+}
+
+type VocabularyEntry = Record<string, string>;
+interface VocabularyCatalogShape {
+  default_locale?: string;
+  required_locales?: string[];
+  domains?: Record<string, Record<string, VocabularyEntry>>;
+}
+
+// I18N-02: directories scanned for both directions of the code<->catalog
+// cross-check below. `renderStatus`'s STATUS_KEY_MAP lives inside
+// ux-vocabulary.ts itself, so scanning libs/core already covers it for the
+// unused-key (reverse) check even though it is not one of the literal call
+// patterns scanned for the undefined-key (forward) check.
+const VOCABULARY_SCAN_DIRS = [
+  'libs/core',
+  'scripts',
+  'presence/displays/chronos-mirror-v2/src',
+  'presence/displays/operator-surface/src',
+  'presence/displays/concierge/src',
+  'satellites',
+  'tests',
+];
+
+function collectSourceFiles(rootRelativeDirs: string[]): string[] {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    if (!safeExistsSync(dir)) return;
+    for (const entry of safeReaddir(dir) as string[]) {
+      if (entry === 'node_modules' || entry === 'dist' || entry === '.next' || entry === '.git') {
+        continue;
+      }
+      const full = path.join(dir, entry);
+      const stat = safeStat(full);
+      if (stat.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (/\.(ts|tsx)$/.test(entry)) files.push(full);
+    }
+  };
+  for (const rel of rootRelativeDirs) walk(pathResolver.rootResolve(rel));
+  return files;
+}
+
+// Forward direction: a `t`, `uxText`, `uxLabel`, or `renderVocabularyText`
+// call whose literal key argument does not resolve against the catalog.
+// Restricted to these named call patterns (not a bare `t(` scan across every
+// directory) because `scripts/onboarding_wizard.ts` defines its own
+// unrelated two-argument `t(en, ja)` helper — a bare-`t(` scan would
+// misidentify its calls as vocabulary-key references and fail on every one
+// of them. `scripts/cli.ts` is the one script-level exception: its local
+// `t()` is a verified thin delegate to the core vocabulary `t()` (I18N-02),
+// so it is scanned by name.
+//
+// `uxTextOr` is deliberately excluded: per its own doc comment it is the
+// "fallback-carrying variant for DYNAMIC keys only" — a key it references is
+// allowed not to resolve (that's the point of the fallback argument), so
+// checking it here would turn an intentional escape hatch into a build
+// failure.
+const KNOWN_KEY_CALL_RE = /\b(?:uxText|uxLabel|renderVocabularyText)\(\s*'([^']+)'/g;
+const CLI_T_CALL_RE = /\bt\(\s*'([^']+)'/g;
+
+function findUndefinedKeyReferences(files: string[]): string[] {
+  const violations: string[] = [];
+  for (const file of files) {
+    const source = String(safeReadFile(file, { encoding: 'utf8' }) || '');
+    const isCliScript = file.endsWith(`${path.sep}scripts${path.sep}cli.ts`);
+    const matches = [
+      ...source.matchAll(KNOWN_KEY_CALL_RE),
+      ...(isCliScript ? source.matchAll(CLI_T_CALL_RE) : []),
+    ];
+    for (const match of matches) {
+      const key = match[1];
+      try {
+        if (!resolveVocabularyEntry(key)) {
+          violations.push(
+            `user-facing-vocabulary: ${path.relative(pathResolver.rootDir(), file)} references undefined key "${key}"`
+          );
+        }
+      } catch (error) {
+        violations.push(
+          `user-facing-vocabulary: ${path.relative(pathResolver.rootDir(), file)} references ambiguous key "${key}" (${(error as Error).message})`
+        );
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Reverse direction: a catalog key that no scanned file references as a
+ * quoted string literal at all (not restricted to the call patterns above —
+ * this also catches `STATUS_KEY_MAP`/`keyMap` object-literal values that are
+ * vocabulary keys but not passed directly to a `t()`-shaped call).
+ *
+ * Policy: **warning, not a build failure.** Unlike the forward check (a
+ * literal string that fails to resolve is unambiguously a typo/bug), "no
+ * quoted-literal occurrence anywhere in the scanned trees" has real false
+ * positive risk — a key can legitimately be referenced only via a template
+ * literal or computed key (`` uxText(`chronos_qa_action_${id}`) ``) that this
+ * regex-based scan cannot see. Failing the build on a heuristic with known
+ * blind spots would make `check:catalogs` untrustworthy; surfacing it as a
+ * warning keeps the signal (catalog hygiene, dead-key cleanup) without that
+ * risk. I18N-08's translation-ops audit is the place to make this stricter
+ * once a lower-false-positive detector exists.
+ */
+function findUnusedKeys(catalog: VocabularyCatalogShape, haystack: string): string[] {
+  const unused: string[] = [];
+  for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+    for (const key of Object.keys(entries || {})) {
+      if (!haystack.includes(`'${key}'`) && !haystack.includes(`"${key}"`)) {
+        unused.push(
+          `user-facing-vocabulary: ${namespace}.${key} is not referenced anywhere scanned`
+        );
+      }
+    }
+  }
+  return unused;
+}
+
+function validateUserFacingVocabulary(
+  data: Record<string, unknown>,
+  violations: string[],
+  warnings: string[]
+) {
+  const typed = data as VocabularyCatalogShape;
+  const defaultLocale = String(typed.default_locale || '');
+  const requiredLocales = typed.required_locales || [];
+  const domains = typed.domains || {};
+
+  if (!defaultLocale) {
+    violations.push('user-facing-vocabulary: default_locale must not be empty');
+  }
+  if (requiredLocales.length === 0) {
+    violations.push('user-facing-vocabulary: required_locales must not be empty');
+  }
+  if (defaultLocale && requiredLocales.length > 0 && !requiredLocales.includes(defaultLocale)) {
+    violations.push(
+      `user-facing-vocabulary: default_locale "${defaultLocale}" must be a member of required_locales`
+    );
+  }
+
+  for (const [domainName, domainEntries] of Object.entries(domains)) {
+    for (const [entryKey, localized] of Object.entries(domainEntries || {})) {
+      // Every required locale must be present (not just default_locale —
+      // I18N-02 closes the gap where a `ja`-missing key silently passed).
+      for (const locale of requiredLocales) {
+        if (!localized[locale]) {
+          violations.push(
+            `user-facing-vocabulary: ${domainName}.${entryKey} must define required locale "${locale}"`
+          );
+        }
+      }
+      // Placeholders must match across locales for the same key (en has
+      // `{name}`, ja does not -> fail).
+      const localeTexts = requiredLocales
+        .filter((locale) => typeof localized[locale] === 'string')
+        .map((locale) => ({ locale, text: localized[locale] }));
+      if (localeTexts.length > 1) {
+        const reference = localeTexts[0];
+        const referencePlaceholders = extractPlaceholderNames(reference.text).sort().join(',');
+        for (const other of localeTexts.slice(1)) {
+          const otherPlaceholders = extractPlaceholderNames(other.text).sort().join(',');
+          if (otherPlaceholders !== referencePlaceholders) {
+            violations.push(
+              `user-facing-vocabulary: ${domainName}.${entryKey} placeholders differ between "${reference.locale}" (${referencePlaceholders || 'none'}) and "${other.locale}" (${otherPlaceholders || 'none'})`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  const files = collectSourceFiles(VOCABULARY_SCAN_DIRS);
+  violations.push(...findUndefinedKeyReferences(files));
+
+  const haystack = files
+    .map((file) => String(safeReadFile(file, { encoding: 'utf8' }) || ''))
+    .join('\n');
+  warnings.push(...findUnusedKeys(typed, haystack));
 }
 
 function validateDesignTokenCatalog(violations: string[]) {
@@ -416,8 +583,9 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
 
 function main() {
   const violations: string[] = [];
+  const warnings: string[] = [];
   for (const check of CHECKS) {
-    validateCatalog(check, violations);
+    validateCatalog(check, violations, warnings);
   }
   validateDesignTokenCatalog(violations);
   validateCapabilitiesGuideDrift(violations);
@@ -427,6 +595,13 @@ function main() {
     violations.push(
       'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
     );
+  }
+
+  if (warnings.length > 0) {
+    console.warn('[check:catalogs] warnings (non-fatal):');
+    for (const warning of warnings.sort()) {
+      console.warn(`- ${warning}`);
+    }
   }
 
   if (violations.length > 0) {

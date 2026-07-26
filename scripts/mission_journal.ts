@@ -1,8 +1,11 @@
 import * as path from 'node:path';
 import {
+  formatDateTime,
   logger,
   pathResolver,
   resolveMissionJournalPolicy,
+  resolveOperatorLocale,
+  resolveTimeZone,
   safeExistsSync,
   safeReaddir,
 } from '@agent/core';
@@ -98,7 +101,10 @@ function renderJournal() {
     m.history.forEach((h, idx) => {
       const isLast = idx === m.history.length - 1;
       const prefix = isLast ? ' └── ' : ' ├── ';
-      const time = new Date(h.ts).toLocaleString();
+      const time = formatDateTime(h.ts, {
+        locale: resolveOperatorLocale(),
+        timeZone: resolveTimeZone(),
+      });
       console.log(
         `   ${chalk.gray(prefix)}${chalk.dim(time)}: ${chalk.white(h.event)} - ${chalk.italic(h.note)}`
       );

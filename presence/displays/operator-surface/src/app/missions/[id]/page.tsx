@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getMissionDetail, suggestedCommand } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
+import { formatNumber, resolveOperatorLocale } from '@agent/core';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +106,7 @@ export default async function MissionDetailPage({ params }: { params: { id: stri
                 <td style={td}>
                   <code>{f.name}</code>
                 </td>
-                <td style={td}>{f.bytes.toLocaleString()}</td>
+                <td style={td}>{formatNumber(f.bytes, { locale: resolveOperatorLocale() })}</td>
                 <td style={td}>{f.modified_at}</td>
               </tr>
             ))}

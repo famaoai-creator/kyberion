@@ -3,6 +3,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { normalizeLocale } from './locale-normalize.js';
 
 export interface DocumentContentsPolicyCatalog {
   version: string;
@@ -44,7 +45,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): DocumentContentsPolicyCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid document contents policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid document contents policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as DocumentContentsPolicyCatalog;
 }
@@ -66,9 +69,14 @@ export function loadDocumentContentsPolicyCatalog(): DocumentContentsPolicyCatal
 }
 
 export function resolveDocumentContentsLabel(locale?: string): string {
-  const normalized = String(locale || '').trim().toLowerCase();
+  // I18N-02: generic over whatever locale keys `title_by_locale` happens to
+  // carry — no hardcoded `ja` special case. Adding a locale is a data edit
+  // to the catalog (plus a `default` fallback), not a code change here.
+  const normalized = normalizeLocale(locale);
   const catalog = loadDocumentContentsPolicyCatalog();
-  if (normalized.startsWith('ja')) return catalog.title_by_locale.ja || catalog.title_by_locale.default || 'Contents';
+  if (normalized && catalog.title_by_locale[normalized]) {
+    return catalog.title_by_locale[normalized];
+  }
   return catalog.title_by_locale.default || 'Contents';
 }
 

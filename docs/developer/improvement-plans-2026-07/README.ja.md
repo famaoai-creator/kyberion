@@ -13,6 +13,7 @@
 > **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
 > **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
 > **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
+> **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
 
 ## 1. 目的
 

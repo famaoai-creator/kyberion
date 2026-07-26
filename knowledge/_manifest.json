@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 71020,
+      "size": 71197,
       "type": "json"
     },
     {
@@ -1387,6 +1387,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/i18n-baseline.json",
+      "tier": "public",
+      "size": 6920,
+      "type": "json"
+    },
+    {
       "path": "product/governance/independent-validation-evidence-package.md",
       "tier": "public",
       "size": 6760,
@@ -1503,7 +1509,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 10844,
+      "size": 15142,
       "type": "md"
     },
     {
@@ -4581,7 +4587,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 50397,
+      "size": 96988,
       "type": "json"
     },
     {
@@ -7599,7 +7605,7 @@
     {
       "path": "product/schemas/user-facing-vocabulary.schema.json",
       "tier": "public",
-      "size": 679,
+      "size": 827,
       "type": "json"
     },
     {

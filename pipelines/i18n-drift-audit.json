@@ -1,0 +1,88 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "i18n-drift-audit",
+  "name": "i18n-drift-audit",
+  "version": "1.0.0",
+  "description": "Weekly i18n drift audit (I18N-08): surfaces ratchet baseline movement, per-locale translation-coverage regression, and unused-key accumulation. Not a gate — pnpm check:i18n and pnpm check:catalogs remain the enforcement paths (see knowledge/product/governance/kyberion-development-practices.md); this pipeline makes their weekly trend visible in one report and alerts on translation-coverage regression.",
+  "_refs": {
+    "plan": "docs/developer/improvement-plans-2026-07/INTERNATIONALIZATION_PLAN_2026-07-26.ja.md",
+    "implementation": "scripts/report_i18n_translation_coverage.ts"
+  },
+  "schedule": {
+    "id": "i18n-drift-audit-weekly",
+    "cron": "0 8 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🌐 [I18N-DRIFT] Starting weekly i18n drift audit..." }
+    },
+    {
+      "id": "hardcoding_ratchet",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "hardcoding_report", "type": "CommandResult" },
+      "params": {
+        "command": "node",
+        "args": [
+          "--import",
+          "./scripts/ts-loader.mjs",
+          "scripts/check_i18n_hardcoding.ts",
+          "--json"
+        ],
+        "timeout_ms": 120000,
+        "allow_error": true
+      }
+    },
+    {
+      "id": "catalog_integrity",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "catalog_report", "type": "CommandResult" },
+      "params": {
+        "command": "node",
+        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_catalog_integrity.ts"],
+        "timeout_ms": 120000,
+        "allow_error": true
+      }
+    },
+    {
+      "id": "translation_coverage",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "coverage_report", "type": "CommandResult" },
+      "params": {
+        "command": "node",
+        "args": [
+          "--import",
+          "./scripts/ts-loader.mjs",
+          "scripts/report_i18n_translation_coverage.ts",
+          "--json",
+          "--alert-on-regression"
+        ],
+        "timeout_ms": 120000,
+        "allow_error": true
+      }
+    },
+    {
+      "id": "write_drift_report",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["hardcoding_report", "catalog_report", "coverage_report"],
+      "params": {
+        "path": "active/shared/tmp/i18n-drift-audit/report.md",
+        "content": "# I18N Drift Audit — {{run_utc_now}}\n\n## Ratchet baseline (pnpm check:i18n)\n\nAn `increased from X to Y` line below means hardcoded strings are being added faster than they are migrated.\n\n```\n{{hardcoding_report.stdout}}\n{{hardcoding_report.stderr}}\n```\n\n## Catalog integrity (pnpm check:catalogs)\n\nIncludes unused-key warnings (dynamic keys can false-positive here; this is where unused-key accumulation is surfaced for human review, not auto-repaired). `check_catalog_integrity.ts` prints its warnings/violations to stderr, so both streams are included below.\n\n```\n{{catalog_report.stdout}}\n{{catalog_report.stderr}}\n```\n\n## Translation coverage (pnpm report:i18n-coverage)\n\nInformational — not a gate. Use this to decide when a still-growing locale is ready for promotion to `required_locales`. A regression alert (if any) was already dispatched through the ops-alert sink by the step above.\n\n```\n{{coverage_report.stdout}}\n```\n"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ [I18N-DRIFT] Report written to active/shared/tmp/i18n-drift-audit/report.md"
+      }
+    }
+  ]
+}

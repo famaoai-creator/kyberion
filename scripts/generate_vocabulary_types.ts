@@ -1,0 +1,195 @@
+/**
+ * generate_vocabulary_types.ts — I18N-02: catalog-driven type generation.
+ *
+ * Two generated artifacts, both derived from
+ * `knowledge/product/orchestration/user-facing-vocabulary.json`:
+ *
+ *   1. `libs/core/locale-normalize.ts`'s `SUPPORTED_LOCALES` array (spliced
+ *      between `GENERATED-LOCALES:BEGIN`/`END` markers) — from the catalog's
+ *      `required_locales` field. `SupportedLocale` is derived from this array
+ *      via `(typeof SUPPORTED_LOCALES)[number]`, so adding a locale is a data
+ *      edit to the catalog plus a regeneration, never a hand-edit of a type
+ *      union. `locale-normalize.ts` stays import-free (this generator writes
+ *      a literal array, not a runtime catalog read) so it stays safe to
+ *      bundle into the chronos browser build.
+ *   2. `libs/core/vocabulary-keys.generated.ts`'s `VocabularyKey` union type
+ *      — every `namespace:key` qualified form, plus (for the one-release
+ *      backward-compat window) every bare `key` form that is unambiguous
+ *      across namespaces. Referencing an unknown key in `t()` is then a
+ *      typecheck error.
+ *
+ * Same shape as `generate_op_registry.ts` / `generate_subagent_definitions.ts`:
+ * `--check` regenerates in-memory and diffs against the committed files.
+ *
+ * Usage:
+ *   pnpm generate:vocabulary-types   — write both generated artifacts
+ *   pnpm check:vocabulary-types      — fail if either file has drifted
+ */
+
+import * as path from 'node:path';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
+import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+
+interface VocabularyCatalogFile {
+  version: string;
+  default_locale: string;
+  required_locales?: string[];
+  domains: Record<string, Record<string, Record<string, string>>>;
+}
+
+const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
+const LOCALE_NORMALIZE_PATH = pathResolver.rootResolve('libs/core/locale-normalize.ts');
+const VOCABULARY_KEYS_PATH = pathResolver.rootResolve('libs/core/vocabulary-keys.generated.ts');
+
+const LOCALES_BEGIN_MARKER = '// GENERATED-LOCALES:BEGIN';
+const LOCALES_END_MARKER = '// GENERATED-LOCALES:END';
+
+function loadCatalog(): VocabularyCatalogFile {
+  return JSON.parse(
+    String(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) || '{}')
+  ) as VocabularyCatalogFile;
+}
+
+/** Builds the replacement block for locale-normalize.ts's generated locales array. */
+export function buildLocalesBlock(requiredLocales: string[]): string {
+  const sorted = [...requiredLocales].sort();
+  const arrayLiteral = sorted.map((locale) => `'${locale}'`).join(', ');
+  return [
+    LOCALES_BEGIN_MARKER,
+    `export const SUPPORTED_LOCALES = [${arrayLiteral}] as const;`,
+    LOCALES_END_MARKER,
+  ].join('\n');
+}
+
+export function spliceLocalesBlock(source: string, requiredLocales: string[]): string {
+  const block = buildLocalesBlock(requiredLocales);
+  const beginIndex = source.indexOf(LOCALES_BEGIN_MARKER);
+  const endIndex = source.indexOf(LOCALES_END_MARKER);
+  if (beginIndex === -1 || endIndex === -1) {
+    throw new Error(
+      `locale-normalize.ts is missing the ${LOCALES_BEGIN_MARKER}/${LOCALES_END_MARKER} markers`
+    );
+  }
+  const before = source.slice(0, beginIndex);
+  const after = source.slice(endIndex + LOCALES_END_MARKER.length);
+  return `${before}${block}${after}`;
+}
+
+/**
+ * Every `namespace:key` qualified key, plus every bare key that is
+ * unambiguous across namespaces (i.e. appears in exactly one namespace).
+ * A bare key that collides across namespaces is intentionally omitted from
+ * the union — callers must use the qualified form, and `check:catalogs`
+ * separately fails the build if `t()` is ever called with such a key bare.
+ */
+export function buildVocabularyKeys(catalog: VocabularyCatalogFile): string[] {
+  const bareOccurrences = new Map<string, number>();
+  const qualified: string[] = [];
+  for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+    for (const key of Object.keys(entries || {})) {
+      qualified.push(`${namespace}:${key}`);
+      bareOccurrences.set(key, (bareOccurrences.get(key) ?? 0) + 1);
+    }
+  }
+  const bare = [...bareOccurrences.entries()]
+    .filter(([, count]) => count === 1)
+    .map(([key]) => key);
+  return [...new Set([...qualified, ...bare])].sort();
+}
+
+function renderVocabularyKeysSource(keys: string[]): string {
+  const lines = [
+    '// GENERATED FILE — DO NOT EDIT BY HAND.',
+    '// Regenerate with: pnpm generate:vocabulary-types',
+    '// Check drift with: pnpm check:vocabulary-types',
+    '// Source (SSoT): knowledge/product/orchestration/user-facing-vocabulary.json',
+    '// Generator: scripts/generate_vocabulary_types.ts',
+    '',
+    '/**',
+    ' * I18N-02: the union of every valid `t()` lookup key — the canonical',
+    ' * `namespace:key` qualified form for every catalog entry, plus (for the',
+    ' * one-release backward-compat window) the bare unqualified form for every',
+    ' * key that is unambiguous across namespaces. Referencing an unknown key is',
+    ' * a typecheck error.',
+    ' */',
+    'export type VocabularyKey =',
+    ...keys.map((key) => `  | '${key}'`),
+    ';',
+    '',
+  ];
+  return lines.join('\n');
+}
+
+async function formatTs(content: string, filePath: string): Promise<string> {
+  const config = (await resolvePrettierConfig(filePath)) ?? {};
+  return prettierFormat(content, { ...config, parser: 'typescript' });
+}
+
+interface BuiltArtifacts {
+  localeNormalizeSource: string;
+  vocabularyKeysSource: string;
+}
+
+export async function buildArtifacts(): Promise<BuiltArtifacts> {
+  const catalog = loadCatalog();
+  const requiredLocales = catalog.required_locales?.length
+    ? catalog.required_locales
+    : [catalog.default_locale];
+  const currentLocaleNormalize = String(
+    safeReadFile(LOCALE_NORMALIZE_PATH, { encoding: 'utf8' }) || ''
+  );
+  const localeNormalizeSource = await formatTs(
+    spliceLocalesBlock(currentLocaleNormalize, requiredLocales),
+    LOCALE_NORMALIZE_PATH
+  );
+  const vocabularyKeysSource = await formatTs(
+    renderVocabularyKeysSource(buildVocabularyKeys(catalog)),
+    VOCABULARY_KEYS_PATH
+  );
+  return { localeNormalizeSource, vocabularyKeysSource };
+}
+
+function readIfExists(filePath: string): string | null {
+  return safeExistsSync(filePath)
+    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
+    : null;
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const shouldCheck = argv.includes('--check');
+  const built = await buildArtifacts();
+  const rootDir = pathResolver.rootDir();
+
+  return withExecutionContext('ecosystem_architect', () => {
+    if (shouldCheck) {
+      const drifted: string[] = [];
+      if (readIfExists(LOCALE_NORMALIZE_PATH) !== built.localeNormalizeSource) {
+        drifted.push(path.relative(rootDir, LOCALE_NORMALIZE_PATH));
+      }
+      if (readIfExists(VOCABULARY_KEYS_PATH) !== built.vocabularyKeysSource) {
+        drifted.push(path.relative(rootDir, VOCABULARY_KEYS_PATH));
+      }
+      if (drifted.length === 0) {
+        console.log('vocabulary types are up to date');
+        return;
+      }
+      console.error('vocabulary type drift detected — run pnpm generate:vocabulary-types');
+      for (const rel of drifted) console.error(`- ${rel} differs`);
+      process.exitCode = 1;
+      return;
+    }
+
+    safeWriteFile(LOCALE_NORMALIZE_PATH, built.localeNormalizeSource);
+    safeWriteFile(VOCABULARY_KEYS_PATH, built.vocabularyKeysSource);
+    console.log(`wrote ${path.relative(rootDir, LOCALE_NORMALIZE_PATH)}`);
+    console.log(`wrote ${path.relative(rootDir, VOCABULARY_KEYS_PATH)}`);
+  });
+}
+
+if (process.argv[1] && /generate_vocabulary_types\.(ts|js)$/.test(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
+import { resolveLocale } from './locale.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -170,7 +171,10 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
       );
       return {
         text,
-        language: input.language,
+        // I18N-06: an unset transcribe language falls back to the resolved
+        // locale (identity/env/OS), not a hardcoded default — same pattern
+        // as `python-voice-bridge.ts`'s TTS language (I18N-01).
+        language: input.language || resolveLocale(),
         written_to: sidecar,
         backend: 'stub-sidecar',
         capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
@@ -227,9 +231,13 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     if (!safeExistsSync(audioAbs)) {
       throw new Error(`[stt-bridge:shell] audio file not found: ${input.audioPath}`);
     }
+    // I18N-06: an unset transcribe language falls back to the resolved
+    // locale (identity/env/OS) instead of an empty string, matching the
+    // stub bridge above and `python-voice-bridge.ts`'s TTS language (I18N-01).
+    const resolvedLanguage = input.language ?? resolveLocale();
     const cmd = this.options.command
       .replace(/\{\{audio\}\}/gu, audioAbs)
-      .replace(/\{\{language\}\}/gu, input.language ?? '');
+      .replace(/\{\{language\}\}/gu, resolvedLanguage);
     const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
     const stdout = execFileSync(shell, ['-c', cmd], {
       encoding: 'utf8',
@@ -254,7 +262,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
     return {
       text,
-      language: input.language,
+      language: resolvedLanguage,
       written_to: outputPath,
       backend: 'shell',
       capabilities: structured.capabilities || this.getCapabilities(),

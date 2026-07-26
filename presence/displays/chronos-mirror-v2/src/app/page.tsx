@@ -46,7 +46,7 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
 } from '../lib/operator-console';
-import { setChronosLocalePreference, uxText } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, setChronosLocalePreference, uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
 type QuickAction = {
@@ -1535,7 +1535,7 @@ export default function ChronosMirrorV2() {
                     </div>
                     <div className="mt-2 text-2xl font-semibold text-white/92">
                       {typeof costSummary?.totalTokens === 'number'
-                        ? costSummary.totalTokens.toLocaleString()
+                        ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
                         : '-'}
                     </div>
                     <div className="mt-1 text-[10px] text-white/48">
@@ -1581,7 +1581,8 @@ export default function ChronosMirrorV2() {
                           <div className="text-white/80">${item.usd.toFixed(3)}</div>
                         </div>
                         <div className="mt-1 text-white/42">
-                          {item.tokens.toLocaleString()} tokens · {item.entryCount} entries
+                          {item.tokens.toLocaleString(chronosSpeechLocale())} tokens ·{' '}
+                          {item.entryCount} entries
                         </div>
                       </div>
                     ))}

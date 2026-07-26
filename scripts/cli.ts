@@ -3,6 +3,7 @@ import {
   logger,
   pathResolver,
   resolveOperatorDisplayName,
+  resolveLocale as resolveUnifiedLocale,
   safeExistsSync,
   safeExec,
   safeMkdir,
@@ -13,7 +14,9 @@ import {
   loadActuatorManifestCatalog,
   installReasoningBackends,
   renderStatus,
+  t as coreT,
 } from '@agent/core';
+import type { SupportedLocale, VocabularyKey } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
   executeEmailDelivery,
@@ -161,24 +164,20 @@ interface WebAppProfileIndexRecord {
 
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
-const vocabularyPath = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
 
-type VocabularyCatalog = {
-  default_locale: string;
-  domains?: Record<string, Record<string, Record<string, string>>>;
-};
-
-function resolveLocale(args: string[] = process.argv.slice(2)): string {
+/**
+ * @deprecated Thin wrapper over `@agent/core`'s `resolveLocale`. `--locale`
+ * takes the `explicit` slot of the unified precedence chain; when absent,
+ * resolution now falls through identity → `KYBERION_LOCALE` →
+ * `KYBERION_UI_LOCALE` (deprecated) → `LANG` → catalog default, instead of
+ * the old CLI-only chain (`--locale` → `KYBERION_UI_LOCALE` → `LANG` →
+ * `'en'`). This is the I18N-01 unification: every locale resolver now
+ * agrees on the same result for the same environment.
+ */
+function resolveLocale(args: string[] = process.argv.slice(2)): SupportedLocale {
   const localeArgIndex = args.indexOf('--locale');
-  const localeArg = localeArgIndex >= 0 ? args[localeArgIndex + 1] : '';
-  const envLocale = process.env.KYBERION_UI_LOCALE || process.env.LANG || '';
-  const rawLocale = String(localeArg || envLocale || 'en').trim();
-  const normalized = rawLocale.replace(/_/g, '-').toLowerCase();
-  if (normalized.startsWith('ja')) return 'ja';
-  if (normalized && !normalized.startsWith('en') && normalized !== 'c' && normalized !== 'posix') {
-    process.stderr.write(`Note: locale "${normalized}" is not available; using "en".\n`);
-  }
-  return 'en';
+  const localeArg = localeArgIndex >= 0 ? args[localeArgIndex + 1] : undefined;
+  return resolveUnifiedLocale({ explicit: localeArg });
 }
 
 function stripLocaleArg(args: string[]): string[] {
@@ -203,22 +202,14 @@ export function stripNpmSeparatorArg(args: string[]): string[] {
   return args.filter((arg) => arg !== '--');
 }
 
-function loadVocabularyCatalog(): VocabularyCatalog | null {
-  if (!safeExistsSync(vocabularyPath)) {
-    return null;
-  }
-  try {
-    return readJsonFile<VocabularyCatalog>(vocabularyPath);
-  } catch {
-    return null;
-  }
-}
-
-function t(key: string, locale = resolveLocale()): string {
-  const catalog = loadVocabularyCatalog();
-  const entry = catalog?.domains?.ux?.[key];
-  if (!entry) return key;
-  return entry[locale] || entry[catalog?.default_locale || 'en'] || key;
+/**
+ * I18N-02: thin wrapper delegating to `@agent/core`'s type-safe `t()`. Kept
+ * as a local `(key, locale)` shim rather than calling `coreT` directly at
+ * every one of this file's ~90 call sites, since those all pass a bare
+ * (unqualified) key with no `params` argument.
+ */
+function t(key: VocabularyKey, locale = resolveLocale()): string {
+  return coreT(key, undefined, locale);
 }
 
 export function normalizeActuators(index: {

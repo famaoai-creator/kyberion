@@ -105,12 +105,50 @@ describe('customer dialogue (E2E-06)', () => {
             disclosure_level: 'public_catalog_only',
             active: true,
           },
+          {
+            surface: 'slack',
+            channel_id: 'C_EN_ESCALATION',
+            counterpart: { name: 'Jane Doe', org: 'Acme Inc' },
+            language: 'en',
+            disclosure_level: 'public_catalog_only',
+            active: true,
+          },
           { surface: 'slack', channel_id: 'C_INACTIVE', active: false },
         ],
       })
     );
     // underscore-prefixed dirs (e.g. _template) must be ignored
     fs.mkdirSync(path.join(tmpRoot, 'customer', '_template', 'connections'), { recursive: true });
+
+    // I18N-06: the deterministic "we will confirm and get back to you" hold
+    // reply (used on backend failure — no LLM turn to phrase it) is now
+    // resolved from the vocabulary catalog's `concierge` namespace instead
+    // of a hardcoded Japanese literal. This fixture is the handoff key from
+    // active/shared/tmp/i18n-06-catalog-keys.json, pre-merged here so the
+    // existing assertions on the ja-locale phrasing keep passing.
+    const vocabularyPath = path.join(
+      tmpRoot,
+      'knowledge',
+      'product',
+      'orchestration',
+      'user-facing-vocabulary.json'
+    );
+    fs.mkdirSync(path.dirname(vocabularyPath), { recursive: true });
+    fs.writeFileSync(
+      vocabularyPath,
+      JSON.stringify({
+        default_locale: 'en',
+        required_locales: ['en', 'ja'],
+        domains: {
+          concierge: {
+            concierge_escalation_hold_reply: {
+              en: 'We will confirm and get back to you shortly.',
+              ja: '確認して回答します',
+            },
+          },
+        },
+      })
+    );
 
     // grounding fixtures
     const catalogPath = path.join(tmpRoot, 'knowledge', 'public', 'sales', 'solution-catalog.json');
@@ -271,6 +309,19 @@ describe('customer dialogue (E2E-06)', () => {
     expect(result.escalated).toBe(true);
     expect(result.text).toContain('確認して回答します');
     expect(opsAlerts).toHaveBeenCalledTimes(1);
+  });
+
+  it('I18N-06: the backend-failure hold reply is locale-resolved, not hardcoded — an en-bound channel gets the English phrase', async () => {
+    backendPrompt.mockRejectedValue(new Error('backend down'));
+    const enBinding = core.resolveCustomerBinding('slack', 'C_EN_ESCALATION')!;
+    const result = await core.runCustomerConversation({
+      binding: enBinding,
+      text: 'give me a quote',
+    });
+    expect(result.escalated).toBe(true);
+    expect(result.text).toContain('We will confirm and get back to you shortly.');
+    expect(result.text).not.toContain('確認して回答します');
+    expect(result.text).not.toContain('[NEEDS_OPERATOR]');
   });
 
   it('builds quotes deterministically from the price book; unknown work is unquotable', () => {
