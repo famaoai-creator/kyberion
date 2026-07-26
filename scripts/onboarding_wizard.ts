@@ -15,6 +15,7 @@ import {
   resolveVocabularyLocale,
   resolveOnboardingText,
   type LocalizedOnboardingText,
+  type SupportedLocale,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -48,7 +49,13 @@ const rl = readline.createInterface({
 // Wizard prompts follow the operator's selected language immediately: the
 // locale seeds from the saved identity (default Japanese) and is re-resolved
 // as soon as the language question is answered (UX-03).
-let wizardLocale: 'en' | 'ja' = 'ja';
+//
+// I18N-07 finding: this was hardcoded to `'en' | 'ja'`, which broke `tsc`
+// the moment `SupportedLocale` grew a third member (`resolveVocabularyLocale`
+// already returns the full `SupportedLocale`) — widened to match rather than
+// special-casing the new locale. `t()`/`pt()` below already fall through to
+// English for anything that isn't `'ja'`, so behavior is unchanged.
+let wizardLocale: SupportedLocale = 'ja';
 
 function setWizardLanguage(language: string): void {
   wizardLocale = resolveVocabularyLocale(language);

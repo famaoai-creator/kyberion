@@ -19,7 +19,14 @@ type VocabularyCatalog = {
 };
 
 const catalog = vocabularyCatalog as VocabularyCatalog;
-const speechLocales: Record<SupportedLocale, string> = {
+// I18N-07 finding: this was `Record<SupportedLocale, string>` (every locale
+// required), which broke `tsc` the moment `SupportedLocale` grew a third
+// member (`qps-ploc`) that has no real speech-synthesis tag. Widened to
+// `Partial` — `chronosSpeechLocale` below already falls back to
+// `speechLocales.en` for any locale without an entry, so a pseudo-locale (or
+// any future locale added before it has STT/TTS support) degrades to English
+// speech instead of failing to compile.
+const speechLocales: Partial<Record<SupportedLocale, string>> = {
   en: 'en-US',
   ja: 'ja-JP',
 };
@@ -78,7 +85,13 @@ export function readStoredChronosLocale(): SupportedLocale | null {
   if (typeof window === 'undefined') return null;
   try {
     const value = window.localStorage.getItem(CHRONOS_LOCALE_STORAGE_KEY);
-    return value === 'ja' || value === 'en' ? value : null;
+    // I18N-07 finding: this compared against the hardcoded pair `'ja'`/`'en'`
+    // instead of the data-driven `SUPPORTED_LOCALES` set (via `normalizeLocale`,
+    // already imported below), so a stored `qps-ploc` preference was silently
+    // discarded even though every other resolution path accepted it. One-line
+    // data-driven fix — reuses the existing normalizer rather than adding a
+    // third literal.
+    return normalizeLocale(value);
   } catch {
     /* storage unavailable (private mode etc.): fall back to navigator */
     return null;
