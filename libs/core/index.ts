@@ -1880,6 +1880,8 @@ export * from './surface-mission-proposals.js';
 export * from './slack-approval-ui.js';
 export * from './slack-onboarding.js';
 export * from './agent-activity-board.js';
+export * from './agent-collaboration-events.js';
+export * from './agent-collaboration-projection.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 export type * from './channel-surface-types.js';
 
