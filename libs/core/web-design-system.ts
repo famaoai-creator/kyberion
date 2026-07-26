@@ -151,18 +151,58 @@ function rgba(hex: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
+/**
+ * WCAG relative luminance, used only to answer "is this surface dark?" —
+ * which decides whether a panel veil should darken or lighten the page.
+ */
+function relativeLuminance(hex: string): number {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 0;
+  const [r, g, b] = rgb.map((channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * True when the theme paints light text on a dark page (the Chronos console
+ * default), false for the light brand themes (concierge, companion, Chronos
+ * Bright Command).
+ */
+export function isDarkWebTheme(themePack: WebThemePack): boolean {
+  const colors = themePack.theme.colors;
+  return relativeLuminance(colors.text) > relativeLuminance(colors.background);
+}
+
 export function webThemePackToCssVars(themePack: WebThemePack): Record<string, string> {
   const colors = themePack.theme.colors;
+  const dark = isDarkWebTheme(themePack);
   return {
     '--kb-bg-main': colors.background,
-    '--kb-panel-bg': rgba(colors.primary, 0.82),
+    // A panel is a veil over the PAGE background, not the brand ink color.
+    // Deriving it from `primary` unconditionally worked only for dark themes
+    // (where primary happens to be a deep navy and text is near-white). For
+    // light themes primary IS the ink, so panels came out near-opaque dark
+    // while text stayed dark — contrast 1.0, i.e. invisible headings on
+    // concierge, presence-studio and Chronos Bright Command. Light themes now
+    // get a faint ink tint instead, which is what presence-studio had been
+    // patching in by hand.
+    '--kb-panel-bg': dark ? rgba(colors.primary, 0.82) : rgba(colors.text, 0.05),
     '--kb-accent': colors.accent,
     '--kb-warning': colors.secondary,
     '--kb-text-primary': colors.text,
-    '--kb-text-secondary': rgba(colors.text, 0.62),
+    // Dark ink fading toward a light page loses contrast much faster than light
+    // ink fading toward a dark one, so 0.62 (fine on the console) left every
+    // light theme's secondary text just under 4.5:1.
+    '--kb-text-secondary': rgba(colors.text, dark ? 0.62 : 0.74),
     '--kb-font-sans': themePack.theme.fonts.body,
     '--kb-font-mono': '"JetBrains Mono", monospace',
-    '--kb-border': `1px solid ${rgba(colors.text, 0.1)}`,
+    // A COLOR, not a `border` shorthand. Every consumer in the tree writes
+    // `1px solid var(--kb-border)` (and every static design-tokens.css defines
+    // it as a hex), so emitting the shorthand here silently invalidated those
+    // declarations wherever these vars were applied.
+    '--kb-border': rgba(colors.text, dark ? 0.1 : 0.16),
     '--kb-glow-cyan': `0 0 15px ${rgba(colors.accent, 0.42)}`,
   };
 }
