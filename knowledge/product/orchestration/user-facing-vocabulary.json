@@ -1,187 +1,152 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "default_locale": "en",
+  "required_locales": ["en", "ja"],
   "domains": {
-    "ux": {
-      "chronos_mission_intelligence": {
-        "en": "Mission Intelligence",
-        "ja": "ミッション・インテリジェンス"
+    "chronos": {
+      "chronos_a2a_handoff_trail": {
+        "en": "A2A Handoff Trail",
+        "ja": "A2A Handoff Trail"
+      },
+      "chronos_access": {
+        "en": "access",
+        "ja": "access"
+      },
+      "chronos_active_missions": {
+        "en": "Active Missions",
+        "ja": "Active Missions"
+      },
+      "chronos_agent_registry": {
+        "en": "Agent Registry",
+        "ja": "Agent Registry"
       },
       "chronos_agent_runtimes": {
         "en": "Agent Runtimes",
         "ja": "Agent Runtime"
       },
-      "chronos_quick_actions": {
-        "en": "Quick Actions",
-        "ja": "Quick Action"
+      "chronos_all_agents_running": {
+        "en": "All defined agents are already running.",
+        "ja": "定義済み agent はすべて稼働中です。"
       },
-      "chronos_grouped_by_operator_intent": {
-        "en": "Grouped by operator intent.",
-        "ja": "operator の意図ごとに整理。"
+      "chronos_all_missions": {
+        "en": "all missions",
+        "ja": "all missions"
       },
-      "chronos_jump_to_section": {
-        "en": "Jump to section",
-        "ja": "セクションへ移動"
+      "chronos_background": {
+        "en": "background",
+        "ja": "background"
       },
-      "chronos_header_title": {
-        "en": "Clear operator view for mission state, runtime health, and delivery flow.",
-        "ja": "ミッション状態、ランタイム健全性、デリバリーフローを明瞭に扱う operator view."
+      "chronos_bindings": {
+        "en": "bindings",
+        "ja": "bindings"
       },
-      "chronos_header_description": {
-        "en": "Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.",
-        "ja": "左から順に、意図を選び、現在の surface を確認し、control plane か runtime doctor が必要と示したときだけ介入します。"
+      "chronos_channel": {
+        "en": "channel",
+        "ja": "channel"
       },
-      "chronos_chat_no_response": {
-        "en": "No response",
-        "ja": "応答がありません。"
+      "chronos_chat_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル"
+      },
+      "chronos_chat_cancelled": {
+        "en": "Request cancelled.",
+        "ja": "リクエストをキャンセルしました。"
       },
       "chronos_chat_connection_error": {
         "en": "Connection error",
         "ja": "接続エラー"
       },
-      "chronos_chat_minimize": {
-        "en": "MINIMIZE",
-        "ja": "最小化"
+      "chronos_chat_guided_prompts": {
+        "en": "Guided prompts",
+        "ja": "ガイド付きプロンプト"
       },
-      "chronos_chat_welcome": {
-        "en": "Welcome, Sovereign. The mirror is ready for your command.",
-        "ja": "ようこそ、Sovereign。mirror は command を受け付ける準備ができています。"
+      "chronos_chat_input": {
+        "en": "Chat input",
+        "ja": "チャット入力"
       },
       "chronos_chat_listening": {
         "en": "Listening...",
         "ja": "音声を聞いています..."
       },
+      "chronos_chat_minimize": {
+        "en": "MINIMIZE",
+        "ja": "最小化"
+      },
+      "chronos_chat_no_response": {
+        "en": "No response",
+        "ja": "応答がありません。"
+      },
+      "chronos_chat_open": {
+        "en": "Open Sovereign chat",
+        "ja": "Sovereign チャットを開く"
+      },
+      "chronos_chat_phase_long_running": {
+        "en": "Still working — long tasks can take a while.",
+        "ja": "処理を継続中です — 時間がかかる場合があります。"
+      },
+      "chronos_chat_phase_sending": {
+        "en": "Sending request…",
+        "ja": "リクエスト送信中…"
+      },
+      "chronos_chat_phase_thinking": {
+        "en": "Sovereign is thinking…",
+        "ja": "Sovereign が考えています…"
+      },
       "chronos_chat_placeholder": {
         "en": "Command the mirror...",
         "ja": "mirror に指示してください..."
       },
-      "progress_working": {
-        "en": "Working",
-        "ja": "処理中"
+      "chronos_chat_prompt_health_label": {
+        "en": "Health",
+        "ja": "健全性"
       },
-      "progress_completed": {
-        "en": "Completed",
-        "ja": "完了"
+      "chronos_chat_prompt_health_query": {
+        "en": "Summarize system health and current blockers.",
+        "ja": "システムの健全性と現在のブロッカーを要約してください。"
       },
-      "progress_failed": {
-        "en": "Failed",
-        "ja": "失敗"
+      "chronos_chat_prompt_missions_label": {
+        "en": "Missions",
+        "ja": "ミッション"
       },
-      "error_title": {
-        "en": "Something went wrong",
-        "ja": "問題が発生しました"
+      "chronos_chat_prompt_missions_query": {
+        "en": "List the active missions and what needs attention.",
+        "ja": "アクティブなミッションと要注意点を一覧にしてください。"
       },
-      "error_trace_label": {
-        "en": "Trace",
-        "ja": "trace"
+      "chronos_chat_prompt_next_step_label": {
+        "en": "Next step",
+        "ja": "次の一手"
       },
-      "error_connection_body": {
-        "en": "The service or network is unavailable.",
-        "ja": "サービスまたはネットワークに接続できません。"
+      "chronos_chat_prompt_next_step_query": {
+        "en": "What should I do next to unblock delivery?",
+        "ja": "デリバリーを前に進めるために次に何をすべきですか?"
       },
-      "error_rate_limit_body": {
-        "en": "The provider is temporarily rate-limiting requests.",
-        "ja": "プロバイダが一時的にリクエストを制限しています。"
+      "chronos_chat_prompt_traces_label": {
+        "en": "Traces",
+        "ja": "トレース"
       },
-      "error_missing_dependency_body": {
-        "en": "A runtime dependency is missing.",
-        "ja": "実行に必要な依存が不足しています。"
+      "chronos_chat_prompt_traces_query": {
+        "en": "Show the latest trace issues and what failed.",
+        "ja": "最新のトレースの問題と失敗箇所を見せてください。"
       },
-      "error_missing_secret_body": {
-        "en": "A required credential or secret is missing.",
-        "ja": "必要な credential か secret が見つかりません。"
+      "chronos_chat_send": {
+        "en": "Send",
+        "ja": "送信"
       },
-      "error_invalid_input_body": {
-        "en": "The request shape is invalid.",
-        "ja": "入力形式が不正です。"
+      "chronos_chat_welcome": {
+        "en": "Welcome, Sovereign. The mirror is ready for your command.",
+        "ja": "ようこそ、Sovereign。mirror は command を受け付ける準備ができています。"
       },
-      "error_resource_unavailable_body": {
-        "en": "The requested resource is busy or unavailable.",
-        "ja": "要求したリソースが使用中か利用できません。"
+      "chronos_clear_outbox": {
+        "en": "clear outbox",
+        "ja": "outbox を消去"
       },
-      "error_timeout_body": {
-        "en": "The operation took too long.",
-        "ja": "処理が時間内に完了しませんでした。"
+      "chronos_clearing": {
+        "en": "clearing",
+        "ja": "削除中"
       },
-      "error_governance_block_body": {
-        "en": "The action needs approval or a policy change.",
-        "ja": "承認またはポリシー変更が必要です。"
-      },
-      "error_permission_denied_body": {
-        "en": "You do not have permission to complete this action.",
-        "ja": "この操作を完了する権限がありません。"
-      },
-      "error_mission_not_found_body": {
-        "en": "The mission reference could not be resolved.",
-        "ja": "mission 参照を解決できませんでした。"
-      },
-      "error_unknown_body": {
-        "en": "The request could not be completed.",
-        "ja": "依頼を完了できませんでした。"
-      },
-      "error_next_step_retry": {
-        "en": "Try the request again.",
-        "ja": "もう一度やり直してください。"
-      },
-      "error_next_step_doctor": {
-        "en": "Check the runtime health and prerequisites.",
-        "ja": "実行環境と健全性を確認してください。"
-      },
-      "error_next_step_repair": {
-        "en": "Repair the blocked policy or approval and retry.",
-        "ja": "ブロックされたポリシーや承認を修復して再実行してください。"
-      },
-      "error_next_step_connect": {
-        "en": "Reconnect the service or network and retry.",
-        "ja": "接続を回復して再実行してください。"
-      },
-      "error_next_step_input": {
-        "en": "Fix the input shape and rerun the same action.",
-        "ja": "入力形式を修正して同じ操作を再実行してください。"
-      },
-      "error_next_step_secret": {
-        "en": "Update the required secret or credential and retry.",
-        "ja": "必要な secret / credential を更新して再実行してください。"
-      },
-      "empty_reply_body": {
-        "en": "I could not produce a result for that request.",
-        "ja": "今回の依頼に対する結果を生成できませんでした。"
-      },
-      "empty_reply_next_step": {
-        "en": "Try rephrasing the request or adding more detail.",
-        "ja": "言い換えるか、もう少し詳しく書いて再度お試しください。"
-      },
-      "pipeline_crystallization_loop": {
-        "en": "Pipeline Crystallization Loop",
-        "ja": "パイプライン結晶化ループ"
-      },
-      "pipeline_crystallization_loop_description": {
-        "en": "The phase that turns exploratory work into a stable, reproducible pipeline before execution.",
-        "ja": "探索段階の work を、実行前に stable かつ再現可能な pipeline へ固める段階。"
-      },
-      "pipeline_crystallization_loop_rule": {
-        "en": "Explore first, normalize the shape, crystallize it into a pipeline, verify, then freeze.",
-        "ja": "まず探索し、形を整え、pipeline に結晶化し、検証してから freeze します。"
-      },
-      "chronos_mission_loading": {
-        "en": "Loading mission intelligence...",
-        "ja": "mission intelligence を読み込み中..."
-      },
-      "chronos_mission_hero_title": {
-        "en": "Read mission health first, then act on runtime or delivery issues.",
-        "ja": "まず mission health を確認し、その後に runtime や delivery の問題へ対応します。"
-      },
-      "chronos_mission_hero_description": {
-        "en": "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.",
-        "ja": "この view は operator 向けです。active mission の進行を確認し、最近の orchestration transition を見て、その後 control plane に介入が必要な場合だけ stale runtime や pending delivery を処理します。"
-      },
-      "chronos_last_action": {
-        "en": "last action",
-        "ja": "last action"
-      },
-      "chronos_access": {
-        "en": "access",
-        "ja": "access"
+      "chronos_close": {
+        "en": "Close",
+        "ja": "閉じる"
       },
       "chronos_control_actions_disabled": {
         "en": " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.",
@@ -191,86 +156,6 @@
         "en": " · control actions enabled.",
         "ja": " · control action は有効です。"
       },
-      "chronos_active_missions": {
-        "en": "Active Missions",
-        "ja": "Active Missions"
-      },
-      "chronos_durable_contracts_in_execution": {
-        "en": "Durable contracts in execution",
-        "ja": "実行中の durable contract"
-      },
-      "chronos_recent_events": {
-        "en": "Recent Events",
-        "ja": "Recent Events"
-      },
-      "chronos_latest_orchestration_transitions": {
-        "en": "Latest orchestration transitions",
-        "ja": "最近の orchestration transition"
-      },
-      "chronos_surfaces": {
-        "en": "surfaces",
-        "ja": "surfaces"
-      },
-      "chronos_hide_latest_action": {
-        "en": "hide latest action",
-        "ja": "最新 action を隠す"
-      },
-      "chronos_show_latest_action": {
-        "en": "show latest action",
-        "ja": "最新 action を表示"
-      },
-      "chronos_retrying": {
-        "en": "retrying",
-        "ja": "再試行中"
-      },
-      "chronos_retry_latest_action": {
-        "en": "retry latest action",
-        "ja": "最新 action を再試行"
-      },
-      "chronos_no_managed_surfaces": {
-        "en": "No managed surfaces.",
-        "ja": "管理対象 surface はありません。"
-      },
-      "chronos_last_control_action": {
-        "en": "last control action",
-        "ja": "前回の control action"
-      },
-      "chronos_background": {
-        "en": "background",
-        "ja": "background"
-      },
-      "chronos_running": {
-        "en": "running",
-        "ja": "running"
-      },
-      "chronos_stopped": {
-        "en": "stopped",
-        "ja": "stopped"
-      },
-      "chronos_detail": {
-        "en": "detail",
-        "ja": "detail"
-      },
-      "chronos_control_summary": {
-        "en": "control summary",
-        "ja": "control summary"
-      },
-      "chronos_requested_by": {
-        "en": "requested by",
-        "ja": "requested by"
-      },
-      "chronos_safe_actions": {
-        "en": "safe actions",
-        "ja": "safe actions"
-      },
-      "chronos_working": {
-        "en": "working",
-        "ja": "実行中"
-      },
-      "chronos_risky_actions_approval_required": {
-        "en": "risky actions · approval required",
-        "ja": "risky actions · approval required"
-      },
       "chronos_control_model": {
         "en": "Control Model",
         "ja": "Control Model"
@@ -279,9 +164,149 @@
         "en": "Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.",
         "ja": "Chronos は control surface です。mission や runtime state を直接変更しません。各 button は mission_controller、agent-runtime-supervisor、または surface_runtime を通じて deterministic backend action を発行し、その後 control-plane view を更新します。"
       },
+      "chronos_control_summary": {
+        "en": "control summary",
+        "ja": "control summary"
+      },
+      "chronos_correlation": {
+        "en": "correlation",
+        "ja": "correlation"
+      },
+      "chronos_custom": {
+        "en": "Custom",
+        "ja": "Custom"
+      },
+      "chronos_detail": {
+        "en": "detail",
+        "ja": "detail"
+      },
+      "chronos_durable_contracts_in_execution": {
+        "en": "Durable contracts in execution",
+        "ja": "実行中の durable contract"
+      },
+      "chronos_focus_project": {
+        "en": "focus project",
+        "ja": "project を focus"
+      },
+      "chronos_focused": {
+        "en": "focused",
+        "ja": "focused"
+      },
+      "chronos_from_manifest": {
+        "en": "From Manifest",
+        "ja": "Manifest から"
+      },
+      "chronos_grouped_by_operator_intent": {
+        "en": "Grouped by operator intent.",
+        "ja": "operator の意図ごとに整理。"
+      },
+      "chronos_header_description": {
+        "en": "Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.",
+        "ja": "左から順に、意図を選び、現在の surface を確認し、control plane か runtime doctor が必要と示したときだけ介入します。"
+      },
+      "chronos_header_title": {
+        "en": "Clear operator view for mission state, runtime health, and delivery flow.",
+        "ja": "ミッション状態、ランタイム健全性、デリバリーフローを明瞭に扱う operator view."
+      },
+      "chronos_hide_latest_action": {
+        "en": "hide latest action",
+        "ja": "最新 action を隠す"
+      },
+      "chronos_intent": {
+        "en": "intent",
+        "ja": "intent"
+      },
+      "chronos_jump_to_section": {
+        "en": "Jump to section",
+        "ja": "セクションへ移動"
+      },
+      "chronos_kickoff": {
+        "en": "kickoff",
+        "ja": "kickoff"
+      },
+      "chronos_last_action": {
+        "en": "last action",
+        "ja": "last action"
+      },
+      "chronos_last_control_action": {
+        "en": "last control action",
+        "ja": "前回の control action"
+      },
+      "chronos_latest_orchestration_transitions": {
+        "en": "Latest orchestration transitions",
+        "ja": "最近の orchestration transition"
+      },
+      "chronos_live_agent_conversation": {
+        "en": "Live Agent Conversation",
+        "ja": "Live Agent Conversation"
+      },
+      "chronos_mission": {
+        "en": "mission",
+        "ja": "mission"
+      },
       "chronos_mission_control_description": {
         "en": "Confirm which durable work items are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.",
         "ja": "どの durable work が active で、どこが blocked で、次に安全に介入すべき場所がどこかを確認します。mission を pin すると、下の unified thread をその文脈に絞れます。"
+      },
+      "chronos_mission_hero_description": {
+        "en": "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.",
+        "ja": "この view は operator 向けです。active mission の進行を確認し、最近の orchestration transition を見て、その後 control plane に介入が必要な場合だけ stale runtime や pending delivery を処理します。"
+      },
+      "chronos_mission_hero_title": {
+        "en": "Read mission health first, then act on runtime or delivery issues.",
+        "ja": "まず mission health を確認し、その後に runtime や delivery の問題へ対応します。"
+      },
+      "chronos_mission_intelligence": {
+        "en": "Mission Intelligence",
+        "ja": "ミッション・インテリジェンス"
+      },
+      "chronos_mission_loading": {
+        "en": "Loading mission intelligence...",
+        "ja": "mission intelligence を読み込み中..."
+      },
+      "chronos_missions": {
+        "en": "missions",
+        "ja": "missions"
+      },
+      "chronos_next_work": {
+        "en": "next work",
+        "ja": "次の work"
+      },
+      "chronos_no_a2a_handoffs_for_filter": {
+        "en": "No A2A handoffs observed for the current mission filter.",
+        "ja": "現在の mission filter では A2A handoff はありません。"
+      },
+      "chronos_no_agents_running": {
+        "en": "No agents running. Spawn one to get started.",
+        "ja": "稼働中の agent はありません。起動して開始してください。"
+      },
+      "chronos_no_logs_yet": {
+        "en": "No logs yet. Send a message to this agent first.",
+        "ja": "まだログはありません。先にこの agent へメッセージを送ってください。"
+      },
+      "chronos_no_managed_surfaces": {
+        "en": "No managed surfaces.",
+        "ja": "管理対象 surface はありません。"
+      },
+      "chronos_no_mission_scoped_messages": {
+        "en": "No mission-scoped agent messages observed yet.",
+        "ja": "mission 単位の agent message はまだありません。"
+      },
+      "chronos_no_projects": {
+        "en": "No projects registered yet.",
+        "ja": "まだ project は登録されていません。"
+      },
+      "chronos_no_recent_surface_outbox": {
+        "en": "No pending or recent surface outbox messages.",
+        "ja": "pending または recent な surface outbox message はありません。"
+      },
+      "chronos_no_unified_mission_thread": {
+        "en": "No unified mission thread is available yet.",
+        "ja": "unified mission thread はまだありません。"
+      },
+      "chronos_owner": {
+        "en": "owner",
+        "ja": "owner"
       },
       "chronos_project_bootstrap_notice": {
         "en": "This project does not have active missions yet. Current bootstrap work:",
@@ -295,33 +320,233 @@
         "en": "Projects hold the long-lived intent context. Use this panel to see which durable work, bindings, and results already have a parent container before creating new missions.",
         "ja": "Project は長期の intent context を保持します。新しい mission を切る前に、どの durable work・binding・result が既に親 container を持つかをここで確認します。"
       },
-      "chronos_no_projects": {
-        "en": "No projects registered yet.",
-        "ja": "まだ project は登録されていません。"
+      "chronos_qa_action_agents": {
+        "en": "Agents",
+        "ja": "エージェント"
       },
-      "chronos_missions": {
-        "en": "missions",
-        "ja": "missions"
+      "chronos_qa_action_audit_log": {
+        "en": "Audit Log",
+        "ja": "監査ログ"
       },
-      "chronos_bindings": {
-        "en": "bindings",
-        "ja": "bindings"
+      "chronos_qa_action_build_test": {
+        "en": "Build & Test",
+        "ja": "ビルド&テスト"
       },
-      "chronos_next_work": {
-        "en": "next work",
-        "ja": "次の work"
+      "chronos_qa_action_capability_audit": {
+        "en": "Capability Audit",
+        "ja": "能力監査"
       },
-      "chronos_kickoff": {
-        "en": "kickoff",
-        "ja": "kickoff"
+      "chronos_qa_action_dashboard": {
+        "en": "Dashboard",
+        "ja": "ダッシュボード"
       },
-      "chronos_focused": {
-        "en": "focused",
-        "ja": "focused"
+      "chronos_qa_action_diagnostics": {
+        "en": "Diagnostics",
+        "ja": "診断"
       },
-      "chronos_focus_project": {
-        "en": "focus project",
-        "ja": "project を focus"
+      "chronos_qa_action_doctor": {
+        "en": "Doctor",
+        "ja": "Doctor"
+      },
+      "chronos_qa_action_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ"
+      },
+      "chronos_qa_action_missions": {
+        "en": "Missions",
+        "ja": "ミッション"
+      },
+      "chronos_qa_action_policies": {
+        "en": "Policies",
+        "ja": "ポリシー"
+      },
+      "chronos_qa_action_prereq_check": {
+        "en": "Prereq Check",
+        "ja": "前提チェック"
+      },
+      "chronos_qa_action_provider_check": {
+        "en": "Provider Check",
+        "ja": "プロバイダ確認"
+      },
+      "chronos_qa_action_schedule_list": {
+        "en": "Schedule List",
+        "ja": "スケジュール一覧"
+      },
+      "chronos_qa_action_schedule_tick": {
+        "en": "Schedule Tick",
+        "ja": "スケジュール実行"
+      },
+      "chronos_qa_action_setup_report": {
+        "en": "Setup Report",
+        "ja": "セットアップ報告"
+      },
+      "chronos_qa_action_surface_setup": {
+        "en": "Surface Setup",
+        "ja": "Surface セットアップ"
+      },
+      "chronos_qa_action_traces": {
+        "en": "Traces",
+        "ja": "トレース"
+      },
+      "chronos_qa_action_upgrade_check": {
+        "en": "Upgrade Check",
+        "ja": "アップデート確認"
+      },
+      "chronos_qa_action_vital_check": {
+        "en": "Vital Check",
+        "ja": "バイタルチェック"
+      },
+      "chronos_qa_observe_hint": {
+        "en": "Open governed readouts before you intervene.",
+        "ja": "介入する前に、統制された読み出しを開きます。"
+      },
+      "chronos_qa_observe_title": {
+        "en": "Observe",
+        "ja": "観測"
+      },
+      "chronos_qa_operate_hint": {
+        "en": "Escalate only when mission flow, runtime health, or delivery is blocked.",
+        "ja": "ミッションの流れ・ランタイム健全性・デリバリーが詰まったときだけエスカレーションします。"
+      },
+      "chronos_qa_operate_title": {
+        "en": "Operate",
+        "ja": "運用"
+      },
+      "chronos_qa_prepare_hint": {
+        "en": "Check the local toolchain and readiness manifests before you start the operator flow.",
+        "ja": "operator フローを始める前に、ローカルのツールチェーンと readiness manifest を確認します。"
+      },
+      "chronos_qa_prepare_title": {
+        "en": "Prepare",
+        "ja": "準備"
+      },
+      "chronos_qa_schedule_hint": {
+        "en": "Run scheduled generation jobs or inspect the current schedule registry.",
+        "ja": "スケジュール済みの生成ジョブを実行するか、現在のスケジュール登録を確認します。"
+      },
+      "chronos_qa_schedule_title": {
+        "en": "Schedule",
+        "ja": "スケジュール"
+      },
+      "chronos_qa_verify_hint": {
+        "en": "Run deterministic checks when the control plane needs proof.",
+        "ja": "control plane に証拠が必要なとき、決定論的チェックを実行します。"
+      },
+      "chronos_qa_verify_title": {
+        "en": "Verify",
+        "ja": "検証"
+      },
+      "chronos_quick_actions": {
+        "en": "Quick Actions",
+        "ja": "Quick Action"
+      },
+      "chronos_recent_events": {
+        "en": "Recent Events",
+        "ja": "Recent Events"
+      },
+      "chronos_recent_surface_outbox": {
+        "en": "Recent Surface Outbox",
+        "ja": "Recent Surface Outbox"
+      },
+      "chronos_refresh": {
+        "en": "Refresh",
+        "ja": "更新"
+      },
+      "chronos_requested_by": {
+        "en": "requested by",
+        "ja": "requested by"
+      },
+      "chronos_retry_latest_action": {
+        "en": "retry latest action",
+        "ja": "最新 action を再試行"
+      },
+      "chronos_retrying": {
+        "en": "retrying",
+        "ja": "再試行中"
+      },
+      "chronos_risky_actions_approval_required": {
+        "en": "risky actions · approval required",
+        "ja": "risky actions · approval required"
+      },
+      "chronos_running": {
+        "en": "running",
+        "ja": "running"
+      },
+      "chronos_safe_actions": {
+        "en": "safe actions",
+        "ja": "safe actions"
+      },
+      "chronos_sc_delivery_detail": {
+        "en": "Slack and Chronos share one operator-visible delivery queue.",
+        "ja": "Slack と Chronos は operator から見える単一のデリバリーキューを共有します。"
+      },
+      "chronos_sc_delivery_label": {
+        "en": "Delivery",
+        "ja": "デリバリー"
+      },
+      "chronos_sc_delivery_value": {
+        "en": "Outbox",
+        "ja": "送信箱"
+      },
+      "chronos_sc_needs_attention_detail": {
+        "en": "Start with mission blockers, runtime incidents, and delivery exceptions.",
+        "ja": "ミッションのブロッカー、ランタイム障害、デリバリー例外から確認します。"
+      },
+      "chronos_sc_needs_attention_label": {
+        "en": "Needs Attention",
+        "ja": "要注意"
+      },
+      "chronos_sc_needs_attention_value": {
+        "en": "Exceptions",
+        "ja": "例外"
+      },
+      "chronos_sc_runtime_governance_detail": {
+        "en": "Managed runtimes, lease ownership, and remediation live here.",
+        "ja": "管理ランタイム、リース所有権、是正処置はここに集約されます。"
+      },
+      "chronos_sc_runtime_governance_label": {
+        "en": "Runtime Governance",
+        "ja": "ランタイム統制"
+      },
+      "chronos_sc_runtime_governance_value": {
+        "en": "Supervisor",
+        "ja": "スーパーバイザ"
+      },
+      "chronos_sc_schedules_detail": {
+        "en": "Inspect and tick scheduled generation jobs from the operator console.",
+        "ja": "operator コンソールからスケジュール済み生成ジョブを確認・実行します。"
+      },
+      "chronos_sc_schedules_label": {
+        "en": "Schedules",
+        "ja": "スケジュール"
+      },
+      "chronos_sc_schedules_value": {
+        "en": "Registry",
+        "ja": "登録簿"
+      },
+      "chronos_sc_toolchain_detail": {
+        "en": "Confirm local prerequisites and setup reports before you work from source.",
+        "ja": "ソースから作業する前に、ローカル前提条件とセットアップ報告を確認します。"
+      },
+      "chronos_sc_toolchain_label": {
+        "en": "Toolchain",
+        "ja": "ツールチェーン"
+      },
+      "chronos_sc_toolchain_value": {
+        "en": "Preflight",
+        "ja": "事前確認"
+      },
+      "chronos_select_agent_definition": {
+        "en": "Select Agent Definition",
+        "ja": "Agent Definition を選択"
+      },
+      "chronos_select_mission_to_inspect_thread": {
+        "en": "select a mission to inspect a unified thread",
+        "ja": "mission を選択して unified thread を確認します"
+      },
+      "chronos_selected_mission_thread": {
+        "en": "Selected Mission Thread",
+        "ja": "Selected Mission Thread"
       },
       "chronos_service_bindings": {
         "en": "Service Bindings",
@@ -331,306 +556,28 @@
         "en": "Bindings define where Kyberion can read from or deliver to. This is the governed edge for GitHub, Slack, Drive, search, and other external systems.",
         "ja": "Binding は Kyberion がどこから読み取り、どこへ deliver できるかを定義します。これは GitHub、Slack、Drive、search など外部システムに対する governed edge です。"
       },
-      "chronos_live_agent_conversation": {
-        "en": "Live Agent Conversation",
-        "ja": "Live Agent Conversation"
+      "chronos_show_latest_action": {
+        "en": "show latest action",
+        "ja": "最新 action を表示"
       },
-      "chronos_all_missions": {
-        "en": "all missions",
-        "ja": "all missions"
+      "chronos_stopped": {
+        "en": "stopped",
+        "ja": "stopped"
       },
-      "chronos_no_mission_scoped_messages": {
-        "en": "No mission-scoped agent messages observed yet.",
-        "ja": "mission 単位の agent message はまだありません。"
-      },
-      "chronos_owner": {
-        "en": "owner",
-        "ja": "owner"
-      },
-      "chronos_channel": {
-        "en": "channel",
-        "ja": "channel"
+      "chronos_surfaces": {
+        "en": "surfaces",
+        "ja": "surfaces"
       },
       "chronos_thread": {
         "en": "thread",
         "ja": "thread"
       },
-      "chronos_selected_mission_thread": {
-        "en": "Selected Mission Thread",
-        "ja": "Selected Mission Thread"
-      },
-      "chronos_select_mission_to_inspect_thread": {
-        "en": "select a mission to inspect a unified thread",
-        "ja": "mission を選択して unified thread を確認します"
-      },
-      "chronos_no_unified_mission_thread": {
-        "en": "No unified mission thread is available yet.",
-        "ja": "unified mission thread はまだありません。"
-      },
-      "chronos_a2a_handoff_trail": {
-        "en": "A2A Handoff Trail",
-        "ja": "A2A Handoff Trail"
-      },
-      "chronos_no_a2a_handoffs_for_filter": {
-        "en": "No A2A handoffs observed for the current mission filter.",
-        "ja": "現在の mission filter では A2A handoff はありません。"
-      },
-      "chronos_mission": {
-        "en": "mission",
-        "ja": "mission"
-      },
-      "chronos_intent": {
-        "en": "intent",
-        "ja": "intent"
-      },
-      "chronos_recent_surface_outbox": {
-        "en": "Recent Surface Outbox",
-        "ja": "Recent Surface Outbox"
-      },
-      "chronos_no_recent_surface_outbox": {
-        "en": "No pending or recent surface outbox messages.",
-        "ja": "pending または recent な surface outbox message はありません。"
-      },
-      "chronos_correlation": {
-        "en": "correlation",
-        "ja": "correlation"
-      },
-      "chronos_clearing": {
-        "en": "clearing",
-        "ja": "削除中"
-      },
-      "chronos_clear_outbox": {
-        "en": "clear outbox",
-        "ja": "outbox を消去"
-      },
-      "chronos_agent_registry": {
-        "en": "Agent Registry",
-        "ja": "Agent Registry"
-      },
-      "chronos_no_agents_running": {
-        "en": "No agents running. Spawn one to get started.",
-        "ja": "稼働中の agent はありません。起動して開始してください。"
-      },
-      "chronos_refresh": {
-        "en": "Refresh",
-        "ja": "更新"
-      },
-      "chronos_close": {
-        "en": "Close",
-        "ja": "閉じる"
-      },
-      "chronos_no_logs_yet": {
-        "en": "No logs yet. Send a message to this agent first.",
-        "ja": "まだログはありません。先にこの agent へメッセージを送ってください。"
-      },
-      "chronos_from_manifest": {
-        "en": "From Manifest",
-        "ja": "Manifest から"
-      },
-      "chronos_custom": {
-        "en": "Custom",
-        "ja": "Custom"
-      },
-      "chronos_select_agent_definition": {
-        "en": "Select Agent Definition",
-        "ja": "Agent Definition を選択"
-      },
-      "chronos_all_agents_running": {
-        "en": "All defined agents are already running.",
-        "ja": "定義済み agent はすべて稼働中です。"
-      },
-      "execution_brief": {
-        "en": "Request understanding",
-        "ja": "理解した依頼"
-      },
-      "resolution_plan": {
-        "en": "Execution plan",
-        "ja": "実行計画"
-      },
-      "pipeline_bundle": {
-        "en": "Execution bundle",
-        "ja": "実行セット"
-      },
-      "capability_bundle": {
-        "en": "Capability bundle",
-        "ja": "能力バンドル"
-      },
-      "execution_plan_set": {
-        "en": "Generated execution files",
-        "ja": "実行ファイル群"
-      },
-      "delivery_pack": {
-        "en": "Deliverable pack",
-        "ja": "成果物パック"
-      },
-      "operator_interaction_packet": {
-        "en": "Interaction card",
-        "ja": "対話カード"
-      },
-      "operator_response_preview": {
-        "en": "Response preview",
-        "ja": "返答プレビュー"
-      },
-      "system_status_report": {
-        "en": "Status report",
-        "ja": "状態レポート"
-      },
-      "readiness_ready": {
-        "en": "ready to run",
-        "ja": "そのまま実行可能"
-      },
-      "readiness_clarification": {
-        "en": "needs clarification",
-        "ja": "追加確認が必要"
-      },
-      "readiness_assets": {
-        "en": "needs external assets",
-        "ja": "外部素材が必要"
-      },
-      "readiness_setup": {
-        "en": "setup required",
-        "ja": "設定が必要"
-      },
-      "readiness_runtime": {
-        "en": "missing runtime prerequisites",
-        "ja": "実行環境が不足"
-      },
-      "question_headline": {
-        "en": "More context is required before execution",
-        "ja": "実行前に追加の確認が必要です"
-      },
-      "question_summary": {
-        "en": "The request needs clarification before Kyberion can proceed safely.",
-        "ja": "実行を続ける前に入力内容の確認が必要です。"
-      },
-      "question_unresolved": {
-        "en": "The request still has unresolved inputs.",
-        "ja": "未解決の入力があります。"
-      },
-      "question_clear": {
-        "en": "The request can proceed without clarification.",
-        "ja": "この依頼は追加確認なしで進められます。"
-      },
-      "question_provide": {
-        "en": "Please provide {input}.",
-        "ja": "{input} を指定してください。"
-      },
-      "question_confirm": {
-        "en": "Please confirm {input}.",
-        "ja": "{input} を確認してください。"
-      },
-      "question_reason": {
-        "en": "The request cannot be executed safely without this input.",
-        "ja": "この入力がないと安全に実行できません。"
-      },
-      "question_goal_prompt": {
-        "en": "What should Kyberion do, and what outcome should count as success?",
-        "ja": "Kyberion は何を実行し、何を成功とみなせばよいですか?"
-      },
-      "connection_connected": {
-        "en": "connected",
-        "ja": "接続済み"
-      },
-      "connection_connecting": {
-        "en": "connecting",
-        "ja": "接続中"
-      },
-      "connection_pending": {
-        "en": "pending",
-        "ja": "確認待ち"
-      },
-      "connection_blocked": {
-        "en": "blocked",
-        "ja": "要対応"
-      },
-      "connection_missing": {
-        "en": "missing",
-        "ja": "未設定"
-      },
-      "connection_not_applicable": {
-        "en": "not required",
-        "ja": "不要"
-      },
-      "connection_degraded": {
-        "en": "degraded",
-        "ja": "接続品質が低下"
-      },
-      "connection_disconnected": {
-        "en": "disconnected",
-        "ja": "未接続"
-      },
-      "provider_available": {
-        "en": "available",
-        "ja": "利用可能"
-      },
-      "provider_busy": {
-        "en": "busy",
-        "ja": "処理中"
-      },
-      "provider_fallback": {
-        "en": "fallback",
-        "ja": "代替"
-      },
-      "provider_error": {
-        "en": "error",
-        "ja": "エラー"
-      },
-      "provider_missing": {
-        "en": "missing",
-        "ja": "未導入"
-      },
-      "mission_planned": {
-        "en": "planned",
-        "ja": "予定"
-      },
-      "mission_active": {
-        "en": "active",
-        "ja": "進行中"
-      },
-      "mission_blocked": {
-        "en": "blocked",
-        "ja": "停止中"
-      },
-      "mission_completed": {
-        "en": "completed",
-        "ja": "完了"
-      },
-      "mission_failed": {
-        "en": "failed",
-        "ja": "失敗"
-      },
-      "mission_review": {
-        "en": "review",
-        "ja": "レビュー"
-      },
-      "mission_recovered": {
-        "en": "recovered",
-        "ja": "復旧"
-      },
-      "mission_paused": {
-        "en": "paused",
-        "ja": "一時停止"
-      },
-      "mission_distilling": {
-        "en": "distilling",
-        "ja": "学習整理中"
-      },
-      "mission_archived": {
-        "en": "archived",
-        "ja": "保管済み"
-      },
-      "runtime_running": {
-        "en": "running",
-        "ja": "稼働中"
-      },
-      "runtime_stale": {
-        "en": "stale",
-        "ja": "応答遅延"
-      },
-      "runtime_stopped": {
-        "en": "stopped",
-        "ja": "停止"
-      },
+      "chronos_working": {
+        "en": "working",
+        "ja": "実行中"
+      }
+    },
+    "cli": {
       "cli_readiness": {
         "en": "Readiness",
         "ja": "実行準備度"
@@ -690,62 +637,6 @@
       "cli_detail": {
         "en": "detail",
         "ja": "詳細"
-      },
-      "chronos_chat_cancel": {
-        "en": "Cancel",
-        "ja": "キャンセル"
-      },
-      "chronos_chat_cancelled": {
-        "en": "Request cancelled.",
-        "ja": "リクエストをキャンセルしました。"
-      },
-      "chronos_chat_phase_sending": {
-        "en": "Sending request…",
-        "ja": "リクエスト送信中…"
-      },
-      "chronos_chat_phase_thinking": {
-        "en": "Sovereign is thinking…",
-        "ja": "Sovereign が考えています…"
-      },
-      "chronos_chat_phase_long_running": {
-        "en": "Still working — long tasks can take a while.",
-        "ja": "処理を継続中です — 時間がかかる場合があります。"
-      },
-      "chronos_chat_guided_prompts": {
-        "en": "Guided prompts",
-        "ja": "ガイド付きプロンプト"
-      },
-      "chronos_chat_prompt_health_label": {
-        "en": "Health",
-        "ja": "健全性"
-      },
-      "chronos_chat_prompt_health_query": {
-        "en": "Summarize system health and current blockers.",
-        "ja": "システムの健全性と現在のブロッカーを要約してください。"
-      },
-      "chronos_chat_prompt_missions_label": {
-        "en": "Missions",
-        "ja": "ミッション"
-      },
-      "chronos_chat_prompt_missions_query": {
-        "en": "List the active missions and what needs attention.",
-        "ja": "アクティブなミッションと要注意点を一覧にしてください。"
-      },
-      "chronos_chat_prompt_traces_label": {
-        "en": "Traces",
-        "ja": "トレース"
-      },
-      "chronos_chat_prompt_traces_query": {
-        "en": "Show the latest trace issues and what failed.",
-        "ja": "最新のトレースの問題と失敗箇所を見せてください。"
-      },
-      "chronos_chat_prompt_next_step_label": {
-        "en": "Next step",
-        "ja": "次の一手"
-      },
-      "chronos_chat_prompt_next_step_query": {
-        "en": "What should I do next to unblock delivery?",
-        "ja": "デリバリーを前に進めるために次に何をすべきですか?"
       },
       "cli_help_usage": {
         "en": "Usage: npm run cli -- <command> [arguments]",
@@ -1011,194 +902,6 @@
         "en": "❌ Error: Branch \"{branch}\" not found in Wisdom Vault.",
         "ja": "❌ エラー: ブランチ \"{branch}\" が Wisdom Vault に見つかりません。"
       },
-      "chronos_chat_open": {
-        "en": "Open Sovereign chat",
-        "ja": "Sovereign チャットを開く"
-      },
-      "chronos_chat_input": {
-        "en": "Chat input",
-        "ja": "チャット入力"
-      },
-      "chronos_chat_send": {
-        "en": "Send",
-        "ja": "送信"
-      },
-      "chronos_qa_prepare_title": {
-        "en": "Prepare",
-        "ja": "準備"
-      },
-      "chronos_qa_prepare_hint": {
-        "en": "Check the local toolchain and readiness manifests before you start the operator flow.",
-        "ja": "operator フローを始める前に、ローカルのツールチェーンと readiness manifest を確認します。"
-      },
-      "chronos_qa_schedule_title": {
-        "en": "Schedule",
-        "ja": "スケジュール"
-      },
-      "chronos_qa_schedule_hint": {
-        "en": "Run scheduled generation jobs or inspect the current schedule registry.",
-        "ja": "スケジュール済みの生成ジョブを実行するか、現在のスケジュール登録を確認します。"
-      },
-      "chronos_qa_observe_title": {
-        "en": "Observe",
-        "ja": "観測"
-      },
-      "chronos_qa_observe_hint": {
-        "en": "Open governed readouts before you intervene.",
-        "ja": "介入する前に、統制された読み出しを開きます。"
-      },
-      "chronos_qa_verify_title": {
-        "en": "Verify",
-        "ja": "検証"
-      },
-      "chronos_qa_verify_hint": {
-        "en": "Run deterministic checks when the control plane needs proof.",
-        "ja": "control plane に証拠が必要なとき、決定論的チェックを実行します。"
-      },
-      "chronos_qa_operate_title": {
-        "en": "Operate",
-        "ja": "運用"
-      },
-      "chronos_qa_operate_hint": {
-        "en": "Escalate only when mission flow, runtime health, or delivery is blocked.",
-        "ja": "ミッションの流れ・ランタイム健全性・デリバリーが詰まったときだけエスカレーションします。"
-      },
-      "chronos_qa_action_prereq_check": {
-        "en": "Prereq Check",
-        "ja": "前提チェック"
-      },
-      "chronos_qa_action_setup_report": {
-        "en": "Setup Report",
-        "ja": "セットアップ報告"
-      },
-      "chronos_qa_action_doctor": {
-        "en": "Doctor",
-        "ja": "Doctor"
-      },
-      "chronos_qa_action_surface_setup": {
-        "en": "Surface Setup",
-        "ja": "Surface セットアップ"
-      },
-      "chronos_qa_action_schedule_tick": {
-        "en": "Schedule Tick",
-        "ja": "スケジュール実行"
-      },
-      "chronos_qa_action_schedule_list": {
-        "en": "Schedule List",
-        "ja": "スケジュール一覧"
-      },
-      "chronos_qa_action_dashboard": {
-        "en": "Dashboard",
-        "ja": "ダッシュボード"
-      },
-      "chronos_qa_action_missions": {
-        "en": "Missions",
-        "ja": "ミッション"
-      },
-      "chronos_qa_action_agents": {
-        "en": "Agents",
-        "ja": "エージェント"
-      },
-      "chronos_qa_action_audit_log": {
-        "en": "Audit Log",
-        "ja": "監査ログ"
-      },
-      "chronos_qa_action_traces": {
-        "en": "Traces",
-        "ja": "トレース"
-      },
-      "chronos_qa_action_vital_check": {
-        "en": "Vital Check",
-        "ja": "バイタルチェック"
-      },
-      "chronos_qa_action_diagnostics": {
-        "en": "Diagnostics",
-        "ja": "診断"
-      },
-      "chronos_qa_action_capability_audit": {
-        "en": "Capability Audit",
-        "ja": "能力監査"
-      },
-      "chronos_qa_action_provider_check": {
-        "en": "Provider Check",
-        "ja": "プロバイダ確認"
-      },
-      "chronos_qa_action_build_test": {
-        "en": "Build & Test",
-        "ja": "ビルド&テスト"
-      },
-      "chronos_qa_action_policies": {
-        "en": "Policies",
-        "ja": "ポリシー"
-      },
-      "chronos_qa_action_upgrade_check": {
-        "en": "Upgrade Check",
-        "ja": "アップデート確認"
-      },
-      "chronos_qa_action_knowledge": {
-        "en": "Knowledge",
-        "ja": "ナレッジ"
-      },
-      "chronos_sc_needs_attention_label": {
-        "en": "Needs Attention",
-        "ja": "要注意"
-      },
-      "chronos_sc_needs_attention_value": {
-        "en": "Exceptions",
-        "ja": "例外"
-      },
-      "chronos_sc_needs_attention_detail": {
-        "en": "Start with mission blockers, runtime incidents, and delivery exceptions.",
-        "ja": "ミッションのブロッカー、ランタイム障害、デリバリー例外から確認します。"
-      },
-      "chronos_sc_toolchain_label": {
-        "en": "Toolchain",
-        "ja": "ツールチェーン"
-      },
-      "chronos_sc_toolchain_value": {
-        "en": "Preflight",
-        "ja": "事前確認"
-      },
-      "chronos_sc_toolchain_detail": {
-        "en": "Confirm local prerequisites and setup reports before you work from source.",
-        "ja": "ソースから作業する前に、ローカル前提条件とセットアップ報告を確認します。"
-      },
-      "chronos_sc_schedules_label": {
-        "en": "Schedules",
-        "ja": "スケジュール"
-      },
-      "chronos_sc_schedules_value": {
-        "en": "Registry",
-        "ja": "登録簿"
-      },
-      "chronos_sc_schedules_detail": {
-        "en": "Inspect and tick scheduled generation jobs from the operator console.",
-        "ja": "operator コンソールからスケジュール済み生成ジョブを確認・実行します。"
-      },
-      "chronos_sc_runtime_governance_label": {
-        "en": "Runtime Governance",
-        "ja": "ランタイム統制"
-      },
-      "chronos_sc_runtime_governance_value": {
-        "en": "Supervisor",
-        "ja": "スーパーバイザ"
-      },
-      "chronos_sc_runtime_governance_detail": {
-        "en": "Managed runtimes, lease ownership, and remediation live here.",
-        "ja": "管理ランタイム、リース所有権、是正処置はここに集約されます。"
-      },
-      "chronos_sc_delivery_label": {
-        "en": "Delivery",
-        "ja": "デリバリー"
-      },
-      "chronos_sc_delivery_value": {
-        "en": "Outbox",
-        "ja": "送信箱"
-      },
-      "chronos_sc_delivery_detail": {
-        "en": "Slack and Chronos share one operator-visible delivery queue.",
-        "ja": "Slack と Chronos は operator から見える単一のデリバリーキューを共有します。"
-      },
       "cli_help_sec_offboarding": {
         "en": "── Scope Offboarding ───────────────────────────────────────────────",
         "ja": "── スコープオフボーディング ────────────────────────────────────────"
@@ -1223,6 +926,317 @@
         "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",
         "ja": "  削除は soft-delete: active/archive/.trash/ へ移動し、janitor が purge するまで復元可能。"
       }
-    }
+    },
+    "status": {
+      "progress_working": {
+        "en": "Working",
+        "ja": "処理中"
+      },
+      "progress_completed": {
+        "en": "Completed",
+        "ja": "完了"
+      },
+      "progress_failed": {
+        "en": "Failed",
+        "ja": "失敗"
+      },
+      "readiness_ready": {
+        "en": "ready to run",
+        "ja": "そのまま実行可能"
+      },
+      "readiness_clarification": {
+        "en": "needs clarification",
+        "ja": "追加確認が必要"
+      },
+      "readiness_assets": {
+        "en": "needs external assets",
+        "ja": "外部素材が必要"
+      },
+      "readiness_setup": {
+        "en": "setup required",
+        "ja": "設定が必要"
+      },
+      "readiness_runtime": {
+        "en": "missing runtime prerequisites",
+        "ja": "実行環境が不足"
+      },
+      "connection_connected": {
+        "en": "connected",
+        "ja": "接続済み"
+      },
+      "connection_connecting": {
+        "en": "connecting",
+        "ja": "接続中"
+      },
+      "connection_pending": {
+        "en": "pending",
+        "ja": "確認待ち"
+      },
+      "connection_blocked": {
+        "en": "blocked",
+        "ja": "要対応"
+      },
+      "connection_missing": {
+        "en": "missing",
+        "ja": "未設定"
+      },
+      "connection_not_applicable": {
+        "en": "not required",
+        "ja": "不要"
+      },
+      "connection_degraded": {
+        "en": "degraded",
+        "ja": "接続品質が低下"
+      },
+      "connection_disconnected": {
+        "en": "disconnected",
+        "ja": "未接続"
+      },
+      "provider_available": {
+        "en": "available",
+        "ja": "利用可能"
+      },
+      "provider_busy": {
+        "en": "busy",
+        "ja": "処理中"
+      },
+      "provider_fallback": {
+        "en": "fallback",
+        "ja": "代替"
+      },
+      "provider_error": {
+        "en": "error",
+        "ja": "エラー"
+      },
+      "provider_missing": {
+        "en": "missing",
+        "ja": "未導入"
+      },
+      "mission_planned": {
+        "en": "planned",
+        "ja": "予定"
+      },
+      "mission_active": {
+        "en": "active",
+        "ja": "進行中"
+      },
+      "mission_blocked": {
+        "en": "blocked",
+        "ja": "停止中"
+      },
+      "mission_completed": {
+        "en": "completed",
+        "ja": "完了"
+      },
+      "mission_failed": {
+        "en": "failed",
+        "ja": "失敗"
+      },
+      "mission_review": {
+        "en": "review",
+        "ja": "レビュー"
+      },
+      "mission_recovered": {
+        "en": "recovered",
+        "ja": "復旧"
+      },
+      "mission_paused": {
+        "en": "paused",
+        "ja": "一時停止"
+      },
+      "mission_distilling": {
+        "en": "distilling",
+        "ja": "学習整理中"
+      },
+      "mission_archived": {
+        "en": "archived",
+        "ja": "保管済み"
+      },
+      "runtime_running": {
+        "en": "running",
+        "ja": "稼働中"
+      },
+      "runtime_stale": {
+        "en": "stale",
+        "ja": "応答遅延"
+      },
+      "runtime_stopped": {
+        "en": "stopped",
+        "ja": "停止"
+      }
+    },
+    "error": {
+      "error_title": {
+        "en": "Something went wrong",
+        "ja": "問題が発生しました"
+      },
+      "error_trace_label": {
+        "en": "Trace",
+        "ja": "trace"
+      },
+      "error_connection_body": {
+        "en": "The service or network is unavailable.",
+        "ja": "サービスまたはネットワークに接続できません。"
+      },
+      "error_rate_limit_body": {
+        "en": "The provider is temporarily rate-limiting requests.",
+        "ja": "プロバイダが一時的にリクエストを制限しています。"
+      },
+      "error_missing_dependency_body": {
+        "en": "A runtime dependency is missing.",
+        "ja": "実行に必要な依存が不足しています。"
+      },
+      "error_missing_secret_body": {
+        "en": "A required credential or secret is missing.",
+        "ja": "必要な credential か secret が見つかりません。"
+      },
+      "error_invalid_input_body": {
+        "en": "The request shape is invalid.",
+        "ja": "入力形式が不正です。"
+      },
+      "error_resource_unavailable_body": {
+        "en": "The requested resource is busy or unavailable.",
+        "ja": "要求したリソースが使用中か利用できません。"
+      },
+      "error_timeout_body": {
+        "en": "The operation took too long.",
+        "ja": "処理が時間内に完了しませんでした。"
+      },
+      "error_governance_block_body": {
+        "en": "The action needs approval or a policy change.",
+        "ja": "承認またはポリシー変更が必要です。"
+      },
+      "error_permission_denied_body": {
+        "en": "You do not have permission to complete this action.",
+        "ja": "この操作を完了する権限がありません。"
+      },
+      "error_mission_not_found_body": {
+        "en": "The mission reference could not be resolved.",
+        "ja": "mission 参照を解決できませんでした。"
+      },
+      "error_unknown_body": {
+        "en": "The request could not be completed.",
+        "ja": "依頼を完了できませんでした。"
+      },
+      "error_next_step_retry": {
+        "en": "Try the request again.",
+        "ja": "もう一度やり直してください。"
+      },
+      "error_next_step_doctor": {
+        "en": "Check the runtime health and prerequisites.",
+        "ja": "実行環境と健全性を確認してください。"
+      },
+      "error_next_step_repair": {
+        "en": "Repair the blocked policy or approval and retry.",
+        "ja": "ブロックされたポリシーや承認を修復して再実行してください。"
+      },
+      "error_next_step_connect": {
+        "en": "Reconnect the service or network and retry.",
+        "ja": "接続を回復して再実行してください。"
+      },
+      "error_next_step_input": {
+        "en": "Fix the input shape and rerun the same action.",
+        "ja": "入力形式を修正して同じ操作を再実行してください。"
+      },
+      "error_next_step_secret": {
+        "en": "Update the required secret or credential and retry.",
+        "ja": "必要な secret / credential を更新して再実行してください。"
+      }
+    },
+    "question": {
+      "question_headline": {
+        "en": "More context is required before execution",
+        "ja": "実行前に追加の確認が必要です"
+      },
+      "question_summary": {
+        "en": "The request needs clarification before Kyberion can proceed safely.",
+        "ja": "実行を続ける前に入力内容の確認が必要です。"
+      },
+      "question_unresolved": {
+        "en": "The request still has unresolved inputs.",
+        "ja": "未解決の入力があります。"
+      },
+      "question_clear": {
+        "en": "The request can proceed without clarification.",
+        "ja": "この依頼は追加確認なしで進められます。"
+      },
+      "question_provide": {
+        "en": "Please provide {input}.",
+        "ja": "{input} を指定してください。"
+      },
+      "question_confirm": {
+        "en": "Please confirm {input}.",
+        "ja": "{input} を確認してください。"
+      },
+      "question_reason": {
+        "en": "The request cannot be executed safely without this input.",
+        "ja": "この入力がないと安全に実行できません。"
+      },
+      "question_goal_prompt": {
+        "en": "What should Kyberion do, and what outcome should count as success?",
+        "ja": "Kyberion は何を実行し、何を成功とみなせばよいですか?"
+      }
+    },
+    "common": {
+      "empty_reply_body": {
+        "en": "I could not produce a result for that request.",
+        "ja": "今回の依頼に対する結果を生成できませんでした。"
+      },
+      "empty_reply_next_step": {
+        "en": "Try rephrasing the request or adding more detail.",
+        "ja": "言い換えるか、もう少し詳しく書いて再度お試しください。"
+      },
+      "pipeline_crystallization_loop": {
+        "en": "Pipeline Crystallization Loop",
+        "ja": "パイプライン結晶化ループ"
+      },
+      "pipeline_crystallization_loop_description": {
+        "en": "The phase that turns exploratory work into a stable, reproducible pipeline before execution.",
+        "ja": "探索段階の work を、実行前に stable かつ再現可能な pipeline へ固める段階。"
+      },
+      "pipeline_crystallization_loop_rule": {
+        "en": "Explore first, normalize the shape, crystallize it into a pipeline, verify, then freeze.",
+        "ja": "まず探索し、形を整え、pipeline に結晶化し、検証してから freeze します。"
+      },
+      "execution_brief": {
+        "en": "Request understanding",
+        "ja": "理解した依頼"
+      },
+      "resolution_plan": {
+        "en": "Execution plan",
+        "ja": "実行計画"
+      },
+      "pipeline_bundle": {
+        "en": "Execution bundle",
+        "ja": "実行セット"
+      },
+      "capability_bundle": {
+        "en": "Capability bundle",
+        "ja": "能力バンドル"
+      },
+      "execution_plan_set": {
+        "en": "Generated execution files",
+        "ja": "実行ファイル群"
+      },
+      "delivery_pack": {
+        "en": "Deliverable pack",
+        "ja": "成果物パック"
+      },
+      "operator_interaction_packet": {
+        "en": "Interaction card",
+        "ja": "対話カード"
+      },
+      "operator_response_preview": {
+        "en": "Response preview",
+        "ja": "返答プレビュー"
+      },
+      "system_status_report": {
+        "en": "Status report",
+        "ja": "状態レポート"
+      }
+    },
+    "bridge": {},
+    "concierge": {},
+    "onboarding": {}
   }
 }
