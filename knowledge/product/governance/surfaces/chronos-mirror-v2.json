@@ -20,7 +20,7 @@
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
       "port": 3000,
-      "healthPath": "/api/agents",
+      "healthPath": "/api/healthz",
       "enabled": true
     }
   ]

@@ -35,6 +35,14 @@
       "types": "./dist/agent-registry.d.ts",
       "default": "./dist/agent-registry.js"
     },
+    "./agent-collaboration-events": {
+      "types": "./dist/agent-collaboration-events.d.ts",
+      "default": "./dist/agent-collaboration-events.js"
+    },
+    "./agent-collaboration-projection": {
+      "types": "./dist/agent-collaboration-projection.d.ts",
+      "default": "./dist/agent-collaboration-projection.js"
+    },
     "./acp-mediator": {
       "types": "./dist/acp-mediator.d.ts",
       "default": "./dist/acp-mediator.js"

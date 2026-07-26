@@ -6,6 +6,8 @@ function makeReq(
     ip?: string;
     authorization?: string;
     cookie?: string;
+    hostname?: string;
+    forwardedFor?: string;
   } = {}
 ) {
   return {
@@ -14,6 +16,9 @@ function makeReq(
       get(name: string) {
         if (name.toLowerCase() === 'authorization') {
           return options.authorization || null;
+        }
+        if (name.toLowerCase() === 'x-forwarded-for') {
+          return options.forwardedFor || null;
         }
         return null;
       },
@@ -25,6 +30,9 @@ function makeReq(
         }
         return undefined;
       },
+    },
+    nextUrl: {
+      hostname: options.hostname,
     },
   } as unknown as NextRequest;
 }
@@ -59,6 +67,34 @@ describe('api guard', () => {
     const { resolveChronosAccessRole } = await import('./api-guard.js');
 
     expect(resolveChronosAccessRole(makeReq({ ip: '127.0.0.1' }))).toBe('localadmin');
+  });
+
+  it('allows direct localhost requests when self-hosted Next.js omits the client ip', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+
+    expect(resolveChronosAccessRole(makeReq({ hostname: '127.0.0.1' }))).toBe('localadmin');
+    expect(resolveChronosAccessRole(makeReq({ hostname: 'localhost' }))).toBe('localadmin');
+  });
+
+  it('does not trust a localhost hostname when forwarded identity is present', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+
+    const request = makeReq({ hostname: '127.0.0.1', forwardedFor: '203.0.113.10' });
+    expect(resolveChronosAccessRole(request)).toBeNull();
+  });
+
+  it('accepts the loopback forwarding address added by the self-hosted Next.js server', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+
+    expect(
+      resolveChronosAccessRole({
+        ...makeReq({ hostname: '127.0.0.1', forwardedFor: '::ffff:127.0.0.1' }),
+        ip: undefined,
+      } as any)
+    ).toBe('localadmin');
   });
 
   it('accepts bearer token auth regardless of ip visibility', async () => {

@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Collaboration Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "source_event_id",
+    "ts",
+    "seq",
+    "actor_type",
+    "kind",
+    "summary",
+    "related_ids",
+    "evidence_refs",
+    "redaction",
+    "source"
+  ],
+  "properties": {
+    "schema_version": { "const": "agent-collaboration-event.v1" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "source_event_id": { "type": "string", "minLength": 1 },
+    "ts": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 0 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "parent_agent_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "actor_type": { "enum": ["human", "agent", "surface", "system"] },
+    "kind": {
+      "enum": [
+        "dispatch",
+        "claim",
+        "spawn",
+        "progress",
+        "waiting",
+        "blocked",
+        "handoff",
+        "approval",
+        "review",
+        "artifact",
+        "retry",
+        "failure",
+        "completion",
+        "unknown"
+      ]
+    },
+    "state_before": { "type": "string" },
+    "state_after": { "type": "string" },
+    "reason_code": { "type": "string" },
+    "summary": { "type": "string", "maxLength": 240 },
+    "correlation_id": { "type": "string" },
+    "causation_id": { "type": "string" },
+    "related_ids": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "tier": { "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string" },
+    "redaction": { "enum": ["summary", "reference_only", "redacted"] },
+    "source": {
+      "enum": ["mission", "task", "worker", "orchestration", "a2a", "trace", "surface", "runtime"]
+    }
+  }
+}

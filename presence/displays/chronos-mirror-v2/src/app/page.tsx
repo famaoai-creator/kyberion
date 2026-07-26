@@ -2669,7 +2669,12 @@ export default function ChronosMirrorV2() {
                     />
                   )
                 ) : showOpsBoards ? (
-                  <AgentOpsBoards />
+                  <AgentOpsBoards
+                    onOpenMission={(missionId) =>
+                      handleOperatorViewOpen('mission-control-plane', missionId)
+                    }
+                    onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
+                  />
                 ) : (
                   <div className="flex flex-col gap-6">
                     {a2uiActionNotice ? (

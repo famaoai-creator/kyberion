@@ -83,6 +83,12 @@ describe('vital_check', () => {
     const report = buildVitalReport();
     expect(report.summary.total).toBe(10);
     expect(report.active_mission_count).toBe(activeMissionCount());
+    expect(report.collaboration).toMatchObject({
+      events: expect.any(Number),
+      agents: expect.any(Number),
+      attention: expect.any(Number),
+      status_flags: expect.any(Array),
+    });
   });
 
   it('prefers customer overlay identity and onboarding artifacts when active', () => {
