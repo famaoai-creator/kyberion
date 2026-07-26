@@ -46,8 +46,19 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
 } from '../lib/operator-console';
-import { chronosSpeechLocale, setChronosLocalePreference, uxText } from '../lib/ux-vocabulary';
+import {
+  chronosSpeechLocale,
+  setChronosLocalePreference,
+  uxMessage,
+  uxText,
+  type SupportedLocale,
+} from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
+import {
+  nextChronosThemeMode,
+  resolveChronosThemeMode,
+  type ChronosThemeMode,
+} from '../lib/chronos-theme';
 
 type QuickAction = {
   label: string;
@@ -76,8 +87,6 @@ type StatusCard = {
 
 const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
 const CHRONOS_THEME_PREFS_KEY = 'chronos.theme-mode';
-
-type ChronosThemeMode = 'system' | 'light' | 'dark';
 
 function buildPlanPreviewSignature(input: {
   requestText: string;
@@ -155,14 +164,6 @@ function saveChronosThemeMode(mode: ChronosThemeMode): void {
   } catch {
     // localStorage may be denied; ignore.
   }
-}
-
-function resolveChronosThemeMode(
-  mode: ChronosThemeMode,
-  systemPrefersDark: boolean
-): 'light' | 'dark' {
-  if (mode === 'light' || mode === 'dark') return mode;
-  return systemPrefersDark ? 'dark' : 'light';
 }
 
 const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => [
@@ -416,7 +417,10 @@ export default function ChronosMirrorV2() {
   const [missionHistory, setMissionHistory] = useState<any[]>([]);
   const [missionHistoryError, setMissionHistoryError] = useState<string | null>(null);
   const [missionHistoryQuery, setMissionHistoryQuery] = useState('');
-  const [missionHistoryStatus, setMissionHistoryStatus] = useState('completed');
+  // Defaulting to 'completed' made this panel read "No missions match the
+  // current filter" on a workspace with active missions and no finished ones —
+  // an empty history next to a live mission count. Start unfiltered.
+  const [missionHistoryStatus, setMissionHistoryStatus] = useState('');
   const [missionHistoryTier, setMissionHistoryTier] = useState('');
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
   const [costSummary, setCostSummary] = useState<any | null>(null);
@@ -434,11 +438,18 @@ export default function ChronosMirrorV2() {
   const [connectionReviewBusyId, setConnectionReviewBusyId] = useState<string | null>(null);
   const [connectionReviewNote, setConnectionReviewNote] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  // The console used to open with four competing full-size navigation panels
+  // (quick actions, scenarios, surface cards, operator views) all expanded.
+  // Scenarios is now the one primary entry; everything else starts closed so
+  // the first screen answers "what needs me" instead of "which menu is this".
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taxonomy: false,
     cycle: false,
-    views: true,
+    views: false,
+    checks: false,
+    designSystem: false,
   });
+  const [showCleanedDeliverables, setShowCleanedDeliverables] = useState(false);
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
   const mainSurfaceRef = useRef<HTMLElement | null>(null);
   const currentPlanPreviewSignature = buildPlanPreviewSignature({
@@ -1101,6 +1112,82 @@ export default function ChronosMirrorV2() {
     return () => window.removeEventListener('keydown', handleScenarioHotkey);
   }, [handleScenarioOpen]);
 
+  /**
+   * The one thing to press. `operatorHomeSummary.nextAction` already says WHAT
+   * to do in prose; this maps the same control-plane state onto WHERE that
+   * happens, so the headline action is a real destination and not advice.
+   */
+  /**
+   * The inbox is dominated by records whose file was swept away by a tmp clean
+   * or mission archival. They are honest history, not work — so they collapse
+   * behind a counted toggle and the live deliverables get the panel.
+   */
+  const cleanedDeliverableCount = useMemo(
+    () => deliverables.filter((item) => item.missing).length,
+    [deliverables]
+  );
+  const visibleDeliverables = useMemo(
+    () => (showCleanedDeliverables ? deliverables : deliverables.filter((item) => !item.missing)),
+    [deliverables, showCleanedDeliverables]
+  );
+
+  const homePrimaryAction = useMemo(() => {
+    if (!operatorHomeSummary) return null;
+    const counts = operatorHomeSummary.counts || {};
+    const target: { targetId: string; surface: 'mission-intelligence' | 'focused-operator' } =
+      counts.blockedMissions > 0
+        ? { targetId: 'needs-attention', surface: 'mission-intelligence' }
+        : counts.pendingApprovals > 0
+          ? { targetId: 'approvals', surface: 'mission-intelligence' }
+          : counts.unreadInbox > 0
+            ? { targetId: 'recent-surface-outbox', surface: 'mission-intelligence' }
+            : { targetId: 'mission-control-plane', surface: 'mission-intelligence' };
+    return {
+      title: operatorHomeSummary.nextAction?.title as string | undefined,
+      reason: operatorHomeSummary.nextAction?.reason as string | undefined,
+      ...target,
+    };
+  }, [operatorHomeSummary]);
+
+  /**
+   * The counters double as navigation: each one is the shortest path to the
+   * work it counts. `null` targets stay readable but non-interactive.
+   */
+  const homeCounters = useMemo(() => {
+    if (!operatorHomeSummary) return [];
+    const counts = operatorHomeSummary.counts || {};
+    return [
+      {
+        key: 'approvals',
+        value: counts.pendingApprovals ?? 0,
+        label: uxText('chronos_cb_count_approvals', locale),
+        targetId: 'approvals',
+        tone: 'info' as const,
+      },
+      {
+        key: 'inbox',
+        value: counts.unreadInbox ?? 0,
+        label: uxText('chronos_cb_count_inbox', locale),
+        targetId: 'recent-surface-outbox',
+        tone: 'info' as const,
+      },
+      {
+        key: 'active',
+        value: counts.activeMissions ?? 0,
+        label: uxText('chronos_cb_count_active', locale),
+        targetId: 'mission-control-plane',
+        tone: 'neutral' as const,
+      },
+      {
+        key: 'blocked',
+        value: counts.blockedMissions ?? 0,
+        label: uxText('chronos_cb_count_blocked', locale),
+        targetId: 'needs-attention',
+        tone: 'alert' as const,
+      },
+    ];
+  }, [operatorHomeSummary, locale]);
+
   const webTheme = webDesignSystem.theme.theme;
   const webLayout = webDesignSystem.layout;
   const isLightTheme = themeMode === 'light';
@@ -1108,6 +1195,29 @@ export default function ChronosMirrorV2() {
   const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/40';
   const shellSubtleClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/60';
   const shellTitleClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'text-white/90';
+  // Tone-colored chips were authored for the dark console only: a 100-level
+  // text on a 400/10 wash measures ~1.7:1 once the panel underneath is light.
+  // Light mode needs the ink darkened, not just the panel lightened.
+  const toneChipClass = (tone: 'approve' | 'reject' | 'info' | 'alert' | 'neutral'): string => {
+    if (isLightTheme) {
+      return {
+        approve: 'border-emerald-600/30 bg-emerald-500/12 text-emerald-800 hover:bg-emerald-500/20',
+        reject: 'border-rose-600/30 bg-rose-500/12 text-rose-800 hover:bg-rose-500/20',
+        info: 'border-sky-600/30 bg-sky-500/12 text-sky-800 hover:bg-sky-500/20',
+        alert: 'border-amber-600/35 bg-amber-500/15 text-amber-900 hover:bg-amber-500/22',
+        neutral:
+          'border-[color:var(--kb-border)] bg-black/[0.04] text-[var(--kb-text-primary)] hover:bg-black/[0.07]',
+      }[tone];
+    }
+    return {
+      approve:
+        'border-emerald-400/20 bg-emerald-400/10 text-emerald-100/80 hover:bg-emerald-400/16',
+      reject: 'border-rose-400/20 bg-rose-400/10 text-rose-100/80 hover:bg-rose-400/16',
+      info: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100/80 hover:bg-cyan-400/16',
+      alert: 'border-amber-400/25 bg-amber-400/12 text-amber-100/85 hover:bg-amber-400/20',
+      neutral: 'border-white/10 bg-black/20 text-white/78 hover:bg-white/10',
+    }[tone];
+  };
 
   return (
     <Suspense fallback={null}>
@@ -1172,11 +1282,7 @@ export default function ChronosMirrorV2() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setThemeModePreference((current) =>
-                      current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
-                    )
-                  }
+                  onClick={() => setThemeModePreference(nextChronosThemeMode)}
                   aria-label={`Chronos theme: ${themeModePreference}`}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
                 >
@@ -1206,198 +1312,121 @@ export default function ChronosMirrorV2() {
             </div>
           </header>
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr),minmax(0,0.85fr)]">
-            <div className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <div
-                className={`flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] ${shellMutedClass}`}
-              >
-                <span>{webTheme.name}</span>
-                <span className={shellMutedClass}>·</span>
-                <span>{webDesignSystem.design_system.pack_id}</span>
-                <span className={shellMutedClass}>·</span>
-                <span>{webTheme.colors.accent}</span>
-              </div>
-              <div className="mt-4 max-w-3xl">
-                <h2
-                  className={`text-2xl font-semibold tracking-tight ${shellTitleClass} md:text-[2rem]`}
+          {/* The command band: role, current state, the one action to take,
+              and counters that double as navigation. This is deliberately the
+              first thing on the page — the design-system panel that used to own
+              this slot moved into the sidebar's reference drawer. */}
+          <section className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-3xl">
+                <div
+                  className={`flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] ${shellMutedClass}`}
                 >
-                  {locale === 'ja'
-                    ? 'Kyberionは、環境全体を自律的に制御し、あなたの意図（Intent）に合わせてシステムが最適に連携・動作する高度なインテリジェント・インターフェースです。'
-                    : 'Kyberion is an intelligent interface that autonomously controls your environment so the whole system coordinates around your intent.'}
+                  <span>{uxText('chronos_cb_role', locale)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{uxText('chronos_mission_intelligence', locale)}</span>
+                </div>
+                <h2
+                  className={`mt-3 text-xl font-semibold leading-snug tracking-tight ${shellTitleClass} md:text-2xl`}
+                >
+                  {operatorHomeSummary
+                    ? operatorHomeSummary.statusDetail
+                    : uxText('chronos_cb_reading_state', locale)}
                 </h2>
-                <p className={`mt-3 max-w-2xl text-sm leading-7 ${shellSubtleClass}`}>
-                  {locale === 'ja'
-                    ? 'この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack` でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。'
-                    : 'This surface manages color and typography via `web-theme-pack`, and layout plus section order via `web-design-system-pack`. Reusable structure is fixed first, before visual fine-tuning.'}
+                <p className={`mt-2 text-sm leading-6 ${shellSubtleClass}`}>
+                  {uxText('chronos_cb_purpose', locale)}
                 </p>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {webDesignSystem.section_order.map((sectionId) => (
-                  <span
-                    key={sectionId}
-                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/70 text-[var(--kb-text-primary)]' : 'border-white/10 bg-black/20 text-white/68'}`}
-                  >
-                    {sectionId}
-                  </span>
-                ))}
+              <div
+                className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${toneChipClass(
+                  operatorHomeSummary?.status === 'blocked'
+                    ? 'reject'
+                    : operatorHomeSummary?.status === 'attention'
+                      ? 'alert'
+                      : operatorHomeSummary
+                        ? 'approve'
+                        : 'neutral'
+                )}`}
+              >
+                {operatorHomeSummary?.statusLabel || uxText('chronos_working', locale)}
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-                <div
-                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-cyan-100/60'}`}
-                >
-                  <Palette size={12} />
-                  Theme
-                </div>
-                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
-                  {webTheme.name}
-                </div>
-                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
-                  {webDesignSystem.theme.web.snapshot_summary}
-                </div>
-              </div>
-              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div
-                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
-                >
-                  <LayoutGrid size={12} />
-                  Layout
-                </div>
-                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
-                  {webLayout.grid_columns}-column grid
-                </div>
-                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
-                  Container {webLayout.container_max_width}
-                </div>
-              </div>
-              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div
-                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
-                >
-                  <Type size={12} />
-                  Typography
-                </div>
-                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
-                  {webTheme.fonts.heading}
-                </div>
-                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
-                  Body {webTheme.fonts.body}
-                </div>
-              </div>
-              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div
-                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
-                >
-                  <Ruler size={12} />
-                  Surface
-                </div>
-                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
-                  {webLayout.panel_radius} / {webLayout.surface_radius}
-                </div>
-                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
-                  {webLayout.section_gap} section gap
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <FirstRunBanner />
-
-          <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className={`text-[10px] uppercase tracking-[0.28em] ${shellMutedClass}`}>
-                  Operator Home
-                </div>
-                <h2 className={`mt-1 text-lg font-semibold tracking-tight ${shellTitleClass}`}>
-                  One place to see what needs attention
-                </h2>
-              </div>
-              <div className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}>
-                {operatorHomeSummary?.statusLabel || 'loading'}
-              </div>
-            </div>
             {operatorHomeError ? (
-              <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+              <div className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
                 {operatorHomeError}
               </div>
             ) : null}
-            {operatorHomeSummary ? (
-              <>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
-                      Status
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
-                      {operatorHomeSummary.statusLabel}
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/48">
-                      {operatorHomeSummary.statusDetail}
-                    </div>
+
+            {homePrimaryAction ? (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.07] px-4 py-4">
+                <div className="min-w-0">
+                  <div
+                    className={`text-[10px] font-bold uppercase tracking-[0.22em] ${shellMutedClass}`}
+                  >
+                    {uxText('chronos_cb_do_this_next', locale)}
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
-                      Approvals
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
-                      {operatorHomeSummary.counts.pendingApprovals}
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/48">pending review</div>
+                  <div className={`mt-1 text-base font-semibold ${shellTitleClass}`}>
+                    {homePrimaryAction.title || uxText('chronos_cb_all_clear', locale)}
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
-                      Inbox
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
-                      {operatorHomeSummary.counts.unreadInbox}
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/48">
-                      {operatorHomeSummary.counts.totalInbox} total entries
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
-                      Active
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white/92">
-                      {operatorHomeSummary.counts.activeMissions}
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/48">
-                      {operatorHomeSummary.counts.blockedMissions} blocked
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
-                      Next
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-white/92">
-                      {operatorHomeSummary.nextAction.title}
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/48">
-                      {operatorHomeSummary.nextAction.reason}
-                    </div>
+                  <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                    {homePrimaryAction.reason || uxText('chronos_cb_all_clear_detail', locale)}
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/46">
-                  {operatorHomeSummary.activeMissions.slice(0, 4).map((mission: any) => (
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleScenarioOpen(homePrimaryAction.targetId, homePrimaryAction.surface)
+                  }
+                  className={`rounded-xl border px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] transition ${toneChipClass('info')}`}
+                >
+                  {uxText('chronos_cb_open', locale)} →
+                </button>
+              </div>
+            ) : null}
+
+            {homeCounters.length > 0 ? (
+              <>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {homeCounters.map((counter) => (
                     <button
-                      key={mission.missionId}
+                      key={counter.key}
                       type="button"
-                      onClick={() => setSelectedMissionId(mission.missionId)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/72 transition hover:bg-white/10"
+                      onClick={() => handleScenarioOpen(counter.targetId, 'mission-intelligence')}
+                      className={`rounded-2xl border px-4 py-3 text-left transition ${toneChipClass(
+                        counter.value > 0 ? counter.tone : 'neutral'
+                      )}`}
                     >
-                      {mission.missionId}
+                      <div className="text-2xl font-semibold leading-none">{counter.value}</div>
+                      <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em]">
+                        {counter.label}
+                      </div>
                     </button>
                   ))}
                 </div>
+                <div className={`mt-3 text-[10px] uppercase tracking-[0.16em] ${shellMutedClass}`}>
+                  {uxText('chronos_cb_counts_hint', locale)}
+                </div>
               </>
-            ) : (
-              <div className="mt-4 text-[11px] text-white/50">Loading operator home summary…</div>
-            )}
+            ) : null}
+
+            {operatorHomeSummary?.activeMissions?.length ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {operatorHomeSummary.activeMissions.slice(0, 4).map((mission: any) => (
+                  <button
+                    key={mission.missionId}
+                    type="button"
+                    onClick={() => setSelectedMissionId(mission.missionId)}
+                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                  >
+                    {mission.missionId}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </section>
+
+          <FirstRunBanner />
 
           <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
             <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
@@ -1422,7 +1451,7 @@ export default function ChronosMirrorV2() {
                     onChange={(event) => setMissionHistoryStatus(event.target.value)}
                     className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none focus:border-cyan-300/25"
                   >
-                    <option value="">all</option>
+                    <option value="">{uxText('chronos_mh_all_statuses', locale)}</option>
                     <option value="completed">completed</option>
                     <option value="active">active</option>
                     <option value="paused">paused</option>
@@ -1448,7 +1477,7 @@ export default function ChronosMirrorV2() {
               <div className="mt-4 max-h-[420px] overflow-y-auto pr-1 chronos-scroll space-y-3">
                 {missionHistory.length === 0 ? (
                   <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
-                    No missions match the current filter.
+                    {uxText('chronos_mh_no_match', locale)}
                   </div>
                 ) : (
                   missionHistory.map((mission) => (
@@ -1650,7 +1679,7 @@ export default function ChronosMirrorV2() {
                             type="button"
                             disabled={approvalDecisionBusyId === item.id}
                             onClick={() => submitApprovalDecision(item, 'approved')}
-                            className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
                           >
                             approve
                           </button>
@@ -1658,7 +1687,7 @@ export default function ChronosMirrorV2() {
                             type="button"
                             disabled={approvalDecisionBusyId === item.id}
                             onClick={() => submitApprovalDecision(item, 'rejected')}
-                            className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
                           >
                             reject
                           </button>
@@ -1687,7 +1716,7 @@ export default function ChronosMirrorV2() {
                                       reasonCategory: category,
                                     })
                                   }
-                                  className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-50/90 transition hover:bg-amber-400/18 disabled:opacity-50"
+                                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('alert')}`}
                                 >
                                   {label}
                                 </button>
@@ -1698,7 +1727,7 @@ export default function ChronosMirrorV2() {
                                 onClick={() =>
                                   submitApprovalDecision(item, 'rejected', { skipAskWhy: true })
                                 }
-                                className="rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 text-[11px] text-white/55 transition hover:bg-white/10 disabled:opacity-50"
+                                className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('neutral')}`}
                               >
                                 スキップ
                               </button>
@@ -1825,7 +1854,7 @@ export default function ChronosMirrorV2() {
                               type="button"
                               disabled={connectionReviewBusyId === selected.binding_id}
                               onClick={() => submitConnectionReview(selected.binding_id, 'approve')}
-                              className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                              className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
                             >
                               approve
                             </button>
@@ -1833,7 +1862,7 @@ export default function ChronosMirrorV2() {
                               type="button"
                               disabled={connectionReviewBusyId === selected.binding_id}
                               onClick={() => submitConnectionReview(selected.binding_id, 'modify')}
-                              className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16 disabled:opacity-50"
+                              className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
                             >
                               modify
                             </button>
@@ -1841,7 +1870,7 @@ export default function ChronosMirrorV2() {
                               type="button"
                               disabled={connectionReviewBusyId === selected.binding_id}
                               onClick={() => submitConnectionReview(selected.binding_id, 'hold')}
-                              className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-amber-100/80 transition hover:bg-amber-400/16 disabled:opacity-50"
+                              className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('alert')}`}
                             >
                               hold
                             </button>
@@ -1849,7 +1878,7 @@ export default function ChronosMirrorV2() {
                               type="button"
                               disabled={connectionReviewBusyId === selected.binding_id}
                               onClick={() => submitConnectionReview(selected.binding_id, 'delete')}
-                              className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                              className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
                             >
                               delete
                             </button>
@@ -2082,13 +2111,29 @@ export default function ChronosMirrorV2() {
                   {deliverablesError}
                 </div>
               ) : null}
+              {cleanedDeliverableCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCleanedDeliverables((current) => !current)}
+                  className={`mt-3 rounded-xl border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                >
+                  {uxMessage(
+                    showCleanedDeliverables ? 'chronos_dl_hide_cleaned' : 'chronos_dl_show_cleaned',
+                    { count: cleanedDeliverableCount },
+                    '{count} cleaned-up record(s)',
+                    locale
+                  )}
+                </button>
+              ) : null}
               <div className="mt-4 max-h-[540px] overflow-y-auto pr-1 chronos-scroll space-y-3">
-                {deliverables.length === 0 ? (
+                {visibleDeliverables.length === 0 ? (
                   <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
-                    No deliverables found yet.
+                    {deliverables.length === 0
+                      ? 'No deliverables found yet.'
+                      : uxText('chronos_dl_none_live', locale)}
                   </div>
                 ) : (
-                  deliverables.map((item) => (
+                  visibleDeliverables.map((item) => (
                     <KbArtifactTile
                       key={item.artifactId}
                       type={item.kind}
@@ -2100,6 +2145,14 @@ export default function ChronosMirrorV2() {
                         item.previewText || item.kind,
                         item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
                         item.reviewVersion ? `v${item.reviewVersion}` : '',
+                        item.supersededCount
+                          ? uxMessage(
+                              'chronos_dl_superseded',
+                              { count: item.supersededCount },
+                              '+{count} older record(s) for the same file',
+                              locale
+                            )
+                          : '',
                       ]
                         .filter(Boolean)
                         .join(' · ')}
@@ -2181,7 +2234,7 @@ export default function ChronosMirrorV2() {
                                       reasonCategory: category,
                                     })
                                   }
-                                  className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-50/90 transition hover:bg-amber-400/18 disabled:opacity-50"
+                                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('alert')}`}
                                 >
                                   {label}
                                 </button>
@@ -2194,7 +2247,7 @@ export default function ChronosMirrorV2() {
                                     skipAskWhy: true,
                                   })
                                 }
-                                className="rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 text-[11px] text-white/55 transition hover:bg-white/10 disabled:opacity-50"
+                                className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('neutral')}`}
                               >
                                 スキップ
                               </button>
@@ -2206,7 +2259,7 @@ export default function ChronosMirrorV2() {
                             type="button"
                             disabled={deliverableReviewBusy}
                             onClick={() => submitDeliverableReview('accept')}
-                            className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
                           >
                             accept
                           </button>
@@ -2214,7 +2267,7 @@ export default function ChronosMirrorV2() {
                             type="button"
                             disabled={deliverableReviewBusy}
                             onClick={() => submitDeliverableReview('request-changes')}
-                            className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16 disabled:opacity-50"
+                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
                           >
                             request-changes
                           </button>
@@ -2222,7 +2275,7 @@ export default function ChronosMirrorV2() {
                             type="button"
                             disabled={deliverableReviewBusy}
                             onClick={() => submitDeliverableReview('reject')}
-                            className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
                           >
                             reject
                           </button>
@@ -2245,22 +2298,227 @@ export default function ChronosMirrorV2() {
           <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
             <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
               <div className="flex flex-col gap-6">
-                <section
-                  id="operator-quick-actions"
-                  className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
-                >
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
-                        {uxText('chronos_quick_actions', locale)}
+                {/* The single primary entry point. Everything else in this
+                    sidebar is a drawer below it. */}
+                <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
+                  <div className="kyberion-glass rounded-[24px] border border-cyan-300/20 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-200/75">
+                          {uxText('chronos_nav_start_here', locale)}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-200/65">
+                          {uxText('chronos_nav_start_here_hint', locale)}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm text-slate-200/65">
-                        {uxText('chronos_grouped_by_operator_intent', locale)}
+                      <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
+                        1-7
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-2">
+                      {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
+                        const active =
+                          (scenario.surface === 'mission-intelligence' &&
+                            missionIntelligenceFocus === scenario.targetId) ||
+                          (scenario.surface === 'focused-operator' &&
+                            focusedOperatorView === scenario.targetId);
+                        return (
+                          <button
+                            key={scenario.label}
+                            type="button"
+                            onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              active
+                                ? 'border-cyan-400/30 bg-cyan-400/10'
+                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            {/* Stacked, not side-by-side: this list lives in a
+                                280px column, where a right-aligned action label
+                                collided with the scenario name. */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
+                                {index + 1}
+                              </div>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/78">
+                                {scenario.label}
+                              </div>
+                            </div>
+                            <div className="mt-1.5 text-[11px] leading-5 text-slate-200/56">
+                              {scenario.detail}
+                            </div>
+                            <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/70">
+                              {scenario.actionLabel} →
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Scenarios · 1-7
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Thread · T / C
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Sessions · 1-9 / J K
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Traces · 1-9 / J K / R
+                      </div>
+                    </div>
+                    {/* The five surface cards used to be their own full-size card
+                        grid — a fourth navigation system saying "jump to
+                        section". Same destinations, one line each, inside the
+                        one place an operator is meant to start. */}
+                    <div className="mt-4 border-t border-white/8 pt-3">
+                      <div className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}>
+                        {uxText('chronos_jump_to_section', locale)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {statusCards.map((card) => {
+                          const Icon = card.icon;
+                          return (
+                            <button
+                              key={card.label}
+                              type="button"
+                              onClick={() => handleSectionJump(card.targetId)}
+                              title={card.detail}
+                              className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                            >
+                              <Icon size={11} />
+                              <span>{card.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-5">
+                  {activeScenario ? (
+                    <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+                      <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                        Current
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
+                        {activeScenario.label}
+                      </div>
+                      <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                          Next
+                        </div>
+                        <div className="mt-1 text-[11px] leading-5 text-white/72">
+                          {activeScenario.nextStep}
+                        </div>
+                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
+                          Hotkey{' '}
+                          {OPERATOR_SCENARIO_PRESETS.findIndex(
+                            (scenario) => scenario.label === activeScenario.label
+                          ) + 1}
+                        </div>
+                      </div>
+                      {activeScenario.surface === 'mission-intelligence' ? (
+                        <button
+                          type="button"
+                          onClick={() => setMissionIntelligenceFocus(null)}
+                          className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </section>
+
+                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                  <button
+                    onClick={() => toggleSection('views')}
+                    aria-expanded={expandedSections.views}
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                  >
+                    <span>{uxText('chronos_nav_focus_views', locale)}</span>
+                    {expandedSections.views ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+                  {expandedSections.views && (
+                    <>
+                      <div className="mt-2 text-sm text-slate-200/68">
+                        {uxText('chronos_nav_focus_views_hint', locale)}
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFocusedOperatorView(null)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            focusedOperatorView === null
+                              ? 'border-cyan-400/30 bg-cyan-400/10'
+                              : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                            {uxText('chronos_nav_full_console', locale)}
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                            {uxText('chronos_nav_full_console_hint', locale)}
+                          </div>
+                        </button>
+                        {OPERATOR_VIEW_LINKS.map((view) => (
+                          <button
+                            key={view.targetId}
+                            type="button"
+                            onClick={() => handleOperatorViewOpen(view.targetId)}
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              focusedOperatorView === view.targetId
+                                ? 'border-cyan-400/30 bg-cyan-400/10'
+                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                              {view.label}
+                            </div>
+                            <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                              {view.detail}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </section>
+
+                {/* Diagnostics, not a starting point: 17 buttons competing with
+                    the scenario list is what made the console read as a menu of
+                    menus. Collapsed until something looks wrong. */}
+                <section
+                  id="operator-quick-actions"
+                  className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('checks')}
+                    aria-expanded={expandedSections.checks}
+                    className={`flex w-full items-center justify-between gap-3 text-left transition ${shellTitleClass}`}
+                  >
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
+                        {uxText('chronos_nav_checks', locale)}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-200/65">
+                        {uxText('chronos_nav_checks_hint', locale)}
+                      </div>
+                    </div>
+                    {expandedSections.checks ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+
+                  <div className={expandedSections.checks ? 'mt-4 space-y-5' : 'hidden'}>
                     {quickActionGroups.map((group) => {
                       const Icon = group.icon;
                       return (
@@ -2316,210 +2574,10 @@ export default function ChronosMirrorV2() {
                   </div>
                 </section>
 
-                <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
-                  <div className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
-                          Scenarios
-                        </div>
-                        <div className="mt-1 text-sm text-slate-200/65">
-                          Pick the task. Jump once.
-                        </div>
-                      </div>
-                      <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
-                        1-7
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
-                        const active =
-                          (scenario.surface === 'mission-intelligence' &&
-                            missionIntelligenceFocus === scenario.targetId) ||
-                          (scenario.surface === 'focused-operator' &&
-                            focusedOperatorView === scenario.targetId);
-                        return (
-                          <button
-                            key={scenario.label}
-                            type="button"
-                            onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              active
-                                ? 'border-cyan-400/30 bg-cyan-400/10'
-                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
-                                    {index + 1}
-                                  </div>
-                                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                                    {scenario.label}
-                                  </div>
-                                </div>
-                                <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                                  {scenario.detail}
-                                </div>
-                              </div>
-                              <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">
-                                {scenario.actionLabel}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                        Scenarios · 1-7
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                        Thread · T / C
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                        Sessions · 1-9 / J K
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                        Traces · 1-9 / J K / R
-                      </div>
-                    </div>
-                  </div>
-
-                  {activeScenario ? (
-                    <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-                      <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
-                        Current
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-white/90">
-                        {activeScenario.label}
-                      </div>
-                      <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
-                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
-                          Next
-                        </div>
-                        <div className="mt-1 text-[11px] leading-5 text-white/72">
-                          {activeScenario.nextStep}
-                        </div>
-                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
-                          Hotkey{' '}
-                          {OPERATOR_SCENARIO_PRESETS.findIndex(
-                            (scenario) => scenario.label === activeScenario.label
-                          ) + 1}
-                        </div>
-                      </div>
-                      {activeScenario.surface === 'mission-intelligence' ? (
-                        <button
-                          type="button"
-                          onClick={() => setMissionIntelligenceFocus(null)}
-                          className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
-                        >
-                          Clear
-                        </button>
-                      ) : null}
-                    </section>
-                  ) : null}
-                </section>
-
-                <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-                  {statusCards.map((card) => {
-                    const Icon = card.icon;
-                    return (
-                      <button
-                        key={card.label}
-                        type="button"
-                        onClick={() => handleSectionJump(card.targetId)}
-                        className="kyberion-glass rounded-2xl border border-white/8 p-4 text-left transition hover:border-white/16 hover:bg-white/5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-xl border ${card.accent}`}
-                          >
-                            <Icon size={15} />
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400/80">
-                              {card.label}
-                            </div>
-                            <div className="mt-1 text-base font-semibold text-white/90">
-                              {card.value}
-                            </div>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-[11px] leading-5 text-slate-200/58">
-                          {card.detail}
-                        </p>
-                        <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                          {uxText('chronos_jump_to_section', locale)}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </section>
-
-                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                  <button
-                    onClick={() => toggleSection('views')}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
-                  >
-                    <span>Operator Views</span>
-                    {expandedSections.views ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-                  {expandedSections.views && (
-                    <>
-                      <div className="mt-2 text-sm text-slate-200/68">
-                        Use this menu to switch the main console into a single focused operator
-                        view, including the runtime map.
-                      </div>
-                      <div className="mt-4 grid gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setFocusedOperatorView(null)}
-                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            focusedOperatorView === null
-                              ? 'border-cyan-400/30 bg-cyan-400/10'
-                              : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
-                          }`}
-                        >
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                            Full Console
-                          </div>
-                          <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                            Show the complete control surface with all operator sections.
-                          </div>
-                        </button>
-                        {OPERATOR_VIEW_LINKS.map((view) => (
-                          <button
-                            key={view.targetId}
-                            type="button"
-                            onClick={() => handleOperatorViewOpen(view.targetId)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              focusedOperatorView === view.targetId
-                                ? 'border-cyan-400/30 bg-cyan-400/10'
-                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
-                            }`}
-                          >
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                              {view.label}
-                            </div>
-                            <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                              {view.detail}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
-
                 <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
                   <button
                     onClick={() => toggleSection('taxonomy')}
+                    aria-expanded={expandedSections.taxonomy}
                     className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
                   >
                     <span>Surface Taxonomy</span>
@@ -2563,6 +2621,7 @@ export default function ChronosMirrorV2() {
                 <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
                   <button
                     onClick={() => toggleSection('cycle')}
+                    aria-expanded={expandedSections.cycle}
                     className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
                   >
                     <span>Mission Cycle</span>
@@ -2597,6 +2656,94 @@ export default function ChronosMirrorV2() {
                               {step.detail}
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </section>
+
+                {/* Relocated from the top of the page. It describes how the
+                    surface is themed — reference material for whoever is
+                    styling it, never the operator's first question. */}
+                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                  <button
+                    onClick={() => toggleSection('designSystem')}
+                    aria-expanded={expandedSections.designSystem}
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                  >
+                    <span>{uxText('chronos_nav_design_system', locale)}</span>
+                    {expandedSections.designSystem ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+                  {expandedSections.designSystem && (
+                    <>
+                      <div
+                        className={`mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.24em] ${shellMutedClass}`}
+                      >
+                        <span>{webTheme.name}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{webDesignSystem.design_system.pack_id}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{webTheme.colors.accent}</span>
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div
+                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                          >
+                            <Palette size={11} />
+                            Theme
+                          </div>
+                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                            {webDesignSystem.theme.web.snapshot_summary}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div
+                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                          >
+                            <LayoutGrid size={11} />
+                            Layout
+                          </div>
+                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                            {webLayout.grid_columns}-column grid · container{' '}
+                            {webLayout.container_max_width} · {webLayout.section_gap} section gap
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div
+                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                          >
+                            <Type size={11} />
+                            Typography
+                          </div>
+                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                            {webTheme.fonts.heading}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div
+                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                          >
+                            <Ruler size={11} />
+                            Surface
+                          </div>
+                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                            {webLayout.panel_radius} / {webLayout.surface_radius}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {webDesignSystem.section_order.map((sectionId) => (
+                          <span
+                            key={sectionId}
+                            className={`rounded-full border px-2.5 py-1 text-[9px] uppercase tracking-[0.16em] ${toneChipClass('neutral')}`}
+                          >
+                            {sectionId}
+                          </span>
                         ))}
                       </div>
                     </>
