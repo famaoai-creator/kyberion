@@ -1,0 +1,376 @@
+#!/usr/bin/env node
+// I18N-03: ratchet against new hardcoded user-facing Japanese strings.
+//
+// Detection strategy (see docs/developer/improvement-plans-2026-07/
+// INTERNATIONALIZATION_PLAN_2026-07-26.ja.md §2.4/§2.7 and the I18N-03 item
+// in §4): flag a string literal / template literal part / JSX text node when
+// it contains a Hiragana or Katakana character. Kanji-only strings are
+// deliberately NOT flagged — kanji ranges show up constantly in regexes and
+// character-class definitions across this codebase (including this file's
+// own detection pattern), which would make kanji-based detection extremely
+// noisy. Hiragana/Katakana are a much more reliable "this is Japanese prose,
+// not a regex fragment" signal.
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+import {
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeStat,
+  safeReaddir,
+  safeWriteFile,
+} from '@agent/core';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { withExecutionContext } from '@agent/core/governance';
+
+const ROOT = pathResolver.rootDir();
+const DEFAULT_BASELINE_PATH = pathResolver.rootResolve(
+  'knowledge/product/governance/i18n-baseline.json'
+);
+
+// The Hiragana block (U+3040-U+309F) and Katakana block (U+30A0-U+30FF) are
+// contiguous, so a single range covers "Hiragana or Katakana". Written as a
+// \u escape (not literal kana characters) so this detector's own source
+// stays plain ASCII and cannot accidentally flag itself.
+const KANA_PATTERN = /[\u3040-\u30ff]/u;
+
+// Opt-out directive format: "// i18n-exempt: <reason>" on the same line as
+// (or the line above) a flagged literal. The directive text itself is ASCII
+// and never matches KANA_PATTERN, so it cannot exempt itself by accident.
+const EXEMPT_COMMENT_PATTERN = /\/\/\s*i18n-exempt:\s*(.*)$/u;
+
+// Scan each workspace package at its ROOT, not at <package>/src. Several
+// packages keep user-facing code directly in the package directory —
+// satellites/voice-hub/server.ts is the single largest offender in the tree —
+// so a src-only scan would leave them permanently un-ratcheted. getAllFiles
+// already skips node_modules/dist/build/.next via project_standards.ignore_dirs.
+const GLOB_SCAN_PARENTS = [
+  'libs/actuators',
+  'satellites',
+  'presence/displays',
+  'presence/bridge',
+  'presence/sensors',
+];
+const DIRECT_SCAN_ROOTS = ['libs/core', 'scripts'];
+
+// Plan §2.7: sample code and dev-only tooling are explicitly out of scope.
+const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/src\/native-[^/]+-engine\/examples\//u];
+
+export type I18nHardcodingReport = {
+  status: 'pass' | 'fail';
+  checked_at: string;
+  checked_files: number;
+  baseline_path: string;
+  total_violations: number;
+  exemption_count: number;
+  violations: string[];
+  stale_entries: string[];
+  updated_baseline: boolean;
+};
+
+type I18nBaseline = {
+  version: 1;
+  generated_at: string;
+  scan_roots: string[];
+  files: Record<string, number>;
+};
+
+export function isTestFile(repoRelativePath: string): boolean {
+  return (
+    /(^|\/)__tests__\//iu.test(repoRelativePath) ||
+    /\.test\.[cm]?[jt]sx?$/iu.test(repoRelativePath) ||
+    /\.spec\.[^/]*$/iu.test(repoRelativePath)
+  );
+}
+
+export function isExcludedFile(repoRelativePath: string): boolean {
+  if (isTestFile(repoRelativePath)) return true;
+  return EXCLUDED_SUBTREE_PATTERNS.some((pattern) => pattern.test(repoRelativePath));
+}
+
+// Expands the glob-shaped scan targets (libs/actuators/<name>/src, etc) into concrete directories.
+export function resolveDefaultScanRoots(): string[] {
+  const roots: string[] = [];
+
+  for (const relativeDir of DIRECT_SCAN_ROOTS) {
+    const abs = pathResolver.rootResolve(relativeDir);
+    if (safeExistsSync(abs)) roots.push(abs);
+  }
+
+  for (const parent of GLOB_SCAN_PARENTS) {
+    const parentAbs = pathResolver.rootResolve(parent);
+    if (!safeExistsSync(parentAbs)) continue;
+    for (const entry of safeReaddir(parentAbs)) {
+      const childAbs = path.join(parentAbs, entry);
+      if (safeExistsSync(childAbs) && safeStat(childAbs).isDirectory()) {
+        roots.push(childAbs);
+      }
+    }
+  }
+
+  return roots;
+}
+
+type FileScanResult = {
+  count: number;
+  exemptions: number;
+};
+
+/**
+ * Scans a single file's AST for Hiragana/Katakana-bearing string literals,
+ * template literal parts, and JSX text nodes. Comments are never visited
+ * here — only literal AST nodes — so comment text can never contribute a
+ * violation.
+ */
+export function scanFileForKanaLiterals(text: string, repoRelativePath: string): FileScanResult {
+  const sourceFile = ts.createSourceFile(
+    repoRelativePath,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    repoRelativePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const lines = text.split('\n');
+
+  let count = 0;
+  let exemptions = 0;
+
+  function isExemptAtLine(lineIndex: number): boolean {
+    const sameLine = lines[lineIndex] || '';
+    const previousLine = lineIndex > 0 ? lines[lineIndex - 1] || '' : '';
+    for (const candidate of [sameLine, previousLine]) {
+      const match = EXEMPT_COMMENT_PATTERN.exec(candidate);
+      if (match && match[1].trim().length > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function visitLiteral(node: ts.Node, literalText: string): void {
+    if (!KANA_PATTERN.test(literalText)) return;
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    if (isExemptAtLine(line)) {
+      exemptions += 1;
+      return;
+    }
+    count += 1;
+  }
+
+  function visit(node: ts.Node): void {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      visitLiteral(node, node.text);
+    } else if (
+      node.kind === ts.SyntaxKind.TemplateHead ||
+      node.kind === ts.SyntaxKind.TemplateMiddle ||
+      node.kind === ts.SyntaxKind.TemplateTail
+    ) {
+      visitLiteral(node, (node as ts.TemplateLiteralToken).text);
+    } else if (ts.isJsxText(node)) {
+      visitLiteral(node, node.getText(sourceFile));
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return { count, exemptions };
+}
+
+function scanTree(scanRoots: string[]): {
+  currentCounts: Record<string, number>;
+  scannedFiles: Set<string>;
+  checkedFiles: number;
+  exemptionCount: number;
+} {
+  const currentCounts: Record<string, number> = {};
+  const scannedFiles = new Set<string>();
+  let checkedFiles = 0;
+  let exemptionCount = 0;
+
+  for (const root of scanRoots) {
+    if (!safeExistsSync(root)) continue;
+    for (const filePath of getAllFiles(root)) {
+      if (!/\.(?:ts|tsx)$/u.test(filePath)) continue;
+      const repoRelativePath = path.relative(ROOT, filePath).split(path.sep).join('/');
+      if (isExcludedFile(repoRelativePath)) continue;
+
+      checkedFiles += 1;
+      scannedFiles.add(repoRelativePath);
+      const text = String(safeReadFile(filePath, { encoding: 'utf8' }));
+      const { count, exemptions } = scanFileForKanaLiterals(text, repoRelativePath);
+      exemptionCount += exemptions;
+      if (count > 0) currentCounts[repoRelativePath] = count;
+    }
+  }
+
+  return { currentCounts, scannedFiles, checkedFiles, exemptionCount };
+}
+
+function loadBaseline(baselinePath: string): I18nBaseline | null {
+  if (!safeExistsSync(baselinePath)) return null;
+  return JSON.parse(safeReadFile(baselinePath, { encoding: 'utf8' }) as string) as I18nBaseline;
+}
+
+function writeBaselineFile(
+  baselinePath: string,
+  baseline: I18nBaseline,
+  relativeScanRootsForNote: string[]
+): void {
+  withExecutionContext('ecosystem_architect', () => {
+    safeMkdir(path.dirname(baselinePath), { recursive: true });
+    safeWriteFile(
+      baselinePath,
+      JSON.stringify({ ...baseline, scan_roots: relativeScanRootsForNote }, null, 2)
+    );
+  });
+}
+
+export function checkI18nHardcoding(
+  options: {
+    baselinePath?: string;
+    scanRoots?: string[];
+    updateBaseline?: boolean;
+  } = {}
+): I18nHardcodingReport {
+  const baselinePath = options.baselinePath || DEFAULT_BASELINE_PATH;
+  const scanRoots = options.scanRoots || resolveDefaultScanRoots();
+  const relativeScanRoots = scanRoots.map((root) =>
+    path.relative(ROOT, root).split(path.sep).join('/')
+  );
+
+  const { currentCounts, scannedFiles, checkedFiles, exemptionCount } = scanTree(scanRoots);
+  const totalViolationsInTree = Object.values(currentCounts).reduce((sum, n) => sum + n, 0);
+
+  if (options.updateBaseline) {
+    const nextBaseline: I18nBaseline = {
+      version: 1,
+      generated_at: new Date().toISOString(),
+      scan_roots: relativeScanRoots,
+      files: currentCounts,
+    };
+    writeBaselineFile(baselinePath, nextBaseline, relativeScanRoots);
+    return {
+      status: 'pass',
+      checked_at: nextBaseline.generated_at,
+      checked_files: checkedFiles,
+      baseline_path: path.relative(ROOT, baselinePath),
+      total_violations: totalViolationsInTree,
+      exemption_count: exemptionCount,
+      violations: [],
+      stale_entries: [],
+      updated_baseline: true,
+    };
+  }
+
+  const checkedAt = new Date().toISOString();
+  const baseline = loadBaseline(baselinePath);
+  if (!baseline) {
+    return {
+      status: 'fail',
+      checked_at: checkedAt,
+      checked_files: checkedFiles,
+      baseline_path: path.relative(ROOT, baselinePath),
+      total_violations: totalViolationsInTree,
+      exemption_count: exemptionCount,
+      violations: [
+        `baseline missing: ${path.relative(ROOT, baselinePath)} (run with --update-baseline to initialize)`,
+      ],
+      stale_entries: [],
+      updated_baseline: false,
+    };
+  }
+
+  const violations: string[] = [];
+  const staleEntries: string[] = [];
+
+  for (const [file, currentCount] of Object.entries(currentCounts)) {
+    const baselineCount = baseline.files[file];
+    if (baselineCount === undefined) {
+      violations.push(`${file}: new file with ${currentCount} violation(s) (absent from baseline)`);
+    } else if (currentCount > baselineCount) {
+      violations.push(`${file}: increased from ${baselineCount} to ${currentCount}`);
+    } else if (currentCount < baselineCount) {
+      staleEntries.push(
+        `${file}: decreased from ${baselineCount} to ${currentCount} (baseline is stale, run --update-baseline)`
+      );
+    }
+  }
+
+  for (const [file, baselineCount] of Object.entries(baseline.files)) {
+    if (file in currentCounts) continue;
+    if (!scannedFiles.has(file)) {
+      // File no longer exists (or moved out of scan scope) — drop silently.
+      continue;
+    }
+    // File still exists and was scanned, but now has zero violations.
+    staleEntries.push(
+      `${file}: decreased from ${baselineCount} to 0 (baseline is stale, run --update-baseline)`
+    );
+  }
+
+  violations.sort();
+  staleEntries.sort();
+
+  return {
+    status: violations.length === 0 && staleEntries.length === 0 ? 'pass' : 'fail',
+    checked_at: checkedAt,
+    checked_files: checkedFiles,
+    baseline_path: path.relative(ROOT, baselinePath),
+    total_violations: totalViolationsInTree,
+    exemption_count: exemptionCount,
+    violations,
+    stale_entries: staleEntries,
+    updated_baseline: false,
+  };
+}
+
+function printHumanReport(report: I18nHardcodingReport): void {
+  if (report.updated_baseline) {
+    console.log(
+      `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`
+    );
+    return;
+  }
+
+  if (report.status === 'pass') {
+    console.log(
+      `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`
+    );
+    return;
+  }
+
+  console.error('[check:i18n] violations detected:');
+  for (const violation of report.violations) {
+    console.error(`- ${violation}`);
+  }
+  if (report.stale_entries.length > 0) {
+    console.error('[check:i18n] baseline is stale, run --update-baseline:');
+    for (const entry of report.stale_entries) {
+      console.error(`- ${entry}`);
+    }
+  }
+}
+
+export function main(): void {
+  const updateBaseline = process.argv.includes('--update-baseline');
+  const asJson = process.argv.includes('--json');
+  const report = checkI18nHardcoding({ updateBaseline });
+
+  if (asJson) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    printHumanReport(report);
+  }
+
+  if (report.status === 'fail') {
+    process.exitCode = 1;
+  }
+}
+
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun) {
+  main();
+}
