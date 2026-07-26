@@ -12,6 +12,16 @@ import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegatio
 import { notifyOperator } from './operator-notifications.js';
 import { agentRegistry } from './agent-registry.js';
 import { deriveAgentNhiId } from './agent-identity.js';
+import {
+  appendDelegationLink,
+  buildDelegationLink,
+  delegationChainRootActor,
+  serializeDelegationChain,
+  validateChainAttenuation,
+  type DelegationCapabilityTier,
+  type DelegationChain,
+} from './delegation-chain.js';
+import { resolveCapabilityProfileForTeamRole } from './subagent-capability-profiles.js';
 import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import {
   emitChannelSurfaceEvent,
@@ -2482,6 +2492,65 @@ function resolveDispatchActorNhiId(agentId: string): string | undefined {
   }
 }
 
+/**
+ * NI-03: originate the mission dispatch delegation chain, root-first:
+ *
+ *   [0] the orchestrator (this worker's control loop) — its nhi_id when
+ *       derivable, else the legacy 'kyberion:mission-orchestrator' actor.
+ *       Its `granted_scope` is deliberately UNRESTRICTED: the orchestrator
+ *       grants out of mission authority, not out of its own KD-05 execution
+ *       tier (which is 'planner' — it never executes tools itself; encoding
+ *       that tier here would make every implementer dispatch an attenuation
+ *       violation).
+ *   [1] the dispatched worker agent — its nhi_id (NI-01 runtime identity or
+ *       derivation), its team_role, and the KD-05 capability tier that team
+ *       role projects onto (resolveCapabilityProfileForTeamRole).
+ *
+ * Each further hop (worker → sub-worker) appends its own link in
+ * agent-dispatch.ts. Best-effort by contract: chain origination must never
+ * affect dispatch, so any failure returns undefined (chain-less legacy
+ * behavior) rather than throwing.
+ */
+function originateMissionDispatchDelegationChain(input: {
+  teamRole: string;
+  agentId: string;
+}): DelegationChain | undefined {
+  try {
+    const orchestratorActor =
+      resolveDispatchActorNhiId('mission-orchestrator') ?? 'kyberion:mission-orchestrator';
+    const workerActor = resolveDispatchActorNhiId(input.agentId) ?? input.agentId;
+    const workerTier = resolveCapabilityProfileForTeamRole(
+      canonicalizeTeamRole(input.teamRole)
+    ) as DelegationCapabilityTier;
+    let chain = appendDelegationLink(
+      [],
+      buildDelegationLink({
+        actor: orchestratorActor,
+        team_role: 'orchestrator',
+        granted_scope: {},
+      })
+    );
+    chain = appendDelegationLink(
+      chain,
+      buildDelegationLink({
+        actor: workerActor,
+        team_role: input.teamRole,
+        granted_scope: { capability_tier: workerTier },
+      })
+    );
+    const attenuation = validateChainAttenuation(chain);
+    if (!attenuation.ok) {
+      logger.warn(
+        `[MISSION_WORKER][NI-03] Originated delegation chain failed attenuation (${attenuation.violations.join('; ')}) — dispatching chain-less.`
+      );
+      return undefined;
+    }
+    return chain;
+  } catch {
+    return undefined;
+  }
+}
+
 async function dispatchPlannedMissionTask(
   input: DispatchPlannedMissionTaskInput
 ): Promise<DispatchMissionTaskOutcome | null> {
@@ -2490,9 +2559,20 @@ async function dispatchPlannedMissionTask(
   // (input.assignment.agent_id), so worker-attributed traces carry actorNhiId
   // from here without any per-call-site changes elsewhere.
   const actorNhiId = resolveDispatchActorNhiId(input.assignment.agent_id);
+  // NI-03: originate the delegation chain at THE dispatch point (same
+  // neighborhood as the NI-02 actorNhiId stamp) and record on the trace who
+  // the dispatched work is ultimately done on behalf of — the chain's root
+  // actor (the orchestrator, until user-rooted chains arrive via SO-03
+  // steering sessions).
+  const delegationChain = originateMissionDispatchDelegationChain({
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+  });
+  const onBehalfOf = delegationChain ? delegationChainRootActor(delegationChain) : undefined;
   const traceCtx = new TraceContext('mission_task_dispatch', {
     missionId: input.missionId,
     ...(actorNhiId ? { actorNhiId } : {}),
+    ...(onBehalfOf ? { onBehalfOf } : {}),
   });
   let outcome: DispatchMissionTaskOutcome | null = null;
   try {
@@ -2509,7 +2589,7 @@ async function dispatchPlannedMissionTask(
           },
           traceCtx
         )
-      : await dispatchPlannedMissionTaskCore(input, traceCtx);
+      : await dispatchPlannedMissionTaskCore(input, traceCtx, delegationChain);
     return outcome;
   } finally {
     finalizeMissionTaskTrace(traceCtx, input, outcome);
@@ -2518,7 +2598,8 @@ async function dispatchPlannedMissionTask(
 
 async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
-  traceCtx: TraceContext
+  traceCtx: TraceContext,
+  delegationChain?: DelegationChain
 ): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
@@ -2584,6 +2665,9 @@ async function dispatchPlannedMissionTaskCore(
       // KP-04: lets a needs-driven retry's second-round retrieval exclude
       // what the first-round context pack already delivered.
       deliveredKnowledgeRefs: context.deliveredKnowledgeRefs,
+      // NI-03: the originated delegation chain rides into the task contract
+      // payload and the A2A envelope header.
+      delegationChain,
     };
     return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
       ? obtainBestOfTaskResultResponse(dispatchArgs)
@@ -2647,6 +2731,10 @@ async function dispatchPlannedMissionTaskCore(
       model_id: input.assignment.modelId,
       security_scope: dispatchContext.securityScope,
       context_pack_id: dispatchContext.missionContextPackId,
+      // NI-03: mission-task-events forwards this payload to the execution
+      // ledger, where appendMissionExecutionLedgerEntry promotes it to the
+      // first-class `delegation_chain` column for audit reconstruction.
+      ...(delegationChain ? { delegation_chain: delegationChain } : {}),
     },
   });
   const taskResultNeeds = response.taskResult?.needs || [];
@@ -3397,6 +3485,14 @@ async function obtainTaskResultResponse(input: {
    * exclude paths the worker already has instead of re-listing them.
    */
   deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
+  /**
+   * NI-03: the delegation chain originated at the dispatch point. Embedded
+   * (a) structured in the task contract payload (`context.delegation_chain`)
+   * and (b) compact-serialized in the A2A envelope header
+   * (`delegation_chain`, HMAC-covered when the envelope is signed). Optional
+   * — chain-less dispatches emit byte-identical legacy envelopes.
+   */
+  delegationChain?: DelegationChain;
 }): Promise<{
   executionMode: 'agent';
   responseText: string;
@@ -3415,6 +3511,9 @@ async function obtainTaskResultResponse(input: {
       receiver: input.agentId,
       performative: 'request',
       timestamp: new Date().toISOString(),
+      ...(input.delegationChain
+        ? { delegation_chain: serializeDelegationChain(input.delegationChain) }
+        : {}),
     },
     payload: {
       intent: 'mission_task_execution',
@@ -3443,6 +3542,7 @@ async function obtainTaskResultResponse(input: {
         execution_mode: 'task',
         task_model_hint: input.taskModelHint,
         security_scope: input.securityScope,
+        ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
       },
     },
   });
@@ -3477,6 +3577,9 @@ async function obtainTaskResultResponse(input: {
         receiver: input.agentId,
         performative: 'request',
         timestamp: new Date().toISOString(),
+        ...(input.delegationChain
+          ? { delegation_chain: serializeDelegationChain(input.delegationChain) }
+          : {}),
       },
       payload: {
         intent: 'mission_task_execution',
@@ -3516,6 +3619,7 @@ async function obtainTaskResultResponse(input: {
           execution_mode: 'task',
           task_model_hint: input.taskModelHint,
           security_scope: input.securityScope,
+          ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
         },
       },
     });
@@ -3677,6 +3781,8 @@ async function obtainBestOfTaskResultResponse(input: {
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
+  /** NI-03: forwarded verbatim to each candidate's obtainTaskResultResponse. */
+  delegationChain?: DelegationChain;
 }): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
   const attempts: Array<{
     key: string;

@@ -47,10 +47,43 @@
       "type": "array",
       "items": { "type": "string" }
     },
-    "correlation_id": { "type": "string" }
+    "correlation_id": { "type": "string" },
+    "delegation_chain": {
+      "type": "array",
+      "description": "NI-03: root-first delegation chain (internal analogue of the RFC 8693 nested act claim). chain[0] is the originating principal (user/orchestrator); each hop appends one link. Optional/additive — chain-less contracts remain valid.",
+      "items": { "$ref": "#/definitions/delegation_link" }
+    }
   },
   "additionalProperties": true,
   "definitions": {
+    "delegation_link": {
+      "type": "object",
+      "required": ["actor", "granted_scope", "granted_at"],
+      "properties": {
+        "actor": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical nhi_id (kyberion://agent/<org>/<slug>), 'user:<id>', or a legacy actor string."
+        },
+        "team_role": { "type": "string" },
+        "granted_scope": {
+          "type": "object",
+          "description": "What this link grants. Absent fields = unrestricted at this link; every non-root link must be a subset of its parent (child <= parent, fail-closed).",
+          "properties": {
+            "capability_tier": {
+              "type": "string",
+              "enum": ["implementer", "explorer", "planner"],
+              "description": "KD-05 capability tier. Privilege order (what a tier can DO): implementer > explorer > planner."
+            },
+            "capabilities": { "type": "array", "items": { "type": "string" } },
+            "write_scopes": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "granted_at": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "workforce_resource_ref": {
       "type": "object",
       "required": [

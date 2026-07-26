@@ -7,6 +7,13 @@ import {
   verifyA2AContent,
 } from './a2a-envelope-signature.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
+import {
+  DelegationAttenuationError,
+  parseDelegationChain,
+  serializeDelegationChain,
+  validateChainAttenuation,
+  type DelegationChain,
+} from './delegation-chain.js';
 import { type AgentHandle } from './agent-lifecycle.js';
 import {
   getAgentManifest,
@@ -84,6 +91,17 @@ export interface A2AMessage {
      * remain E4's public-key scope.
      */
     sender_nhi_id?: string;
+    /**
+     * NI-03 delegation-chain claim: the compact-serialized
+     * {@link DelegationChain} (root-first `DelegationLink[]` JSON — see
+     * delegation-chain.ts) recording who delegated the work this envelope
+     * carries. Like `sender_nhi_id`, it sits inside the HMAC-signed content
+     * (the whole header is signed), so within AA-03's same-host integrity
+     * boundary the chain cannot be altered or stripped without breaking the
+     * signature. Optional: legacy chain-less envelopes canonicalize (and
+     * verify) byte-for-byte as before.
+     */
+    delegation_chain?: string;
   };
   payload: any;
 }
@@ -114,6 +132,19 @@ export function extractVerifiedSenderNhiId(message: A2AMessage): string | undefi
   const claim = message.header.sender_nhi_id;
   if (!claim) return undefined;
   return verifyA2ASignature(message) ? claim : undefined;
+}
+
+/**
+ * NI-03 verification side of the delegation-chain claim, mirroring
+ * {@link extractVerifiedSenderNhiId}: the parsed chain from the envelope's
+ * `delegation_chain` header, but only when the envelope carries a valid
+ * signature — an unsigned, tampered, or malformed claim is not exposed.
+ */
+export function extractVerifiedDelegationChain(message: A2AMessage): DelegationChain | undefined {
+  const claim = message.header.delegation_chain;
+  if (!claim) return undefined;
+  if (!verifyA2ASignature(message)) return undefined;
+  return parseDelegationChain(claim) ?? undefined;
 }
 
 export class AgentBusyError extends Error {
@@ -215,6 +246,60 @@ class A2ABridgeImpl {
     }
     const verifiedSenderNhiId =
       senderNhiClaim && envelope.header.signature ? senderNhiClaim : undefined;
+
+    // NI-03: delegation-chain claim. Presence is optional (legacy chain-less
+    // envelopes route unchanged), but a PRESENT chain is validated before any
+    // dispatch: a malformed serialization or an attenuation violation (a
+    // child link granted more than its parent) is a bug, not a policy
+    // choice, and fails closed regardless of KYBERION_* modes. Like the
+    // sender claim, the chain counts as VERIFIED (exposed via
+    // extractVerifiedDelegationChain / audit metadata) only when the
+    // envelope signature validated, since it is inside the signed content.
+    const delegationChainClaim = envelope.header.delegation_chain;
+    let routedDelegationChain: DelegationChain | undefined;
+    if (delegationChainClaim !== undefined) {
+      const parsedChain = parseDelegationChain(delegationChainClaim);
+      if (!parsedChain) {
+        auditChain.record({
+          agentId: envelope.header.sender,
+          action: 'a2a_delegation_chain_invalid',
+          operation: 'route',
+          result: 'denied',
+          reason: `Malformed delegation_chain header on message ${envelope.header.msg_id}`,
+          correlationId: envelope.header.correlation_id,
+        });
+        recordGovernanceAction(
+          envelope.header.sender,
+          'a2a_delegation_chain_invalid',
+          'system',
+          true
+        );
+        throw new DelegationAttenuationError([
+          `malformed delegation_chain header on message ${envelope.header.msg_id}`,
+        ]);
+      }
+      const attenuation = validateChainAttenuation(parsedChain);
+      if (!attenuation.ok) {
+        auditChain.record({
+          agentId: envelope.header.sender,
+          action: 'a2a_delegation_attenuation_violation',
+          operation: 'route',
+          result: 'denied',
+          reason: `Delegation attenuation violation on message ${envelope.header.msg_id}: ${attenuation.violations.join('; ')}`,
+          correlationId: envelope.header.correlation_id,
+        });
+        recordGovernanceAction(
+          envelope.header.sender,
+          'a2a_delegation_attenuation_violation',
+          'system',
+          true
+        );
+        throw new DelegationAttenuationError(attenuation.violations);
+      }
+      routedDelegationChain = parsedChain;
+    }
+    const verifiedDelegationChain =
+      routedDelegationChain && envelope.header.signature ? routedDelegationChain : undefined;
 
     // Parse receiver
     const { agentId, provider } = this.parseReceiver(receiver);
@@ -344,6 +429,14 @@ class A2ABridgeImpl {
         // NI-02: durable identity attribution for the routed message, only
         // when the claim was covered by a valid signature.
         ...(verifiedSenderNhiId ? { sender_nhi_id: verifiedSenderNhiId } : {}),
+        // NI-03: delegation attribution (root principal + chain depth), only
+        // when the chain claim was covered by a valid signature.
+        ...(verifiedDelegationChain && verifiedDelegationChain.length > 0
+          ? {
+              delegation_root_actor: verifiedDelegationChain[0].actor,
+              delegation_chain_length: verifiedDelegationChain.length,
+            }
+          : {}),
       },
     });
     recordGovernanceAction(envelope.header.sender, 'a2a_route', agentId, false);
@@ -474,6 +567,13 @@ class A2ABridgeImpl {
     // mocks without the NI-01 accessor simply produce a claim-less envelope.
     const responderNhiId = agentRegistry.getRuntimeIdentity?.(agentId);
     if (responderNhiId) response.header.sender_nhi_id = responderNhiId;
+    // NI-03: echo the (already-validated) request chain onto the signed
+    // result envelope, so the chain survives the round trip under the
+    // response's own HMAC and the caller can attribute the result to the
+    // full delegation path.
+    if (routedDelegationChain) {
+      response.header.delegation_chain = serializeDelegationChain(routedDelegationChain);
+    }
     response.header.signature = signA2AMessage(response);
     response.header.sig_alg = 'hmac-sha256';
 
