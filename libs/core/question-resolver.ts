@@ -4,6 +4,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
+import { resolveLocale, type SupportedLocale } from './locale.js';
 import {
   assessContextualClarification,
   type ContextualClarificationExecutionShape,
@@ -95,14 +96,19 @@ export interface ResolveQuestionInput {
 
 type SupplementalQuestion = NonNullable<ResolveQuestionInput['supplementalQuestions']>[number];
 
-type QuestionLocale = 'en' | 'ja';
+/** @deprecated Use `SupportedLocale` from `./locale.js` instead. */
+type QuestionLocale = SupportedLocale;
 
+/**
+ * @deprecated Thin wrapper over `./locale.js`. `inputLocale` takes the
+ * `explicit` slot of the unified precedence chain; when absent, resolution
+ * now falls through identity → `KYBERION_LOCALE` → `KYBERION_UI_LOCALE`
+ * (deprecated) → `LANG` → catalog default, instead of the old
+ * env-var-only chain (`KYBERION_UI_LOCALE` → `LANG` → `'en'`). This is the
+ * I18N-01 unification: every locale resolver now agrees.
+ */
 function resolveQuestionLocale(inputLocale?: string): QuestionLocale {
-  const normalized = String(inputLocale || process.env.KYBERION_UI_LOCALE || process.env.LANG || '')
-    .trim()
-    .replace(/_/g, '-')
-    .toLowerCase();
-  return normalized.startsWith('ja') ? 'ja' : 'en';
+  return resolveLocale({ explicit: inputLocale });
 }
 
 function localizedQuestionText(
