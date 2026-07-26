@@ -28,7 +28,7 @@
  */
 
 // GENERATED-LOCALES:BEGIN
-export const SUPPORTED_LOCALES = ['en', 'ja'] as const;
+export const SUPPORTED_LOCALES = ['en', 'ja', 'qps-ploc'] as const;
 // GENERATED-LOCALES:END
 
 /**

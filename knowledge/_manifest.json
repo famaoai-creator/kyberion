@@ -1509,7 +1509,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 10844,
+      "size": 11457,
       "type": "md"
     },
     {
@@ -4587,7 +4587,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 55185,
+      "size": 96988,
       "type": "json"
     },
     {

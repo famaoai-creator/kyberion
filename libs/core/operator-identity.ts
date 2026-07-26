@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { resolveLocale } from './locale.js';
+import { resolveLocale, type SupportedLocale } from './locale.js';
 
 /**
  * UX-04 acceptance 5: approval decisions should carry the onboarding
@@ -39,7 +39,14 @@ export function resolveOperatorDisplayName(fallback = 'sovereign-user'): string 
  * in `operator-identity.test.ts`). The `fallback` argument is accepted
  * only for call-site compatibility — `resolveLocale` always resolves to a
  * concrete locale, so it is never reached.
+ *
+ * I18N-07 finding: the parameter/return type was hardcoded to `'ja' | 'en'`,
+ * which broke `tsc` the moment `SupportedLocale` grew a third member
+ * (`qps-ploc`) — this function's own return statement was no longer
+ * assignable to its declared return type. Widened to `SupportedLocale`
+ * (the type this function already delegates to) rather than special-casing
+ * the new locale.
  */
-export function resolveOperatorLocale(fallback: 'ja' | 'en' = 'ja'): 'ja' | 'en' {
+export function resolveOperatorLocale(fallback: SupportedLocale = 'ja'): SupportedLocale {
   return resolveLocale() ?? fallback;
 }
