@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { AgentCollaborationBoard } from './AgentCollaborationBoard';
 
 type Blocker = { kind: string; reason: string };
 type Entry = {
@@ -37,7 +38,15 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /** どのエージェントが今何をしていて、どこがブロッカーか(V2)。 */
-export function AgentOpsBoards() {
+export function AgentOpsBoards({
+  onOpenMission,
+  onOpenView,
+}: {
+  onOpenMission?: (missionId: string) => void;
+  onOpenView?: (
+    viewId: 'secret-approval-queue' | 'runtime-topology-map' | 'mission-control-plane'
+  ) => void;
+}) {
   const [board, setBoard] = React.useState<Board | null>(null);
   const [items, setItems] = React.useState<WorkItem[]>([]);
   const [statuses, setStatuses] = React.useState<string[]>([]);
@@ -94,12 +103,18 @@ export function AgentOpsBoards() {
   );
 
   const tenants = React.useMemo(
-    () => [...new Set((board?.entries || []).map((entry) => entry.tenant_slug).filter(Boolean))],
+    () =>
+      Array.from(new Set((board?.entries || []).map((entry) => entry.tenant_slug).filter(Boolean))),
     [board]
   );
 
   return (
     <div className="flex flex-col gap-6">
+      <AgentCollaborationBoard
+        tenant={tenant}
+        onOpenMission={onOpenMission}
+        onOpenView={onOpenView}
+      />
       <div className="flex items-center gap-3">
         <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
           Agent Activity
@@ -133,7 +148,9 @@ export function AgentOpsBoards() {
           </div>
         ))}
         {(board?.agents || []).length === 0 ? (
-          <div className="text-[11px] text-white/40">アクティブなエージェント作業はありません。</div>
+          <div className="text-[11px] text-white/40">
+            アクティブなエージェント作業はありません。
+          </div>
         ) : null}
       </div>
 
