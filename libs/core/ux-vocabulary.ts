@@ -1,8 +1,10 @@
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
+import { normalizeLocale, resolveDefaultLocale, type SupportedLocale } from './locale.js';
 
-export type UxVocabularyLocale = 'en' | 'ja';
+/** @deprecated Use `SupportedLocale` from `./locale.js` instead. */
+export type UxVocabularyLocale = SupportedLocale;
 export type UxStatusDomain =
   | 'readiness'
   | 'connection'
@@ -94,12 +96,19 @@ function loadCatalog(): VocabularyCatalog | null {
   return cachedCatalog;
 }
 
+/**
+ * @deprecated Thin wrapper over `./locale.js`. Kept for call-site
+ * compatibility — this remains an arg-only resolver (it does not consult
+ * identity/env; callers that need the full precedence chain should call
+ * `resolveLocale()` themselves and pass its result in, as
+ * `scripts/intent.ts` now does). The only behavior change is the fallback
+ * for a missing/unknown `locale`: it now comes from the catalog's
+ * `default_locale` via `resolveDefaultLocale()` instead of a hardcoded
+ * `'en'` (the two happen to agree today, but this keeps the default in
+ * one place).
+ */
 export function resolveVocabularyLocale(locale?: string): UxVocabularyLocale {
-  const normalized = String(locale || '')
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, '-');
-  return normalized.startsWith('ja') ? 'ja' : 'en';
+  return normalizeLocale(locale) ?? resolveDefaultLocale();
 }
 
 function renderVocabularyKey(key: string, locale: UxVocabularyLocale): string | null {
