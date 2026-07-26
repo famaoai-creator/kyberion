@@ -20,6 +20,7 @@ import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { EnergyVad, type EnergyVadOptions } from './voice-activity-detector.js';
 import type { AudioChunk } from './meeting-session-types.js';
+import { resolveLocale } from './locale.js';
 
 export interface InRoomMinutesOptions {
   missionId: string;
@@ -136,7 +137,13 @@ export async function startInRoomMinutesSession(
     const audioPath = path.join(audioDir, `segment-${String(segment).padStart(3, '0')}.wav`);
     safeWriteFile(audioPath, Buffer.concat([wavHeader(pcm.length, sampleRateHz), pcm]));
     try {
-      const result = await stt.transcribe({ audioPath, language: options.language || 'ja' });
+      // I18N-06: an unset recording language follows the resolved locale
+      // (identity/env/OS), not a hardcoded 'ja' — same pattern as
+      // `python-voice-bridge.ts`'s TTS language (I18N-01).
+      const result = await stt.transcribe({
+        audioPath,
+        language: options.language || resolveLocale(),
+      });
       const text = result.text.trim();
       if (text) {
         appendTranscript(`- ${text}\n`);
