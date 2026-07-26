@@ -26,8 +26,8 @@
  *
  *   pnpm report:i18n-coverage -- --alert-on-regression
  *     Additionally compares the current per-locale coverage percentage
- *     against the last recorded snapshot (`active/shared/tmp/
- *     i18n-drift-audit/coverage-history.json`) and, if any *required*
+ *     against the last recorded snapshot (`active/shared/runtime/reports/
+ *     i18n-coverage-history.json`) and, if any *required*
  *     locale's coverage dropped since that snapshot, records/dispatches an
  *     ops alert through the repository-managed alert sink (mirrors
  *     `scripts/watch_tenant_drift.ts`'s `--alert` convention) before
