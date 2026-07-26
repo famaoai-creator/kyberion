@@ -14,7 +14,9 @@ describe('vocabulary-catalog (I18N-02)', () => {
     const catalog = loadVocabularyCatalog();
     expect(catalog).not.toBeNull();
     expect(catalog?.default_locale).toBe('en');
-    expect(catalog?.required_locales).toEqual(['en', 'ja']);
+    // I18N-07: qps-ploc is the proof-of-locale pseudo-locale, data-added
+    // alongside en/ja.
+    expect(catalog?.required_locales).toEqual(['en', 'ja', 'qps-ploc']);
     expect(Object.keys(catalog?.domains ?? {})).toEqual(
       expect.arrayContaining(['chronos', 'cli', 'status', 'error', 'question', 'common'])
     );
