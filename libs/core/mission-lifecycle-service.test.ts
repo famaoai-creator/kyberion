@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
+import { resetAgentIdentityServiceForTests } from './agent-identity.js';
 import * as pathResolver from './path-resolver.js';
 import {
   buildMissionLifecycleService,
@@ -37,17 +38,36 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
     dispatchMissionWorkItems: vi.fn(async () => ({ ok: true }) as any),
     pauseMission: vi.fn(async () => undefined),
     resumeMission: vi.fn(async () => undefined),
+    purgeMissions: vi.fn(async () => ({
+      status: 'ok',
+      adfPath: 'stub',
+      dryRun: true,
+      candidates: [],
+      archived: [],
+    })) as any,
   };
 }
 
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
 
+// NI-01 hermeticity: the argv-independence test below runs the REAL start()
+// under mission_controller, whose staffing path provisions durable agent
+// identities — point that ledger at a per-process tmp journal so this suite
+// never writes the governed default path (mirrors how orchestrator-session
+// tests repoint their own journal).
+const IDENTITY_JOURNAL_TMP_DIR = `active/shared/tmp/mission-lifecycle-service-ni01-${process.pid}`;
+let identityJournalCounter = 0;
+
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
   previousPersona = process.env.KYBERION_PERSONA;
   delete process.env.MISSION_ROLE;
   delete process.env.KYBERION_PERSONA;
+  identityJournalCounter += 1;
+  resetAgentIdentityServiceForTests(
+    `${IDENTITY_JOURNAL_TMP_DIR}/agent-identities-${identityJournalCounter}.jsonl`
+  );
 });
 
 afterEach(() => {
@@ -55,6 +75,12 @@ afterEach(() => {
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = previousPersona;
+  resetAgentIdentityServiceForTests();
+});
+
+afterAll(() => {
+  const dir = pathResolver.rootResolve(IDENTITY_JOURNAL_TMP_DIR);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('mission-lifecycle-service — fail-closed execution-context gate', () => {
@@ -96,6 +122,10 @@ describe('mission-lifecycle-service — fail-closed execution-context gate', () 
     [
       'resume',
       (facade: ReturnType<typeof buildMissionLifecycleService>) => facade.resume(missionId),
+    ],
+    [
+      'archive',
+      (facade: ReturnType<typeof buildMissionLifecycleService>) => facade.archive({ dryRun: true }),
     ],
   ] as const)(
     'verb "%s" throws MissionLifecycleGovernedError outside mission_controller context, and reaches the underlying system inside withExecutionContext',
@@ -194,6 +224,64 @@ describe('mission-lifecycle-service — shared audit record', () => {
     expect(surfaceEntry.metadata.surface).toBe('slack');
     expect(typeof cliEntry.metadata.actor).toBe('string');
     expect(typeof surfaceEntry.metadata.actor).toBe('string');
+  });
+});
+
+describe('mission-lifecycle-service — archive verb (AL-03)', () => {
+  it('routes the policy-driven sweep to the underlying purgeMissions with the dry-run flag', async () => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+
+    const dry = await withExecutionContext('mission_controller', () =>
+      facade.archive({ dryRun: true })
+    );
+    expect(system.purgeMissions).toHaveBeenCalledWith(true);
+    expect((dry as any).status).toBe('ok');
+
+    await withExecutionContext('mission_controller', () => facade.archive());
+    expect(system.purgeMissions).toHaveBeenLastCalledWith(false);
+  });
+
+  it('routes --mission targeting to archiveMissionById with the normalized id, without touching the sweep', async () => {
+    const system = makeStubSystem();
+    const archiveOne = vi.fn(async (mission: string) => ({
+      status: 'archived' as const,
+      mission,
+    }));
+    const facade = buildMissionLifecycleService(system, { archiveMissionById: archiveOne });
+
+    const result = await withExecutionContext('mission_controller', () =>
+      facade.archive({ missionId: 'msn-al03-target' })
+    );
+
+    expect(archiveOne).toHaveBeenCalledWith('MSN-AL03-TARGET');
+    expect(system.purgeMissions).not.toHaveBeenCalled();
+    expect((result as any).status).toBe('archived');
+  });
+
+  it('records the shared {actor, surface, verb, mission} audit record for archive', async () => {
+    const recordSpy = vi.spyOn(auditChain, 'record');
+    const facade = buildMissionLifecycleService(makeStubSystem(), {
+      archiveMissionById: vi.fn(async (mission: string) => ({
+        status: 'already_archived' as const,
+        mission,
+      })),
+    });
+    recordSpy.mockClear();
+
+    await withExecutionContext('mission_controller', () =>
+      facade.archive({ missionId: 'MSN-AL03-AUDIT-001', surface: 'cli' })
+    );
+
+    expect(recordSpy).toHaveBeenCalledTimes(1);
+    const entry = recordSpy.mock.results[0]!.value;
+    expect(Object.keys(entry.metadata).sort()).toEqual(['actor', 'mission', 'surface', 'verb']);
+    expect(entry.metadata).toMatchObject({
+      verb: 'archive',
+      mission: 'MSN-AL03-AUDIT-001',
+      surface: 'cli',
+    });
+    recordSpy.mockRestore();
   });
 });
 

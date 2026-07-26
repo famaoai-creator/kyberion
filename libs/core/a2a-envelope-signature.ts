@@ -72,6 +72,33 @@ export function resolveA2ASignatureMode(): A2ASignatureMode {
   return process.env.KYBERION_A2A_SIGNATURE === 'enforce' ? 'enforce' : 'warn';
 }
 
+/**
+ * NI-02: canonical signed-content serialization for an A2A envelope.
+ *
+ * The signed content is the JSON of `{ header, payload }` with the
+ * signature-carrying fields (`signature`, `sig_alg`) blanked — exactly the
+ * shape a2a-bridge has always signed. Because the WHOLE header is spread
+ * into the canonical form, every header claim — including NI-02's
+ * `sender_nhi_id` — is inside the HMAC: altering or stripping a present
+ * claim breaks verification. Backward compatible by construction:
+ * `JSON.stringify` drops `undefined` properties, so an envelope without
+ * `sender_nhi_id` canonicalizes byte-for-byte as it did before the field
+ * existed, and previously signed traffic still verifies.
+ */
+export function canonicalA2AEnvelopeContent(envelope: {
+  header: object;
+  payload: unknown;
+}): string {
+  return JSON.stringify({
+    header: {
+      ...(envelope.header as Record<string, unknown>),
+      signature: undefined,
+      sig_alg: undefined,
+    },
+    payload: envelope.payload,
+  });
+}
+
 export function signA2AContent(content: string): {
   signature: string;
   sig_alg: A2ASignatureAlgorithm;

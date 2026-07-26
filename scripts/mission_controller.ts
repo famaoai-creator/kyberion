@@ -656,8 +656,25 @@ async function reenterMissionFromReview(missionId: string) {
   return result;
 }
 
-async function purgeMissions(dryRun: boolean = false) {
-  return missionSystem.purgeMissions(dryRun);
+async function purgeMissions(dryRun: boolean = false): Promise<void> {
+  // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
+  // CLI router's context type is (dryRun?) => Awaitable<void> and never
+  // consumed a return value, so drop it here to keep the thin-router contract.
+  await missionSystem.purgeMissions(dryRun);
+}
+
+async function archiveMissions(
+  options: { missionId?: string; execute?: boolean } = {}
+): Promise<void> {
+  // AL-03: the archive verb is governed by the mission-lifecycle-service
+  // facade (gate + audit). `--mission <ID>` archives one completed/failed
+  // mission immediately (explicit operator action, age-independent);
+  // otherwise it is the policy-driven sweep with the same dry-run-by-default
+  // contract as `purge`.
+  const result = options.missionId
+    ? await missionLifecycleService.archive({ missionId: options.missionId })
+    : await missionLifecycleService.archive({ dryRun: !options.execute });
+  console.log(JSON.stringify(result, null, 2));
 }
 
 /**
@@ -1375,6 +1392,9 @@ Maintenance Commands:
   scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]
                                  Approve a scope change and rebaseline the origin intent
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
+  archive  [--execute] [--mission <ID>]
+                                 Governed archive verb: policy-driven sweep like purge (dry-run by
+                                 default), or archive one completed/failed mission now via --mission
     sync                           Sync mission registry
   organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]
                                  List available organization team template catalogs
@@ -1877,6 +1897,7 @@ export async function main() {
     reconcileExistingWork,
     reenterMissionFromReview,
     purgeMissions,
+    archiveMissions,
     listMissions,
     listOrganizationCatalogs,
     listOrganizationProfiles,

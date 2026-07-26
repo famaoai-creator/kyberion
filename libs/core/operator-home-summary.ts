@@ -7,6 +7,7 @@ import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbo
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
+import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -50,6 +51,25 @@ export interface OperatorHomeWorkforceSummary {
   agentResources: number;
   serviceResources: number;
   accountableOwners: string[];
+}
+
+/**
+ * NI-05 NHI ledger digest for the operator packet: counts by lifecycle state
+ * plus the orphans (identities outliving their scope) by name — an orphan is
+ * a decision the operator has to make, so it is never reduced to a count.
+ */
+export interface OperatorHomeNhiLedgerSummary {
+  total: number;
+  active: number;
+  suspended: number;
+  retired: number;
+  orphanCount: number;
+  orphans: Array<{
+    nhiId: string;
+    accountableHumanId: string;
+    reason: string;
+    missingScopeId: string;
+  }>;
 }
 
 export interface OperatorHomeActionItem {
@@ -98,9 +118,38 @@ export interface OperatorHomeSummary {
   inboxEntries: DeliverableInboxEntry[];
   costSummary: OperatorHomeCostSummary;
   workforceSummary?: OperatorHomeWorkforceSummary;
+  /** NI-05: NHI inventory — who exists, in what state, and which are orphaned. */
+  nhiLedger?: OperatorHomeNhiLedgerSummary;
   actionQueue?: OperatorHomeActionItem[];
   qualitySummary?: OperatorHomeQualitySummary;
   nextAction: NextAction;
+}
+
+/**
+ * NI-05: NHI inventory for the operator packet. Never throws and never blocks
+ * the home summary — an unreadable identity ledger degrades to `undefined`
+ * (the report already logs the read failure).
+ */
+function collectNhiLedgerSummary(): OperatorHomeNhiLedgerSummary | undefined {
+  try {
+    const report = buildNhiLedgerReport();
+    if (report.total === 0 && report.orphans.length === 0) return undefined;
+    return {
+      total: report.total,
+      active: report.by_status.active,
+      suspended: report.by_status.suspended,
+      retired: report.by_status.retired,
+      orphanCount: report.orphans.length,
+      orphans: report.orphans.map((orphan) => ({
+        nhiId: orphan.nhi_id,
+        accountableHumanId: orphan.accountable_human_id,
+        reason: orphan.reason,
+        missingScopeId: orphan.missing_scope_id,
+      })),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
@@ -404,6 +453,7 @@ export function collectOperatorHomeSummary(
     since: input.since,
   });
   const workforceSummary = collectWorkforceSummary(missionItems);
+  const nhiLedger = collectNhiLedgerSummary();
   const actionQueue = collectActionQueue(missionItems, pendingApprovals, inboxEntries);
   const qualitySummary = collectQualitySummary();
   const pendingQualityDecisions = qualitySummary?.humanDecision === 'pending' ? 1 : 0;
@@ -481,6 +531,7 @@ export function collectOperatorHomeSummary(
     inboxEntries,
     costSummary,
     workforceSummary,
+    nhiLedger,
     actionQueue,
     qualitySummary,
     nextAction,

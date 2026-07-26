@@ -1,4 +1,5 @@
 import { performanceScoreAdjustment } from './agent-performance-index.js';
+import { deriveAgentNhiId } from './agent-identity.js';
 import {
   resolveAgentProviderTarget,
   type ResolvedAgentProviderTarget,
@@ -115,7 +116,9 @@ export function selectAgentForTeamRole(
   authorityRoles: Record<string, AuthorityRoleRecord>,
   agents: Record<string, AgentProfileRecord>,
   routingHint?: { model_id: string },
-  separation?: RoleSeparationConstraints
+  separation?: RoleSeparationConstraints,
+  /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
+  organizationId?: string
 ): MissionTeamAssignment {
   const hardExcludedAgents = new Set(
     (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
@@ -220,6 +223,10 @@ export function selectAgentForTeamRole(
       required: true,
       status: 'assigned',
       agent_id: winner.agentId,
+      // NI-01: canonical durable-identity name for the selected agent
+      // (kyberion://agent/<org>/<slug>). Pure derivation — the provisioned
+      // ledger record is ensured downstream at staffing/spawn time.
+      runtime_identity: deriveAgentNhiId(winner.agentId, organizationId),
       authority_role: winner.authorityRole,
       delegation_contract: {
         ownership_scope: teamRoleRecord.ownership_scope,

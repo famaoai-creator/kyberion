@@ -46,6 +46,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { logger } from './core.js';
+import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
 import {
   EventSourcingKernel,
   journalEventEnvelopeSchema,
@@ -492,6 +493,9 @@ export function createOrchestratorSession(
   params: CreateOrchestratorSessionParams
 ): OrchestratorSessionRecord {
   assertOrchestratorSessionGovernedContext('createOrchestratorSession');
+  // NI-02: owner_actor is no longer an unverified free string. warn (default)
+  // audits unregistered/inactive actors and allows; enforce rejects.
+  enforceNhiActorPolicy(params.ownerActor, 'orchestrator-session.createOrchestratorSession');
   const missionId = normalizeMissionId(params.missionId);
   const sessionId = deriveSurfaceSessionId(params.surface, params.channel, params.threadTs);
   const state = ensureState();

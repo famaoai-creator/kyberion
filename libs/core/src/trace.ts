@@ -48,6 +48,18 @@ export interface Trace {
     completedAt?: string;
     customerId?: string;
     tenantSlug?: string;
+    /**
+     * NI-02 actor attribution: canonical NHI id
+     * (`kyberion://agent/<org>/<slug>`, see agent-identity.ts) of the agent
+     * this trace's work is attributed to. Optional and purely additive.
+     */
+    actorNhiId?: string;
+    /**
+     * NI-02 actor attribution: who the actor is acting for — an nhi_id or a
+     * `user:<id>` principal (delegation-chain vocabulary; full chains are
+     * NI-03's scope).
+     */
+    onBehalfOf?: string;
   };
 }
 

@@ -47,7 +47,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (76)
+## path (77)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -110,6 +110,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TASK_GRANTS_PATH`                                      | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TENANT_DESIGN_ROOT`                                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TEST_OBSERVABILITY_DIR`                                | path | no       | _undocumented_                                                                                                                |
@@ -256,7 +257,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (134)
+## runtime (136)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -333,6 +334,8 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_MOBILE_TOOLCHAIN`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MODE`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MYSTERY`                             | string | no       | _undocumented_                                                                                          |
+| `KYBERION_NHI_ACTOR`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_NHI_ID`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_OAUTH_SERVICE_ID`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ONBOARDING_NON_INTERACTIVE_OK`       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PEER_NETWORK_CATALOG`                | string | no       | _undocumented_                                                                                          |
