@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-26T11:58:35.289Z",
+  "generated_at": "2026-07-26T15:11:37.310Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -139,7 +139,7 @@
     "satellites/voice-hub/server.ts": 142,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 5,
     "presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/page.tsx": 37,
+    "presence/displays/chronos-mirror-v2/src/app/page.tsx": 35,
     "presence/displays/chronos-mirror-v2/src/components/A2UIComponentLibrary.tsx": 1,
     "presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx": 18,
     "presence/displays/chronos-mirror-v2/src/components/AgentOpsBoards.tsx": 5,
