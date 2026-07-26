@@ -148,7 +148,7 @@ ${varLines}
         line-height: 1.7;
       }
       main { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
-      .hero { padding: 72px 0 40px; border-bottom: var(--kb-border, 1px solid rgba(226,232,240,0.1)); }
+      .hero { padding: 72px 0 40px; border-bottom: 1px solid var(--kb-border, rgba(226,232,240,0.1)); }
       .hero h1 { font-family: ${heading}; font-size: 2.6rem; letter-spacing: -0.02em; }
       .hero p.audience { color: var(--kb-text-secondary, #94a3b8); margin-top: 12px; }
       .hero ul { margin: 28px 0 0 1.2em; }
@@ -158,7 +158,7 @@ ${varLines}
         /* panel derives from the page background, not the dark-console panel
            token — keeps light brand themes readable. */
         background: color-mix(in srgb, var(--kb-accent, #38bdf8) 7%, var(--kb-bg-main, #020617));
-        border: var(--kb-border, 1px solid rgba(226,232,240,0.1));
+        border: 1px solid var(--kb-border, rgba(226,232,240,0.1));
         border-radius: 14px;
         padding: 28px 32px;
         margin-top: 28px;
