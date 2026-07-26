@@ -12,6 +12,7 @@ import {
   loadServiceEndpointsCatalog,
   killSwitch,
   readJanitorLastRunMs,
+  listOrphanNhiIdentities,
   readReasoningDegraded,
   readReasoningFailover,
   type ReasoningFailoverMarker,
@@ -578,6 +579,13 @@ async function main() {
   const janitorLastRunMs = readJanitorLastRunMs();
   sentinel.registerLayer('L8', async () => isJanitorMarkerFresh(janitorLastRunMs));
 
+  // L9: NHI Lifecycle Layer (NI-05) — orphan identities. A non-retired agent
+  // identity whose affiliation scope no longer exists is a missed offboarding
+  // (OWASP NHI #1); it must degrade the baseline to needs_attention rather
+  // than stay silently permanent. Read-only, never blocking L0-L2 recovery.
+  const nhiOrphans = listOrphanNhiIdentities();
+  sentinel.registerLayer('L9', async () => nhiOrphans.length === 0);
+
   const result = await sentinel.run();
   const state = sentinel.getState();
 
@@ -639,6 +647,12 @@ async function main() {
       errors: envReport.errors,
       warnings: envReport.warnings,
       unknown: envReport.unknown,
+    },
+    // NI-05 (L9): orphan NHIs — an identity outliving its scope needs a
+    // human retirement decision, so it is named here, not just counted.
+    nhi: {
+      orphans: nhiOrphans,
+      orphan_count: nhiOrphans.length,
     },
   };
 

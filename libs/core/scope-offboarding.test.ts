@@ -7,12 +7,31 @@
  * fs and path-resolver is repointed, so no test ever touches `active/`.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 
-let rootDir: string;
+/**
+ * `var`, and created on first access: audit-chain (pulled in transitively by
+ * NI-05's governance hook) builds its singleton the moment path-resolver is
+ * imported and calls `rootDir()` right then — before any `let` in this file
+ * is initialized and before beforeEach runs. A `var` has no TDZ, and the
+ * lazy accessor hands that early caller a real directory. Each test then
+ * repoints it to a fresh root.
+ */
+/* eslint-disable no-var */
+var rootDirState: string | undefined;
+var createdRoots: string[] | undefined;
+/* eslint-enable no-var */
+
+function currentRoot(): string {
+  if (!rootDirState) {
+    rootDirState = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-al04-'));
+    (createdRoots ??= []).push(rootDirState);
+  }
+  return rootDirState;
+}
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -44,14 +63,23 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-vi.mock('./path-resolver.js', () => ({
-  rootDir: () => rootDir,
-  rootResolve: (rel: string) => (path.isAbsolute(rel) ? rel : path.join(rootDir, rel)),
-  shared: (sub = '') => path.join(rootDir, 'active', 'shared', sub),
-  sharedTmp: (sub = '') => path.join(rootDir, 'active', 'shared', 'tmp', sub),
-  sharedExports: (sub = '') => path.join(rootDir, 'active', 'shared', 'exports', sub),
-  sharedLogsAudit: (sub = '') => path.join(rootDir, 'active', 'shared', 'logs', 'audit', sub),
-}));
+vi.mock('./path-resolver.js', () => {
+  const resolver = {
+    rootDir: () => currentRoot(),
+    rootResolve: (rel: string) => (path.isAbsolute(rel) ? rel : path.join(currentRoot(), rel)),
+    resolve: (rel: string) => (path.isAbsolute(rel) ? rel : path.join(currentRoot(), rel)),
+    shared: (sub = '') => path.join(currentRoot(), 'active', 'shared', sub),
+    sharedTmp: (sub = '') => path.join(currentRoot(), 'active', 'shared', 'tmp', sub),
+    sharedExports: (sub = '') => path.join(currentRoot(), 'active', 'shared', 'exports', sub),
+    sharedLogsAudit: (sub = '') =>
+      path.join(currentRoot(), 'active', 'shared', 'logs', 'audit', sub),
+    knowledge: (sub = '') => path.join(currentRoot(), 'knowledge', sub),
+    findMissionPath: () => null,
+  };
+  // `pathResolver` (the namespace-style export) is what audit-chain — pulled
+  // in transitively by NI-05's governance hook — reads at construction.
+  return { ...resolver, pathResolver: resolver };
+});
 
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), success: vi.fn() },
@@ -74,16 +102,16 @@ function writeJson(filePath: string, value: unknown): void {
 }
 
 function abs(repoRelative: string): string {
-  return path.join(rootDir, ...repoRelative.split('/'));
+  return path.join(currentRoot(), ...repoRelative.split('/'));
 }
 
 function trashPathOf(repoRelative: string): string {
-  return path.join(rootDir, ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
+  return path.join(currentRoot(), ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
 }
 
 function auditEvents(): Array<Record<string, any>> {
   const auditPath = path.join(
-    rootDir,
+    currentRoot(),
     'active',
     'shared',
     'logs',
@@ -99,11 +127,16 @@ function auditEvents(): Array<Record<string, any>> {
 }
 
 beforeEach(() => {
-  rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-al04-'));
+  rootDirState = undefined;
+  currentRoot();
 });
 
 afterEach(() => {
-  fs.rmSync(rootDir, { recursive: true, force: true });
+  if (rootDirState) fs.rmSync(rootDirState, { recursive: true, force: true });
+});
+
+afterAll(() => {
+  for (const root of createdRoots ?? []) fs.rmSync(root, { recursive: true, force: true });
 });
 
 describe('AL-04 mission runtime residue GC', () => {
