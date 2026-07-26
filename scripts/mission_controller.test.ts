@@ -1187,3 +1187,74 @@ describe('handoffMission — SO-02 orchestrator-session release hook', () => {
     releaseSpy.mockRestore();
   });
 });
+
+describe('mission controller router — archive verb (AL-03)', () => {
+  // The router context has many members, but each `case` only touches the
+  // handlers it routes to — a minimal stub (cast) keeps this an argv-contract
+  // test rather than a full CLI integration test.
+  function makeRoutingContext(argv: string[], action: string) {
+    return {
+      argv,
+      action,
+      hasRefresh: false,
+      hasDryRun: argv.includes('--dry-run'),
+      getOptionValue: (flag: string, args: string[]) => {
+        const index = args.indexOf(flag);
+        return index >= 0 ? args[index + 1] : undefined;
+      },
+      parseCsvOption: (() => undefined) as any,
+      purgeMissions: vi.fn(async () => undefined),
+      archiveMissions: vi.fn(async () => undefined),
+      showHelp: vi.fn(),
+    } as any;
+  }
+
+  it("routes 'archive' to archiveMissions, passing --mission and --execute through", async () => {
+    const targeted = makeRoutingContext(
+      ['node', 'dist/scripts/mission_controller.js', 'archive', '--mission', 'msn-al03-1'],
+      'archive'
+    );
+    await missionControllerRouter.runMissionControllerAction(targeted);
+    expect(targeted.archiveMissions).toHaveBeenCalledWith({
+      missionId: 'msn-al03-1',
+      execute: false,
+    });
+
+    const sweep = makeRoutingContext(
+      ['node', 'dist/scripts/mission_controller.js', 'archive', '--execute'],
+      'archive'
+    );
+    await missionControllerRouter.runMissionControllerAction(sweep);
+    expect(sweep.archiveMissions).toHaveBeenCalledWith({ missionId: undefined, execute: true });
+    expect(sweep.purgeMissions).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing 'purge' argv contract unchanged (dry-run by default, --execute to apply)", async () => {
+    const dry = makeRoutingContext(
+      ['node', 'dist/scripts/mission_controller.js', 'purge'],
+      'purge'
+    );
+    await missionControllerRouter.runMissionControllerAction(dry);
+    expect(dry.purgeMissions).toHaveBeenCalledWith(true);
+    expect(dry.archiveMissions).not.toHaveBeenCalled();
+
+    const execute = makeRoutingContext(
+      ['node', 'dist/scripts/mission_controller.js', 'purge', '--execute'],
+      'purge'
+    );
+    await missionControllerRouter.runMissionControllerAction(execute);
+    expect(execute.purgeMissions).toHaveBeenCalledWith(false);
+  });
+
+  it("'archive' and '--mission' stay out of positional argument extraction (argv contract)", () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'archive',
+      '--mission',
+      'MSN-AL03-POS',
+      '--execute',
+    ]);
+    expect(positionalArgs).toEqual(['archive']);
+  });
+});

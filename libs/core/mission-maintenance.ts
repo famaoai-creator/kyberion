@@ -889,14 +889,26 @@ function readMissionStatus(missionDir: string): string | null {
   }
 }
 
-export async function purgeMissions(rootDir: string, dryRun = false): Promise<PurgeMissionsResult> {
-  // AL-01: the lifecycle ADF lives under knowledge/product/governance/ — the
-  // former `knowledge('governance/...')` path pointed at a file that never
-  // existed, so automatic archival was silently dead.
+interface MissionLifecyclePolicy {
+  name: string;
+  condition: { has_file?: string; max_age_days?: number; status?: string };
+  target_dir: string;
+  naming_pattern: string;
+}
+
+/**
+ * Loads the mission lifecycle ADF policies. AL-01: the ADF lives under
+ * knowledge/product/governance/ — the former `knowledge('governance/...')`
+ * path pointed at a file that never existed, so automatic archival was
+ * silently dead. A missing ADF escalates (no-silent-noop) and returns
+ * `policies: null`.
+ */
+function loadMissionLifecyclePolicies(): {
+  adfPath: string;
+  policies: MissionLifecyclePolicy[] | null;
+} {
   const adfPath = pathResolver.knowledge('product/governance/mission-lifecycle.json');
   if (!safeExistsSync(adfPath)) {
-    // No-silent-noop: a missing lifecycle ADF disables all mission GC, which
-    // is exactly the failure mode that kept this path dead. Escalate.
     logger.error(`Mission lifecycle ADF not found: ${adfPath}`);
     sendOpsAlert({
       severity: 'critical',
@@ -906,21 +918,52 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
         'Restore knowledge/product/governance/mission-lifecycle.json so mission purge/archive policies can run again.',
       dedupe_key: 'mission-purge:adf-missing',
     });
+    return { adfPath, policies: null };
+  }
+  const adf = readJsonFile<{ policies: MissionLifecyclePolicy[] }>(adfPath);
+  return { adfPath, policies: adf.policies };
+}
+
+/** Resolves a policy's absolute archive target path for a mission id. */
+function resolvePolicyTargetPath(policy: MissionLifecyclePolicy, mission: string): string {
+  const now = new Date();
+  const targetDir = policy.target_dir.replace(
+    '{YYYY-MM}',
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  );
+  return pathResolver.rootResolve(
+    path.join(targetDir, policy.naming_pattern.replace('{mission_id}', mission))
+  );
+}
+
+/**
+ * AL-01/AL-03 acceptance: archival leaves an audit record of what moved
+ * where. Best-effort — an unwritable audit log never blocks the archival
+ * that already happened.
+ */
+function appendMissionPurgeAudit(record: Record<string, unknown>): void {
+  try {
+    safeAppendFileSync(
+      pathResolver.sharedLogsAudit('mission-purge.jsonl'),
+      `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
+      { encoding: 'utf8' }
+    );
+  } catch (err) {
+    logger.warn(
+      `Failed to record mission purge audit entry for ${String(record.mission)}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+export async function purgeMissions(rootDir: string, dryRun = false): Promise<PurgeMissionsResult> {
+  const { adfPath, policies } = loadMissionLifecyclePolicies();
+  if (!policies) {
     return { status: 'adf_missing', adfPath, dryRun, candidates: [], archived: [] };
   }
-
-  const adf = readJsonFile<{
-    policies: Array<{
-      name: string;
-      condition: { has_file?: string; max_age_days?: number; status?: string };
-      target_dir: string;
-      naming_pattern: string;
-    }>;
-  }>(adfPath);
   const candidates: PurgeMissionCandidate[] = [];
 
   for (const { missionId: mission, missionPath: missionDir } of listMissionsInSearchDirs()) {
-    for (const policy of adf.policies) {
+    for (const policy of policies) {
       const { condition } = policy;
 
       // AND semantics across every declared condition field. The real ADF
@@ -942,15 +985,7 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
       const match = checks.length > 0 && checks.every(Boolean);
       if (!match) continue;
 
-      let targetPath = policy.target_dir;
-      const now = new Date();
-      targetPath = targetPath.replace(
-        '{YYYY-MM}',
-        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      );
-      targetPath = pathResolver.rootResolve(
-        path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission))
-      );
+      const targetPath = resolvePolicyTargetPath(policy, mission);
       candidates.push({ mission, missionDir, targetPath, policyName: policy.name });
       break;
     }
@@ -987,27 +1022,102 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
     safeExec('cp', ['-r', candidate.missionDir, candidate.targetPath]);
     safeRmSync(candidate.missionDir, { recursive: true, force: true });
     archived.push(candidate);
-    // AL-01 acceptance: archival leaves an audit record of what moved where.
-    try {
-      safeAppendFileSync(
-        pathResolver.sharedLogsAudit('mission-purge.jsonl'),
-        `${JSON.stringify({
-          ts: new Date().toISOString(),
-          event: 'MISSION_PURGE_ARCHIVED',
-          mission: candidate.mission,
-          from: candidate.missionDir,
-          to: candidate.targetPath,
-          policy: candidate.policyName,
-        })}\n`,
-        { encoding: 'utf8' }
-      );
-    } catch (err) {
-      logger.warn(
-        `Failed to record mission purge audit entry for ${candidate.mission}: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
+    appendMissionPurgeAudit({
+      event: 'MISSION_PURGE_ARCHIVED',
+      mission: candidate.mission,
+      from: candidate.missionDir,
+      to: candidate.targetPath,
+      policy: candidate.policyName,
+    });
   }
 
   logger.success(`✅ ${archived.length} mission(s) purged.`);
   return { status: 'ok', adfPath, dryRun, candidates, archived };
+}
+
+export interface ArchiveMissionByIdResult {
+  status: 'archived' | 'already_archived' | 'not_found' | 'not_archivable' | 'adf_missing';
+  mission: string;
+  from?: string;
+  to?: string;
+  policy?: string;
+  reason?: string;
+}
+
+/**
+ * AL-03: explicit operator-targeted archive of a single mission. Unlike the
+ * policy sweep in `purgeMissions`, the mission is archived regardless of age
+ * — but ONLY when its status is `completed` or `failed` (an explicit archive
+ * still refuses to move live missions). The archive target comes from the
+ * same lifecycle ADF policy that declares the mission's status, and the same
+ * `mission-purge.jsonl` audit record is written (with `explicit: true`).
+ *
+ * Idempotent and structured: an already-archived or missing mission returns
+ * a no-op result instead of throwing.
+ */
+export async function archiveMissionById(missionId: string): Promise<ArchiveMissionByIdResult> {
+  const mission = String(missionId || '').toUpperCase();
+  const { adfPath, policies } = loadMissionLifecyclePolicies();
+  if (!policies) {
+    return {
+      status: 'adf_missing',
+      mission,
+      reason: `mission lifecycle ADF not found: ${adfPath}`,
+    };
+  }
+
+  const missionDir = findMissionPath(mission);
+  if (!missionDir) {
+    for (const policy of policies) {
+      const target = resolvePolicyTargetPath(policy, mission);
+      if (safeExistsSync(target)) {
+        return { status: 'already_archived', mission, to: target, policy: policy.name };
+      }
+    }
+    return {
+      status: 'not_found',
+      mission,
+      reason: 'mission directory not found in active mission roots or lifecycle archive targets',
+    };
+  }
+
+  const status = readMissionStatus(missionDir);
+  if (status !== 'completed' && status !== 'failed') {
+    return {
+      status: 'not_archivable',
+      mission,
+      from: missionDir,
+      reason: `mission status '${status ?? 'unknown'}' is not completed/failed — explicit archive refuses to move live missions`,
+    };
+  }
+
+  // Match on the policy's declared status only: explicit targeting is the
+  // operator's decision, so max_age_days is deliberately not applied here.
+  const policy = policies.find((entry) => entry.condition?.status === status);
+  if (!policy) {
+    return {
+      status: 'not_archivable',
+      mission,
+      from: missionDir,
+      reason: `no lifecycle policy declares an archive target for status '${status}'`,
+    };
+  }
+
+  const targetPath = resolvePolicyTargetPath(policy, mission);
+  if (!safeExistsSync(path.dirname(targetPath))) {
+    safeMkdir(path.dirname(targetPath), { recursive: true });
+  }
+  if (safeExistsSync(targetPath)) safeRmSync(targetPath, { recursive: true, force: true });
+  safeExec('cp', ['-r', missionDir, targetPath]);
+  safeRmSync(missionDir, { recursive: true, force: true });
+  appendMissionPurgeAudit({
+    event: 'MISSION_PURGE_ARCHIVED',
+    mission,
+    from: missionDir,
+    to: targetPath,
+    policy: policy.name,
+    explicit: true,
+  });
+  logger.success(`📦 Mission ${mission} archived to ${targetPath} (policy: ${policy.name}).`);
+  return { status: 'archived', mission, from: missionDir, to: targetPath, policy: policy.name };
 }
