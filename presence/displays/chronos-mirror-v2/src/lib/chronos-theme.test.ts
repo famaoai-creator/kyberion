@@ -7,11 +7,8 @@ import {
 } from './chronos-theme';
 
 describe('chronos theme mode', () => {
-  it('never resolves `system` to the light palette', () => {
-    // Regression: `system` followed prefers-color-scheme, so every operator on
-    // a light-mode OS opened the console into the light path without choosing
-    // it — and the component layer is dark-only, so that path is unreadable.
-    expect(resolveChronosThemeMode('system', false)).toBe('dark');
+  it('follows the operating system for the system preference', () => {
+    expect(resolveChronosThemeMode('system', false)).toBe('light');
     expect(resolveChronosThemeMode('system', true)).toBe('dark');
   });
 
@@ -24,9 +21,9 @@ describe('chronos theme mode', () => {
     expect(resolveChronosThemeMode('light', true)).toBe('light');
   });
 
-  it('does not offer light in the header cycle', () => {
-    expect(CHRONOS_THEME_CYCLE).not.toContain('light');
-    expect(CHRONOS_THEME_CYCLE.length).toBeGreaterThan(1);
+  it('offers both light and dark in the header cycle', () => {
+    expect(CHRONOS_THEME_CYCLE).toContain('light');
+    expect(CHRONOS_THEME_CYCLE).toContain('dark');
   });
 
   it('cycles through the supported modes and returns to the start', () => {
@@ -40,9 +37,7 @@ describe('chronos theme mode', () => {
     expect(new Set(seen).size).toBe(CHRONOS_THEME_CYCLE.length);
   });
 
-  it('recovers from a withdrawn mode left in localStorage', () => {
-    // Someone who picked 'light' before it was withdrawn must not get stuck
-    // outside the cycle.
-    expect(nextChronosThemeMode('light')).toBe(CHRONOS_THEME_CYCLE[0]);
+  it('keeps explicit light in the cycle', () => {
+    expect(nextChronosThemeMode('light')).toBe('dark');
   });
 });
