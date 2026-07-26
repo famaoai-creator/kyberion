@@ -69,6 +69,11 @@ jobs:
       - name: Check UI/UX governance drift
         run: pnpm run check:ui-ux
 
+      # I18N-03: ratchet against new hardcoded Japanese string literals in
+      # implementation code (baseline-frozen; only increases fail).
+      - name: Check i18n hardcoding ratchet
+        run: pnpm run check:i18n
+
       # Actuator op registry / discovery catalog must be regenerated when
       # actuator manifests or dispatch ops change (REVIEW_CODEX_2026-07-11:
       # scaffold-to-registry drift was previously unchecked).
