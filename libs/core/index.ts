@@ -1320,6 +1320,8 @@ export {
 } from './a2a-envelope-signature.js';
 // NI-02: actor-string verification against the NHI registry (warn -> enforce).
 export * from './nhi-actor-verification.js';
+// NI-03: RFC 8693 act-chain-analog delegation chains with attenuation.
+export * from './delegation-chain.js';
 export {
   buildFailoverReasoningBackend,
   buildRoleAwareReasoningBackend,

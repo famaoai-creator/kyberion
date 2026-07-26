@@ -7449,7 +7449,7 @@
     {
       "path": "product/schemas/task-contract.schema.json",
       "tier": "public",
-      "size": 3517,
+      "size": 5106,
       "type": "json"
     },
     {

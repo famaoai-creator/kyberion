@@ -1,5 +1,15 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
+import { deriveAgentNhiId } from './agent-identity.js';
+import {
+  appendDelegationLink,
+  assertChainAttenuation,
+  buildDelegationLink,
+  DelegationAttenuationError,
+  embedDelegationChainInContext,
+  extractDelegationChainFromContext,
+  type DelegationCapabilityTier,
+} from './delegation-chain.js';
 import {
   SUBAGENT_PROFILE_CLI_TOOLS,
   describeSubagentCapabilityCatalog,
@@ -466,6 +476,95 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
 }
 
 /**
+ * NI-03: resolve the KD-05 tier this delegation runs under, mirroring
+ * {@link HarnessSubagentDispatcher}'s degrade-not-fail rule (`options.profile`
+ * > `options.role` > default; unknown names degrade to the default).
+ */
+function resolveDelegationTier(options?: ReasoningCallOptions): DelegationCapabilityTier {
+  const requested = options?.profile || options?.role || DEFAULT_SUBAGENT_PROFILE;
+  try {
+    return getSubagentCapabilityProfile(requested).name as DelegationCapabilityTier;
+  } catch {
+    return DEFAULT_SUBAGENT_PROFILE as DelegationCapabilityTier;
+  }
+}
+
+/**
+ * NI-03: best-effort identity of the CURRENT actor for chain origination.
+ * There is no authenticated "who am I" seam in a worker process yet, so this
+ * mirrors authority.ts's role resolution inputs (SYSTEM_ROLE / MISSION_ROLE)
+ * and projects them onto an NI-01 nhi_id when the slug derives cleanly,
+ * falling back to a legacy `actor:<role>` string. Documented best-effort:
+ * the chain root recorded here is an attribution claim, not a verified
+ * identity (NI-02's registry verification applies where the chain is
+ * consumed).
+ */
+function resolveBestEffortDelegationActor(): string {
+  const role =
+    String(process.env.SYSTEM_ROLE || process.env.MISSION_ROLE || 'delegating-agent')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'delegating-agent';
+  try {
+    return deriveAgentNhiId(role) ?? `actor:${role}`;
+  } catch {
+    return `actor:${role}`;
+  }
+}
+
+/**
+ * NI-03 chain propagation at the delegation choke point
+ * ({@link DispatchingReasoningBackend.delegateTask}). The chain travels in
+ * the `context` string as a marked block (see delegation-chain.ts), because
+ * `delegateTask(instruction, context)` is the only channel every dispatcher
+ * and backend already threads through.
+ *
+ * - Incoming context carries a chain → append this delegation's sub-worker
+ *   link (tier from {@link resolveDelegationTier}) and validate attenuation
+ *   FAIL-CLOSED before any dispatch happens. The sub-worker has no durable
+ *   identity at this seam (process-spawn children are anonymous), so its
+ *   actor is the documented placeholder `subagent:<dispatcher>:<tier>` until
+ *   spawned sub-workers acquire NHIs.
+ * - Incoming context carries a MALFORMED chain block → fail closed too (a
+ *   corrupted chain is a bug, not a legacy path).
+ * - No chain present → originate a single-link chain rooted at the current
+ *   actor (best-effort, see {@link resolveBestEffortDelegationActor}) with an
+ *   unrestricted scope, so the next chain-aware hop appends onto a recorded
+ *   root instead of starting blind. Chain-less LEGACY payloads elsewhere are
+ *   untouched — this only augments the context string of governed dispatch.
+ */
+function propagateDelegationChainThroughContext(
+  context: string | undefined,
+  options: ReasoningCallOptions | undefined,
+  dispatcherName: string
+): string {
+  const extracted = extractDelegationChainFromContext(context);
+  if (extracted.malformed) {
+    throw new DelegationAttenuationError([
+      'embedded delegation-chain block is malformed — refusing to dispatch on a corrupted chain',
+    ]);
+  }
+  if (extracted.chain) {
+    const tier = resolveDelegationTier(options);
+    const extended = appendDelegationLink(
+      extracted.chain,
+      buildDelegationLink({
+        actor: `subagent:${dispatcherName}:${tier}`,
+        ...(options?.role ? { team_role: options.role } : {}),
+        granted_scope: { capability_tier: tier },
+      })
+    );
+    assertChainAttenuation(extended); // fail-closed BEFORE dispatch
+    return embedDelegationChainInContext(extracted.contextWithoutChain, extended);
+  }
+  const origin = [
+    buildDelegationLink({ actor: resolveBestEffortDelegationActor(), granted_scope: {} }),
+  ];
+  return embedDelegationChainInContext(context, origin);
+}
+
+/**
  * A reasoning backend decorator whose `delegateTask` routes through the agent-runtime
  * dispatch plane, while every cognition op forwards verbatim to the wrapped base
  * backend. This keeps `delegateTask` on the {@link ReasoningBackend} interface (so all
@@ -487,7 +586,19 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return this.dispatcher.dispatch(instruction, context, this.base, options);
+    // NI-03: continue (or originate) the delegation chain BEFORE dispatch —
+    // an attenuation violation rejects here and the dispatcher never runs.
+    let chainedContext: string;
+    try {
+      chainedContext = propagateDelegationChainThroughContext(
+        context,
+        options,
+        this.dispatcher.name
+      );
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return this.dispatcher.dispatch(instruction, chainedContext, this.base, options);
   }
 
   // --- cognition substrate: forward verbatim to the wrapped base backend ---

@@ -111,6 +111,9 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     model_hint: z.record(z.string(), z.unknown()).optional(),
     task_id: z.string().optional(),
     security_scope: z.record(z.string(), z.unknown()).optional(),
+    // NI-03: delegation chain (see A2ATaskContext doc comment) — loose here,
+    // deep-validated by delegation-chain.ts where the chain is consumed.
+    delegation_chain: z.array(z.record(z.string(), z.unknown())).optional(),
   })
   .strict();
 

@@ -734,6 +734,215 @@ describe('a2a-bridge', () => {
     });
   });
 
+  describe('NI-03 delegation_chain claim', () => {
+    const savedSecret = process.env.KYBERION_A2A_SECRET;
+
+    beforeEach(async () => {
+      process.env.KYBERION_A2A_SECRET = 'ni03-bridge-test-secret';
+      // See NI-02 describe: the a2aBridge singleton survives vi.resetModules().
+      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
+      const { resetA2ASecretCache } = await import('./a2a-envelope-signature.js');
+      resetA2ASecretCache();
+    });
+
+    afterEach(async () => {
+      if (savedSecret === undefined) delete process.env.KYBERION_A2A_SECRET;
+      else process.env.KYBERION_A2A_SECRET = savedSecret;
+      const { resetA2ASecretCache } = await import('./a2a-envelope-signature.js');
+      resetA2ASecretCache();
+      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
+    });
+
+    function baseRouteMocks(agentId: string) {
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        systemPrompt: 'agent',
+        capabilities: ['delegate'],
+      });
+      const handle = { ask: vi.fn(async () => 'ok') };
+      mocks.ensureAgentRuntime.mockResolvedValue(handle);
+      mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.getAgentRuntimeHandle.mockImplementation((id: string) =>
+        id === agentId ? handle : null
+      );
+      mocks.askAgentRuntime.mockResolvedValue('ok');
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.get.mockReturnValue({ status: 'ready' });
+    }
+
+    function sampleChain() {
+      return [
+        {
+          actor: 'kyberion://agent/ni03-org/mission-orchestrator',
+          team_role: 'orchestrator',
+          granted_scope: {},
+          granted_at: '2026-07-26T00:00:00.000Z',
+        },
+        {
+          actor: 'kyberion://agent/ni03-org/worker-a',
+          team_role: 'implementer',
+          granted_scope: { capability_tier: 'implementer' as const },
+          granted_at: '2026-07-26T00:00:01.000Z',
+        },
+      ];
+    }
+
+    it('a signed chain survives route: validated on ingress, echoed inside the signed response, audited', async () => {
+      const { a2aBridge, signA2AMessage, verifyA2ASignature, extractVerifiedDelegationChain } =
+        await import('./a2a-bridge.js');
+      const { serializeDelegationChain } = await import('./delegation-chain.js');
+      baseRouteMocks('nerve-agent');
+
+      const chain = sampleChain();
+      const message = {
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-NI03-1',
+          sender: 'kyberion:gateway',
+          receiver: 'nerve-agent',
+          performative: 'request' as const,
+          delegation_chain: serializeDelegationChain(chain),
+        },
+        payload: { text: 'hello' },
+      };
+      const signed = {
+        ...message,
+        header: { ...message.header, signature: signA2AMessage(message) },
+      };
+
+      const response = await a2aBridge.route(signed);
+
+      // Chain survived the round trip inside the signed result envelope.
+      expect(response.header.delegation_chain).toBe(serializeDelegationChain(chain));
+      expect(verifyA2ASignature(response)).toBe(true);
+      expect(extractVerifiedDelegationChain(response)).toEqual(chain);
+
+      // The a2a_route audit record attributes the routed work to the chain root.
+      const routeRecord = mocks.record.mock.calls
+        .map((call) => call[0])
+        .find((entry) => entry.action === 'a2a_route');
+      expect(routeRecord?.metadata).toMatchObject({
+        delegation_root_actor: 'kyberion://agent/ni03-org/mission-orchestrator',
+        delegation_chain_length: 2,
+      });
+    });
+
+    it('tampering with the chain breaks the signature and hides the claim (extractVerifiedDelegationChain)', async () => {
+      const { signA2AMessage, verifyA2ASignature, extractVerifiedDelegationChain } =
+        await import('./a2a-bridge.js');
+      const { serializeDelegationChain } = await import('./delegation-chain.js');
+      const chain = sampleChain();
+      const message = {
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-NI03-2',
+          sender: 'kyberion:gateway',
+          receiver: 'nerve-agent',
+          performative: 'request' as const,
+          delegation_chain: serializeDelegationChain(chain),
+        },
+        payload: { text: 'hello' },
+      };
+      const signed = {
+        ...message,
+        header: { ...message.header, signature: signA2AMessage(message) },
+      };
+      expect(extractVerifiedDelegationChain(signed)).toEqual(chain);
+
+      const tamperedChain = sampleChain();
+      tamperedChain[1].actor = 'kyberion://agent/ni03-org/impostor';
+      const tampered = {
+        ...signed,
+        header: { ...signed.header, delegation_chain: serializeDelegationChain(tamperedChain) },
+      };
+      expect(verifyA2ASignature(tampered)).toBe(false);
+      expect(extractVerifiedDelegationChain(tampered)).toBeUndefined();
+
+      // Stripping a present chain also breaks the signature (claim is inside the HMAC).
+      const stripped = { ...signed, header: { ...signed.header } };
+      delete (stripped.header as { delegation_chain?: string }).delegation_chain;
+      expect(verifyA2ASignature(stripped)).toBe(false);
+    });
+
+    it('chain-less envelopes stay byte-compatible: same signature with and without the (absent) field', async () => {
+      const { signA2AMessage } = await import('./a2a-bridge.js');
+      const legacy = {
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-NI03-3',
+          sender: 'kyberion:gateway',
+          receiver: 'nerve-agent',
+          performative: 'request' as const,
+        },
+        payload: { text: 'hello' },
+      };
+      const withUndefined = {
+        ...legacy,
+        header: { ...legacy.header, delegation_chain: undefined },
+      };
+      expect(signA2AMessage(withUndefined as never)).toBe(signA2AMessage(legacy));
+    });
+
+    it('rejects an attenuation-violating chain fail-closed before any dispatch', async () => {
+      const { a2aBridge, signA2AMessage } = await import('./a2a-bridge.js');
+      const { DelegationAttenuationError, serializeDelegationChain } =
+        await import('./delegation-chain.js');
+      baseRouteMocks('nerve-agent');
+
+      // Child (implementer) outranks its parent grant (explorer).
+      const violating = sampleChain();
+      violating[0].granted_scope = { capability_tier: 'explorer' as const };
+      const message = {
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-NI03-4',
+          sender: 'kyberion:gateway',
+          receiver: 'nerve-agent',
+          performative: 'request' as const,
+          delegation_chain: serializeDelegationChain(violating),
+        },
+        payload: { text: 'hello' },
+      };
+      const signed = {
+        ...message,
+        header: { ...message.header, signature: signA2AMessage(message) },
+      };
+
+      await expect(a2aBridge.route(signed)).rejects.toThrow(DelegationAttenuationError);
+
+      // Fail-closed BEFORE dispatch: the agent was never asked.
+      expect(mocks.askAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.askAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      const denial = mocks.record.mock.calls
+        .map((call) => call[0])
+        .find((entry) => entry.action === 'a2a_delegation_attenuation_violation');
+      expect(denial?.result).toBe('denied');
+    });
+
+    it('rejects a malformed chain header fail-closed before any dispatch', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const { DelegationAttenuationError } = await import('./delegation-chain.js');
+      baseRouteMocks('nerve-agent');
+
+      await expect(
+        a2aBridge.route({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'MSG-NI03-5',
+            sender: 'kyberion:gateway',
+            receiver: 'nerve-agent',
+            performative: 'request',
+            delegation_chain: '{not json[',
+          },
+          payload: { text: 'hello' },
+        })
+      ).rejects.toThrow(DelegationAttenuationError);
+      expect(mocks.askAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.askAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+    });
+  });
+
   describe('AA-04 Conversation store and rehydration', () => {
     it('appends conversation turns and rehydrates on session change', async () => {
       const { a2aBridge } = await import('./a2a-bridge.js');

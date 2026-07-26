@@ -38,6 +38,10 @@
           "type": "string",
           "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
           "description": "NI-02: sender's durable NHI identity claim (agent-identity ledger). Covered by the envelope HMAC signature when present."
+        },
+        "delegation_chain": {
+          "type": "string",
+          "description": "NI-03: compact-serialized DelegationChain (root-first DelegationLink[] JSON, delegation-chain.ts; internal analogue of the RFC 8693 nested act claim). Covered by the envelope HMAC signature when present."
         }
       }
     },

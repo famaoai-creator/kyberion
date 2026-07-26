@@ -90,7 +90,13 @@ describe('agent-dispatch', () => {
 
     expect(wrapped.name).toBe('fake+process-spawn');
     await wrapped.delegateTask('task', 'c');
-    expect(backend.delegateTask).toHaveBeenCalledWith('task', 'c');
+    // NI-03: with no incoming chain, delegateTask originates a single-link
+    // delegation chain and embeds it into the context it passes down — the
+    // original context is preserved as the prefix.
+    expect(backend.delegateTask).toHaveBeenCalledWith(
+      'task',
+      expect.stringMatching(/^c\n<delegation-chain>\[.*\]<\/delegation-chain>$/)
+    );
 
     await wrapped.prompt('hi');
     expect(backend.prompt).toHaveBeenCalledWith('hi');
@@ -517,5 +523,115 @@ describe('XP-06 delegation concurrency governance (agent-dispatch wiring)', () =
       },
     });
     await expect(dispatcher.dispatch('do X', 'ctx', backend)).resolves.toBe('spawned:do X');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NI-03: delegation-chain propagation at the delegateTask choke point.
+// ---------------------------------------------------------------------------
+describe('agent-dispatch NI-03 delegation chain', () => {
+  const savedSystemRole = process.env.SYSTEM_ROLE;
+  const savedMissionRole = process.env.MISSION_ROLE;
+
+  afterEach(() => {
+    if (savedSystemRole === undefined) delete process.env.SYSTEM_ROLE;
+    else process.env.SYSTEM_ROLE = savedSystemRole;
+    if (savedMissionRole === undefined) delete process.env.MISSION_ROLE;
+    else process.env.MISSION_ROLE = savedMissionRole;
+  });
+
+  function makeIncomingChain() {
+    // What the mission worker originates at dispatch (NI-03): orchestrator
+    // root (unrestricted) → worker (its KD-05 tier).
+    return [
+      {
+        actor: 'kyberion://agent/ni03-org/mission-orchestrator',
+        team_role: 'orchestrator',
+        granted_scope: {},
+        granted_at: '2026-07-26T00:00:00.000Z',
+      },
+      {
+        actor: 'kyberion://agent/ni03-org/worker-a',
+        team_role: 'implementer',
+        granted_scope: { capability_tier: 'implementer' as const },
+        granted_at: '2026-07-26T00:00:01.000Z',
+      },
+    ];
+  }
+
+  it('2-hop delegation: appends the sub-worker link, giving a 3-link root-first chain in the sub-worker dispatch', async () => {
+    const { embedDelegationChainInContext, extractDelegationChainFromContext } =
+      await import('./delegation-chain.js');
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+
+    const incoming = makeIncomingChain();
+    const context = embedDelegationChainInContext('worker task context', incoming);
+    await wrapped.delegateTask('investigate the failure', context, {
+      role: 'reviewer',
+      profile: 'explorer',
+    });
+
+    expect(backend.delegateTask).toHaveBeenCalledTimes(1);
+    const receivedContext = backend.delegateTask.mock.calls[0][1] as string;
+    const extracted = extractDelegationChainFromContext(receivedContext);
+    expect(extracted.contextWithoutChain).toBe('worker task context');
+    expect(extracted.chain).toHaveLength(3);
+    // Root-first: orchestrator → worker → sub-worker.
+    expect(extracted.chain![0].actor).toBe('kyberion://agent/ni03-org/mission-orchestrator');
+    expect(extracted.chain![1].actor).toBe('kyberion://agent/ni03-org/worker-a');
+    expect(extracted.chain![2]).toMatchObject({
+      actor: 'subagent:process-spawn:explorer',
+      team_role: 'reviewer',
+      granted_scope: { capability_tier: 'explorer' },
+    });
+  });
+
+  it('fail-closed attenuation: a sub-worker tier above its parent throws typed and never dispatches', async () => {
+    const { DelegationAttenuationError, embedDelegationChainInContext } =
+      await import('./delegation-chain.js');
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+
+    // Parent (worker) holds the read-only explorer tier...
+    const incoming = makeIncomingChain();
+    incoming[1].granted_scope = { capability_tier: 'explorer' as const };
+    const context = embedDelegationChainInContext('ctx', incoming);
+
+    // ...and the delegation requests the (default) implementer tier.
+    await expect(wrapped.delegateTask('write files', context)).rejects.toThrow(
+      DelegationAttenuationError
+    );
+    expect(backend.delegateTask).not.toHaveBeenCalled();
+  });
+
+  it('a malformed embedded chain block also fails closed before dispatch', async () => {
+    const { DelegationAttenuationError } = await import('./delegation-chain.js');
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+
+    await expect(
+      wrapped.delegateTask('task', 'ctx\n<delegation-chain>{broken</delegation-chain>')
+    ).rejects.toThrow(DelegationAttenuationError);
+    expect(backend.delegateTask).not.toHaveBeenCalled();
+  });
+
+  it('no incoming chain: originates a single-link root chain from the current actor (best-effort env resolution)', async () => {
+    const { extractDelegationChainFromContext } = await import('./delegation-chain.js');
+    process.env.SYSTEM_ROLE = 'Mission Controller';
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+
+    await wrapped.delegateTask('task', 'plain context');
+
+    const receivedContext = backend.delegateTask.mock.calls[0][1] as string;
+    const extracted = extractDelegationChainFromContext(receivedContext);
+    expect(extracted.contextWithoutChain).toBe('plain context');
+    expect(extracted.chain).toHaveLength(1);
+    // 'Mission Controller' slugifies to mission-controller and derives an nhi id.
+    expect(extracted.chain![0].actor).toMatch(
+      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/mission-controller$/
+    );
+    expect(extracted.chain![0].granted_scope).toEqual({});
   });
 });
