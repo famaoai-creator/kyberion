@@ -14,8 +14,9 @@ import {
   loadActuatorManifestCatalog,
   installReasoningBackends,
   renderStatus,
+  t as coreT,
 } from '@agent/core';
-import type { SupportedLocale } from '@agent/core';
+import type { SupportedLocale, VocabularyKey } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
   executeEmailDelivery,
@@ -163,12 +164,6 @@ interface WebAppProfileIndexRecord {
 
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
-const vocabularyPath = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-
-type VocabularyCatalog = {
-  default_locale: string;
-  domains?: Record<string, Record<string, Record<string, string>>>;
-};
 
 /**
  * @deprecated Thin wrapper over `@agent/core`'s `resolveLocale`. `--locale`
@@ -207,22 +202,14 @@ export function stripNpmSeparatorArg(args: string[]): string[] {
   return args.filter((arg) => arg !== '--');
 }
 
-function loadVocabularyCatalog(): VocabularyCatalog | null {
-  if (!safeExistsSync(vocabularyPath)) {
-    return null;
-  }
-  try {
-    return readJsonFile<VocabularyCatalog>(vocabularyPath);
-  } catch {
-    return null;
-  }
-}
-
-function t(key: string, locale = resolveLocale()): string {
-  const catalog = loadVocabularyCatalog();
-  const entry = catalog?.domains?.ux?.[key];
-  if (!entry) return key;
-  return entry[locale] || entry[catalog?.default_locale || 'en'] || key;
+/**
+ * I18N-02: thin wrapper delegating to `@agent/core`'s type-safe `t()`. Kept
+ * as a local `(key, locale)` shim rather than calling `coreT` directly at
+ * every one of this file's ~90 call sites, since those all pass a bare
+ * (unqualified) key with no `params` argument.
+ */
+function t(key: VocabularyKey, locale = resolveLocale()): string {
+  return coreT(key, undefined, locale);
 }
 
 export function normalizeActuators(index: {

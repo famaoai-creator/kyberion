@@ -3,18 +3,29 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
 
 /**
- * UX-03 Task 3: operator-facing onboarding strings carry en/ja pairs.
- * A plain string is treated as English (backward compatibility with
- * pre-localization catalogs).
+ * UX-03 Task 3 / I18N-02: operator-facing onboarding strings carry
+ * per-locale text. A plain string is treated as English (backward
+ * compatibility with pre-localization catalogs).
+ *
+ * This is keyed by {@link SupportedLocale} (data-driven from the vocabulary
+ * catalog's `required_locales`), not a hand-written `{ en, ja }` shape — a
+ * hardcoded two-locale object type would need editing at every one of this
+ * catalog's entries whenever a locale is added, exactly the failure mode
+ * I18N-02 removes for the `'ja' | 'en'` literal unions elsewhere.
  */
-export type LocalizedOnboardingText = string | { en: string; ja?: string };
+export type LocalizedOnboardingText = string | Partial<Record<SupportedLocale, string>>;
 
 export function resolveOnboardingText(value: LocalizedOnboardingText, locale: string): string {
   if (typeof value === 'string') return value;
-  if (locale === 'ja' && value.ja) return value.ja;
-  return value.en;
+  const normalized = normalizeLocale(locale);
+  if (normalized && value[normalized]) return value[normalized] as string;
+  const firstDefined = Object.values(value).find(
+    (text): text is string => typeof text === 'string'
+  );
+  return firstDefined ?? '';
 }
 
 export interface OnboardingFlowPolicyCatalog {

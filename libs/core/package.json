@@ -918,6 +918,22 @@
     "./format": {
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
+    },
+    "./message-format": {
+      "types": "./dist/message-format.d.ts",
+      "default": "./dist/message-format.js"
+    },
+    "./t": {
+      "types": "./dist/t.d.ts",
+      "default": "./dist/t.js"
+    },
+    "./vocabulary-catalog": {
+      "types": "./dist/vocabulary-catalog.d.ts",
+      "default": "./dist/vocabulary-catalog.js"
+    },
+    "./vocabulary-keys.generated": {
+      "types": "./dist/vocabulary-keys.generated.d.ts",
+      "default": "./dist/vocabulary-keys.generated.js"
     }
   },
   "dependencies": {
