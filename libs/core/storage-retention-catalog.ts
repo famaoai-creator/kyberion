@@ -38,11 +38,35 @@ export const RETENTION_ARTIFACT_CLASSES = [
   'cache',
   'tmp',
   'log',
+  /**
+   * AL-04: load-bearing runtime state (registries, locks, sessions, oauth
+   * tokens, service bindings, …). State directories are declared so coverage
+   * is complete, but they are never TTL-deleted — pair with
+   * `action: 'review_required'`.
+   */
+  'state',
 ] as const;
 export type RetentionArtifactClass = (typeof RETENTION_ARTIFACT_CLASSES)[number];
 
-export const RETENTION_ACTIONS = ['delete', 'archive'] as const;
+export const RETENTION_ACTIONS = [
+  'delete',
+  'archive',
+  /**
+   * AL-04: no automatic deletion — the directory is declared (so it never
+   * shows up as uncovered) and surfaced in the janitor report for a human
+   * retention decision. The janitor MUST NOT delete anything under it.
+   */
+  'review_required',
+] as const;
 export type RetentionAction = (typeof RETENTION_ACTIONS)[number];
+
+/**
+ * AL-04: shared audit JSONL (under `active/shared/logs/audit/`) for retention
+ * deletions, soft-deletes, trash purges, mission runtime-residue GC, and
+ * tenant/project offboarding steps. Sibling of AL-03's
+ * `mission-closure.jsonl` / `mission-purge.jsonl`.
+ */
+export const STORAGE_RETENTION_AUDIT_FILENAME = 'storage-retention.jsonl';
 
 export interface RetentionCatalogEntry {
   /** Repo-relative directory (POSIX separators, no leading/trailing slash). */
@@ -56,6 +80,12 @@ export interface RetentionCatalogEntry {
   action: RetentionAction;
   /** When true, expiry actions should leave an audit record. */
   audit?: boolean;
+  /**
+   * AL-04 soft-delete grace: instead of unlinking, the janitor moves expired
+   * files to `active/archive/.trash/<original-repo-relative-path>` and purges
+   * them from the trash only after this many further days.
+   */
+  soft_delete_days?: number;
   note?: string;
 }
 
@@ -151,6 +181,15 @@ function validateEntry(raw: unknown, index: number): string | null {
   }
   if (entry.audit !== undefined && typeof entry.audit !== 'boolean') {
     return `entries[${index}] (${String(entry.path)}): "audit" must be a boolean`;
+  }
+  if (entry.soft_delete_days !== undefined) {
+    if (
+      typeof entry.soft_delete_days !== 'number' ||
+      !Number.isFinite(entry.soft_delete_days) ||
+      entry.soft_delete_days <= 0
+    ) {
+      return `entries[${index}] (${String(entry.path)}): "soft_delete_days" must be a positive number`;
+    }
   }
   if (entry.note !== undefined && typeof entry.note !== 'string') {
     return `entries[${index}] (${String(entry.path)}): "note" must be a string`;
@@ -248,17 +287,62 @@ const RUNTIME_PREFIX = 'active/shared/runtime/';
 /**
  * TTL rules for `active/shared/runtime/<subdir>` derived from the catalog —
  * the catalog-driven successor of the janitor's former `RUNTIME_RETENTION`
- * constant. Only entries with a `ttl_days` participate.
+ * constant. Only entries with a `ttl_days` participate; `review_required`
+ * entries NEVER become scan rules (AL-04), even if a ttl_days slipped in.
  */
 export function runtimeRetentionRules(
   catalog: LoadedRetentionCatalog
-): Array<{ subdir: string; ttlMs: number }> {
+): Array<{ subdir: string; ttlMs: number; entry: RetentionCatalogEntry }> {
   return catalog.entries
-    .filter((e) => e.path.startsWith(RUNTIME_PREFIX) && e.ttl_days !== undefined)
+    .filter(
+      (e) =>
+        e.path.startsWith(RUNTIME_PREFIX) &&
+        e.ttl_days !== undefined &&
+        e.action !== 'review_required'
+    )
     .map((e) => ({
       subdir: e.path.slice(RUNTIME_PREFIX.length),
       ttlMs: (e.ttl_days as number) * RETENTION_DAY_MS,
+      entry: e,
     }));
+}
+
+/** Exact-path catalog entry lookup (repo-relative directory). */
+export function retentionEntryForExactPath(
+  catalog: LoadedRetentionCatalog,
+  repoRelativeDir: string
+): RetentionCatalogEntry | null {
+  return catalog.entries.find((e) => e.path === repoRelativeDir) ?? null;
+}
+
+/**
+ * Longest-prefix catalog entry covering a repo-relative file or directory
+ * path (exact match or an ancestor directory). Used by the janitor's trash
+ * sweep to recover the governing `soft_delete_days` for a trashed file, and
+ * by any caller that needs "which retention rule owns this path".
+ */
+export function retentionEntryForPath(
+  catalog: LoadedRetentionCatalog,
+  repoRelativePath: string
+): RetentionCatalogEntry | null {
+  let best: RetentionCatalogEntry | null = null;
+  for (const entry of catalog.entries) {
+    if (repoRelativePath === entry.path || repoRelativePath.startsWith(entry.path + '/')) {
+      if (!best || entry.path.length > best.path.length) best = entry;
+    }
+  }
+  return best;
+}
+
+/**
+ * Repo-relative paths declared `review_required` (AL-04): covered for
+ * reporting purposes, never deleted, surfaced for a human retention decision.
+ */
+export function reviewRequiredCatalogPaths(catalog: LoadedRetentionCatalog): string[] {
+  return catalog.entries
+    .filter((e) => e.action === 'review_required')
+    .map((e) => e.path)
+    .sort();
 }
 
 /**

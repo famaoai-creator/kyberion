@@ -70,14 +70,17 @@ describe('storage-retention-catalog', () => {
       expect(loaded.source).toBe('catalog');
       expect(loaded.warnings).toEqual([]);
 
-      // TTLs must match the former in-code constants 1:1.
+      // TTLs must match the former in-code constants 1:1. AL-04 added further
+      // runtime entries around them, so the seed values are asserted by lookup
+      // rather than by whole-list equality.
       expect(retentionTtlMsForPath(loaded, 'active/shared/tmp')).toBe(24 * 60 * 60 * 1000);
       expect(retentionTtlDaysForPath(loaded, 'active/shared/logs')).toBe(30);
-      expect(runtimeRetentionRules(loaded)).toEqual([
-        { subdir: 'browser-receipts', ttlMs: 90 * RETENTION_DAY_MS },
-        { subdir: 'procedure-deltas', ttlMs: 14 * RETENTION_DAY_MS },
-        { subdir: 'a2a-conversations', ttlMs: 30 * RETENTION_DAY_MS },
-      ]);
+      const ttlBySubdir = new Map(
+        runtimeRetentionRules(loaded).map((rule) => [rule.subdir, rule.ttlMs])
+      );
+      expect(ttlBySubdir.get('browser-receipts')).toBe(90 * RETENTION_DAY_MS);
+      expect(ttlBySubdir.get('procedure-deltas')).toBe(14 * RETENTION_DAY_MS);
+      expect(ttlBySubdir.get('a2a-conversations')).toBe(30 * RETENTION_DAY_MS);
       // data-vault is a note-only (self-expiring) entry: declared but no TTL.
       const vault = loaded.entries.find((e) => e.path === 'active/shared/data-vault');
       expect(vault).toBeDefined();
@@ -192,9 +195,9 @@ describe('storage-retention-catalog', () => {
       expect(retentionTtlDaysForPath(loaded, 'active/shared/logs')).toBe(7);
       expect(retentionTtlMsForPath(loaded, 'active/shared/never-declared')).toBeNull();
       // Only TTL'd runtime entries become scan rules.
-      expect(runtimeRetentionRules(loaded)).toEqual([
-        { subdir: 'custom-cache', ttlMs: 2 * RETENTION_DAY_MS },
-      ]);
+      expect(runtimeRetentionRules(loaded).map(({ subdir, ttlMs }) => ({ subdir, ttlMs }))).toEqual(
+        [{ subdir: 'custom-cache', ttlMs: 2 * RETENTION_DAY_MS }]
+      );
       // Coverage reporting counts top-level runtime subdirs with or without TTL.
       expect([...coveredRuntimeSubdirs(loaded)].sort()).toEqual(['custom-cache', 'receipts']);
     });

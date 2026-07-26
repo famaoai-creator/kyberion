@@ -19,6 +19,15 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data);
     },
+    // AL-04: soft-delete moves + deletion audit appends.
+    safeAppendFileSync: (p: string, data: string) => {
+      actual.mkdirSync(path.dirname(p), { recursive: true });
+      actual.appendFileSync(p, data);
+    },
+    safeMoveSync: (src: string, dest: string) => {
+      actual.mkdirSync(path.dirname(dest), { recursive: true });
+      actual.renameSync(src, dest);
+    },
   };
 });
 
@@ -33,7 +42,11 @@ vi.mock('./path-resolver.js', () => ({
     const base = path.dirname(tmpDir); // active/shared
     return path.join(base, sub);
   },
-  rootDir: () => path.dirname(path.dirname(tmpDir)),
+  sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
+  // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
+  // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
+  // resolve exactly as they do in the real tree.
+  rootDir: () => testRootDir(),
 }));
 
 vi.mock('./core.js', () => ({
@@ -45,14 +58,23 @@ import {
   rotateLogs,
   scanRuntime,
   sweepDelegationChildren,
+  sweepTrash,
+  restoreFromTrash,
+  listReviewRequiredDirs,
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
   listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
+  DEFAULT_TRASH_GRACE_DAYS,
+  TRASH_REPO_SUBPATH,
   type DelegationChildRecord,
 } from './storage-janitor.js';
-import { RETENTION_CATALOG_REPO_PATH, RETENTION_DAY_MS } from './storage-retention-catalog.js';
+import {
+  RETENTION_CATALOG_REPO_PATH,
+  RETENTION_DAY_MS,
+  STORAGE_RETENTION_AUDIT_FILENAME,
+} from './storage-retention-catalog.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -64,14 +86,40 @@ function setMtime(filePath: string, msAgo: number): void {
   fs.utimesSync(filePath, t, t);
 }
 
+/** Repo root of the temp fixture — tmpDir is `<root>/active/shared/tmp`. */
+function testRootDir(): string {
+  return path.dirname(path.dirname(path.dirname(tmpDir)));
+}
+
 /**
  * AL-01: default catalog location under the mocked rootDir (see the
- * path-resolver mock above — rootDir() is dirname(dirname(tmpDir))).
- * The base tests never write this file, so they exercise the
- * builtin-defaults fallback — which mirrors the former constants exactly.
+ * path-resolver mock above). The base tests never write this file, so they
+ * exercise the builtin-defaults fallback — which mirrors the former
+ * constants exactly.
  */
 function catalogFilePath(): string {
-  return path.join(path.dirname(path.dirname(tmpDir)), ...RETENTION_CATALOG_REPO_PATH.split('/'));
+  return path.join(testRootDir(), ...RETENTION_CATALOG_REPO_PATH.split('/'));
+}
+
+/** AL-04: absolute path of a repo-relative path inside the trash tree. */
+function trashPathOf(repoRelative: string): string {
+  return path.join(testRootDir(), ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
+}
+
+/** AL-04: parsed deletion-audit records written this test. */
+function readRetentionAudit(): Array<Record<string, any>> {
+  const auditPath = path.join(
+    path.dirname(tmpDir),
+    'logs',
+    'audit',
+    STORAGE_RETENTION_AUDIT_FILENAME
+  );
+  if (!fs.existsSync(auditPath)) return [];
+  return fs
+    .readFileSync(auditPath, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 function writeCatalogFile(content: unknown): void {
@@ -92,8 +140,7 @@ describe('storage-janitor', () => {
   });
 
   afterEach(() => {
-    const base = path.dirname(path.dirname(tmpDir));
-    fs.rmSync(base, { recursive: true, force: true });
+    fs.rmSync(testRootDir(), { recursive: true, force: true });
   });
 
   describe('scanTmp', () => {
@@ -426,11 +473,218 @@ describe('storage-janitor', () => {
     });
   });
 
+  /** AL-04: deletion audit, soft-delete grace + restore, review_required. */
+  describe('soft-delete, trash sweep and review_required (AL-04)', () => {
+    function writeAl04Catalog(): void {
+      writeCatalogFile({
+        version: '1.1.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/reports',
+            artifact_class: 'report',
+            ttl_days: 90,
+            action: 'delete',
+            audit: true,
+            soft_delete_days: 14,
+          },
+          {
+            path: 'active/shared/runtime/cache-hard',
+            artifact_class: 'cache',
+            ttl_days: 1,
+            action: 'delete',
+            audit: true,
+          },
+          {
+            path: 'active/shared/runtime/locks',
+            artifact_class: 'state',
+            action: 'review_required',
+            note: 'load-bearing state — never auto-deleted',
+          },
+          { path: 'active/archive/.trash', artifact_class: 'tmp', action: 'delete' },
+        ],
+      });
+    }
+
+    it('moves an expired file to the trash instead of unlinking it and audits the move', () => {
+      writeAl04Catalog();
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      const expiredReport = path.join(runtimeRoot, 'reports', 'janitor-2026-01-01.json');
+      writeFile(expiredReport);
+      setMtime(expiredReport, 100 * RETENTION_DAY_MS);
+
+      const result = scanRuntime({ dryRun: false });
+      expect(result.softDeleted).toContain(expiredReport);
+      expect(result.deleted).not.toContain(expiredReport);
+      expect(fs.existsSync(expiredReport)).toBe(false);
+
+      const repoRelative = 'active/shared/runtime/reports/janitor-2026-01-01.json';
+      expect(fs.existsSync(trashPathOf(repoRelative))).toBe(true);
+
+      const audit = readRetentionAudit();
+      const record = audit.find((entry) => entry.event === 'RETENTION_SOFT_DELETE');
+      expect(record).toMatchObject({
+        path: repoRelative,
+        trash_path: `${TRASH_REPO_SUBPATH}/${repoRelative}`,
+        soft_delete_days: 14,
+        artifact_class: 'report',
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+      });
+      expect(typeof record?.reason).toBe('string');
+    });
+
+    it('hard-deletes (and audits) when the covering entry declares no grace', () => {
+      writeAl04Catalog();
+      const stale = path.join(path.dirname(tmpDir), 'runtime', 'cache-hard', 'blob.bin');
+      writeFile(stale);
+      setMtime(stale, 3 * RETENTION_DAY_MS);
+
+      const result = scanRuntime({ dryRun: false });
+      expect(result.deleted).toContain(stale);
+      expect(result.softDeleted).toHaveLength(0);
+      expect(fs.existsSync(stale)).toBe(false);
+      expect(fs.existsSync(trashPathOf('active/shared/runtime/cache-hard/blob.bin'))).toBe(false);
+      expect(readRetentionAudit().map((entry) => entry.event)).toContain('RETENTION_DELETE');
+    });
+
+    it('restores a soft-deleted file to its original location within the grace period', () => {
+      writeAl04Catalog();
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      const expiredReport = path.join(runtimeRoot, 'reports', 'recoverable.json');
+      writeFile(expiredReport, 'important');
+      setMtime(expiredReport, 100 * RETENTION_DAY_MS);
+      scanRuntime({ dryRun: false });
+      expect(fs.existsSync(expiredReport)).toBe(false);
+
+      const repoRelative = 'active/shared/runtime/reports/recoverable.json';
+      const restored = restoreFromTrash(repoRelative);
+      expect(restored.restored).toBe(true);
+      expect(fs.readFileSync(expiredReport, 'utf8')).toBe('important');
+      expect(fs.existsSync(trashPathOf(repoRelative))).toBe(false);
+      expect(readRetentionAudit().map((entry) => entry.event)).toContain('RETENTION_RESTORED');
+
+      // Restoring again is a structured no-op, never an error.
+      expect(restoreFromTrash(repoRelative).restored).toBe(false);
+    });
+
+    it('purges trash only after the covering entry grace, then audits the purge', () => {
+      writeAl04Catalog();
+      const repoRelative = 'active/shared/runtime/reports/aged.json';
+      const fresh = trashPathOf(repoRelative);
+      writeFile(fresh);
+      setMtime(fresh, 10 * RETENTION_DAY_MS); // < 14d grace
+
+      expect(sweepTrash({ dryRun: false }).purged).toHaveLength(0);
+      expect(fs.existsSync(fresh)).toBe(true);
+
+      setMtime(fresh, 20 * RETENTION_DAY_MS); // > 14d grace
+      const swept = sweepTrash({ dryRun: false });
+      expect(swept.purged).toContain(fresh);
+      expect(fs.existsSync(fresh)).toBe(false);
+      const purgeAudit = readRetentionAudit().find(
+        (entry) => entry.event === 'RETENTION_TRASH_PURGED'
+      );
+      expect(purgeAudit).toMatchObject({ original_path: repoRelative, soft_delete_days: 14 });
+    });
+
+    it('counts the grace from the trash time, not the mtime a move preserves', () => {
+      writeAl04Catalog();
+      const expiredReport = path.join(path.dirname(tmpDir), 'runtime', 'reports', 'just-aged.json');
+      writeFile(expiredReport);
+      setMtime(expiredReport, 400 * RETENTION_DAY_MS); // far past every grace
+
+      scanRuntime({ dryRun: false });
+      const repoRelative = 'active/shared/runtime/reports/just-aged.json';
+      expect(fs.existsSync(trashPathOf(repoRelative))).toBe(true);
+
+      // The sweep right behind the soft-delete must NOT purge it: the file
+      // entered the trash now, however old its content is.
+      const swept = sweepTrash({ dryRun: false });
+      expect(swept.expired).toHaveLength(0);
+      expect(swept.purged).toHaveLength(0);
+      expect(fs.existsSync(trashPathOf(repoRelative))).toBe(true);
+      expect(restoreFromTrash(repoRelative).restored).toBe(true);
+    });
+
+    it('falls back to the default grace for a trashed path with no covering entry', () => {
+      writeAl04Catalog();
+      const orphan = trashPathOf('active/shared/runtime/gone-dir/orphan.json');
+      writeFile(orphan);
+      setMtime(orphan, (DEFAULT_TRASH_GRACE_DAYS - 1) * RETENTION_DAY_MS);
+      expect(sweepTrash({ dryRun: true }).expired).toHaveLength(0);
+
+      setMtime(orphan, (DEFAULT_TRASH_GRACE_DAYS + 1) * RETENTION_DAY_MS);
+      expect(sweepTrash({ dryRun: true }).expired).toContain(orphan);
+      expect(fs.existsSync(orphan)).toBe(true); // dry run never purges
+    });
+
+    it('never deletes a review_required directory and surfaces it in the report', () => {
+      writeAl04Catalog();
+      const lock = path.join(path.dirname(tmpDir), 'runtime', 'locks', 'resource.lock');
+      writeFile(lock);
+      setMtime(lock, 400 * RETENTION_DAY_MS);
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.reviewRequiredDirs).toContain('active/shared/runtime/locks');
+      // Declared → not reported as uncovered, and never deleted.
+      expect(report.uncoveredRuntimeDirs).not.toContain('active/shared/runtime/locks');
+      expect(fs.existsSync(lock)).toBe(true);
+    });
+
+    it('review_required is honored even when the entry carries a ttl_days', () => {
+      writeCatalogFile({
+        version: '1.1.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/oauth',
+            artifact_class: 'state',
+            ttl_days: 1,
+            action: 'review_required',
+          },
+        ],
+      });
+      const token = path.join(path.dirname(tmpDir), 'runtime', 'oauth', 'token.json');
+      writeFile(token);
+      setMtime(token, 30 * RETENTION_DAY_MS);
+
+      const result = scanRuntime({ dryRun: false });
+      expect(result.expired).toHaveLength(0);
+      expect(fs.existsSync(token)).toBe(true);
+    });
+
+    it('runJanitor counts soft-deletes and trash outcomes in its report', () => {
+      writeAl04Catalog();
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      const expiredReport = path.join(runtimeRoot, 'reports', 'counted.json');
+      writeFile(expiredReport);
+      setMtime(expiredReport, 100 * RETENTION_DAY_MS);
+      const agedTrash = trashPathOf('active/shared/runtime/reports/already-trashed.json');
+      writeFile(agedTrash);
+      setMtime(agedTrash, 40 * RETENTION_DAY_MS);
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.softDeleted).toBe(1);
+      expect(report.expiredTrash).toBe(1);
+      expect(report.purgedTrash).toBe(1);
+      expect(report.errors).toEqual([]);
+    });
+
+    it('listReviewRequiredDirs reports only declared directories that exist on disk', () => {
+      writeAl04Catalog();
+      writeFile(path.join(path.dirname(tmpDir), 'runtime', 'locks', 'a.lock'));
+      const declared = listReviewRequiredDirs();
+      expect(declared).toEqual(['active/shared/runtime/locks']);
+    });
+  });
+
   describe('runJanitor', () => {
     it('returns a valid report shape', () => {
       const report = runJanitor({ dryRun: true });
       expect(report).toMatchObject({
         uncoveredRuntimeDirs: expect.any(Array),
+        reviewRequiredDirs: expect.any(Array),
+        softDeleted: expect.any(Number),
+        expiredTrash: expect.any(Number),
+        purgedTrash: expect.any(Number),
         retentionCatalogSource: 'builtin-defaults',
         retentionCatalogWarnings: expect.any(Array),
         expiredTmp: expect.any(Number),

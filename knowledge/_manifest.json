@@ -2223,7 +2223,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 2044,
+      "size": 12093,
       "type": "json"
     },
     {
@@ -7395,7 +7395,7 @@
     {
       "path": "product/schemas/storage-retention-catalog.schema.json",
       "tier": "public",
-      "size": 3195,
+      "size": 3950,
       "type": "json"
     },
     {
