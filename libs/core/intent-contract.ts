@@ -1338,8 +1338,17 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
 export interface ClarificationFormatOptions {
   /** When true, show only the first blocking question instead of the full list. Default: false */
   concise?: boolean;
-  /** Output locale. 'ja' produces Japanese-phrased output. Default: 'en' */
-  locale?: 'en' | 'ja';
+  /**
+   * Output locale. 'ja' produces Japanese-phrased output; anything else
+   * (including locales this formatter has no dedicated phrasing for, e.g.
+   * the I18N-07 pseudo-locale `qps-ploc`) falls through to the English
+   * branch below. Typed as `string`, not the narrower `SupportedLocale`,
+   * because this widened from a hardcoded `'en' | 'ja'` literal union that
+   * broke `tsc` the moment `SupportedLocale` grew a third member — the
+   * comparison logic below was always string-shaped, only the declared
+   * type was too narrow. Default: 'en'
+   */
+  locale?: string;
 }
 
 /**

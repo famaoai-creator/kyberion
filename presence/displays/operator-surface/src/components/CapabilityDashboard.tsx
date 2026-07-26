@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDateTime, resolveOperatorLocale, resolveTimeZone } from '@agent/core';
 
 interface Dependency {
   id: string;
@@ -135,7 +136,10 @@ export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboa
                     </td>
                     <td style={tdStyle}>
                       <span style={{ color: 'var(--kb-text-secondary)', fontSize: '12px' }}>
-                        {new Date(pin.pinnedAt).toLocaleString()}
+                        {formatDateTime(pin.pinnedAt, {
+                          locale: resolveOperatorLocale(),
+                          timeZone: resolveTimeZone(),
+                        })}
                       </span>
                     </td>
                   </tr>

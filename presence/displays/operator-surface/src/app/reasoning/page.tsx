@@ -1,4 +1,9 @@
-import { inspectReasoningRoutes } from '@agent/core';
+import {
+  formatDateTime,
+  inspectReasoningRoutes,
+  resolveOperatorLocale,
+  resolveTimeZone,
+} from '@agent/core';
 import { emitMosRead } from '@/lib/audit-mos';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +33,14 @@ export default async function ReasoningPage() {
                 : 'ready'
           }
         />
-        <Status label="Checked" value={new Date(report.checkedAt).toLocaleTimeString()} />
+        <Status
+          label="Checked"
+          value={formatDateTime(report.checkedAt, {
+            locale: resolveOperatorLocale(),
+            timeZone: resolveTimeZone(),
+            style: 'time',
+          })}
+        />
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>

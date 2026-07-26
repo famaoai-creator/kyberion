@@ -2670,6 +2670,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TIMEZONE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH",
       "category": "path",
       "type": "path",

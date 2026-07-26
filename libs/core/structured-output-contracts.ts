@@ -106,6 +106,14 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     thread: z.string().optional(),
     slack_channel: z.string().optional(),
     correlation_id: z.string().optional(),
+    // I18N-06: derived from the sending surface's per-message language
+    // heuristic (e.g. `parseSlackSurfacePrompt`'s content check in
+    // `surface-runtime-router.ts`), NOT from `resolveLocale()` — a user can
+    // type in a language different from their resolved operator locale.
+    // `surface-runtime-orchestrator.ts` warns (via
+    // `warnOnUserLanguageDisagreement`) when the two disagree instead of
+    // silently preferring one; this field keeps deciding downstream
+    // delegation behavior exactly as before.
     user_language: z.string().optional(),
     task_model_hint: z.record(z.string(), z.unknown()).optional(),
     model_hint: z.record(z.string(), z.unknown()).optional(),

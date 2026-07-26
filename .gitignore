@@ -63,6 +63,8 @@ libs/core/**/*.d.ts.map
 libs/core/tsconfig.tsbuildinfo
 # Workspace package build artifacts (TypeScript incremental build info)
 libs/shared-*/tsconfig.tsbuildinfo
+presence/displays/*/tsconfig.tsbuildinfo
+satellites/*/tsconfig.tsbuildinfo
 # Hand-written JS (no .ts source)
 !libs/core/finance.js
 !libs/core/mcp-client-engine.js

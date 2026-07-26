@@ -15,6 +15,9 @@ import {
   safeExistsSync,
   safeReaddir,
   renderStatus,
+  formatDateTime,
+  resolveOperatorLocale,
+  resolveTimeZone,
 } from '@agent/core';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
@@ -140,7 +143,7 @@ function drawHeader() {
   );
   console.log(chalk.dim(' --------------------------------------------------- '));
   console.log(
-    ` Status: ${status === 'OPERATIONAL' ? chalk.green(renderStatus('connection', 'connected', 'en').toUpperCase()) : chalk.yellow(renderStatus('connection', 'degraded', 'en').toUpperCase())} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${new Date().toLocaleTimeString()}\n`
+    ` Status: ${status === 'OPERATIONAL' ? chalk.green(renderStatus('connection', 'connected', 'en').toUpperCase()) : chalk.yellow(renderStatus('connection', 'degraded', 'en').toUpperCase())} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${formatDateTime(new Date(), { locale: resolveOperatorLocale(), timeZone: resolveTimeZone(), style: 'time' })}\n`
   );
 }
 
