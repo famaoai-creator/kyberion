@@ -949,10 +949,10 @@ app.get('/api/minutes/session', (_req, res) => {
 // rendered as --kb-* CSS vars. Loaded after the static design-tokens.css so
 // the canonical values win while the static file remains the fallback.
 app.get('/api/design-tokens.css', (_req, res) => {
+  // The shared derivation is now theme-aware (light themes get a faint ink
+  // tint instead of the dark-console panel), so the local --kb-panel-bg
+  // override this used to carry is no longer needed.
   const cssVars = webThemePackToCssVars(createCompanionWebThemePack());
-  // The shared derivation targets dark surfaces (panel = primary @ 0.82);
-  // the companion theme is light, so keep panels as a faint primary tint.
-  cssVars['--kb-panel-bg'] = 'rgba(19, 52, 59, 0.05)';
   const body = `:root {\n${Object.entries(cssVars)
     .map(([name, value]) => `  ${name}: ${value};`)
     .join('\n')}\n}\n`;
