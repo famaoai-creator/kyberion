@@ -624,6 +624,7 @@ export * from './orchestrator-session.js';
 // NI-01: durable NHI registry for agent identities (journal-backed, SO-02
 // pattern); AL-01 retention catalog is the storage-lifecycle counterpart.
 export * from './agent-identity.js';
+export * from './nhi-lifecycle-governance.js';
 export * from './storage-retention-catalog.js';
 export * from './surface-steering-authority.js';
 export * from './adf-guardrails.js';

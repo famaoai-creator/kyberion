@@ -45,6 +45,11 @@ const allowedCoreFsImports = [
   'libs/core/mission-maintenance.purge.test.ts',
   // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission-artifact-closure.test.ts',
+  // AL-04 / NI-05 hermetic tests: raw fs to seed/inspect a temp repo root
+  // (scope trees, trash, identity ledger) — secure-io is the module under
+  // test's own seam, so the fixtures must bypass it.
+  'libs/core/scope-offboarding.test.ts',
+  'libs/core/nhi-lifecycle-governance.test.ts',
   'libs/core/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',

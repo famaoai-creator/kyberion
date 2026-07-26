@@ -104,6 +104,22 @@ A durable, journaled binding between a conversation thread (`surface`/`channel`/
 
 A conversation thread (Slack / Telegram / Discord / iMessage / terminal / web) that has been promoted, via an active OrchestratorSession, to mission-owner authority equal to a CLI orchestrator process — able to steer mission lifecycle verbs (checkpoint, gate approval, pause/resume, finish) through the same governed SO-01 facade the CLI uses. This authority is never projected into worker/provider delegations spawned from that process (KD-05 capability tiers, XP-02 env minimization) — see [SO-03 in SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md).
 
+### NHI (Non-Human Identity)
+
+An agent or service acting in the system as a first-class, durable identity rather than an ad-hoc string. Kyberion's canonical record is `AgentIdentityRecord` (NI-01, `libs/core/agent-identity.ts`): a journal-backed `nhi_id` (`kyberion://agent/<org>/<slug>`) with an accountable human owner, a scope affiliation (organization / project / mission / task), and a lifecycle state. The older representations — in-memory `agentId`, role strings, persona, `peer_id`, `resource_id`, provider — are attributes or projections of this record, never identities of their own (provider and model are hints, per AO-05). Retirement is terminal and enforced at use time: with `KYBERION_NHI_ACTOR=enforce`, a retired identity's claims and dispatches are refused. See [NHI_IDENTITY_MAPPING](./developer/NHI_IDENTITY_MAPPING.md).
+
+### Delegation chain
+
+The ordered record of who acted on whose behalf across a delegation (NI-03, `libs/core/delegation-chain.ts`): `user:<id> → orchestrator → worker → sub-worker`, one element appended per hop, each carrying the scope granted at that hop. Attenuation is fail-closed — a child's `granted_scope` may never exceed its parent's — and the chain is stamped into the execution ledger, traces and audit chain so a full chain can be reconstructed from audit alone. Same shape as RFC 8693's nested `act` claim.
+
+### Task-scoped grant
+
+A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `libs/core/task-scoped-grants.ts`): `{grantee_nhi_id, scope, audience: {mission_id, task_id?}, expires_at}`. It is served only inside its declared mission/task, expires within 24h at the latest, and is revoked when the task finishes — so least privilege comes from grants that die, not from standing permissions. The internal analogue of RFC 8707 audience restriction.
+
+### NHI offboarding
+
+Retiring the identities that belonged to a scope when that scope closes (NI-05, `libs/core/nhi-lifecycle-governance.ts`): mission finish/archive retires the mission's identities, tenant/project offboarding retires theirs. The inverse check — a non-retired identity whose scope no longer exists — is an _orphan NHI_, surfaced by baseline-check (layer L9 → `needs_attention`) and in the operator packet's NHI ledger. OWASP ranks improper offboarding as the #1 non-human identity risk, which is why this is a lifecycle hook rather than a periodic cleanup.
+
 ## Lifecycle terms
 
 ### Onboarding

@@ -32,6 +32,7 @@
     "libs/core/mission-phase-exit-gates.test.ts",
     "libs/core/mission-retrospective.test.ts",
     "libs/core/mission-seal.test.ts",
+    "libs/core/nhi-lifecycle-governance.test.ts",
     "libs/core/operator-home-summary.test.ts",
     "libs/core/operator-notifications.test.ts",
     "libs/core/output-artifacts.test.ts",
