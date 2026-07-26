@@ -6,7 +6,7 @@ import { findLatestMissionHandoff, type MissionAssetCategory } from '../lib/miss
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { TraceViewer } from './TraceViewer';
 
@@ -265,7 +265,7 @@ function formatBytes(sizeBytes: number): string {
 
 function formatTimestamp(value: string): string {
   try {
-    return new Date(value).toLocaleString();
+    return new Date(value).toLocaleString(chronosSpeechLocale());
   } catch {
     return value;
   }
@@ -1392,7 +1392,7 @@ export function FocusedOperatorView({
                     {message.surface} · {message.channel}
                   </div>
                   <div className="text-[9px] text-white/35">
-                    {new Date(message.created_at).toLocaleString()}
+                    {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
                 <div className="mt-2 text-sm text-white/82">{message.text}</div>

@@ -15,7 +15,7 @@ import {
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
 interface MissionSummary {
@@ -924,7 +924,7 @@ function ActionDetailList({
             {detail.why && <div className="mt-1 text-[10px] text-white/60">{detail.why}</div>}
             {detail.error && <div className="mt-1 text-[10px] text-red-200/70">{detail.error}</div>}
             <div className="mt-1 text-[9px] font-mono text-white/25">
-              {new Date(detail.ts).toLocaleString()}
+              {new Date(detail.ts).toLocaleString(chronosSpeechLocale())}
             </div>
           </div>
         ))
@@ -2544,7 +2544,10 @@ export function MissionIntelligence({
                   {typeof data.company.financial.latestGrossProfitJpy === 'number' ? (
                     <>
                       <span className="mx-2 text-white/35">·</span>
-                      gross profit ¥{data.company.financial.latestGrossProfitJpy.toLocaleString()}
+                      gross profit ¥
+                      {data.company.financial.latestGrossProfitJpy.toLocaleString(
+                        chronosSpeechLocale()
+                      )}
                     </>
                   ) : null}
                 </>
@@ -2761,7 +2764,7 @@ export function MissionIntelligence({
                     <div className="sm:col-span-2">
                       updated:{' '}
                       <span className="font-mono text-white/78">
-                        {new Date(item.updated_at).toLocaleString()}
+                        {new Date(item.updated_at).toLocaleString(chronosSpeechLocale())}
                       </span>
                     </div>
                   </div>
@@ -3413,7 +3416,9 @@ export function MissionIntelligence({
                         <span>count {flow.count}</span>
                         {flow.channel && <span>channel {flow.channel}</span>}
                         {flow.thread && <span>thread {flow.thread}</span>}
-                        <span>{new Date(flow.latestAt).toLocaleTimeString()}</span>
+                        <span>
+                          {new Date(flow.latestAt).toLocaleTimeString(chronosSpeechLocale())}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -3538,7 +3543,7 @@ export function MissionIntelligence({
                       {message.surface} · {message.source} · {message.channel}
                     </div>
                     <div className="text-[9px] font-mono text-white/30">
-                      {new Date(message.created_at).toLocaleString()}
+                      {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
                   <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/28">
@@ -4771,7 +4776,7 @@ export function MissionIntelligence({
                     <div className="mt-2 text-[10px] text-red-200/70">{action.error}</div>
                   )}
                   <div className="mt-2 text-[9px] font-mono text-white/25">
-                    {new Date(action.ts).toLocaleString()}
+                    {new Date(action.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
               ))
@@ -4801,7 +4806,7 @@ export function MissionIntelligence({
                   </div>
                   {event.why && <div className="mt-1 text-[10px] text-white/45">{event.why}</div>}
                   <div className="mt-1 text-[9px] font-mono text-white/25">
-                    {new Date(event.ts).toLocaleString()}
+                    {new Date(event.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
               ))
@@ -4825,7 +4830,7 @@ export function MissionIntelligence({
                       {summary.mission_id}
                     </div>
                     <div className="text-[9px] font-mono text-white/30">
-                      {new Date(summary.ts).toLocaleString()}
+                      {new Date(summary.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/60">
@@ -4920,14 +4925,16 @@ export function MissionIntelligence({
                     <div>
                       updated:{' '}
                       <span className="font-mono text-white/80">
-                        {new Date(session.updated_at).toLocaleTimeString()}
+                        {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
                       </span>
                     </div>
                     <div>
                       lease expires:{' '}
                       <span className="font-mono text-white/80">
                         {session.lease_expires_at
-                          ? new Date(session.lease_expires_at).toLocaleTimeString()
+                          ? new Date(session.lease_expires_at).toLocaleTimeString(
+                              chronosSpeechLocale()
+                            )
                           : 'n/a'}
                       </span>
                     </div>
@@ -4986,7 +4993,7 @@ export function MissionIntelligence({
                               {action.kind} · {action.op}
                             </div>
                             <div className="text-[9px] font-mono text-white/30">
-                              {new Date(action.ts).toLocaleTimeString()}
+                              {new Date(action.ts).toLocaleTimeString(chronosSpeechLocale())}
                             </div>
                           </div>
                           <div className="mt-1 text-[10px] text-white/45">
@@ -5112,7 +5119,7 @@ export function MissionIntelligence({
                     <div>
                       updated:{' '}
                       <span className="font-mono text-white/80">
-                        {new Date(session.updated_at).toLocaleTimeString()}
+                        {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
                       </span>
                     </div>
                   </div>
@@ -5517,7 +5524,7 @@ export function MissionIntelligence({
                       <div className="text-[10px] text-white/35">{message.missionId}</div>
                     )}
                     <div className="ml-auto text-[9px] font-mono text-white/30">
-                      {new Date(message.ts).toLocaleString()}
+                      {new Date(message.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
                   <div className="mt-2 text-[11px] leading-6 text-white/82">{message.content}</div>
@@ -5600,7 +5607,7 @@ export function MissionIntelligence({
                         </div>
                       )}
                       <div className="ml-auto text-[9px] font-mono text-white/30">
-                        {new Date(entry.ts).toLocaleString()}
+                        {new Date(entry.ts).toLocaleString(chronosSpeechLocale())}
                       </div>
                     </div>
                     <div className="mt-2 text-[11px] leading-6 text-white/82">{entry.content}</div>
@@ -5651,7 +5658,7 @@ export function MissionIntelligence({
                       </div>
                     )}
                     <div className="ml-auto text-[9px] font-mono text-white/30">
-                      {new Date(handoff.ts).toLocaleString()}
+                      {new Date(handoff.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
                   <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-white/35">

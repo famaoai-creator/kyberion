@@ -506,7 +506,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       stderr: 'text-red-400',
                       text: 'text-yellow-400',
                     };
-                    const time = new Date(entry.ts).toLocaleTimeString();
+                    const time = new Date(entry.ts).toLocaleTimeString(resolveChronosLocale());
                     return (
                       <div
                         key={i}

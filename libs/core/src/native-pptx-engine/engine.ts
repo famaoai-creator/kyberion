@@ -284,7 +284,7 @@ export async function generateNativePptx(
       const isMasterOnly = idx < masterOnlyCount;
 
       if (el.type === 'shape' || el.type === 'text') {
-        const shapeXml = buildShape(el, masterIdCounter++);
+        const shapeXml = buildShape(el, masterIdCounter++, undefined, protocol.locale);
         if (isMasterOnly) {
           // Master-only elements go to master spTree only
           masterSpTree += shapeXml;
@@ -355,7 +355,7 @@ export async function generateNativePptx(
     </p:bodyStyle>
     <p:otherStyle>
       <a:defPPr>
-        <a:defRPr lang="ja-JP"/>
+        <a:defRPr lang="${protocol.locale || 'ja-JP'}"/>
       </a:defPPr>
     </p:otherStyle>
   </p:txStyles>`;
@@ -427,11 +427,11 @@ export async function generateNativePptx(
       }
 
       if (el.type === 'shape' || el.type === 'text') {
-        slideSpTree += buildShape(el, slideIdCounter++, rIdLink);
+        slideSpTree += buildShape(el, slideIdCounter++, rIdLink, protocol.locale);
       } else if (el.type === 'line') {
         slideSpTree += buildConnector(el, slideIdCounter++, rIdLink);
       } else if (el.type === 'table') {
-        slideSpTree += buildTable(el, slideIdCounter++);
+        slideSpTree += buildTable(el, slideIdCounter++, protocol.locale);
       } else if (el.type === 'image' && (el.imagePath || el.imageData)) {
         const ext = el.imagePath ? path.extname(el.imagePath).toLowerCase() || '.png' : '.png';
         const targetName = `image${imageCounter}${ext}`;

@@ -914,6 +914,10 @@
     "./locale": {
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"
+    },
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "default": "./dist/format.js"
     }
   },
   "dependencies": {

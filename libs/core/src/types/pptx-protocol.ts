@@ -165,6 +165,10 @@ export interface PptxDesignProtocol {
   generatedAt: string;
   canvas: { w: number; h: number };
   theme: { [key: string]: string };
+  // I18N-05: BCP-47/OOXML language tag applied to generated <a:rPr>/<a:endParaRPr>
+  // lang attributes (spell-check/hyphenation language, not visual style).
+  // Absent = legacy default 'ja-JP' (byte-identical output to pre-I18N-05 behavior).
+  locale?: string;
   // LE-01 design-defaults cascade (engine fills missing style keys consistently).
   // true = built-in defaults derived from theme fonts; object = per-key overrides.
   // Absent/false = legacy behavior (builder fallbacks), byte-identical output.
