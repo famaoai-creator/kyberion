@@ -24,6 +24,7 @@ import {
   type QuoteResult,
 } from './deal-store.js';
 import { sendToCustomer, type SendToCustomerResult } from './customer-conversation.js';
+import { formatNumber } from './format.js';
 
 /**
  * E2E-06 Tasks 5/6: deal documents (quote / contract) and the SDLC handoff.
@@ -53,6 +54,14 @@ function nextVersion(dir: string, prefix: string): number {
   }
 }
 
+// I18N-05: this template's prose is Japanese-only today (see the literal
+// headings below); 'ja-JP' here just makes that existing assumption
+// explicit for the number formatting instead of relying on an
+// argument-less (environment-dependent) Number#toLocaleString().
+// TODO(I18N-04): thread a resolved customer/tenant locale once this
+// template itself is localized.
+const QUOTE_DOCUMENT_LOCALE = 'ja-JP';
+
 function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: number): string {
   return [
     `# お見積書 (${deal.deal_id} v${version})`,
@@ -64,10 +73,10 @@ function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: numb
     '|---|---|---:|---:|---:|',
     ...quote.lines.map(
       (line) =>
-        `| ${line.description} | ${line.task_kind} | ${line.hours}h | ${line.unit_price.toLocaleString()} | ${line.amount.toLocaleString()} |`
+        `| ${line.description} | ${line.task_kind} | ${line.hours}h | ${formatNumber(line.unit_price, { locale: QUOTE_DOCUMENT_LOCALE })} | ${formatNumber(line.amount, { locale: QUOTE_DOCUMENT_LOCALE })} |`
     ),
     '',
-    `**合計: ${quote.total.toLocaleString()} ${quote.currency}(税別)**`,
+    `**合計: ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}(税別)**`,
     '',
     '> 金額は price book の決定論ルールで算出されています。',
   ].join('\n');
@@ -122,7 +131,7 @@ export function generateQuoteForDeal(input: {
   });
   void notifyOperator('approval_required', {
     title: `見積書ドラフト完成 (${deal.deal_id} v${version})`,
-    body: `合計 ${quote.total.toLocaleString()} ${quote.currency}。送付には承認が必要です。`,
+    body: `合計 ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}。送付には承認が必要です。`,
     link_hint: quoteRef,
     correlation_id: `${deal.deal_id}:quote-v${version}`,
   });
@@ -154,7 +163,7 @@ export function draftContractForDeal(input: {
     .split('{{SCOPE}}')
     .join(deal.agreed.scope.map((entry) => `- ${entry}`).join('\n'))
     .split('{{AMOUNT}}')
-    .join(deal.agreed.amount.value.toLocaleString())
+    .join(formatNumber(deal.agreed.amount.value, { locale: QUOTE_DOCUMENT_LOCALE }))
     .split('{{CURRENCY}}')
     .join(deal.agreed.amount.currency)
     .split('{{DUE_DATE}}')

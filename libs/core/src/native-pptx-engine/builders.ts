@@ -114,20 +114,26 @@ function insertInSchemaOrder(
 /**
  * Ensure <a:rPr> is in open/close form (not self-closing) so child elements can be injected.
  * Also ensures lang attribute is present.
+ * I18N-05: `locale` is the OOXML lang tag (default 'ja-JP' preserves prior behavior).
  */
-function ensureOpenRPr(rPr: string): string {
+function ensureOpenRPr(rPr: string, locale = 'ja-JP'): string {
   // Convert self-closing <a:rPr .../> to <a:rPr ...></a:rPr>
   if (rPr.match(/<a:rPr[^>]*\/>/)) {
     rPr = rPr.replace(/\/>$/, '></a:rPr>');
   }
   // Ensure lang attribute
   if (!rPr.includes(' lang="')) {
-    rPr = rPr.replace('<a:rPr', '<a:rPr lang="ja-JP"');
+    rPr = rPr.replace('<a:rPr', `<a:rPr lang="${locale}"`);
   }
   return rPr;
 }
 
-export function buildShape(el: PptxElement, id: number, rIdLink?: string): string {
+export function buildShape(
+  el: PptxElement,
+  id: number,
+  rIdLink?: string,
+  locale = 'ja-JP'
+): string {
   const x = inToEmu(el.pos.x);
   const y = inToEmu(el.pos.y);
   const cx = inToEmu(el.pos.w);
@@ -160,12 +166,12 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
   // To handle text modifications with perfect font fidelity:
   // If pXmlLst exists, we extract the base paragraph style (<a:pPr>) and run style (<a:rPr>) from it.
   let basePPr = '<a:pPr/>';
-  let baseRPr = '<a:rPr lang="ja-JP"></a:rPr>';
+  let baseRPr = `<a:rPr lang="${locale}"></a:rPr>`;
   if (el.pXmlLst && el.pXmlLst.length > 0) {
     const pPrMatch = el.pXmlLst[0].match(/<a:pPr[^>]*>[\s\S]*?<\/a:pPr>/);
     if (pPrMatch) basePPr = pPrMatch[0];
     const rPrMatch = el.pXmlLst[0].match(/<a:rPr[^>]*\/>|<a:rPr[^>]*>[\s\S]*?<\/a:rPr>/);
-    if (rPrMatch) baseRPr = ensureOpenRPr(rPrMatch[0]);
+    if (rPrMatch) baseRPr = ensureOpenRPr(rPrMatch[0], locale);
   }
 
   // We should use pXmlLst ONLY if the user hasn't supplied a modified textRuns array.
@@ -237,7 +243,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
     let hasEmittedContent = false;
 
     runs.forEach((run) => {
-      let rPr = ensureOpenRPr(baseRPr); // Start with the original exact font/style (always open form)
+      let rPr = ensureOpenRPr(baseRPr, locale); // Start with the original exact font/style (always open form)
 
       // Override specific attributes if requested
       if (run.options?.fontSize || el.style?.fontSize) {
@@ -311,7 +317,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
         if (pendingBreaks > 0 && hasEmittedContent) {
           pContent += '</a:p>';
           for (let i = 0; i < pendingBreaks - 1; i++) {
-            pContent += `<a:p>${basePPr}<a:endParaRPr lang="ja-JP"/></a:p>`;
+            pContent += `<a:p>${basePPr}<a:endParaRPr lang="${locale}"/></a:p>`;
           }
           pContent += `<a:p>${basePPr}`;
         }
@@ -400,7 +406,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
       }
     }
 
-    textBody = `<p:txBody>${bodyPr}${lstStyle}<a:p>${finalPPr}${pContent}<a:endParaRPr lang="ja-JP"/></a:p></p:txBody>`;
+    textBody = `<p:txBody>${bodyPr}${lstStyle}<a:p>${finalPPr}${pContent}<a:endParaRPr lang="${locale}"/></a:p></p:txBody>`;
   }
 
   let spPrContent = '';
@@ -460,8 +466,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
 
   // OOXML requires <p:txBody> even for shapes without text
   if (!textBody) {
-    textBody =
-      '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="ja-JP"/></a:p></p:txBody>';
+    textBody = `<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="${locale}"/></a:p></p:txBody>`;
   }
 
   // Use raw cNvPr/cNvSpPr/nvPr if available for faithful round-trip
@@ -574,7 +579,7 @@ export function buildSmartArt(
   </p:graphicFrame>`;
 }
 
-export function buildTable(el: PptxElement, id: number): string {
+export function buildTable(el: PptxElement, id: number, locale = 'ja-JP'): string {
   const x = inToEmu(el.pos.x);
   const y = inToEmu(el.pos.y);
   const cx = inToEmu(el.pos.w);
@@ -611,14 +616,14 @@ export function buildTable(el: PptxElement, id: number): string {
           ? '<a:solidFill><a:srgbClr val="F4F7F9"/></a:solidFill>'
           : '';
       const textColor = isHeader ? 'FFFFFF' : '1A1A1A';
-      const rPrXml = `<a:rPr lang="ja-JP" sz="1100" b="${isHeader ? '1' : '0'}" dirty="0"><a:solidFill><a:srgbClr val="${textColor}"/></a:solidFill></a:rPr>`;
+      const rPrXml = `<a:rPr lang="${locale}" sz="1100" b="${isHeader ? '1' : '0'}" dirty="0"><a:solidFill><a:srgbClr val="${textColor}"/></a:solidFill></a:rPr>`;
 
       // Split cell text by newlines into multiple <a:p> elements
       const lines = cellText.split('\n');
       let cellParagraphs = '';
       for (const ln of lines) {
         const safeLine = sanitizeXmlText(ln);
-        cellParagraphs += `<a:p><a:r>${rPrXml}<a:t>${safeLine}</a:t></a:r><a:endParaRPr lang="ja-JP"/></a:p>`;
+        cellParagraphs += `<a:p><a:r>${rPrXml}<a:t>${safeLine}</a:t></a:r><a:endParaRPr lang="${locale}"/></a:p>`;
       }
 
       trXml += `<a:tc>

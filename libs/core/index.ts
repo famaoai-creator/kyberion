@@ -210,10 +210,42 @@ export type {
 } from './next-action.js';
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
+// I18N-02: type-safe rendering entry point over the namespaced vocabulary
+// catalog, plus the ICU-lite message renderer it builds on.
+export { t } from './t.js';
+export type { VocabularyKey } from './t.js';
+export { renderMessage, extractPlaceholderNames } from './message-format.js';
+export type { MessageParams } from './message-format.js';
+export {
+  loadVocabularyCatalog,
+  resolveVocabularyEntry,
+  _resetVocabularyCatalogCacheForTests,
+} from './vocabulary-catalog.js';
+export type { VocabularyCatalogFile, VocabularyEntry } from './vocabulary-catalog.js';
 export * from './operator-home-summary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
 export * from './browser-onboarding.js';
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
+// I18N-01: single source of truth for locale resolution.
+export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
+export type { SupportedLocale, LocaleContext } from './locale.js';
+// I18N-05: single source of truth for locale/timeZone-aware date, number,
+// currency, and relative-time formatting.
+export {
+  formatDateTime,
+  formatNumber,
+  formatCurrency,
+  formatRelativeTime,
+  resolveTimeZone,
+} from './format.js';
+export type {
+  DateTimeFormatStyle,
+  FormatDateTimeOptions,
+  FormatNumberOptions,
+  FormatCurrencyOptions,
+  FormatRelativeTimeOptions,
+  ResolveTimeZoneContext,
+} from './format.js';
 export * from './company.js';
 export * from './financial-model.js';
 export * from './finance-controller.js';
