@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertApprovedNextActionCommand,
+  parseOffboardArgs,
   assertApprovedPipelinePath,
   assertPacketPathAllowed,
   classifyNextActionExecutionOutcome,
@@ -213,6 +214,90 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('使い方: npm run cli -- task <plan|start>');
     expect(output).toContain('外部効果は引き続き停止');
+  });
+
+  it('parses an offboard dry run by default and needs no approval', () => {
+    expect(parseOffboardArgs(['tenant', 'acme'])).toEqual({
+      scopeType: 'tenant',
+      scopeId: 'acme',
+      mode: 'dry_run',
+      json: false,
+    });
+    expect(parseOffboardArgs(['project', 'proj-alpha', '--json'])).toMatchObject({
+      scopeType: 'project',
+      mode: 'dry_run',
+      json: true,
+    });
+  });
+
+  it('refuses an offboard --execute without both approved-by and purpose (AL-04 fail-closed)', () => {
+    expect(() => parseOffboardArgs(['tenant', 'acme', '--execute'])).toThrowError(/--approved-by/);
+    expect(() =>
+      parseOffboardArgs(['tenant', 'acme', '--execute', '--approved-by', 'founder'])
+    ).toThrowError(/--purpose/);
+    expect(() =>
+      parseOffboardArgs(['tenant', 'acme', '--execute', '--purpose', 'contract ended'])
+    ).toThrowError(/--approved-by/);
+  });
+
+  it('carries a complete offboard approval through', () => {
+    expect(
+      parseOffboardArgs([
+        'tenant',
+        'acme',
+        '--execute',
+        '--approved-by',
+        'founder',
+        '--purpose',
+        'contract ended',
+      ])
+    ).toEqual({
+      scopeType: 'tenant',
+      scopeId: 'acme',
+      mode: 'execute',
+      json: false,
+      approval: { approved_by: 'founder', purpose: 'contract ended' },
+    });
+  });
+
+  it('rejects an unknown offboard scope kind or a missing id', () => {
+    expect(() => parseOffboardArgs(['workspace', 'acme'])).toThrowError(/tenant.*project/);
+    expect(() => parseOffboardArgs([])).toThrowError(/tenant.*project/);
+    expect(() => parseOffboardArgs(['tenant'])).toThrowError(/requires a tenant id/);
+    expect(() => parseOffboardArgs(['tenant', '--execute'])).toThrowError(/requires a tenant id/);
+  });
+
+  it('reports not_found (exit 0, no writes) for a scope with no active trees', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const previousExitCode = process.exitCode;
+
+    await main(['offboard', 'tenant', 'kyberion-cli-test-absent-tenant', '--json']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('"status": "not_found"');
+    expect(output).toContain('"soft_deleted": []');
+    expect(process.exitCode ?? 0).toBe(previousExitCode ?? 0);
+  });
+
+  it('includes the offboarding command in help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['help', '--locale', 'en']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('offboard <tenant|project> <id>');
+    expect(output).toContain('npm run cli -- offboard tenant acme');
+  });
+
+  it('shows offboard command help in Japanese (UX-03)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['offboard', 'help', '--locale', 'ja']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('使い方: npm run cli -- offboard <tenant|project> <id>');
+    expect(output).toContain('--approved-by と --purpose が必須');
+    expect(output).toContain('復元可能');
   });
 
   it('allows only approved packet commands', () => {

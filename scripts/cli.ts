@@ -349,6 +349,9 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log(t('cli_help_intent', locale));
   console.log(t('cli_help_task_summary', locale));
   console.log('');
+  console.log(t('cli_help_sec_offboarding', locale));
+  console.log(t('cli_help_offboard_summary', locale));
+  console.log('');
   console.log(t('cli_help_sec_packets', locale));
   console.log(t('cli_help_packet', locale));
   console.log(t('cli_help_accept_next', locale));
@@ -385,6 +388,7 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log('  npm run cli -- calendar list-calendars');
   console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
   console.log('  npm run cli -- task plan "明日の会議資料とメール下書きを作って"');
+  console.log('  npm run cli -- offboard tenant acme');
   console.log('');
   console.log(t('cli_help_first_run', locale));
   console.log(t('cli_help_onboard', locale));
@@ -494,6 +498,127 @@ function parseTaskRequest(args: string[]): { request: string; outputPath?: strin
     request: (requestOption || positional.join(' ')).trim(),
     outputPath: typeof options['--output'] === 'string' ? options['--output'] : undefined,
   };
+}
+
+function printOffboardHelp(locale = resolveLocale()): void {
+  printHeader(locale);
+  console.log(t('cli_help_offboard_usage', locale));
+  console.log('');
+  console.log(t('cli_help_commands', locale));
+  console.log(t('cli_help_offboard_dry_run_short', locale));
+  console.log(t('cli_help_offboard_execute_short', locale));
+  console.log(t('cli_help_offboard_restore_note', locale));
+  console.log('');
+  console.log(t('cli_help_examples', locale));
+  console.log('  npm run cli -- offboard tenant acme');
+  console.log(
+    '  npm run cli -- offboard tenant acme --execute --approved-by founder --purpose "contract ended"'
+  );
+  console.log('  npm run cli -- offboard project proj-alpha --json');
+}
+
+export interface ParsedOffboardCommand {
+  scopeType: 'tenant' | 'project';
+  scopeId: string;
+  mode: 'dry_run' | 'execute';
+  json: boolean;
+  approval?: { approved_by: string; purpose: string };
+}
+
+/**
+ * AL-04 offboarding CLI arguments. Pure and exported so the fail-closed
+ * rules (execute needs BOTH --approved-by and --purpose) are unit-testable
+ * without touching a scope tree. The library verb refuses an unapproved
+ * delete too — this is the earlier, friendlier of the two gates.
+ */
+export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
+  const [scopeType, scopeId, ...rest] = args;
+  if (scopeType !== 'tenant' && scopeType !== 'project') {
+    throw new Error(
+      `offboard scope must be 'tenant' or 'project' (received: ${scopeType ?? '<none>'})`
+    );
+  }
+  if (!scopeId || scopeId.startsWith('--')) {
+    throw new Error(`offboard requires a ${scopeType} id`);
+  }
+
+  const options = parseEmailWorkflowOptions(rest);
+  const mode = options['--execute'] === true ? 'execute' : 'dry_run';
+  const json = options['--json'] === true;
+  const approvedBy = typeof options['--approved-by'] === 'string' ? options['--approved-by'] : '';
+  const purpose = typeof options['--purpose'] === 'string' ? options['--purpose'] : '';
+
+  if (mode === 'dry_run') {
+    return { scopeType, scopeId, mode, json };
+  }
+  if (!approvedBy.trim() || !purpose.trim()) {
+    throw new Error(
+      'offboard --execute deletes a scope: it requires --approved-by <who> and --purpose "<why>". ' +
+        'Run without --execute for a dry run.'
+    );
+  }
+  return {
+    scopeType,
+    scopeId,
+    mode,
+    json,
+    approval: { approved_by: approvedBy.trim(), purpose: purpose.trim() },
+  };
+}
+
+async function handleOffboardCommand(
+  firstArg: string | undefined,
+  restArgs: string[],
+  locale = resolveLocale()
+): Promise<void> {
+  if (!firstArg || firstArg === 'help' || firstArg === '--help' || firstArg === '-h') {
+    printOffboardHelp(locale);
+    return;
+  }
+
+  const parsed = parseOffboardArgs([firstArg, ...restArgs]);
+  const { offboardScope } = await import('@agent/core');
+  const result = offboardScope({
+    scopeType: parsed.scopeType,
+    scopeId: parsed.scopeId,
+    mode: parsed.mode,
+    approval: parsed.approval
+      ? { approved_by: parsed.approval.approved_by, purpose: parsed.approval.purpose }
+      : undefined,
+  });
+
+  if (parsed.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log('');
+    console.log(`Scope: ${result.scope_type} '${result.scope_id}'  →  ${result.status}`);
+    if (result.reason) console.log(`Reason: ${result.reason}`);
+    if (result.targets.length > 0) {
+      console.log(`Targets (${result.targets.length}):`);
+      for (const target of result.targets) console.log(`  - [${target.kind}] ${target.path}`);
+    }
+    if (result.export_path) console.log(`Exported to: ${result.export_path}`);
+    if (result.soft_deleted.length > 0) {
+      console.log(`Moved to active/archive/.trash/ (restorable): ${result.soft_deleted.length}`);
+    }
+    if (result.retired_identities) {
+      console.log(`Identities retired: ${result.retired_identities}`);
+    }
+    if (result.status === 'dry_run') {
+      console.log('');
+      console.log(
+        'Dry run — nothing was written. Re-run with --execute --approved-by <who> --purpose "<why>" to apply.'
+      );
+    }
+    console.log('');
+  }
+
+  // Non-zero only for the states an operator must act on: an unapproved
+  // delete attempt or a failure. A dry run and a clean offboarding exit 0,
+  // and `not_found` is a legitimate "nothing to do" answer.
+  if (result.status === 'approval_required' || result.status === 'error') {
+    process.exitCode = 1;
+  }
 }
 
 async function handleTaskCommand(
@@ -1747,6 +1872,11 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'task') {
     await handleTaskCommand(firstArg, restArgs, locale);
+    return;
+  }
+
+  if (command === 'offboard') {
+    await handleOffboardCommand(firstArg, restArgs, locale);
     return;
   }
 
