@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 71020,
+      "size": 71197,
       "type": "json"
     },
     {
@@ -1384,6 +1384,12 @@
       "path": "product/governance/health-thresholds.json",
       "tier": "public",
       "size": 402,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/i18n-baseline.json",
+      "tier": "public",
+      "size": 6993,
       "type": "json"
     },
     {

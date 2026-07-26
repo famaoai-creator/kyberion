@@ -1,6 +1,15 @@
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
+import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
 
-export type SupportedLocale = 'en' | 'ja';
+/**
+ * I18N-01: the canonical `SupportedLocale` type and normalization rules come
+ * from `@agent/core/locale-normalize`, which is import-free precisely so it
+ * is safe to pull into a `'use client'` browser bundle. (`@agent/core/locale`
+ * itself is NOT safe here — it reads the identity file via `node:path` +
+ * secure-io at module scope, and ESM executes the whole imported graph
+ * regardless of which exports are used.)
+ */
+export type { SupportedLocale };
 
 type VocabularyCatalog = {
   default_locale: SupportedLocale;
@@ -13,13 +22,14 @@ const speechLocales: Record<SupportedLocale, string> = {
   ja: 'ja-JP',
 };
 
+/**
+ * Chronos-side entry point for steps 2/5/6 of the master precedence chain in
+ * `@agent/core/locale` (surface preference → browser language → catalog
+ * default). The identity/env steps are Node-only and do not apply in the
+ * browser. The normalization rule itself is the shared one — not a copy.
+ */
 export function normalizeChronosLocale(value: unknown): SupportedLocale {
-  const normalized = String(value || catalog.default_locale || 'en')
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, '-');
-  if (normalized.startsWith('ja')) return 'ja';
-  return 'en';
+  return normalizeLocale(value) ?? normalizeLocale(catalog.default_locale) ?? 'en';
 }
 
 // UX-03 Task 5: an explicit operator choice (header toggle) persists in
@@ -48,6 +58,14 @@ export function setChronosLocalePreference(locale: SupportedLocale): void {
   window.dispatchEvent(new CustomEvent(CHRONOS_LOCALE_EVENT, { detail: locale }));
 }
 
+/**
+ * I18N-01: the browser-safe subset of `libs/core/locale.ts`'s
+ * `resolveLocale` precedence chain — steps 2 (surface preference, here the
+ * localStorage-persisted header-toggle choice), 5 (`navigator.language`),
+ * and 6 (catalog `default_locale`). Steps 1 (explicit arg), 3 (onboarding
+ * identity), and 4 (`KYBERION_LOCALE`/`KYBERION_UI_LOCALE` env) are
+ * Node-only and do not apply in the browser.
+ */
 export function resolveChronosLocale(): SupportedLocale {
   if (typeof window !== 'undefined') {
     const stored = readStoredChronosLocale();

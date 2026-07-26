@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeExistsSync } from './secure-io.js';
+import { resolveLocale } from './locale.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 import {
@@ -125,7 +126,9 @@ export function installPythonVoiceBridgeIfAvailable(
     profileId,
     voiceBridgePath: bridgePath,
     audioOutputDir,
-    language: env.KYBERION_VOICE_LANGUAGE ?? 'ja',
+    // I18N-01: voice defaults now follow the unified locale resolution
+    // chain instead of a hardcoded 'ja'.
+    language: env.KYBERION_VOICE_LANGUAGE ?? resolveLocale(),
     pythonBin: env.KYBERION_PYTHON_BIN ?? env.KYBERION_PYTHON ?? 'python3',
     blackholePath: blackholePath ?? undefined,
     playThroughBlackhole,

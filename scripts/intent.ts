@@ -6,6 +6,7 @@ import {
   createStandardYargs,
   loadIntentContractMemorySnapshot,
   renderStatus,
+  resolveLocale,
   resolveVocabularyLocale,
   safeExistsSync,
   safeReadFile,
@@ -111,7 +112,7 @@ function shouldRedact(state: MissionState | null | undefined): boolean {
 function summarizeMissionState(state: MissionState, redact: boolean): string {
   const parts = [
     `mission=${state.mission_id}`,
-    `status=${renderStatus('mission', state.status, resolveVocabularyLocale(process.env.LANG))}`,
+    `status=${renderStatus('mission', state.status, resolveVocabularyLocale(resolveLocale()))}`,
   ];
   if (state.correlation_id) parts.push(`correlation=${state.correlation_id}`);
   if (state.origin_intent_id) parts.push(`origin_intent=${state.origin_intent_id}`);
@@ -191,7 +192,7 @@ function summarizeTrace(trace: Trace): string {
     `root=${trace.rootSpan.name}`,
     `spans=${countSpans(trace.rootSpan)}`,
     `events=${countEvents(trace.rootSpan)}`,
-    `status=${renderStatus('progress', trace.rootSpan.status === 'ok' ? 'completed' : 'failed', resolveVocabularyLocale(process.env.LANG))}`,
+    `status=${renderStatus('progress', trace.rootSpan.status === 'ok' ? 'completed' : 'failed', resolveVocabularyLocale(resolveLocale()))}`,
   ];
   if (trace.metadata.missionId) parts.push(`mission=${trace.metadata.missionId}`);
   if (trace.metadata.correlationId) parts.push(`correlation=${trace.metadata.correlationId}`);
@@ -392,7 +393,7 @@ export function collectIntentTraceReport(
 
   return {
     correlationId,
-    locale: resolveVocabularyLocale(options.locale || process.env.LANG),
+    locale: resolveVocabularyLocale(options.locale || resolveLocale()),
     missions,
     snapshots,
     deltas,

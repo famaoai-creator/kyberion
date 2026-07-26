@@ -214,6 +214,9 @@ export * from './operator-home-summary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
 export * from './browser-onboarding.js';
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
+// I18N-01: single source of truth for locale resolution.
+export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
+export type { SupportedLocale, LocaleContext } from './locale.js';
 export * from './company.js';
 export * from './financial-model.js';
 export * from './finance-controller.js';
