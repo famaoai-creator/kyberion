@@ -12,22 +12,91 @@
   --kb-accent: #0066cc;
   --kb-warning: #eab308;
   --kb-text-primary: #0f172a;
-  --kb-text-secondary: #334155;
+  --kb-text-secondary: rgba(15, 23, 42, 0.62);
+  --kb-accent-text: #0066cc;
+  --kb-surface: #f1f5f9;
+  --kb-muted-text: #475569;
+  --kb-border: #e2e8f0;
+  --kb-success: #15803d;
+  --kb-danger: #b91c1c;
+  --kb-font-sans: Inter, 'Noto Sans JP', sans-serif;
+  --kb-font-mono: 'JetBrains Mono', monospace;
+  --kb-blur: blur(12px);
+  --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #020617;
+    --foreground: #F8FAFC;
+    --kb-bg-main: #020617;
+    --kb-panel-bg: rgba(10, 25, 47, 0.82);
+    --kb-primary: #0A192F;
+    --kb-secondary: #31415B;
+    --kb-accent: #00F2FF;
+    --kb-warning: #f59e0b;
+    --kb-text-primary: #F8FAFC;
+    --kb-text-secondary: rgba(248, 250, 252, 0.62);
+    --kb-accent-text: #00F2FF;
+    --kb-surface: #0f172a;
+    --kb-muted-text: #94a3b8;
+    --kb-border: #1e293b;
+    --kb-success: #4ade80;
+    --kb-danger: #f87171;
+  }
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --kb-bg-main: #ffffff;
+  --kb-panel-bg: rgba(15, 23, 42, 0.05);
+  --kb-primary: #0f172a;
+  --kb-secondary: #334155;
+  --kb-accent: #0066cc;
+  --kb-warning: #eab308;
+  --kb-text-primary: #0f172a;
+  --kb-text-secondary: rgba(15, 23, 42, 0.62);
+  --kb-accent-text: #0066cc;
+  --kb-surface: #f1f5f9;
+  --kb-muted-text: #475569;
+  --kb-border: #e2e8f0;
+  --kb-success: #15803d;
+  --kb-danger: #b91c1c;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #020617;
+  --foreground: #F8FAFC;
+  --kb-bg-main: #020617;
+  --kb-panel-bg: rgba(10, 25, 47, 0.82);
+  --kb-primary: #0A192F;
+  --kb-secondary: #31415B;
+  --kb-accent: #00F2FF;
+  --kb-warning: #f59e0b;
+  --kb-text-primary: #F8FAFC;
+  --kb-text-secondary: rgba(248, 250, 252, 0.62);
+  --kb-accent-text: #00F2FF;
+  --kb-surface: #0f172a;
+  --kb-muted-text: #94a3b8;
+  --kb-border: #1e293b;
+  --kb-success: #4ade80;
+  --kb-danger: #f87171;
+}
+
+/* DS-06 semantic extensions are intentionally kept outside the generated KDS block. */
+:root {
   --kb-text-muted: #475569;
   --kb-text-subtle: #64748b;
   --kb-text-inverse: #ffffff;
-  --kb-accent-text: #00529c;
   --kb-accent-border: #1d4ed8;
-  --kb-surface: #f1f5f9;
   --kb-surface-raised: rgba(15, 23, 42, 0.04);
   --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
   --kb-surface-sunken: rgba(15, 23, 42, 0.08);
   --kb-surface-well: rgba(15, 23, 42, 0.12);
   --kb-surface-accent: rgba(0, 102, 204, 0.1);
-  --kb-muted-text: #475569;
-  --kb-border: #e2e8f0;
-  --kb-success: #15803d;
-  --kb-danger: #b91c1c;
   --kb-status-positive: #166534;
   --kb-status-negative: #991b1b;
   --kb-status-warning: #78350f;
@@ -40,39 +109,19 @@
   --kb-status-negative-border: rgba(185, 28, 28, 0.35);
   --kb-status-warning-border: rgba(146, 64, 14, 0.35);
   --kb-status-info-border: rgba(7, 89, 133, 0.35);
-  --kb-font-sans: Inter, 'Noto Sans JP', sans-serif;
-  --kb-font-mono: 'JetBrains Mono', monospace;
-  --kb-blur: blur(12px);
-  --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #020617;
-    --foreground: #f8fafc;
-    --kb-bg-main: #020617;
-    --kb-panel-bg: rgba(10, 25, 47, 0.82);
-    --kb-primary: #0a192f;
-    --kb-secondary: #31415b;
-    --kb-accent: #00f2ff;
-    --kb-warning: #f59e0b;
-    --kb-text-primary: #f8fafc;
-    --kb-text-secondary: #cbd5e1;
     --kb-text-muted: #94a3b8;
     --kb-text-subtle: #94a3b8;
     --kb-text-inverse: #020617;
-    --kb-accent-text: #00f2ff;
     --kb-accent-border: #67e8f9;
-    --kb-surface: #0f172a;
     --kb-surface-raised: rgba(255, 255, 255, 0.05);
     --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
     --kb-surface-sunken: rgba(0, 0, 0, 0.2);
     --kb-surface-well: rgba(0, 0, 0, 0.4);
     --kb-surface-accent: rgba(0, 242, 255, 0.1);
-    --kb-muted-text: #94a3b8;
-    --kb-border: #1e293b;
-    --kb-success: #4ade80;
-    --kb-danger: #f87171;
     --kb-status-positive: #86efac;
     --kb-status-negative: #fca5a5;
     --kb-status-warning: #fcd34d;
@@ -89,32 +138,15 @@
 }
 
 [data-theme='light'] {
-  color-scheme: light;
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --kb-bg-main: #ffffff;
-  --kb-panel-bg: rgba(15, 23, 42, 0.05);
-  --kb-primary: #0f172a;
-  --kb-secondary: #334155;
-  --kb-accent: #0066cc;
-  --kb-warning: #eab308;
-  --kb-text-primary: #0f172a;
-  --kb-text-secondary: #334155;
   --kb-text-muted: #475569;
   --kb-text-subtle: #64748b;
   --kb-text-inverse: #ffffff;
-  --kb-accent-text: #00529c;
   --kb-accent-border: #1d4ed8;
-  --kb-surface: #f1f5f9;
   --kb-surface-raised: rgba(15, 23, 42, 0.04);
   --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
   --kb-surface-sunken: rgba(15, 23, 42, 0.08);
   --kb-surface-well: rgba(15, 23, 42, 0.12);
   --kb-surface-accent: rgba(0, 102, 204, 0.1);
-  --kb-muted-text: #475569;
-  --kb-border: #e2e8f0;
-  --kb-success: #15803d;
-  --kb-danger: #b91c1c;
   --kb-status-positive: #166534;
   --kb-status-negative: #991b1b;
   --kb-status-warning: #78350f;
@@ -130,32 +162,15 @@
 }
 
 [data-theme='dark'] {
-  color-scheme: dark;
-  --background: #020617;
-  --foreground: #f8fafc;
-  --kb-bg-main: #020617;
-  --kb-panel-bg: rgba(10, 25, 47, 0.82);
-  --kb-primary: #0a192f;
-  --kb-secondary: #31415b;
-  --kb-accent: #00f2ff;
-  --kb-warning: #f59e0b;
-  --kb-text-primary: #f8fafc;
-  --kb-text-secondary: #cbd5e1;
   --kb-text-muted: #94a3b8;
   --kb-text-subtle: #94a3b8;
   --kb-text-inverse: #020617;
-  --kb-accent-text: #00f2ff;
   --kb-accent-border: #67e8f9;
-  --kb-surface: #0f172a;
   --kb-surface-raised: rgba(255, 255, 255, 0.05);
   --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
   --kb-surface-sunken: rgba(0, 0, 0, 0.2);
   --kb-surface-well: rgba(0, 0, 0, 0.4);
   --kb-surface-accent: rgba(0, 242, 255, 0.1);
-  --kb-muted-text: #94a3b8;
-  --kb-border: #1e293b;
-  --kb-success: #4ade80;
-  --kb-danger: #f87171;
   --kb-status-positive: #86efac;
   --kb-status-negative: #fca5a5;
   --kb-status-warning: #fcd34d;
