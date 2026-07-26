@@ -8,6 +8,14 @@ export interface DeliverableInboxItem {
   artifactId: string;
   /** True when the record points at a local file that no longer exists. */
   missing?: boolean;
+  /**
+   * How many older artifact records describe this same deliverable. Test
+   * fixtures and repeated pipeline runs register a fresh artifact_id per run
+   * against an unchanged path, so the raw record list is mostly duplicates
+   * (96 of 103 records on the reference workspace pointed at two files).
+   * Only the newest record per target survives; this is the collapsed count.
+   */
+  supersededCount?: number;
   missionId?: string;
   projectId?: string;
   trackId?: string;
@@ -54,6 +62,32 @@ function resolveArtifactRecordPath(artifactId: string): string {
   return pathResolver.shared(path.join('runtime', 'artifacts', `${artifactId}.json`));
 }
 
+/**
+ * What makes two records "the same deliverable": the thing they point at. Falls
+ * back to the artifact id so records without a path/ref are never merged.
+ */
+function deliverableIdentity(item: DeliverableInboxItem): string {
+  return (item.path || item.externalRef || item.artifactId).toLowerCase();
+}
+
+/**
+ * Keep the newest record per target and report how many it stood in for.
+ * Input is expected to be sorted newest-first.
+ */
+export function dedupeDeliverables(items: DeliverableInboxItem[]): DeliverableInboxItem[] {
+  const byIdentity = new Map<string, DeliverableInboxItem>();
+  for (const item of items) {
+    const identity = deliverableIdentity(item);
+    const existing = byIdentity.get(identity);
+    if (!existing) {
+      byIdentity.set(identity, item);
+      continue;
+    }
+    existing.supersededCount = (existing.supersededCount || 0) + 1;
+  }
+  return Array.from(byIdentity.values());
+}
+
 function collectSearchText(item: DeliverableInboxItem): string {
   return [
     item.artifactId,
@@ -78,7 +112,7 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
   const kind = input.kind?.trim().toLowerCase() || '';
   const tier = input.tier || '';
 
-  return listArtifactRecords()
+  const filtered = listArtifactRecords()
     .map((record) => {
       const recordPath = resolveArtifactRecordPath(record.artifact_id);
       const stats = safeExistsSync(recordPath) ? safeStat(recordPath) : null;
@@ -126,7 +160,12 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
     .filter((item) =>
       tier ? item.path?.includes(`/${tier}/`) || item.externalRef?.includes(tier) : true
     )
-    .filter((item) => (query ? collectSearchText(item).includes(query) : true))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, Math.max(1, Math.min(200, Number(input.limit || 50))));
+    .filter((item) => (query ? collectSearchText(item).includes(query) : true));
+
+  // Dedupe BEFORE the limit — otherwise a handful of re-registered fixtures
+  // eats the whole page and the real deliverables never reach the operator.
+  return dedupeDeliverables(filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))).slice(
+    0,
+    Math.max(1, Math.min(200, Number(input.limit || 50)))
+  );
 }
