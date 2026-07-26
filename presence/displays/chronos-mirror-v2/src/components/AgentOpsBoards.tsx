@@ -116,13 +116,13 @@ export function AgentOpsBoards({
         onOpenView={onOpenView}
       />
       <div className="flex items-center gap-3">
-        <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-secondary">
           Agent Activity
         </div>
         <select
           value={tenant}
           onChange={(event) => setTenant(event.target.value)}
-          className="rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white/80"
+          className="rounded border kb-border-subtle kb-surface-well px-2 py-1 text-[11px] kb-text-primary"
         >
           <option value="">全テナント</option>
           {tenants.map((slug) => (
@@ -131,7 +131,7 @@ export function AgentOpsBoards({
             </option>
           ))}
         </select>
-        {error ? <span className="text-[11px] text-red-300">{error}</span> : null}
+        {error ? <span className="text-[11px] kb-status-negative">{error}</span> : null}
       </div>
 
       {/* エージェント別サマリ */}
@@ -139,16 +139,16 @@ export function AgentOpsBoards({
         {(board?.agents || []).map((agent) => (
           <div
             key={agent.agent_id}
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px]"
+            className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px]"
           >
-            <span className="font-bold text-white/90">{agent.agent_id}</span>
-            <span className="ml-2 text-cyan-300">稼働 {agent.active}</span>
-            <span className="ml-2 text-amber-300">ブロック {agent.blocked}</span>
-            <span className="ml-2 text-white/50">レビュー待ち {agent.in_review}</span>
+            <span className="font-bold kb-text-primary">{agent.agent_id}</span>
+            <span className="ml-2 kb-text-accent">稼働 {agent.active}</span>
+            <span className="ml-2 kb-status-warning">ブロック {agent.blocked}</span>
+            <span className="ml-2 kb-text-muted">レビュー待ち {agent.in_review}</span>
           </div>
         ))}
         {(board?.agents || []).length === 0 ? (
-          <div className="text-[11px] text-white/40">
+          <div className="text-[11px] kb-text-muted">
             アクティブなエージェント作業はありません。
           </div>
         ) : null}
@@ -159,21 +159,21 @@ export function AgentOpsBoards({
         {(board?.entries || []).map((entry) => (
           <div
             key={entry.item_id}
-            className="rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-[12px]"
+            className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px]"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-white/90">{entry.agent_id}</span>
+              <span className="font-bold kb-text-primary">{entry.agent_id}</span>
               {entry.team_role ? (
-                <span className="rounded-full border border-white/10 px-2 text-[10px] text-white/50">
+                <span className="rounded-full border kb-border-subtle px-2 text-[10px] kb-text-muted">
                   {entry.team_role}
                 </span>
               ) : null}
-              <span className="text-white/60">{entry.title}</span>
-              <span className="ml-auto rounded-full border border-cyan-400/20 px-2 text-[10px] text-cyan-200/80">
+              <span className="kb-text-secondary">{entry.title}</span>
+              <span className="ml-auto rounded-full border kb-border-accent px-2 text-[10px] kb-text-accent">
                 {STATUS_LABEL[entry.status] || entry.status}
               </span>
             </div>
-            <div className="mt-1 text-[10px] text-white/40">
+            <div className="mt-1 text-[10px] kb-text-muted">
               {entry.mission_id}
               {entry.phase ? ` · phase: ${entry.phase}` : ''}
               {entry.tenant_slug ? ` · tenant: ${entry.tenant_slug}` : ''}
@@ -185,8 +185,8 @@ export function AgentOpsBoards({
                     key={index}
                     className={`rounded-lg px-2 py-1 text-[10px] ${
                       blocker.kind === 'review_wait'
-                        ? 'bg-white/10 text-white/60'
-                        : 'bg-amber-500/15 text-amber-200'
+                        ? 'kb-surface-raised kb-text-secondary'
+                        : 'kb-status-warning-surface kb-status-warning'
                     }`}
                   >
                     🚧 {blocker.reason}
@@ -199,13 +199,13 @@ export function AgentOpsBoards({
       </div>
 
       {/* 看板ボード */}
-      <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
+      <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-secondary">
         Work Items 看板
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {statuses.map((column) => (
-          <div key={column} className="rounded-xl border border-white/8 bg-black/20 p-2">
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
+          <div key={column} className="rounded-xl border kb-border-subtle kb-surface-sunken p-2">
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
               {STATUS_LABEL[column] || column} (
               {items.filter((item) => item.status === column).length})
             </div>
@@ -217,10 +217,10 @@ export function AgentOpsBoards({
                   return (
                     <div
                       key={item.item_id}
-                      className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-[11px]"
+                      className="rounded-lg border kb-border-subtle kb-surface-raised p-2 text-[11px]"
                     >
-                      <div className="text-white/85">{item.title}</div>
-                      <div className="mt-1 text-[9px] text-white/40">
+                      <div className="kb-text-primary">{item.title}</div>
+                      <div className="mt-1 text-[9px] kb-text-muted">
                         {item.assignee_peer_id || '未割当'}
                         {item.metadata?.phase ? ` · ${String(item.metadata.phase)}` : ''}
                       </div>
@@ -230,7 +230,7 @@ export function AgentOpsBoards({
                             type="button"
                             disabled={busyId === item.item_id}
                             onClick={() => void moveItem(item.item_id, statuses[columnIndex - 1])}
-                            className="rounded bg-white/10 px-2 text-[10px] text-white/70 hover:bg-white/20"
+                            className="rounded kb-surface-raised px-2 text-[10px] kb-text-secondary hover:kb-surface-raised"
                           >
                             ←
                           </button>
@@ -240,7 +240,7 @@ export function AgentOpsBoards({
                             type="button"
                             disabled={busyId === item.item_id}
                             onClick={() => void moveItem(item.item_id, statuses[columnIndex + 1])}
-                            className="rounded bg-cyan-500/20 px-2 text-[10px] text-cyan-100 hover:bg-cyan-500/30"
+                            className="rounded kb-surface-accent px-2 text-[10px] kb-text-accent hover:kb-surface-accent"
                           >
                             →
                           </button>
