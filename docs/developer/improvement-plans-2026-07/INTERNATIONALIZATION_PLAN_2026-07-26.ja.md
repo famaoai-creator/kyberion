@@ -196,6 +196,10 @@
 
 **共通ルール**: **キー化しても既定ロケールでは従来と同一文字列**を出す。これによりスナップショット/文字列マッチの既存テストが壊れない(UX-03 で有効だった原則を踏襲)。
 
+**対象範囲の正本**: 移行対象は推測ではなく **I18N-03 の baseline が正確に列挙している** — `knowledge/product/governance/i18n-baseline.json`(2026-07-26 時点で 100 ファイル / 1,056 件)。移行が進むたび `--update-baseline` で締め直すため、**baseline の残件数がそのまま I18N-04 の進捗**になる。
+
+**I18N-05 からの繰り越し(順3 chronos に含める)**: chronos の `'use client'` 群は `libs/core/format.ts` が module scope で secure-io を引くためブラウザバンドルに載せられず、解決済みロケールを `toLocaleString` に明示引数として渡す形に留めてある(環境依存という本質的な問題は解消済み)。**`locale-normalize.ts` と同型に `format.ts` の純粋 Intl 部分を import ゼロのモジュールへ分離**すれば共有 formatter に載る。chronos を触る順3 で同時に行うこと(単独で先行実装しても消費者がいない)。
+
 ---
 
 ### I18N-05: 日時・数値書式の国際化 — P1 / M
