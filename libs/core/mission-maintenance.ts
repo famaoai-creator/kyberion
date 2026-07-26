@@ -54,6 +54,7 @@ import {
 } from './mission-lifecycle.js';
 import { readJsonFile } from './cli-input.js';
 import { gcMissionRuntimeResidue } from './scope-offboarding.js';
+import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 
 function resolveApprovalActor(requestedBy?: string): string {
   const resolvedActor = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
@@ -1033,6 +1034,14 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
     // AL-04: the mission tree moved to the archive — reclaim the runtime
     // residue that now points at nothing (best-effort by contract).
     gcMissionRuntimeResidue({ missionId: candidate.mission });
+    // NI-05: and retire the identities affiliated with it (idempotent — the
+    // finish ceremony already tried; a mission archived without a finish
+    // closure is exactly the case this catches).
+    retireIdentitiesForScopeBestEffort({
+      scope: 'mission',
+      scopeId: candidate.mission,
+      reason: `mission ${candidate.mission} archived by policy ${candidate.policyName}`,
+    });
   }
 
   logger.success(`✅ ${archived.length} mission(s) purged.`);
@@ -1125,6 +1134,12 @@ export async function archiveMissionById(missionId: string): Promise<ArchiveMiss
   // AL-04: scope-linked GC — the mission's runtime residue follows its tree
   // into the archive. Best-effort: never fails an archive that succeeded.
   gcMissionRuntimeResidue({ missionId: mission });
+  // NI-05: auto-offboard the mission's identities (idempotent with finish).
+  retireIdentitiesForScopeBestEffort({
+    scope: 'mission',
+    scopeId: mission,
+    reason: `mission ${mission} archived (explicit)`,
+  });
   logger.success(`📦 Mission ${mission} archived to ${targetPath} (policy: ${policy.name}).`);
   return { status: 'archived', mission, from: missionDir, to: targetPath, policy: policy.name };
 }

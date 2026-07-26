@@ -45,6 +45,7 @@ import {
   TRASH_REPO_SUBPATH,
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
+import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -254,6 +255,8 @@ export interface OffboardScopeResult {
   export_path?: string;
   /** Repo-relative paths moved to the trash (execute mode only). */
   soft_deleted: string[];
+  /** NI-05: identities auto-retired because their scope closed (execute mode only). */
+  retired_identities?: number;
   reason?: string;
 }
 
@@ -488,8 +491,17 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       }
     }
 
+    // NI-05: the scope is gone — so are the identities affiliated with it
+    // (OWASP NHI #1). Best-effort and idempotent, like the mission hooks.
+    const retiredIdentities = retireIdentitiesForScopeBestEffort({
+      scope: scopeType,
+      scopeId,
+      reason: `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`,
+    });
+    result.retired_identities = retiredIdentities;
+
     logger.info(
-      `[scope-offboarding] ${scopeType} '${scopeId}' offboarded: ${result.soft_deleted.length} tree(s) exported to ${result.export_path} and moved to the trash`
+      `[scope-offboarding] ${scopeType} '${scopeId}' offboarded: ${result.soft_deleted.length} tree(s) exported to ${result.export_path} and moved to the trash, ${retiredIdentities} identity(ies) retired`
     );
     return result;
   } catch (err) {

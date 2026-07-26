@@ -45,6 +45,7 @@ import {
   scopedTaskArtifactDirName,
   type ScopedArtifactIndexEntry,
 } from './artifact-store.js';
+import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 
 /** Artifact classes deleted at closure time. Everything else is kept. */
 export const MISSION_CLOSURE_DELETE_CLASSES: readonly RetentionArtifactClass[] = Object.freeze([
@@ -258,6 +259,15 @@ export function closeMissionArtifacts(input: {
 
     const bundle = bundleMissionGitRepo(missionDir);
 
+    // NI-05: mission closure is also identity closure — retire the NHIs
+    // affiliated with this mission (OWASP NHI #1: improper offboarding).
+    // Best-effort and idempotent; the archive verbs re-run it.
+    const retiredIdentities = retireIdentitiesForScopeBestEffort({
+      scope: 'mission',
+      scopeId: missionId,
+      reason: `mission ${missionId} finished (closure ceremony)`,
+    });
+
     const auditPath = appendClosureAudit({
       ts: new Date().toISOString(),
       event: 'MISSION_ARTIFACTS_CLOSED',
@@ -267,6 +277,7 @@ export function closeMissionArtifacts(input: {
       deleted_index_entries: deletedIndexEntries,
       kept_index_entries: keptLines.length,
       bundle,
+      retired_identities: retiredIdentities,
       policy_ref: RETENTION_CATALOG_REPO_PATH,
       policy_classes: [...MISSION_CLOSURE_DELETE_CLASSES],
       reason:
