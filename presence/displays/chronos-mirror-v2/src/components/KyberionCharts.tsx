@@ -65,7 +65,7 @@ function colorFor(label: string, explicit?: string, index = 0): string {
   return cycle[index % cycle.length];
 }
 
-const label10 = 'text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80';
+const label10 = 'text-[10px] uppercase tracking-widest opacity-60 kb-text-secondary';
 
 // --- display:donut — status distribution as a ring with center total ---
 export const KyberionDonut = ({
@@ -198,7 +198,7 @@ export const KyberionBarChart = ({
                   {unit}
                 </span>
               </div>
-              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+              <div className="h-1.5 w-full kb-surface-raised/5 rounded-full overflow-hidden border kb-border-subtle">
                 <div
                   className="h-full rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${pct}%`, background: colorFor(d.label, d.color, i) }}
@@ -228,7 +228,7 @@ export const KyberionStackedBar = ({
   return (
     <div className="flex flex-col gap-3 w-full">
       {title && <div className={label10}>{title}</div>}
-      <div className="h-3 w-full flex rounded-full overflow-hidden border border-white/10 bg-white/5">
+      <div className="h-3 w-full flex rounded-full overflow-hidden border kb-border-subtle kb-surface-raised/5">
         {total === 0 && <div className="w-full" />}
         {items.map((d, i) => (
           <div

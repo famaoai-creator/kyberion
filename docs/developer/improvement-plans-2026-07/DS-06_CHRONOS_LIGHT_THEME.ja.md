@@ -65,4 +65,10 @@ chronos `src` 配下の実数: **text 系カラーユーティリティ約 939 �
 
 ## 実装状況
 
-TODO(2026-07-26 起票)。暫定対応(`system` を dark 固定・トグルから light を除外)と、その前提となる共有トークン層の修正・`check:design-contrast` 拡張のみ完了。
+**DONE (2026-07-27)**。
+
+- `globals.css` に本文・補助・ミュート・アクセント、面、境界、approve/reject/info/alert のセマンティック語彙を追加し、light/dark の値を `--kb-*` に集約した。
+- Chronos のコンポーネント全体(`page.tsx`、`MissionIntelligence.tsx`、共有 panels)から白/黒/Slate/Cyan 等の dark 専用 utility を除去し、`kb-*` 語彙へ移行した。status/gradient/IdentityBadge の直接色参照も同じカスケードへ統合した。
+- `CHRONOS_THEME_CYCLE` は `system → light → dark` を提示し、`system` は `prefers-color-scheme` に追従する。
+- `scripts/check_chronos_dom_contrast.ts` を追加し、Playwright で light/dark + reduced-motion の実 DOM を alpha 合成込みで計測する。`check:chronos-dom-contrast` と `validate` に接続した。
+- 検証結果: light/dark の DOM コントラスト違反 0件、`check:design-contrast`、typecheck、Chronos lint/build、テーマ回帰テストが緑。

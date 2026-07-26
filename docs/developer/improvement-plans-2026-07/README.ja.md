@@ -127,13 +127,14 @@ UI・CLI・会話ブリッジ・音声のユーザー接点調査(2026-07-02 追
 
 視覚成果物のデザイン定義の調査(2026-07-02 追加)に基づく。既存の [VIDEO_DESIGN_SYSTEM_INTEGRATION_PLAN](../VIDEO_DESIGN_SYSTEM_INTEGRATION_PLAN.ja.md)(VDS-01〜08 の配管はほぼ完了)と重複せず、未了の VDS-07 は DS-02 が引き取る。
 
-| ID                                                  | タイトル                                                                   | 優先度 | 規模 | 依存  |
-| --------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----- |
-| [DS-01](./DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**         | P1     | M    | なし  |
-| [DS-02](./DS-02_TENANT_BRANDING_EVERYWHERE.ja.md)   | テナントブランディングの全面適用(PPTX 限定→Web/動画、VDS-07 実装)          | P1     | M    | DS-01 |
-| [DS-03](./DS-03_DOCUMENT_THEME_JP_TYPOGRAPHY.ja.md) | 文書エンジンのテーマ駆動化と日本語タイポグラフィ(PDF フォント埋め込み)     | P1     | M    | DS-01 |
-| [DS-04](./DS-04_VIDEO_SCENE_TOKENIZATION.ja.md)     | 動画シーンテンプレートのトークン化                                         | P2     | S〜M | DS-01 |
-| [DS-05](./DS-05_A11Y_BASELINE.ja.md)                | アクセシビリティ基盤(reduced-motion・light/dark・コントラストゲート・ARIA) | P2     | M    | DS-01 |
+| ID                                                  | タイトル                                                                   | 優先度 | 規模 | 依存         |
+| --------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ------------ |
+| [DS-01](./DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**         | P1     | M    | なし         |
+| [DS-02](./DS-02_TENANT_BRANDING_EVERYWHERE.ja.md)   | テナントブランディングの全面適用(PPTX 限定→Web/動画、VDS-07 実装)          | P1     | M    | DS-01        |
+| [DS-03](./DS-03_DOCUMENT_THEME_JP_TYPOGRAPHY.ja.md) | 文書エンジンのテーマ駆動化と日本語タイポグラフィ(PDF フォント埋め込み)     | P1     | M    | DS-01        |
+| [DS-04](./DS-04_VIDEO_SCENE_TOKENIZATION.ja.md)     | 動画シーンテンプレートのトークン化                                         | P2     | S〜M | DS-01        |
+| [DS-05](./DS-05_A11Y_BASELINE.ja.md)                | アクセシビリティ基盤(reduced-motion・light/dark・コントラストゲート・ARIA) | P2     | M    | DS-01        |
+| [DS-06](./DS-06_CHRONOS_LIGHT_THEME.ja.md)          | Chronos light テーマの実効化(コンポーネント層トークン化・DOM コントラスト) | P2     | L    | DS-01, DS-05 |
 
 ### エージェント間通信(A2A / メッセージハブ / agent runtime)
 
