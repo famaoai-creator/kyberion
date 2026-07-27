@@ -12,6 +12,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'read_file',
   'read_json',
   'probe',
+  'probe_active_profile',
   'glob_files',
   'scan_directory',
   'pulse_status',

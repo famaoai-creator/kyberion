@@ -15,6 +15,39 @@ Use this path when you want Kyberion to:
 - complete the operator's own follow-up work, and
 - record an audit trail for later review.
 
+## 最短の参加依頼シナリオ
+
+次のように、会議URLと「してほしいこと」だけを添えて依頼できます。プラットフォームはURLから判定します。
+
+```text
+このミーティングに参加して。
+URL: https://meet.google.com/xxx-xxxx-xxx
+私の代わりに聞いて、要点とアクションアイテムを整理して。発言はしないで。
+```
+
+Kyberion は次の順番で進めます。
+
+1. URL、参加時の役割、会議の目的だけを確認する
+2. 参加前に、聞くだけ／議事録／進行／必要時の発言を含む実行プランを表示する
+3. 発言が指定されていない場合は、聞くだけ・発言なしで参加する
+4. runtime と同意を確認してから会議へ参加する
+5. 退出後に要点、アクションアイテム、フォローアップを返す
+
+URLだけで依頼を始めることもできます。その場合は、次の2点だけを追加で確認します。
+
+- 会議の目的と、会議中に何をしてほしいか（聞くだけ／議事録／進行）
+- 発言を許可するか（既定は発言なし）
+
+繰り返し使う場合は、同じ確認を毎回入力せず、参加依頼シナリオとして保存できます。
+
+```bash
+pnpm task:list
+pnpm task:init meeting-participation-request --print-template
+pnpm task:run meeting-participation-request --dry-run
+```
+
+このシナリオは、参加前の確認と dry-run を担当します。実際の会議へ入るときは、確認済みの mission と同意境界を引き継いで `pnpm meeting:participate` を使います。
+
 ## What is safe by default
 
 - `join`, `listen`, `chat`, and `leave` are available without speaking consent.

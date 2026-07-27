@@ -993,7 +993,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16128,
+      "size": 16160,
       "type": "json"
     },
     {
@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 71197,
+      "size": 71745,
       "type": "json"
     },
     {
@@ -1461,7 +1461,7 @@
     {
       "path": "product/governance/intent-routing-map.json",
       "tier": "public",
-      "size": 4020,
+      "size": 4064,
       "type": "json"
     },
     {
@@ -2217,7 +2217,7 @@
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 188068,
+      "size": 188228,
       "type": "json"
     },
     {
@@ -3027,7 +3027,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 76833,
+      "size": 77478,
       "type": "json"
     },
     {
@@ -3393,7 +3393,7 @@
     {
       "path": "product/orchestration/intent-scenario-catalog.md",
       "tier": "public",
-      "size": 15108,
+      "size": 22937,
       "type": "md"
     },
     {
@@ -7840,6 +7840,12 @@
       "path": "product/task-scenarios/meeting-action-items.json",
       "tier": "public",
       "size": 1479,
+      "type": "json"
+    },
+    {
+      "path": "product/task-scenarios/meeting-participation-request.json",
+      "tier": "public",
+      "size": 2033,
       "type": "json"
     },
     {

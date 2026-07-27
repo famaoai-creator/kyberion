@@ -11,9 +11,15 @@ import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/standard-intents.schema.json');
-const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-resolution-policy.schema.json');
-const PERSONAL_INTENT_OVERLAY_PATH = pathResolver.knowledge('personal/orchestration/intent-catalog.json');
+const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/standard-intents.schema.json'
+);
+const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-resolution-policy.schema.json'
+);
+const PERSONAL_INTENT_OVERLAY_PATH = pathResolver.knowledge(
+  'personal/orchestration/intent-catalog.json'
+);
 const CONFIDENTIAL_INTENT_OVERLAY_DIR = 'confidential';
 
 export type StandardIntentDefinition = {
@@ -147,17 +153,24 @@ function ensureStandardIntentValidator(): ValidateFunction {
 
 function ensureIntentResolutionPolicyValidator(): ValidateFunction {
   if (intentResolutionPolicyValidateFn) return intentResolutionPolicyValidateFn;
-  intentResolutionPolicyValidateFn = compileSchemaFromPath(ajv, INTENT_RESOLUTION_POLICY_SCHEMA_PATH);
+  intentResolutionPolicyValidateFn = compileSchemaFromPath(
+    ajv,
+    INTENT_RESOLUTION_POLICY_SCHEMA_PATH
+  );
   return intentResolutionPolicyValidateFn;
 }
 
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
   const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntentDefinition[] };
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    intents?: StandardIntentDefinition[];
+  };
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid standard-intents catalog: ${errors}`);
   }
   standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
@@ -166,10 +179,14 @@ export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
 
 function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[] {
   if (!safeExistsSync(filePath)) return [];
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntentDefinition[] };
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    intents?: StandardIntentDefinition[];
+  };
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid intent catalog overlay at ${filePath}: ${errors}`);
   }
   return Array.isArray(parsed.intents) ? parsed.intents : [];
@@ -196,7 +213,11 @@ function buildIntentOverlayPaths(options: IntentResolutionOptions): string[] {
     paths.push(PERSONAL_INTENT_OVERLAY_PATH);
     const tenantId = sanitizePathSegment(options.tenantId || defaultTenantId() || '');
     if (tenantId) {
-      paths.push(pathResolver.knowledge(`${CONFIDENTIAL_INTENT_OVERLAY_DIR}/${tenantId}/orchestration/intent-catalog.json`));
+      paths.push(
+        pathResolver.knowledge(
+          `${CONFIDENTIAL_INTENT_OVERLAY_DIR}/${tenantId}/orchestration/intent-catalog.json`
+        )
+      );
     }
   }
 
@@ -209,23 +230,33 @@ function buildIntentOverlayPaths(options: IntentResolutionOptions): string[] {
 
 function mergeIntentDefinition(
   base: StandardIntentDefinition,
-  overlay: StandardIntentDefinition,
+  overlay: StandardIntentDefinition
 ): StandardIntentDefinition {
   const merged: StandardIntentDefinition = { ...base, ...overlay };
   if (base.surface_examples || overlay.surface_examples) {
-    merged.surface_examples = Array.from(new Set([...(base.surface_examples || []), ...(overlay.surface_examples || [])]));
+    merged.surface_examples = Array.from(
+      new Set([...(base.surface_examples || []), ...(overlay.surface_examples || [])])
+    );
   }
   if (base.trigger_keywords || overlay.trigger_keywords) {
-    merged.trigger_keywords = Array.from(new Set([...(base.trigger_keywords || []), ...(overlay.trigger_keywords || [])]));
+    merged.trigger_keywords = Array.from(
+      new Set([...(base.trigger_keywords || []), ...(overlay.trigger_keywords || [])])
+    );
   }
   if (base.outcome_ids || overlay.outcome_ids) {
-    merged.outcome_ids = Array.from(new Set([...(base.outcome_ids || []), ...(overlay.outcome_ids || [])]));
+    merged.outcome_ids = Array.from(
+      new Set([...(base.outcome_ids || []), ...(overlay.outcome_ids || [])])
+    );
   }
   if (base.plan_outline || overlay.plan_outline) {
-    merged.plan_outline = Array.from(new Set([...(base.plan_outline || []), ...(overlay.plan_outline || [])]));
+    merged.plan_outline = Array.from(
+      new Set([...(base.plan_outline || []), ...(overlay.plan_outline || [])])
+    );
   }
   if (base.intake_requirements || overlay.intake_requirements) {
-    merged.intake_requirements = Array.from(new Set([...(base.intake_requirements || []), ...(overlay.intake_requirements || [])]));
+    merged.intake_requirements = Array.from(
+      new Set([...(base.intake_requirements || []), ...(overlay.intake_requirements || [])])
+    );
   }
   if (base.pipeline || overlay.pipeline) {
     merged.pipeline = [...(base.pipeline || []), ...(overlay.pipeline || [])];
@@ -245,7 +276,7 @@ function resolvedCatalogCacheKey(options: IntentResolutionOptions): string {
 }
 
 export function loadResolvedStandardIntentCatalog(
-  options: IntentResolutionOptions = {},
+  options: IntentResolutionOptions = {}
 ): StandardIntentDefinition[] {
   const cacheKey = resolvedCatalogCacheKey(options);
   const cached = resolvedIntentCatalogCache.get(cacheKey);
@@ -283,10 +314,14 @@ export function loadResolvedStandardIntentCatalog(
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
   const filePath = pathResolver.knowledge('product/governance/intent-resolution-policy.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentResolutionPolicyFile;
+  const parsed = JSON.parse(
+    safeReadFile(filePath, { encoding: 'utf8' }) as string
+  ) as IntentResolutionPolicyFile;
   const validate = ensureIntentResolutionPolicyValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid intent-resolution-policy: ${errors}`);
   }
   intentResolutionPolicyCache = parsed;
@@ -319,16 +354,12 @@ function normalizeFreeText(value: string): string {
 // Converts full-width ASCII (\uff21\u2013\uff3a, \uff10\u2013\uff19, \uff01 etc.) to half-width equivalents
 // so "\uff21\uff29" resolves the same as "AI" in keyword matching.
 function normalizeFullWidthToHalfWidth(text: string): string {
-  return text.replace(/[\uff01-\uff5e]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)
-  );
+  return text.replace(/[\uff01-\uff5e]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
 }
 
 // Converts katakana to hiragana so "\u30b9\u30e9\u30c3\u30af" and "\u3059\u3089\u3063\u304f" both match "slack".
 function normalizeKatakanaToHiragana(text: string): string {
-  return text.replace(/[\u30a1-\u30f6]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
+  return text.replace(/[\u30a1-\u30f6]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
 /**
@@ -347,7 +378,10 @@ function tokenize(value: string): string[] {
     .filter((token) => token.length >= 2);
 }
 
-function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition): IntentResolutionCandidate | null {
+function scoreCatalogIntent(
+  utterance: string,
+  intent: StandardIntentDefinition
+): IntentResolutionCandidate | null {
   const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
   const localizedNormalized = normalizeForTriggerMatch(utterance);
@@ -364,12 +398,20 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
   }
 
   if (matchedKeywords.length > 0) {
-    score = Math.max(score, Math.min(policy.keyword_base_confidence + matchedKeywords.length * policy.keyword_increment, policy.keyword_max_confidence));
+    score = Math.max(
+      score,
+      Math.min(
+        policy.keyword_base_confidence + matchedKeywords.length * policy.keyword_increment,
+        policy.keyword_max_confidence
+      )
+    );
     reasons.push(`matched keywords: ${matchedKeywords.join(', ')}`);
   }
 
   const utteranceTokens = tokenize(utterance);
-  const exactExample = (intent.surface_examples || []).find((example) => normalizeFreeText(example) === normalized);
+  const exactExample = (intent.surface_examples || []).find(
+    (example) => normalizeFreeText(example) === normalized
+  );
   if (exactExample) {
     score = Math.max(score, policy.exact_surface_example_confidence);
     reasons.push(`exact surface example match: ${exactExample}`);
@@ -377,7 +419,10 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
 
   const containingExample = (intent.surface_examples || []).find((example) => {
     const normalizedExample = normalizeFreeText(example);
-    return normalizedExample.length >= 4 && (normalized.includes(normalizedExample) || normalizedExample.includes(normalized));
+    return (
+      normalizedExample.length >= 4 &&
+      (normalized.includes(normalizedExample) || normalizedExample.includes(normalized))
+    );
   });
   if (containingExample) {
     score = Math.max(score, policy.surface_containment_confidence);
@@ -387,7 +432,13 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
   const exampleTokens = (intent.surface_examples || []).flatMap((example) => tokenize(example));
   const overlap = utteranceTokens.filter((token) => exampleTokens.includes(token));
   if (overlap.length > 0) {
-    score = Math.max(score, Math.min(score + overlap.length * policy.surface_overlap_increment, policy.surface_overlap_max_confidence));
+    score = Math.max(
+      score,
+      Math.min(
+        score + overlap.length * policy.surface_overlap_increment,
+        policy.surface_overlap_max_confidence
+      )
+    );
     reasons.push(`surface example overlap: ${overlap.slice(0, 4).join(', ')}`);
   }
 
@@ -405,7 +456,10 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
 function scoreScheduleReadAgendaIntent(utterance: string): IntentResolutionCandidate | null {
   const frame = buildContextualIntentFrame(utterance);
   const normalized = normalizeFreeText(utterance);
-  const calendarHint = /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(normalized);
+  const calendarHint =
+    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(
+      normalized
+    );
   const readHint = frame.action === 'read';
   if (!calendarHint || !readHint) return null;
 
@@ -445,11 +499,15 @@ function scoreScheduleReadAgendaIntent(utterance: string): IntentResolutionCandi
 function scoreScheduleCoordinationIntent(utterance: string): IntentResolutionCandidate | null {
   const frame = buildContextualIntentFrame(utterance);
   const normalized = normalizeFreeText(utterance);
-  const scheduleHint = /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|参加者|全員|合わせて|calendar|schedule)/i.test(
-    normalized
-  );
+  const scheduleHint =
+    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|参加者|全員|合わせて|calendar|schedule)/i.test(
+      normalized
+    );
   const changeHint = frame.action === 'change';
-  const meetingProxyHint = /(代わりに参加|代理参加|ファシリテート|進行|議事録|アクションアイテム|proxy|facilitate)/i.test(normalized);
+  const meetingProxyHint =
+    /(代わりに参加|代理参加|ファシリテート|進行|議事録|アクションアイテム|proxy|facilitate)/i.test(
+      normalized
+    );
   if (!scheduleHint || !changeHint || meetingProxyHint) return null;
 
   let confidence = 0.8;
@@ -557,9 +615,30 @@ function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | n
   };
 }
 
+function scoreBrowserFillIntent(utterance: string): IntentResolutionCandidate | null {
+  const normalized = normalizeForTriggerMatch(utterance);
+  const fillVerb = /(入力|入れて|記入|貼り付け|type|fill|enter|paste)/i.test(normalized);
+  const fieldHint = /(欄|フィールド|入力フィールド|フォーム|field|form|input|textbox|email)/i.test(
+    normalized
+  );
+  if (!fillVerb || !fieldHint) return null;
+
+  return {
+    intent_id: 'browser-step',
+    confidence: 0.96,
+    source: 'heuristic',
+    matched_keywords: [],
+    reasons: ['browser field-fill request matched'],
+    resolution: {
+      shape: 'browser_session',
+      result_shape: 'browser_step',
+    },
+  };
+}
+
 function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
-  return loadIntentResolutionPolicy().legacy_candidates
-    .filter((candidate) => matchesAnyTextRule(utterance, candidate.patterns))
+  return loadIntentResolutionPolicy()
+    .legacy_candidates.filter((candidate) => matchesAnyTextRule(utterance, candidate.patterns))
     .map((candidate) => ({
       intent_id: candidate.intent_id,
       confidence: candidate.confidence,
@@ -575,7 +654,12 @@ function inferMessagingBridgePlatformId(utterance: string): string | undefined {
   if (!normalized) return undefined;
 
   if (normalized.includes('slack') || normalized.includes('すらっく')) return 'slack';
-  if (normalized.includes('imessage') || normalized.includes('i message') || normalized.includes('あいめっせーじ')) return 'imessage';
+  if (
+    normalized.includes('imessage') ||
+    normalized.includes('i message') ||
+    normalized.includes('あいめっせーじ')
+  )
+    return 'imessage';
   if (normalized.includes('telegram') || normalized.includes('てれぐらむ')) return 'telegram';
   if (normalized.includes('line') || normalized.includes('らいん')) return 'line';
   if (normalized.includes('discord') || normalized.includes('でぃすこーど')) return 'discord';
@@ -599,7 +683,7 @@ function inferSelectedParameters(
 
 export function resolveIntentResolutionPacket(
   utterance: string,
-  options: IntentResolutionOptions = {},
+  options: IntentResolutionOptions = {}
 ): IntentResolutionPacket {
   const trimmed = utterance.trim();
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
@@ -624,6 +708,9 @@ export function resolveIntentResolutionPacket(
     ...[scoreVoiceInputIntent(trimmed)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
     ),
+    ...[scoreBrowserFillIntent(trimmed)].filter(
+      (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
+    ),
     ...[scoreScheduleReadAgendaIntent(trimmed)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
     ),
@@ -639,7 +726,24 @@ export function resolveIntentResolutionPacket(
   }
 
   const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
-  const selected = sorted[0] && sorted[0].confidence >= scoringPolicy.selected_confidence_threshold ? sorted[0] : undefined;
+  // A greeting can occur inside a substantive request (for example,
+  // `「こんにちは」を英語に翻訳して`).  The generic conversation intent
+  // intentionally has a strong greeting score, so prefer a near-tied,
+  // concrete task-session candidate in that case.
+  const topCandidate = sorted[0];
+  const concreteTaskCandidate = sorted.find(
+    (candidate) => candidate.resolution?.shape === 'task_session'
+  );
+  const selectedCandidate =
+    topCandidate?.intent_id === 'continue-conversation' &&
+    concreteTaskCandidate &&
+    concreteTaskCandidate.confidence >= topCandidate.confidence - 0.05
+      ? concreteTaskCandidate
+      : topCandidate;
+  const selected =
+    selectedCandidate && selectedCandidate.confidence >= scoringPolicy.selected_confidence_threshold
+      ? selectedCandidate
+      : undefined;
   const selectedParameters = inferSelectedParameters(selected?.intent_id, trimmed);
   const bundleById = new Map<string, IntentResolutionBundleCandidate>();
   for (const candidate of sorted) {
@@ -694,7 +798,7 @@ export function resolveIntentResolutionPacket(
  */
 export function chooseExecutionIntent(
   packet: Pick<IntentResolutionPacket, 'selected_intent_id'>,
-  rawIntent: string,
+  rawIntent: string
 ): string {
   return packet.selected_intent_id || rawIntent;
 }
@@ -714,14 +818,16 @@ export function chooseExecutionIntent(
  */
 export async function gatherImprovementHints(
   intent: string,
-  options: { maxResults?: number } = {},
+  options: { maxResults?: number } = {}
 ): Promise<Array<{ topic: string; hint: string; confidence: number }>> {
   const topic = (intent ?? '').trim();
   if (!topic) return [];
   try {
     const mod = await import('./src/knowledge-index.js');
     const index = await mod.buildKnowledgeIndex();
-    const hints = await mod.queryKnowledgeHybrid(index, topic, { maxResults: options.maxResults ?? 5 });
+    const hints = await mod.queryKnowledgeHybrid(index, topic, {
+      maxResults: options.maxResults ?? 5,
+    });
     return hints.map((h) => ({ topic: h.topic, hint: h.hint, confidence: h.confidence }));
   } catch {
     return [];

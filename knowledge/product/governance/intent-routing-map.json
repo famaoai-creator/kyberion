@@ -23,6 +23,7 @@
   },
   "mission_intent_action_map": {
     "create-mission": "create",
+    "feature-expansion-delivery": "create",
     "classify-mission": "classify",
     "select-mission-workflow": "workflow",
     "compose-mission-team": "compose_team",

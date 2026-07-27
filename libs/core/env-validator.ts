@@ -17,6 +17,7 @@ export interface EnvRegistryValidationEntry {
   type: 'string' | 'boolean' | 'number' | 'enum' | 'path';
   enum?: string[];
   required: boolean;
+  documented?: boolean;
 }
 
 export interface EnvValidationIssue {
@@ -28,6 +29,7 @@ export interface EnvValidationReport {
   errors: EnvValidationIssue[];
   warnings: EnvValidationIssue[];
   unknown: string[];
+  undocumented: string[];
   checked: number;
 }
 
@@ -48,7 +50,13 @@ export function validateEnvAgainstRegistry(
   entries: EnvRegistryValidationEntry[],
   env: Record<string, string | undefined>
 ): EnvValidationReport {
-  const report: EnvValidationReport = { errors: [], warnings: [], unknown: [], checked: 0 };
+  const report: EnvValidationReport = {
+    errors: [],
+    warnings: [],
+    unknown: [],
+    undocumented: [],
+    checked: 0,
+  };
   const registered = new Set(entries.map((entry) => entry.name));
 
   for (const key of Object.keys(env)) {
@@ -59,6 +67,7 @@ export function validateEnvAgainstRegistry(
   report.unknown.sort((a, b) => a.localeCompare(b));
 
   for (const entry of entries) {
+    if (entry.documented !== true) report.undocumented.push(entry.name);
     const value = env[entry.name];
     if (value === undefined || value === '') {
       if (entry.required) {
@@ -82,6 +91,8 @@ export function validateEnvAgainstRegistry(
     }
   }
 
+  report.undocumented.sort((a, b) => a.localeCompare(b));
+
   return report;
 }
 
@@ -96,7 +107,7 @@ export function formatEnvValidationReport(report: EnvValidationReport): string[]
   lines.push(
     `Env configuration: ${report.checked} registered variable(s) set, ` +
       `${report.errors.length} error(s), ${report.warnings.length} warning(s), ` +
-      `${report.unknown.length} unknown`
+      `${report.unknown.length} unknown, ${report.undocumented.length} undocumented`
   );
   for (const issue of report.errors) {
     lines.push(`  ✗ ${issue.name}: ${issue.issue}`);
@@ -108,6 +119,12 @@ export function formatEnvValidationReport(report: EnvValidationReport): string[]
     lines.push(
       `  ⚠ unregistered KYBERION_* variables set: ${report.unknown.join(', ')} ` +
         '(register via pnpm generate:env-registry)'
+    );
+  }
+  if (report.undocumented.length > 0) {
+    lines.push(
+      `  ⚠ ${report.undocumented.length} registered KYBERION_* variable(s) lack documentation ` +
+        '(curate description/documented in knowledge/product/governance/env-registry.json)'
     );
   }
   return lines;

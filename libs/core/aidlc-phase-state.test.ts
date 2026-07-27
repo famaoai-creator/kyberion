@@ -5,6 +5,7 @@ import {
   advanceAiDlcPhase,
   createAiDlcPhaseState,
   loadAiDlcPhaseState,
+  resumeAiDlcPhaseState,
   saveAiDlcPhaseState,
   tripAiDlcCircuitBreaker,
 } from './aidlc-phase-state.js';
@@ -124,5 +125,35 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     expect(loaded?.phase).toBe('execution');
     expect(loaded?.execution_result?.summary).toBe('done');
     expect(loadAiDlcPhaseState('MSN-NONE', baseDir)).toBeNull();
+  });
+
+  it('cleanly resumes a stopped state while retaining failure context', () => {
+    const baseDir = path.join(
+      pathResolver.active('shared/tmp/tests'),
+      `aidlc-resume-${Date.now()}`
+    );
+    let state = createAiDlcPhaseState('MSN-AIDLC-RESUME', { now: NOW });
+    state = tripAiDlcCircuitBreaker(
+      state,
+      {
+        failed_phase: 'execution',
+        what_failed: 'review approval is pending',
+        attempted: ['execution:passed'],
+        open_questions: ['who approves?'],
+      },
+      NOW
+    );
+    saveAiDlcPhaseState(state, baseDir);
+
+    const resumed = resumeAiDlcPhaseState('MSN-AIDLC-RESUME', {
+      baseDir,
+      now: '2026-07-11T12:05:00.000Z',
+    });
+    expect(resumed.phase).toBe('alignment');
+    expect(resumed.resume_count).toBe(1);
+    expect(resumed.failure_context?.what_failed).toBe('review approval is pending');
+    expect(loadAiDlcPhaseState('MSN-AIDLC-RESUME', baseDir)?.last_resumed_at).toBe(
+      '2026-07-11T12:05:00.000Z'
+    );
   });
 });

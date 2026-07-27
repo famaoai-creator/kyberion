@@ -20,7 +20,7 @@
 ## 実装状況 (2026-07-11)
 
 - **完了済み(Task 1 最小実証)**: `libs/core/aidlc-phase-state.ts` — `AiDlcPhaseState`(task_board_ref / execution_result / test_output / review_findings / failure_context / attempts[])と順序強制付きフェーズ遷移(Alignment→Execution→Test→Self-Review→complete)。下流フェーズは上流の構造化結果をデータとして受領(diff 再導出なし)。test/review ゲート失敗は自動で circuit breaker を作動し、failure_context(何が失敗・何を試した・残課題)付きで Alignment へ差し戻す。payload は summary+artifact_refs 形(MO-04 予算原則)。mission evidence への保存/再読込付き。スタブテスト5件。
-- 残: MO-01 code_change テンプレートへの配線(Task 1.2/1.4)、統合ハンドオフ履歴ビュー(Task 2)、clean 再開(Task 3)、playbook 整合(Task 4)。
+- 2026-07-27: `resumeAiDlcPhaseState` を追加し、`mission_controller resume` から `failure_context` を保持したまま再開できるようにした。`pnpm work history <correlation_id>`（JSON出力対応）で mission履歴・lease/coordination・監査・AI-DLC試行を統合表示し、playbook に自動経路と参照方法を追記。残: question-resolver の実際の回答イベントからの完全な再突入配線。
 
 ## 実装タスク
 

@@ -17,6 +17,8 @@
  * Usage:
  *   pnpm generate:env-registry          — rewrite the three artifacts
  *   pnpm check:env-registry             — fail if any artifact drifted
+ *   KYBERION_ENV_REGISTRY_STRICT=1 pnpm check:env-registry
+ *                                      — also fail while entries remain undocumented
  */
 
 import * as path from 'node:path';
@@ -197,6 +199,7 @@ function readIfExists(filePath: string): string | null {
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const shouldCheck = argv.includes('--check');
+  const strictDocumentation = process.env.KYBERION_ENV_REGISTRY_STRICT === '1';
   const rootDir = pathResolver.rootDir();
 
   const built = withExecutionContext('ecosystem_architect', () => {
@@ -225,6 +228,17 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (shouldCheck) {
     const drifted = targets.filter((target) => readIfExists(target.filePath) !== target.next);
     if (drifted.length === 0) {
+      if (strictDocumentation) {
+        const undocumented = built.entries.filter((entry) => !entry.documented);
+        if (undocumented.length > 0) {
+          console.error(
+            `env registry has ${undocumented.length} undocumented entr${undocumented.length === 1 ? 'y' : 'ies'} — ` +
+              'curate descriptions/documented before enabling strict mode'
+          );
+          process.exitCode = 1;
+          return;
+        }
+      }
       console.log('env registry is up to date');
       return;
     }

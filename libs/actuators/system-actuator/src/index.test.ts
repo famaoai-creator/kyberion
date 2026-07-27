@@ -27,6 +27,8 @@ const withinLoopBounds = vi.fn(
 const safeWriteFile = vi.fn();
 const safeMkdir = vi.fn();
 const safeExistsSync = vi.fn(() => false);
+const safeStat = vi.fn(() => ({ isDirectory: () => false }));
+const resolveActiveProfileRoot = vi.fn(() => '/tmp/active-profile');
 const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) =>
   results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'
 );
@@ -907,6 +909,8 @@ vi.mock('@agent/core', () => ({
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeStat,
+  resolveActiveProfileRoot,
   assertExecutionBounds,
   withinLoopBounds,
   DEFAULT_MAX_PIPELINE_STEPS,
@@ -1017,6 +1021,10 @@ vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),
 }));
 
+vi.mock('@agent/core/secure-io', () => ({
+  safeStat,
+}));
+
 vi.mock('@agent/shared-vision', () => ({
   consultVision: vi.fn(async () => ({ decision: 'ok' })),
 }));
@@ -1044,6 +1052,8 @@ beforeEach(() => {
   safeWriteFile.mockImplementation(() => {});
   safeMkdir.mockImplementation(() => {});
   safeExistsSync.mockImplementation(() => false);
+  safeStat.mockImplementation(() => ({ isDirectory: () => false }));
+  resolveActiveProfileRoot.mockImplementation(() => '/tmp/active-profile');
   derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) =>
     results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'
   );
@@ -1769,6 +1779,46 @@ describe('system-actuator computer_interaction adapter', () => {
 
 describe('system-actuator new OS automation ops (pipeline mode)', () => {
   describe('capture ops', () => {
+    it('probe_active_profile: resolves relative paths against the active profile', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.resolveActiveProfileRoot).mockReturnValue('/tmp/customer/acme');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'probe_active_profile',
+            params: { path: 'my-identity.json', export_as: 'identity' },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(core.safeExistsSync).toHaveBeenCalledWith('/tmp/customer/acme/my-identity.json');
+      expect(result.context.identity).toEqual({
+        path: 'my-identity.json',
+        exists: true,
+        kind: 'file',
+      });
+    });
+
+    it('probe_active_profile: rejects absolute and traversal paths', async () => {
+      const { handleAction } = await import('./index');
+
+      for (const pathValue of ['../secret', '/etc/passwd']) {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'probe_active_profile', params: { path: pathValue } }],
+        } as any);
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toContain('safe profile-relative path');
+      }
+    });
+
     it('screenshot: creates dir when missing and returns path', async () => {
       const { handleAction } = await import('./index');
       const core = await import('@agent/core');

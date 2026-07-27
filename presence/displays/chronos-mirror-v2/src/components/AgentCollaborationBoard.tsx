@@ -65,6 +65,37 @@ const KIND_LABEL: Record<string, string> = {
   unknown: '不明',
 };
 
+export type CollaborationAttentionAction =
+  | {
+      mode: 'view';
+      viewId:
+        | 'secret-approval-queue'
+        | 'runtime-topology-map'
+        | 'runtime-lease-doctor'
+        | 'trace-viewer';
+      label: string;
+    }
+  | { mode: 'mission'; label: string };
+
+export function attentionActionForKind(kind: string): CollaborationAttentionAction | null {
+  switch (kind) {
+    case 'approval':
+      return { mode: 'view', viewId: 'secret-approval-queue', label: '承認キューを開く' };
+    case 'failure':
+      return { mode: 'view', viewId: 'runtime-topology-map', label: 'Runtime を確認' };
+    case 'retry':
+      return { mode: 'view', viewId: 'runtime-lease-doctor', label: '再試行・lease診断を開く' };
+    case 'handoff':
+      return { mode: 'view', viewId: 'trace-viewer', label: '引き継ぎ履歴を開く' };
+    case 'waiting':
+    case 'blocked':
+    case 'review':
+      return { mode: 'mission', label: '停止・再開操作を開く' };
+    default:
+      return null;
+  }
+}
+
 function Stat({
   label,
   value,
@@ -91,7 +122,12 @@ export function AgentCollaborationBoard({
   tenant?: string;
   onOpenMission?: (missionId: string) => void;
   onOpenView?: (
-    viewId: 'secret-approval-queue' | 'runtime-topology-map' | 'mission-control-plane'
+    viewId:
+      | 'secret-approval-queue'
+      | 'runtime-topology-map'
+      | 'runtime-lease-doctor'
+      | 'trace-viewer'
+      | 'mission-control-plane'
   ) => void;
 }) {
   const [projection, setProjection] = React.useState<CollaborationProjection | null>(null);
@@ -206,22 +242,31 @@ export function AgentCollaborationBoard({
                       ミッションを開く
                     </button>
                   ) : null}
-                  {item.kind === 'approval' && onOpenView ? (
+                  {attentionActionForKind(item.kind)?.mode === 'view' && onOpenView ? (
                     <button
                       type="button"
-                      onClick={() => onOpenView('secret-approval-queue')}
+                      aria-label={attentionActionForKind(item.kind)?.label}
+                      title={attentionActionForKind(item.kind)?.label}
+                      onClick={() => {
+                        const action = attentionActionForKind(item.kind);
+                        if (action?.mode === 'view') onOpenView(action.viewId);
+                      }}
                       className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning hover:kb-status-warning-surface"
                     >
-                      承認キューを開く
+                      {attentionActionForKind(item.kind)?.label}
                     </button>
                   ) : null}
-                  {item.kind === 'failure' && onOpenView ? (
+                  {attentionActionForKind(item.kind)?.mode === 'mission' &&
+                  item.mission_id &&
+                  onOpenMission ? (
                     <button
                       type="button"
-                      onClick={() => onOpenView('runtime-topology-map')}
-                      className="rounded border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] kb-status-negative hover:kb-status-negative-surface"
+                      aria-label={attentionActionForKind(item.kind)?.label}
+                      title={attentionActionForKind(item.kind)?.label}
+                      onClick={() => onOpenMission(item.mission_id as string)}
+                      className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning hover:kb-status-warning-surface"
                     >
-                      Runtime を確認
+                      {attentionActionForKind(item.kind)?.label}
                     </button>
                   ) : null}
                 </div>
