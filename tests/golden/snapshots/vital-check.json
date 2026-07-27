@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-20T13:32:44.702Z",
+  "generated_at": "2026-07-27T13:50:38.303Z",
   "pipeline_id": "vital-check",
   "pipeline_path": "pipelines/vital-check.json",
-  "result_hash": "4dcb35cbf372ba7e7f00b17e7e1ff9e415af040eefa438f18741bc33ee626ff8",
+  "result_hash": "78b927db300a8952fd53da04e075d0cd336ee8a43698c36d0b8f8f75b811392d",
   "result": {
     "status": "succeeded",
     "results": [
@@ -31,11 +31,11 @@
         "status": "success"
       },
       {
-        "op": "system:probe",
+        "op": "system:probe_active_profile",
         "status": "success"
       },
       {
-        "op": "system:probe",
+        "op": "system:probe_active_profile",
         "status": "success"
       },
       {
