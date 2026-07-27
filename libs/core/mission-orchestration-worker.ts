@@ -35,7 +35,11 @@ import {
   PlanningReviewVerdictSchema,
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
-import { evaluateMissionGate, type MissionGateDefinition } from './mission-gate-engine.js';
+import {
+  evaluateMissionGate,
+  writeMissionGateRecord,
+  type MissionGateDefinition,
+} from './mission-gate-engine.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -117,7 +121,12 @@ import {
   loadMissionOrchestrationReplayPlan,
 } from './mission-orchestration-journal.js';
 import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
-import { emitIntentSnapshot, mapStageToLoopPhase } from './intent-snapshot-store.js';
+import {
+  emitIntentSnapshot,
+  latestSnapshot,
+  mapStageToLoopPhase,
+} from './intent-snapshot-store.js';
+import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
@@ -171,11 +180,47 @@ function emitWorkerTransitionSnapshot(
           goalHint ?? `Mission ${missionId} progressing through ${mapStageToLoopPhase(stageKey)}`,
       },
     });
+    recordWorkerIntentDriftObservation(missionId, stageKey);
   } catch (err: any) {
     // evidence dir may not yet exist on very first events; keep worker non-blocking
     logger.warn(
       `[worker] intent snapshot skipped for ${missionId}/${stageKey}: ${err?.message ?? err}`
     );
+  }
+}
+
+/**
+ * IL-03: inspect the original user intent after every worker transition.
+ * This is deliberately warn-first: the phase-exit evaluator below is the
+ * enforcement boundary, while this record makes drift visible while work is
+ * still running instead of only at completion.
+ */
+function recordWorkerIntentDriftObservation(missionId: string, stage: string): void {
+  if (resolvePhaseGateMode() === 'off') return;
+  const summary = evaluateMissionIntentDrift(missionId);
+  if (!summary || summary.verdict === 'no_history') return;
+  try {
+    writeMissionGateRecord({
+      missionId,
+      gateId: 'INTENT_DRIFT',
+      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+      payload: {
+        phase: stage,
+        position: 'execution',
+        source: 'worker_transition',
+        verdict: summary.passed ? 'pass' : 'fail',
+        reason: summary.message,
+        drift_score: summary.drift_score,
+        checked_at: summary.checked_at,
+      },
+    });
+  } catch (err: any) {
+    logger.warn(
+      `[worker] intent drift observation skipped for ${missionId}/${stage}: ${err?.message ?? err}`
+    );
+  }
+  if (!summary.passed) {
+    logger.warn(`[worker] intent drift detected for ${missionId}/${stage}: ${summary.message}`);
   }
 }
 
@@ -4199,15 +4244,41 @@ export async function evaluateMissionPhaseExitGates(
   );
   const priorRecords = loadMissionGateRecords(missionId);
   const failures: PhaseExitGateOutcome['failures'] = [];
+  const driftSummary = evaluateMissionIntentDrift(missionId);
+  const hasPersistedDriftGate = definitions.some(
+    (definition) => definition.gate.id === 'INTENT_DRIFT'
+  );
   for (const definition of definitions) {
     const priorFailures = priorRecords.filter(
       (record) => record.gate_id === definition.gate.id && record.verdict === 'fail'
     ).length;
-    const evaluation = await evaluateMissionGate({
-      missionId,
-      gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
-      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
-    });
+    const evaluation =
+      definition.gate.id === 'INTENT_DRIFT' && driftSummary
+        ? {
+            verdict: driftSummary.passed ? ('pass' as const) : ('fail' as const),
+            reasons: driftSummary.passed ? [] : [driftSummary.message],
+          }
+        : await evaluateMissionGate({
+            missionId,
+            gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
+            evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+          });
+    if (definition.gate.id === 'INTENT_DRIFT' && driftSummary) {
+      writeMissionGateRecord({
+        missionId,
+        gateId: 'INTENT_DRIFT',
+        evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+        payload: {
+          phase: definition.phase,
+          position: 'exit',
+          source: 'phase_exit',
+          verdict: evaluation.verdict,
+          reason: driftSummary.message,
+          drift_score: driftSummary.drift_score,
+          checked_at: driftSummary.checked_at,
+        },
+      });
+    }
     if (evaluation.verdict !== 'pass') {
       failures.push({
         gate_id: definition.gate.id,
@@ -4217,7 +4288,43 @@ export async function evaluateMissionPhaseExitGates(
       });
     }
   }
-  return { passed: failures.length === 0, evaluated: definitions.length, failures };
+  // Make INTENT_DRIFT a built-in execution gate for workflows that predate
+  // the catalog entry. Missions with no user-origin snapshot remain a clean
+  // no-op, preserving deterministic CLI-only and fixture missions.
+  if (!hasPersistedDriftGate && driftSummary && driftSummary.verdict !== 'no_history') {
+    const priorFailures = priorRecords.filter(
+      (record) => record.gate_id === 'INTENT_DRIFT' && record.verdict === 'fail'
+    ).length;
+    writeMissionGateRecord({
+      missionId,
+      gateId: 'INTENT_DRIFT',
+      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+      payload: {
+        phase: latestSnapshot(missionId)?.stage || 'execution',
+        position: 'exit',
+        source: 'phase_exit',
+        verdict: driftSummary.passed ? 'pass' : 'fail',
+        reason: driftSummary.message,
+        drift_score: driftSummary.drift_score,
+        checked_at: driftSummary.checked_at,
+      },
+    });
+    if (!driftSummary.passed) {
+      failures.push({
+        gate_id: 'INTENT_DRIFT',
+        phase: latestSnapshot(missionId)?.stage || 'execution',
+        reasons: [driftSummary.message],
+        prior_failures: priorFailures,
+      });
+    }
+  }
+  return {
+    passed: failures.length === 0,
+    evaluated:
+      definitions.length +
+      (!hasPersistedDriftGate && driftSummary && driftSummary.verdict !== 'no_history' ? 1 : 0),
+    failures,
+  };
 }
 
 function syncPlanningArtifacts(missionId: string): void {

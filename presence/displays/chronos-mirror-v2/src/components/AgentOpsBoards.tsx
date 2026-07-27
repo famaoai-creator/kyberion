@@ -44,7 +44,12 @@ export function AgentOpsBoards({
 }: {
   onOpenMission?: (missionId: string) => void;
   onOpenView?: (
-    viewId: 'secret-approval-queue' | 'runtime-topology-map' | 'mission-control-plane'
+    viewId:
+      | 'secret-approval-queue'
+      | 'runtime-topology-map'
+      | 'runtime-lease-doctor'
+      | 'trace-viewer'
+      | 'mission-control-plane'
   ) => void;
 }) {
   const [board, setBoard] = React.useState<Board | null>(null);

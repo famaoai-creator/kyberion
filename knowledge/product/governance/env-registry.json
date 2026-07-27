@@ -887,6 +887,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_DOCUMENTED",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_DRAFT_REFINE",
       "category": "runtime",
       "type": "string",
@@ -922,6 +930,14 @@
       "name": "KYBERION_ENABLE_SERVICE_ACTUATE_TOOL",
       "category": "flag",
       "type": "boolean",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_ENV_REGISTRY_STRICT",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
@@ -2719,6 +2735,14 @@
     },
     {
       "name": "KYBERION_UI_LOCALE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_UNDOCUMENTED",
       "category": "runtime",
       "type": "string",
       "required": false,

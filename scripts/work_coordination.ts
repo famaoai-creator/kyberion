@@ -1,4 +1,4 @@
-import { createStandardYargs, logger } from '@agent/core';
+import { auditChain, createStandardYargs, logger } from '@agent/core';
 import {
   appendCoordinationEvent,
   getWorkCoordinationImportCatalogEntryByCommand,
@@ -21,13 +21,23 @@ import {
   type WorkItemPriority,
   type WorkItemSource,
   type WorkItemStatus,
+  buildIntegratedHandoffHistory,
+  formatIntegratedHandoffHistory,
+  loadAiDlcPhaseState,
+  pathResolver,
+  safeExistsSync,
+  safeReaddir,
 } from '@agent/core';
 import { safeReadFile } from '@agent/core';
+import * as path from 'node:path';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
   if (typeof value !== 'string' || !value.trim()) return [];
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function json(value: unknown): Record<string, unknown> | undefined {
@@ -37,6 +47,36 @@ function json(value: unknown): Record<string, unknown> | undefined {
 
 function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
+}
+
+function discoverReadableMissionStates(): Array<{ missionId: string; state: any }> {
+  const roots = [pathResolver.active('missions'), pathResolver.active('archive/missions')];
+  const states: Array<{ missionId: string; state: any }> = [];
+  const seen = new Set<string>();
+  const visit = (root: string, nested = false): void => {
+    if (!safeExistsSync(root)) return;
+    for (const entry of safeReaddir(root)) {
+      const candidate = nested
+        ? path.join(root, entry, 'mission-state.json')
+        : path.join(root, entry, 'mission-state.json');
+      if (safeExistsSync(candidate)) {
+        try {
+          const state = JSON.parse(String(safeReadFile(candidate, { encoding: 'utf8' }) || '{}'));
+          const missionId = String(state?.mission_id || path.basename(path.dirname(candidate)));
+          if (!seen.has(missionId)) {
+            seen.add(missionId);
+            states.push({ missionId, state });
+          }
+        } catch {
+          // Ignore malformed mission state; the history view remains best-effort.
+        }
+        continue;
+      }
+      if (!nested) visit(path.join(root, entry), true);
+    }
+  };
+  for (const root of roots) visit(root);
+  return states;
 }
 
 async function main(): Promise<void> {
@@ -53,6 +93,7 @@ async function main(): Promise<void> {
     .command('list-items', 'List work items', () => undefined)
     .command('list-events', 'List coordination events', () => undefined)
     .command('list-leases', 'List active leases', () => undefined)
+    .command('history <correlationId>', 'Show the integrated handoff history', () => undefined)
     .demandCommand(1)
     .option('item-id', { type: 'string' })
     .option('board-id', { type: 'string' })
@@ -89,10 +130,13 @@ async function main(): Promise<void> {
     .option('note', { type: 'string' })
     .option('payload', { type: 'string' })
     .option('project', { type: 'string' })
-    ;
-
+    .option('json', { type: 'boolean', default: false });
   for (const entry of listWorkCoordinationImportCatalogEntries()) {
-    yargs.command(entry.command, entry.summary || `Import a ${entry.source} issue JSON file`, () => undefined);
+    yargs.command(
+      entry.command,
+      entry.summary || `Import a ${entry.source} issue JSON file`,
+      () => undefined
+    );
   }
 
   const argv = await yargs.parseSync();
@@ -237,14 +281,46 @@ async function main(): Promise<void> {
     case 'list-leases':
       print({ leases: listActiveWorkLeases() });
       break;
+    case 'history': {
+      const correlationId = String(argv.correlationId || '').trim();
+      if (!correlationId) throw new Error('Missing correlation id');
+      const missions = discoverReadableMissionStates().flatMap(({ missionId, state }) => {
+        let aidlcState = null;
+        try {
+          aidlcState = loadAiDlcPhaseState(missionId);
+        } catch {
+          // Keep the mission row; its phase state may be in a restricted tier.
+        }
+        return [
+          {
+            missionId,
+            state,
+            aidlcState,
+          },
+        ];
+      });
+      const rows = buildIntegratedHandoffHistory({
+        correlationId,
+        missions,
+        coordinationEvents: listCoordinationEvents(),
+        auditEntries: auditChain.loadAll(),
+      });
+      if (argv.json) print({ correlationId, rows });
+      else console.log(formatIntegratedHandoffHistory(correlationId, rows));
+      break;
+    }
     default: {
       const importEntry = getWorkCoordinationImportCatalogEntryByCommand(command);
       if (!importEntry) {
         throw new Error(`unknown command '${command}'`);
       }
       if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = JSON.parse(String(safeReadFile(String(argv.input), { encoding: 'utf8' }) || '{}'));
-      const projectId = argv.project ? String(argv.project) : importEntry.default_project_id || undefined;
+      const issue = JSON.parse(
+        String(safeReadFile(String(argv.input), { encoding: 'utf8' }) || '{}')
+      );
+      const projectId = argv.project
+        ? String(argv.project)
+        : importEntry.default_project_id || undefined;
       const result =
         importEntry.source === 'github'
           ? importGitHubIssueWithEvent(issue, projectId || 'github')

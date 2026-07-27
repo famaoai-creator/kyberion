@@ -80,6 +80,13 @@ _When things go wrong. If an unexpected error occurs during execution, trigger a
 
 This playbook's phase discipline is automated by the mission process templates and phase gates:
 
+For automated code-change missions, the authoritative path is the MO-01
+`code-change-aidlc` template plus the HO-02 `AiDlcPhaseState`. This document
+remains the human-readable fallback and learning guide. The persisted state
+threads summaries and artifact references between phases, retains
+`failure_context` when the circuit breaker returns to Alignment, and can be
+cleanly resumed with the same context.
+
 | Playbook concept              | Automated by                                                                                                                                               |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Phase plan approval           | planning gate — `planning_packet` schema validation + independent plan review (mission-orchestration-worker)                                               |
@@ -87,3 +94,14 @@ This playbook's phase discipline is automated by the mission process templates a
 | Adversarial verification      | reviewer tasks (`reviewer_approved` checks) resolved from NEXT_TASKS.json outcomes                                                                         |
 | Phase 4 circuit breaker       | phase exit gates before mission completion — `KYBERION_PHASE_GATE_MODE` (`warn` default → `enforce`); repeated failures raise a realignment recommendation |
 | Manual gate verdicts          | `gate-pass` / `gate-fail` mission-controller verbs, recorded as overrides under `missions/<id>/gates/`                                                     |
+
+The integrated handoff timeline is available with:
+
+```bash
+pnpm work history <correlation_id>
+pnpm work history <correlation_id> --json
+```
+
+It joins mission persona history, lease/coordination events, audit entries,
+and AI-DLC phase attempts. Confidential mission contents are shown as
+references rather than copied into the operator view.

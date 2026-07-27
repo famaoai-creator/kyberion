@@ -257,7 +257,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (137)
+## runtime (140)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -302,9 +302,11 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DEPLOY_PROJECT`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DEPLOYMENT_PROJECT`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DISPATCH_MAX_ROUNDS`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DOCUMENTED`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DRAFT_REFINE`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EGRESS_POLICY`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EMAIL_FROM`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_ENV_REGISTRY_STRICT`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FORMAT`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GATE_OVERRIDE_SIGNATURE`             | string | no       | _undocumented_                                                                                          |
@@ -389,6 +391,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TIMEZONE`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TTS_ARGS`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_UI_LOCALE`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_UNDOCUMENTED`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VAD`                                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIDEO_RENDER_RUN_MODE`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_LANGUAGE`                      | string | no       | _undocumented_                                                                                          |

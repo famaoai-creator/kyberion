@@ -52,3 +52,7 @@
 - ドリフト検出の実効化は**進行中ミッションを止め得る**。閾値は保守的に始め、まず warn(検知を記録・通知するがブロックしない)で観測 → enforce。MO-02 の circuit breaker と同じ段階導入。
 - ドリフト判定が LLM を使う場合、stub backend では形骸化する。テストは判定応答を fixture 注入。判定コストが高いので、フェーズ遷移時のみ(全ステップでなく)評価する。
 - 「逸脱」と「深化(同じ goal のより詳細な達成)」を誤判定しないよう、比較は goal.success_condition 充足方向の変化を見る(表層テキスト差分でなく)。IL-04 の完了突合と判定ロジックを共有する。
+
+## 実装状況
+
+- 2026-07-27: worker の各遷移で `INTENT_DRIFT` の観測記録を追加し、phase exit ではカタログにゲートが無い既存ミッションにも起点 intent 対現在の評価を組み込んだ。既定 warn、`KYBERION_PHASE_GATE_MODE=enforce` では完了前にブロックする。blocking drift の phase-exit テストを追加。
