@@ -25,6 +25,7 @@ describe('pipeline-preview', () => {
       expect(result.totalSteps).toBe(2);
       expect(result.steps).toHaveLength(2);
       expect(result.errors).toHaveLength(0);
+      expect(result.graph?.mermaid).toContain('flowchart TD');
     });
 
     it('with missing steps returns valid: false', () => {
@@ -192,6 +193,27 @@ describe('pipeline-preview', () => {
       expect(result.steps[1].resolvedParams.message).toContain('Required inputs');
       expect(result.steps[2].resolvedParams.message).toContain('preview it with');
     });
+  });
+
+  it('renders explicit graph edges in the preview', () => {
+    const result = previewPipeline({
+      steps: [
+        { id: 'source', op: 'system:log', params: {}, produces: 'items' },
+        {
+          id: 'join',
+          op: 'system:log',
+          params: {},
+          consumes: 'items',
+          depends_on: ['source'],
+          merge: 'collect',
+        },
+      ],
+    });
+    expect(result.valid).toBe(true);
+    expect(result.graph?.edges).toEqual(
+      expect.arrayContaining([{ from: 'source', to: 'join', kind: 'data', channel: 'items' }])
+    );
+    expect(result.graph?.mermaid).toContain('data:items');
   });
 
   describe('describeStep (via previewPipeline)', () => {

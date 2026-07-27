@@ -113,6 +113,12 @@ describe('logic-utils', () => {
     expect(evaluateCondition({ from: 'mission.priority', operator: 'unknown' }, ctx)).toBe(true);
   });
 
+  it('rejects expression-like string conditions instead of silently returning false', () => {
+    expect(() => evaluateCondition('items.length > 0', { items: [1] })).toThrow(
+      /Unsafe string condition/
+    );
+  });
+
   it('builds unified write artifact specs from path, output_path, content, and from', () => {
     expect(resolveWriteArtifactSpec({ path: 'out.txt', content: 'hello' }, ctx)).toEqual({
       path: 'out.txt',

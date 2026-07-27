@@ -233,11 +233,13 @@ describe('agy-cli-backend', () => {
       spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
 
       const backend = new AgyCliBackend({ bin: 'agy', model: 'agy', timeoutMs: 9876 });
-      await backend.prompt('hello');
+      const controller = new AbortController();
+      await backend.delegateTask('hello', undefined, { signal: controller.signal });
 
       expect(withWallClockBudgetMock).toHaveBeenCalledTimes(1);
       const [opts, fn] = withWallClockBudgetMock.mock.calls[0];
       expect(opts).toMatchObject({ provider: 'agy', budgetMs: 9876 });
+      expect(opts.signal).toBe(controller.signal);
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
     });

@@ -23,6 +23,7 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ReasoningCallOptions,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
@@ -200,10 +201,19 @@ function joinEndpoint(baseURL: string, suffix: string): string {
   return url.toString();
 }
 
-function buildAbortSignal(timeoutMs: number): AbortSignal | undefined {
+function buildAbortSignal(
+  timeoutMs: number,
+  externalSignal?: AbortSignal
+): AbortSignal | undefined {
   if (!globalThis.AbortController) return undefined;
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), timeoutMs).unref?.();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
+  if (externalSignal) {
+    const abort = () => controller.abort(externalSignal.reason);
+    if (externalSignal.aborted) abort();
+    else externalSignal.addEventListener('abort', abort, { once: true });
+  }
   return controller.signal;
 }
 
@@ -443,8 +453,13 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean } = {}
+    opts: { useTools?: boolean; signal?: AbortSignal } = {}
   ): Promise<ChatCompletionResponse> {
+    if (opts.signal?.aborted) {
+      throw opts.signal.reason instanceof Error
+        ? opts.signal.reason
+        : new Error('[DELEGATION_CANCELLED] local reasoning operation aborted');
+    }
     assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -468,7 +483,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: buildAbortSignal(this.timeoutMs),
+      signal: buildAbortSignal(this.timeoutMs, opts.signal),
     });
 
     const text = await response.text();
@@ -516,7 +531,17 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     }
   }
 
-  async prompt(prompt: string, context?: unknown): Promise<string> {
+  async prompt(
+    prompt: string,
+    contextOrOptions?: unknown,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const optionsWithSignal =
+      options ??
+      (contextOrOptions && typeof contextOrOptions === 'object' && 'signal' in contextOrOptions
+        ? (contextOrOptions as ReasoningCallOptions)
+        : undefined);
+    const context = optionsWithSignal === contextOrOptions ? undefined : contextOrOptions;
     const redactedContext = context === undefined ? undefined : redactSensitiveObject(context);
     const messages: ChatMessage[] = [
       {
@@ -538,7 +563,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       },
     ];
 
-    let response = await this.fetchChatCompletion(messages);
+    let response = await this.fetchChatCompletion(messages, { signal: optionsWithSignal?.signal });
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
     // KD-08: record the stable-prefix baseline for this turn before any tool
@@ -575,7 +600,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         });
       }
       prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
-      response = await this.fetchChatCompletion(messages);
+      response = await this.fetchChatCompletion(messages, { signal: optionsWithSignal?.signal });
       message = response.choices[0].message;
     }
 
@@ -669,8 +694,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     );
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`);
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`, undefined, options);
   }
 }
 

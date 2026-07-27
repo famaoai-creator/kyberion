@@ -194,6 +194,32 @@ describe('openai-compatible-backend', () => {
     expect(body.tool_choice).toBeUndefined();
   });
 
+  it('propagates delegation cancellation to the OpenAI-compatible fetch', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          });
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'llama3',
+      timeoutMs: 60_000,
+    });
+
+    const pending = backend.delegateTask('wait', undefined, { signal: controller.signal });
+    controller.abort();
+
+    await expect(pending).rejects.toThrow('aborted');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  });
+
   it('stops repeated identical tool calls through the guardrail', async () => {
     const makeResponse = (id: string) =>
       new Response(

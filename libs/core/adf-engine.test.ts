@@ -11,6 +11,151 @@ vi.mock('./core.js', () => ({
 }));
 
 describe('executeAdfSteps', () => {
+  it('executes declared graph nodes with a completion-driven frontier', async () => {
+    const events: string[] = [];
+    const result = await executeAdfSteps(
+      [
+        { id: 'slow', type: 'capture', op: 'slow', params: {}, depends_on: [] } as any,
+        { id: 'fast', type: 'capture', op: 'fast', params: {}, depends_on: [] } as any,
+        {
+          id: 'slow-child',
+          type: 'transform',
+          op: 'slow-child',
+          params: {},
+          depends_on: ['slow'],
+        } as any,
+        {
+          id: 'fast-child',
+          type: 'transform',
+          op: 'fast-child',
+          params: {},
+          depends_on: ['fast'],
+        } as any,
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000, maxConcurrency: 2 },
+      {
+        capture: async (op, _params, ctx) => {
+          events.push(`start:${op}`);
+          await new Promise((resolve) => setTimeout(resolve, op === 'slow' ? 20 : 1));
+          events.push(`end:${op}`);
+          return { ...ctx, [op]: true };
+        },
+        transform: async (op, _params, ctx) => {
+          events.push(`start:${op}`);
+          return { ...ctx, [op]: true };
+        },
+        apply: async (_op, _params, ctx) => ctx,
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context).toMatchObject({
+      slow: true,
+      fast: true,
+      'fast-child': true,
+      'slow-child': true,
+    });
+    expect(events.indexOf('start:fast-child')).toBeLessThan(events.indexOf('end:slow'));
+  });
+
+  it('honors explicit step resource claims without inferring ownership claims', async () => {
+    const events: string[] = [];
+    let releaseFirst!: () => void;
+    const firstReleased = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const execution = executeAdfSteps(
+      [
+        {
+          id: 'first',
+          type: 'capture',
+          op: 'first',
+          params: {},
+          depends_on: [],
+          resource_claims: ['workspace:shared'],
+        } as any,
+        {
+          id: 'second',
+          type: 'capture',
+          op: 'second',
+          params: {},
+          depends_on: [],
+          resource_claims: ['workspace:shared'],
+        } as any,
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000, maxConcurrency: 2 },
+      {
+        capture: async (op, _params, ctx) => {
+          events.push(`start:${op}`);
+          if (op === 'first') await firstReleased;
+          events.push(`end:${op}`);
+          return { ...ctx, [op]: true };
+        },
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => ctx,
+      }
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(events).toEqual(['start:first']);
+    releaseFirst();
+    await execution;
+    expect(events).toEqual(['start:first', 'end:first', 'start:second', 'end:second']);
+  });
+
+  it('derives conservative typed file claims for graph steps without explicit claims', async () => {
+    const events: string[] = [];
+    let releaseFirst!: () => void;
+    const firstReleased = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const execution = executeAdfSteps(
+      [
+        {
+          id: 'read-a',
+          type: 'apply',
+          op: 'file:read_file',
+          params: { path: 'shared.txt' },
+          depends_on: [],
+        } as any,
+        {
+          id: 'read-b',
+          type: 'apply',
+          op: 'file:read_file',
+          params: { path: 'shared.txt' },
+          depends_on: [],
+        } as any,
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000, maxConcurrency: 2 },
+      {
+        capture: async (_op, _params, ctx) => ctx,
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (op, _params, ctx) => {
+          events.push(`start:${op}`);
+          if (op === 'file:read_file') {
+            if (events.length === 1) await firstReleased;
+          }
+          events.push(`end:${op}`);
+          return ctx;
+        },
+      }
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(events).toEqual(['start:file:read_file']);
+    releaseFirst();
+    await execution;
+    expect(events).toEqual([
+      'start:file:read_file',
+      'end:file:read_file',
+      'start:file:read_file',
+      'end:file:read_file',
+    ]);
+  });
+
   it('executes nested control steps with a shared step budget', async () => {
     const result = await executeAdfSteps(
       [
@@ -327,7 +472,12 @@ describe('executeAdfSteps', () => {
       }));
 
       await expect(
-        executeAdfSteps(steps, {}, { maxSteps: 100, timeoutMs: 10_000, onRepeatForceStop }, passthroughHandlers)
+        executeAdfSteps(
+          steps,
+          {},
+          { maxSteps: 100, timeoutMs: 10_000, onRepeatForceStop },
+          passthroughHandlers
+        )
       ).rejects.toThrow('[TOOL_CALL_REPEAT]');
       expect(onRepeatForceStop).toHaveBeenCalledTimes(1);
       expect(onRepeatForceStop.mock.calls[0][1].streak).toBe(12);

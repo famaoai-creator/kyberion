@@ -54,6 +54,18 @@ import {
   resolveOpAccessClaims,
   type ResourceClaim,
   type OpInputDomain,
+  createPipelineRunJournal,
+  openPipelineRunJournal,
+  loadPipelineRunJournal,
+  newPipelineRunId,
+  hashPipelineOutput,
+  type PipelineRunJournalHandle,
+  type PipelineRunJournalState,
+  deriveExecutionGraph,
+  createGraphRunArtifact,
+  recordGraphRunNode,
+  persistGraphRunArtifact,
+  type GraphRunArtifact,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -383,6 +395,9 @@ interface RunStepsOptions {
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;
   quiet?: boolean;
+  runJournal?: PipelineRunJournalHandle;
+  resumeState?: PipelineRunJournalState;
+  runId?: string;
 }
 
 function resolveParamsRecursive(params: any, ctx: any): any {
@@ -983,6 +998,7 @@ async function runInlineCoreTransform(
 
 const CONTROL_ACTIONS = new Set([
   'if',
+  'switch',
   'while',
   'loop_until',
   'retry_until_quality',
@@ -1474,6 +1490,19 @@ async function runStepsInternal(
       return ctx;
     }
 
+    if (action === 'switch') {
+      const cases = Array.isArray(params.cases) ? params.cases : [];
+      const selected = cases.find((entry: any) =>
+        evaluateCondition(entry.when ?? entry.condition, ctx)
+      );
+      const branch = selected?.steps ?? selected?.pipeline ?? selected?.then ?? params.default;
+      if (Array.isArray(branch)) {
+        const nested = await runBody(branch, ctx, 'core:switch branch failed');
+        return nested.context;
+      }
+      return skipAdfStep(ctx, 'core:switch selected no case and no default branch');
+    }
+
     if (action === 'while' || action === 'loop_until' || action === 'retry_until_quality') {
       const body = Array.isArray(params.pipeline)
         ? (params.pipeline as PipelineAdfStep[])
@@ -1548,6 +1577,10 @@ async function runStepsInternal(
         { op: rawOp, params } as PipelineAdfStep,
         'last_parallel_foreach'
       );
+      const mergePolicy =
+        params.merge === 'last' || params.merge === 'namespace' || params.merge === 'collect'
+          ? params.merge
+          : 'collect';
       const originalItemValue = (ctx as any)[itemName];
       const originalSharedCtx = { ...ctx };
       const preparedBody = prepareEngineSteps(subSteps);
@@ -1577,7 +1610,14 @@ async function runStepsInternal(
       let workingCtx: Record<string, unknown> = { ...ctx, [exportKey]: perItemOutputs };
       if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
       else (workingCtx as any)[itemName] = originalItemValue;
-      if (perItemContexts.length > 0) {
+      if (mergePolicy === 'namespace') {
+        workingCtx = {
+          ...workingCtx,
+          [exportKey]: Object.fromEntries(
+            perItemContexts.map((itemContext, index) => [String(index), itemContext])
+          ),
+        };
+      } else if (mergePolicy === 'last' && perItemContexts.length > 0) {
         workingCtx = { ...workingCtx, ...perItemContexts[perItemContexts.length - 1] };
       }
       return workingCtx;
@@ -1795,6 +1835,13 @@ async function runStepsInternal(
     const step = stepRefStack[stepRefStack.length - 1];
     const stepPolicy = normalizeReasoningPolicy(step);
 
+    // GE-04: completed nodes are terminal successes on resume. The caller
+    // restored their declared channels into the seed context before entering
+    // the engine, so this path never dispatches an actuator or repair.
+    if (step.id && opts.resumeState?.completed_nodes.has(step.id)) {
+      return { ...ctx };
+    }
+
     if (step.hooks?.before?.length) {
       const decision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
       if (decision === 'abort') throw new Error('aborted by before hook');
@@ -1928,6 +1975,36 @@ async function runStepsInternal(
         status: outcome.status,
         ...(outcome.error && outcome.status === 'failed' ? { error: outcome.error } : {}),
       });
+      if (opts.runJournal && step.id && !opts.resumeState?.completed_nodes.has(step.id)) {
+        const journalDeclaredChannel = step.produces
+          ? typeof step.produces === 'string'
+            ? step.produces
+            : step.produces.channel
+          : typeof step.params?.export_as === 'string'
+            ? step.params.export_as
+            : undefined;
+        const snapshot: Record<string, unknown> = {};
+        if (
+          journalDeclaredChannel &&
+          Object.prototype.hasOwnProperty.call(ctx, journalDeclaredChannel)
+        ) {
+          snapshot[journalDeclaredChannel] = ctx[journalDeclaredChannel];
+        }
+        if (outcome.status === 'failed') {
+          opts.runJournal.append('node_failed', {
+            step_id: step.id,
+            error: outcome.error || 'step failed',
+            duration_ms: durationMs,
+          });
+        } else if (outcome.status === 'success' || outcome.status === 'recovered') {
+          opts.runJournal.append('node_completed', {
+            step_id: step.id,
+            output_channels_snapshot: snapshot,
+            output_hash: hashPipelineOutput(snapshot),
+            duration_ms: durationMs,
+          });
+        }
+      }
       // OH-04 offloads oversized step output to an artifact and leaves a
       // `{artifact_path, preview}` reference behind. That is right for tool
       // logs, but a step's declared channel exists precisely so a later step
@@ -1973,7 +2050,7 @@ async function runStepsInternal(
   };
 
   const pipelineOptions = (initialCtx as any).__pipeline_options as
-    | { max_steps?: unknown; timeout_ms?: unknown }
+    | { max_steps?: unknown; timeout_ms?: unknown; max_concurrency?: unknown }
     | undefined;
   const explicitMaxSteps = Number(pipelineOptions?.max_steps);
   const explicitTimeoutMs = Number(pipelineOptions?.timeout_ms);
@@ -1991,6 +2068,25 @@ async function runStepsInternal(
       ? explicitTimeoutMs
       : Number.MAX_SAFE_INTEGER;
 
+  const graphDeclared = steps.some(
+    (step) =>
+      Array.isArray((step as any).depends_on) ||
+      (step as any).consumes !== undefined ||
+      (step as any).when !== undefined
+  );
+  const graphExecutionEnabled =
+    steps.length > 1 &&
+    (graphDeclared ||
+      (Number.isFinite(Number(pipelineOptions?.max_concurrency)) &&
+        Number(pipelineOptions?.max_concurrency) > 1));
+  const graphArtifact: GraphRunArtifact | undefined = graphExecutionEnabled
+    ? createGraphRunArtifact(
+        deriveExecutionGraph(prepareEngineSteps(steps), Object.keys(initialCtx)).graph,
+        opts.runId,
+        opts.trace?.traceId
+      )
+    : undefined;
+
   try {
     const engineResult = await executeAdfSteps(
       prepareEngineSteps(steps),
@@ -1998,6 +2094,16 @@ async function runStepsInternal(
       {
         maxSteps,
         timeoutMs,
+        maxConcurrency:
+          Number.isFinite(Number(pipelineOptions?.max_concurrency)) &&
+          Number(pipelineOptions?.max_concurrency) > 0
+            ? Number(pipelineOptions?.max_concurrency)
+            : 1,
+        resumeCompletedNodeIds: new Set(opts.resumeState?.completed_nodes.keys()),
+        onGraphNodeSettled: graphArtifact
+          ? (node, outcome, durationMs) =>
+              recordGraphRunNode(graphArtifact, node, outcome, durationMs)
+          : undefined,
         resolveVars: (value: any, c: any) => resolveVars(value, c),
         // KC-04: pre_tool_use hooks can block a step; a block aborts the run.
         stepGate: async (step, _stepNumber) => {
@@ -2012,6 +2118,10 @@ async function runStepsInternal(
       handlers,
       hooks
     );
+    if (graphArtifact) {
+      const artifactPath = persistGraphRunArtifact(graphArtifact);
+      opts.trace?.addArtifact('log', artifactPath, 'Pipeline DAG run graph');
+    }
     return { status: derivePipelineStatus(results), results, context: engineResult.context };
   } catch (err: any) {
     // Only the engine's own pre-step safety-limit checks (max_steps /
@@ -2076,7 +2186,11 @@ export async function main() {
   process.once('SIGTERM', () => cleanupAndExit(143));
 
   const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
+    .option('input', { alias: 'i', type: 'string', required: false })
+    .option('resume', {
+      type: 'string',
+      describe: 'Resume a durable pipeline run by run id',
+    })
     .option('context', {
       alias: 'c',
       type: 'string',
@@ -2089,6 +2203,12 @@ export async function main() {
     })
     .parseSync();
 
+  let resumeState: PipelineRunJournalState | undefined;
+  if (argv.resume) {
+    resumeState = loadPipelineRunJournal(String(argv.resume), process.env.MISSION_ID);
+    if (!argv.input) argv.input = resumeState.started?.input_path;
+  }
+  if (!argv.input) throw new Error('Either --input or --resume is required.');
   const pipeline = await readValidatedWorkflowAdf(argv.input as string);
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
@@ -2147,6 +2267,11 @@ export async function main() {
     autoContext._knowledge_scope = inferredScope;
   }
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
+  // Restore only declared output channels from completed journal nodes. The
+  // journal never carries the full mutable context.
+  for (const node of resumeState?.completed_nodes.values() || []) {
+    Object.assign(mergedContext, node.output_channels_snapshot);
+  }
 
   logger.info(
     `🚀 [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
@@ -2170,11 +2295,29 @@ export async function main() {
     { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
   );
 
+  let runJournal: PipelineRunJournalHandle | undefined;
   try {
     const stepsToRun = (pipeline.steps || []).map((step) => ({
       ...step,
       params: step.params || {},
     }));
+    const runId = resumeState?.run_id || newPipelineRunId();
+    const activeRunJournal = resumeState
+      ? openPipelineRunJournal(resumeState)
+      : createPipelineRunJournal(
+          runId,
+          {
+            pipeline_id: pipelineId,
+            input_path: String(argv.input),
+            ...(missionId ? { mission_id: missionId } : {}),
+            step_ids: stepsToRun.map((step, index) => step.id || `__step_${index}`),
+          },
+          missionId
+        );
+    runJournal = activeRunJournal;
+    if (resumeState) {
+      activeRunJournal.append('run_resumed', { resumed_at: new Date().toISOString() });
+    }
     const sessionStart = await fireLifecycleHooks(
       getDefaultLifecycleHookEngine(),
       'session_start',
@@ -2205,6 +2348,9 @@ export async function main() {
         trace,
         pipelinePath: argv.input as string,
         quiet: argv.quiet as boolean,
+        runJournal: activeRunJournal,
+        resumeState,
+        runId,
       });
     const result =
       payloadTier === 'public'
@@ -2236,6 +2382,7 @@ export async function main() {
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
+    activeRunJournal.append('run_finished', { status: pipelineStatus });
     getDefaultWorkerEventStream().emit(
       'turn_end',
       { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
@@ -2322,6 +2469,12 @@ export async function main() {
       error_category: failure.classification.category,
       error_rule_id: failure.classification.ruleId,
     });
+    if (runJournal) {
+      runJournal.append('run_finished', {
+        status: recovered ? 'succeeded' : 'failed',
+        error: err?.message ?? String(err),
+      });
+    }
     const persisted = finalizeAndPersist(trace);
     runFeedbackLoop(pipelineId, 'failed', persisted.trace);
     logger.info(

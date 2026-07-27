@@ -9,6 +9,7 @@ import {
   type CollaborationKind,
   type CollaborationSource,
 } from './agent-collaboration-events.js';
+import type { GraphRunArtifact } from './graph-run-artifact.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -76,6 +77,8 @@ export interface ComposeCollaborationProjectionOptions {
   limit?: number;
   now?: string;
   staleAfterMs?: number;
+  /** Optional pipeline DAG artifact projected into the operator graph. */
+  runGraph?: GraphRunArtifact;
 }
 
 const OBSERVABILITY_DIR = pathResolver.shared('observability/mission-control');
@@ -447,6 +450,43 @@ export function composeAgentCollaborationProjection(
     if (event.kind === 'failure') failures += 1;
     const attentionItem = attentionForEvent(event);
     if (attentionItem) attention.push(attentionItem);
+  }
+  if (options.runGraph) {
+    const graphId = `run-graph:${options.runGraph.run_id || 'run'}`;
+    addNode(nodes, graphId, 'artifact', graphId, 'completed');
+    if (options.runGraph.trace_id) {
+      const traceId = `trace:${options.runGraph.trace_id}`;
+      addNode(nodes, traceId, 'artifact', traceId, 'completed');
+      edges.push({
+        from: graphId,
+        to: traceId,
+        kind: 'progress',
+        event_id: `${graphId}:trace:${options.runGraph.trace_id}`,
+      });
+    }
+    for (const node of options.runGraph.nodes) {
+      const nodeId = `${graphId}:node:${node.id}`;
+      addNode(nodes, nodeId, 'system', node.id, node.status);
+      edges.push({
+        from: graphId,
+        to: nodeId,
+        kind:
+          node.status === 'failed'
+            ? 'failure'
+            : node.status === 'success'
+              ? 'completion'
+              : 'progress',
+        event_id: `${graphId}:node:${node.id}`,
+      });
+    }
+    for (const edge of options.runGraph.edges) {
+      edges.push({
+        from: `${graphId}:node:${edge.from}`,
+        to: `${graphId}:node:${edge.to}`,
+        kind: edge.kind === 'control' ? 'dispatch' : 'progress',
+        event_id: `${graphId}:edge:${edge.from}:${edge.to}:${edge.kind}`,
+      });
+    }
   }
   return {
     generated_at: options.now || new Date().toISOString(),
