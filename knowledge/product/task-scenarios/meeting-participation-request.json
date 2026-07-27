@@ -1,0 +1,53 @@
+{
+  "id": "meeting-participation-request",
+  "title": "ミーティングへの代理参加",
+  "description": "ユーザーの短い依頼から参加条件を確認し、会議への同席・記録・必要時の発言を安全な境界付きで準備する。",
+  "trigger": {
+    "type": "manual",
+    "prompt": "このミーティングに参加して。要点とアクションアイテムを整理して、発言は必要な場合だけにして。"
+  },
+  "input": {
+    "sources": [
+      "meeting_url",
+      "meeting_operations_profile",
+      "mission_context",
+      "meeting_environment"
+    ],
+    "required_params": ["meeting_url", "meeting_role_boundary", "meeting_purpose"],
+    "optional_params": [
+      "platform",
+      "transport_mode",
+      "speaking_authority",
+      "meeting_title",
+      "capture_summary",
+      "follow_up_channel"
+    ]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "参加する会議のURL（Teams / Zoom / Google Meet）を教えてください。",
+      "会議の目的と、Kyberionにしてほしいことを教えてください（聞くだけ／議事録を取る／進行する／必要時だけ発言する）。",
+      "会議中の発言は許可しますか？ 初期設定は聞くだけ・発言なしです。"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/meeting-participation-request.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/meeting-proxy-workflow.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/meeting-participation-request.json"
+  },
+  "result": {
+    "artifacts": [
+      "meeting-participation-brief.json",
+      "meeting-transcript.txt",
+      "meeting-action-items.json",
+      "meeting-follow-up-summary.md"
+    ],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["speak_in_meeting", "share_summary_externally", "send_followup"],
+    "default_action": "notify-only"
+  }
+}
