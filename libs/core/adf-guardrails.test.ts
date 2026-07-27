@@ -3,6 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 
 describe('validatePipelineGuardrails', () => {
+  it('warns when a dynamic include cannot be expanded during preflight', () => {
+    const report = validatePipelineGuardrails({
+      steps: [{ op: 'core:include', params: { fragment: '{{fragment_ref}}' } }],
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({ code: 'include-ref-dynamic', severity: 'warn' })
+    );
+  });
+
   it('allows a simple pipeline with a literal https hook URL', () => {
     const report = validatePipelineGuardrails({
       steps: [

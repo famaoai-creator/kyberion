@@ -19,6 +19,8 @@ export interface GraphRunArtifactNode {
 export interface GraphRunArtifact {
   version: 1;
   run_id?: string;
+  trace_id?: string;
+  artifact_path?: string;
   generated_at: string;
   nodes: GraphRunArtifactNode[];
   edges: GraphEdge[];
@@ -26,11 +28,13 @@ export interface GraphRunArtifact {
 
 export function createGraphRunArtifact<T>(
   graph: ExecutionGraph<T>,
-  runId?: string
+  runId?: string,
+  traceId?: string
 ): GraphRunArtifact {
   return {
     version: 1,
     ...(runId ? { run_id: runId } : {}),
+    ...(traceId ? { trace_id: traceId } : {}),
     generated_at: new Date().toISOString(),
     nodes: graph.nodes.map((node) => ({ id: node.id, status: 'pending', duration_ms: 0 })),
     edges: graph.edges.map((edge) => ({ ...edge })),
@@ -59,6 +63,7 @@ export function persistGraphRunArtifact(artifact: GraphRunArtifact, filePath?: s
   const target = filePath || graphRunArtifactPath(artifact.run_id);
   const dir = target.replace(/[/\\][^/\\]+$/, '');
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  artifact.artifact_path = target;
   safeWriteFile(target, `${JSON.stringify(artifact, null, 2)}\n`);
   return target;
 }
