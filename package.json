@@ -180,6 +180,7 @@
     "peer:collaboration": "node --import ./scripts/ts-loader.mjs scripts/peer_collaboration.ts",
     "peer:send": "node --import ./scripts/ts-loader.mjs scripts/peer_messaging_send.ts",
     "work:coord": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
+    "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
     "mission:orchestrator": "node dist/scripts/run_mission_orchestration_event_worker.js",
     "mission:handoff": "node dist/scripts/mission_controller.js handoff",
     "vital": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json",

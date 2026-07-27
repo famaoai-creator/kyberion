@@ -125,6 +125,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `pptx_slide_text`                  | media                                                  |
 | `preset`                           | service                                                |
 | `probe`                            | system                                                 |
+| `probe_active_profile`             | system                                                 |
 | `probe_audio_route`                | voice                                                  |
 | `pulse_status`                     | system                                                 |
 | `query`                            | wisdom                                                 |

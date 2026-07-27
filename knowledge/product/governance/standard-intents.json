@@ -1585,7 +1585,9 @@
         "それで進めて",
         "そのまま続けて",
         "Please continue the conversation",
-        "Keep going"
+        "Keep going",
+        "hello",
+        "こんにちは"
       ],
       "plan_outline": [
         "preserve the current conversational thread",
@@ -1602,7 +1604,9 @@
         "そのまま",
         "次",
         "more",
-        "follow up"
+        "follow up",
+        "hello",
+        "こんにちは"
       ],
       "resolution": {
         "shape": "direct_reply",
@@ -2065,7 +2069,9 @@
         "既存サービスの機能拡張プロジェクトを要件ヒアリングから進めて",
         "この機能追加を要件定義から設計・実装・リリースまで回して",
         "顧客ヒアリングを起点に機能拡張のデリバリを進行して",
-        "Run a feature expansion from customer hearing to release"
+        "Run a feature expansion from customer hearing to release",
+        "implement this change",
+        "この変更を実装して"
       ],
       "plan_outline": [
         "frame the initiative and get initiation approval (G1)",

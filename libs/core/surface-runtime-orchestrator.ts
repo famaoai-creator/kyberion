@@ -2216,7 +2216,15 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   {
     matches: (context) => {
       const resolved = resolvedSurfaceIntent(context);
-      return resolved.routeFamily === 'direct_reply' && !context.computedReceiver;
+      // Generic direct-reply intent continue-conversation must fall through
+      // to the surface agent, otherwise a greeting is treated as a knowledge
+      // search and bypasses the runtime supervisor. Other direct-reply
+      // catalog paths retain the existing local fallback behavior.
+      return (
+        resolved.routeFamily === 'direct_reply' &&
+        !context.computedReceiver &&
+        resolved.intentId !== 'continue-conversation'
+      );
     },
     handle: async (context) => {
       const resolved = resolvedSurfaceIntent(context);
