@@ -57,6 +57,9 @@ export interface MissionTeamLifecyclePolicy {
   max_messages_per_run: number;
   max_wall_clock_minutes: number;
   max_member_turns: number;
+  max_followup_iterations: number;
+  max_rework_attempts: number;
+  max_review_rounds: number;
   shutdown_policy: 'graceful_handoff' | 'manual' | 'auto_shutdown';
   resume_policy: 'checkpoint_resume' | 'manual_resume';
   cooldown_minutes: number;
@@ -77,7 +80,7 @@ export interface MissionTeamGovernance {
 interface MissionTeamTemplateRecord {
   required_roles: string[];
   optional_roles: string[];
-  lifecycle?: MissionTeamLifecyclePolicy;
+  lifecycle?: Partial<MissionTeamLifecyclePolicy>;
 }
 
 export interface ResolveMissionTeamOptions {
@@ -98,15 +101,19 @@ function buildTeamGovernance(
   template: MissionTeamTemplateRecord,
   assignments: MissionTeamAssignment[]
 ): MissionTeamGovernance {
-  const lifecycle = template.lifecycle || {
+  const lifecycle: MissionTeamLifecyclePolicy = {
     max_parallel_members: template.required_roles.length,
     max_members: template.required_roles.length + template.optional_roles.length,
     max_messages_per_run: 40,
     max_wall_clock_minutes: 120,
     max_member_turns: 8,
+    max_followup_iterations: 20,
+    max_rework_attempts: 1,
+    max_review_rounds: 2,
     shutdown_policy: 'graceful_handoff',
     resume_policy: 'checkpoint_resume',
     cooldown_minutes: 5,
+    ...template.lifecycle,
   };
   const assignedRoles = assignments
     .filter((entry) => entry.status === 'assigned')

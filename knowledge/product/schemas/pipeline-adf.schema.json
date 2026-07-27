@@ -37,6 +37,10 @@
         },
         "timeout_ms": {
           "type": "number"
+        },
+        "max_concurrency": {
+          "type": "number",
+          "minimum": 1
         }
       },
       "additionalProperties": true
@@ -144,7 +148,28 @@
             "after": { "$ref": "#/definitions/hookList" }
           },
           "additionalProperties": false
-        }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "resource_claims": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "when": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "operator": { "type": "string" },
+            "value": {},
+            "conditions": { "type": "array" }
+          },
+          "additionalProperties": false
+        },
+        "merge": { "type": "string", "enum": ["collect", "namespace", "last"] }
       },
       "patternProperties": {
         "^_": {}

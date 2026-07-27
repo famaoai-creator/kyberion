@@ -402,6 +402,8 @@ export interface WithWallClockBudgetOptions {
   child?: DelegationChildHandle;
   /** Stable id for registry/records. Defaults to an internal counter keyed by provider. */
   id?: string;
+  /** AbortSignal for explicit delegation cancellation. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -438,6 +440,7 @@ export async function withWallClockBudget<T>(
 
   let timedOut = false;
   let sigtermTimer: ReturnType<typeof setTimeout> | undefined;
+  let abortListener: (() => void) | undefined;
 
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     sigtermTimer = setTimeout(() => {
@@ -455,12 +458,29 @@ export async function withWallClockBudget<T>(
       reject(new DelegationWallClockExceededError(provider, budgetMs));
     }, budgetMs);
     sigtermTimer.unref?.();
+    if (opts.signal) {
+      abortListener = () => {
+        timedOut = true;
+        if (opts.child) {
+          safeKillChild(opts.child, 'SIGTERM');
+          const sigkillTimer = setTimeout(() => {
+            safeKillChild(opts.child!, 'SIGKILL');
+            unregisterActiveChild(id);
+          }, graceMs);
+          sigkillTimer.unref?.();
+        }
+        reject(new Error('[DELEGATION_CANCELLED] provider operation aborted'));
+      };
+      if (opts.signal.aborted) abortListener();
+      else opts.signal.addEventListener('abort', abortListener, { once: true });
+    }
   });
 
   try {
     return await Promise.race([fn(), timeoutPromise]);
   } finally {
     if (sigtermTimer) clearTimeout(sigtermTimer);
+    if (opts.signal && abortListener) opts.signal.removeEventListener('abort', abortListener);
     // On the timeout path, the SIGKILL escalation above owns unregistration
     // (it must stay tracked through the grace window). On any other settle
     // path (success or a normal `fn()` rejection), clean up immediately.

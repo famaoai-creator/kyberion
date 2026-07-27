@@ -311,11 +311,12 @@ export class AgyCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: { profile?: ProviderPermissionProfileName }
+    options?: { profile?: ProviderPermissionProfileName; signal?: AbortSignal }
   ): Promise<string> {
     return this.runPrompt(
       [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n'),
-      options?.profile
+      options?.profile,
+      options?.signal
     );
   }
 
@@ -401,7 +402,8 @@ export class AgyCliBackend implements ReasoningBackend {
 
   private async runPrompt(
     prompt: string,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    signal?: AbortSignal
   ): Promise<string> {
     const args = [
       '--log-file',
@@ -414,7 +416,7 @@ export class AgyCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args);
+    const stdout = await this.spawnCli(args, signal);
     try {
       const cliResult = JSON.parse(extractJsonPayload(stdout));
       const responseStr: string | undefined = cliResult.response;
@@ -451,7 +453,7 @@ export class AgyCliBackend implements ReasoningBackend {
    * enforced against a real, killable handle via {@link withWallClockBudget}
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
-  private spawnCli(args: string[]): Promise<string> {
+  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
     const child = spawn(this.bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       // XP-02: minimal allowlisted env, scoped to agy's own required vars.
@@ -463,6 +465,7 @@ export class AgyCliBackend implements ReasoningBackend {
         provider: 'agy',
         budgetMs: this.timeoutMs,
         child: delegationChildHandleFromChildProcess(child),
+        signal,
       },
       () =>
         new Promise<string>((resolve, reject) => {
