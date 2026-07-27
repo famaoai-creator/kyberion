@@ -66,6 +66,19 @@ export interface PipelineAdfStep {
   produces?: string | FlowChannel;
   /** Channel(s) this step reads from upstream steps. Validated before execution. */
   consumes?: string | string[];
+  /** Explicit control dependencies. Omit for legacy implicit linear flow. */
+  depends_on?: string[];
+  /** Explicit shared-resource claims; omitted means no graph-level claim. */
+  resource_claims?: string[];
+  /** Structured condition for a graph edge/node. False skips downstream work. */
+  when?: {
+    from?: string;
+    operator?: string;
+    value?: unknown;
+    conditions?: unknown[];
+  };
+  /** Fan-in context merge policy. */
+  merge?: 'collect' | 'namespace' | 'last';
   on_error?: {
     strategy: 'skip' | 'abort' | 'fallback';
     fallback?: PipelineAdfStep[];
@@ -107,6 +120,7 @@ export interface PipelineAdf {
   options?: {
     max_steps?: number;
     timeout_ms?: number;
+    max_concurrency?: number;
   };
   steps: PipelineAdfStep[];
   schedule?: PipelineSchedule;

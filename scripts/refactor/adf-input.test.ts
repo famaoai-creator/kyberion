@@ -136,4 +136,15 @@ describe('readValidatedPipelineAdf', () => {
       })
     );
   });
+
+  it('expands static includes before guardrail validation and rejects include cycles', async () => {
+    const cyclePath = path.resolve(
+      pathResolver.rootDir(),
+      'pipelines/fragments/_test-run-pipeline-include-cycle.json'
+    );
+
+    await expect(readValidatedWorkflowAdf(cyclePath)).rejects.toThrow(
+      'circular reference detected'
+    );
+  });
 });
