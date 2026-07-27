@@ -7,6 +7,7 @@ import {
   resolvePhaseGateMode,
 } from './mission-orchestration-worker.js';
 import { missionDir } from './path-resolver.js';
+import { emitIntentSnapshot } from './intent-snapshot-store.js';
 
 // MO-02 Task 4: phase exit gates. Fixtures live under a unique throwaway
 // mission id and are removed after each test.
@@ -127,5 +128,26 @@ describe('mission phase exit gates (MO-02)', () => {
     const failedIds = outcome.failures.map((failure) => failure.gate_id);
     expect(failedIds).toEqual(['REVIEW_PENDING']);
     expect(outcome.failures[0].reasons.join(' ')).toContain('status: requested');
+  });
+
+  it('evaluates blocking intent drift at the phase exit boundary even without a catalog gate', async () => {
+    emitIntentSnapshot({
+      missionId,
+      stage: 'intake',
+      source: 'user_prompt',
+      intent: { goal: 'Create a customer onboarding dashboard' },
+    });
+    emitIntentSnapshot({
+      missionId,
+      stage: 'execution',
+      source: 'worker_transition',
+      intent: { goal: 'Delete all customer records permanently' },
+    });
+
+    const outcome = await evaluateMissionPhaseExitGates(missionId);
+    expect(outcome.evaluated).toBe(1);
+    expect(outcome.passed).toBe(false);
+    expect(outcome.failures[0]?.gate_id).toBe('INTENT_DRIFT');
+    expect(outcome.failures[0]?.reasons.join(' ')).toContain('intent drift blocks progression');
   });
 });

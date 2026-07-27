@@ -194,4 +194,4 @@ mission/task/orchestration/worker/a2a/trace writers
 - 2026-07-26: Phase 5 の第一段階として、source ごとの `sequence_gap`、未知イベント、active runtime の stale 状態を `status_flags` として決定論的に返し、golden 相当の projection test（human approval と agent failure の分離を含む）を追加した。
 - 2026-07-26: 実データ probe で worker JSONL がファイル単位の sequence namespace であることを確認し、worker ファイル境界を欠番と誤認しないよう source-wide gap 判定から除外した。単一 stream として扱える source の欠落だけを `sequence_gap` にする。
 - 2026-07-26: Phase 5 の golden replay fixture（10 agent、retry、crash、handoff、human approval、review、completion）と決定論的 replay assertion を追加した。`pnpm vital:json` にも協調イベント数、attention 数、agent 数、partial/status flags を追加し、既存の overall 判定は変更していない。
-- 残作業: Phase 4 の approval/review/停止/再開の各 action contract への詳細リンク、3〜10 agent の実ミッション replay、doctor 画面への専用 finding、実ブラウザ表示・keyboard/screen-reader 検証。
+- 2026-07-27: Attention の種別ごとに承認キュー、停止・再開を含む Mission Control、Runtime lease診断、引き継ぎTraceへ既存operator viewを開く導線を追加し、action mappingの契約テストを追加。残作業: 3〜10 agent の実ミッション replay、doctor画面専用finding、実ブラウザ表示・keyboard/screen-reader検証。
