@@ -2226,6 +2226,31 @@
           "kind": "capture"
         },
         {
+          "op": "probe_active_profile",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "my-identity.json",
+              "export_as": "identity_probe"
+            }
+          ]
+        },
+        {
           "op": "glob_files",
           "kind": "capture"
         },

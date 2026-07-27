@@ -14,8 +14,8 @@ import {
   loadActuatorManifestCatalog,
   installReasoningBackends,
   renderStatus,
-  t as coreT,
 } from '@agent/core';
+import { t as coreT } from '@agent/core/t';
 import type { SupportedLocale, VocabularyKey } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {

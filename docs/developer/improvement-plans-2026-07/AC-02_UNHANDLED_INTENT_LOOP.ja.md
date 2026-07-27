@@ -68,3 +68,9 @@
 
 - **browser fill フォールバック完了**: `fillWithFallback`(±100行の計画スコープ内)— セレクタ直 → label(`params.field` ヒント or セレクタが平文の場合はそれ自体)→ placeholder → name 属性の多段解決。全滅時は**ページ上の入力欄候補一覧付きエラー**(修復エージェント/操作者がページを開き直さず修正可能)。フォールバック成功時は `fallback_strategy` を action trail に記録。テスト4本(直/label/平文ヒント/候補一覧エラー)。
 - 残: 4系統 reconciled 化の E2E(意図オントロジー側)。
+
+## 実装状況 追記 (2026-07-27)
+
+- 「ミッション一覧を教えて」は既存の `inspect-mission-inventory` 経路へ接続し、「メール欄に…を入力して」は `browser-step` へ優先解決する決定論的フォーム入力ヒューリスティックを追加した。
+- 「implement this change」は既存の `feature-expansion-delivery` ミッション経路へ、「hello`/`こんにちは`」は `continue-conversation` へ吸収する surface 例・キーワードとルーティングを追加した。新しい意図を増やさず既存のガバナンス経路を再利用している。
+- CLIで4発話の解決を実走確認し、関連テスト・build・intent-domain coverage・governance・op registry を検証済み。残りは既存未処理レジストリの履歴3件をreconciledへ移す実データE2Eとする。
