@@ -5,20 +5,98 @@
   "description": "Checks for critical ecosystem paths and active missions using optimized ADF ops.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🩺 [KYBERION] Ecosystem Vital Report (Optimized)" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_node", "type": "ProbeResult" }, "params": { "path": "node_modules" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_dist", "type": "ProbeResult" }, "params": { "path": "dist" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_manifest_dir", "type": "ProbeResult" }, "params": { "path": "knowledge/product/governance/surfaces" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_manifest", "type": "ProbeResult" }, "params": { "path": "knowledge/product/governance/active-surfaces.json" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_state", "type": "ProbeResult" }, "params": { "path": "active/shared/runtime/surfaces/state.json" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_identity", "type": "ProbeResult" }, "params": { "path": "knowledge/personal/my-identity.json" } },
-    { "role": "source", "op": "system:probe", "produces": { "channel": "p_vision", "type": "ProbeResult" }, "params": { "path": "knowledge/personal/my-vision.md" } },
-    { "role": "source", "op": "system:list_missions", "produces": { "channel": "active_missions", "type": "MissionList" }, "params": { "status": "active" } },
-    { "role": "sink", "op": "system:log", "consumes": "p_node", "params": { "message": "✅ Physical Foundation: {{p_node.exists}} ({{p_node.kind}})" } },
-    { "role": "sink", "op": "system:log", "consumes": "p_dist", "params": { "message": "✅ System Build:       {{p_dist.exists}} ({{p_dist.kind}})" } },
-    { "role": "sink", "op": "system:log", "consumes": ["p_manifest_dir", "p_manifest"], "params": { "message": "✅ Surface Manifests:  {{p_manifest_dir.exists}} / snapshot: {{p_manifest.exists}}" } },
-    { "role": "sink", "op": "system:log", "consumes": "p_state", "params": { "message": "✅ Runtime State:      {{p_state.exists}}" } },
-    { "role": "sink", "op": "system:log", "consumes": ["p_identity", "p_vision"], "params": { "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} / Vision:{{p_vision.exists}}" } },
-    { "role": "sink", "op": "system:log", "consumes": "active_missions", "params": { "message": "🚀 Active Missions:    {{active_missions.count}}" } }
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🩺 [KYBERION] Ecosystem Vital Report (Optimized)" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_node", "type": "ProbeResult" },
+      "params": { "path": "node_modules" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_dist", "type": "ProbeResult" },
+      "params": { "path": "dist" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_manifest_dir", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/surfaces" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_manifest", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/active-surfaces.json" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_state", "type": "ProbeResult" },
+      "params": { "path": "active/shared/runtime/surfaces/state.json" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe_active_profile",
+      "produces": { "channel": "p_identity", "type": "ProbeResult" },
+      "params": { "path": "my-identity.json" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe_active_profile",
+      "produces": { "channel": "p_vision", "type": "ProbeResult" },
+      "params": { "path": "my-vision.md" }
+    },
+    {
+      "role": "source",
+      "op": "system:list_missions",
+      "produces": { "channel": "active_missions", "type": "MissionList" },
+      "params": { "status": "active" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_node",
+      "params": { "message": "✅ Physical Foundation: {{p_node.exists}} ({{p_node.kind}})" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_dist",
+      "params": { "message": "✅ System Build:       {{p_dist.exists}} ({{p_dist.kind}})" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["p_manifest_dir", "p_manifest"],
+      "params": {
+        "message": "✅ Surface Manifests:  {{p_manifest_dir.exists}} / snapshot: {{p_manifest.exists}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_state",
+      "params": { "message": "✅ Runtime State:      {{p_state.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["p_identity", "p_vision"],
+      "params": {
+        "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} / Vision:{{p_vision.exists}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "active_missions",
+      "params": { "message": "🚀 Active Missions:    {{active_missions.count}}" }
+    }
   ]
 }

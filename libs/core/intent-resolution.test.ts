@@ -15,7 +15,10 @@ import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const INTENT_OVERLAY_TEST_ROOT = pathResolver.sharedTmp('intent-resolution-overlay-tests');
 
-function writeIntentOverlayCatalog(filePath: string, intents: Array<Record<string, unknown>>): void {
+function writeIntentOverlayCatalog(
+  filePath: string,
+  intents: Array<Record<string, unknown>>
+): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, JSON.stringify({ version: '1.0.0', intents }, null, 2));
 }
@@ -105,13 +108,29 @@ describe('intent-resolution', () => {
       ['初回セットアップを始めて', 'launch-first-run-onboarding', 'onboarding_plan'],
       ['推論バックエンドを設定して', 'configure-reasoning-backend', 'reasoning_backend_configured'],
       ['CI/CDを設定して', 'configure-organization-toolchain', 'organization_toolchain_configured'],
-      ['デザインテーマを登録して', 'register-presentation-preference-profile', 'presentation_preference_profile_registered'],
+      [
+        'デザインテーマを登録して',
+        'register-presentation-preference-profile',
+        'presentation_preference_profile_registered',
+      ],
       ['ミッション一覧を教えて', 'inspect-mission-inventory', 'mission_inventory_summary'],
-      ['スケジュールタスクの一覧を教えて', 'inspect-generation-schedules', 'generation_schedule_summary'],
-      ['Kyberionのベースライン状態を確認して', 'check-kyberion-baseline', 'kyberion_baseline_status'],
+      [
+        'スケジュールタスクの一覧を教えて',
+        'inspect-generation-schedules',
+        'generation_schedule_summary',
+      ],
+      [
+        'Kyberionのベースライン状態を確認して',
+        'check-kyberion-baseline',
+        'kyberion_baseline_status',
+      ],
       ['Kyberionのvitalを確認して', 'check-kyberion-vital', 'kyberion_vital_status'],
       ['Kyberionを診断して', 'diagnose-kyberion-system', 'kyberion_diagnostics_report'],
-      ['runtime supervisorの状態を確認して', 'inspect-runtime-supervisor', 'runtime_supervisor_summary'],
+      [
+        'runtime supervisorの状態を確認して',
+        'inspect-runtime-supervisor',
+        'runtime_supervisor_summary',
+      ],
       ['サービスを起動して', 'start-service', 'service_started'],
       ['サービスを停止して', 'stop-service', 'service_stopped'],
       ['サービスを再起動して', 'restart-service', 'service_restarted'],
@@ -143,9 +162,9 @@ describe('intent-resolution', () => {
     const videoPacket = resolveIntentResolutionPacket('動画を生成して');
     expect(videoPacket.selected_intent_id).toBe('generate-video');
     expect(videoPacket.selected_resolution?.shape).toBe('pipeline');
-    expect(
-      videoPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)
-    ).toContain('video-generation-governed');
+    expect(videoPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)).toContain(
+      'video-generation-governed'
+    );
 
     const transcriptPacket = resolveIntentResolutionPacket('この音声を書き起こして');
     expect(transcriptPacket.selected_intent_id).toBe('transcribe-audio');
@@ -193,7 +212,7 @@ describe('intent-resolution', () => {
       ['不足している情報を質問して', 'clarify-user-request', 'clarification_packet'],
       ['続けて', 'continue-conversation', 'conversation_reply'],
       ['ここまでを要約して', 'summarize-conversation', 'conversation_summary'],
-      ['この会話をミッションにして', 'conversation-to-mission', 'mission_brief']
+      ['この会話をミッションにして', 'conversation-to-mission', 'mission_brief'],
     ] as const;
 
     for (const [sample, intentId, resultShape] of cases) {
@@ -226,18 +245,54 @@ describe('intent-resolution', () => {
 
   it('resolves CEO/CTO operator harness intents from simulated requests', () => {
     const cases = [
-      ['今期の成長戦略を3案で比較して、最も現実的な案を提案して', 'executive-strategy-brief', 'strategy_brief'],
-      ['次の四半期にやることを5つに絞って、やらないことも決めて', 'executive-prioritization', 'priority_roadmap'],
+      [
+        '今期の成長戦略を3案で比較して、最も現実的な案を提案して',
+        'executive-strategy-brief',
+        'strategy_brief',
+      ],
+      [
+        '次の四半期にやることを5つに絞って、やらないことも決めて',
+        'executive-prioritization',
+        'priority_roadmap',
+      ],
       ['今月の経営会議向けにKPIサマリを1枚でまとめて', 'executive-reporting', 'executive_report'],
-      ['役員会向けに社員向けメッセージのたたき台を作って', 'stakeholder-communication', 'stakeholder_message'],
-      ['大口顧客のアップセル戦略を整理して、提案の切り口を出して', 'sales-account-strategy', 'account_strategy_plan'],
-      ['この投資判断の技術面を整理して、採用可否を1枚でまとめて', 'technical-decision-memo', 'technical_decision_memo'],
-      ['OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して', 'llm-provider-selection', 'provider_selection_report'],
-      ['エージェントの起動数とメモリ上限を調整して、遅延を半分にして', 'agent-runtime-tuning', 'runtime_tuning_plan'],
-      ['明日のデプロイをgo/no-go判定して、条件付きなら条件も出して', 'release-readiness-review', 'release_readiness_report'],
+      [
+        '役員会向けに社員向けメッセージのたたき台を作って',
+        'stakeholder-communication',
+        'stakeholder_message',
+      ],
+      [
+        '大口顧客のアップセル戦略を整理して、提案の切り口を出して',
+        'sales-account-strategy',
+        'account_strategy_plan',
+      ],
+      [
+        'この投資判断の技術面を整理して、採用可否を1枚でまとめて',
+        'technical-decision-memo',
+        'technical_decision_memo',
+      ],
+      [
+        'OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して',
+        'llm-provider-selection',
+        'provider_selection_report',
+      ],
+      [
+        'エージェントの起動数とメモリ上限を調整して、遅延を半分にして',
+        'agent-runtime-tuning',
+        'runtime_tuning_plan',
+      ],
+      [
+        '明日のデプロイをgo/no-go判定して、条件付きなら条件も出して',
+        'release-readiness-review',
+        'release_readiness_report',
+      ],
       ['承認を依頼して', 'request-approval', 'summary'],
       ['承認依頼を解決して', 'resolve-approval', 'summary'],
-      ['CEO/CTOとしての使い方にKyberionを最適化して', 'operator-profile-learning', 'operator_learning_update'],
+      [
+        'CEO/CTOとしての使い方にKyberionを最適化して',
+        'operator-profile-learning',
+        'operator_learning_update',
+      ],
     ] as const;
 
     for (const [sample, intentId, resultShape] of cases) {
@@ -256,6 +311,23 @@ describe('intent-resolution', () => {
     const packet = resolveIntentResolutionPacket('会議の日程を調整して');
     expect(packet.selected_intent_id).toBe('schedule-coordination');
     expect(packet.selected_resolution?.task_kind).toBe('service_operation');
+  });
+
+  it('routes common unhandled-intent examples to usable surface paths', () => {
+    const inventory = resolveIntentResolutionPacket('ミッション一覧を教えて');
+    expect(inventory.selected_intent_id).toBe('inspect-mission-inventory');
+
+    const browserFill = resolveIntentResolutionPacket('メール欄にtest@example.comを入力して');
+    expect(browserFill.selected_intent_id).toBe('browser-step');
+    expect(browserFill.selected_resolution?.shape).toBe('browser_session');
+
+    const codeChange = resolveIntentResolutionPacket('implement this change');
+    expect(codeChange.selected_intent_id).toBe('feature-expansion-delivery');
+    expect(codeChange.selected_resolution?.shape).toBe('mission');
+
+    const greeting = resolveIntentResolutionPacket('hello');
+    expect(greeting.selected_intent_id).toBe('continue-conversation');
+    expect(greeting.selected_resolution?.shape).toBe('direct_reply');
   });
 
   it('catalogs capture-photo as a first-class surface intent', () => {
@@ -291,9 +363,15 @@ describe('intent-resolution', () => {
 
   it('applies personal and confidential intent overlays when resolving surface input', () => {
     resetIntentOverlayTestRoot();
-    const baseGenerateReport = loadStandardIntentCatalog().find((intent) => intent.id === 'generate-report');
-    const baseBootstrapProject = loadStandardIntentCatalog().find((intent) => intent.id === 'bootstrap-project');
-    const baseMeetingOperations = loadStandardIntentCatalog().find((intent) => intent.id === 'meeting-operations');
+    const baseGenerateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    );
+    const baseBootstrapProject = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'bootstrap-project'
+    );
+    const baseMeetingOperations = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'meeting-operations'
+    );
     expect(baseGenerateReport, 'missing base generate-report intent').toBeTruthy();
     expect(baseBootstrapProject, 'missing base bootstrap-project intent').toBeTruthy();
     expect(baseMeetingOperations, 'missing base meeting-operations intent').toBeTruthy();
@@ -303,15 +381,15 @@ describe('intent-resolution', () => {
 
     const personalOverlayPath = path.join(
       INTENT_OVERLAY_TEST_ROOT,
-      'personal/orchestration/intent-catalog.json',
+      'personal/orchestration/intent-catalog.json'
     );
     const confidentialOverlayPath = path.join(
       INTENT_OVERLAY_TEST_ROOT,
-      'confidential/acme/orchestration/intent-catalog.json',
+      'confidential/acme/orchestration/intent-catalog.json'
     );
     const meetingOverlayPath = path.join(
       INTENT_OVERLAY_TEST_ROOT,
-      'personal/orchestration/meeting-operations.intent-catalog.json',
+      'personal/orchestration/meeting-operations.intent-catalog.json'
     );
 
     try {
@@ -352,13 +430,18 @@ describe('intent-resolution', () => {
       });
       expect(personalPacket.selected_intent_id).toBe('generate-report');
 
-      const personalMeetingPacket = resolveIntentResolutionPacket('zqxvmeetingoverlay を使って会議に参加して', {
-        tier: 'personal',
-        overlayPaths: [personalOverlayPath, meetingOverlayPath],
-      });
+      const personalMeetingPacket = resolveIntentResolutionPacket(
+        'zqxvmeetingoverlay を使って会議に参加して',
+        {
+          tier: 'personal',
+          overlayPaths: [personalOverlayPath, meetingOverlayPath],
+        }
+      );
       expect(personalMeetingPacket.selected_intent_id).toBe('meeting-operations');
       expect(
-        personalMeetingPacket.bundle_candidates?.some((bundle) => bundle.bundle_id === 'meeting-operations-governed')
+        personalMeetingPacket.bundle_candidates?.some(
+          (bundle) => bundle.bundle_id === 'meeting-operations-governed'
+        )
       ).toBe(true);
 
       const confidentialFallbackPacket = resolveIntentResolutionPacket('personal memo をまとめて', {
@@ -375,11 +458,14 @@ describe('intent-resolution', () => {
       });
       expect(confidentialPacket.selected_intent_id).toBe('bootstrap-project');
 
-      const confidentialMeetingPacket = resolveIntentResolutionPacket('zqxvmeetingoverlay の会議に参加して', {
-        tier: 'confidential',
-        tenantId: 'acme',
-        overlayPaths: [personalOverlayPath, confidentialOverlayPath, meetingOverlayPath],
-      });
+      const confidentialMeetingPacket = resolveIntentResolutionPacket(
+        'zqxvmeetingoverlay の会議に参加して',
+        {
+          tier: 'confidential',
+          tenantId: 'acme',
+          overlayPaths: [personalOverlayPath, confidentialOverlayPath, meetingOverlayPath],
+        }
+      );
       expect(confidentialMeetingPacket.selected_intent_id).toBe('meeting-operations');
 
       const publicPacket = resolveIntentResolutionPacket('personal memo をまとめて');
@@ -418,9 +504,16 @@ describe('normalizeForTriggerMatch', () => {
 
 describe('chooseExecutionIntent (GAP1 resolver convergence)', () => {
   it('returns the packet selected_intent_id when present (canonical decision drives execution)', () => {
-    expect(chooseExecutionIntent({ selected_intent_id: 'attendance.approve' }, 'please approve attendance')).toBe('attendance.approve');
+    expect(
+      chooseExecutionIntent(
+        { selected_intent_id: 'attendance.approve' },
+        'please approve attendance'
+      )
+    ).toBe('attendance.approve');
   });
   it('falls back to the raw utterance when no confident selection', () => {
-    expect(chooseExecutionIntent({ selected_intent_id: undefined }, 'do something vague')).toBe('do something vague');
+    expect(chooseExecutionIntent({ selected_intent_id: undefined }, 'do something vague')).toBe(
+      'do something vague'
+    );
   });
 });
