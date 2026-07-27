@@ -94,7 +94,11 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     return this.runStructured(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const schema = z.object({ answer: z.string() });
     const result = (await runCodexCliQuery({
@@ -105,7 +109,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         .join('\n\n'),
       schema,
       mode: 'workspace-write',
-      options: this.options,
+      options: { ...this.options, ...(options?.signal ? { signal: options.signal } : {}) },
     })) as z.infer<typeof schema>;
     return result.answer;
   }

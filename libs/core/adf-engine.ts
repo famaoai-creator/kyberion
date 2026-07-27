@@ -1,7 +1,13 @@
 import { logger } from './core.js';
 import { derivePipelineStatus, type PipelineStepResult } from './pipeline-contract.js';
 import { handleStepError } from './src/pipeline-engine.js';
-import { resolveVars } from './src/logic-utils.js';
+import { evaluateCondition, resolveVars } from './src/logic-utils.js';
+import {
+  deriveExecutionGraph,
+  executeGraph,
+  type GraphExecutionOutcome,
+  type GraphNode,
+} from './graph-scheduler.js';
 import {
   advanceToolCallRepeatGovernor,
   buildToolCallRepeatForceStopMessage,
@@ -9,6 +15,7 @@ import {
   type ToolCallRepeatDecision,
   type ToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
+import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -16,6 +23,43 @@ export interface AdfStep {
   type: AdfStepType;
   op: string;
   params: any;
+  /** Explicit shared-resource claims used by the graph frontier scheduler. */
+  resource_claims?: string[];
+}
+
+function serializeAdfResourceClaim(claim: {
+  kind: 'all' | 'file';
+  path?: string;
+  recursive?: boolean;
+}): string {
+  if (claim.kind === 'all') return 'resource:all';
+  // The graph scheduler deliberately uses a conservative string key. Reads
+  // and writes therefore serialize on the same path, and recursive claims
+  // become global-exclusive rather than risking an incomplete overlap test.
+  if (claim.recursive) return 'resource:all';
+  return `resource:file:${claim.path || '/'}`;
+}
+
+function resolveAdfResourceClaims(
+  step: AdfStep,
+  context: AdfEngineContext,
+  resolve: (value: any, ctx: Record<string, any>) => any
+): string[] {
+  if (step.resource_claims !== undefined) return [...new Set(step.resource_claims)];
+  const normalizedOp = String(step.op || '').replace(/^([a-z]+):/u, '$1:');
+  const [domain, action] = normalizedOp.split(':');
+  // Legacy/custom actuator ops have no typed access contract at this layer;
+  // keep their historical graph behavior until they opt into explicit claims.
+  if (!domain || !action || domain === 'core') return [];
+  if (domain !== 'browser' && domain !== 'file' && domain !== 'system') return [];
+  try {
+    const params = (resolve(step.params || {}, context) || {}) as Record<string, unknown>;
+    return resolveOpAccessClaims(domain as OpInputDomain, action, params).map(
+      serializeAdfResourceClaim
+    );
+  } catch {
+    return ['resource:all'];
+  }
 }
 
 export interface AdfEngineContext {
@@ -44,6 +88,16 @@ export interface AdfRunOptions {
     stepNumber: number,
     ctx: AdfEngineContext
   ) => Promise<{ blocked: boolean; reasons?: string[] } | void>;
+  /** Maximum number of independent graph nodes to execute concurrently. */
+  maxConcurrency?: number;
+  /** Completed node ids restored from a durable pipeline run journal. */
+  resumeCompletedNodeIds?: ReadonlySet<string>;
+  /** Optional observer for durable DAG/run-graph artifacts. */
+  onGraphNodeSettled?: (
+    node: GraphNode<AdfStep>,
+    outcome: GraphExecutionOutcome<AdfEngineContext>,
+    durationMs: number
+  ) => void;
 }
 
 export interface AdfSkippedStep {
@@ -165,6 +219,99 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   ): Promise<AdfRunResult<Ctx>> =>
     executeAdfStepsInternal(nestedSteps, seedCtx, options, handlers, state, hooks);
 
+  // GE-01/02/03: graph-declared streams use the shared completion-driven
+  // frontier. A pipeline with no graph metadata stays on the legacy loop,
+  // which is intentionally equivalent to a one-wide linear graph.
+  const graphDeclared = steps.some(
+    (step) =>
+      Array.isArray((step as any).depends_on) ||
+      (step as any).consumes !== undefined ||
+      (step as any).when !== undefined
+  );
+  if (steps.length > 1 && (graphDeclared || (options.maxConcurrency ?? 1) > 1)) {
+    const built = deriveExecutionGraph(steps as unknown as AdfStep[], Object.keys(ctx));
+    const hardGraphErrors = built.errors.filter((error) => error.code !== 'missing-channel');
+    if (hardGraphErrors.length > 0) {
+      throw new Error(
+        `[GRAPH_PREFLIGHT] ${hardGraphErrors.map((error) => error.message).join('; ')}`
+      );
+    }
+    const graphResult = await executeGraph(
+      built.graph,
+      async (node: GraphNode<AdfStep>, nodeCtx: Ctx): Promise<GraphExecutionOutcome<Ctx>> => {
+        // The single-node invocation must not recursively interpret its own
+        // graph metadata. produces is retained because dispatch uses it as the
+        // output-channel export key.
+        const {
+          depends_on: _dependsOn,
+          consumes: _consumes,
+          when: _when,
+          merge: _merge,
+          ...plain
+        } = node.value as AdfStep & Record<string, unknown>;
+        const nested = await executeAdfStepsInternal(
+          [plain as AdfStep],
+          nodeCtx,
+          options,
+          handlers,
+          state,
+          hooks
+        );
+        const failed = nested.results.find((result) => result.status === 'failed');
+        return {
+          status: nested.status === 'failed' ? 'failed' : 'success',
+          context: nested.context,
+          ...(failed?.error ? { error: failed.error } : {}),
+        };
+      },
+      {
+        maxConcurrency: options.maxConcurrency ?? 1,
+        initialContext: ctx,
+        precompletedNodeIds: options.resumeCompletedNodeIds,
+        evaluateWhen: (condition, graphCtx) => evaluateCondition(condition, graphCtx),
+        resourceClaims: (node, graphCtx) =>
+          resolveAdfResourceClaims(
+            node.value as AdfStep,
+            graphCtx,
+            options.resolveVars || ((value, context) => resolveVars(value, context))
+          ),
+        onNodeSettled: (node, outcome, durationMs) =>
+          options.onGraphNodeSettled?.(
+            node as GraphNode<AdfStep>,
+            outcome as GraphExecutionOutcome<AdfEngineContext>,
+            durationMs
+          ),
+      }
+    );
+    const graphResults: PipelineStepResult[] = [];
+    for (const node of built.graph.nodes) {
+      const outcome = graphResult.outcomes[node.id];
+      if (!outcome) continue;
+      if (outcome.status === 'skipped') {
+        graphResults.push({
+          op: node.value.op,
+          status: 'skipped',
+          ...(outcome.error ? { error: outcome.error } : {}),
+        });
+      } else if (outcome.context) {
+        // The node execution's nested result is intentionally represented as
+        // one top-level result here; nested control steps have already emitted
+        // their own hook/trace events.
+        graphResults.push({
+          op: node.value.op,
+          status: outcome.status === 'failed' ? 'failed' : 'success',
+          ...(outcome.error ? { error: outcome.error } : {}),
+        });
+      }
+    }
+    return {
+      status: derivePipelineStatus(graphResults),
+      results: graphResults,
+      context: graphResult.context,
+      total_steps: state.stepCount,
+    };
+  }
+
   for (const step of steps) {
     state.stepCount += 1;
     if (state.stepCount > maxSteps) {
@@ -229,7 +376,13 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         if (loopOp) state.loopDepth += 1;
         let controlResult;
         try {
-          controlResult = await handlers.control(step.op, step.params, ctx, runNestedSteps, resolve);
+          controlResult = await handlers.control(
+            step.op,
+            step.params,
+            ctx,
+            runNestedSteps,
+            resolve
+          );
         } finally {
           if (loopOp) state.loopDepth -= 1;
         }

@@ -394,6 +394,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
        * byte-identical to callers that predate this option.
        */
       profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
@@ -407,7 +408,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...permissionArgs,
       ...this.extraArgs,
     ];
-    return this.spawnCli(args, '');
+    return this.spawnCli(args, '', options?.signal);
   }
 
   async prompt(
@@ -538,7 +539,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * this backend's CLI process is actually SIGTERM'd then (after the grace
    * window) SIGKILL'd, not just abandoned.
    */
-  private spawnCli(args: string[], stdin: string): Promise<string> {
+  private spawnCli(args: string[], stdin: string, signal?: AbortSignal): Promise<string> {
     const child = spawn(this.bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       // XP-02: minimal allowlisted env (no cross-provider credential
@@ -551,6 +552,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         provider: 'claude',
         budgetMs: this.timeoutMs,
         child: delegationChildHandleFromChildProcess(child),
+        signal,
       },
       () =>
         new Promise<string>((resolve, reject) => {
