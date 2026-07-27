@@ -24,6 +24,7 @@ describe('validateEnvAgainstRegistry', () => {
     expect(report.errors).toHaveLength(0);
     expect(report.warnings).toHaveLength(0);
     expect(report.unknown).toHaveLength(0);
+    expect(report.undocumented).toHaveLength(4);
     expect(report.checked).toBe(4);
   });
 
@@ -60,6 +61,19 @@ describe('validateEnvAgainstRegistry', () => {
       KYBERION_REQUIRED_TOKEN: 'x',
     });
     expect(report.unknown).toEqual(['KYBERION_MYSTERY']);
+  });
+
+  it('reports registry entries without operator documentation separately from runtime errors', () => {
+    const report = validateEnvAgainstRegistry(
+      [
+        { name: 'KYBERION_DOCUMENTED', type: 'string', required: false, documented: true },
+        { name: 'KYBERION_UNDOCUMENTED', type: 'string', required: false, documented: false },
+      ],
+      { KYBERION_DOCUMENTED: 'ok', KYBERION_UNDOCUMENTED: 'ok' }
+    );
+    expect(report.errors).toHaveLength(0);
+    expect(report.warnings).toHaveLength(0);
+    expect(report.undocumented).toEqual(['KYBERION_UNDOCUMENTED']);
   });
 });
 

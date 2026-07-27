@@ -535,6 +535,20 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    probe_active_profile: {
+      summary: 'Check whether a file exists under the active customer or personal profile root.',
+      examples: [{ path: 'my-identity.json', export_as: 'identity_probe' }],
+      schema: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
+    },
     reconcile_config_fallbacks: {
       summary:
         'Sweep the config-fallback registry: recreate missing public-tier knowledge JSON from defaults, write parse-error proposals. Returns { repaired, proposals_written, skipped, pruned }.',

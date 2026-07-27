@@ -44,6 +44,7 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
   ['tests/lead-score.test.ts', ['../libs/core/lead-score.js']],
   ['tests/mesh-hub-contract.test.ts', ['../libs/core/mesh-hub-contract.js']],
   ['tests/task-scenario-meeting-action-items-contract.test.ts', ['../libs/core/schema-loader.js']],
+  ['tests/task-scenario-meeting-participation-contract.test.ts', ['../libs/core/schema-loader.js']],
   [
     'tests/task-scenario-meeting-to-proposal-pptx-contract.test.ts',
     ['../libs/core/schema-loader.js'],

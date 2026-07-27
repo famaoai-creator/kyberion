@@ -29,6 +29,13 @@ describe('router-contract', () => {
     expect(classifyBrowserConversationCommand('左下の承認ボタンを押して')?.action).toBe('click');
   });
 
+  it('routes field-fill requests to the browser conversation path', () => {
+    const fill = resolveSurfaceIntent('メール欄にtest@example.comを入力して');
+    expect(fill.intentId).toBe('browser-step');
+    expect(fill.routeFamily).toBe('browser_session');
+    expect(fill.browserCommandKind).toBe('browser_step');
+  });
+
   it('emits pipeline and mission routing hints for governed process intents', () => {
     const baseline = resolveSurfaceIntent('Kyberionのベースライン状態を確認して');
     const createMission = resolveSurfaceIntent('ミッションを作成して');
@@ -43,6 +50,11 @@ describe('router-contract', () => {
     expect(inventory.shape).toBe('task_session');
     expect(inventory.routeFamily).toBe('pipeline');
     expect(inventory.pipelineId).toBe('inspect-mission-inventory');
+
+    const codeChange = resolveSurfaceIntent('implement this change');
+    expect(codeChange.intentId).toBe('feature-expansion-delivery');
+    expect(codeChange.routeFamily).toBe('mission');
+    expect(codeChange.missionAction).toBe('create');
   });
 
   it('maps extended mission-process intents to direct mission actions', () => {

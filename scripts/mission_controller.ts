@@ -52,6 +52,7 @@ import {
   recordMissionGateOverride,
   missionLifecycleService,
   releaseOrchestratorSessionForMissionBestEffort,
+  resumeAiDlcPhaseState,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -568,7 +569,15 @@ async function createCheckpoint(taskId: string, note: string, explicitMissionId?
 }
 
 async function resumeMission(id?: string) {
-  return missionLifecycleService.resume(id);
+  const result = await missionLifecycleService.resume(id);
+  if (id) {
+    try {
+      resumeAiDlcPhaseState(id);
+    } catch {
+      // Older missions may not have HO-02 state yet; lifecycle resume remains valid.
+    }
+  }
+  return result;
 }
 
 async function pauseMission(id: string, note?: string) {

@@ -8,6 +8,7 @@ import {
   safeExec,
   safeExecResult,
   safeExistsSync,
+  safeStat,
   derivePipelineStatus,
   executeAdfSteps,
   pathResolver,
@@ -17,6 +18,7 @@ import {
   resolveWriteArtifactSpec,
   createVoiceCapabilityBridge,
   buildGovernedRetryOptions,
+  resolveActiveProfileRoot,
   classifyError,
   retry,
   createVirtualMediaDeviceControlBridge,
@@ -222,6 +224,7 @@ const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
   'read_file',
   'read_json',
   'probe',
+  'probe_active_profile',
   'glob_files',
   'scan_directory',
   'pulse_status',
@@ -763,7 +766,6 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           buildRetryOptions(params.retry)
         );
         if (exists) {
-          const { safeStat } = await import('@agent/core/secure-io');
           const stats = await retry(
             async () => safeStat(targetPath),
             buildRetryOptions(params.retry)
@@ -777,6 +779,36 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'last_probe']: {
           path: resolve(params.path),
+          exists,
+          kind,
+        },
+      };
+    }
+    case 'probe_active_profile': {
+      const relativePath = String(resolve(params.path || '')).trim();
+      if (
+        !relativePath ||
+        path.isAbsolute(relativePath) ||
+        relativePath.split(/[\\/]/).includes('..')
+      ) {
+        throw new Error('probe_active_profile requires a safe profile-relative path');
+      }
+      const targetPath = path.join(resolveActiveProfileRoot(), relativePath);
+      let exists = false;
+      let kind = 'unknown';
+      try {
+        exists = safeExistsSync(targetPath);
+        if (exists) {
+          const stats = safeStat(targetPath);
+          kind = stats.isDirectory() ? 'dir' : 'file';
+        }
+      } catch {
+        exists = false;
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_probe']: {
+          path: relativePath,
           exists,
           kind,
         },

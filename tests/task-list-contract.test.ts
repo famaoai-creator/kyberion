@@ -6,7 +6,7 @@ const EMPTY_DIR = pathResolver.rootResolve('active/shared/tmp/task-scenario-empt
 const READINESS_DIR = pathResolver.rootResolve('active/shared/tmp/task-scenario-readiness');
 const READINESS_SCENARIO_ID = 'task-list-readiness';
 const READINESS_PROFILE = pathResolver.rootResolve(
-  'knowledge/personal/task-profiles/task-list-readiness.json',
+  'knowledge/personal/task-profiles/task-list-readiness.json'
 );
 
 describe('task list contract', () => {
@@ -43,6 +43,7 @@ describe('task list contract', () => {
 
     expect(scenarios.length).toBeGreaterThan(0);
     expect(scenarios.map((scenario) => scenario.id)).toContain('daily-email-triage');
+    expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-participation-request');
     expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-action-items');
     expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-to-proposal-pptx');
     expect(scenarios.map((scenario) => scenario.id)).toContain('weekly-executive-digest');
@@ -98,7 +99,9 @@ describe('task list contract', () => {
 function writeReadinessScenario(includeProfile: boolean): void {
   safeMkdir(READINESS_DIR, { recursive: true });
   safeWriteFile(
-    pathResolver.rootResolve(`active/shared/tmp/task-scenario-readiness/${READINESS_SCENARIO_ID}.json`),
+    pathResolver.rootResolve(
+      `active/shared/tmp/task-scenario-readiness/${READINESS_SCENARIO_ID}.json`
+    ),
     `${JSON.stringify(
       {
         id: READINESS_SCENARIO_ID,
@@ -132,15 +135,15 @@ function writeReadinessScenario(includeProfile: boolean): void {
         },
       },
       null,
-      2,
-    )}\n`,
+      2
+    )}\n`
   );
 
   if (includeProfile) {
     safeMkdir(pathResolver.rootResolve('knowledge/personal/task-profiles'), { recursive: true });
     safeWriteFile(
       READINESS_PROFILE,
-      `${JSON.stringify({ readiness: true, scenario_id: READINESS_SCENARIO_ID }, null, 2)}\n`,
+      `${JSON.stringify({ readiness: true, scenario_id: READINESS_SCENARIO_ID }, null, 2)}\n`
     );
   }
 

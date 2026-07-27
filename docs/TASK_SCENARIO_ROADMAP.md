@@ -33,7 +33,19 @@ last_updated: 2026-07-13
 
 ## 初期シナリオ
 
-### 1. `daily-email-triage`
+### 1. `meeting-participation-request`
+
+- User phrase example: `このミーティングに参加して。要点とアクションアイテムを整理して。`
+- Business outcome: 会議URLと役割を確認し、参加前の実行プラン、会議後の要点、アクションアイテムを揃える
+- Input sources: meeting URL, meeting operations profile, mission context, meeting environment
+- First-run reasoning / setup questions: URL、参加時の役割、発言許可（既定は聞くだけ・発言なし）
+- Repeat-run behavior: 保存済み profile を使って preflight と参加準備を再利用する
+- Output artifacts: participation brief, transcript, action items, follow-up summary
+- Approval boundary: 会議中の発言と外部共有は要承認、既定は `notify-only`
+- Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-proxy-workflow.json`
+- Implementation status: scenario + user-facing guided intake を追加済み
+
+### 2. `daily-email-triage`
 
 - User phrase example: `毎朝メールを整理して`
 - Business outcome: 重要メールの抽出、要約、返信下書きの作成
@@ -45,7 +57,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/email-triage-workflow.json`
 - Implementation status: scenario + workflow + CLI profile path を追加済み
 
-### 2. `meeting-action-items`
+### 3. `meeting-action-items`
 
 - User phrase example: `会議が終わったらTODOをまとめて`
 - Business outcome: 会議 transcript から action item を抽出して次アクションを整える
@@ -57,7 +69,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json`
 - Implementation status: scenario + workflow MVP を追加済み
 
-### 3. `meeting-to-proposal-pptx`
+### 4. `meeting-to-proposal-pptx`
 
 - User phrase example: `商談メモから提案資料を作って`
 - Business outcome: 会議メモから提案書デッキを生成する
@@ -69,7 +81,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-to-pptx-workflow.json`
 - Implementation status: TaskScenario contract を追加済み
 
-### 4. `sales-inbound-response`
+### 5. `sales-inbound-response`
 
 - User phrase example: `問い合わせが来たら見込み度と返信案を作って`
 - Business outcome: インバウンド問い合わせを分類し、見込み度と返信下書きを作る
@@ -81,7 +93,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/sales-inbound-lead-workflow.json`
 - Implementation status: workflow は既存。repeatable task の profile 化が必要
 
-### 5. `weekly-executive-digest`
+### 6. `weekly-executive-digest`
 
 - User phrase example: `毎週月曜に経営・PJダイジェストを作って`
 - Business outcome: 経営・プロジェクトの要点を週次でまとめる

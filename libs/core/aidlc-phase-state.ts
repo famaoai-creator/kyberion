@@ -46,6 +46,8 @@ export interface AiDlcPhaseState {
   test_output?: AiDlcPhaseResult & { passed: boolean };
   review_findings?: AiDlcPhaseResult & { approved: boolean };
   failure_context?: AiDlcFailureContext;
+  resume_count?: number;
+  last_resumed_at?: string;
   attempts: AiDlcAttempt[];
   updated_at: string;
 }
@@ -168,4 +170,29 @@ export function loadAiDlcPhaseState(missionId: string, baseDir?: string): AiDlcP
   } catch {
     return null;
   }
+}
+
+/**
+ * Resume a persisted AI-DLC run without discarding the failure context that
+ * Alignment needs to continue the work. The operation is intentionally
+ * idempotent in its data shape and records a small audit-friendly counter
+ * instead of fabricating a new phase result.
+ */
+export function resumeAiDlcPhaseState(
+  missionId: string,
+  options: { baseDir?: string; now?: string } = {}
+): AiDlcPhaseState {
+  const state = loadAiDlcPhaseState(missionId, options.baseDir);
+  if (!state) throw new Error(`[aidlc-phase-state] no persisted state for ${missionId}`);
+  if (state.phase === 'complete') {
+    throw new Error(`[aidlc-phase-state] cannot resume completed mission ${missionId}`);
+  }
+  const resumed: AiDlcPhaseState = {
+    ...state,
+    resume_count: (state.resume_count || 0) + 1,
+    last_resumed_at: options.now ?? new Date().toISOString(),
+    updated_at: options.now ?? new Date().toISOString(),
+  };
+  saveAiDlcPhaseState(resumed, options.baseDir);
+  return resumed;
 }

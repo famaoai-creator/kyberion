@@ -428,6 +428,7 @@
         "list_tool_runtimes",
         "macos_automation_probe",
         "probe",
+        "probe_active_profile",
         "pulse_status",
         "read_file",
         "read_json",
