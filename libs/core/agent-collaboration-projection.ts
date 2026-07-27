@@ -454,6 +454,16 @@ export function composeAgentCollaborationProjection(
   if (options.runGraph) {
     const graphId = `run-graph:${options.runGraph.run_id || 'run'}`;
     addNode(nodes, graphId, 'artifact', graphId, 'completed');
+    if (options.runGraph.trace_id) {
+      const traceId = `trace:${options.runGraph.trace_id}`;
+      addNode(nodes, traceId, 'artifact', traceId, 'completed');
+      edges.push({
+        from: graphId,
+        to: traceId,
+        kind: 'progress',
+        event_id: `${graphId}:trace:${options.runGraph.trace_id}`,
+      });
+    }
     for (const node of options.runGraph.nodes) {
       const nodeId = `${graphId}:node:${node.id}`;
       addNode(nodes, nodeId, 'system', node.id, node.status);

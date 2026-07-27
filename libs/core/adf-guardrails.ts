@@ -206,6 +206,23 @@ export function validatePipelineGuardrails(
       // authors may have a reason, but the default shape is distill → decide,
       // selection over generation.
       const opName = String(step.op || '');
+      if (opName === 'core:include' || opName === 'include') {
+        const includeParams = (step.params ?? {}) as Record<string, unknown>;
+        const includeRef = includeParams.fragment ?? includeParams.path;
+        if (
+          typeof includeRef !== 'string' ||
+          includeRef.trim().length === 0 ||
+          includeRef.includes('{{')
+        ) {
+          findings.push({
+            code: 'include-ref-dynamic',
+            severity: 'warn',
+            message:
+              'core:include uses a dynamic or empty fragment reference; nested guardrails and graph lint will run only after runtime resolution.',
+            path: `${stepPath}.params.fragment`,
+          });
+        }
+      }
       if (opName.includes('distill')) sawDistillOp = true;
       if (opName === 'llm_decide' || opName.endsWith(':llm_decide')) {
         const params = (step.params ?? {}) as Record<string, unknown>;
