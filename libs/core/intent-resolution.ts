@@ -726,9 +726,23 @@ export function resolveIntentResolutionPacket(
   }
 
   const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
+  // A greeting can occur inside a substantive request (for example,
+  // `「こんにちは」を英語に翻訳して`).  The generic conversation intent
+  // intentionally has a strong greeting score, so prefer a near-tied,
+  // concrete task-session candidate in that case.
+  const topCandidate = sorted[0];
+  const concreteTaskCandidate = sorted.find(
+    (candidate) => candidate.resolution?.shape === 'task_session'
+  );
+  const selectedCandidate =
+    topCandidate?.intent_id === 'continue-conversation' &&
+    concreteTaskCandidate &&
+    concreteTaskCandidate.confidence >= topCandidate.confidence - 0.05
+      ? concreteTaskCandidate
+      : topCandidate;
   const selected =
-    sorted[0] && sorted[0].confidence >= scoringPolicy.selected_confidence_threshold
-      ? sorted[0]
+    selectedCandidate && selectedCandidate.confidence >= scoringPolicy.selected_confidence_threshold
+      ? selectedCandidate
       : undefined;
   const selectedParameters = inferSelectedParameters(selected?.intent_id, trimmed);
   const bundleById = new Map<string, IntentResolutionBundleCandidate>();
