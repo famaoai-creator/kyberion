@@ -647,6 +647,7 @@ async function main() {
       errors: envReport.errors,
       warnings: envReport.warnings,
       unknown: envReport.unknown,
+      undocumented: envReport.undocumented,
     },
     // NI-05 (L9): orphan NHIs — an identity outliving its scope needs a
     // human retirement decision, so it is named here, not just counted.
