@@ -10,7 +10,7 @@ describe('graph run artifact', () => {
       { id: 'source', produces: 'records' },
       { id: 'sink', consumes: 'records' },
     ]).graph;
-    const artifact = createGraphRunArtifact(graph, 'run-1');
+    const artifact = createGraphRunArtifact(graph, 'run-1', 'trace-1');
     recordGraphRunNode(
       artifact,
       graph.nodes[0],
@@ -39,7 +39,13 @@ describe('graph run artifact', () => {
     expect(projection.nodes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'run-graph:run-1', type: 'artifact' }),
+        expect.objectContaining({ id: 'trace:trace-1', type: 'artifact' }),
         expect.objectContaining({ id: 'run-graph:run-1:node:source', state: 'success' }),
+      ])
+    );
+    expect(projection.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'run-graph:run-1', to: 'trace:trace-1' }),
       ])
     );
   });

@@ -2082,7 +2082,8 @@ async function runStepsInternal(
   const graphArtifact: GraphRunArtifact | undefined = graphExecutionEnabled
     ? createGraphRunArtifact(
         deriveExecutionGraph(prepareEngineSteps(steps), Object.keys(initialCtx)).graph,
-        opts.runId
+        opts.runId,
+        opts.trace?.traceId
       )
     : undefined;
 
