@@ -3393,7 +3393,7 @@
     {
       "path": "product/orchestration/intent-scenario-catalog.md",
       "tier": "public",
-      "size": 15180,
+      "size": 15108,
       "type": "md"
     },
     {
@@ -7840,12 +7840,6 @@
       "path": "product/task-scenarios/meeting-action-items.json",
       "tier": "public",
       "size": 1479,
-      "type": "json"
-    },
-    {
-      "path": "product/task-scenarios/meeting-participation-request.json",
-      "tier": "public",
-      "size": 1961,
       "type": "json"
     },
     {
