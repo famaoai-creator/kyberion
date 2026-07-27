@@ -25,6 +25,7 @@ import {
 } from '@agent/core';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
+import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -168,9 +169,10 @@ function tenantDir(): string {
 }
 
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const expressMode = isExpressOnboarding();
 
 const ask = async (question: string, defaultValue = ''): Promise<string> => {
-  if (!interactive) {
+  if (!interactive || expressMode) {
     return defaultValue;
   }
 
@@ -465,7 +467,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
         '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・OpenRouter・ローカルバックエンドを設定できます。'
       )
     );
-    if (interactive) {
+    if (interactive && !expressMode) {
       const continueWithStub = isAffirmative(
         await ask(
           t(
@@ -824,7 +826,7 @@ async function runOnboarding() {
   const rootDir = pathResolver.rootDir();
   let customerSlug = customerResolver.activeCustomer();
 
-  if (!customerSlug && interactive) {
+  if (!customerSlug && interactive && !expressMode) {
     const wantsCustomer = isAffirmative(await ask('Set up a customer overlay now? (y/N): ', 'n'));
     if (wantsCustomer) {
       while (!customerSlug) {
@@ -843,7 +845,13 @@ async function runOnboarding() {
 
   const personalDir = profileRoot();
 
-  if (!interactive && process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK !== '1') {
+  if (
+    shouldRefuseNonInteractiveOnboarding({
+      interactive,
+      express: expressMode,
+      allowDefaults: process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK,
+    })
+  ) {
     console.error(
       chalk.red(
         t(
@@ -902,6 +910,14 @@ async function runOnboarding() {
     )
   );
   console.log(t('Estimated time: 5-10 minutes.', '所要時間の目安: 5〜10分。'));
+  if (expressMode) {
+    console.log(
+      t(
+        'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboard`.',
+        'Express モード: 安全な既定値で開始し、後から `pnpm onboard` でアイデンティティと接続を調整します。'
+      )
+    );
+  }
   console.log(
     t(
       'You can stop with Ctrl-C at any point and resume later.\n',

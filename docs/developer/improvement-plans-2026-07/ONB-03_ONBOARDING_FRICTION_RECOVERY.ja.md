@@ -62,3 +62,6 @@
 ## 実装メモ(続き)
 
 - 2026-07-14: Task 5 前半(Chronos identity route)を実装。UX-06 が想定した専用 resolver 抽出は行われていなかったが、`libs/core/customer-resolver.ts` の `resolveOverlay()`(operator-identity.ts が既に使っている解決順: `customer/{slug}/{file}` → `knowledge/personal/{file}`)がそのまま使えたため、`api/identity/route.ts` の `pathResolver.knowledge("personal/...")` 直参照をこれに置換。`FirstRunBanner`/`IdentityBadge` はどちらも `/api/identity` を叩くため副次的に修正される。テスト3本新設(未オンボード / personal フォールバック / customer overlay 優先、overlay 存在時に personal 側データを無視することを固定)。残: `pipelines/vital-check.json` の `p_identity`/`p_vision` ステップは静的 JSON のため同じ置換ができない — テンプレート変数(`{{active_profile_root}}` 等)を run_pipeline エンジンに追加するか、overlay 解決済みの新 op を作る設計判断が必要で、本セッションのスコープ外とした。
+
+- 2026-07-27: `pnpm onboard --express` を追加し、TTYなしでは明示的な `--express` または既存の `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1` がない限り実行を拒否するようにした。Express時は安全な既定値を受け入れ、後から `pnpm onboard` で調整できることを表示する。`onboarding_mode` の判定テストを新設。
+- 2026-07-27: `pipelines/vital-check.json` のidentity/vision probeをactive profile root基準へ変更する `system:probe_active_profile` を追加。絶対パスと `..` を拒否し、op registry/input contractへ登録した。system-actuatorの回帰テストとbuild・governance検査を通過。
