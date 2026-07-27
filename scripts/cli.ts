@@ -1906,6 +1906,9 @@ export async function main(args = process.argv.slice(2)) {
       if (step.children) step.children.forEach((c: any) => printStep(c, indent + 1));
     };
     preview.steps.forEach((s: any) => printStep(s));
+    if (restArgs.includes('--preview-graph') && preview.graph) {
+      console.log(`\n=== Effective Graph (Mermaid) ===\n${preview.graph.mermaid}`);
+    }
     process.exit(preview.valid ? 0 : 1);
   }
 

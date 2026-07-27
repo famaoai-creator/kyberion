@@ -35,6 +35,7 @@ import type {
   ToolDefinition,
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
+import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 import type { ClaudeAgentTaskParams, ClaudeAgentTaskResult } from './claude-agent-query.js';
 import type { GovernedAgentPromptInput } from './claude-agent-governance.js';
 import type { CanUseTool, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
@@ -599,6 +600,20 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
       return Promise.reject(error);
     }
     return this.dispatcher.dispatch(instruction, chainedContext, this.base, options);
+  }
+
+  delegateTaskHandle(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): DelegationHandle {
+    return createDelegationHandle({
+      instruction,
+      ...(context ? { context } : {}),
+      backendName: this.name,
+      execute: (signal) =>
+        this.delegateTask(instruction, context, { ...options, ...(signal ? { signal } : {}) }),
+    });
   }
 
   // --- cognition substrate: forward verbatim to the wrapped base backend ---

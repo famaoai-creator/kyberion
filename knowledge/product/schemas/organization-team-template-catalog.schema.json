@@ -53,6 +53,9 @@
               "max_messages_per_run": { "type": "integer", "minimum": 1 },
               "max_wall_clock_minutes": { "type": "integer", "minimum": 1 },
               "max_member_turns": { "type": "integer", "minimum": 1 },
+              "max_followup_iterations": { "type": "integer", "minimum": 1 },
+              "max_rework_attempts": { "type": "integer", "minimum": 1 },
+              "max_review_rounds": { "type": "integer", "minimum": 1 },
               "shutdown_policy": {
                 "type": "string",
                 "enum": ["graceful_handoff", "manual", "auto_shutdown"]

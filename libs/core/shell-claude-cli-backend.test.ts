@@ -163,11 +163,13 @@ describe('shell-claude-cli-backend', () => {
       spawnMock.mockReturnValueOnce(createChild('ok'));
 
       const backend = new ShellClaudeCliBackend({ bin: 'claude', timeoutMs: 12345 });
-      await backend.delegateTask('do the thing');
+      const controller = new AbortController();
+      await backend.delegateTask('do the thing', undefined, { signal: controller.signal });
 
       expect(withWallClockBudgetMock).toHaveBeenCalledTimes(1);
       const [opts, fn] = withWallClockBudgetMock.mock.calls[0];
       expect(opts).toMatchObject({ provider: 'claude', budgetMs: 12345 });
+      expect(opts.signal).toBe(controller.signal);
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
     });

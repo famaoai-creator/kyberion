@@ -16,7 +16,7 @@ export interface DelegatedTaskTrace {
   kind: 'delegated_task';
   created_at: string;
   completed_at?: string;
-  status: 'started' | 'completed' | 'failed';
+  status: 'started' | 'completed' | 'failed' | 'cancelled';
   owner: string;
   instruction: string;
   context?: string;
@@ -41,6 +41,13 @@ export interface DelegatedTaskTrace {
 export type DelegatedTaskRecord = Omit<DelegatedTaskTrace, 'trace_id'> & {
   delegation_id: string;
 };
+
+export interface DelegationHandle {
+  readonly delegation_id: string;
+  status(): DelegatedTaskRecord;
+  join(): Promise<string>;
+  cancel(reason?: string): Promise<void>;
+}
 
 // Tests namespace the trace/store via KYBERION_DELEGATION_TRACE_PATH /
 // KYBERION_DELEGATION_STORE_DIR so parallel suites never clobber the real
@@ -163,6 +170,95 @@ export function completeDelegatedTaskTrace(
     }
   }
   return completed;
+}
+
+export function cancelDelegatedTaskTrace(
+  trace: DelegatedTaskTrace,
+  reason = 'cancelled by caller'
+): DelegatedTaskTrace {
+  const cancelled: DelegatedTaskTrace = {
+    ...trace,
+    completed_at: new Date().toISOString(),
+    status: 'cancelled',
+    error: reason,
+  };
+  appendTrace(cancelled);
+  persistRecord(cancelled);
+  return cancelled;
+}
+
+/**
+ * Start a durable, id-addressable delegation without changing the legacy
+ * delegateTask promise API. Cancellation is best effort: a provider may supply
+ * a real cancel callback (for example SIGTERM/SIGKILL); otherwise the handle
+ * stops awaiting the result and records the terminal cancellation state.
+ */
+export function createDelegationHandle(input: {
+  owner?: string;
+  instruction: string;
+  context?: string;
+  backendName?: string;
+  missionId?: string;
+  taskId?: string;
+  execute: (signal?: AbortSignal) => Promise<string>;
+  cancel?: (reason: string) => Promise<void> | void;
+}): DelegationHandle {
+  const trace = startDelegatedTaskTrace({
+    owner:
+      input.owner ||
+      process.env.MISSION_ROLE ||
+      process.env.KYBERION_PERSONA ||
+      'reasoning-backend',
+    instruction: input.instruction,
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.backendName ? { backendName: input.backendName } : {}),
+    ...(input.missionId ? { missionId: input.missionId } : {}),
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+  });
+  let record = trace;
+  let cancelled = false;
+  let cancelPromise: Promise<void> | undefined;
+  const controller = new AbortController();
+  const result = Promise.resolve()
+    .then(() => input.execute(controller.signal))
+    .then((value) => {
+      if (!cancelled) record = completeDelegatedTaskTrace(record, { resultSummary: value });
+      return value;
+    })
+    .catch((error: unknown) => {
+      if (!cancelled) {
+        record = completeDelegatedTaskTrace(record, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    });
+  return {
+    delegation_id: trace.trace_id,
+    status: () => {
+      const { trace_id: _traceId, ...rest } = record;
+      return { delegation_id: trace.trace_id, ...rest };
+    },
+    join: async () => {
+      if (cancelled) throw new Error(`[DELEGATION_CANCELLED] ${record.error || 'cancelled'}`);
+      const value = await result;
+      if (cancelled) throw new Error(`[DELEGATION_CANCELLED] ${record.error || 'cancelled'}`);
+      return value;
+    },
+    cancel: async (reason = 'cancelled by caller') => {
+      if (cancelled || record.status !== 'started') return;
+      cancelled = true;
+      controller.abort(reason);
+      // A provider that cannot observe the signal may still settle later. The
+      // handle remains terminal and join() refuses the late result.
+      void result.catch(() => undefined);
+      if (input.cancel) {
+        cancelPromise = Promise.resolve(input.cancel(reason));
+        await cancelPromise;
+      }
+      record = cancelDelegatedTaskTrace(record, reason);
+    },
+  };
 }
 
 export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskRecord | null {

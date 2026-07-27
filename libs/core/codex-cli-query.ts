@@ -24,6 +24,7 @@ export interface CodexCliQueryOptions {
   timeoutMs?: number;
   extraArgs?: string[];
   cwd?: string;
+  signal?: AbortSignal;
 }
 
 export interface RunCodexCliQueryParams<T> {
@@ -55,6 +56,7 @@ export async function runCodexCliQuery<T>({
 }
 
 class CodexCliQuery {
+  private readonly options: CodexCliQueryOptions;
   private readonly bin: string;
   private readonly model: string;
   private readonly timeoutMs: number;
@@ -62,6 +64,7 @@ class CodexCliQuery {
   private readonly cwd: string;
 
   constructor(options: CodexCliQueryOptions = {}) {
+    this.options = options;
     this.bin = options.bin ?? resolveCodexBinary();
     this.model = options.model ?? resolveRuntimeModelId('codex-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
@@ -166,6 +169,7 @@ class CodexCliQuery {
         provider: 'codex',
         budgetMs: this.timeoutMs,
         child: delegationChildHandleFromChildProcess(child),
+        signal: this.options.signal,
       },
       () =>
         new Promise<void>((resolve, reject) => {

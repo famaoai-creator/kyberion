@@ -37,6 +37,7 @@ import type {
   HypothesisSketch,
   PersonaSynthesisInput,
   ReasoningBackend,
+  ReasoningCallOptions,
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
@@ -438,13 +439,23 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
 
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
   private async callParse(
-    params: Parameters<typeof this.client.messages.parse>[0]
+    params: Parameters<typeof this.client.messages.parse>[0],
+    options?: Pick<ReasoningCallOptions, 'signal'>
   ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
+    if (options?.signal?.aborted) {
+      throw options.signal.reason instanceof Error
+        ? options.signal.reason
+        : new Error('[DELEGATION_CANCELLED] anthropic reasoning operation aborted');
+    }
     assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(params);
     const started = Date.now();
     try {
-      const result = await llmSemaphore.run(() => this.client.messages.parse(budgeted));
+      const result = await llmSemaphore.run(() =>
+        options?.signal
+          ? this.client.messages.parse(budgeted, { signal: options.signal })
+          : this.client.messages.parse(budgeted)
+      );
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
     } catch (err) {
@@ -455,17 +466,26 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
 
   /** Semaphore-guarded wrapper around messages.create (non-streaming). */
   private async callCreate(
-    params: Parameters<typeof this.client.messages.create>[0] & { stream?: false }
+    params: Parameters<typeof this.client.messages.create>[0] & { stream?: false },
+    options?: Pick<ReasoningCallOptions, 'signal'>
   ): Promise<Anthropic.Message> {
     // The single outbound choke point for this backend. The SDK issues its own
     // HTTP, so `secureFetch`'s tier gate never sees these sends; checking here
     // is what keeps tenant material from reaching an unapproved provider.
     assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(params);
+    if (options?.signal?.aborted) {
+      throw options.signal.reason instanceof Error
+        ? options.signal.reason
+        : new Error('[DELEGATION_CANCELLED] anthropic reasoning operation aborted');
+    }
     const started = Date.now();
     try {
       const result = await llmSemaphore.run(
-        () => this.client.messages.create(budgeted) as Promise<Anthropic.Message>
+        () =>
+          (options?.signal
+            ? this.client.messages.create(budgeted, { signal: options.signal })
+            : this.client.messages.create(budgeted)) as Promise<Anthropic.Message>
       );
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
@@ -802,27 +822,27 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
+    options?: ReasoningCallOptions
   ): Promise<string> {
-    const response = await this.callCreate({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      thinking: this.thinkingConfig(options?.effort),
-      messages: [
-        {
-          role: 'user',
-          content: [context ? `Context: ${context}\n\n` : '', `Task: ${instruction}`].join(''),
-        },
-      ],
-    });
+    const response = await this.callCreate(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        thinking: this.thinkingConfig(options?.effort),
+        messages: [
+          {
+            role: 'user',
+            content: [context ? `Context: ${context}\n\n` : '', `Task: ${instruction}`].join(''),
+          },
+        ],
+      },
+      options
+    );
     const parts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
     return parts.map((b) => b.text).join('\n');
   }
 
-  async prompt(
-    prompt: string,
-    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
   }
 
