@@ -32,6 +32,20 @@ describe('AnthropicReasoningBackend', () => {
     );
   });
 
+  it('forwards delegation cancellation to the Anthropic SDK request options', async () => {
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'done' }],
+    });
+    const backend = new AnthropicReasoningBackend({
+      client: { messages: { create, parse: vi.fn() } } as any,
+    });
+    const controller = new AbortController();
+
+    await backend.delegateTask('do it', undefined, { signal: controller.signal });
+
+    expect(create).toHaveBeenCalledWith(expect.any(Object), { signal: controller.signal });
+  });
+
   it('shrinks max_tokens when the estimated input nears the context window', async () => {
     vi.stubEnv('KYBERION_CONTEXT_WINDOW_TOKENS', '20000');
     const create = vi.fn().mockResolvedValue({

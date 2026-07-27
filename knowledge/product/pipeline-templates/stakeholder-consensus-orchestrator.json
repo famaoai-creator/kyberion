@@ -27,7 +27,7 @@
       "op": "core:while",
       "consumes": "ordered_visits",
       "params": {
-        "condition": "ordered_visits.length > 0",
+        "condition": { "from": "ordered_visits", "operator": "not_empty" },
         "max_iterations": 50,
         "pipeline": [
           {

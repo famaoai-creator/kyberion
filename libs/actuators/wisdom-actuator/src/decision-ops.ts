@@ -25,6 +25,8 @@ import {
   type GoldenRulePriority,
   curateBackgroundReviewProposals,
   generateKnowledgeCurationReport,
+  deriveExecutionGraph,
+  executeGraph,
 } from '@agent/core';
 import * as path from 'node:path';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
@@ -442,7 +444,8 @@ export async function perspectiveFanout(input: {
   const backend = getReasoningBackend();
   const hypotheses: any[] = [];
   const participantReceipts: PerspectiveFanoutReceipt[] = [];
-
+  // Security validation stays a synchronous preflight: a lower-tier output
+  // request must fail the operation before any participant is dispatched.
   for (const participant of input.participants) {
     const resolvedParticipant = resolveReasoningParticipant({
       participant,
@@ -454,35 +457,78 @@ export async function perspectiveFanout(input: {
       input.output_tier
     );
     if (!outputGuard.allowed) throw new Error(outputGuard.reason);
-
-    const participantHypotheses = await backend.divergePersonas({
-      topic: input.topic,
-      personas: [participant.participant_id],
-      minPerPersona: input.min_hypotheses_per_participant,
-      context: renderReasoningParticipantContext(resolvedParticipant),
-    });
-    hypotheses.push(
-      ...participantHypotheses.map((hypothesis) => ({
-        ...hypothesis,
-        proposed_by: participant.participant_id,
+  }
+  const graph = deriveExecutionGraph(
+    input.participants.map((participant) => ({
+      id: `participant-${participant.participant_id}`,
+      depends_on: [],
+      participant,
+    }))
+  );
+  const fanout = await executeGraph<any, Record<string, unknown>>(
+    graph.graph,
+    async (node) => {
+      const participant = (node.value as any).participant as ReasoningParticipant;
+      const resolvedParticipant = resolveReasoningParticipant({
+        participant,
+        candidate_fragments: input.candidate_fragments,
+        backend_name: backend.name,
+      });
+      const outputGuard = validateContextOutputTier(
+        resolvedParticipant.context_pack,
+        input.output_tier
+      );
+      if (!outputGuard.allowed) throw new Error(outputGuard.reason);
+      const participantHypotheses = await backend.divergePersonas({
+        topic: input.topic,
+        personas: [participant.participant_id],
+        minPerPersona: input.min_hypotheses_per_participant,
+        context: renderReasoningParticipantContext(resolvedParticipant),
+      });
+      return {
+        status: 'success' as const,
+        context: {
+          hypotheses: participantHypotheses.map((hypothesis) => ({
+            ...hypothesis,
+            proposed_by: participant.participant_id,
+            participant_id: participant.participant_id,
+            perspective_ids: participant.perspective_ids,
+          })),
+          receipt: {
+            participant_id: participant.participant_id,
+            backend_name: backend.name,
+            security_scope: participant.security_scope,
+            effective_input_tier: resolvedParticipant.context_pack.effective_input_tier,
+            accepted_fragment_ids: resolvedParticipant.context_pack.fragments.map(
+              (fragment) => fragment.fragment_id
+            ),
+            rejected_fragments: resolvedParticipant.context_pack.rejected.map((rejection) => ({
+              fragment_id: rejection.fragment_id,
+              code: rejection.code,
+              reason: rejection.reason,
+            })),
+          } satisfies PerspectiveFanoutReceipt,
+        },
+      };
+    },
+    {
+      initialContext: {},
+      maxConcurrency: Math.min(6, input.participants.length),
+    }
+  );
+  const participantFailures: Array<{ participant_id: string; error: string }> = [];
+  for (const node of graph.graph.nodes) {
+    const outcome = fanout.outcomes[node.id];
+    const participant = (node.value as any).participant as ReasoningParticipant;
+    if (outcome?.status === 'success' && outcome.context) {
+      hypotheses.push(...((outcome.context as any).hypotheses || []));
+      participantReceipts.push((outcome.context as any).receipt);
+    } else if (outcome?.error) {
+      participantFailures.push({
         participant_id: participant.participant_id,
-        perspective_ids: participant.perspective_ids,
-      }))
-    );
-    participantReceipts.push({
-      participant_id: participant.participant_id,
-      backend_name: backend.name,
-      security_scope: participant.security_scope,
-      effective_input_tier: resolvedParticipant.context_pack.effective_input_tier,
-      accepted_fragment_ids: resolvedParticipant.context_pack.fragments.map(
-        (fragment) => fragment.fragment_id
-      ),
-      rejected_fragments: resolvedParticipant.context_pack.rejected.map((rejection) => ({
-        fragment_id: rejection.fragment_id,
-        code: rejection.code,
-        reason: rejection.reason,
-      })),
-    });
+        error: outcome.error,
+      });
+    }
   }
 
   const reasoningMode = deriveReasoningMode(backend.name);
@@ -491,6 +537,7 @@ export async function perspectiveFanout(input: {
     topic: input.topic,
     hypotheses,
     participant_receipts: participantReceipts,
+    ...(participantFailures.length > 0 ? { participant_failures: participantFailures } : {}),
     output_tier: input.output_tier,
     generated_by: backend.name,
     generated_at: nowIso(),
@@ -807,23 +854,51 @@ export async function simulateAllEnsemble(input: {
   safeMkdir(pathResolver.rootResolve(runsDir), { recursive: true });
 
   const executeEnsemble = async (runsCount: number) => {
-    const runs: any[] = [];
-    for (let i = 0; i < runsCount; i++) {
-      const runOutDir = `${runsDir}/run-${i + 1}`;
-      safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
-      const result = await simulateAll({
-        ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
-        goal: input.goal,
-        output_dir: runOutDir,
-      });
-      const summaryPath = result.written_to;
-      runs.push({
-        run_index: i + 1,
-        summary_path: summaryPath,
-        quality_severity: result.quality_severity,
-        summary: readJSON<any>(summaryPath),
-      });
-    }
+    const graph = {
+      nodes: Array.from({ length: runsCount }, (_, index) => ({
+        id: `ensemble-run-${index + 1}`,
+        index,
+        value: index + 1,
+        dependencies: [] as string[],
+        incoming: [],
+        outgoing: [],
+        merge: 'collect' as const,
+      })),
+      edges: [],
+    };
+    const scheduled = await executeGraph<number, { run?: any }>(
+      graph,
+      async (node) => {
+        const runIndex = node.value;
+        const runOutDir = `${runsDir}/run-${runIndex}`;
+        safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
+        const result = await simulateAll({
+          ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
+          goal: input.goal,
+          output_dir: runOutDir,
+        });
+        const summaryPath = result.written_to;
+        return {
+          status: 'success' as const,
+          context: {
+            run: {
+              run_index: runIndex,
+              summary_path: summaryPath,
+              quality_severity: result.quality_severity,
+              summary: readJSON<any>(summaryPath),
+            },
+          },
+        };
+      },
+      {
+        initialContext: {},
+        maxConcurrency: Math.min(6, runsCount),
+      }
+    );
+    const runs = Object.values(scheduled.outcomes)
+      .map((outcome) => outcome.context?.run)
+      .filter((run): run is any => Boolean(run))
+      .sort((left, right) => left.run_index - right.run_index);
     const convergence = evaluateEnsembleConvergence({
       runs: runs.map((r) => r.summary),
       threshold: input.convergence_threshold ?? 0.6,

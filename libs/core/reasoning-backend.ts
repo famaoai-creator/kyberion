@@ -44,6 +44,7 @@ import {
 } from './reasoning-egress-scope.js';
 import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
 import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
+import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -108,6 +109,13 @@ function resolveInPlaceRetryDelayMs(error: unknown, retryAttempt: number): numbe
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function throwIfReasoningAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error('[DELEGATION_CANCELLED] reasoning operation aborted');
 }
 
 export type PersonaLabel = string;
@@ -437,6 +445,8 @@ export interface ReasoningCallOptions {
    * fast→haiku, standard→sonnet, deep→opus. Absent = backend default.
    */
   model_tier?: 'fast' | 'standard' | 'deep';
+  /** Cancellation propagated by delegateTaskHandle to killable providers. */
+  signal?: AbortSignal;
 }
 
 export interface StructuredDelegationOptions {
@@ -514,6 +524,12 @@ export interface ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string>;
+  /** Start an id-addressable delegation that can be joined or cancelled. */
+  delegateTaskHandle?(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): DelegationHandle;
   /** Run a plain prompt against the active reasoning backend. */
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string>;
   /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
@@ -797,8 +813,10 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
   private async runWithFailover<T>(
     operation: string,
-    invoke: (backend: ReasoningBackend) => Promise<T>
+    invoke: (backend: ReasoningBackend) => Promise<T>,
+    signal?: AbortSignal
   ): Promise<T> {
+    throwIfReasoningAborted(signal);
     // OP-01: the spend cap is real control, not prompt text. Warn posture
     // logs/alerts and proceeds; block posture throws SpendCapExceededError
     // before any provider is invoked.
@@ -821,7 +839,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         operation,
         candidate,
         provider,
-        invoke
+        invoke,
+        signal
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
@@ -848,11 +867,13 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     operation: string,
     candidate: ReasoningBackendCandidate,
     provider: string | undefined,
-    invoke: (backend: ReasoningBackend) => Promise<T>
+    invoke: (backend: ReasoningBackend) => Promise<T>,
+    signal?: AbortSignal
   ): Promise<{ ok: true; result: T } | { ok: false; message: string; stop: boolean }> {
     const maxInPlaceRetries = resolveInPlaceRetryCount(this.failoverPolicy.max_in_place_retries);
     for (let retryAttempt = 0; ; retryAttempt++) {
       try {
+        throwIfReasoningAborted(signal);
         const endpoint = (candidate.backend as ReasoningBackend & { egressEndpoint?: string })
           .egressEndpoint;
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
@@ -870,6 +891,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         }
         return { ok: true, result };
       } catch (error) {
+        if (signal?.aborted) throw error;
         const message = reasoningFailureMessage(error);
         const classification = classifyReasoningFailure(error);
         if (classification.retryable && retryAttempt < maxInPlaceRetries) {
@@ -891,6 +913,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
             // Metrics are best-effort and must not alter retry behavior.
           }
           await sleep(delayMs);
+          throwIfReasoningAborted(signal);
           continue;
         }
 
@@ -1001,12 +1024,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     options?: ReasoningCallOptions
   ): Promise<string> {
     let servedBackendName = '';
-    const run = (prompt: string): Promise<string> =>
-      this.runWithFailover('delegateTask', (backend) => {
+    const first = await this.runWithFailover(
+      'delegateTask',
+      (backend) => {
         servedBackendName = backend.name;
-        return backend.delegateTask(prompt, context, options);
-      });
-    const first = await run(instruction);
+        return backend.delegateTask(instruction, context, options);
+      },
+      options?.signal
+    );
     if (!shouldRetryShortDelegationSummary({ instruction, result: first, servedBackendName })) {
       return first;
     }
@@ -1014,11 +1039,40 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       `[reasoning-backend] delegation report too brief (${first.trim().length} chars < ${DELEGATION_SUMMARY_MIN_CHARS}); requesting one continuation`
     );
     // KC-06: exactly one continuation — the second result passes through as-is.
-    return run(buildDelegationSummaryContinuationPrompt(instruction, first));
+    return this.runWithFailover(
+      'delegateTask',
+      (backend) => {
+        servedBackendName = backend.name;
+        return backend.delegateTask(
+          buildDelegationSummaryContinuationPrompt(instruction, first),
+          context,
+          options
+        );
+      },
+      options?.signal
+    );
+  }
+
+  delegateTaskHandle(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): DelegationHandle {
+    return createDelegationHandle({
+      instruction,
+      ...(context ? { context } : {}),
+      backendName: this.name,
+      execute: (signal) =>
+        this.delegateTask(instruction, context, { ...options, ...(signal ? { signal } : {}) }),
+    });
   }
 
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
-    return this.runWithFailover('prompt', (backend) => backend.prompt(prompt, options));
+    return this.runWithFailover(
+      'prompt',
+      (backend) => backend.prompt(prompt, options),
+      options?.signal
+    );
   }
 
   async generateWithTools(
@@ -1158,6 +1212,21 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
   }
   delegateTask(instruction: string, context?: string, options?: ReasoningCallOptions) {
     return this.pick(options).delegateTask(instruction, context, options);
+  }
+  delegateTaskHandle(instruction: string, context?: string, options?: ReasoningCallOptions) {
+    const backend = this.pick(options);
+    return backend.delegateTaskHandle
+      ? backend.delegateTaskHandle(instruction, context, options)
+      : createDelegationHandle({
+          instruction,
+          ...(context ? { context } : {}),
+          backendName: backend.name,
+          execute: (signal) =>
+            backend.delegateTask(instruction, context, {
+              ...options,
+              ...(signal ? { signal } : {}),
+            }),
+        });
   }
   prompt(prompt: string, options?: ReasoningCallOptions) {
     return this.pick(options).prompt(prompt, options);
@@ -1628,6 +1697,19 @@ export const stubReasoningBackend: ReasoningBackend = {
   async delegateTask(instruction, context) {
     recordStubServed('delegateTask', `instruction="${instruction}"`);
     return stubText(`[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`);
+  },
+
+  delegateTaskHandle(instruction, context, options) {
+    return createDelegationHandle({
+      instruction,
+      ...(context ? { context } : {}),
+      backendName: 'stub',
+      execute: (signal) =>
+        stubReasoningBackend.delegateTask(instruction, context, {
+          ...options,
+          ...(signal ? { signal } : {}),
+        }),
+    });
   },
 
   async prompt(prompt) {

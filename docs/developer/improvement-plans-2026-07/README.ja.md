@@ -14,6 +14,7 @@
 > **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
 > **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
 > **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
+> **グラフオーケストレーション計画**: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)(GE-01〜09: ループエンジニアリングからグラフエンジニアリングへ。ステップ間エッジの契約化・frontier スケジューラ・条件付きエッジと式評価安全化・ノード境界チェックポイント `--resume`・ミッションワーカーの wave バリア撤廃・delegateTask ハンドル・グラフ guardrails/Mermaid プレビュー・DAG トレース・wisdom fanout 並列化。AR-01/HN-03/MO-03/MO-06 の後続、外部フレームワーク非依存)。
 
 ## 1. 目的
 
@@ -426,6 +427,22 @@ PPTX デザイン乖離の調査(2026-07-15)に基づく。正本は [LAYERED_EX
 | [CO-04](./CO-04_DECISION_RIGHTS.ja.md)          | 意思決定権限マトリクス(decision rights as data・承認ゲート統合・黄金律タイブレーク)    | P2     | M    | CO-01,CO-02,SA-05                       |
 | [CO-05](./CO-05_BUSINESS_PROCESS_LIBRARY.ja.md) | 事業プロセステンプレートの拡充(採用/財務決算/調達/取締役会/資金調達)                   | P2     | M    | MO-01,CO-02,CO-03                       |
 | [CO-06](./CO-06_SOLOPRENEUR_AI_WORKFORCE.ja.md) | ソロプレナーAI workforce(人とAIの共通労働契約・人間への最終帰責・委任lease・CEO操作面) | **P0** | L    | CO-01,CO-04,MO-03,OP-01,SU-01〜04,SA-05 |
+
+### グラフオーケストレーション(ループ → グラフ)
+
+グラフエンジニアリング動向(ADK Go 2.0・LangGraph durable execution)の取り込み調査(2026-07-28 追加)に基づく。グラフの「データ」(タスク DAG・Kahn ソート・並列原語)は既にあるが「実行機」(エッジ契約・frontier スケジューラ・checkpoint/resume)がない、というねじれの解消。正本: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)。
+
+| ID                                                   | タイトル                                                                        | 優先度 | 規模 | 依存        |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [GE-01](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ステップ間エッジの契約化(depends_on + データフローエッジ・preflight 検証)       | P1     | M    | なし        |
+| [GE-02](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | frontier スケジューラ(逐次 for 置換・fan-in マージポリシー・ResourceClaim 統合) | P1     | L    | GE-01       |
+| [GE-03](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | 条件付きエッジと安全な式評価(when・core:switch・黙殺 false 根治)                | P1     | M    | GE-01       |
+| [GE-04](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ノード境界チェックポイントと --resume(EventSourcingKernel 派生 run journal)     | P1     | L    | GE-01,GE-02 |
+| [GE-05](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ミッションワーカーの wave バリア撤廃(frontier 駆動・ループ上限ポリシー化)       | P1     | L    | GE-02,GE-06 |
+| [GE-06](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | delegateTask ハンドル API(delegation_id・join・cancel)                          | P1     | M    | なし        |
+| [GE-07](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | グラフ guardrails とプレビュー(トラバース穴・グラフ lint・Mermaid)              | P2     | S〜M | GE-01       |
+| [GE-08](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | DAG 形トレースと run-graph アーティファクト                                     | P2     | M    | GE-02       |
+| [GE-09](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | wisdom fanout の並列化(dogfood・before/after 実測)                              | P2     | S〜M | GE-02       |
 
 ## 4. 優先度の根拠(要約)
 

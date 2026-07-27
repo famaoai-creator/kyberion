@@ -7,6 +7,7 @@ import {
 } from './shell-command-policy.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import type { PipelineAdf, PipelineAdfStep, StepHook } from './pipeline-contract.js';
+import { deriveExecutionGraph } from './graph-scheduler.js';
 
 export interface AdfGuardrailFinding {
   code: string;
@@ -131,6 +132,44 @@ export function validatePipelineGuardrails(
 
   visitSteps(pipeline.steps, `${sourcePath}.steps`, 0);
 
+  // GE-07: graph structure is linted before any actuator can run.
+  const graph = deriveExecutionGraph(pipeline.steps);
+  for (const error of graph.errors) {
+    findings.push({
+      code:
+        error.code === 'cycle'
+          ? 'graph-cycle'
+          : error.code === 'missing-dependency'
+            ? 'graph-missing-dependency'
+            : error.code === 'missing-channel'
+              ? 'graph-missing-channel'
+              : error.code === 'duplicate-id'
+                ? 'graph-duplicate-id'
+                : 'graph-id-required-for-dependency',
+      severity: error.code === 'missing-channel' ? 'warn' : 'error',
+      message: error.message,
+      path: sourcePath,
+    });
+  }
+  for (const node of graph.graph.nodes) {
+    if (node.index > 0 && node.incoming.length === 0) {
+      findings.push({
+        code: 'graph-unreachable-node',
+        severity: 'warn',
+        message: `Graph node "${node.id}" has no incoming edge and may be unreachable from the pipeline entry.`,
+        path: `${sourcePath}.steps[${node.index}]`,
+      });
+    }
+    if (node.incoming.length > 1 && !(node.value as PipelineAdfStep).merge) {
+      findings.push({
+        code: 'graph-unmerged-fanin',
+        severity: 'warn',
+        message: `Graph node "${node.id}" has ${node.incoming.length} incoming edges; declare merge: collect|namespace|last.`,
+        path: `${sourcePath}.steps[${node.index}]`,
+      });
+    }
+  }
+
   return {
     ok: findings.every((finding) => finding.severity !== 'error'),
     findings,
@@ -206,6 +245,23 @@ export function validatePipelineGuardrails(
         }
       }
 
+      for (const condition of [
+        (step.params as Record<string, unknown> | undefined)?.condition,
+        (step.params as Record<string, unknown> | undefined)?.when,
+        (step.params as Record<string, unknown> | undefined)?.until,
+        (step as any).when,
+      ]) {
+        if (typeof condition === 'string' && looksLikeExpression(condition)) {
+          findings.push({
+            code: 'condition-looks-like-expression',
+            severity: 'error',
+            message:
+              'String conditions must be paths or structured conditions; expression syntax is not evaluated.',
+            path: `${stepPath}.params.condition`,
+          });
+        }
+      }
+
       inspectStep(step, stepPath, depth);
     }
   }
@@ -268,6 +324,12 @@ export function validatePipelineGuardrails(
       if (body) visitSteps(body, `${stepPath}.params.do`, depth + 1);
     }
 
+    if (step.op === 'core:parallel_calls') {
+      const params = step.params as Record<string, unknown> | undefined;
+      const calls = Array.isArray(params?.calls) ? (params.calls as PipelineAdfStep[]) : undefined;
+      if (calls) visitSteps(calls, `${stepPath}.params.calls`, depth + 1);
+    }
+
     if (
       step.op === 'core:while' ||
       step.op === 'core:loop_until' ||
@@ -278,6 +340,14 @@ export function validatePipelineGuardrails(
         ? (params?.pipeline as PipelineAdfStep[])
         : undefined;
       if (body) visitSteps(body, `${stepPath}.params.pipeline`, depth + 1);
+      if (params?.max_iterations === undefined && params?.maxIterations === undefined) {
+        findings.push({
+          code: 'graph-loop-without-bound',
+          severity: 'error',
+          message: 'Loop nodes must declare max_iterations.',
+          path: `${stepPath}.params`,
+        });
+      }
     }
 
     const nestedPipeline = extractNestedPipeline(step);
@@ -346,6 +416,10 @@ export function validatePipelineGuardrails(
     if (!params) return undefined;
     const nested = params.pipeline;
     return Array.isArray(nested) ? (nested as PipelineAdfStep[]) : undefined;
+  }
+
+  function looksLikeExpression(value: string): boolean {
+    return /[<>]=?|={2,3}|&&|\|\||\.length\b|\b(?:and|or)\b/u.test(value);
   }
 }
 

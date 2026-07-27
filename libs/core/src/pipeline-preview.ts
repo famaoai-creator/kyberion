@@ -1,6 +1,7 @@
 import { safeReadFile, safeExistsSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import * as path from 'node:path';
+import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +24,11 @@ export interface PipelinePreview {
   warnings: string[];
   errors: string[];
   steps: PreviewStep[];
+  graph?: {
+    nodes: Array<{ id: string; op: string; dependencies: string[] }>;
+    edges: GraphEdge[];
+    mermaid: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +66,45 @@ export function previewPipeline(
     preview.warnings.push(...ps.warnings);
   }
 
+  const graph = deriveExecutionGraph(pipelineJson.steps);
+  preview.graph = {
+    nodes: graph.graph.nodes.map((node) => ({
+      id: node.id,
+      op: String((node.value as any).op || '?'),
+      dependencies: node.dependencies,
+    })),
+    edges: graph.graph.edges,
+    mermaid: renderGraphMermaid(graph.graph.nodes, graph.graph.edges),
+  };
+  for (const error of graph.errors) preview.errors.push(error.message);
+  if (graph.errors.length > 0) preview.valid = false;
+
   return preview;
+}
+
+export function renderGraphMermaid(
+  nodes: Array<{ id: string; value: any }>,
+  edges: GraphEdge[]
+): string {
+  const lines = ['flowchart TD'];
+  for (const node of nodes) {
+    const label = String(node.value?.op || node.id).replace(/["\n\r]/g, ' ');
+    lines.push(`  ${mermaidId(node.id)}["${label}"]`);
+  }
+  for (const edge of edges) {
+    const label =
+      edge.kind === 'data' && edge.channel
+        ? `|data:${edge.channel}|`
+        : edge.kind === 'when'
+          ? '|when|'
+          : '';
+    lines.push(`  ${mermaidId(edge.from)} -->${label} ${mermaidId(edge.to)}`);
+  }
+  return lines.join('\n');
+}
+
+function mermaidId(value: string): string {
+  return `n_${value.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 }
 
 // ---------------------------------------------------------------------------

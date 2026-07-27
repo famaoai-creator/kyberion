@@ -823,6 +823,21 @@ export {
   UNKNOWN_DELEGATION_PROVIDER,
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
 } from './delegation-concurrency.js';
+
+export {
+  startDelegatedTaskTrace,
+  completeDelegatedTaskTrace,
+  cancelDelegatedTaskTrace,
+  createDelegationHandle,
+  loadDelegatedTaskRecord,
+  listActiveDelegatedTaskRecords,
+  resumeDelegatedTask,
+} from './delegated-task-observability.js';
+export type {
+  DelegatedTaskTrace,
+  DelegatedTaskRecord,
+  DelegationHandle,
+} from './delegated-task-observability.js';
 export type {
   DelegationSlotOptions,
   DelegationConcurrencyStats,
@@ -1867,6 +1882,9 @@ export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './worker-assignment-policy.js';
 export * from './pipeline-contract.js';
+export * from './graph-scheduler.js';
+export * from './pipeline-run-journal.js';
+export * from './graph-run-artifact.js';
 export * from './realtime-voice-conversation.js';
 export * from './surface-coordination-store.js';
 export * from './surface-delivery.js';

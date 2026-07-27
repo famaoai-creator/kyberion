@@ -5277,7 +5277,7 @@
     {
       "path": "product/pipeline-templates/stakeholder-consensus-orchestrator.json",
       "tier": "public",
-      "size": 3368,
+      "size": 3394,
       "type": "json"
     },
     {
@@ -7017,7 +7017,7 @@
     {
       "path": "product/schemas/organization-team-template-catalog.schema.json",
       "tier": "public",
-      "size": 2077,
+      "size": 2301,
       "type": "json"
     },
     {
@@ -7065,7 +7065,7 @@
     {
       "path": "product/schemas/pipeline-adf.schema.json",
       "tier": "public",
-      "size": 5324,
+      "size": 6094,
       "type": "json"
     },
     {

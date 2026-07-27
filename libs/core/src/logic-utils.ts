@@ -124,6 +124,11 @@ export function evaluateCondition(cond: any, ctx: any): boolean {
   if (!cond) return true;
 
   if (typeof cond === 'string') {
+    if (/[<>]=?|={2,3}|&&|\|\||\.length\b|\b(?:and|or)\b/u.test(cond)) {
+      throw new Error(
+        `Unsafe string condition "${cond}". Use a structured condition or a typed decision op.`
+      );
+    }
     return !!getPathValue(ctx, cond);
   }
 

@@ -131,6 +131,7 @@ import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
 import { getReasoningBackend, getLastServedReasoningMode } from './reasoning-backend.js';
+import { deriveExecutionGraph, executeGraph, type GraphNode } from './graph-scheduler.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
@@ -305,6 +306,8 @@ interface PlannedNextTask {
   deliverable?: string;
   target_path?: string;
   dependencies?: string[];
+  /** Explicit shared-resource claims; agent identity is intentionally not a claim. */
+  resource_claims?: string[];
   acceptance_criteria?: string[];
   risk?: string;
   expected_output_format?: 'text' | 'files' | 'structured';
@@ -394,6 +397,26 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
     const dependencies = Array.isArray(task.dependencies)
       ? task.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
       : [];
+    const resourceClaims = (() => {
+      if (task.resource_claims === undefined) return [];
+      if (!Array.isArray(task.resource_claims)) {
+        throw new Error(
+          `Invalid NEXT_TASKS.json for ${missionId}: task ${taskId} resource_claims must be an array`
+        );
+      }
+      return Array.from(
+        new Set(
+          task.resource_claims.map((claim) => {
+            if (typeof claim !== 'string' || !claim.trim()) {
+              throw new Error(
+                `Invalid NEXT_TASKS.json for ${missionId}: task ${taskId} resource_claims must contain non-empty strings`
+              );
+            }
+            return claim.trim();
+          })
+        )
+      );
+    })();
     const acceptanceCriteria = Array.isArray(task.acceptance_criteria)
       ? task.acceptance_criteria.map((criterion) => String(criterion || '').trim()).filter(Boolean)
       : [];
@@ -465,6 +488,7 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
         ? { target_path: task.target_path.trim() }
         : {}),
       dependencies,
+      ...(resourceClaims.length > 0 ? { resource_claims: resourceClaims } : {}),
       acceptance_criteria: acceptanceCriteria,
       ...(typeof task.risk === 'string' && task.risk.trim() ? { risk: task.risk.trim() } : {}),
       ...(typeof task.expected_output_format === 'string' && task.expected_output_format.trim()
@@ -2508,6 +2532,10 @@ interface DispatchPlannedMissionTaskInput {
     modelId?: string | null;
   };
   allTasks: PlannedNextTask[];
+  iterationPolicy: {
+    max_rework_attempts: number;
+    max_review_rounds: number;
+  };
 }
 
 /**
@@ -3030,7 +3058,7 @@ async function dispatchPlannedMissionTaskCore(
       };
     }
 
-    if (hasMustFixFindings && currentReviewRound >= 2) {
+    if (hasMustFixFindings && currentReviewRound >= input.iterationPolicy.max_review_rounds) {
       updateWorkItem({
         itemId: claimed.item.item_id,
         expectedVersion: claimed.item.version,
@@ -3235,7 +3263,7 @@ async function dispatchPlannedMissionTaskCore(
     const nextReworkCount = currentReworkCount + 1;
     const gateReason = acceptance.reasons.join('; ') || 'task acceptance gate failed';
 
-    if (currentReworkCount < 1) {
+    if (currentReworkCount < input.iterationPolicy.max_rework_attempts) {
       input.task.rework_count = nextReworkCount;
       input.task.status = 'planned';
       releaseWorkItem({
@@ -4680,8 +4708,9 @@ function markTaskBoardInProgress(missionId: string): void {
   }
 }
 
-export async function dispatchMissionNextTasks(
-  missionId: string
+async function dispatchMissionNextTasksCore(
+  missionId: string,
+  missionRunTrace?: TraceContext
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
   ensureWorkerBackendsInstalled();
   const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
@@ -4721,24 +4750,68 @@ export async function dispatchMissionNextTasks(
   }> = [];
   const plan = resolveMissionTeamPlan({ missionId });
   const maxParallelMembers = Math.max(1, plan.team_governance?.lifecycle.max_parallel_members || 3);
+  const lifecycle = plan.team_governance?.lifecycle;
+  const maxFollowupIterations = Math.max(1, lifecycle?.max_followup_iterations || 20);
+  const iterationPolicy = {
+    max_rework_attempts: Math.max(1, lifecycle?.max_rework_attempts || 1),
+    max_review_rounds: Math.max(1, lifecycle?.max_review_rounds || 2),
+  };
   const dispatchedTaskIds = new Set<string>();
+  let followupIterations = 0;
 
   while (true) {
     const readyTasks = plannedTasks
-      .filter((task) => {
-        const status = String(task.status || 'planned');
-        return status === 'planned' || status === 'rework';
-      })
-      .filter((task) => areTaskDependenciesSatisfied(task, allTasks))
-      .filter((task) => task.status === 'rework' || !dispatchedTaskIds.has(task.task_id))
+      .filter(
+        (task) =>
+          (task.status === 'planned' || task.status === 'rework') &&
+          !dispatchedTaskIds.has(task.task_id)
+      )
       .sort((left, right) => left.task_id.localeCompare(right.task_id));
 
     if (readyTasks.length === 0) break;
+    followupIterations += 1;
+    if (followupIterations > maxFollowupIterations) {
+      const summary = `Mission follow-up iteration limit reached (${maxFollowupIterations}); remaining tasks were blocked.`;
+      logger.warn(`[worker] ${summary}`);
+      emitMissionOrchestrationObservation({
+        event_type: 'mission_owner_notified',
+        decision: 'mission_owner_notified',
+        mission_id: missionId,
+        reason: 'followup_iteration_limit',
+        gate_rework_count: followupIterations,
+        gate_reasons: [summary],
+        payload: { max_followup_iterations: maxFollowupIterations },
+      });
+      try {
+        const env = buildExecutionEnv(process.env, 'mission_controller');
+        runMissionController(env, [
+          'pause',
+          missionId,
+          '--note',
+          `${summary} Resume after reviewing the blocked task frontier.`,
+        ]);
+      } catch (err) {
+        logger.warn(
+          `[worker] failed to pause mission ${missionId} after iteration limit (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      for (const task of readyTasks) {
+        task.status = 'blocked';
+        recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+          summary,
+          next_step:
+            'raise the iteration limit through team governance after investigating the loop',
+          work_item_id: task.task_id,
+          reason: 'blocked(followup_iteration_limit)',
+          max_followup_iterations: maxFollowupIterations,
+        });
+      }
+      break;
+    }
 
-    const batch: Promise<DispatchMissionTaskOutcome | null>[] = [];
+    const batchExecutors = new Map<string, () => Promise<DispatchMissionTaskOutcome | null>>();
     let waveMadeProgress = false;
     for (const task of readyTasks) {
-      if (batch.length >= maxParallelMembers) break;
       const teamRole = task.assigned_to?.role;
       if (!teamRole) {
         task.status = 'blocked';
@@ -4769,6 +4842,7 @@ export async function dispatchMissionNextTasks(
           assignee_peer_id: task.assigned_to?.agent_id,
           reason: 'blocked(unassigned_role)',
         });
+        batchExecutors.set(task.task_id, async () => null);
         continue;
       }
       const reviewArtifact =
@@ -4824,6 +4898,7 @@ export async function dispatchMissionNextTasks(
           assignee_peer_id: assignment.agent_id || undefined,
           reason: 'blocked(reviewer_independence)',
         });
+        batchExecutors.set(task.task_id, async () => null);
         continue;
       }
       // Fill in a routed model hint only when the team plan did not already
@@ -4872,6 +4947,7 @@ export async function dispatchMissionNextTasks(
           team_role: teamRole,
           reason: 'blocked(unassigned_role)',
         });
+        batchExecutors.set(task.task_id, async () => null);
         continue;
       }
       const preflight = validateDelegatedTaskPreflight({
@@ -4911,42 +4987,121 @@ export async function dispatchMissionNextTasks(
       if (!preflight.allowed) {
         task.status = 'blocked';
         waveMadeProgress = true;
+        batchExecutors.set(task.task_id, async () => null);
         continue;
       }
 
-      batch.push(
-        (async () => {
-          const outcome = await withTaskDispatchTimeout(
+      batchExecutors.set(task.task_id, async () => {
+        missionRunTrace?.addEvent('mission_task_dispatch_started', {
+          task_id: task.task_id,
+          team_role: teamRole,
+          agent_id: assignment.agent_id,
+        });
+        const outcome = await withTaskDispatchTimeout(
+          task,
+          dispatchPlannedMissionTask({
+            missionId,
             task,
-            dispatchPlannedMissionTask({
-              missionId,
-              task,
-              teamRole,
-              assignment,
-              allTasks,
-            })
-          );
-          if (outcome === 'timeout') {
-            task.status = 'blocked';
-            const summary = `Task ${task.task_id} exceeded its dispatch budget (${resolveTaskDispatchTimeoutMs(task)}ms) — blocked(timeout).`;
-            logger.warn(`[worker] ${summary}`);
-            recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
-              summary,
-              next_step: 'investigate the hung worker, then set the task back to rework',
-              work_item_id: task.task_id,
-              team_role: teamRole,
-              reason: 'blocked(timeout)',
-            });
-            return null;
-          }
-          return outcome;
-        })()
-      );
+            teamRole,
+            assignment,
+            allTasks,
+            iterationPolicy,
+          })
+        );
+        if (outcome === 'timeout') {
+          task.status = 'blocked';
+          const summary = `Task ${task.task_id} exceeded its dispatch budget (${resolveTaskDispatchTimeoutMs(task)}ms) — blocked(timeout).`;
+          logger.warn(`[worker] ${summary}`);
+          recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+            summary,
+            next_step: 'investigate the hung worker, then set the task back to rework',
+            work_item_id: task.task_id,
+            team_role: teamRole,
+            reason: 'blocked(timeout)',
+          });
+          missionRunTrace?.addEvent('mission_task_dispatch_finished', {
+            task_id: task.task_id,
+            status: 'timeout',
+          });
+          return null;
+        }
+        missionRunTrace?.addEvent('mission_task_dispatch_finished', {
+          task_id: task.task_id,
+          status: outcome?.dispatched ? 'completed' : 'not_dispatched',
+        });
+        return outcome;
+      });
     }
 
-    if (batch.length === 0) continue;
+    if (batchExecutors.size === 0) continue;
 
-    const results = await Promise.all(batch);
+    // GE-05: schedule the prepared frontier through the shared completion-
+    // driven graph scheduler. The governance cap remains the global upper
+    // bound for this mission invocation; same-agent serialization is not
+    // inferred because the existing team contract permits it.
+    // Keep the frontier deterministic across planner JSON ordering. The
+    // scheduler still honors dependency edges, while independent nodes are
+    // started in the same task_id order as the legacy worker contract.
+    const graphTaskOrder = [...allTasks].sort((left, right) =>
+      left.task_id.localeCompare(right.task_id)
+    );
+    const graphInputs = graphTaskOrder.map((task) => ({
+      id: task.task_id,
+      depends_on: Array.isArray(task.dependencies) ? task.dependencies : [],
+    }));
+    const derivedFrontier = deriveExecutionGraph(graphInputs);
+    if (derivedFrontier.errors.length > 0) {
+      throw new Error(
+        `[MISSION_GRAPH_PREFLIGHT] ${derivedFrontier.errors.map((error) => error.message).join('; ')}`
+      );
+    }
+    const taskById = new Map(graphTaskOrder.map((task) => [task.task_id, task]));
+    const frontierGraph = {
+      nodes: derivedFrontier.graph.nodes.map((node) => ({
+        ...node,
+        value: taskById.get(node.id)!,
+      })),
+      edges: derivedFrontier.graph.edges,
+    };
+    const terminalSuccessIds = allTasks
+      .filter((task) => ['completed', 'accepted', 'reviewed'].includes(String(task.status || '')))
+      .map((task) => task.task_id)
+      .concat([...dispatchedTaskIds]);
+    const terminalBlockedIds = allTasks
+      .filter((task) => ['blocked', 'requested'].includes(String(task.status || '')))
+      .map((task) => task.task_id);
+    const frontierResult = await executeGraph<
+      PlannedNextTask,
+      { outcome?: DispatchMissionTaskOutcome }
+    >(
+      frontierGraph,
+      async (node: GraphNode<PlannedNextTask>) => {
+        const executor = batchExecutors.get(node.id);
+        if (!executor) return { status: 'skipped' as const, error: 'task is not dispatchable' };
+        const outcome = await executor();
+        return outcome
+          ? { status: 'success' as const, context: { outcome } }
+          : { status: 'failed' as const, error: 'task was blocked before dispatch' };
+      },
+      {
+        initialContext: {},
+        maxConcurrency: maxParallelMembers,
+        precompletedNodeIds: terminalSuccessIds,
+        preskippedNodeIds: terminalBlockedIds,
+        resourceClaims: (node) => {
+          const task = node.value as PlannedNextTask;
+          return task.resource_claims || [];
+        },
+      }
+    );
+    const results = readyTasks
+      .map(
+        (task) =>
+          frontierResult.outcomes[task.task_id]?.context?.outcome as
+            | DispatchMissionTaskOutcome
+            | undefined
+      )
+      .filter((outcome): outcome is DispatchMissionTaskOutcome => Boolean(outcome));
     const cascadedIds = cascadeBlockedDependents(plannedTasks);
     if (cascadedIds.length > 0) {
       logger.warn(
@@ -5014,6 +5169,50 @@ export async function dispatchMissionNextTasks(
     rollup_used_count: rollupCount,
   });
   return dispatched;
+}
+
+/**
+ * GE-08: one durable trace root per mission-worker invocation. Task dispatch
+ * traces remain independently queryable for the existing operator surfaces;
+ * this run-level trace adds the missing invocation boundary and a compact
+ * event stream linking every task attempt to the same trace id.
+ */
+export async function dispatchMissionNextTasks(
+  missionId: string
+): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
+  const traceCtx = new TraceContext('mission_run', {
+    missionId,
+    correlationId: `mission-run:${missionId}:${Date.now()}`,
+  });
+  let dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
+  try {
+    traceCtx.addEvent('mission_run_started', { mission_id: missionId });
+    dispatched = await dispatchMissionNextTasksCore(missionId, traceCtx);
+    traceCtx.setAttributes({
+      mission_id: missionId,
+      dispatched_task_count: dispatched.length,
+      status: 'completed',
+    });
+    return dispatched;
+  } catch (error) {
+    traceCtx.setAttributes({
+      mission_id: missionId,
+      dispatched_task_count: dispatched.length,
+      status: 'error',
+    });
+    traceCtx.addEvent('mission_run_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  } finally {
+    try {
+      const trace = traceCtx.finalize();
+      const dirOverride = missionTaskTraceDirOverride();
+      persistTrace(trace, dirOverride ? { dir: dirOverride } : undefined);
+    } catch (error) {
+      warnMissionTaskTraceFailureOnce('Failed to persist mission run trace', error);
+    }
+  }
 }
 
 function emitSlackMissionEvent(
