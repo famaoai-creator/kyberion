@@ -43,15 +43,15 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
 import {
   EventSourcingKernel,
+  appendValidatedJournalEvent,
   journalEventEnvelopeSchema,
   runInRestoreMode,
-  assertNotDuringRestore,
   type JournalEventEnvelope,
 } from './worker-state-journal.js';
 import {
@@ -272,18 +272,24 @@ export class OrchestratorSessionJournal {
 
   /** Validate, stamp seq/ts, and append. Refused during restore (no mutation while replaying). */
   append(opName: string, payload: unknown): JournalEventEnvelope {
-    assertNotDuringRestore('OrchestratorSessionJournal.append');
-    const validated = this.kernel.validatePayload(opName, payload);
     this.ensureSeqLoaded();
-    const envelope = journalEventEnvelopeSchema.parse({
-      v: ORCHESTRATOR_SESSION_JOURNAL_VERSION,
-      seq: this.seq++,
-      ts: this.now(),
-      op: opName,
-      payload: validated,
+    const envelope = appendValidatedJournalEvent({
+      kernel: this.kernel,
+      opName,
+      payload,
+      journalPath: this.journalPath,
+      seq: this.seq,
+      now: this.now,
+      buildEnvelope: ({ seq, ts, payload: validated }) =>
+        journalEventEnvelopeSchema.parse({
+          v: ORCHESTRATOR_SESSION_JOURNAL_VERSION,
+          seq,
+          ts,
+          op: opName,
+          payload: validated,
+        }),
     });
-    this.ensureDir();
-    safeAppendFileSync(this.journalPath, `${JSON.stringify(envelope)}\n`);
+    this.seq += 1;
     return envelope;
   }
 
@@ -324,13 +330,6 @@ export class OrchestratorSessionJournal {
       }
     }
     return { events, maxSeq };
-  }
-
-  private ensureDir(): void {
-    const dir = this.journalPath.replace(/[/\\][^/\\]+$/, '');
-    if (dir && dir !== this.journalPath && !safeExistsSync(dir)) {
-      safeMkdir(dir, { recursive: true });
-    }
   }
 }
 
