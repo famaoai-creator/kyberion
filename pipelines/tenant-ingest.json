@@ -1,0 +1,92 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "tenant-ingest",
+  "version": "1.0.0",
+  "name": "Tenant Incremental Ingest Sync",
+  "description": "DA-03: reads the jobs registry in knowledge/product/governance/knowledge-sync-rules.json and runs ingest:sync_source for every enabled tenant × source job. Declarative wiring only (LE rule): the watermark read/advance, pagination, and retry classification live inside the typed op; transport retry/backoff lives in the service-engine recovery_policy layer. The op lists changed items and advances the per-tenant watermark (active/shared/runtime/ingest-cursors/) only on full success — body fetch, parse, normalize, and the explicit ingest:commit ceremony are wired separately and stay operator-initiated (DA-05: no automatic knowledge/ landing).",
+  "schedule": {
+    "id": "tenant-ingest",
+    "cron": "30 2 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🔄 [TENANT-INGEST] Starting incremental sync of enabled ingest jobs..."
+      }
+    },
+    {
+      "id": "load-jobs",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "sync_config", "type": "KnowledgeSyncRules" },
+      "params": {
+        "path": "knowledge/product/governance/knowledge-sync-rules.json"
+      }
+    },
+    {
+      "id": "run-jobs",
+      "role": "gate",
+      "op": "core:foreach",
+      "consumes": "sync_config",
+      "params": {
+        "items": "{{sync_config.jobs}}",
+        "as": "sync_job",
+        "do": [
+          {
+            "role": "gate",
+            "op": "core:if",
+            "params": {
+              "condition": { "from": "sync_job.enabled", "operator": "eq", "value": true },
+              "then": [
+                {
+                  "role": "sink",
+                  "op": "system:log",
+                  "params": {
+                    "message": "🔄 [TENANT-INGEST] Sync job {{sync_job.id}}: {{sync_job.tenant_slug}} × {{sync_job.source_system}} (dry_run={{sync_job.dry_run}})"
+                  }
+                },
+                {
+                  "role": "source",
+                  "op": "ingest:sync_source",
+                  "produces": { "channel": "sync_result", "type": "SyncSourceResult" },
+                  "params": {
+                    "tenant_slug": "{{sync_job.tenant_slug}}",
+                    "source_system": "{{sync_job.source_system}}",
+                    "source_params": "{{sync_job.source_params}}",
+                    "dry_run": "{{sync_job.dry_run}}",
+                    "export_as": "sync_result"
+                  }
+                },
+                {
+                  "role": "sink",
+                  "op": "system:log",
+                  "params": {
+                    "message": "✅ [TENANT-INGEST] Job {{sync_job.id}} done: {{sync_result.items.length}} changed item(s), advanced={{sync_result.advanced}}, truncated={{sync_result.truncated}}"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "role": "sink",
+                  "op": "system:log",
+                  "params": {
+                    "message": "⏭️ [TENANT-INGEST] Job {{sync_job.id}} is disabled — skipped."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ [TENANT-INGEST] Incremental sync complete." }
+    }
+  ]
+}

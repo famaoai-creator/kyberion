@@ -1,0 +1,37 @@
+{
+  "_meta": "DA-01 tenant registry consistency exceptions. Each entry documents an INTENTIONAL asymmetry between the tenant reference systems (tenant profiles / knowledge/confidential/tenants/index.json / customer/{slug}/ dirs) that check:tenant-registry would otherwise flag as drift. Every entry must carry a one-line reason. Entries matching no slug in the current checkout are reported as warnings, never failures (CI checkouts contain no gitignored tenant data).",
+  "exceptions": [
+    {
+      "slug": "__pptx_sink_persist_test",
+      "reason": "Test sink registered in the confidential design index by media-actuator persist tests — not an operating tenant (invalid slug format by design)."
+    },
+    {
+      "slug": "__web_theme_pack_test",
+      "reason": "Test sink registered in the confidential design index by media-actuator web theme pack tests — not an operating tenant (invalid slug format by design)."
+    },
+    {
+      "slug": "_template",
+      "reason": "customer/ scaffold template copied by pnpm customer:create — not a tenant (invalid slug format by design)."
+    },
+    {
+      "slug": "alpha-team",
+      "reason": "Demo/workshop customer directory containing only logs/ — not an operating tenant."
+    },
+    {
+      "slug": "client-a",
+      "reason": "Sample tenant used by tenant-design override demos/tests (no knowledge/confidential/client-a directory, no operating profile)."
+    },
+    {
+      "slug": "client-b",
+      "reason": "Sample tenant used by tenant-design override demos/tests — design/ fixture only, not an operating tenant."
+    },
+    {
+      "slug": "client-new",
+      "reason": "Sample tenant used by tenant-design override demos/tests — design/ fixture only, not an operating tenant."
+    },
+    {
+      "slug": "demo-org",
+      "reason": "Demo organization fixture (organization-profile.json only) — not an operating tenant."
+    }
+  ]
+}

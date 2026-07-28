@@ -88,8 +88,10 @@ vi.mock('./core.js', () => ({
 import {
   collectScopeTargets,
   gcMissionRuntimeResidue,
+  INGEST_DEDUP_REGISTRY_REPO_PATH,
   offboardScope,
   OFFBOARDING_EXPORT_SUBDIR,
+  verifyScopeOffboarded,
 } from './scope-offboarding.js';
 import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
@@ -395,5 +397,196 @@ describe('AL-04 tenant/project offboarding', () => {
       status: 'not_found',
     });
     expect(offboardScope({ scopeType: 'project', scopeId: '' })).toMatchObject({ status: 'error' });
+  });
+});
+
+describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vault', () => {
+  const TENANT = 'tenant-alpha';
+  const KNOWLEDGE_ROOT = `knowledge/confidential/${TENANT}`;
+  const ALPHA_HASH = 'a'.repeat(64);
+  const ALPHA_HASH_2 = 'c'.repeat(64);
+  const BETA_HASH = 'b'.repeat(64);
+
+  function writeJsonl(repoRelative: string, lines: unknown[]): void {
+    const filePath = abs(repoRelative);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(
+      filePath,
+      `${lines.map((line) => (typeof line === 'string' ? line : JSON.stringify(line))).join('\n')}\n`
+    );
+  }
+
+  function registryLines(): string[] {
+    return fs
+      .readFileSync(abs(INGEST_DEDUP_REGISTRY_REPO_PATH), 'utf8')
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
+  }
+
+  function seedIngestResidue(): void {
+    // Tenant knowledge tree with the DA-05 asset ledger inside.
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/reports/q1.md`), '# Q1');
+    writeJsonl(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`, [
+      {
+        asset_id: 'ing-alpha1',
+        source_system: 'confluence',
+        source_id: 'PAGE-1',
+        content_sha256: ALPHA_HASH,
+        target_path: `${KNOWLEDGE_ROOT}/reports/q1.md`,
+        version: 1,
+        status: 'active',
+      },
+    ]);
+    // Another tenant's knowledge tree — must survive untouched.
+    fs.mkdirSync(abs('knowledge/confidential/tenant-beta'), { recursive: true });
+    fs.writeFileSync(abs('knowledge/confidential/tenant-beta/x.md'), '# Beta');
+    // Sync cursors + quota counters for both tenants.
+    writeJson(abs(`active/shared/runtime/ingest-cursors/${TENANT}/confluence.json`), { c: 1 });
+    writeJson(abs('active/shared/runtime/ingest-cursors/tenant-beta/confluence.json'), { c: 2 });
+    writeJson(abs(`active/shared/runtime/ingest/quota/${TENANT}/2026-07-28.json`), {
+      files: 3,
+      bytes: 100,
+    });
+    // Shared dedup registry: two alpha lines (one by ledger hash, one only by
+    // landing-path prefix), one beta line, one corrupt line.
+    writeJsonl(INGEST_DEDUP_REGISTRY_REPO_PATH, [
+      { content_sha256: ALPHA_HASH, source_system: 'confluence', source_id: 'PAGE-1' },
+      { content_sha256: ALPHA_HASH_2, target_path: `${KNOWLEDGE_ROOT}/reports/q2.md` },
+      { content_sha256: BETA_HASH, target_path: 'knowledge/confidential/tenant-beta/x.md' },
+      '{corrupt line',
+    ]);
+    // Data-vault entries keyed by projectId.
+    writeJson(abs('active/shared/data-vault/alpha-entry.json'), {
+      sourceType: 'confluence',
+      key: 'k1',
+      projectId: TENANT,
+      tier: 'confidential',
+      data: { secret: 1 },
+    });
+    writeJson(abs('active/shared/data-vault/other-entry.json'), {
+      sourceType: 'confluence',
+      key: 'k2',
+      projectId: 'someone-else',
+      tier: 'confidential',
+      data: { keep: true },
+    });
+    // Classic active/ residue so the pre-DA-08 flow is exercised together.
+    writeJson(abs(`active/projects/public/${TENANT}/workspace/plan.json`), { a: 1 });
+  }
+
+  it('dry run surfaces every residue class and writes nothing', () => {
+    seedIngestResidue();
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.targets).toEqual(
+      expect.arrayContaining([
+        { path: `active/projects/public/${TENANT}`, kind: 'project_tree' },
+        { path: KNOWLEDGE_ROOT, kind: 'tenant_knowledge_tree' },
+        { path: `active/shared/runtime/ingest-cursors/${TENANT}`, kind: 'ingest_cursors_tree' },
+        { path: `active/shared/runtime/ingest/quota/${TENANT}`, kind: 'ingest_cursors_tree' },
+        { path: 'active/shared/data-vault/alpha-entry.json', kind: 'data_vault_entry' },
+      ])
+    );
+    expect(result.targets.map((t) => t.path)).not.toContain(
+      'active/shared/data-vault/other-entry.json'
+    );
+    expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
+
+    // Nothing changed on disk.
+    expect(fs.existsSync(abs(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`))).toBe(true);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(true);
+    expect(registryLines()).toHaveLength(4);
+
+    // And the standalone verification agrees there are still traces.
+    const verification = verifyScopeOffboarded('tenant', TENANT);
+    expect(verification.clean).toBe(false);
+    expect(verification.leftovers.length).toBeGreaterThan(0);
+  });
+
+  it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {
+    seedIngestResidue();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-07-28T01:02:03.000Z',
+    });
+
+    expect(result.status).toBe('offboarded');
+
+    // DA-08 acceptance: no trace of the tenant remains anywhere.
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(KNOWLEDGE_ROOT))).toBe(false);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest/quota/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(false);
+
+    // The dedup registry kept exactly the other tenant's line + the corrupt line.
+    const kept = registryLines();
+    expect(kept).toHaveLength(2);
+    expect(kept.some((line) => line.includes(BETA_HASH))).toBe(true);
+    expect(kept.some((line) => line.includes('{corrupt line'))).toBe(true);
+    expect(kept.some((line) => line.includes(ALPHA_HASH))).toBe(false);
+    expect(result.dedup_registry).toMatchObject({ matched: 2, removed: 2 });
+
+    // Everything else survives.
+    expect(fs.existsSync(abs('knowledge/confidential/tenant-beta/x.md'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/runtime/ingest-cursors/tenant-beta'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/data-vault/other-entry.json'))).toBe(true);
+
+    // Export-before-delete: knowledge (incl. ledger), and the removed
+    // dedup-registry lines as a verbatim JSONL copy.
+    const exported = abs(`${result.export_path}/${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`);
+    expect(fs.existsSync(exported)).toBe(true);
+    const removedCopy = fs.readFileSync(
+      abs(`${result.export_path}/dedup-registry-removed.jsonl`),
+      'utf8'
+    );
+    expect(removedCopy).toContain(ALPHA_HASH);
+    expect(removedCopy).toContain(ALPHA_HASH_2);
+
+    // Every purge audited: soft-deletes per target, dedup prune, verification.
+    const events = auditEvents();
+    const softDeletes = events.filter((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(softDeletes.map((e) => e.path)).toEqual(
+      expect.arrayContaining([
+        KNOWLEDGE_ROOT,
+        `active/shared/runtime/ingest-cursors/${TENANT}`,
+        `active/shared/runtime/ingest/quota/${TENANT}`,
+        'active/shared/data-vault/alpha-entry.json',
+      ])
+    );
+    expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE')).toMatchObject({
+      scope_id: TENANT,
+      removed_lines: 2,
+      kept_lines: 2,
+      approved_by: 'operator@example',
+    });
+    expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_VERIFIED')).toMatchObject({
+      scope_id: TENANT,
+      clean: true,
+    });
+
+    // Idempotent: a second execute finds nothing.
+    expect(
+      offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'retry' },
+      }).status
+    ).toBe('not_found');
+  });
+
+  it('refuses to touch the residue without approval (fail-closed carries over)', () => {
+    seedIngestResidue();
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(result.status).toBe('approval_required');
+    expect(fs.existsSync(abs(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`))).toBe(true);
+    expect(registryLines()).toHaveLength(4);
   });
 });

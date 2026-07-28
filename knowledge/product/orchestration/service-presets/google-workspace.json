@@ -30,6 +30,26 @@
         "params": { "required": false, "type": "object" }
       }
     },
+    "drive_file_download": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["drive", "files", "get", "--params", "{{params}}"],
+      "description": "Download Google Drive file content via the discovery method drive.files.get; pass params like {\"fileId\": \"...\", \"alt\": \"media\"}.",
+      "note": "Declared from the Drive discovery method drive.files.get with alt=media. Requires CLI verification: confirm the installed gws CLI honors alt=media (binary content) before production ingest use.",
+      "parameters": {
+        "params": { "required": true, "type": "object" }
+      }
+    },
+    "drive_file_export": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["drive", "files", "export", "--params", "{{params}}"],
+      "description": "Export a Google-native document (Docs/Sheets/Slides) via the discovery method drive.files.export; pass params like {\"fileId\": \"...\", \"mimeType\": \"text/plain\"}.",
+      "note": "Declared from the Drive discovery method drive.files.export. Requires CLI verification: confirm the installed gws CLI exposes the export method and streams the exported bytes.",
+      "parameters": {
+        "params": { "required": true, "type": "object" }
+      }
+    },
     "gmail_triage": {
       "type": "cli",
       "command": "gws",
@@ -48,6 +68,13 @@
       "args": ["gmail", "users", "messages", "get", "--params", "{{params}}"],
       "description": "Get a Gmail message with metadata headers."
     },
+    "gmail_attachment_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "messages", "attachments", "get", "--params", "{{params}}"],
+      "description": "Fetch a Gmail message attachment body via the discovery method users.messages.attachments.get; pass params like {\"messageId\": \"...\", \"id\": \"<attachmentId>\"}.",
+      "note": "Declared from the Gmail discovery method users.messages.attachments.get, mirroring gmail_message_get. Requires CLI verification: confirm the installed gws CLI exposes the attachments subresource."
+    },
     "gmail_filters_list": {
       "type": "cli",
       "command": "gws",
@@ -57,25 +84,63 @@
     "gmail_filters_create": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "users", "settings", "filters", "create", "--params", "{{params}}", "--json", "{{body}}"],
+      "args": [
+        "gmail",
+        "users",
+        "settings",
+        "filters",
+        "create",
+        "--params",
+        "{{params}}",
+        "--json",
+        "{{body}}"
+      ],
       "description": "Create a Gmail filter."
     },
     "gmail_messages_batch_modify": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "users", "messages", "batchModify", "--params", "{{params}}", "--json", "{{body}}"],
+      "args": [
+        "gmail",
+        "users",
+        "messages",
+        "batchModify",
+        "--params",
+        "{{params}}",
+        "--json",
+        "{{body}}"
+      ],
       "description": "Batch modify Gmail messages, including archiving by removing the INBOX label."
     },
     "gmail_send": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "+send", "--to", "{{to}}", "--subject", "{{subject}}", "--body", "{{body}}"],
+      "args": [
+        "gmail",
+        "+send",
+        "--to",
+        "{{to}}",
+        "--subject",
+        "{{subject}}",
+        "--body",
+        "{{body}}"
+      ],
       "description": "Send a Gmail message."
     },
     "gmail_send_draft": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "+send", "--to", "{{to}}", "--subject", "{{subject}}", "--body", "{{body}}", "--draft"],
+      "args": [
+        "gmail",
+        "+send",
+        "--to",
+        "{{to}}",
+        "--subject",
+        "{{subject}}",
+        "--body",
+        "{{body}}",
+        "--draft"
+      ],
       "description": "Create a Gmail draft instead of sending."
     },
     "gmail_reply": {
@@ -87,7 +152,15 @@
     "gmail_reply_draft": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "+reply", "--message-id", "{{message_id}}", "--body", "{{body}}", "--draft"],
+      "args": [
+        "gmail",
+        "+reply",
+        "--message-id",
+        "{{message_id}}",
+        "--body",
+        "{{body}}",
+        "--draft"
+      ],
       "description": "Create a Gmail reply draft."
     },
     "gmail_reply_all": {
@@ -99,7 +172,15 @@
     "gmail_reply_all_draft": {
       "type": "cli",
       "command": "gws",
-      "args": ["gmail", "+reply-all", "--message-id", "{{message_id}}", "--body", "{{body}}", "--draft"],
+      "args": [
+        "gmail",
+        "+reply-all",
+        "--message-id",
+        "{{message_id}}",
+        "--body",
+        "{{body}}",
+        "--draft"
+      ],
       "description": "Create a Gmail reply-all draft."
     },
     "calendar_agenda": {

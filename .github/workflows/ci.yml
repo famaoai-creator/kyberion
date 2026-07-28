@@ -64,6 +64,12 @@ jobs:
       - name: Check knowledge catalogs & index freshness
         run: pnpm run check:catalogs
 
+      # DA-01: the tenant reference systems (tenant profiles / confidential
+      # index / customer dirs) must agree; asymmetries require a documented
+      # exception in tenant-registry-exceptions.json.
+      - name: Check tenant registry consistency
+        run: pnpm run check:tenant-registry
+
       # DS-01 / UX-05: prevent new operator-surface color literals and
       # dashboard status vocabulary bypasses after the generated-token gate.
       - name: Check UI/UX governance drift

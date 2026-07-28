@@ -68,6 +68,27 @@ describe('backup cli', () => {
     ]);
   });
 
+  it('tenant scope covers the knowledge root (with the DA-05 _ledger inside) and DA-08 ingest cursors', () => {
+    const existing = new Set([
+      'knowledge/confidential/acme',
+      'active/shared/runtime/ingest-cursors/acme',
+    ]);
+    const plan = resolveBackupPlan({
+      scope: 'tenant',
+      tenant: 'acme',
+      rootDir: '/repo',
+      pathExists: (repoPath) => existing.has(repoPath),
+    });
+
+    expect(plan.entries).toEqual([
+      'active/shared/runtime/ingest-cursors/acme',
+      // The whole tenant knowledge root — knowledge/confidential/acme/_ledger/
+      // rides along without a separate entry.
+      'knowledge/confidential/acme',
+    ]);
+    expect(plan.includesSensitive).toBe(true);
+  });
+
   it('requires a tenant for tenant backup planning', () => {
     expect(() =>
       resolveBackupPlan({

@@ -25,6 +25,51 @@
         "channel": { "required": true, "type": "string" },
         "text": { "required": true, "type": "string" }
       }
+    },
+    "conversations_history": {
+      "type": "api",
+      "path": "conversations.history",
+      "method": "GET",
+      "description": "Fetch message history for a channel (read-only; cursor pagination via response_metadata.next_cursor, incremental sync via oldest).",
+      "parameters": {
+        "channel": { "required": true, "type": "string" },
+        "cursor": {
+          "type": "string",
+          "description": "Pagination cursor from the previous response's response_metadata.next_cursor."
+        },
+        "oldest": {
+          "type": "string",
+          "description": "Only messages after this Unix timestamp (watermark for incremental sync)."
+        },
+        "limit": { "type": "number", "default": 100 }
+      }
+    },
+    "conversations_replies": {
+      "type": "api",
+      "path": "conversations.replies",
+      "method": "GET",
+      "description": "Fetch a thread of messages anchored at a parent message ts (read-only; cursor-paginated).",
+      "parameters": {
+        "channel": { "required": true, "type": "string" },
+        "ts": {
+          "required": true,
+          "type": "string",
+          "description": "Timestamp of the thread's parent message."
+        },
+        "cursor": { "type": "string" },
+        "limit": { "type": "number", "default": 100 }
+      }
+    },
+    "files_list": {
+      "type": "api",
+      "path": "files.list",
+      "method": "GET",
+      "description": "List files visible to the authed token, optionally scoped to a channel (read-only; page-numbered pagination).",
+      "parameters": {
+        "channel": { "type": "string" },
+        "page": { "type": "number", "default": 1 },
+        "count": { "type": "number", "default": 100 }
+      }
     }
   }
 }

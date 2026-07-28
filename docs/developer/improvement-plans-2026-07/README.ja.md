@@ -15,6 +15,7 @@
 > **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
 > **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
 > **グラフオーケストレーション計画**: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)(GE-01〜09: ループエンジニアリングからグラフエンジニアリングへ。ステップ間エッジの契約化・frontier スケジューラ・条件付きエッジと式評価安全化・ノード境界チェックポイント `--resume`・ミッションワーカーの wave バリア撤廃・delegateTask ハンドル・グラフ guardrails/Mermaid プレビュー・DAG トレース・wisdom fanout 並列化。AR-01/HN-03/MO-03/MO-06 の後続、外部フレームワーク非依存)。
+> **テナントデータ活用計画**: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-01〜08: 社内ツールの非構造データを「抽出→連携→ナレッジ化→活用」の閉ループへ。テナント基準系の単一化・抽出コネクタ完備(Box 新設/Slack 読取/Drive 本文)・増分同期 watermark・正規化カード化・情報資産台帳と明示 ingest(Hybrid Sovereign Ledger 実装)・PII/tier ゲート・テナント知識の検索到達性・保持/オフボーディング/取込予算。KP-01〜07 の上流ループ)。
 
 ## 1. 目的
 
@@ -443,6 +444,21 @@ PPTX デザイン乖離の調査(2026-07-15)に基づく。正本は [LAYERED_EX
 | [GE-07](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | グラフ guardrails とプレビュー(トラバース穴・グラフ lint・Mermaid)              | P2     | S〜M | GE-01       |
 | [GE-08](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | DAG 形トレースと run-graph アーティファクト                                     | P2     | M    | GE-02       |
 | [GE-09](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | wisdom fanout の並列化(dogfood・before/after 実測)                              | P2     | S〜M | GE-02       |
+
+### テナントデータ活用(抽出→連携→ナレッジ化→活用)
+
+オペレータ要望「テナントごとに社内ツールのデータを抽出・連携・ナレッジ化・活用したい」(2026-07-28)に基づく。KP-01〜07 が閉じた「knowledge/ にある知識を配る」ループの上流 — 「knowledge/ の外にある社内データを統制付きで入れる」取込ループと、テナント知識への検索到達性を成立させる。[analysis-multi-tenant-governance-20260304](../../../knowledge/product/architecture/analysis-multi-tenant-governance-20260304.md) の結論(Hybrid Sovereign Ledger)の実装計画を含む。正本: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)。
+
+| ID                                                      | タイトル                                                                        | 優先度 | 規模 | 依存        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [DA-01](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント基準系の単一化(4系統併存の slug 突合・TenantProfile 正本化)             | **P0** | S〜M | なし        |
+| [DA-02](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 抽出コネクタの完備(Box 新設・Slack 読取・Drive 本文・メール添付)                | **P0** | M    | DA-01,AC-05 |
+| [DA-03](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 増分同期エンジン(watermark ストア・knowledge-sync no-op 解消・cron 取込)        | P1     | M    | DA-02       |
+| [DA-04](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 正規化・カード化パイプライン(docx/pdf/xlsx/html/Slack → knowledge card)         | **P0** | M    | DA-02       |
+| [DA-05](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 情報資産台帳と明示 ingest(Hybrid Sovereign Ledger・lineage・supersede)          | **P0** | M〜L | DA-01,DA-04 |
+| [DA-06](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | PII・秘匿ガード(pii_patterns 実効化・tier 分類提案・steward 承認必須)           | **P0** | M    | DA-04,DA-05 |
+| [DA-07](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント知識の検索到達性(context pack corpus 統合・slice tenant 次元・隔離強制) | P1     | M〜L | DA-01       |
+| [DA-08](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 運用ガバナンス(保持カタログ登録・オフボーディング purge・取込クォータ)          | P2     | S〜M | DA-03,DA-05 |
 
 ## 4. 優先度の根拠(要約)
 

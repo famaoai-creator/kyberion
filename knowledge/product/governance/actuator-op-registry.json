@@ -259,6 +259,11 @@
       "transform": [],
       "apply": ["agent-task", "api", "issue", "pr", "repo", "run-workflow", "skill"]
     },
+    "ingest": {
+      "capture": ["parse_document", "sync_source"],
+      "transform": ["dedup", "normalize_card", "staleness_report"],
+      "apply": ["commit"]
+    },
     "ios": {
       "capture": [
         "capture_runtime_session_handoff",

@@ -30,6 +30,7 @@ import {
   createKnowledgePackage,
   normalizeKnowledgePackageAgentId,
   normalizeKnowledgeTier,
+  resolveIngestAssetProvenance,
 } from './knowledge/knowledge-package.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result.js';
@@ -638,6 +639,14 @@ async function opApply(
         const { createHash } = await import('node:crypto');
         const hash = createHash('sha256').update(rawData).digest('hex');
         const packageId = String(params.package_id || `KKP-${hash.slice(0, 16)}`);
+        // DA-05: when the exported file was landed by the ingest ceremony,
+        // its frontmatter provenance keys resolve to an asset-ledger record —
+        // the asset:{id}@v{n} ref joins provenance[] so the KKP and the
+        // information-asset ledger stay connected across tenant migration.
+        const ingestAssetRef = resolveIngestAssetProvenance({
+          tenantSlug: originTenantId,
+          rawData,
+        });
         const kkp = createKnowledgePackage({
           packageId,
           originAgentId: agentId,
@@ -649,7 +658,7 @@ async function opApply(
           ),
           contentHash: hash,
           createdAt: new Date().toISOString(),
-          provenance: [resolveVars(params.path, ctx)],
+          provenance: [resolveVars(params.path, ctx), ...(ingestAssetRef ? [ingestAssetRef] : [])],
           contentPath: resolveVars(params.path, ctx),
           rawData,
         });

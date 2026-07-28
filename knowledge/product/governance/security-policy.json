@@ -473,6 +473,9 @@
         "active/audit/"
       ]
     },
+    "check_tenant_registry_consistency": {
+      "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/tenants/index.json"]
+    },
     "generate_design_tokens": {
       "allow_write": [
         "knowledge/public/design-patterns/media-templates/themes.json",
@@ -481,6 +484,9 @@
     },
     "generate_subagent_definitions": {
       "allow_write": [".claude/agents/"]
+    },
+    "ingest_commit": {
+      "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
     },
     "reconcile_config_fallbacks": {
       "allow_write": ["knowledge/public/", "active/shared/tmp/"]

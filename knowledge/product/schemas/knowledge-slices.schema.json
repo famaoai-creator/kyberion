@@ -18,7 +18,7 @@
     },
     "slices": {
       "type": "array",
-      "description": "Ordered list of slices. A request matches every slice whose declared matcher fields all equal the request value or are the wildcard '*'. PRECEDENCE / MERGE across the matching set: (1) `pinned` and `exclude` are UNIONED across all matching slices — additive, so a broad default exclude always still applies. (2) `pinned` order is most-specific-first (higher matcher specificity = more non-wildcard fields leads), ties broken by array order, then de-duplicated keeping first occurrence. (3) `search_roots` is MOST-SPECIFIC-WINS (not merged): the single most-specific matching slice that declares search_roots supplies the whole list; if it declares none, fall back to the next-most-specific that does. Specificity = count of non-wildcard fields in `match` (0-3); exact array order is the deterministic tie-breaker (later entry wins).",
+      "description": "Ordered list of slices. A request matches every slice whose declared matcher fields all equal the request value or are the wildcard '*'. PRECEDENCE / MERGE across the matching set: (1) `pinned` and `exclude` are UNIONED across all matching slices — additive, so a broad default exclude always still applies. (2) `pinned` order is most-specific-first (higher matcher specificity = more non-wildcard fields leads), ties broken by array order, then de-duplicated keeping first occurrence. (3) `search_roots` is MOST-SPECIFIC-WINS (not merged): the single most-specific matching slice that declares search_roots supplies the whole list; if it declares none, fall back to the next-most-specific that does. Specificity = count of non-wildcard fields in `match` (0-5, DA-07 added tenant/project); exact array order is the deterministic tie-breaker (later entry wins).",
       "items": { "$ref": "#/definitions/slice" }
     }
   },
@@ -32,6 +32,16 @@
       "type": "string",
       "description": "A governance phase (see knowledge/product/governance/phases/) or '*' for any phase.",
       "enum": ["alignment", "execution", "onboarding", "recovery", "review", "*"]
+    },
+    "tenantToken": {
+      "type": "string",
+      "description": "DA-07: a concrete tenant slug (tenant-registry grammar: lowercase alphanumeric + hyphen) matched case-sensitively against the dispatch-time tenant, or '*' for any value (including tenantless requests, whose tenant normalizes to '*'). Omitting the field is equivalent to '*'.",
+      "pattern": "^(\\*|[a-z][a-z0-9-]{1,30})$"
+    },
+    "projectToken": {
+      "type": "string",
+      "description": "DA-07: a concrete project id (e.g. 'PRJ-FOO-001') matched case-sensitively against the dispatch-time project, or '*' for any value. Omitting the field is equivalent to '*'.",
+      "pattern": "^(\\*|[A-Za-z][A-Za-z0-9._-]*)$"
     },
     "pinnedPath": {
       "type": "string",
@@ -69,7 +79,9 @@
           "properties": {
             "team_role": { "$ref": "#/definitions/matcherToken" },
             "phase": { "$ref": "#/definitions/phaseToken" },
-            "mission_type": { "$ref": "#/definitions/matcherToken" }
+            "mission_type": { "$ref": "#/definitions/matcherToken" },
+            "tenant": { "$ref": "#/definitions/tenantToken" },
+            "project": { "$ref": "#/definitions/projectToken" }
           }
         },
         "pinned": {

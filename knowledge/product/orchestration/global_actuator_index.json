@@ -1,6 +1,6 @@
 {
   "v": "2.0.0",
-  "t": 31,
+  "t": 32,
   "actuators": [
     {
       "n": "agent-actuator",
@@ -148,6 +148,23 @@
       "capability_count": 1,
       "ops": ["pipeline"],
       "contract_schema": "schemas/file-pipeline.schema.json",
+      "prerequisites_summary": "-"
+    },
+    {
+      "n": "ingest-actuator",
+      "path": "libs/actuators/ingest-actuator",
+      "d": "DA-03/DA-04/DA-05 ingest pipeline: unstructured internal documents (docx/pdf/xlsx/html/slack threads) into governed knowledge cards — incremental sync_source change-listing (watermark store), parse/normalize/dedup capture-transforms, plus the explicit ingest:commit ceremony (Hybrid Sovereign Ledger asset records, supersede, staleness detection)",
+      "s": "implemented",
+      "version": "1.2.0",
+      "capability_count": 6,
+      "ops": [
+        "commit",
+        "dedup",
+        "normalize_card",
+        "parse_document",
+        "staleness_report",
+        "sync_source"
+      ],
       "prerequisites_summary": "-"
     },
     {
