@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   createPipelineRunJournal,
   hashPipelineOutput,
@@ -40,6 +40,27 @@ describe('pipeline run journal', () => {
     });
     safeWriteFile(journal.path, '{not-json}\n');
     expect(() => loadPipelineRunJournal(runId)).toThrow(/corrupt JSONL journal/);
+    safeRmSync(journal.path);
+  });
+
+  it('validates lifecycle payloads before appending them', () => {
+    const runId = `test-contract-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'journal-contract-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['source'],
+    });
+    const before = String(safeReadFile(journal.path, { encoding: 'utf8' }))
+      .trim()
+      .split('\n');
+
+    expect(() => journal.append('node_completed', { step_id: 'source' })).toThrow();
+
+    const after = String(safeReadFile(journal.path, { encoding: 'utf8' }))
+      .trim()
+      .split('\n');
+    expect(after).toHaveLength(before.length);
+    expect(journal.append('run_finished', { status: 'succeeded' }).sequence).toBe(2);
     safeRmSync(journal.path);
   });
 });
