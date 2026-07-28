@@ -6,7 +6,8 @@
     "codex": { "egress": "external-api" },
     "agy": { "egress": "external-api" },
     "gemini": { "egress": "external-api" },
-    "copilot": { "egress": "external-api" }
+    "copilot": { "egress": "external-api" },
+    "grok": { "egress": "external-api" }
   },
   "tier_policy": {
     "confidential": {

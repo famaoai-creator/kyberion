@@ -47,7 +47,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (77)
+## path (78)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -73,6 +73,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_GROK_CLI_BIN`                                          | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_HINTS_ARCHIVE_DIR`                                     | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_HINTS_PATH`                                            | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR`                     | path | no       | _undocumented_                                                                                                                |
@@ -148,7 +149,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SKIP_TYPE_RATCHET`                       | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                           |
 
-## tuning (33)
+## tuning (34)
 
 | Variable                                   | Type   | Required | Description    |
 | ------------------------------------------ | ------ | -------- | -------------- |
@@ -169,6 +170,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_GEMINI_CLI_TIMEOUT`              | number | no       | _undocumented_ |
 | `KYBERION_GENERATION_SCHEDULE_INTERVAL_MS` | number | no       | _undocumented_ |
 | `KYBERION_GLOBAL_INFLIGHT_LIMIT`           | number | no       | _undocumented_ |
+| `KYBERION_GROK_CLI_TIMEOUT_MS`             | number | no       | _undocumented_ |
 | `KYBERION_KILL_SWITCH_INTERVAL_MS`         | number | no       | _undocumented_ |
 | `KYBERION_MEDIA_BACKEND_PROBE_TTL_MS`      | number | no       | _undocumented_ |
 | `KYBERION_MFLUX_TIMEOUT_MS`                | number | no       | _undocumented_ |
@@ -186,7 +188,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
 | `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
 
-## provider (66)
+## provider (67)
 
 | Variable                                  | Type                                         | Required | Description                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -213,6 +215,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_GEMINI_FAST_MODEL`              | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_GEMINI_MODEL`                   | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_GEMINI_VIDEO_URL`               | string                                       | no       | Optional base URL override for the Google Veo video-generation API.                                                                                                                                                                                                                                                             |
+| `KYBERION_GROK_CLI_MODEL`                 | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_INTENT_COMPILER_MODEL`          | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_INTENT_COMPILER_MODEL_PROVIDER` | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_INTENT_COMPILER_PROVIDER`       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
@@ -257,7 +260,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (142)
+## runtime (143)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -313,6 +316,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_GATE_OVERRIDE_SIGNATURE`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GEMINI_TTS_VOICE`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GOAL_LOOP_MAX_ROUNDS`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_GROK_CLI_EXTRA_ARGS`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_HARNESS_SUBAGENT`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_HISTORY_SEARCH_DB`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_HOST_AGENT_ACTIVE`                   | string | no       | _undocumented_                                                                                          |

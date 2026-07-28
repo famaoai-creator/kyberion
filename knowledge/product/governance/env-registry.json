@@ -1081,6 +1081,38 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GROK_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_GROK_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_GROK_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_GROK_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_HARNESS_SUBAGENT",
       "category": "runtime",
       "type": "string",
