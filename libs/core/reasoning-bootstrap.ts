@@ -61,6 +61,13 @@ import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
 import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
+import {
+  buildGrokCliOptionsFromEnv,
+  buildShellGrokCliBackendFromEnv,
+  GrokCliBackend,
+} from './grok-cli-backend.js';
+import { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
+import { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from './adapter-default-selection.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
@@ -193,6 +200,8 @@ function providerForReasoningMode(mode: ReasoningBackendMode): string | undefine
       return 'gemini';
     case 'agy-cli':
       return 'agy';
+    case 'grok-cli':
+      return 'grok';
     case 'copilot':
       return 'copilot';
     case 'anthropic':
@@ -385,6 +394,30 @@ function buildReasoningRuntimeBundle(
         },
         voiceBridge: {
           bridge: new AgyCliVoiceBridge(agyOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'grok-cli': {
+      // Probe via env helper, then re-construct with optional model override so
+      // installReasoningBackends({ model }) pins intent/voice/reasoning alike.
+      if (!buildShellGrokCliBackendFromEnv()) return null;
+      const grokOptions = {
+        ...buildGrokCliOptionsFromEnv(),
+        ...(options.model ? { model: options.model } : {}),
+      };
+      const grokBackend = new GrokCliBackend(grokOptions);
+      return {
+        mode,
+        backend: { backend: grokBackend, provider, label: mode },
+        intentExtractor: {
+          extractor: new GrokCliIntentExtractor(grokOptions),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new GrokCliVoiceBridge(grokOptions),
           provider,
           label: mode,
         },
@@ -650,6 +683,7 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<Reaso
   'gemini-cli',
   'gemini-api',
   'agy-cli',
+  'grok-cli',
   'copilot',
   'local',
   'nemotron',
@@ -844,7 +878,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   // Only CLI-backed candidates can be probed via provider discovery; API-key /
   // URL-backed candidates (anthropic, openrouter, local, nemotron) only enter
   // the chain when their credential exists, so they count as usable.
-  const CLI_PROBED_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'agy', 'copilot']);
+  const CLI_PROBED_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'agy', 'grok', 'copilot']);
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
     if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;

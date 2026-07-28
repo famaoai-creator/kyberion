@@ -7,6 +7,7 @@
     "api.openai.com",
     "generativelanguage.googleapis.com",
     "api.githubcopilot.com",
+    "api.x.ai",
     "api.box.com"
   ],
   "blocked_domains": [],

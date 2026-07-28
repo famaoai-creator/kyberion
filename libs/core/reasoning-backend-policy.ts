@@ -12,6 +12,7 @@ export type ReasoningBackendMode =
   | 'gemini-cli'
   | 'gemini-api'
   | 'agy-cli'
+  | 'grok-cli'
   | 'copilot'
   | 'local'
   | 'ollama'
@@ -75,6 +76,8 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   mode_aliases: {
     'gemini-api': 'gemini-cli',
     nemotron: 'nemotron-api',
+    grok: 'grok-cli',
+    'grok-build': 'grok-cli',
   },
   allowed_modes: [
     'claude-cli',
@@ -83,6 +86,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'anthropic',
     'gemini-cli',
     'agy-cli',
+    'grok-cli',
     'copilot',
     'local',
     'ollama',
@@ -121,10 +125,12 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
       mode: 'codex-cli',
     },
     { env_any: ['AGY_CLI', 'ANTIGRAVITY_CLI'], provider: 'agy', mode: 'agy-cli' },
+    { env_any: ['GROK_CLI', 'GROK_VERSION'], provider: 'grok', mode: 'grok-cli' },
   ],
   provider_fallback_order: [
     { provider: 'codex', mode: 'codex-cli' },
     { provider: 'agy', mode: 'agy-cli' },
+    { provider: 'grok', mode: 'grok-cli' },
     { provider: 'copilot', mode: 'copilot' },
   ],
   default_mode: 'codex-cli',
