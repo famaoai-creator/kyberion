@@ -1788,6 +1788,132 @@
         "qps-ploc": "⟦Ẇė ẇïŀŀ ƈőñƒïřɱ ȧñḓ ɠėŧ ƀȧƈķ ŧő ẏőů şħőřŧŀẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
-    "onboarding": {}
+    "onboarding": {
+      "onboarding_menu_title": {
+        "en": "=== 🛠️ Kyberion Onboarding & Re-Configuration Menu ===",
+        "ja": "=== 🛠️ Kyberion Onboarding & Re-Configuration Menu ===",
+        "qps-ploc": "⟦=== 🛠️ Ķẏƀėřïőñ Őñƀőȧřḓïñɠ & Řė-Ƈőñƒïɠůřȧŧïőñ Ɱėñů === ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "onboarding_menu_item_identity": {
+        "en": "  [1] 👤 Update basic profile & vision (My Identity & Vision)",
+        "ja": "  [1] 👤 基本プロファイル・ビジョンの更新 (My Identity & Vision)",
+        "qps-ploc": "⟦  [1] 👤 Ůṗḓȧŧė ƀȧşïƈ ṗřőƒïŀė & ṽïşïőñ (Ɱẏ Ïḓėñŧïŧẏ & Ṽïşïőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "onboarding_menu_item_avatar": {
+        "en": "  [2] 📷 Recapture / regenerate the avatar image (Create / Update Avatar)",
+        "ja": "  [2] 📷 アバター画像の再撮影・生成 (Create / Update Avatar)",
+        "qps-ploc": "⟦  [2] 📷 Řėƈȧṗŧůřė / řėɠėñėřȧŧė ŧħė ȧṽȧŧȧř ïɱȧɠė (Ƈřėȧŧė / Ůṗḓȧŧė Ȧṽȧŧȧř) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "onboarding_menu_item_voice": {
+        "en": "  [3] 🎤 Re-record & retrain the voice model (Voice Profile Training)",
+        "ja": "  [3] 🎤 音声モデルの再録音・再学習 (Voice Profile Training)",
+        "qps-ploc": "⟦  [3] 🎤 Řė-řėƈőřḓ & řėŧřȧïñ ŧħė ṽőïƈė ɱőḓėŀ (Ṽőïƈė Ṗřőƒïŀė Ŧřȧïñïñɠ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "onboarding_menu_item_knowledge": {
+        "en": "  [4] 📄 Import additional knowledge & documents (Import Knowledge)",
+        "ja": "  [4] 📄 ナレッジ・資料の追加インポート (Import Knowledge)",
+        "qps-ploc": "⟦  [4] 📄 Ïɱṗőřŧ ȧḓḓïŧïőñȧŀ ķñőẇŀėḓɠė & ḓőƈůɱėñŧş (Ïɱṗőřŧ Ķñőẇŀėḓɠė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "onboarding_menu_item_ping": {
+        "en": "  [5] 💬 Test communication channel connectivity (Ping Check)",
+        "ja": "  [5] 💬 コミュニケーションチャネルの疎通テスト (Ping Check)",
+        "qps-ploc": "⟦  [5] 💬 Ŧėşŧ ƈőɱɱůñïƈȧŧïőñ ƈħȧññėŀ ƈőññėƈŧïṽïŧẏ (Ṗïñɠ Ƈħėƈķ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "onboarding_menu_item_guardrails": {
+        "en": "  [6] 🛡️ Change permission & security settings (Guardrails Config)",
+        "ja": "  [6] 🛡️ 権限・セキュリティ設定の変更 (Guardrails Config)",
+        "qps-ploc": "⟦  [6] 🛡️ Ƈħȧñɠė ṗėřɱïşşïőñ & şėƈůřïŧẏ şėŧŧïñɠş (Ɠůȧřḓřȧïŀş Ƈőñƒïɠ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "onboarding_menu_item_cadence": {
+        "en": "  [7] ⏰ Change the morning/evening briefing schedule (Daily Cadence)",
+        "ja": "  [7] ⏰ 朝夕の定期ブリーフィング スケジュール変更 (Daily Cadence)",
+        "qps-ploc": "⟦  [7] ⏰ Ƈħȧñɠė ŧħė ɱőřñïñɠ/ėṽėñïñɠ ƀřïėƒïñɠ şƈħėḓůŀė (Ḓȧïŀẏ Ƈȧḓėñƈė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "onboarding_menu_item_tutorial": {
+        "en": "  [8] 🎯 Re-run the first tutorial (Run Tutorial)",
+        "ja": "  [8] 🎯 初回チュートリアルの再実行 (Run Tutorial)",
+        "qps-ploc": "⟦  [8] 🎯 Řė-řůñ ŧħė ƒïřşŧ ŧůŧőřïȧŀ (Řůñ Ŧůŧőřïȧŀ) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "onboarding_menu_item_restart": {
+        "en": "  [9] 🔄 Restart full onboarding from scratch (Restart Full Onboarding)",
+        "ja": "  [9] 🔄 最初からフルオンボーディングをやり直す (Restart Full Onboarding)",
+        "qps-ploc": "⟦  [9] 🔄 Řėşŧȧřŧ ƒůŀŀ őñƀőȧřḓïñɠ ƒřőɱ şƈřȧŧƈħ (Řėşŧȧřŧ Ƒůŀŀ Őñƀőȧřḓïñɠ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "onboarding_menu_prompt": {
+        "en": "Select an option (1-9, [Q]uit): ",
+        "ja": "選択してください (1-9, [Q]uit): ",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧñ őṗŧïőñ (1-9, [Ɋ]ůïŧ):  ŀőřėɱ ïṗşů⟧"
+      },
+      "onboarding_menu_running_avatar": {
+        "en": "📷 Running the avatar image generation pipeline...",
+        "ja": "📷 アバター画像生成パイプラインを実行します...",
+        "qps-ploc": "⟦📷 Řůññïñɠ ŧħė ȧṽȧŧȧř ïɱȧɠė ɠėñėřȧŧïőñ ṗïṗėŀïñė... ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "onboarding_menu_error_avatar": {
+        "en": "Avatar generation failed:",
+        "ja": "アバター生成中にエラーが発生しました:",
+        "qps-ploc": "⟦Ȧṽȧŧȧř ɠėñėřȧŧïőñ ƒȧïŀėḓ: ŀőřėɱ ïṗ⟧"
+      },
+      "onboarding_menu_running_voice": {
+        "en": "🎤 Running the voice model training pipeline...",
+        "ja": "🎤 音声モデル学習パイプラインを実行します...",
+        "qps-ploc": "⟦🎤 Řůññïñɠ ŧħė ṽőïƈė ɱőḓėŀ ŧřȧïñïñɠ ṗïṗėŀïñė... ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "onboarding_menu_error_voice": {
+        "en": "Voice model training failed:",
+        "ja": "音声モデル学習中にエラーが発生しました:",
+        "qps-ploc": "⟦Ṽőïƈė ɱőḓėŀ ŧřȧïñïñɠ ƒȧïŀėḓ: ŀőřėɱ ïṗş⟧"
+      },
+      "onboarding_menu_running_knowledge": {
+        "en": "📄 Updating the knowledge index...",
+        "ja": "📄 ナレッジインデックスを更新します...",
+        "qps-ploc": "⟦📄 Ůṗḓȧŧïñɠ ŧħė ķñőẇŀėḓɠė ïñḓėẋ... ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "onboarding_menu_error_knowledge": {
+        "en": "Knowledge import failed:",
+        "ja": "ナレッジインポート中にエラーが発生しました:",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ïɱṗőřŧ ƒȧïŀėḓ: ŀőřėɱ ï⟧"
+      },
+      "onboarding_menu_running_ping": {
+        "en": "💬 Showing the readiness & channel report...",
+        "ja": "💬 レディネス・チャネルレポートを表示します...",
+        "qps-ploc": "⟦💬 Şħőẇïñɠ ŧħė řėȧḓïñėşş & ƈħȧññėŀ řėṗőřŧ... ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "onboarding_menu_error_ping": {
+        "en": "Report output failed:",
+        "ja": "レポート出力中にエラーが発生しました:",
+        "qps-ploc": "⟦Řėṗőřŧ őůŧṗůŧ ƒȧïŀėḓ: ŀőřėɱ ⟧"
+      },
+      "onboarding_menu_running_guardrails": {
+        "en": "🛡️ Running the governance & security rule check...",
+        "ja": "🛡️ ガバナンス・セキュリティルールのチェックを実行します...",
+        "qps-ploc": "⟦🛡️ Řůññïñɠ ŧħė ɠőṽėřñȧñƈė & şėƈůřïŧẏ řůŀė ƈħėƈķ... ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "onboarding_menu_error_guardrails": {
+        "en": "Governance check failed:",
+        "ja": "ガバナンスチェック中にエラーが発生しました:",
+        "qps-ploc": "⟦Ɠőṽėřñȧñƈė ƈħėƈķ ƒȧïŀėḓ: ŀőřėɱ ï⟧"
+      },
+      "onboarding_menu_running_cadence": {
+        "en": "⏰ Showing the recurring schedule list...",
+        "ja": "⏰ 定期スケジュール一覧を表示します...",
+        "qps-ploc": "⟦⏰ Şħőẇïñɠ ŧħė řėƈůřřïñɠ şƈħėḓůŀė ŀïşŧ... ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "onboarding_menu_error_cadence": {
+        "en": "Schedule lookup failed:",
+        "ja": "スケジュール確認中にエラーが発生しました:",
+        "qps-ploc": "⟦Şƈħėḓůŀė ŀőőķůṗ ƒȧïŀėḓ: ŀőřėɱ ï⟧"
+      },
+      "onboarding_menu_running_restart": {
+        "en": "🔄 Restarting full onboarding from scratch...",
+        "ja": "🔄 最初からフルオンボーディングをやり直します...",
+        "qps-ploc": "⟦🔄 Řėşŧȧřŧïñɠ ƒůŀŀ őñƀőȧřḓïñɠ ƒřőɱ şƈřȧŧƈħ... ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "onboarding_menu_quit": {
+        "en": "Exiting the onboarding menu.",
+        "ja": "オンボーディングメニューを終了します。",
+        "qps-ploc": "⟦Ėẋïŧïñɠ ŧħė őñƀőȧřḓïñɠ ɱėñů. ŀőřėɱ ïṗş⟧"
+      }
+    }
   }
 }

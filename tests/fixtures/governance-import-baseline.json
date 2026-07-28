@@ -80,6 +80,7 @@
     "plugins/fixtures/skill-plugin-loader-official-fixture.mjs",
     "presence/displays/concierge/test/concierge-contract.test.ts",
     "scripts/agent_runtime_supervisor_daemon.test.ts",
+    "scripts/check_tenant_registry_consistency.test.ts",
     "scripts/check_tier_hygiene.test.ts",
     "scripts/customer_create.test.ts",
     "scripts/customer_list.test.ts",

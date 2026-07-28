@@ -1,6 +1,19 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Knowledge & Documentation Sync Rules",
+  "jobs_note": "DA-03 incremental-sync job registry, consumed by pipelines/tenant-ingest.json (cron) and pipelines/knowledge-sync.json (manual alias). Job shape: { id: string (unique), tenant_slug: string (registered tenant, see tenant-registry), source_system: 'box'|'slack'|'confluence', source_params: object (box → { folder_id }, slack → { channel }, confluence → { domain? }), enabled: boolean (disabled jobs are skipped), dry_run: boolean (required: true = list changes without persisting the watermark), schedule_hint?: string (documentation only — the cron lives in the pipeline's schedule block). Watermarks are stored per tenant × source under active/shared/runtime/ingest-cursors/ and advance only on fully successful listings (ingest:sync_source).",
+  "jobs": [
+    {
+      "id": "example-confluence-daily",
+      "tenant_slug": "acme-corp",
+      "source_system": "confluence",
+      "source_params": { "domain": "acme" },
+      "enabled": false,
+      "dry_run": true,
+      "schedule_hint": "daily 02:30 Asia/Tokyo via pipelines/tenant-ingest.json",
+      "note": "Disabled documentation example — copy it, point tenant_slug at a registered tenant, then set enabled: true."
+    }
+  ],
   "indexing": {
     "knowledge_dir": "knowledge",
     "capabilities_dir": "libs/actuators",
@@ -10,14 +23,96 @@
   },
   "guide": {
     "template": "SKILLS_GUIDE.md",
-    "namespaces": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
+    "namespaces": [
+      "core",
+      "engineering",
+      "audit",
+      "connector",
+      "media",
+      "intelligence",
+      "ux",
+      "business",
+      "utilities"
+    ]
   },
   "security": {
     "pii_patterns": [
-      { "name": "API_KEY", "regex": "AIza[0-9A-Za-z-_]{35}" },
-      { "name": "OAUTH_SECRET", "regex": "[0-9A-Za-z-_]{24,32}\\.apps\\.googleusercontent\\.com" },
-      { "name": "PRIVATE_KEY", "regex": "-----BEGIN PRIVATE KEY-----" },
-      { "name": "GENERIC_SECRET", "regex": "secret[:=]\\s*['\"][0-9A-Za-z-_]{16,}['\"]" }
+      {
+        "name": "API_KEY",
+        "id": "API_KEY",
+        "regex": "AIza[0-9A-Za-z-_]{35}",
+        "description": "Google API key",
+        "severity": "secret",
+        "action": "block"
+      },
+      {
+        "name": "OAUTH_SECRET",
+        "id": "OAUTH_SECRET",
+        "regex": "[0-9A-Za-z-_]{24,32}\\.apps\\.googleusercontent\\.com",
+        "description": "Google OAuth client identifier/secret",
+        "severity": "secret",
+        "action": "block"
+      },
+      {
+        "name": "PRIVATE_KEY",
+        "id": "PRIVATE_KEY",
+        "regex": "-----BEGIN PRIVATE KEY-----",
+        "description": "PEM private key header",
+        "severity": "secret",
+        "action": "block"
+      },
+      {
+        "name": "GENERIC_SECRET",
+        "id": "GENERIC_SECRET",
+        "regex": "secret[:=]\\s*['\"][0-9A-Za-z-_]{16,}['\"]",
+        "description": "Generic secret assignment (secret: '...' / secret=\"...\")",
+        "severity": "secret",
+        "action": "block"
+      },
+      {
+        "id": "CREDIT_CARD",
+        "regex": "(?<![0-9A-Fa-f])(?:\\d[ -]?){12,18}\\d(?![0-9A-Fa-f-])",
+        "description": "Payment card number (13-19 digits passing Luhn) — PCI DSS forbids storing the PAN, so the default is block, not mask",
+        "severity": "pii",
+        "action": "block",
+        "validator": "luhn"
+      },
+      {
+        "id": "EMAIL_ADDRESS",
+        "regex": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+        "description": "Email address",
+        "severity": "pii",
+        "action": "mask"
+      },
+      {
+        "id": "JP_BANK_ACCOUNT",
+        "regex": "(?:口座番号|口座|支店|普通|当座)\\D{0,10}\\d{7}(?!\\d)",
+        "description": "7-digit Japanese bank account number in 支店/口座 context",
+        "severity": "pii",
+        "action": "mask"
+      },
+      {
+        "id": "JP_MY_NUMBER",
+        "regex": "(?<![0-9A-Fa-f])\\d{4}[- ]?\\d{4}[- ]?\\d{4}(?![0-9A-Fa-f])",
+        "description": "マイナンバー (12 digits passing the 番号法 check-digit algorithm) — retention of 特定個人情報 is legally restricted, so the default is block, not mask",
+        "severity": "pii",
+        "action": "block",
+        "validator": "jp_mynumber"
+      },
+      {
+        "id": "JP_PHONE_NUMBER",
+        "regex": "(?<![\\d-])0\\d{1,4}-\\d{1,4}-\\d{4}(?![\\d-])",
+        "description": "Japanese phone number (0X0-XXXX-XXXX mobile / 0X-XXXX-XXXX landline variants)",
+        "severity": "pii",
+        "action": "mask"
+      },
+      {
+        "id": "JP_POSTAL_ADDRESS",
+        "regex": "〒\\s*\\d{3}-?\\d{4}",
+        "description": "Japanese postal code (〒NNN-NNNN address context)",
+        "severity": "pii",
+        "action": "mask"
+      }
     ],
     "exempt_dirs": ["knowledge/personal"]
   },

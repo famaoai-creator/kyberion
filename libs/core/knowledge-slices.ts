@@ -5,14 +5,15 @@
  * validates `knowledge/product/governance/knowledge-slices.json` against
  * `knowledge/product/schemas/knowledge-slices.schema.json`, then resolves the
  * merged directives (`pinned` / `search_roots` / `exclude`) for a dispatch-time
- * task profile (`team_role` x `phase` x `mission_type`).
+ * task profile (`team_role` x `phase` x `mission_type` x `tenant` x
+ * `project` — the last two added by DA-07 with identical wildcard semantics).
  *
  * Matcher precedence, merge semantics, and consumption order are specified in
  * `docs/developer/improvement-plans-2026-07/KP-03_SCHEMA_DESIGN_NOTE.ja.md`
  * (binding design answers — follow it, not ad hoc judgment, if this file and
  * that note ever disagree):
  *
- *  - specificity = count of non-wildcard `match` fields (0-3); same
+ *  - specificity = count of non-wildcard `match` fields (0-5); same
  *    specificity ties break on array order, LATER entry wins.
  *  - `pinned` / `exclude` are UNIONED across every matching slice.
  *  - `pinned` order is most-specific-first, then de-duplicated keeping the
@@ -21,11 +22,11 @@
  *    specific matching slice that declares `search_roots` supplies the whole
  *    list.
  *
- * `phase` is not currently threaded through from
- * `loadKnowledgeHintsIfPossible`'s production call site (design note open
- * question #1) — callers that omit it get `'*'`, which only satisfies
- * wildcard-phase slices. This is documented, expected fail-open behavior
- * until phase sourcing is wired, not a bug.
+ * `phase` sourcing (design note open question #1) was closed by DA-07:
+ * `loadKnowledgeHintsIfPossible` now derives it from mission/work-item state
+ * (`deriveGovernancePhaseFromMissionState`, mission-context-pack.ts) when the
+ * caller does not supply one. Callers outside that path that omit it still
+ * get `'*'`, which only satisfies wildcard-phase slices (fail-open).
  *
  * Fail-open: a missing or schema-invalid manifest yields the same
  * `EMPTY_RESOLUTION` as "nothing matched" — callers must not distinguish
@@ -46,6 +47,13 @@ export interface KnowledgeSliceMatcher {
   team_role?: string;
   phase?: string;
   mission_type?: string;
+  /**
+   * DA-07: tenant slug dimension (tenant-registry slug grammar) or '*'.
+   * Semantics identical to team_role/phase/mission_type: omitted = '*'.
+   */
+  tenant?: string;
+  /** DA-07: project id dimension or '*'. Semantics identical to the other fields. */
+  project?: string;
 }
 
 export interface KnowledgeSliceDefinition {
@@ -67,13 +75,17 @@ export interface ResolveKnowledgeSliceInput {
   /** Dispatch-time team role (e.g. 'implementer'). Omitted/blank is treated as '*'. */
   teamRole?: string;
   /**
-   * Governance phase (alignment/execution/onboarding/recovery/review). Not
-   * currently sourced by `loadKnowledgeHintsIfPossible`'s production call
-   * site — see module doc. Omitted/blank is treated as '*'.
+   * Governance phase (alignment/execution/onboarding/recovery/review).
+   * Sourced by `loadKnowledgeHintsIfPossible` from mission/work-item state
+   * since DA-07 — see module doc. Omitted/blank is treated as '*'.
    */
   phase?: string;
   /** Dispatch-time mission type. Omitted/blank is treated as '*'. */
   missionType?: string;
+  /** DA-07: dispatch-time tenant slug. Omitted/blank is treated as '*'. */
+  tenant?: string;
+  /** DA-07: dispatch-time project id. Omitted/blank is treated as '*'. */
+  project?: string;
   /**
    * Test-only override for the slices manifest path (repo-relative).
    * Defaults to `knowledge/product/governance/knowledge-slices.json`.
@@ -187,19 +199,20 @@ function normalizeToken(value: string | undefined): string {
   return trimmed || '*';
 }
 
+// DA-07 added tenant/project as additional match dimensions with identical
+// wildcard semantics. Specificity therefore counts 0-5 non-wildcard fields.
+const MATCH_KEYS = ['team_role', 'phase', 'mission_type', 'tenant', 'project'] as const;
+
+type MatchRequest = Record<(typeof MATCH_KEYS)[number], string>;
+
 function matcherSpecificity(match: KnowledgeSliceMatcher | undefined): number {
   if (!match) return 0;
-  return (['team_role', 'phase', 'mission_type'] as const).filter(
-    (key) => match[key] !== undefined && match[key] !== '*'
-  ).length;
+  return MATCH_KEYS.filter((key) => match[key] !== undefined && match[key] !== '*').length;
 }
 
-function sliceMatches(
-  match: KnowledgeSliceMatcher | undefined,
-  request: { team_role: string; phase: string; mission_type: string }
-): boolean {
+function sliceMatches(match: KnowledgeSliceMatcher | undefined, request: MatchRequest): boolean {
   if (!match) return true;
-  for (const key of ['team_role', 'phase', 'mission_type'] as const) {
+  for (const key of MATCH_KEYS) {
     const declared = match[key];
     if (declared === undefined || declared === '*') continue;
     if (declared !== request[key]) return false;
@@ -217,10 +230,12 @@ export function resolveKnowledgeSlice(input: ResolveKnowledgeSliceInput): Resolv
   const file = loadKnowledgeSlicesFile(input.slicesPath);
   if (!file || !Array.isArray(file.slices) || file.slices.length === 0) return EMPTY_RESOLUTION;
 
-  const request = {
+  const request: MatchRequest = {
     team_role: normalizeToken(input.teamRole),
     phase: normalizeToken(input.phase),
     mission_type: normalizeToken(input.missionType),
+    tenant: normalizeToken(input.tenant),
+    project: normalizeToken(input.project),
   };
 
   const matched = file.slices

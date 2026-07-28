@@ -58,6 +58,9 @@ const TARGET_OPS: Record<OpInputDomain, string[]> = {
     'process_kill',
     'mkdir',
   ],
+  // DA-04: ingest ops declare contracts from day one; coverage is asserted
+  // via DISCOVERY_DOMAINS only for the three legacy retrofit domains above.
+  ingest: [],
 };
 
 function readDiscovery(): DiscoveryFile {
