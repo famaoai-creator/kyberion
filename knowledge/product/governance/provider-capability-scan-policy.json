@@ -168,6 +168,38 @@
       }
     },
     {
+      "provider": "grok-cli",
+      "primary_probe": {
+        "command": "grok",
+        "args": ["--version"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "grok --version"
+      },
+      "evidence_probes": [
+        {
+          "capability_ids": ["cli.native.grok_headless_prompt"],
+          "probe": {
+            "command": "grok",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "grok -p / --single / --output-format json"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.grok_structured_output"],
+          "probe": {
+            "command": "grok",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "grok --json-schema"
+          }
+        }
+      ]
+    },
+    {
       "provider": "gemini-app",
       "primary_probe": {
         "command": "gemini",
