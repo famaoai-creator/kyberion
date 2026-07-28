@@ -35,12 +35,13 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const FALLBACK: ProviderConfigFile = {
-  default_priority: ['gemini', 'claude', 'codex', 'copilot'],
+  default_priority: ['gemini', 'claude', 'codex', 'grok', 'copilot'],
   default_models: {
     gemini: 'gemini-3.5-flash',
     claude: 'claude-fable-5',
     agy: 'Gemini 3.5 Flash (Medium)',
     codex: 'gpt-5.6-sol',
+    grok: 'grok-4.5',
     copilot: 'claude-sonnet-4-6',
   },
   runtime_defaults: {

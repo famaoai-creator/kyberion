@@ -355,6 +355,50 @@
           "structured_json"
         ]
       }
+    },
+    "grok": {
+      "models": ["grok-4.5", "grok-4.5-build"],
+      "capabilities": [
+        "reasoning",
+        "planning",
+        "coordination",
+        "analysis",
+        "review",
+        "code",
+        "long_context",
+        "structured_json",
+        "managed_workflow",
+        "can_fanout",
+        "can_subagent"
+      ],
+      "modelCapabilities": {
+        "grok-4.5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "grok-4.5-build": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ]
+      }
     }
   }
 }

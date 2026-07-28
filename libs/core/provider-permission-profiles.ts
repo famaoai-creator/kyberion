@@ -10,9 +10,9 @@ import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js'
  * This module is the single place that projects each tier onto the
  * provider-specific permission mechanism each CLI actually understands
  * (claude = tool allow/deny + permission-mode flags, codex = sandbox mode,
- * agy = sandbox flag) — so "explorer is read-only" is a structural
- * guarantee instead of something every backend has to remember to encode
- * on its own.
+ * agy = sandbox flag, grok = permission-mode / always-approve) — so
+ * "explorer is read-only" is a structural guarantee instead of something
+ * every backend has to remember to encode on its own.
  *
  * Registration ceremony: to declare a profile × provider permission
  * mapping, add ONE entry to {@link PROVIDER_PERMISSION_MATRIX} below.
@@ -23,16 +23,17 @@ import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js'
  * Scope note: this module is the declarative SSoT for the mapping and is
  * consumed by {@link buildProviderChildEnv} for env minimization, and (XP-02
  * follow-up) by shell-claude-cli-backend.ts / codex-cli-query.ts /
- * agy-cli-backend.ts, each of which accepts an optional KD-05 profile on
- * its invocation path and calls `resolveProviderPermissionArgs` to project
- * it onto that provider's CLI argv (e.g. agy's previously-unconditional
+ * agy-cli-backend.ts / shell-grok-cli-backend.ts, each of which accepts an
+ * optional KD-05 profile on its invocation path and calls
+ * `resolveProviderPermissionArgs` to project it onto that provider's CLI
+ * argv (e.g. agy's previously-unconditional
  * `--dangerously-skip-permissions` is now only used when no profile is
  * given — see each backend's `resolvePermissionArgs` helper).
  */
 
-export type ProviderId = 'claude' | 'codex' | 'agy';
+export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok';
 
-export const PROVIDER_IDS: readonly ProviderId[] = ['claude', 'codex', 'agy'] as const;
+export const PROVIDER_IDS: readonly ProviderId[] = ['claude', 'codex', 'agy', 'grok'] as const;
 
 /** KD-05 tier names this module has a permission projection for. */
 export type ProviderPermissionProfileName = 'implementer' | 'explorer' | 'planner';
@@ -88,6 +89,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--sandbox'],
       'agy always runs sandboxed; implementer gets the full sandboxed tool set.'
     ),
+    grok: ok(
+      ['--permission-mode', 'bypassPermissions'],
+      'Grok Build full auto-approve path for implementer-tier write/exec work.'
+    ),
   },
   explorer: {
     claude: ok(
@@ -109,6 +114,15 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--sandbox'],
       'agy sandbox flag is the closest read-only-leaning primitive this CLI exposes.'
     ),
+    grok: ok(
+      [
+        '--permission-mode',
+        'default',
+        '--disallowed-tools',
+        'run_terminal_command,write,search_replace',
+      ],
+      'Read-leaning: deny shell/write tools; remaining read/search tools stay available under default permission mode.'
+    ),
   },
   planner: {
     claude: ok(
@@ -123,6 +137,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
     agy: refused(
       'agy CLI headless invocations always pass --dangerously-skip-permissions and have no verified ' +
         'no-exec mode. Refusing delegation rather than granting an under-restricted approximation.'
+    ),
+    grok: ok(
+      ['--permission-mode', 'plan'],
+      'Grok Build plan mode produces a plan without executing tools.'
     ),
   },
 } as const;
@@ -210,6 +228,9 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   claude: [],
   codex: ['CODEX_HOME'],
   agy: [],
+  // OAuth session for Grok Build typically lives under ~/.grok; no extra config
+  // home override is required for headless -p invocations.
+  grok: [],
 };
 
 /**
@@ -220,6 +241,9 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   claude: ['ANTHROPIC_API_KEY'],
   codex: ['OPENAI_API_KEY'],
   agy: [],
+  // Grok Build primarily uses OAuth via `grok login`; optional direct API key
+  // still allowed through when present.
+  grok: ['XAI_API_KEY'],
 };
 
 /**

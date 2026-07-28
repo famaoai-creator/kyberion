@@ -398,6 +398,34 @@ function checkAgy(): ProviderInfo {
   };
 }
 
+function checkGrok(): ProviderInfo {
+  const which = run('which', ['grok']);
+  if (!which.ok)
+    return {
+      provider: 'grok',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  // Use --version only — a live headless LLM probe is too expensive for discovery.
+  // Credential validity is checked at use-time.
+  const ver = run('grok', ['--version']);
+  const entry = capabilityEntryFor('grok');
+  return {
+    provider: 'grok',
+    installed: true,
+    version: ver.ok ? ver.stdout || null : null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: ver.ok,
+  };
+}
+
 /**
  * Discover all available providers. Cached for 5 minutes.
  */
@@ -425,7 +453,14 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
 
   // 3. Full discovery
   logger.info('[PROVIDER_DISCOVERY] Scanning available providers...');
-  const providers = [checkGemini(), checkClaude(), checkCopilot(), checkCodex(), checkAgy()];
+  const providers = [
+    checkGemini(),
+    checkClaude(),
+    checkCopilot(),
+    checkCodex(),
+    checkAgy(),
+    checkGrok(),
+  ];
 
   const available = providers.filter((p) => p.installed);
   logger.info(
