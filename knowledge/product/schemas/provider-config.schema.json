@@ -51,6 +51,10 @@
         "agy": {
           "type": "string",
           "minLength": 1
+        },
+        "grok": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
