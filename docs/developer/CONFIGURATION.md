@@ -257,7 +257,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (140)
+## runtime (142)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -292,6 +292,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CODEX_INSTANCES`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CODEX_MODE`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CURATION_SCAN_ROOTS`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CURATION_TENANT_ROOTDIR`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CUSTOMER`                            | string | no       | Active customer profile slug used to resolve the profile root.                                          |
 | `KYBERION_DEFAULT_LOCALE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DELEGATION_DEPTH`                    | string | no       | _undocumented_                                                                                          |
@@ -317,6 +318,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_HOST_AGENT_ACTIVE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_IMESSAGE_WAKE_WORD`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_IN_SESSION_SUBAGENT`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_INGEST_QUOTA_TEST`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SCOPE`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SUSPECTED`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                                | string | no       | _undocumented_                                                                                          |

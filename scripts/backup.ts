@@ -303,11 +303,16 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
     addTenantMatches(entries, rootDir, tenant, 'active/projects', pathExists);
     addTenantMatches(entries, rootDir, tenant, 'active/missions', pathExists);
     for (const repoPath of [
+      // Includes the DA-05 asset ledger (knowledge/confidential/{tenant}/_ledger/)
+      // by covering the whole tenant knowledge root.
       `knowledge/confidential/${tenant}`,
       `knowledge/personal/${tenant}`,
       `knowledge/personal/customers/${tenant}`,
       `customer/${tenant}`,
       `customers/${tenant}`,
+      // DA-08: incremental-sync cursor state (DA-03) rides along in the
+      // tenant export so an offboarded tenant's sync position is restorable.
+      `active/shared/runtime/ingest-cursors/${tenant}`,
     ]) {
       addIfExists(entries, repoPath, pathExists);
     }

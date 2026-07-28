@@ -16,6 +16,13 @@
         "accessToken": ["API_KEY"]
       }
     },
+    "box": {
+      "base_url": "https://api.box.com/2.0",
+      "preset_path": "knowledge/product/orchestration/service-presets/box.json",
+      "credential_suffixes": {
+        "accessToken": ["ACCESS_TOKEN", "DEVELOPER_TOKEN", "TOKEN"]
+      }
+    },
     "brave-search": {
       "preset_path": "knowledge/product/orchestration/service-presets/brave-search.json"
     },

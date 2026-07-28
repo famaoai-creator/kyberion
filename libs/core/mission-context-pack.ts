@@ -12,6 +12,7 @@ import {
   isKnowledgePathExcluded,
   isKnowledgePathInSearchRoots,
 } from './knowledge-slices.js';
+import { queryTenantKnowledge } from './tenant-knowledge-retrieval.js';
 import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
@@ -362,6 +363,12 @@ export interface ResolveMissionContextPackInput {
    * Omitted = `M`, matching pre-KP-04 behavior byte-for-byte.
    */
   estimatedScope?: 'S' | 'M' | 'L';
+  /**
+   * DA-07 test seam, forwarded to `loadKnowledgeHintsIfPossible`: repo root
+   * containing fixture `knowledge/`, `customer/`, and tenant profile
+   * directories for tenant-scoped retrieval. Defaults to the real repo root.
+   */
+  tenantKnowledgeRootDir?: string;
 }
 
 let missionStateValidateFn: ValidateFunction | null = null;
@@ -1055,10 +1062,13 @@ export interface LoadKnowledgeHintsInput {
   trackRecord?: ProjectTrackRecord | null;
   teamRole?: string;
   /**
-   * Governance phase (alignment/execution/onboarding/recovery/review). Not
-   * currently sourced from mission/work-item state — see KP-03 design note
-   * open question #1. Omitted here in production; tests may supply it
-   * directly to exercise phase-scoped slices (this is the "seam").
+   * Governance phase (alignment/execution/onboarding/recovery/review).
+   * DA-07 closed the KP-03 open question #1: when omitted, the phase is now
+   * DERIVED from mission/work-item state via
+   * `deriveGovernancePhaseFromMissionState` (work-item `metadata.phase` when
+   * it is already a governance token, else a documented mission-status
+   * mapping). An explicit value here still wins — tests and callers with
+   * better knowledge may override the derivation.
    */
   phase?: string;
   workItem?: WorkItem | null;
@@ -1073,6 +1083,140 @@ export interface LoadKnowledgeHintsInput {
    * `M` (pre-KP-04 default of 3).
    */
   estimatedScope?: 'S' | 'M' | 'L';
+  /**
+   * DA-07 test seam: repo root containing the fixture `knowledge/`,
+   * `customer/`, and tenant profile directories used for tenant-scoped
+   * retrieval. Defaults to the real repo root.
+   */
+  tenantKnowledgeRootDir?: string;
+}
+
+/**
+ * DA-07 (closes KP-03 open question #1): derive the governance phase
+ * (alignment/execution/onboarding/recovery/review) from mission/work-item
+ * state so phase-scoped knowledge slices and taxonomy `retrieval_priority`
+ * stop falling through to '*'.
+ *
+ * Signal precedence (documented mapping — keep this comment authoritative):
+ * 1. `workItem.metadata.phase`, only when it is ALREADY one of the five
+ *    governance tokens. Mission workflow phase ids (MO-01 `phase_specs[].id`)
+ *    are free-form strings with no reliable governance mapping, so they are
+ *    deliberately NOT translated here.
+ * 2. Mission status → governance phase:
+ *    planned → alignment; active → execution; validating/distilling → review;
+ *    completed/archived → review; paused/failed → recovery.
+ * 3. Anything else → undefined, which slice resolution normalizes to '*'
+ *    (the pre-DA-07 behavior).
+ */
+const GOVERNANCE_PHASES: ReadonlySet<string> = new Set([
+  'alignment',
+  'execution',
+  'onboarding',
+  'recovery',
+  'review',
+]);
+
+export function deriveGovernancePhaseFromMissionState(
+  missionState: MissionStateSummary,
+  workItem?: WorkItem | null
+): string | undefined {
+  const metadataPhase =
+    workItem?.metadata && typeof workItem.metadata === 'object'
+      ? String((workItem.metadata as Record<string, unknown>).phase || '').trim()
+      : '';
+  if (metadataPhase && GOVERNANCE_PHASES.has(metadataPhase)) return metadataPhase;
+
+  switch (missionState.status) {
+    case 'planned':
+      return 'alignment';
+    case 'active':
+      return 'execution';
+    case 'validating':
+    case 'distilling':
+    case 'completed':
+    case 'archived':
+      return 'review';
+    case 'paused':
+    case 'failed':
+      return 'recovery';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * DA-07: tenant identity as it reaches the pack builder. The mission state
+ * itself carries `tenant_slug` (mission-state.schema.json), and project
+ * operational state carries `tenant_slug` — there is no separate
+ * project→tenant ledger, so these two fields ARE the mapping. The literal
+ * `'shared'` is the tenantless placeholder used by project workspace paths
+ * and is never a real tenant.
+ */
+function tenantSlugFromContext(input: {
+  missionState: MissionStateSummary;
+  projectState?: ProjectOperationalState | null;
+}): string | undefined {
+  const slug = String(
+    input.missionState.tenant_slug || input.projectState?.tenant_slug || ''
+  ).trim();
+  if (!slug || slug === 'shared') return undefined;
+  return slug;
+}
+
+/**
+ * DA-07: gate tenant-knowledge retrieval by mission tier (fail-closed).
+ * Tenant knowledge lives under the confidential tier; a public mission's
+ * security scope reads only `['public']` and a personal mission's reads
+ * `['public', 'personal']`, so only confidential-tier missions may pull
+ * `knowledge/confidential/{tenant}/` content into their pack.
+ */
+function tenantSlugForKnowledgeRetrieval(input: {
+  missionState: MissionStateSummary;
+  projectState?: ProjectOperationalState | null;
+}): string | undefined {
+  if (normalizeTier(input.missionState.tier) !== 'confidential') return undefined;
+  return tenantSlugFromContext(input);
+}
+
+/**
+ * DA-07 merge policy (deterministic, documented here as the single source):
+ * - Pinned slice documents always come first and are never displaced.
+ * - The remaining budget is filled by a two-list merge of (a) the distill
+ *   corpus results in their existing slice-prioritized order and (b) the
+ *   tenant-scoped results in score-descending order: at each step the list
+ *   whose head has the higher score contributes the next hint; a TIE goes to
+ *   the tenant document; a missing score counts as 0. Relative order within
+ *   each list is preserved (distill keeps its search_roots prioritization).
+ * - De-duplicated by path (first occurrence wins, pinned paths included),
+ *   capped at the remaining `SCOPE_KNOWLEDGE_BUDGETS` hint budget.
+ * When the tenant list is empty the caller returns the distill list
+ * untouched, so tenantless dispatches stay byte-identical to pre-DA-07.
+ */
+function mergeTenantKnowledgeHints(input: {
+  distill: MissionContextPackKnowledgeHint[];
+  tenant: MissionContextPackKnowledgeHint[];
+  cap: number;
+  deliveredPaths: ReadonlySet<string>;
+}): MissionContextPackKnowledgeHint[] {
+  const out: MissionContextPackKnowledgeHint[] = [];
+  const seen = new Set(input.deliveredPaths);
+  let d = 0;
+  let t = 0;
+  while (out.length < input.cap && (d < input.distill.length || t < input.tenant.length)) {
+    const distillHead = input.distill[d];
+    const tenantHead = input.tenant[t];
+    let takeTenant: boolean;
+    if (!distillHead) takeTenant = true;
+    else if (!tenantHead) takeTenant = false;
+    else takeTenant = (tenantHead.score ?? 0) >= (distillHead.score ?? 0);
+    const next = takeTenant ? tenantHead! : distillHead!;
+    if (takeTenant) t += 1;
+    else d += 1;
+    if (seen.has(next.path)) continue;
+    seen.add(next.path);
+    out.push(next);
+  }
+  return out;
 }
 
 /**
@@ -1122,10 +1266,24 @@ export async function loadKnowledgeHintsIfPossible(
       .filter(Boolean)
   );
 
+  // DA-07: explicit phase wins; otherwise derive from mission/work-item state
+  // (see deriveGovernancePhaseFromMissionState for the documented mapping).
+  const phase =
+    input.phase ?? deriveGovernancePhaseFromMissionState(input.missionState, input.workItem);
+  const sliceTenant = tenantSlugFromContext(input);
+  const sliceProject = String(
+    input.projectState?.project_id ||
+      input.missionState.relationships?.project?.project_id ||
+      input.workItem?.project_id ||
+      ''
+  ).trim();
+
   const slice = resolveKnowledgeSlice({
     teamRole: input.teamRole,
-    phase: input.phase,
+    phase,
     missionType: input.missionState.mission_type,
+    ...(sliceTenant ? { tenant: sliceTenant } : {}),
+    ...(sliceProject ? { project: sliceProject } : {}),
     slicesPath: input.knowledgeSlicesPath,
   });
 
@@ -1166,7 +1324,7 @@ export async function loadKnowledgeHintsIfPossible(
         ]
       : filtered;
 
-  const searchHints = prioritized.slice(0, remaining).map((entry: DistilledKnowledgeEntry) => ({
+  const distillHints = prioritized.map((entry: DistilledKnowledgeEntry) => ({
     path: entry.path,
     title: entry.title,
     excerpt: entry.excerpt,
@@ -1177,7 +1335,45 @@ export async function loadKnowledgeHintsIfPossible(
     ...(entry.last_updated ? { last_updated: entry.last_updated } : {}),
   }));
 
-  return [...pinnedHints, ...searchHints];
+  // DA-07: tenant-scoped corpus, queried alongside (never instead of) the
+  // distill corpus, with the same topic string. Activates ONLY when the
+  // dispatch context carries a tenant slug AND the mission tier admits
+  // confidential knowledge — every other dispatch takes the exact pre-DA-07
+  // path below (byte-identical output, KP-01 compatibility).
+  const tenantSlug = tenantSlugForKnowledgeRetrieval(input);
+  let tenantHints: MissionContextPackKnowledgeHint[] = [];
+  if (tenantSlug) {
+    // Same over-fetch rule as the distill leg: excludes may filter results.
+    const tenantFetchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
+    const tenantHits = await queryTenantKnowledge({
+      tenantSlug,
+      topic,
+      limit: tenantFetchLimit,
+      ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
+    });
+    tenantHints = tenantHits
+      .filter((hit) => !isKnowledgePathExcluded(hit.path, slice.exclude))
+      .map((hit) => ({
+        path: hit.path,
+        title: hit.title,
+        excerpt: hit.excerpt,
+        tags: hit.tags,
+        score: hit.score,
+      }));
+  }
+
+  if (tenantHints.length === 0) {
+    // Pre-DA-07 path, byte-identical: pinned first, then distill results.
+    return [...pinnedHints, ...distillHints.slice(0, remaining)];
+  }
+
+  const merged = mergeTenantKnowledgeHints({
+    distill: distillHints,
+    tenant: tenantHints,
+    cap: remaining,
+    deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),
+  });
+  return [...pinnedHints, ...merged];
 }
 
 function loadArtifactHintsIfPossible(input: {
@@ -1634,6 +1830,9 @@ export async function resolveMissionContextPack(
           workItem,
           taskSession,
           ...(input.estimatedScope ? { estimatedScope: input.estimatedScope } : {}),
+          ...(input.tenantKnowledgeRootDir
+            ? { tenantKnowledgeRootDir: input.tenantKnowledgeRootDir }
+            : {}),
         });
 
   return buildMissionContextPack({

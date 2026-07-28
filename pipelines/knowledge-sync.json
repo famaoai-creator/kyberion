@@ -1,63 +1,23 @@
 {
   "action": "pipeline",
   "pipeline_id": "knowledge-sync",
-  "version": "2.0.0",
-  "name": "Knowledge & Documentation Sync",
-  "description": "Reads knowledge/product/governance/knowledge-sync-rules.json and runs each configured sync job via wisdom-actuator. Replaces scripts/run_knowledge_sync.ts.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "version": "3.0.0",
+  "name": "Knowledge & Documentation Sync (alias of tenant-ingest)",
+  "description": "DA-03: manual alias for pipelines/tenant-ingest.json — kept because pnpm knowledge:sync and the MCP pipeline_run_allowlist reference this path. v2 was a silent no-op: it looped over knowledge-sync-rules.json `jobs`, which did not exist, and called the since-removed wisdom:knowledge_inject op. The jobs registry is now real (knowledge-sync-rules.json `jobs`) and the actual wiring lives in tenant-ingest.json (cron 02:30 Asia/Tokyo), which this pipeline inlines via core:include.",
+  "_migration_note": "v3: delegates to pipelines/tenant-ingest.json (DA-03). v2 used wisdom:knowledge_inject against a jobs key that never existed (no-op). Prefer running tenant-ingest.json directly; this alias exists for reference stability.",
   "steps": [
     {
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🔄 [KNOWLEDGE] Starting knowledge sync..." }
-    },
-    {
-      "id": "load-config",
-      "role": "source",
-      "op": "system:read_file",
-      "produces": { "channel": "sync_config", "type": "SyncConfig" },
       "params": {
-        "path": "knowledge/product/governance/knowledge-sync-rules.json",
-        "format": "json"
+        "message": "🔄 [KNOWLEDGE] knowledge-sync is an alias — delegating to pipelines/tenant-ingest.json (DA-03 incremental ingest sync)."
       }
     },
     {
-      "id": "run-jobs",
+      "id": "delegate-tenant-ingest",
       "role": "gate",
-      "op": "core:foreach",
-      "consumes": "sync_config",
-      "params": {
-        "items": "{{sync_config.jobs}}",
-        "as": "sync_job",
-        "do": [
-          {
-            "role": "sink",
-            "op": "system:log",
-            "params": { "message": "🔄 Running knowledge sync job: {{sync_job.action}}" }
-          },
-          {
-            "role": "transform",
-            "op": "wisdom:knowledge_inject",
-            "produces": { "channel": "sync_job_result", "type": "SyncJobResult" },
-            "params": {
-              "action": "{{sync_job.action}}",
-              "source": "{{sync_job.source}}",
-              "target": "{{sync_job.target}}",
-              "options": "{{sync_job.options}}"
-            }
-          },
-          {
-            "role": "sink",
-            "op": "system:log",
-            "params": { "message": "✅ Job done: {{sync_job.action}}" }
-          }
-        ]
-      }
-    },
-    {
-      "role": "sink",
-      "op": "system:log",
-      "params": { "message": "✅ [KNOWLEDGE] Knowledge sync complete." }
+      "op": "core:include",
+      "params": { "fragment": "pipelines/tenant-ingest.json" }
     }
   ]
 }

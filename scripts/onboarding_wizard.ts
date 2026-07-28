@@ -23,6 +23,8 @@ import {
   withExecutionContext,
   withLock,
 } from '@agent/core';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
 import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
@@ -68,6 +70,59 @@ function t(en: string, ja: string): string {
 
 function pt(value: LocalizedOnboardingText): string {
   return resolveOnboardingText(value, wizardLocale);
+}
+
+// I18N-02/03: re-configuration menu strings live in the vocabulary catalog
+// (`onboarding` namespace) rather than as hardcoded literals; render them
+// through the typed catalog `t()` pinned to the wizard's live locale so the
+// menu follows the language selected during onboarding.
+function mt(key: VocabularyKey): string {
+  return catalogT(key, undefined, wizardLocale);
+}
+
+// Menu actions launch `node dist/scripts/...` children through the
+// supervised managed-process wrapper (never direct child_process — see
+// kyberion-development-practices §1). stdio is inherited so the child owns
+// the terminal exactly like the wizard itself; the promise rejects on a
+// non-zero exit so callers can surface a catalog-rendered error message.
+async function runManagedMenuTask(taskId: string, args: string[]): Promise<void> {
+  const resourceId = `onboarding-menu:${taskId}:${Date.now().toString(36)}`;
+  const { child } = spawnManagedProcess({
+    resourceId,
+    kind: 'service',
+    ownerId: 'onboarding-wizard',
+    ownerType: 'script',
+    command: process.execPath,
+    args,
+    spawnOptions: {
+      cwd: pathResolver.rootDir(),
+      env: process.env,
+      stdio: 'inherit',
+    },
+    metadata: { source: 'onboarding-wizard-menu', taskId },
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', (code, signal) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              signal ? `terminated by signal ${signal}` : `exited with code ${code ?? 'unknown'}`
+            )
+          );
+        }
+      });
+    });
+  } finally {
+    stopManagedProcess(resourceId, child);
+  }
+}
+
+function formatMenuTaskError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
@@ -932,31 +987,113 @@ async function runOnboarding() {
     safeMkdir(onboardingRoot(), { recursive: true });
   }
 
+  const isMenuMode = process.argv.includes('--menu') || process.argv.includes('--reconfig');
+
   let state = loadState();
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
   }
-  if (!state) {
-    state = createInitialState();
-    await saveState(state);
-  } else if (state.status === 'complete') {
-    const overwrite = await ask(
-      t(
-        'An onboarding state already exists and is complete. Restart from scratch? (y/N): ',
-        '完了済みのオンボーディング状態が既に存在します。最初からやり直しますか?(y/N): '
-      ),
-      'n'
-    );
-    if (!isAffirmative(overwrite)) {
-      console.log(
-        t(
-          'Onboarding cancelled. Existing state preserved.',
-          'オンボーディングを中止しました。既存の状態は保持されます。'
-        )
-      );
+
+  if (isMenuMode || (state && state.status === 'complete' && interactive && !expressMode)) {
+    console.log(chalk.bold.cyan(`\n${mt('onboarding_menu_title')}`));
+    console.log(mt('onboarding_menu_item_identity'));
+    console.log(mt('onboarding_menu_item_avatar'));
+    console.log(mt('onboarding_menu_item_voice'));
+    console.log(mt('onboarding_menu_item_knowledge'));
+    console.log(mt('onboarding_menu_item_ping'));
+    console.log(mt('onboarding_menu_item_guardrails'));
+    console.log(mt('onboarding_menu_item_cadence'));
+    console.log(mt('onboarding_menu_item_tutorial'));
+    console.log(mt('onboarding_menu_item_restart'));
+    console.log('---------------------------------------------------');
+    const choice = (await ask(mt('onboarding_menu_prompt'), 'Q')).trim().toUpperCase();
+
+    if (choice === '1' && state) {
+      await runIdentityPhase(state);
+      await runSummaryPhase(state);
       rl.close();
-      process.exit(0);
+      return;
+    } else if (choice === '2') {
+      console.log(`\n${mt('onboarding_menu_running_avatar')}`);
+      try {
+        await runManagedMenuTask('avatar-pipeline', [
+          'dist/scripts/run_pipeline.js',
+          '--input',
+          'knowledge/product/pipeline-templates/create-my-avatar.json',
+        ]);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_avatar'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '3') {
+      console.log(`\n${mt('onboarding_menu_running_voice')}`);
+      try {
+        await runManagedMenuTask('voice-pipeline', [
+          'dist/scripts/run_pipeline.js',
+          '--input',
+          'knowledge/product/pipeline-templates/clone-my-voice.json',
+        ]);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_voice'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '4') {
+      console.log(`\n${mt('onboarding_menu_running_knowledge')}`);
+      try {
+        await runManagedMenuTask('knowledge-index', ['dist/scripts/generate_knowledge_index.js']);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_knowledge'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '5') {
+      console.log(`\n${mt('onboarding_menu_running_ping')}`);
+      try {
+        await runManagedMenuTask('setup-report', ['dist/scripts/setup_report.js']);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_ping'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '6') {
+      console.log(`\n${mt('onboarding_menu_running_guardrails')}`);
+      try {
+        await runManagedMenuTask('governance-check', ['dist/scripts/check_governance_rules.js']);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_guardrails'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '7') {
+      console.log(`\n${mt('onboarding_menu_running_cadence')}`);
+      try {
+        await runManagedMenuTask('schedule-list', [
+          'dist/scripts/run_generation_schedule.js',
+          '--action',
+          'list',
+        ]);
+      } catch (e) {
+        console.error(mt('onboarding_menu_error_cadence'), formatMenuTaskError(e));
+      }
+      rl.close();
+      return;
+    } else if (choice === '8' && state) {
+      await runTutorialPhase(state);
+      await runSummaryPhase(state);
+      rl.close();
+      return;
+    } else if (choice === '9') {
+      console.log(`\n${mt('onboarding_menu_running_restart')}`);
+      state = createInitialState();
+      await saveState(state);
+    } else {
+      console.log(mt('onboarding_menu_quit'));
+      rl.close();
+      return;
     }
+  } else if (!state) {
     state = createInitialState();
     await saveState(state);
   } else {

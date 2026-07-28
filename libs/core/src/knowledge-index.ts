@@ -36,8 +36,14 @@ export interface KnowledgeHint {
   source: string;
   confidence: number;
   tags?: string[];
-  tier?: 'public' | 'confidential' | 'personal' | 'product';
+  tier?: 'public' | 'confidential' | 'personal' | 'product' | 'customer';
   customerId?: string;
+  /**
+   * DA-07: lexical relevance score for the active query. Populated only when
+   * the caller opts in via `KnowledgeQueryOptions.includeScores` — existing
+   * callers see byte-identical result objects.
+   */
+  score?: number;
   /**
    * KM-02 body-chunk provenance. Internal chunk entries carry
    * `source = "<doc>#chunkN"` plus parentSource/chunkIndex; aggregated query
@@ -61,6 +67,13 @@ export interface KnowledgeQueryOptions {
   maxResults?: number;
   /** Scope used by the shared metadata ranker; defaults to global. */
   scope?: string;
+  /**
+   * DA-07: when true, `queryKnowledge` attaches the lexical relevance score
+   * to each returned hint (`KnowledgeHint.score`) so callers can merge these
+   * results deterministically with other corpora. Opt-in only: omitted keeps
+   * the historical result shape untouched.
+   */
+  includeScores?: boolean;
 }
 
 /**
@@ -73,8 +86,16 @@ export interface KnowledgeQueryOptions {
  * Different tiers/customer → different file → isolation guaranteed.
  */
 export interface KnowledgeScope {
-  /** Which tiers to scan. Order is irrelevant; results are merged. */
-  tiers: Array<'public' | 'confidential' | 'personal' | 'product'>;
+  /**
+   * Which tiers to scan. Order is irrelevant; results are merged.
+   *
+   * `'customer'` (DA-07) scans ONLY the `customer/{customerId}/` overlay
+   * directory (unlike `'personal'`, which scans the overlay AND
+   * `knowledge/personal/`). It requires `customerId` — without one it scans
+   * nothing (fail-closed), so a tenant-scoped index can never accidentally
+   * widen to another tenant's overlay.
+   */
+  tiers: Array<'public' | 'confidential' | 'personal' | 'product' | 'customer'>;
   /**
    * Restrict 'confidential' scanning to one customer subdirectory.
    * Also activates customer/ overlay for 'personal' tier.
@@ -335,6 +356,9 @@ export async function buildScopedIndex(
       case 'personal':
         _scanPersonalTier(knowledgeBase, domains, scope.customerId, hints);
         break;
+      case 'customer':
+        _scanCustomerOverlayTier(knowledgeBase, scope.customerId, hints);
+        break;
     }
   }
 
@@ -535,12 +559,31 @@ function _scanPersonalTier(
   }
 }
 
+/**
+ * DA-07: scan ONLY the `customer/{customerId}/` overlay directory. Unlike
+ * `_scanPersonalTier` this never touches `knowledge/personal/`, so a
+ * tenant-scoped index gets the overlay without pulling in the operator's
+ * personal tier. `customerId` is mandatory — absent means scan nothing
+ * (fail-closed): the caller must name the tenant positively.
+ */
+function _scanCustomerOverlayTier(
+  knowledgeBase: string,
+  customerId: string | undefined,
+  hints: KnowledgeHint[]
+): void {
+  if (!customerId) return;
+  const projectRoot = path.dirname(knowledgeBase);
+  const overlayDir = path.join(projectRoot, 'customer', customerId);
+  if (!safeExistsSync(overlayDir)) return;
+  _scanMarkdownHints(overlayDir, knowledgeBase, 'customer', customerId, hints);
+}
+
 // ─── Low-level scanners ───────────────────────────────────────────────────────
 
 function _loadJsonHints(
   dir: string,
   knowledgeBase: string,
-  tier: 'public' | 'confidential' | 'personal' | 'product',
+  tier: NonNullable<KnowledgeHint['tier']>,
   customerId: string | undefined,
   hints: KnowledgeHint[]
 ): void {
@@ -592,7 +635,7 @@ function _loadJsonHints(
 function _scanMarkdownHints(
   dir: string,
   knowledgeBase: string,
-  tier: 'public' | 'confidential' | 'personal' | 'product',
+  tier: NonNullable<KnowledgeHint['tier']>,
   customerId: string | undefined,
   hints: KnowledgeHint[]
 ): void {
@@ -896,7 +939,12 @@ export function queryKnowledge(
       b.score - a.score ||
       knowledgeMetadataScore(b.hint, options.scope) - knowledgeMetadataScore(a.hint, options.scope)
   );
-  return _aggregateByDocument(scored.map((s) => s.hint)).slice(0, maxResults);
+  // DA-07: opt-in score exposure. Copies (never mutations) so shared index
+  // hint objects and non-opted callers keep the historical shape.
+  const ranked = options.includeScores
+    ? scored.map((s) => ({ ...s.hint, score: s.score }))
+    : scored.map((s) => s.hint);
+  return _aggregateByDocument(ranked).slice(0, maxResults);
 }
 
 // ─── Query (hybrid — lexical + semantic via RRF) ──────────────────────────────

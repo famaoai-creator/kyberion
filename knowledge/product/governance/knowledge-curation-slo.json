@@ -1,11 +1,12 @@
 {
   "$schema": "../schemas/knowledge-curation-slo.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "low_yield_delivery_threshold": 5,
   "freshness_days_by_kind": {
     "governance": 90,
     "playbook": 60,
-    "knowledge_hint": 30
+    "knowledge_hint": 30,
+    "reference": 120
   },
   "default_freshness_days": 180
 }

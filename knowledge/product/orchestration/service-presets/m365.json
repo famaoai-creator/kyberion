@@ -79,6 +79,30 @@
       "args": ["request", "--url", "@graph/me/messages/{{message_id}}", "--output", "json"],
       "description": "Get one Outlook message by ID."
     },
+    "outlook_attachments_list": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--url",
+        "@graph/me/messages/{{message_id}}/attachments",
+        "--output",
+        "json"
+      ],
+      "description": "List attachments on an Outlook message (read-only)."
+    },
+    "outlook_attachment_get": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--url",
+        "@graph/me/messages/{{message_id}}/attachments/{{attachment_id}}",
+        "--output",
+        "json"
+      ],
+      "description": "Fetch one Outlook message attachment; fileAttachment responses include contentBytes (read-only)."
+    },
     "outlook_send": {
       "type": "cli",
       "command": "m365",

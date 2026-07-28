@@ -237,12 +237,37 @@ export interface OffboardApproval {
   approved_at?: string;
 }
 
-export type OffboardTargetKind = 'project_tree' | 'mission_tree';
+export type OffboardTargetKind =
+  | 'project_tree'
+  | 'mission_tree'
+  /** DA-08: the tenant's governed knowledge root incl. its `_ledger/` asset ledger (DA-05). */
+  | 'tenant_knowledge_tree'
+  /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
+  | 'ingest_cursors_tree'
+  /** DA-08: one data-vault cache entry whose projectId equals the scope id. */
+  | 'data_vault_entry';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
   path: string;
   kind: OffboardTargetKind;
+}
+
+/** DA-08: dedup-registry line prune summary (tenant offboarding). */
+export interface OffboardDedupRegistryResult {
+  /** Lines identified as belonging to the tenant (ledger hashes / source ids / landing prefix). */
+  matched: number;
+  /** Lines actually removed (execute mode only; 0 on dry run). */
+  removed: number;
+  /** Repo-relative copy of the removed lines inside the export directory. */
+  export_file?: string;
+}
+
+/** DA-08: post-execute leftover check (受入条件: 痕跡が残らない). */
+export interface OffboardVerification {
+  clean: boolean;
+  /** Repo-relative paths (or annotated registry refs) still carrying scope traces. */
+  leftovers: string[];
 }
 
 export interface OffboardScopeResult {
@@ -257,13 +282,42 @@ export interface OffboardScopeResult {
   soft_deleted: string[];
   /** NI-05: identities auto-retired because their scope closed (execute mode only). */
   retired_identities?: number;
+  /** DA-08: dedup-registry prune summary (tenant scope only). */
+  dedup_registry?: OffboardDedupRegistryResult;
+  /** DA-08: automatic post-execute leftover check (execute mode only). */
+  verification?: OffboardVerification;
   reason?: string;
 }
 
 /** Where offboarding exports land, under the catalog's `active/shared/exports` tree. */
 export const OFFBOARDING_EXPORT_SUBDIR = 'offboarding';
 
+/**
+ * DA-08 ingest-system residue locations. Kept as literals (not imports from
+ * the ingest modules) so this lifecycle verb has no module-load coupling to
+ * the ingest stack; they mirror `ingest-quota.ts` / the ingest-actuator dedup
+ * registry / the DA-03 sync cursor store and the retention-catalog entries.
+ */
+export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors';
+export const INGEST_DEDUP_REGISTRY_REPO_PATH =
+  'active/shared/runtime/ingest/content-hash-registry.jsonl';
+const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
+const DATA_VAULT_REPO_SUBPATH = 'active/shared/data-vault';
+
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
+
+/**
+ * Repo-relative knowledge root for a tenant slug. Deliberately the
+ * tenant-registry DEFAULT (`knowledge/confidential/{slug}`) rather than a
+ * `resolveTenant` call: offboarding must keep working for tenants whose
+ * profile is already gone/invalid, and importing tenant-registry would bind
+ * this module's load to schema files. Profiles that declare a custom
+ * `knowledge_root` are not resolved here (none exist today) — their tree
+ * would surface via the janitor's coverage reporting, not silently vanish.
+ */
+function tenantKnowledgeRootDefault(tenantSlug: string): string {
+  return `knowledge/confidential/${tenantSlug}`;
+}
 
 function missionStateScope(missionDir: string): {
   tenantSlug?: string;
@@ -279,11 +333,29 @@ function missionStateScope(missionDir: string): {
   };
 }
 
+/** Data-vault entry files (`active/shared/data-vault/*.json`) whose projectId equals the scope id. */
+function collectDataVaultEntryTargets(scopeId: string): OffboardTarget[] {
+  const targets: OffboardTarget[] = [];
+  const vaultDir = pathResolver.shared('data-vault');
+  for (const name of listDirEntries(vaultDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = path.join(vaultDir, name);
+    const record = readJsonRecord(filePath);
+    if (record && typeof record.projectId === 'string' && record.projectId === scopeId) {
+      targets.push({ path: repoRelativePosix(filePath), kind: 'data_vault_entry' });
+    }
+  }
+  return targets;
+}
+
 /**
- * Everything under `active/` that belongs to the scope: its project workspace
- * tree(s) and every mission declaring it. Deliberately `active/`-only — the
- * `knowledge/` tier system is KM's territory and out of this plan's scope, so
- * an offboarding never touches promoted knowledge.
+ * Everything that belongs to the scope: its project workspace tree(s), every
+ * mission declaring it, and — for a tenant (DA-08) — the tenant's governed
+ * knowledge root (incl. the DA-05 `_ledger/`), its ingest sync-cursor and
+ * quota-counter subtrees, plus data-vault entries keyed by the scope id.
+ * Data-vault entries use `VaultEntry.projectId` for both scope types — a
+ * tenant that cached vault data under a projectId different from its slug is
+ * NOT matched here (the projectId is the only scope key the vault carries).
  */
 export function collectScopeTargets(
   scopeType: OffboardScopeType,
@@ -319,7 +391,151 @@ export function collectScopeTargets(
     }
   }
 
+  // DA-08 tenant residue: governed knowledge (with the asset ledger inside),
+  // sync cursors, and quota counters.
+  if (scopeType === 'tenant') {
+    const knowledgeRoot = tenantKnowledgeRootDefault(id);
+    if (safeExistsSync(pathResolver.rootResolve(knowledgeRoot))) {
+      targets.push({ path: knowledgeRoot, kind: 'tenant_knowledge_tree' });
+    }
+    for (const subtree of [
+      `${INGEST_CURSORS_REPO_SUBPATH}/${id}`,
+      `${INGEST_QUOTA_REPO_SUBPATH}/${id}`,
+    ]) {
+      if (safeExistsSync(pathResolver.rootResolve(subtree))) {
+        targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
+      }
+    }
+  }
+
+  // DA-08 data-vault entries keyed by the scope id (both scope types — the
+  // vault's only scope dimension is projectId).
+  targets.push(...collectDataVaultEntryTargets(id));
+
   return targets;
+}
+
+// ---------------------------------------------------------------------------
+// DA-08: dedup-registry prune + post-offboard verification
+// ---------------------------------------------------------------------------
+
+interface LedgerAssetLine {
+  content_sha256?: string;
+  source_system?: string;
+  source_id?: string;
+}
+
+/** Parse a JSONL file leniently (corrupt lines skipped — same contract as the ingest readers). */
+function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
+  if (!safeExistsSync(absPath)) return [];
+  const raw = String(safeReadFile(absPath, { encoding: 'utf8' }) || '');
+  const records: Array<Record<string, unknown>> = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') records.push(parsed as Record<string, unknown>);
+    } catch {
+      /* skip corrupt line */
+    }
+  }
+  return records;
+}
+
+interface DedupRegistryPrune {
+  /** Registry lines that belong to the tenant, verbatim (for the export copy). */
+  removedLines: string[];
+  /** Every other line, verbatim, in original order. */
+  keptLines: string[];
+}
+
+/**
+ * Which dedup-registry lines belong to this tenant? A line matches when its
+ * content hash or source identity appears in the tenant's asset ledger, or
+ * when its recorded landing path points into the tenant knowledge root. Must
+ * be computed BEFORE the knowledge tree (and with it the ledger) is deleted.
+ */
+function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
+  const registryAbs = pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH);
+  const result: DedupRegistryPrune = { removedLines: [], keptLines: [] };
+  if (!safeExistsSync(registryAbs)) return result;
+
+  const knowledgeRoot = tenantKnowledgeRootDefault(tenantSlug);
+  const ledgerLines = readJsonlLines(
+    pathResolver.rootResolve(`${knowledgeRoot}/_ledger/assets.jsonl`)
+  ) as LedgerAssetLine[];
+  const hashes = new Set<string>();
+  const sourcePairs = new Set<string>();
+  for (const line of ledgerLines) {
+    if (typeof line.content_sha256 === 'string') hashes.add(line.content_sha256);
+    if (typeof line.source_system === 'string' && typeof line.source_id === 'string') {
+      sourcePairs.add(`${line.source_system}::${line.source_id}`);
+    }
+  }
+
+  const raw = String(safeReadFile(registryAbs, { encoding: 'utf8' }) || '');
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let matches = false;
+    try {
+      const record = JSON.parse(trimmed) as {
+        content_sha256?: string;
+        source_system?: string;
+        source_id?: string;
+        target_path?: string;
+      };
+      matches =
+        (typeof record.content_sha256 === 'string' && hashes.has(record.content_sha256)) ||
+        (typeof record.source_id === 'string' &&
+          sourcePairs.has(`${record.source_system ?? ''}::${record.source_id}`)) ||
+        (typeof record.target_path === 'string' &&
+          (record.target_path === knowledgeRoot ||
+            record.target_path.startsWith(`${knowledgeRoot}/`)));
+    } catch {
+      /* corrupt line: keep it — the registry readers skip it anyway */
+    }
+    (matches ? result.removedLines : result.keptLines).push(trimmed);
+  }
+  return result;
+}
+
+/**
+ * DA-08 acceptance check: does ANY trace of the scope remain (active/ trees,
+ * tenant knowledge + ledger, sync cursors, quota counters, data-vault
+ * entries, dedup-registry lines still pointing into the tenant knowledge
+ * root)? Run automatically after an execute; also callable standalone as the
+ * `--verify` half of the ceremony. Post-delete the ledger no longer exists,
+ * so registry leftovers are detected by landing-path prefix — the strongest
+ * signal still derivable without it.
+ */
+export function verifyScopeOffboarded(
+  scopeType: OffboardScopeType,
+  scopeId: string
+): OffboardVerification {
+  const id = String(scopeId || '').trim();
+  const leftovers: string[] = collectScopeTargets(scopeType, id).map((target) => target.path);
+
+  if (scopeType === 'tenant' && id) {
+    const knowledgeRoot = tenantKnowledgeRootDefault(id);
+    const registryLeft = readJsonlLines(
+      pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH)
+    ).filter((record) => {
+      const targetPath = record.target_path;
+      return (
+        typeof targetPath === 'string' &&
+        (targetPath === knowledgeRoot || targetPath.startsWith(`${knowledgeRoot}/`))
+      );
+    }).length;
+    if (registryLeft > 0) {
+      leftovers.push(
+        `${INGEST_DEDUP_REGISTRY_REPO_PATH} (${registryLeft} line(s) referencing ${knowledgeRoot})`
+      );
+    }
+  }
+
+  return { clean: leftovers.length === 0, leftovers };
 }
 
 /** Recursive copy through secure-io (no shell, cross-platform). */
@@ -381,9 +597,16 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
 
   try {
     result.targets = collectScopeTargets(scopeType, scopeId);
-    if (result.targets.length === 0) {
+    // DA-08: dedup-registry lines are pruned in place (line-level, not a
+    // tree), so they ride next to `targets`. Computed while the ledger still
+    // exists — this must precede any deletion.
+    const dedupPrune = scopeType === 'tenant' ? computeDedupRegistryPrune(scopeId) : null;
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
+    }
+    if (result.targets.length === 0 && !result.dedup_registry) {
       result.status = 'not_found';
-      result.reason = `no active/ trees found for ${scopeType} '${scopeId}'`;
+      result.reason = `no scope-owned trees or entries found for ${scopeType} '${scopeId}'`;
       return result;
     }
 
@@ -393,6 +616,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         scope_type: scopeType,
         scope_id: scopeId,
         targets: result.targets.map((target) => target.path),
+        ...(result.dedup_registry ? { dedup_registry_matched: result.dedup_registry.matched } : {}),
         policy_ref: RETENTION_CATALOG_REPO_PATH,
         reason: 'offboarding dry run (no writes)',
       });
@@ -434,6 +658,22 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         path.join(exportDirAbs, ...target.path.split('/'))
       );
     }
+    // DA-08: the tenant's dedup-registry lines are exported verbatim too —
+    // the prune below removes them from the shared registry, and the export
+    // is the recoverable copy (the registry file itself is shared across
+    // tenants, so it never goes to the trash wholesale).
+    const dedupExportFile = 'dedup-registry-removed.jsonl';
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      safeWriteFile(
+        path.join(exportDirAbs, dedupExportFile),
+        `${dedupPrune.removedLines.join('\n')}\n`
+      );
+      result.dedup_registry = {
+        matched: dedupPrune.removedLines.length,
+        removed: 0,
+        export_file: `${result.export_path}/${dedupExportFile}`,
+      };
+    }
     safeWriteFile(
       path.join(exportDirAbs, 'manifest.json'),
       JSON.stringify(
@@ -443,6 +683,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           exported_at: nowIso,
           approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
           targets: result.targets,
+          ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
           policy_ref: RETENTION_CATALOG_REPO_PATH,
         },
         null,
@@ -461,6 +702,33 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       policy_ref: RETENTION_CATALOG_REPO_PATH,
       reason: 'offboarding export completed',
     });
+
+    // DA-08: prune the tenant's lines out of the shared dedup registry
+    // (exported above). Audited like every other purge in this ceremony.
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      const registryAbs = pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH);
+      safeWriteFile(
+        registryAbs,
+        dedupPrune.keptLines.length > 0 ? `${dedupPrune.keptLines.join('\n')}\n` : ''
+      );
+      if (result.dedup_registry) {
+        result.dedup_registry.removed = dedupPrune.removedLines.length;
+      }
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        path: INGEST_DEDUP_REGISTRY_REPO_PATH,
+        removed_lines: dedupPrune.removedLines.length,
+        kept_lines: dedupPrune.keptLines.length,
+        export_path: result.export_path,
+        approved_by: approvedBy,
+        approved_at: approvedAt,
+        purpose,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: 'offboarding removed the tenant’s dedup-registry lines after export (DA-08)',
+      });
+    }
 
     for (const target of result.targets) {
       const absolute = pathResolver.rootResolve(target.path);
@@ -499,6 +767,35 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       reason: `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`,
     });
     result.retired_identities = retiredIdentities;
+
+    // DA-08 acceptance: prove there is no trace left. Best-effort — a
+    // verification failure is reported, never thrown.
+    try {
+      result.verification = verifyScopeOffboarded(scopeType, scopeId);
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_VERIFIED',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        clean: result.verification.clean,
+        leftovers: result.verification.leftovers,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: result.verification.clean
+          ? 'post-offboard verification found no scope traces'
+          : 'post-offboard verification found leftovers — operator attention required',
+      });
+      if (!result.verification.clean) {
+        logger.warn(
+          `[scope-offboarding] post-offboard verification for ${scopeType} '${scopeId}' found ` +
+            `leftovers: ${result.verification.leftovers.join(', ')}`
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
 
     logger.info(
       `[scope-offboarding] ${scopeType} '${scopeId}' offboarded: ${result.soft_deleted.length} tree(s) exported to ${result.export_path} and moved to the trash, ${retiredIdentities} identity(ies) retired`

@@ -225,6 +225,99 @@ describe('knowledge-slices: precedence and merge semantics', () => {
   });
 });
 
+describe('knowledge-slices: DA-07 tenant/project match dimensions', () => {
+  it('matches a concrete tenant only when the request carries that tenant', () => {
+    const p = writeFixture('tenant-dim.json', {
+      version: '0.2.0',
+      slices: [
+        {
+          id: 'tenant-tenant-masked-a',
+          match: { tenant: 'tenant-masked-a' },
+          pinned: ['knowledge/product/governance/working-philosophy.md'],
+        },
+      ],
+    });
+
+    expect(resolveKnowledgeSlice({ tenant: 'tenant-masked-a', slicesPath: p }).pinned).toEqual([
+      'knowledge/product/governance/working-philosophy.md',
+    ]);
+    expect(resolveKnowledgeSlice({ tenant: 'other', slicesPath: p }).pinned).toEqual([]);
+    // Unsupplied tenant normalizes to '*', which does not equal 'tenant-masked-a'.
+    expect(resolveKnowledgeSlice({ teamRole: 'implementer', slicesPath: p }).pinned).toEqual([]);
+  });
+
+  it('matches a concrete project id case-sensitively', () => {
+    const p = writeFixture('project-dim.json', {
+      version: '0.2.0',
+      slices: [
+        {
+          id: 'project-scoped',
+          match: { project: 'PRJ-DA07-001' },
+          exclude: ['knowledge/product/evolution/distill_*.md'],
+        },
+      ],
+    });
+
+    expect(resolveKnowledgeSlice({ project: 'PRJ-DA07-001', slicesPath: p }).exclude).toEqual([
+      'knowledge/product/evolution/distill_*.md',
+    ]);
+    expect(resolveKnowledgeSlice({ project: 'prj-da07-001', slicesPath: p }).exclude).toEqual([]);
+    expect(resolveKnowledgeSlice({ slicesPath: p }).exclude).toEqual([]);
+  });
+
+  it("a wildcard tenant slice ('*') matches tenantless and tenant-scoped requests alike", () => {
+    const p = writeFixture('tenant-wildcard.json', {
+      version: '0.2.0',
+      slices: [
+        {
+          id: 'tenant-wide',
+          match: { tenant: '*' },
+          exclude: ['knowledge/product/evolution/distill_*.md'],
+        },
+      ],
+    });
+
+    expect(resolveKnowledgeSlice({ slicesPath: p }).exclude).toHaveLength(1);
+    expect(
+      resolveKnowledgeSlice({ tenant: 'tenant-masked-a', slicesPath: p }).exclude
+    ).toHaveLength(1);
+  });
+
+  it('tenant/project count toward specificity (concrete tenant+role beats role-only)', () => {
+    const p = writeFixture('tenant-specificity.json', {
+      version: '0.2.0',
+      slices: [
+        {
+          id: 'tenant-role',
+          match: { team_role: 'implementer', tenant: 'tenant-masked-a' },
+          pinned: ['knowledge/product/governance/working-philosophy.md'],
+          search_roots: ['knowledge/confidential/'],
+        },
+        {
+          id: 'role-only',
+          match: { team_role: 'implementer' },
+          pinned: ['knowledge/product/governance/kyberion-development-practices.md'],
+          search_roots: ['knowledge/product/architecture/'],
+        },
+      ],
+    });
+
+    const resolved = resolveKnowledgeSlice({
+      teamRole: 'implementer',
+      tenant: 'tenant-masked-a',
+      slicesPath: p,
+    });
+    // Most-specific-first pinned order and most-specific-wins search_roots,
+    // even though the more specific slice is declared EARLIER in the array.
+    expect(resolved.pinned).toEqual([
+      'knowledge/product/governance/working-philosophy.md',
+      'knowledge/product/governance/kyberion-development-practices.md',
+    ]);
+    expect(resolved.searchRoots).toEqual(['knowledge/confidential/']);
+    expect(resolved.matchedSliceIds).toEqual(['tenant-role', 'role-only']);
+  });
+});
+
 describe('knowledge-slices: minimal glob matcher', () => {
   it('matches "*" within a single path segment only', () => {
     expect(

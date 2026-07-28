@@ -2,7 +2,7 @@ import AjvModule, { type ErrorObject, type ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import type { ResourceClaim } from './tool-call-scheduler.js';
 
-export type OpInputDomain = 'browser' | 'file' | 'system';
+export type OpInputDomain = 'browser' | 'file' | 'system' | 'ingest';
 
 /**
  * KD-07: one entry in an op's declared resource footprint. Resolved into a
@@ -837,6 +837,266 @@ const INPUT_CONTRACTS: ContractCatalog = {
         type: 'object',
         properties: {
           ms: { type: 'number', minimum: 0 },
+        },
+        additionalProperties: true,
+      },
+    },
+  },
+  // DA-04: ingest-actuator capture/transform ops (parse → normalize → dedup).
+  // These ops never write into knowledge/ — the knowledge/ landing is DA-05's
+  // ingest:commit ceremony.
+  ingest: {
+    // DA-03: incremental change-listing. Reads the tenant × source watermark,
+    // pages the source's read preset, and returns the differential work list;
+    // the watermark advances only after a fully successful listing
+    // (at-least-once — mid-fetch failure records consecutive_failures and
+    // leaves the cursor untouched). Never downloads bodies, never commits.
+    sync_source: {
+      summary:
+        'Incremental sync change-listing for one tenant × source system (box/slack/confluence): watermark read → preset pagination → work-list items + new cursor. Advances the watermark only on full success; truncation by max_items and thrown transport errors never move it (at-least-once). Transport retry/backoff lives in the service-engine recovery_policy layer, not here.',
+      examples: [
+        {
+          tenant_slug: 'acme-corp',
+          source_system: 'box',
+          source_params: { folder_id: '0' },
+          max_items: 200,
+          dry_run: true,
+        },
+        {
+          tenant_slug: 'acme-corp',
+          source_system: 'slack',
+          source_params: { channel: 'C0123456789' },
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['tenant_slug', 'source_system', 'source_params'],
+        properties: {
+          tenant_slug: { type: 'string', minLength: 1 },
+          source_system: { type: 'string', enum: ['box', 'slack', 'confluence'] },
+          source_params: { type: 'object' },
+          auth: { type: 'string', enum: ['none', 'secret-guard'] },
+          max_items: { type: 'number', minimum: 1 },
+          page_limit: { type: 'number', minimum: 1 },
+          dry_run: { type: 'boolean' },
+          now: { type: 'string' },
+          cursor_path_seam: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    parse_document: {
+      summary:
+        'Parse an unstructured document (docx/pdf/xlsx/html/slack_thread/markdown/text) into the unified ingest intermediate representation.',
+      examples: [
+        {
+          source_path: 'active/shared/tmp/report.docx',
+          format: 'docx',
+          source_meta: { source_system: 'confluence', source_id: 'PAGE-123' },
+        },
+        { content_text: '# Notes\n\nBody', format: 'markdown' },
+      ],
+      schema: {
+        type: 'object',
+        required: ['format'],
+        anyOf: [
+          { required: ['source_path'] },
+          { required: ['content_base64'] },
+          { required: ['content_text'] },
+        ],
+        properties: {
+          format: {
+            type: 'string',
+            enum: ['docx', 'pdf', 'xlsx', 'html', 'slack_thread', 'markdown', 'text'],
+          },
+          source_path: { type: 'string', minLength: 1 },
+          content_base64: { type: 'string', minLength: 1 },
+          content_text: { type: 'string' },
+          source_meta: {
+            type: 'object',
+            properties: {
+              source_system: { type: 'string' },
+              source_id: { type: 'string' },
+              source_url: { type: 'string' },
+              source_version: { type: 'string' },
+              retrieved_at: { type: 'string' },
+            },
+            additionalProperties: true,
+          },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    normalize_card: {
+      summary:
+        'Normalize a parsed ingest IR into a knowledge-card (target_path + schema-validated frontmatter + markdown body). Fails closed when required card keys cannot be derived.',
+      examples: [
+        {
+          ir: { text_markdown: '# Title\n\nBody', meta: { format: 'markdown' } },
+          target: { tenant_slug: 'acme-corp', relative_path: 'reports/q1.md' },
+          card: { kind: 'reference' },
+          now: '2026-07-28T00:00:00.000Z',
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['ir', 'target'],
+        properties: {
+          ir: { type: 'object' },
+          target: {
+            type: 'object',
+            required: ['relative_path'],
+            properties: {
+              tenant_slug: { type: 'string', minLength: 1 },
+              relative_path: { type: 'string', minLength: 1 },
+            },
+            additionalProperties: true,
+          },
+          card: { type: 'object' },
+          now: { type: 'string' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    dedup: {
+      summary:
+        'Check (and register in) the ingest content-hash registry: exact-hash duplicates are reported, same-source different-hash re-ingests surface a supersedes_candidate.',
+      examples: [
+        {
+          content_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          source_system: 'confluence',
+          source_id: 'PAGE-123',
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['content_sha256'],
+        properties: {
+          content_sha256: { type: 'string', minLength: 1 },
+          source_system: { type: 'string' },
+          source_id: { type: 'string' },
+          registry_path: { type: 'string', minLength: 1 },
+          target_path: { type: 'string' },
+          register: { type: 'boolean' },
+          now: { type: 'string' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    // DA-05: the explicit ingest ceremony (Hybrid Sovereign Ledger) — the
+    // only ingest op that writes into knowledge/confidential/ (fail-closed
+    // path guard + narrowly-scoped ingest_commit authority role).
+    commit: {
+      summary:
+        'Explicit ingest ceremony: land a normalize_card result inside the tenant knowledge root and append the information-asset ledger record (duplicate → no write; same-source re-ingest → supersede version). DA-06: the card is PII/secret-scrubbed before landing (block-action findings refuse the commit unless an audited override lists them); landings in knowledge/confidential/common/ or knowledge/public/ingest/ require steward_approval_id (KM-03 queue).',
+      examples: [
+        {
+          tenant_slug: 'acme-corp',
+          normalized: {
+            target_path: 'knowledge/confidential/acme-corp/reports/q1.md',
+            frontmatter: { title: 'Q1 Report' },
+            body_markdown: '# Q1 Report',
+            card_markdown: '---\ntitle: Q1 Report\n---\n\n# Q1 Report\n',
+          },
+          source_meta: {
+            source_system: 'confluence',
+            source_id: 'PAGE-123',
+            content_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          },
+          ingested_by: 'ecosystem_architect',
+          transform_chain: ['parse_document:docx', 'normalize_card'],
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['tenant_slug', 'normalized'],
+        properties: {
+          tenant_slug: { type: 'string', minLength: 1 },
+          normalized: {
+            type: 'object',
+            required: ['target_path', 'frontmatter', 'card_markdown'],
+            properties: {
+              target_path: { type: 'string', minLength: 1 },
+              frontmatter: { type: 'object' },
+              body_markdown: { type: 'string' },
+              card_markdown: { type: 'string', minLength: 1 },
+            },
+            additionalProperties: true,
+          },
+          dedup_result: { type: 'object' },
+          source_meta: {
+            type: 'object',
+            properties: {
+              source_system: { type: 'string' },
+              source_id: { type: 'string' },
+              source_url: { type: 'string' },
+              source_version: { type: 'string' },
+              retrieved_at: { type: 'string' },
+              content_sha256: { type: 'string' },
+            },
+            additionalProperties: true,
+          },
+          approval_id: { type: 'string' },
+          steward_approval_id: { type: 'string' },
+          override: {
+            type: 'object',
+            required: ['rule_ids', 'reason', 'approved_by'],
+            properties: {
+              rule_ids: { type: 'array', items: { type: 'string' }, minItems: 1 },
+              reason: { type: 'string', minLength: 1 },
+              approved_by: { type: 'string', minLength: 1 },
+            },
+            additionalProperties: false,
+          },
+          ingested_by: { type: 'string' },
+          transform_chain: { type: 'array', items: { type: 'string' } },
+          visible_to: { type: 'array', items: { type: 'string' } },
+          now: { type: 'string' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    staleness_report: {
+      summary:
+        'Deterministic, side-effect-free asset-ledger comparison: list active assets and flag those whose supplied current source (content_sha256/source_version) differs from the ledger.',
+      examples: [
+        {
+          tenant_slug: 'acme-corp',
+          current_sources: [
+            {
+              source_system: 'confluence',
+              source_id: 'PAGE-123',
+              content_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+            },
+          ],
+        },
+        { tenant_slug: 'acme-corp' },
+      ],
+      schema: {
+        type: 'object',
+        required: ['tenant_slug'],
+        properties: {
+          tenant_slug: { type: 'string', minLength: 1 },
+          current_sources: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['source_system', 'source_id'],
+              properties: {
+                source_system: { type: 'string', minLength: 1 },
+                source_id: { type: 'string', minLength: 1 },
+                source_version: { type: 'string' },
+                content_sha256: { type: 'string' },
+              },
+              additionalProperties: true,
+            },
+          },
+          export_as: { type: 'string', minLength: 1 },
         },
         additionalProperties: true,
       },

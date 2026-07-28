@@ -1,7 +1,16 @@
 import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import type { Ajv as AjvInstance, Options, ValidateFunction } from 'ajv';
-import { compileSchemaFromPath, pathResolver, signA2AContent, verifyA2AContent } from '@agent/core';
+import {
+  assetProvenanceRef,
+  compileSchemaFromPath,
+  findAssetByContentHash,
+  findAssetBySource,
+  pathResolver,
+  signA2AContent,
+  verifyA2AContent,
+  type IngestLedgerPathOptions,
+} from '@agent/core';
 
 export type KnowledgeTier = 'personal' | 'confidential' | 'public';
 export type KnowledgePackageSignatureStatus = 'absent' | 'verified' | 'rejected';
@@ -156,6 +165,58 @@ export function createKnowledgePackage(input: {
     },
   };
   return assertKnowledgePackage(pkg);
+}
+
+/**
+ * DA-05 KKP ⇄ asset-ledger connection (lookup hook — KKP structure is
+ * untouched). When the exported knowledge file's frontmatter carries the
+ * ingest provenance keys (content_sha256, or source_system + source_id), the
+ * tenant's information-asset ledger is consulted and the matching
+ * `asset:{asset_id}@v{n}` ref is returned for inclusion in provenance[].
+ * Best-effort by design: a tenant without a profile/ledger, or a file that
+ * was never ingested, yields null and the export proceeds unchanged.
+ */
+export function resolveIngestAssetProvenance(input: {
+  tenantSlug: string;
+  rawData: string;
+  pathOptions?: IngestLedgerPathOptions;
+}): string | null {
+  const tenantSlug = String(input.tenantSlug || '').trim();
+  if (!tenantSlug) return null;
+  const frontmatter = parseFrontmatterBlock(input.rawData);
+  if (!frontmatter) return null;
+  const pathOptions = input.pathOptions ?? {};
+  try {
+    const contentSha = frontmatter.content_sha256;
+    if (contentSha && /^[a-f0-9]{64}$/.test(contentSha)) {
+      const byHash = findAssetByContentHash(tenantSlug, contentSha, pathOptions);
+      if (byHash) return assetProvenanceRef(byHash);
+    }
+    if (frontmatter.source_system && frontmatter.source_id) {
+      const bySource = findAssetBySource(
+        tenantSlug,
+        frontmatter.source_system,
+        frontmatter.source_id,
+        pathOptions
+      );
+      if (bySource) return assetProvenanceRef(bySource);
+    }
+  } catch {
+    // Unregistered tenant / unreadable ledger — not an ingested asset.
+  }
+  return null;
+}
+
+/** Minimal deterministic frontmatter reader (`key: value` lines between --- fences). */
+function parseFrontmatterBlock(rawData: string): Record<string, string> | null {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(String(rawData || ''));
+  if (!match) return null;
+  const entries: Record<string, string> = {};
+  for (const line of match[1].split('\n')) {
+    const kv = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/.exec(line.trim());
+    if (kv) entries[kv[1]] = kv[2].trim();
+  }
+  return entries;
 }
 
 export function assertKnowledgePackageTrusted(pkg: KnowledgePackage): void {

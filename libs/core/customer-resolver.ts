@@ -16,7 +16,7 @@ export class InvalidCustomerSlugError extends Error {
   constructor(slug: string) {
     super(
       `Invalid ${CUSTOMER_ENV_VAR}: "${slug}". Must match ${SLUG_PATTERN.source} ` +
-        `(lowercase ASCII, digits, hyphen, underscore; must start with letter or digit).`,
+        `(lowercase ASCII, digits, hyphen, underscore; must start with letter or digit).`
     );
     this.name = 'InvalidCustomerSlugError';
   }
@@ -31,12 +31,27 @@ export function activeCustomer(env: NodeJS.ProcessEnv = process.env): string | n
   return slug;
 }
 
-/** Returns the customer root directory for the active slug, or null if no slug active. */
-export function customerRoot(subPath = '', env: NodeJS.ProcessEnv = process.env): string | null {
+/** Returns the customer root directory for the active slug, or null if no slug active.
+ *  `rootDir` defaults to the repository root; hermetic tests may pass a fixture root. */
+export function customerRoot(
+  subPath = '',
+  env: NodeJS.ProcessEnv = process.env,
+  rootDir: string = pathResolver.rootDir()
+): string | null {
   const slug = activeCustomer(env);
   if (!slug) return null;
-  const base = path.join(pathResolver.rootDir(), 'customer', slug);
+  const base = path.join(rootDir, 'customer', slug);
   return subPath ? path.join(base, subPath) : base;
+}
+
+/**
+ * Returns the customer overlay directory for an EXPLICIT slug (independent of
+ * KYBERION_CUSTOMER). Used by the tenant registry (DA-01) to resolve a
+ * tenant's customer overlay root uniquely. Throws on an invalid slug.
+ */
+export function customerDirForSlug(slug: string, rootDir: string = pathResolver.rootDir()): string {
+  if (!SLUG_PATTERN.test(slug)) throw new InvalidCustomerSlugError(slug);
+  return path.join(rootDir, 'customer', slug);
 }
 
 /**
@@ -58,7 +73,7 @@ export function resolveOverlay(subPath: string, env: NodeJS.ProcessEnv = process
  *  that want to read both (e.g. for deep merge of policy overrides). */
 export function overlayCandidates(
   subPath: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): { overlay: string | null; base: string } {
   return {
     overlay: customerRoot(subPath, env),
@@ -67,8 +82,11 @@ export function overlayCandidates(
 }
 
 /** Returns true if a customer slug is active and the directory exists. */
-export function customerIsConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
-  const root = customerRoot('', env);
+export function customerIsConfigured(
+  env: NodeJS.ProcessEnv = process.env,
+  rootDir: string = pathResolver.rootDir()
+): boolean {
+  const root = customerRoot('', env, rootDir);
   return root != null && rawExistsSync(root);
 }
 

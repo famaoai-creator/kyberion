@@ -1,0 +1,93 @@
+{
+  "service_id": "box",
+  "name": "Box Content API v2 Presets (read-only ingestion)",
+  "base_url": "https://api.box.com/2.0",
+  "auth_strategy": "Bearer",
+  "setup_hint": "Store a Box developer token (or app access token) via secret-guard as BOX_ACCESS_TOKEN / BOX_DEVELOPER_TOKEN. OAuth authorize/refresh profiles can be layered on later following canva.json once an app registration exists.",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "operations": {
+    "get_folder_items": {
+      "type": "api",
+      "path": "folders/{{folder_id}}/items",
+      "method": "GET",
+      "description": "List items in a Box folder. Marker-based pagination: pass usemarker=true and the marker cursor from the previous response's next_marker so incremental sync (DA-03) can resume where it left off.",
+      "parameters": {
+        "folder_id": {
+          "required": true,
+          "type": "string",
+          "description": "Folder ID; 0 is the root folder."
+        },
+        "limit": { "type": "number", "default": 100 },
+        "marker": {
+          "type": "string",
+          "description": "Pagination cursor: the next_marker value returned by the previous page."
+        },
+        "usemarker": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable marker-based pagination (required for marker to take effect)."
+        },
+        "fields": {
+          "type": "string",
+          "description": "Comma-separated attribute list, e.g. id,type,name,etag,modified_at,sha1."
+        },
+        "sort": { "type": "string", "description": "Sort field: id, name, or date." },
+        "direction": { "type": "string", "description": "ASC or DESC." }
+      }
+    },
+    "get_file_info": {
+      "type": "api",
+      "path": "files/{{file_id}}",
+      "method": "GET",
+      "description": "Get metadata for a Box file (etag/sha1/modified_at support change detection).",
+      "parameters": {
+        "file_id": { "required": true, "type": "string" },
+        "fields": {
+          "type": "string",
+          "description": "Comma-separated attribute list, e.g. id,name,etag,sha1,modified_at,size."
+        }
+      }
+    },
+    "download_file": {
+      "type": "api",
+      "path": "files/{{file_id}}/content",
+      "method": "GET",
+      "description": "Download Box file content (the API answers with a redirect to the download URL; the HTTP client follows it).",
+      "parameters": {
+        "file_id": { "required": true, "type": "string" },
+        "version": { "type": "string", "description": "Optional file version ID to download." }
+      }
+    },
+    "search": {
+      "type": "api",
+      "path": "search",
+      "method": "GET",
+      "description": "Search content in Box (offset-paginated).",
+      "parameters": {
+        "query": { "required": true, "type": "string" },
+        "type": { "type": "string", "description": "file, folder, or web_link." },
+        "ancestor_folder_ids": {
+          "type": "string",
+          "description": "Comma-separated folder IDs to scope the search."
+        },
+        "file_extensions": { "type": "string", "description": "Comma-separated extensions." },
+        "updated_at_range": {
+          "type": "string",
+          "description": "ISO-8601 from,to range for incremental discovery."
+        },
+        "limit": { "type": "number", "default": 30 },
+        "offset": { "type": "number", "default": 0 }
+      }
+    }
+  }
+}
