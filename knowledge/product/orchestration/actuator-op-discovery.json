@@ -1477,6 +1477,448 @@
       ]
     },
     {
+      "n": "ingest-actuator",
+      "path": "libs/actuators/ingest-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "parse_document",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["format"],
+            "anyOf": [
+              {
+                "required": ["source_path"]
+              },
+              {
+                "required": ["content_base64"]
+              },
+              {
+                "required": ["content_text"]
+              }
+            ],
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": ["docx", "pdf", "xlsx", "html", "slack_thread", "markdown", "text"]
+              },
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_base64": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_text": {
+                "type": "string"
+              },
+              "source_meta": {
+                "type": "object",
+                "properties": {
+                  "source_system": {
+                    "type": "string"
+                  },
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  },
+                  "source_version": {
+                    "type": "string"
+                  },
+                  "retrieved_at": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "source_path": "active/shared/tmp/report.docx",
+              "format": "docx",
+              "source_meta": {
+                "source_system": "confluence",
+                "source_id": "PAGE-123"
+              }
+            },
+            {
+              "content_text": "# Notes\n\nBody",
+              "format": "markdown"
+            }
+          ]
+        },
+        {
+          "op": "sync_source",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["tenant_slug", "source_system", "source_params"],
+            "properties": {
+              "tenant_slug": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_system": {
+                "type": "string",
+                "enum": ["box", "slack", "confluence"]
+              },
+              "source_params": {
+                "type": "object"
+              },
+              "auth": {
+                "type": "string",
+                "enum": ["none", "secret-guard"]
+              },
+              "max_items": {
+                "type": "number",
+                "minimum": 1
+              },
+              "page_limit": {
+                "type": "number",
+                "minimum": 1
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
+              "now": {
+                "type": "string"
+              },
+              "cursor_path_seam": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "tenant_slug": "acme-corp",
+              "source_system": "box",
+              "source_params": {
+                "folder_id": "0"
+              },
+              "max_items": 200,
+              "dry_run": true
+            },
+            {
+              "tenant_slug": "acme-corp",
+              "source_system": "slack",
+              "source_params": {
+                "channel": "C0123456789"
+              }
+            }
+          ]
+        },
+        {
+          "op": "dedup",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "required": ["content_sha256"],
+            "properties": {
+              "content_sha256": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_system": {
+                "type": "string"
+              },
+              "source_id": {
+                "type": "string"
+              },
+              "registry_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_path": {
+                "type": "string"
+              },
+              "register": {
+                "type": "boolean"
+              },
+              "now": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "source_system": "confluence",
+              "source_id": "PAGE-123"
+            }
+          ]
+        },
+        {
+          "op": "normalize_card",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "required": ["ir", "target"],
+            "properties": {
+              "ir": {
+                "type": "object"
+              },
+              "target": {
+                "type": "object",
+                "required": ["relative_path"],
+                "properties": {
+                  "tenant_slug": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "relative_path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": true
+              },
+              "card": {
+                "type": "object"
+              },
+              "now": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ir": {
+                "text_markdown": "# Title\n\nBody",
+                "meta": {
+                  "format": "markdown"
+                }
+              },
+              "target": {
+                "tenant_slug": "acme-corp",
+                "relative_path": "reports/q1.md"
+              },
+              "card": {
+                "kind": "reference"
+              },
+              "now": "2026-07-28T00:00:00.000Z"
+            }
+          ]
+        },
+        {
+          "op": "staleness_report",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "required": ["tenant_slug"],
+            "properties": {
+              "tenant_slug": {
+                "type": "string",
+                "minLength": 1
+              },
+              "current_sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["source_system", "source_id"],
+                  "properties": {
+                    "source_system": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source_version": {
+                      "type": "string"
+                    },
+                    "content_sha256": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "tenant_slug": "acme-corp",
+              "current_sources": [
+                {
+                  "source_system": "confluence",
+                  "source_id": "PAGE-123",
+                  "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                }
+              ]
+            },
+            {
+              "tenant_slug": "acme-corp"
+            }
+          ]
+        },
+        {
+          "op": "commit",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["tenant_slug", "normalized"],
+            "properties": {
+              "tenant_slug": {
+                "type": "string",
+                "minLength": 1
+              },
+              "normalized": {
+                "type": "object",
+                "required": ["target_path", "frontmatter", "card_markdown"],
+                "properties": {
+                  "target_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "frontmatter": {
+                    "type": "object"
+                  },
+                  "body_markdown": {
+                    "type": "string"
+                  },
+                  "card_markdown": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": true
+              },
+              "dedup_result": {
+                "type": "object"
+              },
+              "source_meta": {
+                "type": "object",
+                "properties": {
+                  "source_system": {
+                    "type": "string"
+                  },
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  },
+                  "source_version": {
+                    "type": "string"
+                  },
+                  "retrieved_at": {
+                    "type": "string"
+                  },
+                  "content_sha256": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "approval_id": {
+                "type": "string"
+              },
+              "steward_approval_id": {
+                "type": "string"
+              },
+              "override": {
+                "type": "object",
+                "required": ["rule_ids", "reason", "approved_by"],
+                "properties": {
+                  "rule_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "approved_by": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ingested_by": {
+                "type": "string"
+              },
+              "transform_chain": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "visible_to": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "tenant_slug": "acme-corp",
+              "normalized": {
+                "target_path": "knowledge/confidential/acme-corp/reports/q1.md",
+                "frontmatter": {
+                  "title": "Q1 Report"
+                },
+                "body_markdown": "# Q1 Report",
+                "card_markdown": "---\ntitle: Q1 Report\n---\n\n# Q1 Report\n"
+              },
+              "source_meta": {
+                "source_system": "confluence",
+                "source_id": "PAGE-123",
+                "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "ingested_by": "ecosystem_architect",
+              "transform_chain": ["parse_document:docx", "normalize_card"]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "n": "ios-actuator",
       "path": "libs/actuators/ios-actuator",
       "source": "describeOps",

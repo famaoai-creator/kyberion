@@ -19,6 +19,8 @@ import {
   loadRetentionCatalog,
   retentionTtlMsForPath,
   retentionTtlDaysForPath,
+  retentionEntryForExactPath,
+  reviewRequiredCatalogPaths,
   runtimeRetentionRules,
   coveredRuntimeSubdirs,
   BUILTIN_RETENTION_DEFAULTS,
@@ -85,6 +87,48 @@ describe('storage-retention-catalog', () => {
       const vault = loaded.entries.find((e) => e.path === 'active/shared/data-vault');
       expect(vault).toBeDefined();
       expect(vault?.ttl_days).toBeUndefined();
+    });
+
+    it('DA-08: the ingest system directories are catalog-governed (janitor never reports them uncovered)', () => {
+      const loaded = loadRetentionCatalog({ catalogPath: SEEDED_CATALOG });
+
+      // Dedup registry home: load-bearing state, never TTL-deleted.
+      expect(retentionEntryForExactPath(loaded, 'active/shared/runtime/ingest')).toMatchObject({
+        artifact_class: 'state',
+        action: 'review_required',
+      });
+      // Sync cursors: load-bearing state, purged per tenant by offboarding only.
+      expect(
+        retentionEntryForExactPath(loaded, 'active/shared/runtime/ingest-cursors')
+      ).toMatchObject({ artifact_class: 'state', action: 'review_required' });
+      // Quota counters: daily time series, TTL-deleted after 30d.
+      expect(
+        retentionEntryForExactPath(loaded, 'active/shared/runtime/ingest/quota')
+      ).toMatchObject({ artifact_class: 'log', ttl_days: 30, action: 'delete' });
+      const quotaRule = runtimeRetentionRules(loaded).find(
+        (rule) => rule.subdir === 'ingest/quota'
+      );
+      expect(quotaRule?.ttlMs).toBe(30 * RETENTION_DAY_MS);
+
+      // Both top-level ingest dirs count as covered for the janitor's
+      // uncovered-runtime report.
+      const covered = coveredRuntimeSubdirs(loaded);
+      expect(covered.has('ingest')).toBe(true);
+      expect(covered.has('ingest-cursors')).toBe(true);
+
+      // Tenant knowledge (incl. the DA-05 _ledger/) is explicitly declared
+      // review_required — never auto-deletable, offboarding-only removal.
+      expect(retentionEntryForExactPath(loaded, 'knowledge/confidential')).toMatchObject({
+        artifact_class: 'evidence',
+        action: 'review_required',
+      });
+      expect(reviewRequiredCatalogPaths(loaded)).toEqual(
+        expect.arrayContaining([
+          'active/shared/runtime/ingest',
+          'active/shared/runtime/ingest-cursors',
+          'knowledge/confidential',
+        ])
+      );
     });
 
     it('builtin defaults are themselves schema-shaped (same vocabulary)', () => {

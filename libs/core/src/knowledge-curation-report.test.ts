@@ -317,6 +317,8 @@ describe('knowledge-curation-slo.json config file', () => {
       governance: 90,
       playbook: 60,
       knowledge_hint: 30,
+      // DA-08: ingested cards (typically kind: reference) join the SLO cycle.
+      reference: 120,
     });
     expect(raw.default_freshness_days).toBe(180);
   });

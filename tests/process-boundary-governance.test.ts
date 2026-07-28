@@ -27,6 +27,10 @@ const allowedManagedProcessConsumers = [
   // supervised so they die with the server session instead of leaking.
   'libs/shared-network/src/mcp-server-engine.ts',
   'libs/shared-network/src/mcp-server-engine.test.ts',
+  // Onboarding re-configuration menu: short-lived `node dist/scripts/...`
+  // menu actions run supervised (stdio inherit, awaited, unregistered on
+  // completion) instead of via direct child_process.
+  'scripts/onboarding_wizard.ts',
   'scripts/run_baseline_check.ts',
   'scripts/soak_restart_e2e.ts',
   'scripts/surface_runtime.ts',

@@ -6,7 +6,8 @@
     "api.anthropic.com",
     "api.openai.com",
     "generativelanguage.googleapis.com",
-    "api.githubcopilot.com"
+    "api.githubcopilot.com",
+    "api.box.com"
   ],
   "blocked_domains": [],
   "tenant_allowed_domains": {},

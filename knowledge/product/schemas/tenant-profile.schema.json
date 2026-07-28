@@ -10,12 +10,38 @@
     "tenant_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "display_name": { "type": "string" },
     "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
-    "assigned_role": { "type": "string", "description": "The user's primary role in this tenant (e.g., strategist, pm, lead)." },
+    "assigned_role": {
+      "type": "string",
+      "description": "The user's primary role in this tenant (e.g., strategist, pm, lead)."
+    },
     "isolation_policy": {
       "type": "object",
       "properties": {
         "strict_isolation": { "type": "boolean", "default": true },
-        "allow_cross_distillation": { "type": "boolean", "default": true, "description": "Allow abstract wisdom extraction to public tier." }
+        "allow_cross_distillation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow abstract wisdom extraction to public tier."
+        }
+      }
+    },
+    "knowledge_root": {
+      "type": "string",
+      "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}(/[A-Za-z0-9._-]+)*$",
+      "description": "Repo-relative tenant knowledge root (DA-01). Defaults to knowledge/confidential/{tenant_slug} when omitted."
+    },
+    "ingest_sources": {
+      "type": "array",
+      "description": "Ingest source systems declared for this tenant (DA-01).",
+      "items": {
+        "type": "object",
+        "required": ["source_system", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "source_system": { "type": "string", "minLength": 1 },
+          "enabled": { "type": "boolean" },
+          "note": { "type": "string" }
+        }
       }
     },
     "metadata": { "type": "object", "additionalProperties": true }

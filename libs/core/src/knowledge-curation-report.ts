@@ -34,6 +34,10 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { loadKnowledgeUsageAggregate } from './knowledge-feedback-loop.js';
+import {
+  computeTenantIngestCuration,
+  type TenantIngestCurationSection,
+} from './knowledge-curation-tenant-ingest.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -75,10 +79,14 @@ export interface KnowledgeCurationReport {
   config: CurationSloConfig;
   low_yield_hints: CurationLowYieldHint[];
   freshness_breaches: CurationFreshnessBreach[];
+  /** DA-08: per-tenant ingested-asset freshness sections (advisory only). */
+  tenant_ingest: TenantIngestCurationSection[];
   scanned_document_count: number;
   summary: {
     low_yield_count: number;
     freshness_breach_count: number;
+    /** DA-08: total flagged ingested assets across tenants. */
+    tenant_ingest_flagged_count: number;
   };
 }
 
@@ -316,15 +324,31 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   }
   freshnessBreaches.sort((a, b) => a.document_path.localeCompare(b.document_path));
 
+  // DA-08: tenant-ingested cards join the weekly cycle. Advisory and
+  // fail-open — a broken tenant registry or ledger must never fail the
+  // weekly report the rest of the corpus depends on.
+  let tenantIngest: TenantIngestCurationSection[] = [];
+  try {
+    tenantIngest = computeTenantIngestCuration({ config, now });
+  } catch {
+    tenantIngest = [];
+  }
+  const tenantIngestFlaggedCount = tenantIngest.reduce(
+    (sum, section) => sum + section.flagged.length,
+    0
+  );
+
   return {
     generated_at: now.toISOString(),
     config,
     low_yield_hints: lowYieldHints,
     freshness_breaches: freshnessBreaches,
+    tenant_ingest: tenantIngest,
     scanned_document_count: docs.length,
     summary: {
       low_yield_count: lowYieldHints.length,
       freshness_breach_count: freshnessBreaches.length,
+      tenant_ingest_flagged_count: tenantIngestFlaggedCount,
     },
   };
 }
@@ -387,6 +411,33 @@ export function renderCurationReportMarkdown(report: KnowledgeCurationReport): s
       lines.push(
         `| ${breach.document_path} | ${breach.kind} | ${breach.last_updated ?? '_(missing)_'} | ${breach.age_days ?? '—'} | ${breach.threshold_days} | ${breach.reason} |`
       );
+    }
+  }
+  lines.push(
+    '',
+    '## Tenant Ingest Freshness (DA-08)',
+    '',
+    'Ingested assets (DA-05 ledger, active versions) whose landed card breaches the freshness SLO for its kind.',
+    'Advisory only — a re-ingest is the DA-03/DA-05 sync ceremony’s job, never performed here.',
+    ''
+  );
+  const flaggedSections = report.tenant_ingest.filter((section) => section.flagged.length > 0);
+  if (flaggedSections.length === 0) {
+    lines.push('_(none)_');
+  } else {
+    for (const section of flaggedSections) {
+      lines.push(
+        `### ${section.tenant_slug} (${section.flagged.length} of ${section.active_asset_count} active asset(s))`,
+        '',
+        '| Asset | Card | Kind | Last Updated | Age (days) | Threshold (days) | Reason |',
+        '| --- | --- | --- | --- | --- | --- | --- |'
+      );
+      for (const entry of section.flagged) {
+        lines.push(
+          `| ${entry.asset_id} | ${entry.target_path} | ${entry.kind} | ${entry.last_updated ?? '_(missing)_'} | ${entry.age_days ?? '—'} | ${entry.threshold_days} | ${entry.reason} |`
+        );
+      }
+      lines.push('');
     }
   }
   lines.push('');
