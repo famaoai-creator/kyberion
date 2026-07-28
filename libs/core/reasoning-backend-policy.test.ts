@@ -14,8 +14,12 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
+    expect(policy.allowed_modes).toContain('grok-cli');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
+    expect(policy.mode_aliases.grok).toBe('grok-cli');
+    expect(policy.mode_aliases['grok-build']).toBe('grok-cli');
+    expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('grok-cli');
     expect(policy.openrouter).toEqual({
       default_profile: 'free-router',
       default_cost_policy: 'free-only',
@@ -99,6 +103,26 @@ describe('reasoning-backend-policy', () => {
         providers: [{ provider: 'agy', installed: true, healthy: true }],
       })
     ).toBe('agy-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { GROK_CLI: '1' },
+        providers: [{ provider: 'grok', installed: true, healthy: true }],
+      })
+    ).toBe('grok-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {},
+        providers: [
+          { provider: 'codex', installed: false, healthy: false },
+          { provider: 'agy', installed: false, healthy: false },
+          { provider: 'grok', installed: true, healthy: true },
+        ],
+      })
+    ).toBe('grok-cli');
 
     expect(
       resolveReasoningBackendModeFromContext({

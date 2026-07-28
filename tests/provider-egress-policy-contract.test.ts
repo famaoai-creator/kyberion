@@ -41,7 +41,7 @@ describe('Provider egress policy contract (XP-03)', () => {
       };
     };
 
-    for (const providerId of ['claude', 'codex', 'agy', 'gemini', 'copilot']) {
+    for (const providerId of ['claude', 'codex', 'agy', 'gemini', 'copilot', 'grok']) {
       expect(policy.providers).toHaveProperty(providerId);
       expect(['external-api', 'local-only']).toContain(policy.providers[providerId].egress);
     }
