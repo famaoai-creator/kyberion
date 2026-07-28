@@ -30,6 +30,14 @@ function makeTempRoot(): string {
     path.join(workspaceRoot, 'knowledge', 'product', 'governance', 'security-policy.json'),
     path.join(root, 'knowledge', 'product', 'governance', 'security-policy.json')
   );
+  // The org CLI loads @agent/core in a hermetic KYBERION_ROOT. Keep the
+  // tracked schema catalog available there so module-level tenant-registry
+  // validation does not depend on the caller's real checkout path.
+  fs.symlinkSync(
+    path.join(workspaceRoot, 'knowledge', 'product', 'schemas'),
+    path.join(root, 'knowledge', 'product', 'schemas'),
+    'dir'
+  );
   fs.symlinkSync(path.join(workspaceRoot, 'schemas'), path.join(root, 'schemas'), 'dir');
   fs.writeFileSync(
     path.join(root, 'package.json'),
