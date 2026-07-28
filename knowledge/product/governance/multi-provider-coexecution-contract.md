@@ -8,7 +8,7 @@ last_updated: 2026-07-26
 
 # Multi-Provider Co-Execution Contract
 
-Multiple provider CLIs (`claude`, `codex`, `agy`, and future adapters such as
+Multiple provider CLIs (`claude`, `codex`, `agy`, `grok`, and future adapters such as
 `gemini` / `copilot`) can run against the same repository checkout at the
 same time. Each treats its startup working directory as implicit context and
 reads the same instruction file (`AGENTS.md`, projected via the `CLAUDE.md` /

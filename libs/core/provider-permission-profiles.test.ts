@@ -97,7 +97,7 @@ describe('provider-permission-profiles', () => {
   });
 
   describe('buildProviderChildEnv', () => {
-    const providers: ProviderId[] = ['claude', 'codex', 'agy'];
+    const providers: ProviderId[] = ['claude', 'codex', 'agy', 'grok'];
     const fakeBaseEnv = (): NodeJS.ProcessEnv =>
       ({
         PATH: '/usr/bin:/bin',
@@ -108,6 +108,7 @@ describe('provider-permission-profiles', () => {
         ANTHROPIC_API_KEY: 'fake-anthropic-key',
         GEMINI_API_KEY: 'fake-gemini-key',
         GH_TOKEN: 'fake-github-token',
+        XAI_API_KEY: 'fake-xai-key',
         CUSTOM_SECRET_TOKEN: 'fake-custom-token',
         CODEX_HOME: '/home/test/.codex',
         KYBERION_PERSONA: 'implementer',
@@ -149,6 +150,16 @@ describe('provider-permission-profiles', () => {
 
     it('excludes all credential vars for agy (no declared credential var)', () => {
       const env = buildProviderChildEnv({ provider: 'agy', baseEnv: fakeBaseEnv() });
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+    });
+
+    it('excludes other providers credentials for grok, and carries XAI_API_KEY', () => {
+      const env = buildProviderChildEnv({ provider: 'grok', baseEnv: fakeBaseEnv() });
+      expect(env.XAI_API_KEY).toBe('fake-xai-key');
       expect(env.OPENAI_API_KEY).toBeUndefined();
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(env.GEMINI_API_KEY).toBeUndefined();

@@ -1492,6 +1492,18 @@ export { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
 export type { ClaudeCliIntentExtractorOptions } from './claude-cli-intent-extractor.js';
 export { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 export type { ClaudeCliVoiceBridgeOptions } from './claude-cli-voice-bridge.js';
+export { GrokCliBackend } from './grok-cli-backend.js';
+export type { GrokCliBackendOptions } from './grok-cli-backend.js';
+export { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
+export type { GrokCliIntentExtractorOptions } from './grok-cli-intent-extractor.js';
+export { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
+export type { GrokCliVoiceBridgeOptions } from './grok-cli-voice-bridge.js';
+export {
+  buildGrokCliOptionsFromEnv,
+  buildShellGrokCliBackendFromEnv,
+  probeShellGrokCliAvailability,
+  runGrokCliQuery,
+} from './grok-cli-backend.js';
 export { runClaudeAgentQuery, ClaudeAgentQueryError } from './claude-agent-query.js';
 export type { ClaudeAgentQueryParams, ClaudeAgentQueryResult } from './claude-agent-query.js';
 export {
