@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 72123,
+      "size": 72858,
       "type": "json"
     },
     {
@@ -1377,7 +1377,7 @@
     {
       "path": "product/governance/harness-capability-registry.json",
       "tier": "public",
-      "size": 32519,
+      "size": 34307,
       "type": "json"
     },
     {
@@ -7251,7 +7251,7 @@
     {
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
-      "size": 3492,
+      "size": 3574,
       "type": "json"
     },
     {
