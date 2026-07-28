@@ -726,6 +726,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CURATION_TENANT_ROOTDIR",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CUSTOMER",
       "category": "runtime",
       "type": "string",
@@ -1122,6 +1130,14 @@
     },
     {
       "name": "KYBERION_IN_SESSION_SUBAGENT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_INGEST_QUOTA_TEST",
       "category": "runtime",
       "type": "string",
       "required": false,

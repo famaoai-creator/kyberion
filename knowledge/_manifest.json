@@ -243,7 +243,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6562,
+      "size": 6948,
       "type": "md"
     },
     {
@@ -993,7 +993,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16160,
+      "size": 16329,
       "type": "json"
     },
     {
@@ -1257,13 +1257,13 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 630,
+      "size": 649,
       "type": "json"
     },
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 71745,
+      "size": 72123,
       "type": "json"
     },
     {
@@ -1389,7 +1389,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6920,
+      "size": 6958,
       "type": "json"
     },
     {
@@ -1397,6 +1397,12 @@
       "tier": "public",
       "size": 6760,
       "type": "md"
+    },
+    {
+      "path": "product/governance/ingest-quota-policy.json",
+      "tier": "public",
+      "size": 633,
+      "type": "json"
     },
     {
       "path": "product/governance/ingestion-rules.json",
@@ -1479,7 +1485,7 @@
     {
       "path": "product/governance/knowledge-curation-slo.json",
       "tier": "public",
-      "size": 259,
+      "size": 281,
       "type": "json"
     },
     {
@@ -1491,13 +1497,13 @@
     {
       "path": "product/governance/knowledge-slices.json",
       "tier": "public",
-      "size": 1361,
+      "size": 1951,
       "type": "json"
     },
     {
       "path": "product/governance/knowledge-sync-rules.json",
       "tier": "public",
-      "size": 1031,
+      "size": 4712,
       "type": "json"
     },
     {
@@ -1875,7 +1881,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 4128,
+      "size": 4525,
       "type": "md"
     },
     {
@@ -2121,7 +2127,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19235,
+      "size": 19489,
       "type": "json"
     },
     {
@@ -2229,7 +2235,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 12093,
+      "size": 13793,
       "type": "json"
     },
     {
@@ -2407,9 +2413,21 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tenant-onboarding-procedure.md",
+      "tier": "public",
+      "size": 3095,
+      "type": "md"
+    },
+    {
       "path": "product/governance/tenant-rate-limit-policy.json",
       "tier": "public",
       "size": 1362,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tenant-registry-exceptions.json",
+      "tier": "public",
+      "size": 1909,
       "type": "json"
     },
     {
@@ -3027,7 +3045,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 77478,
+      "size": 90496,
       "type": "json"
     },
     {
@@ -3363,13 +3381,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17761,
+      "size": 18492,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 8343,
+      "size": 8877,
       "type": "json"
     },
     {
@@ -3891,7 +3909,7 @@
     {
       "path": "product/orchestration/service-endpoints.json",
       "tier": "public",
-      "size": 6552,
+      "size": 6805,
       "type": "json"
     },
     {
@@ -3916,6 +3934,12 @@
       "path": "product/orchestration/service-endpoints/backlog.json",
       "tier": "public",
       "size": 340,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/box.json",
+      "tier": "public",
+      "size": 332,
       "type": "json"
     },
     {
@@ -4141,6 +4165,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-presets/box.json",
+      "tier": "public",
+      "size": 3683,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-presets/brave-search.json",
       "tier": "public",
       "size": 893,
@@ -4215,7 +4245,7 @@
     {
       "path": "product/orchestration/service-presets/google-workspace.json",
       "tier": "public",
-      "size": 7424,
+      "size": 9662,
       "type": "json"
     },
     {
@@ -4233,7 +4263,7 @@
     {
       "path": "product/orchestration/service-presets/m365.json",
       "tier": "public",
-      "size": 5192,
+      "size": 5883,
       "type": "json"
     },
     {
@@ -4263,7 +4293,7 @@
     {
       "path": "product/orchestration/service-presets/slack.json",
       "tier": "public",
-      "size": 844,
+      "size": 2567,
       "type": "json"
     },
     {
@@ -4587,7 +4617,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 104229,
+      "size": 112881,
       "type": "json"
     },
     {
@@ -6501,7 +6531,7 @@
     {
       "path": "product/schemas/knowledge-slices.schema.json",
       "tier": "public",
-      "size": 6385,
+      "size": 7241,
       "type": "json"
     },
     {
@@ -7545,7 +7575,7 @@
     {
       "path": "product/schemas/tenant-profile.schema.json",
       "tier": "public",
-      "size": 1110,
+      "size": 1891,
       "type": "json"
     },
     {
@@ -7965,7 +7995,7 @@
     {
       "path": "public/common/project_standards.json",
       "tier": "public",
-      "size": 582,
+      "size": 597,
       "type": "json"
     },
     {
