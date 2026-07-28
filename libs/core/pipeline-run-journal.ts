@@ -7,15 +7,13 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeReaddir,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir } from './secure-io.js';
 import { findMissionPath, rootDir, shared } from './path-resolver.js';
-import { EventSourcingKernel, runInRestoreMode } from './worker-state-journal.js';
+import {
+  appendValidatedJournalEvent,
+  EventSourcingKernel,
+  runInRestoreMode,
+} from './worker-state-journal.js';
 import { z } from 'zod';
 
 export const PIPELINE_RUN_JOURNAL_VERSION = 2;
@@ -127,6 +125,30 @@ function normalizedSegment(value: string): string {
     throw new Error('[PIPELINE_JOURNAL] invalid run id');
   }
   return normalized;
+}
+
+function appendPipelineJournalEvent(
+  filePath: string,
+  runId: string,
+  sequence: number,
+  event: PipelineRunEventType,
+  payload: Record<string, unknown>
+): PipelineRunJournalEvent {
+  return appendValidatedJournalEvent({
+    kernel: pipelineJournalKernel,
+    opName: `pipeline.${event}`,
+    payload,
+    journalPath: filePath,
+    seq: sequence,
+    buildEnvelope: ({ seq, ts, payload: validated }) => ({
+      version: PIPELINE_RUN_JOURNAL_VERSION,
+      sequence: seq,
+      run_id: runId,
+      event,
+      timestamp: ts,
+      payload: validated as Record<string, unknown>,
+    }),
+  });
 }
 
 function journalDir(missionId?: string): string {
@@ -306,15 +328,8 @@ export function createPipelineRunJournal(
   }
   let sequence = 0;
   const append = (event: PipelineRunEventType, payload: Record<string, unknown>) => {
-    const envelope: PipelineRunJournalEvent = {
-      version: PIPELINE_RUN_JOURNAL_VERSION,
-      sequence: ++sequence,
-      run_id: id,
-      event,
-      timestamp: new Date().toISOString(),
-      payload,
-    };
-    safeAppendFileSync(filePath, `${JSON.stringify(envelope)}\n`);
+    const envelope = appendPipelineJournalEvent(filePath, id, sequence + 1, event, payload);
+    sequence = envelope.sequence;
     return envelope;
   };
   append('run_started', {
@@ -333,15 +348,14 @@ export function createPipelineRunJournal(
 export function openPipelineRunJournal(state: PipelineRunJournalState): PipelineRunJournalHandle {
   let sequence = state.events.reduce((max, event) => Math.max(max, event.sequence), 0);
   const append = (event: PipelineRunEventType, payload: Record<string, unknown>) => {
-    const envelope: PipelineRunJournalEvent = {
-      version: PIPELINE_RUN_JOURNAL_VERSION,
-      sequence: ++sequence,
-      run_id: state.run_id,
+    const envelope = appendPipelineJournalEvent(
+      state.path,
+      state.run_id,
+      sequence + 1,
       event,
-      timestamp: new Date().toISOString(),
-      payload,
-    };
-    safeAppendFileSync(state.path, `${JSON.stringify(envelope)}\n`);
+      payload
+    );
+    sequence = envelope.sequence;
     return envelope;
   };
   return {
