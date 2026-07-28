@@ -21,6 +21,7 @@ const IGNORED_DIRS = new Set([
   'vault',
   // parallel-session debris — other checkouts and scratch trees are not
   // this repo's runtime code and must never enter the baseline.
+  '.claude',
   '.worktrees',
   '.tmp-mulmoclaude',
   '.tmp-agency-agents',

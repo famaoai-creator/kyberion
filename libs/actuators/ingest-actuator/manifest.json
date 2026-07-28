@@ -1,0 +1,49 @@
+{
+  "actuator_id": "ingest-actuator",
+  "version": "1.2.0",
+  "description": "DA-03/DA-04/DA-05 ingest pipeline: unstructured internal documents (docx/pdf/xlsx/html/slack threads) into governed knowledge cards — incremental sync_source change-listing (watermark store), parse/normalize/dedup capture-transforms, plus the explicit ingest:commit ceremony (Hybrid Sovereign Ledger asset records, supersede, staleness detection)",
+  "resilience_tier": "fail_fast",
+  "recovery_policy": {
+    "fallback_strategy": "none",
+    "retry": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false
+    },
+    "retryable_categories": []
+  },
+  "capabilities": [
+    {
+      "op": "sync_source",
+      "description": "DA-03 incremental sync: reads the tenant × source watermark (active/shared/runtime/ingest-cursors/), lists changed items from box/slack/confluence read presets, and advances the watermark only after a fully successful listing (at-least-once; mid-fetch failure records consecutive_failures without moving the cursor)",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "parse_document",
+      "description": "Parses docx/pdf/xlsx/html/slack_thread/markdown/text input into the unified ingest intermediate representation with a raw-bytes content_sha256",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "normalize_card",
+      "description": "Derives tenant-aware target path and schema-validated knowledge-card frontmatter from an ingest IR; fails closed when required keys cannot be derived",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "dedup",
+      "description": "Checks and registers content hashes in the ingest registry; same-source different-hash re-ingests are reported as supersede candidates",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "staleness_report",
+      "description": "Side-effect-free comparison of the tenant asset ledger against a caller-supplied current-source listing; lists active assets and flags content-hash/source-version drift",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "commit",
+      "description": "DA-05 explicit ingest ceremony: lands a normalized knowledge card inside the tenant knowledge root (fail-closed path guard, ingest_commit authority role) and appends the append-only asset ledger record; re-ingests of the same source become supersede versions",
+      "platforms": ["darwin", "linux"]
+    }
+  ]
+}

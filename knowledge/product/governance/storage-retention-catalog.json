@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered.",
   "entries": [
     {
@@ -161,6 +161,25 @@
       "note": "Computer-surface session state (computer-surface.ts)."
     },
     {
+      "path": "active/shared/runtime/ingest",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "DA-08: ingest dedup content-hash registry (content-hash-registry.jsonl, ingest-actuator dedup.ts) — load-bearing append-only dedup state; TTL deletion would re-open duplicate ingests. Tenant lines are pruned only by the audited tenant offboarding ceremony (scope-offboarding.ts)."
+    },
+    {
+      "path": "active/shared/runtime/ingest/quota",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "DA-08: per-tenant daily ingest quota counters (ingest-quota.ts) — one JSON per tenant per UTC day; only the current day is load-bearing, older counters expire after 30d."
+    },
+    {
+      "path": "active/shared/runtime/ingest-cursors",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "DA-03/DA-08: incremental sync cursor state per tenant/source — live state, never TTL-deleted; a tenant's subtree is purged by the audited tenant offboarding ceremony (scope-offboarding.ts)."
+    },
+    {
       "path": "active/shared/runtime/locks",
       "artifact_class": "state",
       "action": "review_required",
@@ -279,6 +298,13 @@
       "artifact_class": "tmp",
       "action": "delete",
       "note": "Soft-delete grace floor (AL-04): expired files from soft_delete_days entries land here preserving their original repo-relative path. The janitor trash sweep purges each file after its governing entry's soft_delete_days (30d default when no entry covers it). Code-driven — no directory-level ttl_days."
+    },
+    {
+      "path": "knowledge/confidential",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm cli offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered."
     }
   ]
 }

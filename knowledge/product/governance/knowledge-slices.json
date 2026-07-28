@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/knowledge-slices.schema.json",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Initial knowledge slice declarations (KP-03). Deliberately small: one role/phase-specific slice and one wildcard default. Extend as pinned needs surface from delivered/used telemetry (KP-05).",
   "slices": [
     {
@@ -8,6 +8,12 @@
       "description": "Implementers doing execution-phase work always get the working philosophy up front, and never see unreviewed auto-distilled placeholders that would crowd the budget with low-signal text.",
       "match": { "team_role": "implementer", "phase": "*" },
       "pinned": ["knowledge/product/governance/working-philosophy.md"],
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
+    },
+    {
+      "id": "tenant-wide-default",
+      "description": "DA-07: demonstrates the tenant match dimension. '*' matches any concrete tenant (and tenantless requests, whose tenant normalizes to '*'); replace with a concrete slug (e.g. {\"tenant\": \"tenant-masked-a\"}) to declare per-tenant pinned/search_roots/exclude. The exclude below repeats the corpus-wide distill_ glob (excludes are unioned), so this slice adds no behavioral delta until a concrete tenant slice is declared.",
+      "match": { "tenant": "*" },
       "exclude": ["knowledge/product/evolution/distill_*.md"]
     },
     {

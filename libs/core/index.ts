@@ -796,18 +796,23 @@ export {
   gcMissionRuntimeResidue,
   offboardScope,
   collectScopeTargets,
+  verifyScopeOffboarded,
   OFFBOARDING_EXPORT_SUBDIR,
+  INGEST_CURSORS_REPO_SUBPATH,
+  INGEST_DEDUP_REGISTRY_REPO_PATH,
 } from './scope-offboarding.js';
 export type {
   GcMissionRuntimeResidueResult,
   MissionResidueCandidate,
   MissionResidueProbe,
   OffboardApproval,
+  OffboardDedupRegistryResult,
   OffboardScopeInput,
   OffboardScopeResult,
   OffboardScopeType,
   OffboardTarget,
   OffboardTargetKind,
+  OffboardVerification,
 } from './scope-offboarding.js';
 
 // Delegation Concurrency & Wall-Clock Budget (XP-06)
@@ -1990,6 +1995,12 @@ export * from './os-app-adapters.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
 export * from './tenant-registry.js';
+export * from './tenant-knowledge-retrieval.js';
+export * from './ingest-asset-ledger.js';
+export * from './ingest-quota.js';
+export * from './ingest-sync-cursors.js';
+export * from './pii-scrubber.js';
+export * from './ingest-tier-gate.js';
 export * from './generation-scheduler.js';
 export * from './src/pipeline-scheduler.js';
 export * from './src/pipeline-preview.js';
@@ -2107,6 +2118,15 @@ export type {
   CurationFreshnessBreach,
   KnowledgeCurationReport,
 } from './src/knowledge-curation-report.js';
+// DA-08: tenant-ingested cards join the weekly curation cycle (advisory only).
+export {
+  computeTenantIngestCuration,
+  TENANT_INGEST_DEFAULT_KIND,
+} from './src/knowledge-curation-tenant-ingest.js';
+export type {
+  TenantIngestCurationEntry,
+  TenantIngestCurationSection,
+} from './src/knowledge-curation-tenant-ingest.js';
 
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 export { tryRepairJson, repairJsonString } from './json-repair.js';

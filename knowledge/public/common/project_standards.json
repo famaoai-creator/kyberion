@@ -16,6 +16,7 @@
     "tmp",
     "temp",
     ".kyberion",
+    ".claude",
     ".worktrees",
     ".tmp-mulmoclaude",
     ".tmp-agency-agents",

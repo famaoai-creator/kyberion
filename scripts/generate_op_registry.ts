@@ -21,6 +21,7 @@ import { describeOps as describeBlockchainOps } from '../libs/actuators/blockcha
 import { describeOps as describeBuildOps } from '../libs/actuators/build-actuator/src/op-catalog.js';
 import { describeOps as describeCalendarOps } from '../libs/actuators/calendar-actuator/src/op-catalog.js';
 import { describeOps as describeEmailOps } from '../libs/actuators/email-actuator/src/op-catalog.js';
+import { describeOps as describeIngestOps } from '../libs/actuators/ingest-actuator/src/op-catalog.js';
 import { describeOps as describePresenceOps } from '../libs/actuators/presence-actuator/src/op-catalog.js';
 import { describeOps as describeServiceOps } from '../libs/actuators/service-actuator/src/op-catalog.js';
 import { describeOps as describeOrchestratorOps } from '../libs/actuators/orchestrator-actuator/src/op-catalog.js';
@@ -62,6 +63,7 @@ const DESCRIBE_OPS_SOURCES: Record<
   'build-actuator': describeBuildOps,
   'calendar-actuator': describeCalendarOps,
   'email-actuator': describeEmailOps,
+  'ingest-actuator': describeIngestOps,
   'presence-actuator': describePresenceOps,
   'service-actuator': describeServiceOps,
   'orchestrator-actuator': describeOrchestratorOps,
