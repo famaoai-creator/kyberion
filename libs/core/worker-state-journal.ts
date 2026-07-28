@@ -86,6 +86,42 @@ export interface OpDefinition<S = unknown, P = unknown> {
   readonly apply: OpApply<S, P>;
 }
 
+export interface JournalAppendContext {
+  readonly seq: number;
+  readonly ts: string;
+  readonly payload: unknown;
+}
+
+export interface AppendValidatedJournalEventOptions<TEnvelope> {
+  readonly kernel: EventSourcingKernel;
+  readonly opName: string;
+  readonly payload: unknown;
+  readonly journalPath: string;
+  readonly seq: number;
+  readonly now?: () => string;
+  readonly buildEnvelope: (context: JournalAppendContext) => TEnvelope;
+}
+
+/**
+ * Validate and append one event through the canonical event-sourcing write
+ * boundary. Callers may retain a domain-specific envelope shape, but payload
+ * validation and secure JSONL emission stay identical across journal types.
+ */
+export function appendValidatedJournalEvent<TEnvelope>(
+  options: AppendValidatedJournalEventOptions<TEnvelope>
+): TEnvelope {
+  assertNotDuringRestore('appendValidatedJournalEvent');
+  const validated = options.kernel.validatePayload(options.opName, options.payload);
+  const envelope = options.buildEnvelope({
+    seq: options.seq,
+    ts: (options.now ?? (() => new Date().toISOString()))(),
+    payload: validated,
+  });
+  ensureJournalDirectory(options.journalPath);
+  safeAppendFileSync(options.journalPath, `${JSON.stringify(envelope)}\n`);
+  return envelope;
+}
+
 /**
  * Minimal op/model registry + pure projector. Unknown ops and torn journal
  * lines are tolerated (skipped) so a partially-written or forward-versioned
@@ -156,6 +192,13 @@ export class EventSourcingKernel {
       states.set(op.model, next);
     }
     return states;
+  }
+}
+
+function ensureJournalDirectory(filePath: string): void {
+  const dir = filePath.replace(/[/\\][^/\\]+$/, '');
+  if (dir && dir !== filePath && !safeExistsSync(dir)) {
+    safeMkdir(dir, { recursive: true });
   }
 }
 
@@ -577,18 +620,24 @@ export class WorkerStateJournal {
    * *delivery* is a separate, guarded step ({@link deliverOneShotReminder}).
    */
   append(opName: string, payload: unknown): JournalEventEnvelope {
-    assertNotDuringRestore('WorkerStateJournal.append');
-    const validated = this.kernel.validatePayload(opName, payload);
     this.ensureSeqLoaded();
-    const envelope: JournalEventEnvelope = journalEventEnvelopeSchema.parse({
-      v: CURRENT_JOURNAL_VERSION,
-      seq: this.seq++,
-      ts: this.now(),
-      op: opName,
-      payload: validated,
+    const envelope = appendValidatedJournalEvent({
+      kernel: this.kernel,
+      opName,
+      payload,
+      journalPath: this.journalPath,
+      seq: this.seq,
+      now: this.now,
+      buildEnvelope: ({ seq, ts, payload: validated }) =>
+        journalEventEnvelopeSchema.parse({
+          v: CURRENT_JOURNAL_VERSION,
+          seq,
+          ts,
+          op: opName,
+          payload: validated,
+        }),
     });
-    this.ensureDir(this.journalPath);
-    safeAppendFileSync(this.journalPath, `${JSON.stringify(envelope)}\n`);
+    this.seq += 1;
     return envelope;
   }
 
@@ -747,9 +796,6 @@ export class WorkerStateJournal {
   }
 
   private ensureDir(filePath: string): void {
-    const dir = filePath.replace(/[/\\][^/\\]+$/, '');
-    if (dir && dir !== filePath && !safeExistsSync(dir)) {
-      safeMkdir(dir, { recursive: true });
-    }
+    ensureJournalDirectory(filePath);
   }
 }
