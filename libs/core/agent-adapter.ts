@@ -70,6 +70,12 @@ export interface AgentAskOptions extends Record<string, unknown> {
   intentId?: string;
   tags?: string[];
   responseMimeType?: 'text/plain' | 'application/json';
+  /** Abort the active provider turn without restarting the app-server process. */
+  signal?: AbortSignal;
+  /** Ask a provider-native harness to use its subagent mode for this turn. */
+  subagent?: boolean;
+  /** Per-turn approval projection for a governed provider profile. */
+  approvalMode?: 'strict' | 'relaxed';
 }
 
 /**
@@ -930,6 +936,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     resolve: (res: AgentResponse) => void;
     reject: (err: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
+    abortCleanup?: () => void;
   } | null = null;
   private accumulatedText = '';
   private sawAgentDelta = false;
@@ -937,6 +944,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
   private projectRoot: string = PROJECT_ROOT;
   private usageSummary: Record<string, unknown> | null = null;
+  private nativeMultiAgentMode: unknown = null;
+  private activeApprovalMode: 'strict' | 'relaxed' | undefined;
   private enhancers: AgentEnhancer[] = [];
 
   constructor(options?: CodexAppServerAdapterOptions) {
@@ -1024,6 +1033,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.pendingRequests.clear();
       if (this.pendingTurn) {
         clearTimeout(this.pendingTurn.timeout);
+        this.pendingTurn.abortCleanup?.();
         this.pendingTurn.reject(err);
         this.pendingTurn = null;
       }
@@ -1064,12 +1074,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
         `Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`
       );
     }
+    this.nativeMultiAgentMode =
+      threadRes?.multiAgentMode ?? threadRes?.thread?.multiAgentMode ?? null;
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
+    if (options?.signal?.aborted) throw new Error('Codex app-server turn cancelled before start.');
+    this.activeApprovalMode = options?.approvalMode ?? this.options.approvalMode;
 
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
@@ -1086,6 +1100,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
         model: this.options.model ?? undefined,
         cwd: this.options.cwd ?? undefined,
         sandboxPolicy: this.buildSandboxPolicy(),
+        // Codex 0.146.0 deprecates multiAgentMode and enables proactive native
+        // delegation through effort="ultra". Keep this provider-specific
+        // projection here so callers only request `subagent: true`.
+        ...(options?.subagent ? { effort: 'ultra' } : {}),
         ...enhanced.options,
       },
       this.options.timeoutMs ?? 20000
@@ -1110,11 +1128,34 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
     const timeoutMs = this.options.timeoutMs ?? 300000;
     const raw = await new Promise<AgentResponse>((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = (): void => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        options?.signal?.removeEventListener('abort', onAbort);
+      };
+      const settleReject = (error: Error): void => {
+        cleanup();
+        reject(error);
+      };
+      const onAbort = (): void => {
+        if (this.pendingTurn?.turnId !== turnId) return;
         this.pendingTurn = null;
-        reject(new Error('Codex app-server turn timed out.'));
+        cleanup();
+        void this.interruptTurn(turnId);
+        reject(new Error('Codex app-server turn cancelled.'));
+      };
+      timeout = setTimeout(() => {
+        if (this.pendingTurn?.turnId !== turnId) return;
+        this.pendingTurn = null;
+        cleanup();
+        void this.interruptTurn(turnId);
+        settleReject(new Error('Codex app-server turn timed out.'));
       }, timeoutMs);
-      this.pendingTurn = { turnId, resolve, reject, timeout };
+      this.pendingTurn = { turnId, resolve, reject, timeout, abortCleanup: cleanup };
+      if (options?.signal) options.signal.addEventListener('abort', onAbort, { once: true });
     });
     return applyEnhancersAfterAsk(this.enhancers, raw);
   }
@@ -1125,6 +1166,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.child = null;
     }
     this.runtimeResourceId = null;
+    this.activeApprovalMode = undefined;
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
@@ -1132,6 +1174,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
       pid: this.child?.pid,
       threadId: this.threadId,
       usage: this.usageSummary,
+      nativeMultiAgentMode: this.nativeMultiAgentMode,
+      supportsNativeSubagents: this.nativeMultiAgentMode !== null,
       supportsSoftRefresh: true,
     };
   }
@@ -1267,10 +1311,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
       if (usage) this.usageSummary = usage;
 
       if (this.pendingTurn && this.pendingTurn.turnId === turnId) {
-        clearTimeout(this.pendingTurn.timeout);
-        const resolve = this.pendingTurn.resolve;
+        const pending = this.pendingTurn;
+        clearTimeout(pending.timeout);
+        pending.abortCleanup?.();
         this.pendingTurn = null;
-        resolve(result);
+        pending.resolve(result);
       } else {
         this.earlyTurnResults.set(turnId, result);
       }
@@ -1284,7 +1329,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   private async handleServerRequest(msg: any): Promise<void> {
     const { id, method, params } = msg;
-    const relaxed = this.options.approvalMode === 'relaxed';
+    const relaxed = (this.activeApprovalMode ?? this.options.approvalMode) === 'relaxed';
 
     switch (method) {
       case 'item/commandExecution/requestApproval': {
@@ -1366,6 +1411,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (!this.child?.stdin?.writable) return;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message, data } });
     this.child.stdin.write(`${payload}\n`);
+  }
+
+  private async interruptTurn(turnId: string): Promise<void> {
+    if (!this.threadId || !this.child?.stdin?.writable) return;
+    try {
+      await this.sendRequest(
+        'turn/interrupt',
+        { threadId: this.threadId, turnId },
+        this.options.timeoutMs ?? 20000
+      );
+    } catch (err) {
+      logger.warn(
+        `[UAA_CODEX_INTERRUPT] failed to interrupt turn ${turnId}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   private isReadOnlyCommand(params: any): boolean {

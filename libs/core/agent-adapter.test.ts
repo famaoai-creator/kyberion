@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgyAdapter, ClaudeAdapter } from './agent-adapter.js';
+import { AgyAdapter, ClaudeAdapter, CodexAppServerAdapter } from './agent-adapter.js';
 import { spawnSync } from 'node:child_process';
 
 vi.mock('node:child_process', () => ({
@@ -160,5 +160,86 @@ describe('AgyAdapter', () => {
       ],
       expect.any(Object)
     );
+  });
+});
+
+describe('CodexAppServerAdapter', () => {
+  it('projects subagent turns onto native ultra effort without spawning another process', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
+    const requests: any[] = [];
+    const fakeChild: any = {
+      stdin: {
+        writable: true,
+        write(payload: string) {
+          const request = JSON.parse(payload);
+          requests.push(request);
+          if (request.method !== 'turn/start') return true;
+          setTimeout(() => {
+            (adapter as any).handleMessage({
+              id: request.id,
+              result: { turn: { id: 'turn-native-1' } },
+            });
+          }, 0);
+          setTimeout(() => {
+            (adapter as any).handleMessage({
+              method: 'item/agentMessage/delta',
+              params: { threadId: 'thread-root', turnId: 'turn-native-1', delta: 'native result' },
+            });
+            (adapter as any).handleMessage({
+              method: 'turn/completed',
+              params: { turn: { id: 'turn-native-1', status: 'completed' } },
+            });
+          }, 1);
+          return true;
+        },
+      },
+    };
+    (adapter as any).child = fakeChild;
+    (adapter as any).threadId = 'thread-root';
+
+    const response = await adapter.ask('delegate this', { subagent: true });
+
+    expect(response.text).toBe('native result');
+    const turnStart = requests.find((request) => request.method === 'turn/start');
+    expect(turnStart.params.threadId).toBe('thread-root');
+    expect(turnStart.params.effort).toBe('ultra');
+    expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
+  });
+
+  it('interrupts the active native turn on cancellation without restarting the app-server', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
+    const requests: any[] = [];
+    const fakeChild: any = {
+      stdin: {
+        writable: true,
+        write(payload: string) {
+          const request = JSON.parse(payload);
+          requests.push(request);
+          if (request.method === 'turn/start') {
+            setTimeout(() => {
+              (adapter as any).handleMessage({
+                id: request.id,
+                result: { turn: { id: 'turn-cancel-1' } },
+              });
+            }, 0);
+          } else if (request.method === 'turn/interrupt') {
+            setTimeout(() => {
+              (adapter as any).handleMessage({ id: request.id, result: {} });
+            }, 0);
+          }
+          return true;
+        },
+      },
+    };
+    (adapter as any).child = fakeChild;
+    (adapter as any).threadId = 'thread-root';
+    const controller = new AbortController();
+    const pending = adapter.ask('cancel this', { subagent: true, signal: controller.signal });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
+
+    await expect(pending).rejects.toThrow('cancelled');
+    expect(requests.map((request) => request.method)).toEqual(['turn/start', 'turn/interrupt']);
   });
 });

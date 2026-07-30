@@ -524,6 +524,12 @@ export interface ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string>;
+  /** Optional provider-native harness delegation (for example Codex app-server). */
+  dispatchHarnessSubagent?(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string>;
   /** Start an id-addressable delegation that can be joined or cancelled. */
   delegateTaskHandle?(
     instruction: string,

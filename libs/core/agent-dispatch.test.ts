@@ -434,6 +434,52 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     expect(wrapped).toBeInstanceOf(DispatchingReasoningBackend);
     expect(wrapped.name).toBe('fake+harness-subagent');
   });
+
+  it('routes Codex to the provider-native harness and emits a native success event', async () => {
+    const backend = makeFakeBackend() as ReasoningBackend & {
+      dispatchHarnessSubagent: ReturnType<typeof vi.fn>;
+    };
+    backend.name = 'codex-cli';
+    backend.dispatchHarnessSubagent = vi.fn(async (instruction, context, options) => {
+      expect(instruction).toBe('native task');
+      expect(context).toBe('native context');
+      expect(options?.profile).toBe('explorer');
+      return 'native-result';
+    });
+    const events = collectEvents();
+
+    const result = await new HarnessSubagentDispatcher().dispatch(
+      'native task',
+      'native context',
+      backend,
+      { profile: 'explorer' }
+    );
+
+    expect(result).toBe('native-result');
+    expect(backend.dispatchHarnessSubagent).toHaveBeenCalledOnce();
+    expect(backend.delegateTask).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(['subagent_begin', 'subagent_end']);
+    expect(events[1].payload).toMatchObject({ provider: 'codex', native: true, status: 'success' });
+  });
+
+  it('fails closed for Codex when the native harness is unavailable', async () => {
+    const backend = makeFakeBackend();
+    backend.name = 'codex-cli';
+    const events = collectEvents();
+
+    await expect(
+      new HarnessSubagentDispatcher().dispatch('native task', undefined, backend, {
+        profile: 'implementer',
+      })
+    ).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
+
+    expect(backend.delegateTask).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(['subagent_begin', 'subagent_unavailable']);
+    expect(events[1].payload).toMatchObject({
+      provider: 'codex',
+      fallback_allowed: false,
+    });
+  });
 });
 
 /**
@@ -508,7 +554,6 @@ describe('XP-06 delegation concurrency governance (agent-dispatch wiring)', () =
   it('applies the same governance to InSessionDispatcher and HarnessSubagentDispatcher without double-wrapping their internal process-spawn fallback', async () => {
     process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY = '1';
     const backend = makeFakeBackend({ withTools: false }); // forces InSessionDispatcher's fallback path
-    (backend as any).name = 'codex-cli';
 
     // If the fallback path re-entered the semaphore for the same provider
     // while the outer governance wrapper still held its slot, this would

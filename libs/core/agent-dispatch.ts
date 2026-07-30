@@ -351,10 +351,10 @@ export interface HarnessSubagentDispatcherDeps {
  * `systemPromptPrefix` is prepended to the sub-agent's system prompt.
  *
  * Selected via `KYBERION_HARNESS_SUBAGENT=1` (see {@link maybeWrapWithDispatcher}).
- * Fail-open: if the Agent SDK is unavailable at runtime (import/probe
- * failure), dispatch falls back to {@link ProcessSpawnDispatcher} exactly
- * like {@link InSessionDispatcher}'s own fallback — the env flag must never
- * hard-fail a delegation.
+ * Claude keeps its historical SDK-unavailable fallback. Codex is different:
+ * when its app-server/native-subagent capability is unavailable, the
+ * dispatcher emits `subagent_unavailable` and fails closed rather than
+ * pretending that a process-spawn delegation was a native subagent.
  */
 export class HarnessSubagentDispatcher implements AgentDispatcher {
   readonly name = 'harness-subagent';
@@ -390,6 +390,44 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       dispatcher: this.name,
       profile: profile.name,
     });
+
+    const provider = resolveDelegationProvider(backend);
+    if (provider === 'codex') {
+      if (!backend.dispatchHarnessSubagent) {
+        const reason =
+          'Codex backend does not expose a provider-native app-server subagent session.';
+        this.emitUnavailable(stream, profile.name, reason);
+        throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
+      }
+      try {
+        const result = await backend.dispatchHarnessSubagent(instruction, context, {
+          ...options,
+          profile: profile.name,
+        });
+        this.emit(stream, 'subagent_end', {
+          dispatcher: this.name,
+          provider,
+          profile: profile.name,
+          status: 'success',
+          native: true,
+        });
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) {
+          this.emitUnavailable(stream, profile.name, message, provider);
+        } else {
+          this.emit(stream, 'subagent_end', {
+            dispatcher: this.name,
+            provider,
+            profile: profile.name,
+            status: 'failure',
+            error: message,
+          });
+        }
+        throw err;
+      }
+    }
 
     let runtime: GovernedHarnessRuntime;
     try {
@@ -465,7 +503,7 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
 
   private emit(
     stream: WorkerEventStream,
-    type: 'subagent_begin' | 'subagent_end',
+    type: 'subagent_begin' | 'subagent_end' | 'subagent_unavailable',
     payload: Record<string, unknown>
   ): void {
     try {
@@ -473,6 +511,22 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
     } catch {
       // Event stream projection is best-effort; it must never break dispatch.
     }
+  }
+
+  private emitUnavailable(
+    stream: WorkerEventStream,
+    profile: string,
+    reason: string,
+    provider = 'codex'
+  ): void {
+    logger.warn(`[agent-dispatch:harness-subagent] Native subagent unavailable: ${reason}`);
+    this.emit(stream, 'subagent_unavailable', {
+      dispatcher: this.name,
+      provider,
+      profile,
+      reason,
+      fallback_allowed: false,
+    });
   }
 }
 

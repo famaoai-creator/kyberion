@@ -308,10 +308,11 @@ function buildReasoningRuntimeBundle(
         ...codexOptions,
         ...(options.model ? { model: options.model } : {}),
       };
+      const codexBackend = new CodexCliReasoningBackend(mergedCodexOptions);
       return {
         mode,
         backend: {
-          backend: new CodexCliReasoningBackend(mergedCodexOptions),
+          backend: maybeWrapWithDispatcher(codexBackend),
           provider,
           label: mode,
         },
