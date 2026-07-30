@@ -187,12 +187,12 @@
       "chronos_ac_stat_native_subagents": {
         "en": "native subagents",
         "ja": "ネイティブ subagent",
-        "qps-ploc": "⟦ñȧŧïṽė şůƀȧɠėñŧş ŀőř⟧"
+        "qps-ploc": "⟦ñȧŧïṽė şůƀȧɠėñŧş ŀőřėɱ⟧"
       },
       "chronos_ac_stat_unavailable_subagents": {
         "en": "native unavailable",
         "ja": "native 未対応",
-        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőř⟧"
+        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
       },
       "chronos_ac_native": {
         "en": "native",
@@ -202,7 +202,7 @@
       "chronos_ac_native_unavailable": {
         "en": "native unavailable",
         "ja": "native 未対応",
-        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőř⟧"
+        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
       },
       "chronos_ac_thread": {
         "en": "thread",
