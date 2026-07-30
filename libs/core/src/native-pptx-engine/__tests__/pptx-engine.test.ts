@@ -956,7 +956,7 @@ describe('Native PPTX Engine', () => {
         // 'warning' must count as a failure here too, unlike a typical parser use.
         const partErrors: string[] = [];
         const parser = new DOMParser({
-          errorHandler: (level: string, msg: string) => {
+          onError: (level: string, msg: string) => {
             partErrors.push(`${level}: ${msg}`);
           },
         });
