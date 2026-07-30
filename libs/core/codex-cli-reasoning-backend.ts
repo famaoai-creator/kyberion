@@ -194,6 +194,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         {
           profile: profile.name,
           subagent: true,
+          effort: options?.effort ?? 'medium',
           signal: options?.signal,
           approvalMode: profile.name === 'implementer' ? 'relaxed' : 'strict',
           sandboxPolicy: sandboxPolicyForArgs(permission.args),

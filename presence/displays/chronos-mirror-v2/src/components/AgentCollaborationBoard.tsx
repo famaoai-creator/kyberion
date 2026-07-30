@@ -56,6 +56,7 @@ type CollaborationProjection = {
     native?: boolean;
     native_fork?: boolean;
     native_mode?: string;
+    effort?: 'low' | 'medium' | 'high' | 'ultra';
     native_unavailable?: boolean;
   }>;
   edges: Array<{ from: string; to: string; kind: string; event_id: string }>;
@@ -508,7 +509,8 @@ export function AgentCollaborationBoard({
                     <span className="shrink-0 rounded border kb-border-accent px-1.5 kb-text-accent">
                       {uxText('chronos_ac_native', locale)}
                       {event.provider ? ` · ${event.provider}` : ''}
-                      {event.native_fork ? ' · fork' : ' · ultra'}
+                      {event.native_fork ? ' · fork' : ' · parent'}
+                      {event.effort ? ` · ${event.effort}` : ''}
                     </span>
                   ) : event.native_unavailable ? (
                     <span className="shrink-0 rounded border kb-status-warning-border px-1.5 kb-status-warning">

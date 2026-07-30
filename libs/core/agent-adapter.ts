@@ -75,6 +75,8 @@ export interface AgentAskOptions extends Record<string, unknown> {
   signal?: AbortSignal;
   /** Ask a provider-native harness to use its subagent mode for this turn. */
   subagent?: boolean;
+  /** Native subagent reasoning effort; adopters may map this to provider controls. */
+  effort?: 'low' | 'medium' | 'high' | 'ultra';
   /** Per-turn approval projection for a governed provider profile. */
   approvalMode?: 'strict' | 'relaxed';
 }
@@ -919,7 +921,8 @@ export interface CodexNativeSubagentInfo {
   threadId: string;
   turnId?: string;
   forked: boolean;
-  mode: 'thread-fork' | 'effort-ultra';
+  mode: 'thread-fork' | 'parent-turn';
+  effort: 'low' | 'medium' | 'high' | 'ultra';
 }
 
 /**
@@ -1101,7 +1104,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   /**
    * Use a child thread in the same app-server process when the parent has a
    * completed rollout. The first delegated turn has no parent rollout yet,
-   * so it uses Codex's native ultra-effort path and seeds the parent thread.
+   * so it uses the selected native effort and seeds the parent thread.
    */
   public async askNativeSubagent(
     prompt: string,
@@ -1109,6 +1112,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   ): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     const parentThreadId = this.threadId;
+    const effort = options?.effort ?? 'medium';
     let targetThreadId = parentThreadId;
     let forked = false;
 
@@ -1128,14 +1132,19 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }
     }
 
-    const response = await this.askOnThread(prompt, { ...options, subagent: true }, targetThreadId);
+    const response = await this.askOnThread(
+      prompt,
+      { ...options, effort, subagent: true },
+      targetThreadId
+    );
     const info: CodexNativeSubagentInfo = {
       provider: 'codex',
       parentThreadId,
       threadId: targetThreadId,
       ...(this.currentTurnId ? { turnId: this.currentTurnId } : {}),
       forked,
-      mode: forked ? 'thread-fork' : 'effort-ultra',
+      mode: forked ? 'thread-fork' : 'parent-turn',
+      effort,
     };
     this.lastNativeSubagentInfo = info;
     return { ...response, metadata: { ...(response.metadata || {}), nativeSubagent: info } };
@@ -1167,9 +1176,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
         cwd: this.options.cwd ?? undefined,
         sandboxPolicy: this.buildSandboxPolicy(),
         // Codex 0.146.0 deprecates multiAgentMode and enables proactive native
-        // delegation through effort="ultra". Keep this provider-specific
+        // delegation through the selected effort. Keep this provider-specific
         // projection here so callers only request `subagent: true`.
-        ...(options?.subagent ? { effort: 'ultra' } : {}),
+        ...(options?.subagent ? { effort: options.effort ?? 'medium' } : {}),
         ...enhanced.options,
       },
       this.options.timeoutMs ?? 20000

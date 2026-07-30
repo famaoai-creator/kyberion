@@ -164,7 +164,7 @@ describe('AgyAdapter', () => {
 });
 
 describe('CodexAppServerAdapter', () => {
-  it('projects subagent turns onto native ultra effort without spawning another process', async () => {
+  it('projects subagent turns onto configurable medium effort without spawning another process', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
     const requests: any[] = [];
     const fakeChild: any = {
@@ -202,7 +202,7 @@ describe('CodexAppServerAdapter', () => {
     expect(response.text).toBe('native result');
     const turnStart = requests.find((request) => request.method === 'turn/start');
     expect(turnStart.params.threadId).toBe('thread-root');
-    expect(turnStart.params.effort).toBe('ultra');
+    expect(turnStart.params.effort).toBe('medium');
     expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
   });
 
@@ -291,10 +291,11 @@ describe('CodexAppServerAdapter', () => {
         threadId: 'thread-child',
         forked: true,
         mode: 'thread-fork',
+        effort: 'medium',
       },
     });
     expect(requests.map((request) => request.method)).toEqual(['thread/fork', 'turn/start']);
     expect(requests[1].params.threadId).toBe('thread-child');
-    expect(requests[1].params.effort).toBe('ultra');
+    expect(requests[1].params.effort).toBe('medium');
   });
 });

@@ -547,6 +547,12 @@ function nativeHarnessEventFields(
     ...(typeof info.turnId === 'string' ? { turn_id: info.turnId } : {}),
     ...(typeof info.forked === 'boolean' ? { native_fork: info.forked } : {}),
     ...(typeof info.mode === 'string' ? { native_mode: info.mode } : {}),
+    ...(info.effort === 'low' ||
+    info.effort === 'medium' ||
+    info.effort === 'high' ||
+    info.effort === 'ultra'
+      ? { effort: info.effort }
+      : {}),
   };
 }
 

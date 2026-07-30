@@ -112,11 +112,13 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     expect((session.askNativeSubagent as any).mock.calls[0][1]).toMatchObject({
       profile: 'implementer',
       subagent: true,
+      effort: 'medium',
       sandboxPolicy: { type: 'workspaceWrite', networkAccess: false },
     });
     expect((session.askNativeSubagent as any).mock.calls[1][1]).toMatchObject({
       profile: 'explorer',
       subagent: true,
+      effort: 'medium',
       sandboxPolicy: { type: 'readOnly', networkAccess: false },
     });
     expect(mockRun).not.toHaveBeenCalled();
