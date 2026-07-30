@@ -503,8 +503,8 @@ importers:
         specifier: workspace:*
         version: link:../../core
       axios:
-        specifier: ^1.18.0
-        version: 1.18.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+        specifier: ^1.18.1
+        version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
@@ -563,8 +563,8 @@ importers:
         specifier: workspace:*
         version: link:../../core
       axios:
-        specifier: ^1.18.0
-        version: 1.18.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+        specifier: ^1.18.1
+        version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
@@ -650,8 +650,8 @@ importers:
   libs/core:
     dependencies:
       axios:
-        specifier: ^1.18.0
-        version: 1.18.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+        specifier: ^1.18.1
+        version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
