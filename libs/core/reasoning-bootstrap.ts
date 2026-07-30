@@ -389,7 +389,7 @@ function buildReasoningRuntimeBundle(
       };
       return {
         mode,
-        backend: { backend: agyBackend, provider, label: mode },
+        backend: { backend: maybeWrapWithDispatcher(agyBackend), provider, label: mode },
         intentExtractor: {
           extractor: new AgyCliIntentExtractor(agyOptions),
           provider,
@@ -413,7 +413,7 @@ function buildReasoningRuntimeBundle(
       const grokBackend = new GrokCliBackend(grokOptions);
       return {
         mode,
-        backend: { backend: grokBackend, provider, label: mode },
+        backend: { backend: maybeWrapWithDispatcher(grokBackend), provider, label: mode },
         intentExtractor: {
           extractor: new GrokCliIntentExtractor(grokOptions),
           provider,
