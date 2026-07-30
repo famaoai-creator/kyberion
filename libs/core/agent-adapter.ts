@@ -63,6 +63,7 @@ export interface AgentResponse {
   thought?: string;
   stopReason: string;
   trace?: Array<{ enhancer: string; action: string; details?: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentAskOptions extends Record<string, unknown> {
@@ -912,6 +913,15 @@ export interface CodexAppServerAdapterOptions {
   writableRoots?: string[];
 }
 
+export interface CodexNativeSubagentInfo {
+  provider: 'codex';
+  parentThreadId: string;
+  threadId: string;
+  turnId?: string;
+  forked: boolean;
+  mode: 'thread-fork' | 'effort-ultra';
+}
+
 /**
  * Codex App Server Adapter (JSON-RPC over stdio).
  */
@@ -933,6 +943,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private currentTurnId: string | null = null;
   private pendingTurn: {
     turnId: string;
+    threadId: string;
     resolve: (res: AgentResponse) => void;
     reject: (err: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
@@ -945,6 +956,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private projectRoot: string = PROJECT_ROOT;
   private usageSummary: Record<string, unknown> | null = null;
   private nativeMultiAgentMode: unknown = null;
+  private activeThreadId: string | null = null;
+  private lastNativeSubagentInfo: CodexNativeSubagentInfo | null = null;
   private activeApprovalMode: 'strict' | 'relaxed' | undefined;
   private enhancers: AgentEnhancer[] = [];
 
@@ -1074,6 +1087,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
         `Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`
       );
     }
+    this.activeThreadId = this.threadId;
     this.nativeMultiAgentMode =
       threadRes?.multiAgentMode ?? threadRes?.thread?.multiAgentMode ?? null;
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
@@ -1081,8 +1095,60 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
+    return this.askOnThread(prompt, options, this.threadId);
+  }
+
+  /**
+   * Use a child thread in the same app-server process when the parent has a
+   * completed rollout. The first delegated turn has no parent rollout yet,
+   * so it uses Codex's native ultra-effort path and seeds the parent thread.
+   */
+  public async askNativeSubagent(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<AgentResponse> {
+    if (!this.threadId) throw new Error('Codex app-server not booted.');
+    const parentThreadId = this.threadId;
+    let targetThreadId = parentThreadId;
+    let forked = false;
+
+    try {
+      const forkResponse: any = await this.sendRequest(
+        'thread/fork',
+        { threadId: parentThreadId },
+        this.options.timeoutMs ?? 20000
+      );
+      targetThreadId = forkResponse?.thread?.id || forkResponse?.threadId || forkResponse?.id;
+      if (!targetThreadId) throw new Error('Codex app-server thread/fork missing thread id.');
+      forked = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/no rollout found|rollout.*not found/i.test(message)) {
+        throw new Error(`[SUBAGENT_UNAVAILABLE] Codex thread/fork failed: ${message}`);
+      }
+    }
+
+    const response = await this.askOnThread(prompt, { ...options, subagent: true }, targetThreadId);
+    const info: CodexNativeSubagentInfo = {
+      provider: 'codex',
+      parentThreadId,
+      threadId: targetThreadId,
+      ...(this.currentTurnId ? { turnId: this.currentTurnId } : {}),
+      forked,
+      mode: forked ? 'thread-fork' : 'effort-ultra',
+    };
+    this.lastNativeSubagentInfo = info;
+    return { ...response, metadata: { ...(response.metadata || {}), nativeSubagent: info } };
+  }
+
+  private async askOnThread(
+    prompt: string,
+    options: AgentAskOptions | undefined,
+    targetThreadId: string
+  ): Promise<AgentResponse> {
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
     if (options?.signal?.aborted) throw new Error('Codex app-server turn cancelled before start.');
+    this.activeThreadId = targetThreadId;
     this.activeApprovalMode = options?.approvalMode ?? this.options.approvalMode;
 
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
@@ -1095,7 +1161,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const turnRes: any = await this.sendRequest(
       'turn/start',
       {
-        threadId: this.threadId,
+        threadId: targetThreadId,
         input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
         model: this.options.model ?? undefined,
         cwd: this.options.cwd ?? undefined,
@@ -1144,17 +1210,24 @@ export class CodexAppServerAdapter implements AgentAdapter {
         if (this.pendingTurn?.turnId !== turnId) return;
         this.pendingTurn = null;
         cleanup();
-        void this.interruptTurn(turnId);
+        void this.interruptTurn(targetThreadId, turnId);
         reject(new Error('Codex app-server turn cancelled.'));
       };
       timeout = setTimeout(() => {
         if (this.pendingTurn?.turnId !== turnId) return;
         this.pendingTurn = null;
         cleanup();
-        void this.interruptTurn(turnId);
+        void this.interruptTurn(targetThreadId, turnId);
         settleReject(new Error('Codex app-server turn timed out.'));
       }, timeoutMs);
-      this.pendingTurn = { turnId, resolve, reject, timeout, abortCleanup: cleanup };
+      this.pendingTurn = {
+        turnId,
+        threadId: targetThreadId,
+        resolve,
+        reject,
+        timeout,
+        abortCleanup: cleanup,
+      };
       if (options?.signal) options.signal.addEventListener('abort', onAbort, { once: true });
     });
     return applyEnhancersAfterAsk(this.enhancers, raw);
@@ -1167,14 +1240,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
     this.runtimeResourceId = null;
     this.activeApprovalMode = undefined;
+    this.activeThreadId = null;
+    this.lastNativeSubagentInfo = null;
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
     return {
       pid: this.child?.pid,
       threadId: this.threadId,
+      activeThreadId: this.activeThreadId,
       usage: this.usageSummary,
       nativeMultiAgentMode: this.nativeMultiAgentMode,
+      lastNativeSubagent: this.lastNativeSubagentInfo,
       supportsNativeSubagents: this.nativeMultiAgentMode !== null,
       supportsSoftRefresh: true,
     };
@@ -1201,6 +1278,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.options.timeoutMs ?? 20000
     );
     this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    this.activeThreadId = this.threadId;
     return { mode: 'soft', threadId: this.threadId };
   }
 
@@ -1261,7 +1339,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const params = msg.params || {};
 
     if (method === 'item/agentMessage/delta') {
-      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      const activeThreadId = this.activeThreadId || this.threadId;
+      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
       if (typeof params.delta === 'string') {
         this.sawAgentDelta = true;
@@ -1271,7 +1350,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
 
     if (method === 'rawResponseItem/completed') {
-      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      const activeThreadId = this.activeThreadId || this.threadId;
+      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
       if (
         !this.sawAgentDelta &&
@@ -1413,12 +1493,12 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.child.stdin.write(`${payload}\n`);
   }
 
-  private async interruptTurn(turnId: string): Promise<void> {
-    if (!this.threadId || !this.child?.stdin?.writable) return;
+  private async interruptTurn(threadId: string, turnId: string): Promise<void> {
+    if (!this.child?.stdin?.writable) return;
     try {
       await this.sendRequest(
         'turn/interrupt',
-        { threadId: this.threadId, turnId },
+        { threadId, turnId },
         this.options.timeoutMs ?? 20000
       );
     } catch (err) {

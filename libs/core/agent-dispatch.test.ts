@@ -435,16 +435,27 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     expect(wrapped.name).toBe('fake+harness-subagent');
   });
 
-  it('routes Codex to the provider-native harness and emits a native success event', async () => {
-    const backend = makeFakeBackend() as ReasoningBackend & {
-      dispatchHarnessSubagent: ReturnType<typeof vi.fn>;
-    };
-    backend.name = 'codex-cli';
-    backend.dispatchHarnessSubagent = vi.fn(async (instruction, context, options) => {
+  it('routes through a native adopter and emits a native success event', async () => {
+    const dispatch = vi.fn(async (instruction, context, options) => {
       expect(instruction).toBe('native task');
       expect(context).toBe('native context');
       expect(options?.profile).toBe('explorer');
       return 'native-result';
+    });
+    const backend = makeFakeBackend() as ReasoningBackend & {
+      getNativeSubagentAdopter: NonNullable<ReasoningBackend['getNativeSubagentAdopter']>;
+    };
+    backend.getNativeSubagentAdopter = () => ({
+      id: 'test-native-adopter',
+      dispatch,
+      getInfo: () => ({
+        provider: 'test-provider',
+        parentThreadId: 'parent-thread',
+        threadId: 'child-thread',
+        turnId: 'turn-1',
+        forked: true,
+        mode: 'thread-fork',
+      }),
     });
     const events = collectEvents();
 
@@ -456,15 +467,22 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     );
 
     expect(result).toBe('native-result');
-    expect(backend.dispatchHarnessSubagent).toHaveBeenCalledOnce();
+    expect(dispatch).toHaveBeenCalledOnce();
     expect(backend.delegateTask).not.toHaveBeenCalled();
     expect(events.map((event) => event.type)).toEqual(['subagent_begin', 'subagent_end']);
-    expect(events[1].payload).toMatchObject({ provider: 'codex', native: true, status: 'success' });
+    expect(events[1].payload).toMatchObject({
+      adopter_id: 'test-native-adopter',
+      provider: 'test-provider',
+      thread_id: 'child-thread',
+      native: true,
+      native_fork: true,
+      status: 'success',
+    });
   });
 
-  it('fails closed for Codex when the native harness is unavailable', async () => {
+  it('fails closed when the backend requires native adoption but it is unavailable', async () => {
     const backend = makeFakeBackend();
-    backend.name = 'codex-cli';
+    backend.requiresNativeSubagent = () => true;
     const events = collectEvents();
 
     await expect(
@@ -476,7 +494,6 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     expect(backend.delegateTask).not.toHaveBeenCalled();
     expect(events.map((event) => event.type)).toEqual(['subagent_begin', 'subagent_unavailable']);
     expect(events[1].payload).toMatchObject({
-      provider: 'codex',
       fallback_allowed: false,
     });
   });

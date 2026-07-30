@@ -1950,6 +1950,7 @@ export * from './slack-onboarding.js';
 export * from './agent-activity-board.js';
 export * from './agent-collaboration-events.js';
 export * from './agent-collaboration-projection.js';
+export * from './native-subagent-adopter.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 export type * from './channel-surface-types.js';
 

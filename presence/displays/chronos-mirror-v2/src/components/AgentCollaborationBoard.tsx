@@ -35,6 +35,8 @@ type CollaborationProjection = {
     waiting_human: number;
     review_pending: number;
     failures: number;
+    native_subagents: number;
+    unavailable_subagents: number;
   };
   events: Array<{
     event_id: string;
@@ -47,6 +49,14 @@ type CollaborationProjection = {
     kind: string;
     summary: string;
     source: string;
+    provider?: string;
+    thread_id?: string;
+    parent_thread_id?: string;
+    turn_id?: string;
+    native?: boolean;
+    native_fork?: boolean;
+    native_mode?: string;
+    native_unavailable?: boolean;
   }>;
   edges: Array<{ from: string; to: string; kind: string; event_id: string }>;
   attention: Attention[];
@@ -109,10 +119,7 @@ export type CollaborationAttentionAction =
   | {
       mode: 'view';
       viewId:
-        | 'secret-approval-queue'
-        | 'runtime-topology-map'
-        | 'runtime-lease-doctor'
-        | 'trace-viewer';
+        'secret-approval-queue' | 'runtime-topology-map' | 'runtime-lease-doctor' | 'trace-viewer';
       label: string;
     }
   | { mode: 'mission'; label: string };
@@ -354,6 +361,16 @@ export function AgentCollaborationBoard({
             value={overview.failures}
             tone="kb-status-negative"
           />
+          <Stat
+            label={uxText('chronos_ac_stat_native_subagents', locale)}
+            value={overview.native_subagents}
+            tone="kb-text-accent"
+          />
+          <Stat
+            label={uxText('chronos_ac_stat_unavailable_subagents', locale)}
+            value={overview.unavailable_subagents}
+            tone="kb-status-warning"
+          />
         </div>
       ) : (
         <div className="mt-4 text-[11px] kb-text-muted">{uxText('chronos_ac_loading', locale)}</div>
@@ -485,6 +502,25 @@ export function AgentCollaborationBoard({
                   {event.task_id ? (
                     <span className="shrink-0 rounded border kb-border-subtle px-1.5 kb-text-muted">
                       {uxText('chronos_ac_task', locale)}: {event.task_id}
+                    </span>
+                  ) : null}
+                  {event.native ? (
+                    <span className="shrink-0 rounded border kb-border-accent px-1.5 kb-text-accent">
+                      {uxText('chronos_ac_native', locale)}
+                      {event.provider ? ` · ${event.provider}` : ''}
+                      {event.native_fork ? ' · fork' : ' · ultra'}
+                    </span>
+                  ) : event.native_unavailable ? (
+                    <span className="shrink-0 rounded border kb-status-warning-border px-1.5 kb-status-warning">
+                      {uxText('chronos_ac_native_unavailable', locale)}
+                    </span>
+                  ) : null}
+                  {event.thread_id ? (
+                    <span
+                      className="shrink-0 rounded border kb-border-subtle px-1.5 kb-text-muted"
+                      title={event.thread_id}
+                    >
+                      {uxText('chronos_ac_thread', locale)}: {event.thread_id.slice(0, 8)}
                     </span>
                   ) : null}
                   {collaborationEvidenceRefs(event).length > 0 ? (
