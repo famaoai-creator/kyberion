@@ -6,7 +6,7 @@
 ## What belongs where
 
 - **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/env-validator.ts` (warn by default; missing required values are errors).
-- **Config files (`knowledge/product/**`)\*\*: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.
+- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
