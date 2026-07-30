@@ -1,0 +1,21 @@
+diff --git a/lib/xml/xmldom.js b/lib/xml/xmldom.js
+--- a/lib/xml/xmldom.js
++++ b/lib/xml/xmldom.js
+@@ -5,15 +5,15 @@ function parseFromString(string) {
+     var error = null;
+
+     var domParser = new xmldom.DOMParser({
+-        errorHandler: function(level, message) {
++        onError: function(level, message) {
+             error = {level: level, message: message};
+         }
+     });
+
+-    var document = domParser.parseFromString(string);
++    var document = domParser.parseFromString(string, "text/xml");
+
+     if (error === null) {
+         return document;
+     } else {
+         throw new Error(error.level + ": " + error.message);
+     }

@@ -300,7 +300,7 @@
     "@types/html-to-docx": "^1.8.1",
     "@types/pdf-parse": "^1.1.5",
     "@types/ws": "^8.18.1",
-    "@xmldom/xmldom": "0.8.13",
+    "@xmldom/xmldom": "0.9.10",
     "adm-zip": "^0.6.0",
     "ajv": "8.20.0",
     "ajv-formats": "^3.0.1",
