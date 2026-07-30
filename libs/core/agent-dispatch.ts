@@ -66,6 +66,18 @@ function dispatchWithConcurrencyGovernance<T>(
   return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
 }
 
+/** Preserve the legacy two-argument call shape when no routing options exist. */
+function delegateWithOptions(
+  backend: ReasoningBackend,
+  instruction: string,
+  context: string | undefined,
+  options?: ReasoningCallOptions
+): Promise<string> {
+  return options
+    ? backend.delegateTask(instruction, context, options)
+    : backend.delegateTask(instruction, context);
+}
+
 /**
  * Agent dispatch (agent-runtime plane).
  *
@@ -105,10 +117,11 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
   dispatch(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     return dispatchWithConcurrencyGovernance(backend, () =>
-      backend.delegateTask(instruction, context)
+      delegateWithOptions(backend, instruction, context, options)
     );
   }
 }
@@ -133,17 +146,19 @@ export class InSessionDispatcher implements AgentDispatcher {
   dispatch(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     return dispatchWithConcurrencyGovernance(backend, () =>
-      this.dispatchInner(instruction, context, backend)
+      this.dispatchInner(instruction, context, backend, options)
     );
   }
 
   private async dispatchInner(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     logger.info('[agent-dispatch:in-session] Initiating in-session delegation for task...');
 
@@ -157,7 +172,7 @@ export class InSessionDispatcher implements AgentDispatcher {
       // that same governance itself; nesting the two would double-count (and,
       // under a saturated per-provider cap, self-deadlock: the outer slot
       // would never free while waiting on an inner acquire from the same pool).
-      return backend.delegateTask(instruction, context);
+      return delegateWithOptions(backend, instruction, context, options);
     }
 
     // KD-05: the tier catalog is rebuilt from the registry on every dispatch,
@@ -222,7 +237,7 @@ export class InSessionDispatcher implements AgentDispatcher {
           this.repeatGovernor = createToolCallRepeatGovernorState();
           // XP-06: see the comment on the other fallback path above — call
           // the backend directly to avoid nesting concurrency governance.
-          return backend.delegateTask(instruction, context);
+          return delegateWithOptions(backend, instruction, context, options);
         }
         if (decision.reminder) {
           logger.warn(`[agent-dispatch:in-session] [repeat-governor] ${decision.reminder}`);
@@ -430,7 +445,7 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
         fallback_to: this.fallback.name,
         reason,
       });
-      return backend.delegateTask(instruction, context);
+      return delegateWithOptions(backend, instruction, context, options);
     }
 
     let runtime: HarnessSubagentRuntime;
@@ -453,7 +468,7 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       // (see `dispatch()` below), and nesting it via `ProcessSpawnDispatcher`
       // would double-wrap (and risk self-deadlock under a saturated
       // per-provider cap). `this.fallback` is kept only for its `.name`.
-      return backend.delegateTask(instruction, context);
+      return delegateWithOptions(backend, instruction, context, options);
     }
 
     try {

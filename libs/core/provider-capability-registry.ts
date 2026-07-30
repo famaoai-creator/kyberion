@@ -81,7 +81,7 @@ interface ProviderProbeSpec {
  * `knowledge/product/governance/provider-capability-scan-policy.json`
  * (`--help` across providers, `gh copilot -- --help` for copilot). Auth
  * probes are declared only where a cheap, non-interactive subcommand exists;
- * `claude`/`codex`/`agy`/`gemini` have none known that don't make a live
+ * `claude`/`codex`/`agy`/`grok`/`gemini` have none known that don't make a live
  * call, so their `authenticated` field stays `'unknown'` unless the binary
  * itself is missing (then it is `false`).
  */
@@ -101,6 +101,12 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
   agy: {
     binaryCommand: 'agy',
     binaryArgs: ['--help'],
+    headless: true,
+    structuredOutput: true,
+  },
+  grok: {
+    binaryCommand: 'grok',
+    binaryArgs: ['--version'],
     headless: true,
     structuredOutput: true,
   },

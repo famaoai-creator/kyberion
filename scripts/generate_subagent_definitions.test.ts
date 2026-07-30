@@ -9,10 +9,17 @@ import {
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 import {
+  AGY_PROFILE_TOOLS,
+  agyAgentName,
+  buildAgyAgentDefinitionSource,
+  extractAgentDefinitionBody,
+} from './agy-agent-definition-adapter.js';
+import {
   GENERATED_ROLES,
   PROFILE_SPECS,
   SHARED_DIRECTORY_RULES_LINES,
   buildAgentDefinitionSource,
+  buildGeneratedAgyFiles,
   buildGeneratedFiles,
   condenseProcedure,
   main,
@@ -21,6 +28,10 @@ import {
 
 function agentPath(role: string): string {
   return path.join(pathResolver.rootResolve('.claude/agents'), `${role}.md`);
+}
+
+function agyAgentPath(role: string): string {
+  return path.join(pathResolver.rootResolve('.agents/agents'), agyAgentName(role), 'agent.md');
 }
 
 describe('generate_subagent_definitions', () => {
@@ -75,6 +86,36 @@ describe('generate_subagent_definitions', () => {
     expect(source).toContain('never call `node:fs` directly');
     expect(source).toContain('GENERATED FILE — DO NOT EDIT BY HAND');
     expect(source).toContain(`tools: ${PROFILE_SPECS.implementer.tools.join(', ')}`);
+  });
+
+  it('projects the same governed body into AGY custom-subagent frontmatter', () => {
+    const source = buildAgentDefinitionSource('implementer');
+    const agy = buildAgyAgentDefinitionSource({
+      role: 'implementer',
+      description: 'Produces the main code and configuration changes.',
+      profile: 'implementer',
+      body: extractAgentDefinitionBody(source),
+    });
+
+    expect(agy).toContain('name: kyberion-implementer');
+    expect(agy).toContain('subagent: true');
+    expect(agy).toContain('mainAgent: true');
+    expect(agy).toContain('commandExecutionPolicy: sandbox');
+    expect(agy).toContain('  - replace_file_content');
+    expect(agy).toContain('You are a delegated implementer sub-agent.');
+    expect(agy).not.toContain('tools: Read, Grep, Glob');
+  });
+
+  it('keeps AGY tool vocabulary provider-specific and least-privileged', () => {
+    expect(AGY_PROFILE_TOOLS.implementer).toEqual([
+      'view_file',
+      'grep_search',
+      'replace_file_content',
+      'run_command',
+    ]);
+    expect(AGY_PROFILE_TOOLS.explorer).toEqual(['view_file', 'grep_search']);
+    expect(AGY_PROFILE_TOOLS.planner).toEqual([]);
+    expect(agyAgentName('devils_advocate')).toBe('kyberion-devils-advocate');
   });
 
   it('generated definitions carry the XP-04 shared-directory rules matrix and canonical link', () => {
@@ -147,9 +188,12 @@ describe('generate_subagent_definitions', () => {
 
     it('passes when the committed files match the generator output', async () => {
       const built = await buildGeneratedFiles();
+      const agyBuilt = await buildGeneratedAgyFiles();
       for (const role of GENERATED_ROLES) {
         const onDisk = String(safeReadFile(agentPath(role), { encoding: 'utf8' }) || '');
         expect(onDisk).toBe(built.get(role));
+        const agyOnDisk = String(safeReadFile(agyAgentPath(role), { encoding: 'utf8' }) || '');
+        expect(agyOnDisk).toBe(agyBuilt.get(role));
       }
 
       process.exitCode = undefined;
@@ -198,6 +242,28 @@ describe('generate_subagent_definitions', () => {
 
       withExecutionContext('generate_subagent_definitions', () => {
         safeWriteFile(filePath, tampered);
+      });
+
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBe(1);
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, original);
+      });
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('fails --check when an AGY definition is tampered with, and recovers after restore', async () => {
+      const role = 'implementer';
+      const filePath = agyAgentPath(role);
+      const original = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      expect(original).toContain('name: kyberion-implementer');
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, `${original}\n<!-- tampered -->\n`);
       });
 
       process.exitCode = undefined;

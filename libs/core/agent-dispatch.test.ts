@@ -64,9 +64,10 @@ function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend &
 describe('agent-dispatch', () => {
   it('ProcessSpawnDispatcher delegates via the backend native delegateTask', async () => {
     const backend = makeFakeBackend();
-    const out = await new ProcessSpawnDispatcher().dispatch('do X', 'ctx', backend);
+    const options = { profile: 'explorer', effort: 'medium' as const };
+    const out = await new ProcessSpawnDispatcher().dispatch('do X', 'ctx', backend, options);
     expect(out).toBe('spawned:do X');
-    expect(backend.delegateTask).toHaveBeenCalledWith('do X', 'ctx');
+    expect(backend.delegateTask).toHaveBeenCalledWith('do X', 'ctx', options);
   });
 
   it('InSessionDispatcher falls back to process-spawn when the base lacks generateWithTools', async () => {

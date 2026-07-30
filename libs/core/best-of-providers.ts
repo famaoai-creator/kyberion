@@ -6,7 +6,7 @@
  * between them — it cancels out prompt-framing bias but not *model* bias.
  * CT-03's lens-fan-out is the same-model / different-viewpoint axis. This
  * module is the complementary, orthogonal axis: fan the same instruction out
- * to *different provider CLIs* (claude / codex / agy / …) concurrently and
+ * to *different provider CLIs* (claude / codex / agy / grok / …) concurrently and
  * judge across them, so systematic biases of any one model/vendor get
  * diluted rather than reinforced. Suited to review/judgment/risk-assessment
  * tasks by default (per the plan), but this module itself is domain-neutral.
@@ -51,7 +51,7 @@
  *     until an operator/deployment explicitly opts in.
  *   - `KYBERION_BEST_OF_PROVIDERS_LIVE=1`: delegates to
  *     `resolveProviderBackend` (`provider-backend-resolver.ts`), which
- *     lazily constructs a real 'claude'/'codex'/'agy' CLI-backed backend
+ *     lazily constructs a real 'claude'/'codex'/'agy'/'grok' CLI-backed backend
  *     (never spawns at resolve time — only when `delegateTask` is actually
  *     called), gated by the XP-01 cached capability registry.
  * A caller can still inject its own `seams.getBackend` (e.g. a future real

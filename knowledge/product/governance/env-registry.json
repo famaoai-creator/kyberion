@@ -123,6 +123,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AGY_AGENT",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Generated AGY workspace agent name selected for CLI sessions, for example kyberion-reviewer.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_AGY_CLI_BIN",
       "category": "path",
       "type": "path",

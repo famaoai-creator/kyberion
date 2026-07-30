@@ -55,6 +55,12 @@ export interface AgyCliBackendOptions {
   model?: string;
   timeoutMs?: number;
   extraArgs?: string[];
+  /** Workspace whose `.agents/agents` customizations AGY should discover. */
+  workspaceDir?: string;
+  /** Optional Kyberion/AGY custom agent name, e.g. `kyberion-implementer`. */
+  agent?: string;
+  /** Set false only for callers that intentionally provide their own AGY workspace. */
+  includeWorkspaceAgents?: boolean;
   sandbox?: boolean;
   logFile?: string;
   /** Test seam and runtime injection for the shared AGY session. */
@@ -160,6 +166,9 @@ export class AgyCliBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly extraArgs: string[];
+  private readonly workspaceDir: string;
+  private readonly agent?: string;
+  private readonly includeWorkspaceAgents: boolean;
   private readonly sandbox: boolean;
   private readonly logFile: string;
   private readonly injectedHarnessSession?: AgyHarnessSession;
@@ -175,6 +184,9 @@ export class AgyCliBackend implements ReasoningBackend {
     this.model = options.model ?? 'agy';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+    this.workspaceDir = options.workspaceDir ?? pathResolver.rootDir();
+    this.agent = options.agent;
+    this.includeWorkspaceAgents = options.includeWorkspaceAgents ?? true;
     this.sandbox = options.sandbox ?? process.env.KYBERION_AGY_SANDBOX !== '0';
     this.logFile =
       options.logFile ??
@@ -459,6 +471,7 @@ export class AgyCliBackend implements ReasoningBackend {
       this.logFile,
       '--model',
       this.model,
+      ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(params.profile),
       '-p',
       prompt,
@@ -514,6 +527,7 @@ export class AgyCliBackend implements ReasoningBackend {
       this.logFile,
       '--model',
       this.model,
+      ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(profile),
       '-p',
       prompt,
@@ -550,6 +564,19 @@ export class AgyCliBackend implements ReasoningBackend {
       throw new Error(`[agy-cli] permission profile "${profile}" refused: ${resolution.reason}`);
     }
     return [...resolution.args];
+  }
+
+  /**
+   * Make Kyberion's generated AGY definitions visible to the concrete CLI.
+   * AGY does not discover workspace customizations from cwd alone in all
+   * launch modes, so the workspace is passed explicitly at the provider
+   * boundary. The shared reasoning layer only supplies an optional agent id.
+   */
+  private resolveAgentArgs(): string[] {
+    return [
+      ...(this.includeWorkspaceAgents ? ['--add-dir', this.workspaceDir] : []),
+      ...(this.agent ? ['--agent', this.agent] : []),
+    ];
   }
 
   /**
@@ -608,12 +635,14 @@ export function buildAgyCliBackendFromEnv(
   const sandbox = env.KYBERION_AGY_SANDBOX?.trim();
   const sandboxEnabled = sandbox === undefined ? undefined : sandbox !== '0';
   const logFile = env.KYBERION_AGY_CLI_LOG_FILE?.trim();
+  const agent = env.KYBERION_AGY_AGENT?.trim();
   const backend = new AgyCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(sandboxEnabled !== undefined ? { sandbox: sandboxEnabled } : {}),
     ...(logFile ? { logFile } : {}),
+    ...(agent ? { agent } : {}),
   });
   logger.info(`[agy-cli] backend ready (bin=${bin ?? 'agy'}, model=${model ?? 'agy'})`);
   return backend;
