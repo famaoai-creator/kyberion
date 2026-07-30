@@ -168,6 +168,7 @@ function eventFromRecord(
   const native = booleanValue(record, 'native') ?? booleanValue(payload, 'native');
   const nativeFork = booleanValue(record, 'native_fork') ?? booleanValue(payload, 'native_fork');
   const nativeMode = stringValue(record, 'native_mode') || stringValue(payload, 'native_mode');
+  const effort = stringValue(record, 'effort') || stringValue(payload, 'effort');
   const nativeUnavailable =
     eventType.toLowerCase().includes('subagent_unavailable') ||
     booleanValue(record, 'native_unavailable') === true ||
@@ -206,6 +207,9 @@ function eventFromRecord(
     ...(native !== undefined ? { native } : {}),
     ...(nativeFork !== undefined ? { native_fork: nativeFork } : {}),
     ...(nativeMode ? { native_mode: nativeMode } : {}),
+    ...(effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'ultra'
+      ? { effort }
+      : {}),
     ...(nativeUnavailable ? { native_unavailable: true } : {}),
     actor_type: actorType,
     kind,
