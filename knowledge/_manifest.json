@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 72858,
+      "size": 74068,
       "type": "json"
     },
     {
@@ -1743,7 +1743,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 8384,
+      "size": 8629,
       "type": "md"
     },
     {
@@ -2127,7 +2127,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19489,
+      "size": 19508,
       "type": "json"
     },
     {
@@ -2463,7 +2463,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 17797,
+      "size": 18987,
       "type": "json"
     },
     {
@@ -4617,7 +4617,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 124031,
+      "size": 124904,
       "type": "json"
     },
     {

@@ -30,6 +30,10 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { GrokAdapter, type AgentAskOptions, type AgentResponse } from './agent-adapter.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import type { ReasoningCallOptions } from './reasoning-backend.js';
+import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
 import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   structuredReasoningSpecs,
@@ -81,6 +85,15 @@ export interface ShellGrokCliBackendOptions {
   timeoutMs?: number;
   /** Additional CLI args (e.g. --reasoning-effort high). */
   extraArgs?: string[];
+  /** Test seam and runtime injection for the shared Grok ACP session. */
+  harnessSession?: GrokHarnessSession;
+}
+
+export interface GrokHarnessSession {
+  boot(): Promise<void>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  getRuntimeInfo?(): Record<string, unknown>;
 }
 
 export interface ShellGrokCliAvailability {
@@ -94,12 +107,25 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly extraArgs: string[];
+  private readonly injectedHarnessSession?: GrokHarnessSession;
+  private harnessSession?: GrokHarnessSession;
+  private harnessBoot?: Promise<void>;
+  private harnessQueue: Promise<void> = Promise.resolve();
+  private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: ShellGrokCliBackendOptions = {}) {
     this.bin = options.bin ?? 'grok';
     this.model = options.model ?? DEFAULT_MODEL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.extraArgs = options.extraArgs ?? [];
+    this.injectedHarnessSession = options.harnessSession;
+    this.nativeSubagentAdopter = {
+      id: 'grok-acp',
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
+    };
   }
 
   private async runStructuredOp<TInput, TOutput>(
@@ -181,6 +207,76 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
     return this.spawnCli(args, '', options?.signal);
+  }
+
+  private async dispatchNativeSubagent(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const profile = resolveGrokSubagentProfile(options);
+    const previous = this.harnessQueue;
+    let release!: () => void;
+    this.harnessQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const session = this.getHarnessSession();
+      if (!session.askNativeSubagent) {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] Grok ACP session has no native subagent operation.'
+        );
+      }
+      if (!this.harnessBoot) this.harnessBoot = session.boot();
+      await this.harnessBoot;
+      const response = await session.askNativeSubagent(
+        [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
+          .filter(Boolean)
+          .join('\n\n'),
+        {
+          profile: profile.name,
+          subagent: true,
+          effort: options?.effort ?? 'medium',
+          signal: options?.signal,
+        }
+      );
+      const nativeInfo = response.metadata?.nativeSubagent;
+      const runtimeInfo = session.getRuntimeInfo?.();
+      const runtimeNativeInfo = runtimeInfo?.lastNativeSubagent;
+      this.lastHarnessSubagentInfo =
+        nativeInfo && typeof nativeInfo === 'object'
+          ? { ...(nativeInfo as Record<string, unknown>) }
+          : runtimeNativeInfo && typeof runtimeNativeInfo === 'object'
+            ? { ...(runtimeNativeInfo as Record<string, unknown>) }
+            : null;
+      return response.text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
+      throw new Error(`[SUBAGENT_UNAVAILABLE] Grok ACP harness failed: ${message}`);
+    } finally {
+      release();
+    }
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter {
+    return this.nativeSubagentAdopter;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return true;
+  }
+
+  private getHarnessSession(): GrokHarnessSession {
+    if (this.harnessSession) return this.harnessSession;
+    if (this.injectedHarnessSession) {
+      this.harnessSession = this.injectedHarnessSession;
+      return this.harnessSession;
+    }
+    this.harnessSession = new GrokAdapter({ bin: this.bin, model: this.model });
+    return this.harnessSession;
   }
 
   async prompt(
@@ -304,6 +400,15 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       }
       throw err;
     });
+  }
+}
+
+function resolveGrokSubagentProfile(options?: ReasoningCallOptions) {
+  const requested = options?.profile || options?.role || 'implementer';
+  try {
+    return getSubagentCapabilityProfile(requested);
+  } catch {
+    return getSubagentCapabilityProfile('implementer');
   }
 }
 

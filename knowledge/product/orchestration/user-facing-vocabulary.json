@@ -184,6 +184,31 @@
         "ja": "失敗",
         "qps-ploc": "⟦ƒȧïŀůřėş ŀőř⟧"
       },
+      "chronos_ac_stat_native_subagents": {
+        "en": "native subagents",
+        "ja": "ネイティブ subagent",
+        "qps-ploc": "⟦ñȧŧïṽė şůƀȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "chronos_ac_stat_unavailable_subagents": {
+        "en": "native unavailable",
+        "ja": "native 未対応",
+        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
+      },
+      "chronos_ac_native": {
+        "en": "native",
+        "ja": "native",
+        "qps-ploc": "⟦ñȧŧïṽė ŀőř⟧"
+      },
+      "chronos_ac_native_unavailable": {
+        "en": "native unavailable",
+        "ja": "native 未対応",
+        "qps-ploc": "⟦ñȧŧïṽė ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
+      },
+      "chronos_ac_thread": {
+        "en": "thread",
+        "ja": "thread",
+        "qps-ploc": "⟦ŧħřėȧḓ ŀőř⟧"
+      },
       "chronos_ac_guide_title": {
         "en": "Read this board in order",
         "ja": "この順番で見る",

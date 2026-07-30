@@ -129,6 +129,40 @@ describe('agent collaboration projection', () => {
     expect(projection.partial).toBe(true);
   });
 
+  it('projects native adopter metadata and counts unavailable adoption attempts', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source_event_id: 'native-child',
+        kind: 'spawn',
+        provider: 'codex',
+        native: true,
+        native_fork: true,
+        native_mode: 'thread-fork',
+        effort: 'medium',
+        parent_thread_id: 'parent-thread',
+        thread_id: 'child-thread',
+        turn_id: 'turn-1',
+      }),
+      event({
+        source_event_id: 'native-missing',
+        kind: 'failure',
+        provider: 'codex',
+        native_unavailable: true,
+      }),
+    ]);
+
+    expect(projection.overview).toMatchObject({
+      native_subagents: 1,
+      unavailable_subagents: 1,
+    });
+    expect(projection.events.find((entry) => entry.thread_id === 'child-thread')).toMatchObject({
+      thread_id: 'child-thread',
+      parent_thread_id: 'parent-thread',
+      native_fork: true,
+      effort: 'medium',
+    });
+  });
+
   it('keeps human approval distinct from agent failure in attention', () => {
     const projection = composeAgentCollaborationProjection([
       event({

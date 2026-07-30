@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
+import { pathResolver } from '@agent/core';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
@@ -56,6 +57,7 @@ describe('agy-cli-backend', () => {
     delete process.env.KYBERION_AGY_CLI_TIMEOUT_MS;
     delete process.env.KYBERION_AGY_CLI_LOG_FILE;
     delete process.env.KYBERION_AGY_SANDBOX;
+    delete process.env.KYBERION_AGY_AGENT;
   });
 
   it('builds from env when agy cli settings are configured', () => {
@@ -66,6 +68,71 @@ describe('agy-cli-backend', () => {
     const backend = buildAgyCliBackendFromEnv();
 
     expect(backend?.name).toBe('agy-cli');
+  });
+
+  it('routes the configured AGY CLI agent through the generated workspace definition', async () => {
+    process.env.KYBERION_AGY_AGENT = 'kyberion-reviewer';
+    const backend = buildAgyCliBackendFromEnv();
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+
+    await backend?.prompt('hello');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'agy',
+      expect.arrayContaining(['--add-dir', pathResolver.rootDir(), '--agent', 'kyberion-reviewer']),
+      expect.anything()
+    );
+  });
+
+  it('exposes a valid native subagent adopter via AGY session harness', async () => {
+    const fakeHarness = {
+      boot: vi.fn(async () => {}),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async (prompt: string, options: Record<string, unknown>) => ({
+        text: `delegated: ${prompt}`,
+        metadata: {
+          nativeSubagent: {
+            provider: 'agy',
+            threadId: 'agy-session-123',
+            mode: 'agy-subagent-adopter',
+          },
+        },
+      })),
+      getRuntimeInfo: () => ({
+        lastNativeSubagent: { provider: 'agy', threadId: 'agy-session-123' },
+      }),
+    };
+
+    const backend = new AgyCliBackend({ bin: 'agy', model: 'agy', harnessSession: fakeHarness });
+    const adopter = backend.getNativeSubagentAdopter?.();
+
+    expect(adopter?.id).toBe('agy-cli');
+    expect(backend.requiresNativeSubagent?.()).toBe(true);
+
+    const result = await adopter?.dispatch('native task', 'ctx');
+    expect(result).toContain('delegated:');
+    expect(fakeHarness.askNativeSubagent).toHaveBeenCalledTimes(1);
+    expect(fakeHarness.askNativeSubagent).toHaveBeenCalledWith(
+      expect.stringContaining('Task: native task'),
+      expect.objectContaining({ profile: 'implementer', subagent: true, effort: 'medium' })
+    );
+    expect(adopter?.getInfo?.()).toMatchObject({
+      provider: 'agy',
+      threadId: 'agy-session-123',
+    });
+  });
+
+  it('rejects a harness response that does not prove native delegation', async () => {
+    const fakeHarness = {
+      boot: vi.fn(async () => {}),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async () => ({ text: 'prompt-only', stopReason: 'completed' })),
+    };
+    const backend = new AgyCliBackend({ harnessSession: fakeHarness });
+
+    await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
+      '[SUBAGENT_UNAVAILABLE] AGY SDK returned no native subagent metadata.'
+    );
   });
 
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
@@ -88,6 +155,8 @@ describe('agy-cli-backend', () => {
         '/tmp/agy-cli.log',
         '--model',
         'agy',
+        '--add-dir',
+        pathResolver.rootDir(),
         '--sandbox',
         '--dangerously-skip-permissions',
         '-p',
@@ -160,11 +229,46 @@ describe('agy-cli-backend', () => {
         '/tmp/agy-cli.log',
         '--model',
         'agy',
+        '--add-dir',
+        pathResolver.rootDir(),
         '--sandbox',
         '--dangerously-skip-permissions',
         '-p',
         'hello',
       ]);
+    });
+
+    it('selects a generated Kyberion AGY agent when requested', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        agent: 'kyberion-reviewer',
+        workspaceDir: '/workspace/kyberion',
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello');
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toEqual(
+        expect.arrayContaining(['--add-dir', '/workspace/kyberion', '--agent', 'kyberion-reviewer'])
+      );
+    });
+
+    it('can disable workspace customization discovery for an external AGY workspace', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        includeWorkspaceAgents: false,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello');
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).not.toContain('--add-dir');
     });
 
     it('explorer profile: argv contains the sandbox mapping and not --dangerously-skip-permissions', async () => {

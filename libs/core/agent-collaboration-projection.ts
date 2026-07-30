@@ -64,6 +64,8 @@ export interface AgentCollaborationProjection {
     waiting_human: number;
     review_pending: number;
     failures: number;
+    native_subagents: number;
+    unavailable_subagents: number;
   };
   events: AgentCollaborationEvent[];
   nodes: CollaborationGraphNode[];
@@ -138,6 +140,13 @@ function stringArray(record: JsonRecord, key: string): string[] {
     : [];
 }
 
+function booleanValue(record: JsonRecord, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    if (typeof record[key] === 'boolean') return record[key] as boolean;
+  }
+  return undefined;
+}
+
 function eventFromRecord(
   record: JsonRecord,
   source: CollaborationSource,
@@ -150,6 +159,20 @@ function eventFromRecord(
   const missionId = stringValue(record, 'mission_id')?.toUpperCase();
   const taskId = stringValue(record, 'task_id');
   const agentId = stringValue(record, 'agent_id', 'requested_by', 'actor_id');
+  const provider = stringValue(record, 'provider') || stringValue(payload, 'provider');
+  const adopterId = stringValue(record, 'adopter_id') || stringValue(payload, 'adopter_id');
+  const threadId = stringValue(record, 'thread_id') || stringValue(payload, 'thread_id');
+  const parentThreadId =
+    stringValue(record, 'parent_thread_id') || stringValue(payload, 'parent_thread_id');
+  const turnId = stringValue(record, 'turn_id') || stringValue(payload, 'turn_id');
+  const native = booleanValue(record, 'native') ?? booleanValue(payload, 'native');
+  const nativeFork = booleanValue(record, 'native_fork') ?? booleanValue(payload, 'native_fork');
+  const nativeMode = stringValue(record, 'native_mode') || stringValue(payload, 'native_mode');
+  const effort = stringValue(record, 'effort') || stringValue(payload, 'effort');
+  const nativeUnavailable =
+    eventType.toLowerCase().includes('subagent_unavailable') ||
+    booleanValue(record, 'native_unavailable') === true ||
+    booleanValue(payload, 'native_unavailable') === true;
   const evidence = stringArray(record, 'evidence');
   const relatedIds = [
     ...stringArray(record, 'related_ids'),
@@ -176,6 +199,18 @@ function eventFromRecord(
       ? { parent_agent_id: stringValue(record, 'parent_agent_id') }
       : {}),
     ...(stringValue(record, 'session_id') ? { session_id: stringValue(record, 'session_id') } : {}),
+    ...(provider ? { provider } : {}),
+    ...(adopterId ? { adopter_id: adopterId } : {}),
+    ...(threadId ? { thread_id: threadId } : {}),
+    ...(parentThreadId ? { parent_thread_id: parentThreadId } : {}),
+    ...(turnId ? { turn_id: turnId } : {}),
+    ...(native !== undefined ? { native } : {}),
+    ...(nativeFork !== undefined ? { native_fork: nativeFork } : {}),
+    ...(nativeMode ? { native_mode: nativeMode } : {}),
+    ...(effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'ultra'
+      ? { effort }
+      : {}),
+    ...(nativeUnavailable ? { native_unavailable: true } : {}),
     actor_type: actorType,
     kind,
     ...(stringValue(record, 'state_before')
@@ -408,6 +443,8 @@ export function composeAgentCollaborationProjection(
   let waitingHuman = 0;
   let reviewPending = 0;
   let failures = 0;
+  let nativeSubagents = 0;
+  let unavailableSubagents = 0;
   for (const event of events) {
     if (event.mission_id) {
       missions.add(event.mission_id);
@@ -453,6 +490,8 @@ export function composeAgentCollaborationProjection(
     if (event.kind === 'approval' || event.kind === 'waiting') waitingHuman += 1;
     if (event.kind === 'review') reviewPending += 1;
     if (event.kind === 'failure') failures += 1;
+    if (event.native === true) nativeSubagents += 1;
+    if (event.native_unavailable === true) unavailableSubagents += 1;
     const attentionItem = attentionForEvent(event);
     if (attentionItem) attention.push(attentionItem);
   }
@@ -510,6 +549,8 @@ export function composeAgentCollaborationProjection(
       waiting_human: waitingHuman,
       review_pending: reviewPending,
       failures,
+      native_subagents: nativeSubagents,
+      unavailable_subagents: unavailableSubagents,
     },
     events: events.slice().reverse(),
     nodes: [...nodes.values()],

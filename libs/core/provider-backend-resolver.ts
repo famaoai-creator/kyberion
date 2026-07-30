@@ -4,7 +4,7 @@
  * delegate").
  *
  * `best-of-providers.ts` needs a way to turn a provider id ('claude' /
- * 'codex' / 'agy') into something that satisfies its minimal
+ * 'codex' / 'agy' / 'grok') into something that satisfies its minimal
  * `{ delegateTask(instruction, context?): Promise<string> }` structural
  * interface. This module is that resolver. It is deliberately standalone —
  * it does NOT import `best-of-providers.ts` (avoids a cycle; the return
@@ -26,7 +26,7 @@
  *     and instantiates the class. Chosen over `ClaudeAgentReasoningBackend`
  *     (in-process Agent SDK) because the sibling 'codex'/'agy' providers
  *     are both shell-CLI backends, not in-process SDK clients — using the
- *     shell CLI backend for 'claude' too keeps all three providers uniform
+ *     shell CLI backend for 'claude' too keeps the CLI providers uniform
  *     under best-of-providers' concurrent CLI fan-out.
  *   - 'codex' → `CodexCliReasoningBackend` (`codex-cli-reasoning-backend.ts`),
  *     options built by this module's own `readCodexOptionsWithoutSpawn`
@@ -39,6 +39,10 @@
  *     *resolve*-time spawning is disallowed.
  *   - 'agy' → `buildAgyCliBackendFromEnv` (`agy-cli-backend.ts`) used as-is:
  *     it only parses env vars and constructs `AgyCliBackend`, no probe/spawn.
+ *   - 'grok' → `ShellGrokCliBackend` with environment-derived options. The
+ *     resolver deliberately does not call Grok's availability probe here;
+ *     capability gating is handled by the cached registry just like the
+ *     other providers.
  *
  * Availability gate: before constructing, this module peeks the XP-01
  * provider capability registry (`peekProviderCapabilityRegistry` — cached
@@ -67,6 +71,7 @@ import { ShellClaudeCliBackend, buildClaudeCliOptionsFromEnv } from './shell-cla
 import { CodexCliReasoningBackend } from './codex-cli-reasoning-backend.js';
 import type { CodexCliQueryOptions } from './codex-cli-query.js';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
+import { ShellGrokCliBackend, buildGrokCliOptionsFromEnv } from './shell-grok-cli-backend.js';
 import {
   peekProviderCapabilityRegistry,
   type ProviderCapability,
@@ -77,7 +82,8 @@ import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
  * Minimal structural shape returned by this resolver — declared
  * independently of `best-of-providers.ts`'s `BestOfProviderBackend` (same
  * shape) so this module never imports that file (see header). Real
- * `ShellClaudeCliBackend` / `CodexCliReasoningBackend` / `AgyCliBackend`
+ * `ShellClaudeCliBackend` / `CodexCliReasoningBackend` / `AgyCliBackend` /
+ * `ShellGrokCliBackend`
  * instances all satisfy this with no adapter (they implement the wider
  * `ReasoningBackend` interface, which is a superset).
  */
@@ -85,7 +91,7 @@ export interface ProviderBackendHandle {
   delegateTask(instruction: string, context?: string): Promise<string>;
 }
 
-const KNOWN_PROVIDERS = ['claude', 'codex', 'agy'] as const;
+const KNOWN_PROVIDERS = ['claude', 'codex', 'agy', 'grok'] as const;
 type KnownProvider = (typeof KNOWN_PROVIDERS)[number];
 
 function isKnownProvider(value: string): value is KnownProvider {
@@ -114,6 +120,7 @@ const DEFAULT_CONSTRUCTORS: Readonly<Record<KnownProvider, ProviderConstructor>>
   claude: (env) => new ShellClaudeCliBackend(buildClaudeCliOptionsFromEnv(env)),
   codex: (env) => new CodexCliReasoningBackend(readCodexOptionsWithoutSpawn(env)),
   agy: (env) => buildAgyCliBackendFromEnv(env) as AgyCliBackend | null,
+  grok: (env) => new ShellGrokCliBackend(buildGrokCliOptionsFromEnv(env)),
 };
 
 export interface ProviderBackendResolverOptions {
@@ -146,7 +153,7 @@ function isProviderAvailable(
 
 /**
  * Resolve a lazily-constructed, cached, delegate-capable backend for a
- * provider id ('claude' / 'codex' / 'agy', or a known reasoning
+ * provider id ('claude' / 'codex' / 'agy' / 'grok', or a known reasoning
  * mode/backend-name alias per `providerIdForReasoningIdentifier` — e.g.
  * 'shell-claude-cli'). Returns `null` for unknown or (per the XP-01
  * registry) unavailable providers. Never throws. Constructs only — never

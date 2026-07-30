@@ -118,6 +118,42 @@ describe('shell-grok-cli-backend', () => {
     expect(result).toEqual({ answer: 'pong' });
   });
 
+  it('routes native delegation through the injected Grok ACP adopter session', async () => {
+    const askNativeSubagent = vi.fn(async () => ({
+      text: 'native grok result',
+      stopReason: 'completed',
+      metadata: {
+        nativeSubagent: {
+          provider: 'grok',
+          parentThreadId: 'parent',
+          threadId: 'parent',
+          forked: false,
+          mode: 'acp-native-subagent',
+          effort: 'medium',
+        },
+      },
+    }));
+    const harnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent,
+      getRuntimeInfo: vi.fn(() => ({})),
+    };
+    const backend = new ShellGrokCliBackend({ harnessSession });
+    const adopter = backend.getNativeSubagentAdopter?.();
+
+    await expect(
+      adopter?.dispatch('investigate', 'ctx', { profile: 'explorer', effort: 'medium' })
+    ).resolves.toBe('native grok result');
+
+    expect(harnessSession.boot).toHaveBeenCalledOnce();
+    expect(askNativeSubagent).toHaveBeenCalledWith(
+      expect.stringContaining('Task: investigate'),
+      expect.objectContaining({ profile: 'explorer', subagent: true, effort: 'medium' })
+    );
+    expect(backend.requiresNativeSubagent?.()).toBe(true);
+  });
+
   describe('spawnCli env allowlisting (XP-02)', () => {
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     const previousUnrelated = process.env.UNRELATED_TEST_SECRET;

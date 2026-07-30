@@ -2,8 +2,9 @@
  * generate_subagent_definitions.ts — CT-01: role -> CLI subagent definition
  * generation ceremony (CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md §3 CT-01).
  *
- * Projects Kyberion's runtime-independent team contracts onto Claude Code's
- * subagent mechanism: `.claude/agents/<role>.md` files generated from
+ * Projects Kyberion's runtime-independent team contracts onto provider
+ * subagent mechanisms: `.claude/agents/<role>.md` and AGY's
+ * `.agents/agents/<name>/agent.md` files generated from
  *   - knowledge/product/orchestration/team-roles/<role>.json (team-role SSoT:
  *     description, compatible_authority_roles)
  *   - knowledge/product/roles/<authority-role>/PROCEDURE.md (condensed into
@@ -22,8 +23,8 @@
  * `generate_op_registry.ts --check` / `check:op-registry`.
  *
  * Usage:
- *   pnpm agents:generate                 — write .claude/agents/<role>.md
- *   pnpm check:subagent-definitions      — fail if any file drifted
+ *   pnpm agents:generate                 — write Claude and AGY definitions
+ *   pnpm check:subagent-definitions      — fail if any definition drifted
  */
 
 import * as path from 'node:path';
@@ -36,10 +37,17 @@ import {
   pathResolver,
   resolveCapabilityProfileForTeamRole,
   safeExistsSync,
+  safeMkdir,
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import {
+  buildAgyAgentDefinitionSource,
+  extractAgentDefinitionBody,
+  agyAgentName,
+  type AgyAgentProfile,
+} from './agy-agent-definition-adapter.js';
 
 export type SubagentProfileName = 'implementer' | 'explorer' | 'planner';
 
@@ -210,9 +218,14 @@ export function buildAgentDefinitionSource(role: string): string {
 }
 
 const AGENTS_DIR = pathResolver.rootResolve('.claude/agents');
+const AGY_AGENTS_DIR = pathResolver.rootResolve('.agents/agents');
 
 function targetPath(role: string): string {
   return path.join(AGENTS_DIR, `${role}.md`);
+}
+
+function agyTargetPath(role: string): string {
+  return path.join(AGY_AGENTS_DIR, agyAgentName(role), 'agent.md');
 }
 
 async function formatMarkdown(content: string, filePath: string): Promise<string> {
@@ -231,6 +244,24 @@ export async function buildGeneratedFiles(): Promise<Map<string, string>> {
   return built;
 }
 
+/** Build the AGY-specific projection from the same canonical role output. */
+export async function buildGeneratedAgyFiles(): Promise<Map<string, string>> {
+  const built = new Map<string, string>();
+  for (const role of GENERATED_ROLES) {
+    const source = buildAgentDefinitionSource(role);
+    const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
+    const profile = resolveProfile(role) as AgyAgentProfile;
+    const raw = buildAgyAgentDefinitionSource({
+      role,
+      description: description.replace(/^['"]|['"]$/g, ''),
+      profile,
+      body: extractAgentDefinitionBody(source),
+    });
+    built.set(role, await formatMarkdown(raw, agyTargetPath(role)));
+  }
+  return built;
+}
+
 function readIfExists(filePath: string): string | null {
   return safeExistsSync(filePath)
     ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
@@ -240,12 +271,19 @@ function readIfExists(filePath: string): string | null {
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const shouldCheck = argv.includes('--check');
   const built = await buildGeneratedFiles();
+  const agyBuilt = await buildGeneratedAgyFiles();
   const rootDir = pathResolver.rootDir();
 
   if (shouldCheck) {
     const drifted: string[] = [];
     for (const [role, content] of built) {
       const filePath = targetPath(role);
+      if (readIfExists(filePath) !== content) {
+        drifted.push(path.relative(rootDir, filePath));
+      }
+    }
+    for (const [role, content] of agyBuilt) {
+      const filePath = agyTargetPath(role);
       if (readIfExists(filePath) !== content) {
         drifted.push(path.relative(rootDir, filePath));
       }
@@ -261,8 +299,15 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   return withExecutionContext('generate_subagent_definitions', () => {
+    safeMkdir(AGY_AGENTS_DIR);
     for (const [role, content] of built) {
       const filePath = targetPath(role);
+      safeWriteFile(filePath, content);
+      console.log(`wrote ${path.relative(rootDir, filePath)}`);
+    }
+    for (const [role, content] of agyBuilt) {
+      const filePath = agyTargetPath(role);
+      safeMkdir(path.dirname(filePath));
       safeWriteFile(filePath, content);
       console.log(`wrote ${path.relative(rootDir, filePath)}`);
     }

@@ -98,6 +98,30 @@ describe('ClaudeAgentReasoningBackend', () => {
     expect(call.userPrompt).toBe('Task: do work');
   });
 
+  it('exposes governed Claude delegation through the provider-neutral adopter', async () => {
+    mocks.runClaudeAgentTask.mockResolvedValue({ text: 'native done', sessionId: 'claude-s1' });
+
+    const backend = new ClaudeAgentReasoningBackend();
+    const adopter = backend.getNativeSubagentAdopter?.();
+    const answer = await adopter?.dispatch('inspect the task', 'mission ctx', {
+      profile: 'explorer',
+      effort: 'medium',
+    });
+
+    expect(answer).toBe('native done');
+    expect(mocks.runClaudeAgentTask).toHaveBeenCalledTimes(1);
+    const call = mocks.runClaudeAgentTask.mock.calls[0][0];
+    expect(call.allowedTools).toEqual(['Read']);
+    expect(call.userPrompt).toBe('Task: inspect the task');
+    expect(backend.requiresNativeSubagent?.()).toBe(true);
+    expect(adopter?.getInfo?.()).toMatchObject({
+      provider: 'claude',
+      threadId: 'claude-s1',
+      mode: 'agent-sdk',
+      effort: 'medium',
+    });
+  });
+
   it('propagates transport errors without swallowing them', async () => {
     mocks.runClaudeAgentQuery.mockRejectedValue(new Error('rate_limited: 429'));
 

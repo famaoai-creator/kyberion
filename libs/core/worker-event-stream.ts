@@ -30,6 +30,7 @@ export const WORKER_EVENT_TYPES = [
   // delegation
   'subagent_begin',
   'subagent_end',
+  'subagent_unavailable',
   // governance
   'approval_request',
   'approval_response',
@@ -57,6 +58,7 @@ export interface WorkerEventPayloadMap {
   status_update: Record<string, unknown>;
   subagent_begin: Record<string, unknown>;
   subagent_end: Record<string, unknown>;
+  subagent_unavailable: Record<string, unknown>;
   approval_request: {
     request_id: string;
     correlation_id: string;
