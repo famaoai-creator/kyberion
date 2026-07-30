@@ -69,7 +69,19 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json`
 - Implementation status: scenario + workflow MVP を追加済み
 
-### 4. `meeting-to-proposal-pptx`
+### 4. `email-filter-and-organize`
+
+- User phrase example: `メールを条件ごとにラベル整理して`
+- Business outcome: メールサービスを問わず、検索条件と分類ルールから整理計画を作る
+- Input sources: email
+- First-run reasoning / setup questions: provider、検索条件、分類ルール、ラベル、アーカイブと削除の境界
+- Repeat-run behavior: 保存済み profile を読み、provider adapter に検索・ラベル操作を委譲できる計画を再利用する
+- Output artifacts: `email-filter-report.md`
+- Approval boundary: 削除とprovider側フィルター作成は要承認、既定は `draft-only`
+- Existing pipeline-template: `knowledge/product/pipeline-templates/email-filter-and-organize-workflow.json`
+- Implementation status: provider-neutral scenario + plan template + CLI smoke を追加済み。実際の外部書き込みはprovider adapter接続後に有効化する
+
+### 5. `meeting-to-proposal-pptx`
 
 - User phrase example: `商談メモから提案資料を作って`
 - Business outcome: 会議メモから提案書デッキを生成する
@@ -81,7 +93,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-to-pptx-workflow.json`
 - Implementation status: TaskScenario contract を追加済み
 
-### 5. `sales-inbound-response`
+### 6. `sales-inbound-response`
 
 - User phrase example: `問い合わせが来たら見込み度と返信案を作って`
 - Business outcome: インバウンド問い合わせを分類し、見込み度と返信下書きを作る
@@ -93,7 +105,7 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/sales-inbound-lead-workflow.json`
 - Implementation status: workflow は既存。repeatable task の profile 化が必要
 
-### 6. `weekly-executive-digest`
+### 7. `weekly-executive-digest`
 
 - User phrase example: `毎週月曜に経営・PJダイジェストを作って`
 - Business outcome: 経営・プロジェクトの要点を週次でまとめる

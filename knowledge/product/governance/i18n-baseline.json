@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-28T16:58:41.177Z",
+  "generated_at": "2026-07-30T13:21:03.544Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -43,6 +43,7 @@
     "satellites/slack-bridge",
     "satellites/telegram-bridge",
     "satellites/voice-hub",
+    "presence/displays/avatar-studio",
     "presence/displays/chronos-mirror-v2",
     "presence/displays/computer-surface",
     "presence/displays/concierge",
@@ -123,7 +124,7 @@
     "scripts/register_workflow.ts": 4,
     "scripts/run_pipeline.ts": 1,
     "scripts/run_realtime_voice_conversation.ts": 10,
-    "scripts/task_smoke.ts": 8,
+    "scripts/task_smoke.ts": 7,
     "scripts/test-insession.ts": 1,
     "scripts/virtual_office.ts": 41,
     "libs/actuators/calendar-actuator/src/calendar-actuator-helpers.ts": 1,

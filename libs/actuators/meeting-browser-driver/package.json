@@ -14,7 +14,7 @@
     "@agent/core": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "playwright": "^1.45.0"

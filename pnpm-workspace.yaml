@@ -17,8 +17,10 @@ allowBuilds:
   sqlite3: true
   tesseract.js: true
   unrs-resolver: true
+patchedDependencies:
+  mammoth@1.12.0: patches/mammoth@1.12.0.patch
 overrides:
-  marked: ^12.0.2
+  marked: ^18.0.7
   xmldom: npm:@xmldom/xmldom@^0.8.10
   trim-newlines: ^3.0.1
   jszip: ^3.10.1
@@ -26,7 +28,7 @@ overrides:
   esbuild: ^0.27.0
   nth-check: ^2.0.1
   '@hono/node-server': 1.19.13
-  '@xmldom/xmldom': 0.8.13
+  '@xmldom/xmldom': 0.9.10
   basic-ftp: 5.3.1
   express-rate-limit: 8.2.2
   fast-uri: 3.1.2
@@ -41,7 +43,7 @@ overrides:
   tinyglobby: 0.2.17
   tmp: 0.2.7
   undici: 6.27.0
-  ws: 8.21.0
+  ws: 8.21.1
   '@slack/bolt>path-to-regexp': 8.4.2
   'router>path-to-regexp': 8.4.2
   'express>path-to-regexp': 0.1.13

@@ -322,10 +322,13 @@ abstract class BaseACPAdapter implements AgentAdapter {
         async requestPermission(params) {
           const title = (params.toolCall?.title || '').toLowerCase();
           if (isSafeReadOnlyPermissionTitle(title)) {
-            return { outcome: 'approved' as const };
+            const optionId = params.options?.[0]?.optionId;
+            return optionId
+              ? { outcome: { outcome: 'selected' as const, optionId } }
+              : { outcome: { outcome: 'cancelled' as const } };
           }
           logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
-          return { outcome: 'denied' as const };
+          return { outcome: { outcome: 'cancelled' as const } };
         },
         async readTextFile(params) {
           throw new Error('Not implemented');

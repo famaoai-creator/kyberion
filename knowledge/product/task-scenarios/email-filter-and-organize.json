@@ -1,0 +1,39 @@
+{
+  "id": "email-filter-and-organize",
+  "title": "メールの自動振り分けと整理",
+  "description": "メールサービスに依存しない検索条件と分類ルールで受信メールを整理し、指定ラベルへ移動するための反復タスク。実行前に provider と書き込み操作の承認境界を確認する。",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 9 * * 1-5",
+    "timezone": "Asia/Tokyo"
+  },
+  "input": {
+    "sources": ["email"],
+    "required_params": ["provider", "target_query", "classification_rule", "destination_label"],
+    "optional_params": ["remove_from_inbox", "batch_size", "create_provider_filter"]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "利用するメールサービスとアカウントは何か",
+      "対象とする検索クエリやキーワードは何か",
+      "どの分類ルールでメールを振り分けるか",
+      "移動先のラベル名またはフォルダ名は何か",
+      "受信トレイからアーカイブするか。削除は別途承認するか"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/email-filter-and-organize.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/email-filter-and-organize-workflow.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/email-filter-and-organize.json"
+  },
+  "result": {
+    "artifacts": ["email-filter-report.md"],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["delete_email", "create_provider_filter"],
+    "default_action": "draft-only"
+  }
+}
