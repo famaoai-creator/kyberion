@@ -41,6 +41,7 @@ export interface AgentCollaborationEvent {
   native?: boolean;
   native_fork?: boolean;
   native_mode?: string;
+  effort?: 'low' | 'medium' | 'high' | 'ultra';
   native_unavailable?: boolean;
   actor_type: CollaborationActorType;
   kind: CollaborationKind;
@@ -105,6 +106,7 @@ export function createAgentCollaborationEvent(
     ...(input.native !== undefined ? { native: input.native } : {}),
     ...(input.native_fork !== undefined ? { native_fork: input.native_fork } : {}),
     ...(input.native_mode ? { native_mode: input.native_mode } : {}),
+    ...(input.effort ? { effort: input.effort } : {}),
     ...(input.native_unavailable !== undefined
       ? { native_unavailable: input.native_unavailable }
       : {}),

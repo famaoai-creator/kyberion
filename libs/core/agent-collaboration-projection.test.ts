@@ -138,6 +138,7 @@ describe('agent collaboration projection', () => {
         native: true,
         native_fork: true,
         native_mode: 'thread-fork',
+        effort: 'medium',
         parent_thread_id: 'parent-thread',
         thread_id: 'child-thread',
         turn_id: 'turn-1',
@@ -158,6 +159,7 @@ describe('agent collaboration projection', () => {
       thread_id: 'child-thread',
       parent_thread_id: 'parent-thread',
       native_fork: true,
+      effort: 'medium',
     });
   });
 
