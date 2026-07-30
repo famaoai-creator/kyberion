@@ -16,7 +16,7 @@
   "steps": [
     {
       "id": "prepare_filter_plan",
-      "role": "planner",
+      "role": "sink",
       "op": "system:write_artifact",
       "produces": { "channel": "email_filter_plan", "type": "EmailFilterPlan" },
       "params": {
