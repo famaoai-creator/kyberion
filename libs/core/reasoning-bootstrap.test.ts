@@ -122,6 +122,15 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('codex-cli+harness-subagent');
   });
 
+  it('connects Claude Agent to the provider-neutral harness dispatcher when opted in', () => {
+    process.env.KYBERION_HARNESS_SUBAGENT = '1';
+
+    const installed = installReasoningBackends({ mode: 'claude-agent', force: true });
+
+    expect(installed).toBe(true);
+    expect(getReasoningBackend().name).toBe('claude-agent+harness-subagent');
+  });
+
   it('installs agy-cli adapters when requested explicitly', () => {
     const installed = installReasoningBackends({ mode: 'agy-cli', force: true });
 

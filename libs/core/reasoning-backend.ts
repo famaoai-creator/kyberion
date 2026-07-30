@@ -3,16 +3,14 @@
  *
  * Implements the contract layer of CONCEPT_INTEGRATION_BACKLOG P2-1.
  * Per the CLI harness coordination model, Kyberion owns the contract
- * (what to produce) but delegates the *reasoning* to the host CLI
- * (Claude Code, Codex, Gemini) or, in limited cases, an in-process LLM
- * client. This module exposes a small abstract surface so call sites
- * (decision-ops, compilers, workflows) never embed a specific reasoning
- * implementation.
+ * (what to produce) but delegates the *reasoning* to an external provider
+ * runtime or, in limited cases, an in-process LLM client. This module exposes
+ * a small abstract surface so call sites (decision-ops, compilers, workflows)
+ * never embed a specific reasoning implementation.
  *
  * Default backend is `stub` — deterministic, offline, returns structured
  * placeholders and logs a warning. Real backends (e.g. a host-CLI
- * adapter that shells out to the containing Claude Code session) are
- * registered via `registerReasoningBackend`.
+ * adapter) are registered via `registerReasoningBackend`.
  */
 
 import { logger } from './core.js';
@@ -442,8 +440,8 @@ export interface ReasoningCallOptions {
   budget?: ReasoningCallBudget;
   /**
    * Task-weight routing hint (from resolveTaskModelHint / cognitive routing):
-   * backends map this to a concrete model — e.g. the claude-cli backend maps
-   * fast→haiku, standard→sonnet, deep→opus. Absent = backend default.
+   * backends map this to a concrete model according to their own provider
+   * policy. Absent = backend default.
    */
   model_tier?: 'fast' | 'standard' | 'deep';
   /** Cancellation propagated by delegateTaskHandle to killable providers. */
@@ -1635,7 +1633,7 @@ export const stubReasoningBackend: ReasoningBackend = {
       open_questions: [
         {
           question:
-            '[STUB] No real reasoning backend is registered — register AnthropicReasoningBackend or ClaudeAgentReasoningBackend and re-run.',
+            '[STUB] No real reasoning backend is registered — register a provider backend and re-run.',
           status: 'open',
         },
       ],
@@ -1685,8 +1683,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   async decomposeIntoTasks(_input) {
     recordStubServed('decomposeIntoTasks');
     return {
-      strategy_summary:
-        '[STUB] No real backend registered. Register AnthropicReasoningBackend or ClaudeAgentReasoningBackend.',
+      strategy_summary: '[STUB] No real backend registered. Register a provider backend.',
       tasks: [
         {
           task_id: 'T-STUB-1',
