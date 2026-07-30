@@ -173,6 +173,13 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
   return allowPatterns.some((pattern) => pattern.test(normalized));
 }
 
+function isNativeSubagentToolCall(toolCall: any): boolean {
+  if (!toolCall || typeof toolCall !== 'object') return false;
+  return [toolCall.name, toolCall.title, toolCall.toolName, toolCall.tool_name]
+    .filter((value): value is string => typeof value === 'string')
+    .some((value) => /(?:^|[_:.-])spawn[_:.-]?subagent(?:$|[_:.-])/i.test(value));
+}
+
 async function applyEnhancersBeforeAsk(
   enhancers: AgentEnhancer[],
   prompt: string,
@@ -237,9 +244,23 @@ abstract class BaseACPAdapter implements AgentAdapter {
     protected authMethod: string = 'oauth-personal'
   ) {}
 
+  protected async requestPermission(params: any): Promise<any> {
+    const title = (params.toolCall?.title || '').toLowerCase();
+    if (isSafeReadOnlyPermissionTitle(title)) {
+      const optionId = params.options?.[0]?.optionId;
+      return optionId
+        ? { outcome: { outcome: 'selected' as const, optionId } }
+        : { outcome: { outcome: 'cancelled' as const } };
+    }
+    logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
+    return { outcome: { outcome: 'cancelled' as const } };
+  }
+
   public addEnhancer(enhancer: AgentEnhancer): void {
     registerEnhancer(this.enhancers, enhancer);
   }
+
+  protected handleSessionUpdate(_params: any): void {}
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
@@ -263,6 +284,11 @@ abstract class BaseACPAdapter implements AgentAdapter {
       },
     });
     this.child = managed.child;
+    this.child.stdin?.on('error', (error) => {
+      logger.warn(
+        `[UAA] Provider stdio input closed: ${error instanceof Error ? error.message : error}`
+      );
+    });
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -296,6 +322,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       (agent) => ({
         sessionUpdate: async (params: any) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
+          this.handleSessionUpdate(params);
 
           // RECURSIVE SCAN for text/thought chunks
           const findContent = (obj: any) => {
@@ -328,17 +355,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
           findContent(params);
         },
-        async requestPermission(params) {
-          const title = (params.toolCall?.title || '').toLowerCase();
-          if (isSafeReadOnlyPermissionTitle(title)) {
-            const optionId = params.options?.[0]?.optionId;
-            return optionId
-              ? { outcome: { outcome: 'selected' as const, optionId } }
-              : { outcome: { outcome: 'cancelled' as const } };
-          }
-          logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
-          return { outcome: { outcome: 'cancelled' as const } };
-        },
+        requestPermission: (params) => this.requestPermission(params),
         async readTextFile(params) {
           throw new Error('Not implemented');
         },
@@ -504,6 +521,151 @@ export class GeminiAdapter extends BaseACPAdapter {
     } catch (err) {
       logger.warn(`suppressed error in boot: ${err}`);
     }
+  }
+}
+
+export interface GrokAdapterOptions {
+  bin?: string;
+  model?: string;
+  leaderSocket?: string;
+}
+
+/**
+ * Grok Build ACP adapter. One long-lived `grok agent stdio` process owns the
+ * parent session; native delegation asks that session to use Grok's native
+ * `spawn_subagent` capability without creating another provider process.
+ */
+export class GrokAdapter extends BaseACPAdapter {
+  private readonly model?: string;
+  private activePermissionMode: 'read-only' | 'workspace-write' = 'read-only';
+  private lastNativeSubagentInfo: Record<string, unknown> | null = null;
+
+  constructor(options: GrokAdapterOptions = {}) {
+    super(
+      options.bin ?? 'grok',
+      [
+        'agent',
+        'stdio',
+        ...(options.leaderSocket ? ['--leader-socket', options.leaderSocket] : []),
+      ],
+      {
+        authenticate: 'authenticate',
+        newSession: 'session/new',
+        prompt: 'session/prompt',
+      },
+      'oauth-personal'
+    );
+    this.model = options.model;
+  }
+
+  public async boot(): Promise<void> {
+    await super.boot();
+    if (this.model) {
+      try {
+        await this.connection?.extMethod('session/set_model', {
+          sessionId: this.acpSessionId,
+          modelId: this.model,
+        });
+      } catch (err) {
+        logger.warn(`[UAA] Grok model selection was not accepted: ${err}`);
+      }
+    }
+  }
+
+  protected async requestPermission(params: any): Promise<any> {
+    if (isNativeSubagentToolCall(params.toolCall)) this.nativeSubagentObserved = true;
+    if (this.activePermissionMode === 'workspace-write') {
+      const option = params.options?.find((candidate: any) =>
+        ['allow_once', 'allow_always'].includes(candidate?.kind || candidate?.optionId)
+      );
+      if (option?.optionId) {
+        return { outcome: { outcome: 'selected' as const, optionId: option.optionId } };
+      }
+    }
+    return super.requestPermission(params);
+  }
+
+  private nativeSubagentObserved = false;
+
+  protected handleSessionUpdate(params: any): void {
+    const update = params?.update ?? params;
+    if (
+      isNativeSubagentToolCall(params?.toolCall) ||
+      isNativeSubagentToolCall(update?.toolCall) ||
+      isNativeSubagentToolCall(update?.tool_call)
+    ) {
+      this.nativeSubagentObserved = true;
+      return;
+    }
+
+    // The available-commands notification advertises `spawn_subagent` in a
+    // tools list; it is not evidence that the model invoked it. Only inspect
+    // protocol updates whose kind represents an actual tool/subagent event.
+    const updateKind = String(update?.sessionUpdate ?? params?._meta?.updateType ?? '');
+    if (!/(tool|subagent)/i.test(updateKind)) return;
+    const serialized = JSON.stringify(update);
+    if (/spawn[_-]?subagent|subagent[_-]?(?:id|completed)/i.test(serialized)) {
+      this.nativeSubagentObserved = true;
+    }
+  }
+
+  public async askNativeSubagent(
+    prompt: string,
+    options: AgentAskOptions = {}
+  ): Promise<AgentResponse> {
+    if (process.env.GROK_SUBAGENTS === '0') {
+      throw new Error(
+        '[SUBAGENT_UNAVAILABLE] Grok native subagents are disabled by GROK_SUBAGENTS=0.'
+      );
+    }
+    if (!this.connection || !this.acpSessionId) {
+      throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP session is not booted.');
+    }
+
+    const parentSessionId = this.acpSessionId;
+    const previousPermissionMode = this.activePermissionMode;
+    this.nativeSubagentObserved = false;
+    this.activePermissionMode = options.profile === 'implementer' ? 'workspace-write' : 'read-only';
+    try {
+      const response = await super.ask(
+        [
+          'Use the provider-native spawn_subagent capability exactly once for this bounded task.',
+          'Do not solve the task in the parent session; return the delegated task result only after the subagent completes.',
+          prompt,
+        ].join('\n\n'),
+        { ...options, subagent: true }
+      );
+      if (!this.nativeSubagentObserved) {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] Grok completed without an observable native spawn_subagent event.'
+        );
+      }
+      this.lastNativeSubagentInfo = {
+        provider: 'grok',
+        parentThreadId: parentSessionId,
+        threadId: parentSessionId,
+        forked: false,
+        mode: 'acp-native-subagent',
+        effort: options.effort ?? 'medium',
+      };
+      return {
+        ...response,
+        metadata: {
+          ...(response.metadata || {}),
+          nativeSubagent: this.lastNativeSubagentInfo,
+        },
+      };
+    } finally {
+      this.activePermissionMode = previousPermissionMode;
+    }
+  }
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      ...super.getRuntimeInfo(),
+      supportsNativeSubagents: process.env.GROK_SUBAGENTS !== '0',
+      lastNativeSubagent: this.lastNativeSubagentInfo,
+    };
   }
 }
 
@@ -900,7 +1062,7 @@ export class AgyAdapter implements AgentAdapter {
   }
 }
 
-export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy';
+export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok';
 
 export interface CodexAppServerAdapterOptions {
   model?: string;
@@ -1755,6 +1917,7 @@ const AGENT_ADAPTER_FACTORIES: Record<BuiltinAgentProvider, AgentAdapterFactory>
   codex: () => createCodexAdapterFromEnv(),
   claude: () => new ClaudeAdapter(),
   agy: () => new AgyAdapter(),
+  grok: () => new GrokAdapter(),
 };
 
 function extractUsageSummary(payload: unknown): Record<string, unknown> | null {

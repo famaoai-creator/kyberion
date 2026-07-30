@@ -68,6 +68,19 @@ describe('agy-cli-backend', () => {
     expect(backend?.name).toBe('agy-cli');
   });
 
+  it('exposes an adopter that fails closed because AGY has no verified native surface', async () => {
+    const backend = new AgyCliBackend({ bin: 'agy', model: 'agy' });
+    const adopter = backend.getNativeSubagentAdopter?.();
+
+    await expect(adopter?.dispatch('native task')).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
+    expect(adopter?.id).toBe('agy-cli');
+    expect(backend.requiresNativeSubagent?.()).toBe(true);
+    expect(adopter?.getInfo?.()).toMatchObject({
+      provider: 'agy',
+      mode: 'unsupported-native-surface',
+    });
+  });
+
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
     spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: '{"ok":true}' })));
 
