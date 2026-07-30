@@ -8,6 +8,7 @@ import {
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import * as pathResolver from './path-resolver.js';
 import {
   delegationChildHandleFromChildProcess,
@@ -144,6 +145,7 @@ export class AgyCliBackend implements ReasoningBackend {
   private readonly extraArgs: string[];
   private readonly sandbox: boolean;
   private readonly logFile: string;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: AgyCliBackendOptions = {}) {
     this.bin = options.bin ?? 'agy';
@@ -157,6 +159,15 @@ export class AgyCliBackend implements ReasoningBackend {
         pathResolver.sharedTmp(),
         `agy-cli-${Date.now()}-${Math.random().toString(36).slice(2)}.log`
       );
+    this.nativeSubagentAdopter = {
+      id: 'agy-cli',
+      dispatch: async () => {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] AGY CLI has no verified native subagent protocol; legacy CLI delegation remains available outside harness mode.'
+        );
+      },
+      getInfo: () => ({ provider: 'agy', mode: 'unsupported-native-surface' }),
+    };
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -318,6 +329,14 @@ export class AgyCliBackend implements ReasoningBackend {
       options?.profile,
       options?.signal
     );
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter {
+    return this.nativeSubagentAdopter;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return true;
   }
 
   async prompt(
