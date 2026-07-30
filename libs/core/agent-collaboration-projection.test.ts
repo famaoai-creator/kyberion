@@ -87,6 +87,20 @@ describe('agent collaboration projection', () => {
     expect(projection.events[0]?.mission_id).toBe('MSN-A');
   });
 
+  it('fails closed when filtering the collaboration projection by tenant', () => {
+    const projection = composeAgentCollaborationProjection(
+      [
+        event({ source_event_id: 'tenant-a', tenant_slug: 'client-a' }),
+        event({ source_event_id: 'tenant-b', tenant_slug: 'client-b' }),
+        event({ source_event_id: 'unscoped' }),
+      ],
+      { tenant: 'client-a' }
+    );
+
+    expect(projection.events).toHaveLength(1);
+    expect(projection.events[0]?.tenant_slug).toBe('client-a');
+  });
+
   it('surfaces sequence gaps and stale active runtime state', () => {
     const projection = composeAgentCollaborationProjection(
       [
