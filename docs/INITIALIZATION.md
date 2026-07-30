@@ -111,6 +111,7 @@ dry-runで書き込み範囲を確認してから同じコマンドを実行し�
 
 - Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) → `.venv/bin/python3` → `python3` の順で解決されます。
 - `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
+- AGY native subagent を使う場合は、公式 SDK を managed runtime へ `pnpm agy:sdk:setup --apply`（内部では `uv venv` + `uv pip install`）で導入できます。Python 3.10+ が必要で、任意の Python 実行ファイルは `KYBERION_AGY_SDK_PYTHON` で上書きできます。
 - 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
 
 ### Stage 4: Runtime Surface Setup

@@ -31,6 +31,34 @@
       "notes": "Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval."
     },
     {
+      "tool_id": "agy_sdk",
+      "display_name": "Antigravity Python SDK Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": ["--from", "google-antigravity", "python", "-c", "import google.antigravity"],
+        "description": "Probe the official Antigravity SDK in an isolated uvx environment."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "google-antigravity"],
+        "description": "Install the official Antigravity SDK into Kyberion's managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import google.antigravity; print('ok')"],
+        "description": "Re-check the installed Antigravity SDK runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/agy-sdk",
+      "notes": "Python 3.10+ runtime for the official Antigravity SDK native-subagent bridge. Install through pnpm agy:sdk:setup."
+    },
+    {
       "tool_id": "playwright",
       "display_name": "Playwright Chromium Runtime",
       "ecosystem": "node",

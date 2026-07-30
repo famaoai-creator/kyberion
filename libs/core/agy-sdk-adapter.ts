@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
+import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 
 interface BridgeResponse {
   id?: string;
@@ -64,7 +65,11 @@ export class AgySdkAdapter {
     if (this.ready) return;
     if (this.bootPromise) return this.bootPromise;
     this.bootPromise = new Promise<void>((resolve, reject) => {
-      const python = this.options.pythonBin ?? process.env.KYBERION_AGY_SDK_PYTHON ?? 'python3';
+      const python =
+        this.options.pythonBin ??
+        process.env.KYBERION_AGY_SDK_PYTHON ??
+        resolveManagedToolPythonBin('agy_sdk') ??
+        'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
       const sdkApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
       const child = (this.options.spawnProcess ?? spawn)(python, [script], {
