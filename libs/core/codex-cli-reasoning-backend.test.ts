@@ -85,32 +85,36 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     expect(arg.userPrompt).toContain('Task: do it');
   });
 
-  it('dispatchHarnessSubagent reuses one injected app-server session for multiple tasks', async () => {
+  it('native adopter reuses one injected app-server session for multiple tasks', async () => {
     const session: CodexHarnessSession = {
       boot: vi.fn(async () => undefined),
-      ask: vi.fn(async (prompt, options) => ({
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async (prompt, options) => ({
         text: `native:${prompt}`,
         stopReason: 'completed',
         trace: [{ enhancer: 'test', action: String(options?.subagent) }],
       })),
     };
     const backend = new CodexCliReasoningBackend({ harnessSession: session });
+    const adopter = backend.getNativeSubagentAdopter?.();
+    expect(adopter?.id).toBe('codex-app-server');
 
     const results = await Promise.all([
-      backend.dispatchHarnessSubagent('task-a', 'ctx-a', { profile: 'implementer' }),
-      backend.dispatchHarnessSubagent('task-b', 'ctx-b', { profile: 'explorer' }),
+      adopter!.dispatch('task-a', 'ctx-a', { profile: 'implementer' }),
+      adopter!.dispatch('task-b', 'ctx-b', { profile: 'explorer' }),
     ]);
 
     expect(results[0]).toContain('task-a');
     expect(results[1]).toContain('task-b');
     expect(session.boot).toHaveBeenCalledOnce();
-    expect(session.ask).toHaveBeenCalledTimes(2);
-    expect((session.ask as any).mock.calls[0][1]).toMatchObject({
+    expect(session.askNativeSubagent).toHaveBeenCalledTimes(2);
+    expect(session.ask).not.toHaveBeenCalled();
+    expect((session.askNativeSubagent as any).mock.calls[0][1]).toMatchObject({
       profile: 'implementer',
       subagent: true,
       sandboxPolicy: { type: 'workspaceWrite', networkAccess: false },
     });
-    expect((session.ask as any).mock.calls[1][1]).toMatchObject({
+    expect((session.askNativeSubagent as any).mock.calls[1][1]).toMatchObject({
       profile: 'explorer',
       subagent: true,
       sandboxPolicy: { type: 'readOnly', networkAccess: false },
@@ -126,7 +130,7 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     const backend = new CodexCliReasoningBackend({ harnessSession: session });
 
     await expect(
-      backend.dispatchHarnessSubagent('plan only', undefined, { profile: 'planner' })
+      backend.getNativeSubagentAdopter?.()!.dispatch('plan only', undefined, { profile: 'planner' })
     ).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
     expect(session.boot).not.toHaveBeenCalled();
     expect(session.ask).not.toHaveBeenCalled();

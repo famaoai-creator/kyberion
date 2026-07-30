@@ -19,14 +19,7 @@ export type CollaborationKind =
   | 'completion'
   | 'unknown';
 export type CollaborationSource =
-  | 'mission'
-  | 'task'
-  | 'worker'
-  | 'orchestration'
-  | 'a2a'
-  | 'trace'
-  | 'surface'
-  | 'runtime';
+  'mission' | 'task' | 'worker' | 'orchestration' | 'a2a' | 'trace' | 'surface' | 'runtime';
 export type CollaborationRedaction = 'summary' | 'reference_only' | 'redacted';
 
 export interface AgentCollaborationEvent {
@@ -40,6 +33,15 @@ export interface AgentCollaborationEvent {
   agent_id?: string;
   parent_agent_id?: string;
   session_id?: string;
+  provider?: string;
+  adopter_id?: string;
+  thread_id?: string;
+  parent_thread_id?: string;
+  turn_id?: string;
+  native?: boolean;
+  native_fork?: boolean;
+  native_mode?: string;
+  native_unavailable?: boolean;
   actor_type: CollaborationActorType;
   kind: CollaborationKind;
   state_before?: string;
@@ -95,6 +97,17 @@ export function createAgentCollaborationEvent(
     ...(input.agent_id ? { agent_id: input.agent_id } : {}),
     ...(input.parent_agent_id ? { parent_agent_id: input.parent_agent_id } : {}),
     ...(input.session_id ? { session_id: input.session_id } : {}),
+    ...(input.provider ? { provider: input.provider } : {}),
+    ...(input.adopter_id ? { adopter_id: input.adopter_id } : {}),
+    ...(input.thread_id ? { thread_id: input.thread_id } : {}),
+    ...(input.parent_thread_id ? { parent_thread_id: input.parent_thread_id } : {}),
+    ...(input.turn_id ? { turn_id: input.turn_id } : {}),
+    ...(input.native !== undefined ? { native: input.native } : {}),
+    ...(input.native_fork !== undefined ? { native_fork: input.native_fork } : {}),
+    ...(input.native_mode ? { native_mode: input.native_mode } : {}),
+    ...(input.native_unavailable !== undefined
+      ? { native_unavailable: input.native_unavailable }
+      : {}),
     actor_type: input.actor_type,
     kind: input.kind,
     ...(input.state_before ? { state_before: input.state_before } : {}),
@@ -114,6 +127,8 @@ export function createAgentCollaborationEvent(
 
 export function collaborationKindFromEventType(eventType: unknown): CollaborationKind {
   const type = String(eventType || '').toLowerCase();
+  if (type.includes('subagent_unavailable')) return 'failure';
+  if (type.includes('subagent')) return 'spawn';
   if (type.includes('dispatch') || type.includes('issue')) return 'dispatch';
   if (type.includes('claim') || type.includes('lease')) return 'claim';
   if (type.includes('spawn') || type.includes('prewarm') || type.includes('runtime'))

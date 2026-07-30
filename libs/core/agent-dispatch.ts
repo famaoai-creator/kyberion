@@ -351,10 +351,11 @@ export interface HarnessSubagentDispatcherDeps {
  * `systemPromptPrefix` is prepended to the sub-agent's system prompt.
  *
  * Selected via `KYBERION_HARNESS_SUBAGENT=1` (see {@link maybeWrapWithDispatcher}).
- * Claude keeps its historical SDK-unavailable fallback. Codex is different:
- * when its app-server/native-subagent capability is unavailable, the
- * dispatcher emits `subagent_unavailable` and fails closed rather than
- * pretending that a process-spawn delegation was a native subagent.
+ * Backends may adopt a provider-native surface through the
+ * `NativeSubagentAdopter` contract. If a backend marks native adoption as
+ * required but its adopter is unavailable, the dispatcher emits
+ * `subagent_unavailable` and fails closed rather than pretending that a
+ * process-spawn delegation was native.
  */
 export class HarnessSubagentDispatcher implements AgentDispatcher {
   readonly name = 'harness-subagent';
@@ -391,35 +392,30 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       profile: profile.name,
     });
 
-    const provider = resolveDelegationProvider(backend);
-    if (provider === 'codex') {
-      if (!backend.dispatchHarnessSubagent) {
-        const reason =
-          'Codex backend does not expose a provider-native app-server subagent session.';
-        this.emitUnavailable(stream, profile.name, reason);
-        throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
-      }
+    const nativeAdopter = backend.getNativeSubagentAdopter?.();
+    if (nativeAdopter) {
       try {
-        const result = await backend.dispatchHarnessSubagent(instruction, context, {
+        const result = await nativeAdopter.dispatch(instruction, context, {
           ...options,
           profile: profile.name,
         });
         this.emit(stream, 'subagent_end', {
           dispatcher: this.name,
-          provider,
+          adopter_id: nativeAdopter.id,
           profile: profile.name,
           status: 'success',
           native: true,
+          ...nativeHarnessEventFields(nativeAdopter.id, nativeAdopter.getInfo?.()),
         });
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) {
-          this.emitUnavailable(stream, profile.name, message, provider);
+          this.emitUnavailable(stream, profile.name, message, nativeAdopter.id);
         } else {
           this.emit(stream, 'subagent_end', {
             dispatcher: this.name,
-            provider,
+            adopter_id: nativeAdopter.id,
             profile: profile.name,
             status: 'failure',
             error: message,
@@ -427,6 +423,13 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
         }
         throw err;
       }
+    }
+
+    if (backend.requiresNativeSubagent?.()) {
+      const reason =
+        'The selected backend requires a native subagent adopter, but none is available.';
+      this.emitUnavailable(stream, profile.name, reason);
+      throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
     }
 
     let runtime: GovernedHarnessRuntime;
@@ -517,17 +520,34 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
     stream: WorkerEventStream,
     profile: string,
     reason: string,
-    provider = 'codex'
+    adopterId?: string
   ): void {
     logger.warn(`[agent-dispatch:harness-subagent] Native subagent unavailable: ${reason}`);
     this.emit(stream, 'subagent_unavailable', {
       dispatcher: this.name,
-      provider,
       profile,
+      ...(adopterId ? { adopter_id: adopterId } : {}),
       reason,
       fallback_allowed: false,
+      native_unavailable: true,
     });
   }
+}
+
+function nativeHarnessEventFields(
+  adopterId: string,
+  info: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  if (!info) return { adopter_id: adopterId };
+  return {
+    adopter_id: adopterId,
+    ...(typeof info.provider === 'string' ? { provider: info.provider } : {}),
+    ...(typeof info.parentThreadId === 'string' ? { parent_thread_id: info.parentThreadId } : {}),
+    ...(typeof info.threadId === 'string' ? { thread_id: info.threadId } : {}),
+    ...(typeof info.turnId === 'string' ? { turn_id: info.turnId } : {}),
+    ...(typeof info.forked === 'boolean' ? { native_fork: info.forked } : {}),
+    ...(typeof info.mode === 'string' ? { native_mode: info.mode } : {}),
+  };
 }
 
 /**

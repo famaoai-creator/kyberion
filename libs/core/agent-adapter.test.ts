@@ -242,4 +242,59 @@ describe('CodexAppServerAdapter', () => {
     await expect(pending).rejects.toThrow('cancelled');
     expect(requests.map((request) => request.method)).toEqual(['turn/start', 'turn/interrupt']);
   });
+
+  it('forks a completed parent rollout into a native child thread on the same process', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
+    const requests: any[] = [];
+    const fakeChild: any = {
+      stdin: {
+        writable: true,
+        write(payload: string) {
+          const request = JSON.parse(payload);
+          requests.push(request);
+          if (request.method === 'thread/fork') {
+            setTimeout(() => {
+              (adapter as any).handleMessage({
+                id: request.id,
+                result: { thread: { id: 'thread-child' } },
+              });
+            }, 0);
+          } else if (request.method === 'turn/start') {
+            setTimeout(() => {
+              (adapter as any).handleMessage({
+                id: request.id,
+                result: { turn: { id: 'turn-child-1' } },
+              });
+              (adapter as any).handleMessage({
+                method: 'item/agentMessage/delta',
+                params: { threadId: 'thread-child', turnId: 'turn-child-1', delta: 'child result' },
+              });
+              (adapter as any).handleMessage({
+                method: 'turn/completed',
+                params: { turn: { id: 'turn-child-1', status: 'completed' } },
+              });
+            }, 0);
+          }
+          return true;
+        },
+      },
+    };
+    (adapter as any).child = fakeChild;
+    (adapter as any).threadId = 'thread-root';
+
+    const response = await adapter.askNativeSubagent('fork this', { approvalMode: 'strict' });
+
+    expect(response.text).toBe('child result');
+    expect(response.metadata).toMatchObject({
+      nativeSubagent: {
+        parentThreadId: 'thread-root',
+        threadId: 'thread-child',
+        forked: true,
+        mode: 'thread-fork',
+      },
+    });
+    expect(requests.map((request) => request.method)).toEqual(['thread/fork', 'turn/start']);
+    expect(requests[1].params.threadId).toBe('thread-child');
+    expect(requests[1].params.effort).toBe('ultra');
+  });
 });

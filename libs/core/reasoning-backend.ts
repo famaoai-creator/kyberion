@@ -45,6 +45,7 @@ import {
 import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
 import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -524,12 +525,10 @@ export interface ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string>;
-  /** Optional provider-native harness delegation (for example Codex app-server). */
-  dispatchHarnessSubagent?(
-    instruction: string,
-    context?: string,
-    options?: ReasoningCallOptions
-  ): Promise<string>;
+  /** Optional adopter for a provider-native subagent surface. */
+  getNativeSubagentAdopter?(): NativeSubagentAdopter | null;
+  /** Whether this backend requires the native adopter when delegation is requested. */
+  requiresNativeSubagent?(): boolean;
   /** Start an id-addressable delegation that can be joined or cancelled. */
   delegateTaskHandle?(
     instruction: string,
