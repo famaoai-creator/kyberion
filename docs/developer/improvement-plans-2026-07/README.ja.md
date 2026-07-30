@@ -10,7 +10,7 @@
 > **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
 > **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
 > **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
-> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
+> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜05: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + Claude governed path + Codex app-server 内 logical subagent/thread + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
 > **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
 > **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
 > **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
@@ -329,14 +329,15 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### CLI サブエージェント・チーム(単一プロバイダ CLI 内のチーム構成・連携)
 
-単一 LLM プロバイダの CLI(Claude Code / Agent SDK)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への 1 クラス追加)として実現する。agent-runtime(A2A)の置き換えではなく代替実行面。
+単一 LLM プロバイダの CLI(Claude Code / Codex app-server 等)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜05 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への provider adapter 追加)として実現する。Claude は governed Agent SDK path、Codex は既存 app-server 内の logical subagent/thread を使い、タスクごとの新規 CLI spawn は行わない。agent-runtime(A2A)の置き換えではなく代替実行面。
 
-| ID    | タイトル                                                       | 優先度 | 規模 | 依存            |
-| ----- | -------------------------------------------------------------- | ------ | ---- | --------------- |
-| CT-01 | 役割→サブエージェント定義の生成儀式(`.claude/agents/` SSoT 化) | P1     | M    | KD-05(実装済み) |
-| CT-02 | `HarnessSubagentDispatcher` の追加と配線                       | P1     | M    | CT-01           |
-| CT-03 | ファイル契約によるチーム連携の実証(E2E)                        | P2     | M    | CT-02           |
-| CT-04 | 実行面の使い分け基準と文書化                                   | P2     | S    | CT-02           |
+| ID    | タイトル                                                  | 優先度 | 規模 | 依存                       |
+| ----- | --------------------------------------------------------- | ------ | ---- | -------------------------- |
+| CT-01 | 役割→サブエージェント定義の生成儀式(provider projection)  | P1     | M    | KD-05(実装済み)            |
+| CT-02 | provider-neutral `HarnessSubagentDispatcher` の追加と配線 | P1     | M    | CT-01                      |
+| CT-03 | ファイル契約によるチーム連携の実証(E2E)                   | P2     | M    | CT-02                      |
+| CT-04 | 実行面の使い分け基準と文書化                              | P2     | S    | CT-02                      |
+| CT-05 | Codex app-server 内の spawn-less subagent 委譲            | P1     | M〜L | CT-01・CT-02・XP-01・XP-02 |
 
 ### クロスプロバイダ実行(複数 LLM プロバイダ CLI の併走規約)
 
