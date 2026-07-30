@@ -14,6 +14,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/agent-adapter.ts',
   'libs/core/agent-lifecycle.ts',
   'libs/core/agy-cli-backend.ts',
+  'libs/core/agy-sdk-adapter.ts',
   'libs/core/audio-playback.ts',
   'libs/core/audit-forwarder.ts',
   'libs/core/codex-cli-query.ts',
