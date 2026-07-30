@@ -63,6 +63,7 @@ export interface AgentResponse {
   thought?: string;
   stopReason: string;
   trace?: Array<{ enhancer: string; action: string; details?: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentAskOptions extends Record<string, unknown> {
@@ -70,6 +71,14 @@ export interface AgentAskOptions extends Record<string, unknown> {
   intentId?: string;
   tags?: string[];
   responseMimeType?: 'text/plain' | 'application/json';
+  /** Abort the active provider turn without restarting the app-server process. */
+  signal?: AbortSignal;
+  /** Ask a provider-native harness to use its subagent mode for this turn. */
+  subagent?: boolean;
+  /** Native subagent reasoning effort; adopters may map this to provider controls. */
+  effort?: 'low' | 'medium' | 'high' | 'ultra';
+  /** Per-turn approval projection for a governed provider profile. */
+  approvalMode?: 'strict' | 'relaxed';
 }
 
 /**
@@ -164,6 +173,13 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
   return allowPatterns.some((pattern) => pattern.test(normalized));
 }
 
+function isNativeSubagentToolCall(toolCall: any): boolean {
+  if (!toolCall || typeof toolCall !== 'object') return false;
+  return [toolCall.name, toolCall.title, toolCall.toolName, toolCall.tool_name]
+    .filter((value): value is string => typeof value === 'string')
+    .some((value) => /(?:^|[_:.-])spawn[_:.-]?subagent(?:$|[_:.-])/i.test(value));
+}
+
 async function applyEnhancersBeforeAsk(
   enhancers: AgentEnhancer[],
   prompt: string,
@@ -228,9 +244,23 @@ abstract class BaseACPAdapter implements AgentAdapter {
     protected authMethod: string = 'oauth-personal'
   ) {}
 
+  protected async requestPermission(params: any): Promise<any> {
+    const title = (params.toolCall?.title || '').toLowerCase();
+    if (isSafeReadOnlyPermissionTitle(title)) {
+      const optionId = params.options?.[0]?.optionId;
+      return optionId
+        ? { outcome: { outcome: 'selected' as const, optionId } }
+        : { outcome: { outcome: 'cancelled' as const } };
+    }
+    logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
+    return { outcome: { outcome: 'cancelled' as const } };
+  }
+
   public addEnhancer(enhancer: AgentEnhancer): void {
     registerEnhancer(this.enhancers, enhancer);
   }
+
+  protected handleSessionUpdate(_params: any): void {}
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
@@ -254,6 +284,11 @@ abstract class BaseACPAdapter implements AgentAdapter {
       },
     });
     this.child = managed.child;
+    this.child.stdin?.on('error', (error) => {
+      logger.warn(
+        `[UAA] Provider stdio input closed: ${error instanceof Error ? error.message : error}`
+      );
+    });
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -287,6 +322,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       (agent) => ({
         sessionUpdate: async (params: any) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
+          this.handleSessionUpdate(params);
 
           // RECURSIVE SCAN for text/thought chunks
           const findContent = (obj: any) => {
@@ -319,17 +355,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
           findContent(params);
         },
-        async requestPermission(params) {
-          const title = (params.toolCall?.title || '').toLowerCase();
-          if (isSafeReadOnlyPermissionTitle(title)) {
-            const optionId = params.options?.[0]?.optionId;
-            return optionId
-              ? { outcome: { outcome: 'selected' as const, optionId } }
-              : { outcome: { outcome: 'cancelled' as const } };
-          }
-          logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
-          return { outcome: { outcome: 'cancelled' as const } };
-        },
+        requestPermission: (params) => this.requestPermission(params),
         async readTextFile(params) {
           throw new Error('Not implemented');
         },
@@ -495,6 +521,151 @@ export class GeminiAdapter extends BaseACPAdapter {
     } catch (err) {
       logger.warn(`suppressed error in boot: ${err}`);
     }
+  }
+}
+
+export interface GrokAdapterOptions {
+  bin?: string;
+  model?: string;
+  leaderSocket?: string;
+}
+
+/**
+ * Grok Build ACP adapter. One long-lived `grok agent stdio` process owns the
+ * parent session; native delegation asks that session to use Grok's native
+ * `spawn_subagent` capability without creating another provider process.
+ */
+export class GrokAdapter extends BaseACPAdapter {
+  private readonly model?: string;
+  private activePermissionMode: 'read-only' | 'workspace-write' = 'read-only';
+  private lastNativeSubagentInfo: Record<string, unknown> | null = null;
+
+  constructor(options: GrokAdapterOptions = {}) {
+    super(
+      options.bin ?? 'grok',
+      [
+        'agent',
+        'stdio',
+        ...(options.leaderSocket ? ['--leader-socket', options.leaderSocket] : []),
+      ],
+      {
+        authenticate: 'authenticate',
+        newSession: 'session/new',
+        prompt: 'session/prompt',
+      },
+      'oauth-personal'
+    );
+    this.model = options.model;
+  }
+
+  public async boot(): Promise<void> {
+    await super.boot();
+    if (this.model) {
+      try {
+        await this.connection?.extMethod('session/set_model', {
+          sessionId: this.acpSessionId,
+          modelId: this.model,
+        });
+      } catch (err) {
+        logger.warn(`[UAA] Grok model selection was not accepted: ${err}`);
+      }
+    }
+  }
+
+  protected async requestPermission(params: any): Promise<any> {
+    if (isNativeSubagentToolCall(params.toolCall)) this.nativeSubagentObserved = true;
+    if (this.activePermissionMode === 'workspace-write') {
+      const option = params.options?.find((candidate: any) =>
+        ['allow_once', 'allow_always'].includes(candidate?.kind || candidate?.optionId)
+      );
+      if (option?.optionId) {
+        return { outcome: { outcome: 'selected' as const, optionId: option.optionId } };
+      }
+    }
+    return super.requestPermission(params);
+  }
+
+  private nativeSubagentObserved = false;
+
+  protected handleSessionUpdate(params: any): void {
+    const update = params?.update ?? params;
+    if (
+      isNativeSubagentToolCall(params?.toolCall) ||
+      isNativeSubagentToolCall(update?.toolCall) ||
+      isNativeSubagentToolCall(update?.tool_call)
+    ) {
+      this.nativeSubagentObserved = true;
+      return;
+    }
+
+    // The available-commands notification advertises `spawn_subagent` in a
+    // tools list; it is not evidence that the model invoked it. Only inspect
+    // protocol updates whose kind represents an actual tool/subagent event.
+    const updateKind = String(update?.sessionUpdate ?? params?._meta?.updateType ?? '');
+    if (!/(tool|subagent)/i.test(updateKind)) return;
+    const serialized = JSON.stringify(update);
+    if (/spawn[_-]?subagent|subagent[_-]?(?:id|completed)/i.test(serialized)) {
+      this.nativeSubagentObserved = true;
+    }
+  }
+
+  public async askNativeSubagent(
+    prompt: string,
+    options: AgentAskOptions = {}
+  ): Promise<AgentResponse> {
+    if (process.env.GROK_SUBAGENTS === '0') {
+      throw new Error(
+        '[SUBAGENT_UNAVAILABLE] Grok native subagents are disabled by GROK_SUBAGENTS=0.'
+      );
+    }
+    if (!this.connection || !this.acpSessionId) {
+      throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP session is not booted.');
+    }
+
+    const parentSessionId = this.acpSessionId;
+    const previousPermissionMode = this.activePermissionMode;
+    this.nativeSubagentObserved = false;
+    this.activePermissionMode = options.profile === 'implementer' ? 'workspace-write' : 'read-only';
+    try {
+      const response = await super.ask(
+        [
+          'Use the provider-native spawn_subagent capability exactly once for this bounded task.',
+          'Do not solve the task in the parent session; return the delegated task result only after the subagent completes.',
+          prompt,
+        ].join('\n\n'),
+        { ...options, subagent: true }
+      );
+      if (!this.nativeSubagentObserved) {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] Grok completed without an observable native spawn_subagent event.'
+        );
+      }
+      this.lastNativeSubagentInfo = {
+        provider: 'grok',
+        parentThreadId: parentSessionId,
+        threadId: parentSessionId,
+        forked: false,
+        mode: 'acp-native-subagent',
+        effort: options.effort ?? 'medium',
+      };
+      return {
+        ...response,
+        metadata: {
+          ...(response.metadata || {}),
+          nativeSubagent: this.lastNativeSubagentInfo,
+        },
+      };
+    } finally {
+      this.activePermissionMode = previousPermissionMode;
+    }
+  }
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      ...super.getRuntimeInfo(),
+      supportsNativeSubagents: process.env.GROK_SUBAGENTS !== '0',
+      lastNativeSubagent: this.lastNativeSubagentInfo,
+    };
   }
 }
 
@@ -891,7 +1062,7 @@ export class AgyAdapter implements AgentAdapter {
   }
 }
 
-export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy';
+export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok';
 
 export interface CodexAppServerAdapterOptions {
   model?: string;
@@ -904,6 +1075,16 @@ export interface CodexAppServerAdapterOptions {
   sandboxMode?: 'workspace-write' | 'read-only' | 'danger-full-access';
   networkAccess?: boolean;
   writableRoots?: string[];
+}
+
+export interface CodexNativeSubagentInfo {
+  provider: 'codex';
+  parentThreadId: string;
+  threadId: string;
+  turnId?: string;
+  forked: boolean;
+  mode: 'thread-fork' | 'parent-turn';
+  effort: 'low' | 'medium' | 'high' | 'ultra';
 }
 
 /**
@@ -927,9 +1108,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private currentTurnId: string | null = null;
   private pendingTurn: {
     turnId: string;
+    threadId: string;
     resolve: (res: AgentResponse) => void;
     reject: (err: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
+    abortCleanup?: () => void;
   } | null = null;
   private accumulatedText = '';
   private sawAgentDelta = false;
@@ -937,6 +1120,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
   private projectRoot: string = PROJECT_ROOT;
   private usageSummary: Record<string, unknown> | null = null;
+  private nativeMultiAgentMode: unknown = null;
+  private activeThreadId: string | null = null;
+  private lastNativeSubagentInfo: CodexNativeSubagentInfo | null = null;
+  private activeApprovalMode: 'strict' | 'relaxed' | undefined;
   private enhancers: AgentEnhancer[] = [];
 
   constructor(options?: CodexAppServerAdapterOptions) {
@@ -1024,6 +1211,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.pendingRequests.clear();
       if (this.pendingTurn) {
         clearTimeout(this.pendingTurn.timeout);
+        this.pendingTurn.abortCleanup?.();
         this.pendingTurn.reject(err);
         this.pendingTurn = null;
       }
@@ -1064,12 +1252,75 @@ export class CodexAppServerAdapter implements AgentAdapter {
         `Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`
       );
     }
+    this.activeThreadId = this.threadId;
+    this.nativeMultiAgentMode =
+      threadRes?.multiAgentMode ?? threadRes?.thread?.multiAgentMode ?? null;
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
+    return this.askOnThread(prompt, options, this.threadId);
+  }
+
+  /**
+   * Use a child thread in the same app-server process when the parent has a
+   * completed rollout. The first delegated turn has no parent rollout yet,
+   * so it uses the selected native effort and seeds the parent thread.
+   */
+  public async askNativeSubagent(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<AgentResponse> {
+    if (!this.threadId) throw new Error('Codex app-server not booted.');
+    const parentThreadId = this.threadId;
+    const effort = options?.effort ?? 'medium';
+    let targetThreadId = parentThreadId;
+    let forked = false;
+
+    try {
+      const forkResponse: any = await this.sendRequest(
+        'thread/fork',
+        { threadId: parentThreadId },
+        this.options.timeoutMs ?? 20000
+      );
+      targetThreadId = forkResponse?.thread?.id || forkResponse?.threadId || forkResponse?.id;
+      if (!targetThreadId) throw new Error('Codex app-server thread/fork missing thread id.');
+      forked = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/no rollout found|rollout.*not found/i.test(message)) {
+        throw new Error(`[SUBAGENT_UNAVAILABLE] Codex thread/fork failed: ${message}`);
+      }
+    }
+
+    const response = await this.askOnThread(
+      prompt,
+      { ...options, effort, subagent: true },
+      targetThreadId
+    );
+    const info: CodexNativeSubagentInfo = {
+      provider: 'codex',
+      parentThreadId,
+      threadId: targetThreadId,
+      ...(this.currentTurnId ? { turnId: this.currentTurnId } : {}),
+      forked,
+      mode: forked ? 'thread-fork' : 'parent-turn',
+      effort,
+    };
+    this.lastNativeSubagentInfo = info;
+    return { ...response, metadata: { ...(response.metadata || {}), nativeSubagent: info } };
+  }
+
+  private async askOnThread(
+    prompt: string,
+    options: AgentAskOptions | undefined,
+    targetThreadId: string
+  ): Promise<AgentResponse> {
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
+    if (options?.signal?.aborted) throw new Error('Codex app-server turn cancelled before start.');
+    this.activeThreadId = targetThreadId;
+    this.activeApprovalMode = options?.approvalMode ?? this.options.approvalMode;
 
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
@@ -1081,11 +1332,15 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const turnRes: any = await this.sendRequest(
       'turn/start',
       {
-        threadId: this.threadId,
+        threadId: targetThreadId,
         input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
         model: this.options.model ?? undefined,
         cwd: this.options.cwd ?? undefined,
         sandboxPolicy: this.buildSandboxPolicy(),
+        // Codex 0.146.0 deprecates multiAgentMode and enables proactive native
+        // delegation through the selected effort. Keep this provider-specific
+        // projection here so callers only request `subagent: true`.
+        ...(options?.subagent ? { effort: options.effort ?? 'medium' } : {}),
         ...enhanced.options,
       },
       this.options.timeoutMs ?? 20000
@@ -1110,11 +1365,41 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
     const timeoutMs = this.options.timeoutMs ?? 300000;
     const raw = await new Promise<AgentResponse>((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = (): void => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        options?.signal?.removeEventListener('abort', onAbort);
+      };
+      const settleReject = (error: Error): void => {
+        cleanup();
+        reject(error);
+      };
+      const onAbort = (): void => {
+        if (this.pendingTurn?.turnId !== turnId) return;
         this.pendingTurn = null;
-        reject(new Error('Codex app-server turn timed out.'));
+        cleanup();
+        void this.interruptTurn(targetThreadId, turnId);
+        reject(new Error('Codex app-server turn cancelled.'));
+      };
+      timeout = setTimeout(() => {
+        if (this.pendingTurn?.turnId !== turnId) return;
+        this.pendingTurn = null;
+        cleanup();
+        void this.interruptTurn(targetThreadId, turnId);
+        settleReject(new Error('Codex app-server turn timed out.'));
       }, timeoutMs);
-      this.pendingTurn = { turnId, resolve, reject, timeout };
+      this.pendingTurn = {
+        turnId,
+        threadId: targetThreadId,
+        resolve,
+        reject,
+        timeout,
+        abortCleanup: cleanup,
+      };
+      if (options?.signal) options.signal.addEventListener('abort', onAbort, { once: true });
     });
     return applyEnhancersAfterAsk(this.enhancers, raw);
   }
@@ -1125,13 +1410,20 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.child = null;
     }
     this.runtimeResourceId = null;
+    this.activeApprovalMode = undefined;
+    this.activeThreadId = null;
+    this.lastNativeSubagentInfo = null;
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
     return {
       pid: this.child?.pid,
       threadId: this.threadId,
+      activeThreadId: this.activeThreadId,
       usage: this.usageSummary,
+      nativeMultiAgentMode: this.nativeMultiAgentMode,
+      lastNativeSubagent: this.lastNativeSubagentInfo,
+      supportsNativeSubagents: this.nativeMultiAgentMode !== null,
       supportsSoftRefresh: true,
     };
   }
@@ -1157,6 +1449,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.options.timeoutMs ?? 20000
     );
     this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    this.activeThreadId = this.threadId;
     return { mode: 'soft', threadId: this.threadId };
   }
 
@@ -1217,7 +1510,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const params = msg.params || {};
 
     if (method === 'item/agentMessage/delta') {
-      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      const activeThreadId = this.activeThreadId || this.threadId;
+      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
       if (typeof params.delta === 'string') {
         this.sawAgentDelta = true;
@@ -1227,7 +1521,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     }
 
     if (method === 'rawResponseItem/completed') {
-      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      const activeThreadId = this.activeThreadId || this.threadId;
+      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
       if (
         !this.sawAgentDelta &&
@@ -1267,10 +1562,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
       if (usage) this.usageSummary = usage;
 
       if (this.pendingTurn && this.pendingTurn.turnId === turnId) {
-        clearTimeout(this.pendingTurn.timeout);
-        const resolve = this.pendingTurn.resolve;
+        const pending = this.pendingTurn;
+        clearTimeout(pending.timeout);
+        pending.abortCleanup?.();
         this.pendingTurn = null;
-        resolve(result);
+        pending.resolve(result);
       } else {
         this.earlyTurnResults.set(turnId, result);
       }
@@ -1284,7 +1580,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   private async handleServerRequest(msg: any): Promise<void> {
     const { id, method, params } = msg;
-    const relaxed = this.options.approvalMode === 'relaxed';
+    const relaxed = (this.activeApprovalMode ?? this.options.approvalMode) === 'relaxed';
 
     switch (method) {
       case 'item/commandExecution/requestApproval': {
@@ -1366,6 +1662,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (!this.child?.stdin?.writable) return;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message, data } });
     this.child.stdin.write(`${payload}\n`);
+  }
+
+  private async interruptTurn(threadId: string, turnId: string): Promise<void> {
+    if (!this.child?.stdin?.writable) return;
+    try {
+      await this.sendRequest(
+        'turn/interrupt',
+        { threadId, turnId },
+        this.options.timeoutMs ?? 20000
+      );
+    } catch (err) {
+      logger.warn(
+        `[UAA_CODEX_INTERRUPT] failed to interrupt turn ${turnId}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   private isReadOnlyCommand(params: any): boolean {
@@ -1606,6 +1917,7 @@ const AGENT_ADAPTER_FACTORIES: Record<BuiltinAgentProvider, AgentAdapterFactory>
   codex: () => createCodexAdapterFromEnv(),
   claude: () => new ClaudeAdapter(),
   agy: () => new AgyAdapter(),
+  grok: () => new GrokAdapter(),
 };
 
 function extractUsageSummary(payload: unknown): Record<string, unknown> | null {

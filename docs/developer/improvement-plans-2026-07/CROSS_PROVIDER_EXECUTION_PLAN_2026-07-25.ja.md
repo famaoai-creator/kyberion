@@ -158,7 +158,7 @@ CT(単一 CLI チーム)とは独立に着手可能。両方入ると「CLI 内�
 
 ## 6. 関連計画
 
-- [CLI_SUBAGENT_TEAM_PLAN(CT-01〜04)](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) — 兄弟計画。CT-01 の生成儀式・CT-04 のルーブリックを共有・拡張。
+- [CLI_SUBAGENT_TEAM_PLAN(CT-01〜05)](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) — 兄弟計画。CT-01 の生成儀式・CT-04 のルーブリックを共有・拡張し、CT-05 の Codex app-server adapter へ接続する。
 - [KD-05(能力ティア)](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md) — XP-02 の正本語彙(DONE)。
 - [SA-04_EGRESS_CONTROL](./SA-04_EGRESS_CONTROL.ja.md) — network 面の egress。XP-03 は委譲面への拡張。
 - [TASK_KNOWLEDGE_PROVISIONING_PLAN(KP-01)](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md) — 配給単一入口。XP-03 のゲート設置点。

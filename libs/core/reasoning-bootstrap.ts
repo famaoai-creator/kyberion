@@ -308,10 +308,11 @@ function buildReasoningRuntimeBundle(
         ...codexOptions,
         ...(options.model ? { model: options.model } : {}),
       };
+      const codexBackend = new CodexCliReasoningBackend(mergedCodexOptions);
       return {
         mode,
         backend: {
-          backend: new CodexCliReasoningBackend(mergedCodexOptions),
+          backend: maybeWrapWithDispatcher(codexBackend),
           provider,
           label: mode,
         },
@@ -332,7 +333,9 @@ function buildReasoningRuntimeBundle(
       return {
         mode,
         backend: {
-          backend: new ClaudeAgentReasoningBackend({ model: options.model }),
+          backend: maybeWrapWithDispatcher(
+            new ClaudeAgentReasoningBackend({ model: options.model })
+          ),
           provider,
           label: mode,
         },
@@ -386,7 +389,7 @@ function buildReasoningRuntimeBundle(
       };
       return {
         mode,
-        backend: { backend: agyBackend, provider, label: mode },
+        backend: { backend: maybeWrapWithDispatcher(agyBackend), provider, label: mode },
         intentExtractor: {
           extractor: new AgyCliIntentExtractor(agyOptions),
           provider,
@@ -410,7 +413,7 @@ function buildReasoningRuntimeBundle(
       const grokBackend = new GrokCliBackend(grokOptions);
       return {
         mode,
-        backend: { backend: grokBackend, provider, label: mode },
+        backend: { backend: maybeWrapWithDispatcher(grokBackend), provider, label: mode },
         intentExtractor: {
           extractor: new GrokCliIntentExtractor(grokOptions),
           provider,

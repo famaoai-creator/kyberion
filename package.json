@@ -218,6 +218,7 @@
     "voice:conversation:live": "node dist/scripts/run_realtime_voice_conversation.js --interactive",
     "voice:profile:promote": "node dist/scripts/promote_voice_profile.js",
     "voice:setup": "node --import ./scripts/ts-loader.mjs scripts/voice_setup.ts",
+    "agy:sdk:setup": "node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts",
     "voice:health": "pnpm pipeline --input pipelines/voice-health-check.json",
     "voice:clone": "pnpm pipeline --input knowledge/product/pipeline-templates/clone-my-voice.json",
     "voice:speak": "pnpm pipeline --input knowledge/product/pipeline-templates/speak-with-my-voice.json",

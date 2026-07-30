@@ -71,6 +71,7 @@ export function reasoningBackendEndpoint(backendName: string): string {
     'copilot-acp': 'https://api.githubcopilot.com',
     'grok-cli': 'https://api.x.ai',
     'shell-grok-cli': 'https://api.x.ai',
+    'agy-cli': 'https://generativelanguage.googleapis.com',
   };
   return endpoints[backendName] ?? `https://${backendName}.unknown-provider.invalid`;
 }
