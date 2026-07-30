@@ -69,6 +69,7 @@ describe('reasoning-bootstrap', () => {
     resetIntentExtractor();
     resetVoiceBridge();
     delete process.env.CODEX_CLI;
+    delete process.env.KYBERION_HARNESS_SUBAGENT;
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
@@ -110,6 +111,15 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('codex-cli');
     expect(getIntentExtractor().name).toBe('codex-cli');
     expect(getVoiceBridge().name).toBe('codex-cli-text');
+  });
+
+  it('connects Codex to the provider-native harness dispatcher when opted in', () => {
+    process.env.KYBERION_HARNESS_SUBAGENT = '1';
+
+    const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+    expect(installed).toBe(true);
+    expect(getReasoningBackend().name).toBe('codex-cli+harness-subagent');
   });
 
   it('installs agy-cli adapters when requested explicitly', () => {

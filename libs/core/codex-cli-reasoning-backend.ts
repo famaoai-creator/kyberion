@@ -31,15 +31,38 @@ import {
   type StructuredOpSpec,
 } from './structured-reasoning.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+import {
+  CodexAppServerAdapter,
+  type AgentAskOptions,
+  type AgentResponse,
+} from './agent-adapter.js';
+import {
+  getSubagentCapabilityProfile,
+  type SubagentCapabilityProfile,
+} from './subagent-capability-profiles.js';
+import { resolveProviderPermissionArgs } from './provider-permission-profiles.js';
 
-export interface CodexCliReasoningBackendOptions extends CodexCliQueryOptions {}
+export interface CodexHarnessSession {
+  boot(): Promise<void>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+}
+
+export interface CodexCliReasoningBackendOptions extends CodexCliQueryOptions {
+  /** Test seam and runtime injection for the shared Codex app-server session. */
+  harnessSession?: CodexHarnessSession;
+}
 
 export class CodexCliReasoningBackend implements ReasoningBackend {
   readonly name = 'codex-cli';
   private readonly options: CodexCliQueryOptions;
+  private readonly injectedHarnessSession?: CodexHarnessSession;
+  private harnessSession?: CodexHarnessSession;
+  private harnessBoot?: Promise<void>;
+  private harnessQueue: Promise<void> = Promise.resolve();
 
   constructor(options: CodexCliReasoningBackendOptions = {}) {
     this.options = options;
+    this.injectedHarnessSession = options.harnessSession;
   }
 
   /** Run a shared structured-reasoning op through the codex CLI (schema-validated). */
@@ -114,9 +137,120 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     return result.answer;
   }
 
+  /**
+   * CT-05: use one shared Codex app-server process and its native multi-agent
+   * turn mode instead of spawning `codex exec` for every delegated task.
+   *
+   * This method is intentionally separate from `delegateTask`: normal Codex
+   * reasoning remains backward-compatible, while HarnessSubagentDispatcher
+   * can opt into the provider-native execution surface explicitly.
+   */
+  async dispatchHarnessSubagent(
+    instruction: string,
+    context?: string,
+    options?: { role?: string; profile?: string; signal?: AbortSignal }
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const profile = resolveProfile(options);
+    const permission = resolveProviderPermissionArgs(profile.name, 'codex');
+    if (permission.kind === 'refused') {
+      throw new Error(`[SUBAGENT_UNAVAILABLE] ${permission.reason}`);
+    }
+
+    const previous = this.harnessQueue;
+    let release!: () => void;
+    this.harnessQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const session = this.getHarnessSession(profile, permission.args);
+      if (!this.harnessBoot) this.harnessBoot = session.boot();
+      await this.harnessBoot;
+      const response = await session.ask(
+        [
+          profile.systemPromptPrefix,
+          '<kyberion-delegated-task>',
+          context ? `Context:\n${context}` : '',
+          `Task: ${instruction}`,
+          'Use Codex native subagents when useful for this bounded task and return the requested task_result contract.',
+          '</kyberion-delegated-task>',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        {
+          profile: profile.name,
+          subagent: true,
+          signal: options?.signal,
+          approvalMode: profile.name === 'implementer' ? 'relaxed' : 'strict',
+          sandboxPolicy: sandboxPolicyForArgs(permission.args),
+        }
+      );
+      return response.text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
+      throw new Error(`[SUBAGENT_UNAVAILABLE] Codex app-server harness failed: ${message}`);
+    } finally {
+      release();
+    }
+  }
+
+  private getHarnessSession(
+    profile: SubagentCapabilityProfile,
+    permissionArgs: readonly string[]
+  ): CodexHarnessSession {
+    if (this.harnessSession) return this.harnessSession;
+    if (this.injectedHarnessSession) {
+      this.harnessSession = this.injectedHarnessSession;
+      return this.harnessSession;
+    }
+    this.harnessSession = new CodexAppServerAdapter({
+      model: this.options.model,
+      cwd: this.options.cwd,
+      timeoutMs: this.options.timeoutMs,
+      sandboxMode: sandboxModeFromArgs(permissionArgs),
+      systemPrompt: 'Kyberion governed Codex app-server subagent session.',
+      approvalMode: 'strict',
+    });
+    return this.harnessSession;
+  }
+
   async prompt(prompt: string): Promise<string> {
     return this.delegateTask(prompt);
   }
+}
+
+function resolveProfile(options?: { role?: string; profile?: string }): SubagentCapabilityProfile {
+  const requested = options?.profile || options?.role || 'implementer';
+  try {
+    return getSubagentCapabilityProfile(requested);
+  } catch {
+    return getSubagentCapabilityProfile('implementer');
+  }
+}
+
+function sandboxModeFromArgs(
+  args: readonly string[]
+): 'workspace-write' | 'read-only' | 'danger-full-access' {
+  const sandboxIndex = args.indexOf('--sandbox');
+  const mode = sandboxIndex >= 0 ? args[sandboxIndex + 1] : undefined;
+  if (mode === 'read-only' || mode === 'danger-full-access' || mode === 'workspace-write') {
+    return mode;
+  }
+  throw new Error(`[SUBAGENT_UNAVAILABLE] Codex sandbox projection is invalid: ${args.join(' ')}`);
+}
+
+function sandboxPolicyForArgs(args: readonly string[]): Record<string, unknown> {
+  const mode = sandboxModeFromArgs(args);
+  if (mode === 'read-only') return { type: 'readOnly', networkAccess: false };
+  if (mode === 'danger-full-access') return { type: 'dangerFullAccess' };
+  return {
+    type: 'workspaceWrite',
+    networkAccess: false,
+    excludeTmpdirEnvVar: false,
+    excludeSlashTmp: false,
+  };
 }
 
 export function buildCodexCliBackendFromEnv(
