@@ -333,7 +333,9 @@ function buildReasoningRuntimeBundle(
       return {
         mode,
         backend: {
-          backend: new ClaudeAgentReasoningBackend({ model: options.model }),
+          backend: maybeWrapWithDispatcher(
+            new ClaudeAgentReasoningBackend({ model: options.model })
+          ),
           provider,
           label: mode,
         },
