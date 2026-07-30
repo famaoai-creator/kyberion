@@ -483,7 +483,7 @@
       ]
     },
     "generate_subagent_definitions": {
-      "allow_write": [".claude/agents/"]
+      "allow_write": [".claude/agents/", ".agents/agents/"]
     },
     "ingest_commit": {
       "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]

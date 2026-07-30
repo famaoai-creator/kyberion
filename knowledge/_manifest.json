@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 73766,
+      "size": 74068,
       "type": "json"
     },
     {
@@ -1743,7 +1743,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 8384,
+      "size": 8629,
       "type": "md"
     },
     {
@@ -2127,7 +2127,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19489,
+      "size": 19508,
       "type": "json"
     },
     {
