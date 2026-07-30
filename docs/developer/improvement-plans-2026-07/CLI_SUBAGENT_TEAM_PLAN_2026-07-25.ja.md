@@ -1,15 +1,15 @@
-# CLI サブエージェント・チームモード — 単一 LLM プロバイダ CLI 内で完結するチーム構成と連携(CT-01〜04)
+# CLI サブエージェント・チームモード — 単一 LLM プロバイダ CLI 内で完結するチーム構成と連携(CT-01〜05)
 
 > **作成日**: 2026-07-25
-> **優先度**: P1(CT-01/02)/ P2(CT-03/04)
-> **位置づけ**: agent-runtime(A2A ブリッジ)によるマルチエージェント基盤の**代替実行面**。KD-05(サブエージェント能力ティア)・MO-04(context pack)・KD-03(イベントソーシング journal)・HN-02(schema 強制委譲)の成果を、CLI ハーネスのサブエージェント機構へ射影する。[TASK_KNOWLEDGE_PROVISIONING_PLAN](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01)と配給入口を共有する。
+> **優先度**: P1(CT-01/02/05)/ P2(CT-03/04)
+> **位置づけ**: agent-runtime(A2A ブリッジ)によるマルチエージェント基盤の**代替実行面**。KD-05(サブエージェント能力ティア)・MO-04(context pack)・KD-03(イベントソーシング journal)・HN-02(schema 強制委譲)の成果を、CLI ハーネス(Claude Code / Codex app-server 等)のサブエージェント機構へ射影する。[TASK_KNOWLEDGE_PROVISIONING_PLAN](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01)と配給入口を共有する。
 > **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)
 
 ## 0. 要旨
 
-Kyberion の「チーム」は、実体としてはランタイムの数ではなく**契約の束**である — 役割定義(team-roles)、能力プロファイル(KD-05)、タスク契約(`PlannedNextTask` + `task_result` 出力契約)、context pack(MO-04)、共有ミッション作業域(per-mission git + `coordination/`)。これらはすべて **CLI 非依存の形で実装済み**。したがって、同一 LLM プロバイダの CLI(Claude Code / Agent SDK)内で完結するチームモードは、新しい連携機構の発明ではなく、**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**として構築する。
+Kyberion の「チーム」は、実体としてはランタイムの数ではなく**契約の束**である — 役割定義(team-roles)、能力プロファイル(KD-05)、タスク契約(`PlannedNextTask` + `task_result` 出力契約)、context pack(MO-04)、共有ミッション作業域(per-mission git + `coordination/`)。これらはすべて **CLI 非依存の形で実装済み**。したがって、同一 LLM プロバイダの CLI(Claude Code / Agent SDK / Codex app-server)内で完結するチームモードは、新しい連携機構の発明ではなく、**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**として構築する。
 
-新規に必要なのは2つだけ:
+Claude 向け初版の最小追加は2つであり、Codex 対応は CT-05 で同じ境界へ接続する:
 
 1. **役割 → サブエージェント定義の生成儀式**(SSoT から `.claude/agents/<role>.md` を生成、手書き禁止)
 2. **`HarnessSubagentDispatcher`**(既存の `AgentDispatcher` seam に1クラス追加)
@@ -18,7 +18,7 @@ Kyberion の「チーム」は、実体としてはランタイムの数では�
                  既存契約(CLI 非依存)                        実行面(選択制)
   team-roles/*.json ─┐                                  ┌─ agent-runtime(A2A ブリッジ)
   roles/<r>/PROCEDURE.md ─┤→ タスク契約 + context pack ─┤   … 長時間・書込多・障害分離
-  KD-05 capability profile ─┘        │                  └─ CLI サブエージェント(本計画)
+  KD-05 capability profile ─┘        │                  └─ CLI サブエージェント(Claude / Codex)
                                      │                      … 短命チーム・読取中心・対話内完結
                           共有ミッション作業域(ファイル契約)
                           coordination/ + task_result + claim + journal
@@ -26,10 +26,10 @@ Kyberion の「チーム」は、実体としてはランタイムの数では�
 
 ## 1. 診断(2026-07-25、実コード突合)
 
-### 1.1 切替 seam は既にあるが、CLI ハーネス委譲の実装がない
+### 1.1 切替 seam は既にあり、Claude の governed harness 委譲まで実装済み
 
-- `libs/core/agent-dispatch.ts` — `AgentDispatcher` interface。既定 `ProcessSpawnDispatcher`(`:50`、`claude` CLI を都度プロセス spawn)、`KYBERION_IN_SESSION_SUBAGENT=1` で `InSessionDispatcher`(`:72`、A2A ブリッジ在中ルート)。`maybeWrapWithDispatcher`(`:286`)が env 分岐の単一点。**CLI ハーネス自身のサブエージェント機構(Claude Code の Agent tool / Agent SDK の `agents`)へ委譲する dispatcher が存在しない**。
-- `claude-agent-reasoning-backend.ts:581-593` — `KYBERION_CLAUDE_AGENT_TOOLS=1` の governed agentic path(Agent SDK + Kyberion MCP + `GOVERNED_AGENT_ALLOWED_TOOLS` + `createKyberionCanUseTool` の tier/approval gate)が実装済み。ただし**単発の delegateTask 用**で、役割別のチーム構成には未接続。
+- `libs/core/agent-dispatch.ts` — `AgentDispatcher` interface。既定 `ProcessSpawnDispatcher` は backend の `delegateTask` に処理を渡すため、provider によっては委譲ごとに CLI/SDK プロセスを増やす。`KYBERION_IN_SESSION_SUBAGENT=1` の `InSessionDispatcher` は A2A ブリッジ経由、`KYBERION_HARNESS_SUBAGENT=1` の `HarnessSubagentDispatcher` は Claude Agent SDK の governed path 経由である。`maybeWrapWithDispatcher` が実行面切替の単一点。
+- `claude-agent-reasoning-backend.ts` — `KYBERION_CLAUDE_AGENT_TOOLS=1` の governed agentic path(Agent SDK + Kyberion MCP + `GOVERNED_AGENT_ALLOWED_TOOLS` + `createKyberionCanUseTool` の tier/approval gate)が実装済み。ただし現状の harness 実装は Claude に限定され、Codex の既存 app-server session/thread へは接続されていない。
 
 ### 1.2 チーム構成の SSoT はあるが、CLI サブエージェント定義に射影されていない
 
@@ -42,6 +42,12 @@ Kyberion の「チーム」は、実体としてはランタイムの数では�
 - 発注書: `PlannedNextTask`(受入条件・deliverable・依存・scope)。納品書: `task_result` ブロック 1 個の出力契約(`parseTaskResultResponse`)。
 - 共有状態: `<mission>/coordination/`(context-packs、KD-03 goal-journal)、work-item claim(排他)、per-mission git(rollback)。
 - 相互参照: `buildUpstreamResultLines` — 前タスク結果を次タスクの prompt に載せる hub-and-spoke の流儀が単発 dispatch に実装済み。
+
+### 1.4 Codex 側の未接続境界
+
+- `CodexAppServerAdapter` は現在 `codex app-server --listen stdio://` を起動し、`thread/start` / `turn/start` を単一の app-server session に送る実装である。これは**app-server 自体を1つ起動すること**と、委譲タスクごとに `codex` CLI を新たに spawn することを区別するための基盤になる。
+- 一方、`delegateTask` の実行面選択はまだ Codex の logical thread / native subagent capability を照会せず、既定の `ProcessSpawnDispatcher` に降りうる。Codex が提供する subagent/thread、sandbox、approval、resume の能力を KD-05 / task contract / context pack / KC-02 event stream に結びつける計画がない。
+- CT-05 はこの境界を埋める。**Codex の能力が確認できた場合は既存 app-server 内の論理 subagent/thread を使い、委譲ごとの新規 `codex` process spawn を行わない。能力がない場合は自動的に spawn へ降格せず、`unavailable` と理由を trace/operator surface に表面化する。** これにより「サブエージェントを使っている」という虚偽の成功表示を防ぐ。
 
 ## 2. 目標アーキテクチャ
 
@@ -57,7 +63,7 @@ Kyberion の「チーム」は、実体としてはランタイムの数では�
 
 > 優先度 P1 / 規模 M / 依存: KD-05(実装済み)
 
-`scripts/generate_subagent_definitions.ts` を新設し、team-roles JSON + `roles/<role>/PROCEDURE.md` + KD-05 プロファイル + working principles(`buildWorkingPrinciplesLines`)から `.claude/agents/<role>.md`(frontmatter: `name` / `description` / `tools`)を生成する。tools 許可は KD-05 allowlist → CLI ツール名のマッピング表を単一箇所に持つ(explorer=読取専用ツールのみ、planner=ツールなし、implementer=Edit/Write/Bash を割当範囲で)。生成物は手書き編集禁止(ヘッダに生成元と再生成コマンドを明記)。
+`scripts/generate_subagent_definitions.ts` を新設し、team-roles JSON + `roles/<role>/PROCEDURE.md` + KD-05 プロファイル + working principles(`buildWorkingPrinciplesLines`)から Claude 用 `.claude/agents/<role>.md` と Codex adapter 用の role / sandbox / approval mapping artifact を生成する。tools 許可は KD-05 allowlist → provider ツール名のマッピング表を単一箇所に持つ(explorer=読取専用ツールのみ、planner=ツールなし、implementer=Edit/Write/Bash を割当範囲で)。生成物は手書き編集禁止(ヘッダに生成元と再生成コマンドを明記)。provider 固有の配置や protocol option は生成物の射影先に閉じ込める。
 
 **受入条件**
 
@@ -67,11 +73,11 @@ Kyberion の「チーム」は、実体としてはランタイムの数では�
 
 — claude-sonnet-4
 
-### CT-02: `HarnessSubagentDispatcher` の追加と配線
+### CT-02: provider-neutral `HarnessSubagentDispatcher` の追加と配線
 
 > 優先度 P1 / 規模 M / 依存: CT-01
 
-`libs/core/agent-dispatch.ts` に `HarnessSubagentDispatcher implements AgentDispatcher` を追加する。実装は governed path(`runClaudeAgentTask` + Kyberion MCP + `canUseTool`)を基盤に、CT-01 の役割定義を `agents` オプション(Agent SDK)として渡す。`maybeWrapWithDispatcher` に `KYBERION_HARNESS_SUBAGENT=1`(仮)の分岐を1本追加 — **呼び出し側(mission-orchestration-worker / background-review 等)は無変更**であること。SDK 不在・ハーネス外実行時は `ProcessSpawnDispatcher` へ fail-open フォールバック(`InSessionDispatcher` と同型)。
+`libs/core/agent-dispatch.ts` に `HarnessSubagentDispatcher implements AgentDispatcher` を追加する。Claude の governed path(`runClaudeAgentTask` + Kyberion MCP + `canUseTool`)を第一 adapter とし、CT-01 の役割定義を provider-specific な subagent/agent/thread オプションへ射影する。`maybeWrapWithDispatcher` に `KYBERION_HARNESS_SUBAGENT=1`(仮)の分岐を1本追加 — **呼び出し側(mission-orchestration-worker / background-review 等)は無変更**であること。provider adapter が capability を持たない場合の降格・未対応表面化は CT-05 の契約に従う。
 
 **受入条件**
 
@@ -109,11 +115,35 @@ CLI チームモードで「計画 → 並列実装 + レビュー → 統合」
 
 — claude-haiku(文書)/ ルーブリック設計 claude-sonnet-4
 
+### CT-05: Codex app-server 内の spawn-less subagent 委譲
+
+> 優先度 P1 / 規模 M〜L / 依存: CT-01・CT-02・XP-01・XP-02
+
+Codex を `ProcessSpawnDispatcher` のまま委譲ごとに起動する経路から、Codex app-server の既存 session 内で論理 subagent/thread を作る経路へ接続する。provider-neutral な `HarnessSubagentDispatcher` の adapter 境界を保ち、Claude と Codex の呼び出し側を分岐させない。Codex の実際の app-server protocol が提供する能力(専用 subagent、child thread、sandbox/approval、resume)は capability probe で確認し、未提供の機能を推測で実装しない。
+
+実装方針:
+
+1. `KYBERION_HARNESS_SUBAGENT=1` の provider resolver が backend の宣言済み capability を見て Claude harness / Codex app-server harness を選ぶ。Codex 専用の opt-in が必要な場合は `KYBERION_CODEX_HARNESS_SUBAGENT=1` を provider adapter の設定として扱う。
+2. Codex adapter は既存の app-server process を再利用し、委譲ごとに `codex` child process を spawn しない。logical thread/subagent の識別、親 mission、`DelegationChain`、work-item claim、context pack、`task_result` を同じ契約へ結びつける。
+3. CT-01 の role 定義と KD-05 capability profile を Codex の sandbox / approval / tool permission へ射影し、explorer の write deny、planner の no-tool、implementer の許可範囲を adapter 固有の文字列に複製しない。射影表は XP-02 の単一正本を共有する。
+4. provider capability が未検出・未認証・protocol 非対応の場合、既定では ProcessSpawn へ黙って降格しない。`subagent_unavailable` と理由を KC-02 event / trace / operator surface に記録し、必要ならオペレータが明示的に legacy spawn fallback を選ぶ。
+
+**受入条件**
+
+1. fake Codex app-server で、1つの server process に対して複数 logical subagent/thread を委譲でき、委譲回数に比例した `spawn` が発生しないことを検証する。
+2. Claude harness と Codex harness が同じ `AgentDispatcher` 呼び出し・task contract・context pack・`task_result`・KC-02 event shape を共有する契約テスト。
+3. KD-05 の explorer / planner / implementer が Codex sandbox・approval・tool allowlist へ正しく射影され、未定義の profile/provider 組合せは fail-closed になること。
+4. capability 不在時に成功と誤表示せず、`subagent_unavailable` を理由・provider・model・fallback 可否つきで trace/operator surface に出すこと。
+5. logical subagent の終了・cancel・timeout が親 app-server process の再 spawn なしに処理され、GE-06 の delegation handle と整合すること。
+
+— Codex adapter 実装 claude-sonnet-4 相当 / protocol 調査 claude-opus 相当 / 契約テスト claude-haiku 相当
+
 ## 4. 実施順序
 
 ```
 CT-01(定義生成儀式)→ CT-02(dispatcher)→ CT-03(E2E 実証)
-                                          └→ CT-04(使い分け文書化)
+                                          ├→ CT-04(使い分け文書化)
+                                          └→ CT-05(Codex app-server adapter)
 ```
 
 KP-01(配給 API 単一化)が先に入る場合、CT-02 は `provisionTaskKnowledge` を配給入口として利用する(役割別 pinned 知識が CLI サブエージェントにも自動で届く)。
@@ -121,13 +151,13 @@ KP-01(配給 API 単一化)が先に入る場合、CT-02 は `provisionTaskKnowl
 ## 5. 非目標
 
 - サブエージェント間の直接メッセージング(hub-and-spoke を崩さない。必要になったら A2A ランタイムを使うべき兆候と扱う)。
-- 他プロバイダ CLI(codex 等)への同時対応 — dispatcher とマッピング表は分離して設計するが、初版は claude ハーネスのみ。README.ja.md §2.1 のモデル読み替え方針に従い、概念は移植可能に保つ。
+- Claude 以外の全プロバイダ CLI(agy / gemini / copilot 等)の深い harness 対応 — CT-05 は Codex app-server を第二の実装対象とし、その他の provider は capability probe と明示的な未対応表面化までに留める。README.ja.md §2.1 のモデル読み替え方針に従い、概念は移植可能に保つ。
 - agent-runtime の置き換え。本計画は**代替実行面の追加**であり、長時間ミッションの正本は引き続き A2A ランタイム。
 - ハーネス側 permission 機構の再実装(承認・kill-switch はハーネスの機構に委ね、Kyberion 側は governed path の tier/approval gate を重ねるのみ)。
 
 ## 6. 関連計画
 
-- [KD-05(サブエージェント能力ティア)](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md) — 能力宣言の語彙(DONE)。CT-01 はその射影。
+- [KD-05(サブエージェント能力ティア)](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md) — 能力宣言の語彙(DONE)。CT-01 と CT-05 はその射影。
 - [MO-04](./MO-04_WORKER_CONTEXT_ECONOMY.ja.md) / [KP-01](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md) — context pack 配給。CT-02 の入力面。
 - [MO-07_QUALITY_MAXIMIZING_DELEGATION](./MO-07_QUALITY_MAXIMIZING_DELEGATION.ja.md) — best-of-N/judge。CT-03 の lens 分散はその単一プロバイダ版。
 - [HN-02](./HN-02_SCHEMA_FORCED_DELEGATION.ja.md) — schema 強制委譲。`task_result` 契約の基盤。
