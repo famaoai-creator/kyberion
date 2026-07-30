@@ -12,4 +12,6 @@ export { ClaudeAdapter } from './claude-adapter.js';
 export type { ClaudeAdapterOptions } from './claude-adapter.js';
 export { AgyAdapter } from '../agent-adapter.js';
 export type { AgyAdapterOptions } from '../agent-adapter.js';
+export { AgySdkAdapter } from '../agy-sdk-adapter.js';
+export type { AgySdkAdapterOptions } from '../agy-sdk-adapter.js';
 export { AgentFactory } from './agent-factory.js';

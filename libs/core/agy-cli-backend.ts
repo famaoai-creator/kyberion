@@ -37,6 +37,19 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 
+import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
+import { AgySdkAdapter } from './agy-sdk-adapter.js';
+import type { ReasoningCallOptions } from './reasoning-backend.js';
+import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+
+export interface AgyHarnessSession {
+  boot(): Promise<void>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  getRuntimeInfo?(): Record<string, unknown>;
+}
+
 export interface AgyCliBackendOptions {
   bin?: string;
   model?: string;
@@ -44,6 +57,10 @@ export interface AgyCliBackendOptions {
   extraArgs?: string[];
   sandbox?: boolean;
   logFile?: string;
+  /** Test seam and runtime injection for the shared AGY session. */
+  harnessSession?: AgyHarnessSession;
+  /** Optional Python interpreter for the official Antigravity SDK bridge. */
+  sdkPython?: string;
 }
 
 export interface RunAgyCliQueryParams<T> {
@@ -145,6 +162,12 @@ export class AgyCliBackend implements ReasoningBackend {
   private readonly extraArgs: string[];
   private readonly sandbox: boolean;
   private readonly logFile: string;
+  private readonly injectedHarnessSession?: AgyHarnessSession;
+  private readonly sdkPython?: string;
+  private harnessSession?: AgyHarnessSession;
+  private harnessBoot?: Promise<void>;
+  private harnessQueue: Promise<void> = Promise.resolve();
+  private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
   private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: AgyCliBackendOptions = {}) {
@@ -159,15 +182,85 @@ export class AgyCliBackend implements ReasoningBackend {
         pathResolver.sharedTmp(),
         `agy-cli-${Date.now()}-${Math.random().toString(36).slice(2)}.log`
       );
+    this.injectedHarnessSession = options.harnessSession;
+    this.sdkPython = options.sdkPython;
     this.nativeSubagentAdopter = {
       id: 'agy-cli',
-      dispatch: async () => {
-        throw new Error(
-          '[SUBAGENT_UNAVAILABLE] AGY CLI has no verified native subagent protocol; legacy CLI delegation remains available outside harness mode.'
-        );
-      },
-      getInfo: () => ({ provider: 'agy', mode: 'unsupported-native-surface' }),
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
     };
+  }
+
+  private async dispatchNativeSubagent(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const profile = resolveAgySubagentProfile(options);
+    const previous = this.harnessQueue;
+    let release!: () => void;
+    this.harnessQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const session = this.getHarnessSession();
+      if (!session.askNativeSubagent) {
+        throw new Error('[SUBAGENT_UNAVAILABLE] AGY session has no native subagent operation.');
+      }
+      if (!this.harnessBoot) this.harnessBoot = session.boot();
+      await this.harnessBoot;
+      const response = await session.askNativeSubagent(
+        [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
+          .filter(Boolean)
+          .join('\n\n'),
+        {
+          profile: profile.name,
+          subagent: true,
+          effort: options?.effort ?? 'medium',
+          signal: options?.signal,
+        }
+      );
+      if (response.stopReason === 'error') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] AGY SDK returned an error response.');
+      }
+      const nativeInfo = response.metadata?.nativeSubagent;
+      if (!nativeInfo || typeof nativeInfo !== 'object') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] AGY SDK returned no native subagent metadata.');
+      }
+      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
+      return response.text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
+      throw new Error(`[SUBAGENT_UNAVAILABLE] AGY harness failed: ${message}`);
+    } finally {
+      release();
+    }
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter {
+    return this.nativeSubagentAdopter;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return true;
+  }
+
+  private getHarnessSession(): AgyHarnessSession {
+    if (this.harnessSession) return this.harnessSession;
+    if (this.injectedHarnessSession) {
+      this.harnessSession = this.injectedHarnessSession;
+      return this.harnessSession;
+    }
+    this.harnessSession = new AgySdkAdapter({
+      pythonBin: this.sdkPython,
+      cwd: pathResolver.rootDir(),
+      timeoutMs: this.timeoutMs,
+    });
+    return this.harnessSession;
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -329,14 +422,6 @@ export class AgyCliBackend implements ReasoningBackend {
       options?.profile,
       options?.signal
     );
-  }
-
-  getNativeSubagentAdopter(): NativeSubagentAdopter {
-    return this.nativeSubagentAdopter;
-  }
-
-  requiresNativeSubagent(): boolean {
-    return true;
   }
 
   async prompt(
@@ -543,6 +628,11 @@ export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promis
     schema: params.schema,
     profile: params.profile,
   });
+}
+
+function resolveAgySubagentProfile(options?: ReasoningCallOptions) {
+  const requested = options?.profile || options?.role || 'implementer';
+  return getSubagentCapabilityProfile(requested);
 }
 
 function extractJsonPayload(raw: string): string {

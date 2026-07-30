@@ -163,6 +163,33 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AGY_SDK_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.",
+      "documented": false,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_AGY_SDK_CWD",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Working directory passed from the AGY SDK adapter to its Python bridge.",
+      "documented": false,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_AGY_SDK_PYTHON",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Python 3.10+ interpreter used by the official google-antigravity SDK bridge.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_ALLOW_FILE_SECRETS",
       "category": "flag",
       "type": "boolean",

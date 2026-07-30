@@ -68,17 +68,55 @@ describe('agy-cli-backend', () => {
     expect(backend?.name).toBe('agy-cli');
   });
 
-  it('exposes an adopter that fails closed because AGY has no verified native surface', async () => {
-    const backend = new AgyCliBackend({ bin: 'agy', model: 'agy' });
+  it('exposes a valid native subagent adopter via AGY session harness', async () => {
+    const fakeHarness = {
+      boot: vi.fn(async () => {}),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async (prompt: string, options: Record<string, unknown>) => ({
+        text: `delegated: ${prompt}`,
+        metadata: {
+          nativeSubagent: {
+            provider: 'agy',
+            threadId: 'agy-session-123',
+            mode: 'agy-subagent-adopter',
+          },
+        },
+      })),
+      getRuntimeInfo: () => ({
+        lastNativeSubagent: { provider: 'agy', threadId: 'agy-session-123' },
+      }),
+    };
+
+    const backend = new AgyCliBackend({ bin: 'agy', model: 'agy', harnessSession: fakeHarness });
     const adopter = backend.getNativeSubagentAdopter?.();
 
-    await expect(adopter?.dispatch('native task')).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
     expect(adopter?.id).toBe('agy-cli');
     expect(backend.requiresNativeSubagent?.()).toBe(true);
+
+    const result = await adopter?.dispatch('native task', 'ctx');
+    expect(result).toContain('delegated:');
+    expect(fakeHarness.askNativeSubagent).toHaveBeenCalledTimes(1);
+    expect(fakeHarness.askNativeSubagent).toHaveBeenCalledWith(
+      expect.stringContaining('Task: native task'),
+      expect.objectContaining({ profile: 'implementer', subagent: true, effort: 'medium' })
+    );
     expect(adopter?.getInfo?.()).toMatchObject({
       provider: 'agy',
-      mode: 'unsupported-native-surface',
+      threadId: 'agy-session-123',
     });
+  });
+
+  it('rejects a harness response that does not prove native delegation', async () => {
+    const fakeHarness = {
+      boot: vi.fn(async () => {}),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async () => ({ text: 'prompt-only', stopReason: 'completed' })),
+    };
+    const backend = new AgyCliBackend({ harnessSession: fakeHarness });
+
+    await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
+      '[SUBAGENT_UNAVAILABLE] AGY SDK returned no native subagent metadata.'
+    );
   });
 
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
