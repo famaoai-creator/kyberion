@@ -1,13 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
 import { describeTaskRun } from './task_run.js';
 
 type TaskScenario = {
@@ -15,7 +9,10 @@ type TaskScenario = {
   title: string;
   first_run: { questions: string[] };
   repeat_run: { profile_input?: string };
-  approval_boundary: { required_for: string[]; default_action: 'draft-only' | 'notify-only' | 'requires-human-approval' };
+  approval_boundary: {
+    required_for: string[];
+    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
+  };
 };
 
 type SmokeAnswers = Record<string, Record<string, string>>;
@@ -24,11 +21,18 @@ const SMOKE_PROFILE_DIR = pathResolver.rootResolve('active/shared/tmp/task-smoke
 const SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
 const BUILTIN_ANSWERS: SmokeAnswers = {
+  'email-filter-and-organize': {
+    利用するメールサービスとアカウントは何か: 'Gmail / primary account',
+    対象とする検索クエリやキーワードは何か: 'from:notifications.example.com is:unread',
+    どの分類ルールでメールを振り分けるか: '通知メールを運用ラベルへ分類',
+    移動先のラベル名またはフォルダ名は何か: 'Operations/Notifications',
+    '受信トレイからアーカイブするか。削除は別途承認するか': 'アーカイブする。削除は明示承認する',
+  },
   'daily-email-triage': {
-    '重要メールとして扱う送信元や条件は何か': '顧客、役員、採用候補者からのメール',
-    '返信下書きに含めてよいカテゴリや情報の範囲はどこまでか': '日程調整と受領確認のみ',
-    '送信前に人間承認が必要になる条件は何か': '外部送信は常に承認',
-    '返信トーンはどの程度まで自動化してよいか': '丁寧で簡潔',
+    重要メールとして扱う送信元や条件は何か: '顧客、役員、採用候補者からのメール',
+    返信下書きに含めてよいカテゴリや情報の範囲はどこまでか: '日程調整と受領確認のみ',
+    送信前に人間承認が必要になる条件は何か: '外部送信は常に承認',
+    返信トーンはどの程度まで自動化してよいか: '丁寧で簡潔',
   },
 };
 
@@ -44,7 +48,10 @@ function loadScenario(scenarioId: string): TaskScenario {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
 }
 
-function buildSmokeProfile(scenario: TaskScenario, answers: Record<string, string>): Record<string, unknown> {
+function buildSmokeProfile(
+  scenario: TaskScenario,
+  answers: Record<string, string>
+): Record<string, unknown> {
   const firstRunAnswers: Record<string, string | null> = {};
   for (const question of scenario.first_run.questions) {
     firstRunAnswers[question] = answers[question] ?? null;
@@ -92,7 +99,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(`TaskScenario smoke passed: ${scenario.id}`);
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   main().catch((err) => {
     console.error(err?.message ?? String(err));

@@ -18,7 +18,7 @@ allowBuilds:
   tesseract.js: true
   unrs-resolver: true
 overrides:
-  marked: ^12.0.2
+  marked: ^18.0.7
   xmldom: npm:@xmldom/xmldom@^0.8.10
   trim-newlines: ^3.0.1
   jszip: ^3.10.1
@@ -41,7 +41,7 @@ overrides:
   tinyglobby: 0.2.17
   tmp: 0.2.7
   undici: 6.27.0
-  ws: 8.21.0
+  ws: 8.21.1
   '@slack/bolt>path-to-regexp': 8.4.2
   'router>path-to-regexp': 8.4.2
   'express>path-to-regexp': 0.1.13

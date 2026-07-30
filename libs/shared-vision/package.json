@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "puppeteer": "^22.0.0"
+    "puppeteer": "^25.4.0"
   }
 }

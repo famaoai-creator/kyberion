@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "name": "Email Filter and Organize Workflow",
+  "version": "1.0.0",
+  "description": "Provider-neutral email classification plan. Provider adapters bind the read and label operations; destructive changes remain approval-gated.",
+  "context": {
+    "provider": "{{provider}}",
+    "target_query": "{{target_query}}",
+    "classification_rule": "{{classification_rule}}",
+    "destination_label": "{{destination_label}}",
+    "remove_from_inbox": false,
+    "batch_size": 50,
+    "create_provider_filter": false,
+    "output_path": "active/shared/tmp/email-filter-report.md"
+  },
+  "steps": [
+    {
+      "id": "prepare_filter_plan",
+      "role": "planner",
+      "op": "system:write_artifact",
+      "produces": { "channel": "email_filter_plan", "type": "EmailFilterPlan" },
+      "params": {
+        "path": "{{output_path}}",
+        "content": "# Email Filter and Organize Report\n\nProvider: {{provider}}\nQuery: {{target_query}}\nClassification rule: {{classification_rule}}\nDestination label: {{destination_label}}\nRemove from inbox: {{remove_from_inbox}}\nBatch size: {{batch_size}}\nCreate provider filter: {{create_provider_filter}}\n\n## Execution boundary\n\nThis report is a provider-neutral plan. The provider adapter must bind the search and label operations before any external write. Deletion and provider-filter creation require explicit approval."
+      }
+    },
+    {
+      "id": "log_filter_plan",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "email_filter_plan",
+      "params": {
+        "message": "Email filter plan written to {{output_path}}; provider writes remain approval-gated."
+      }
+    }
+  ]
+}
