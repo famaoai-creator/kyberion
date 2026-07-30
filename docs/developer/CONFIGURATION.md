@@ -10,11 +10,12 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (32)
+## secret (33)
 
 | Variable                              | Type   | Required | Description                                                                                                                                                            |
 | ------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `KYBERION_A2A_SECRET`                 | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_AGY_SDK_API_KEY`            | string | no       | Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.                                          |
 | `KYBERION_API_TOKEN`                  | string | no       | Bearer token for authenticated surface/API requests.                                                                                                                   |
 | `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_BLUEBUBBLES_PASSWORD`       | string | no       | _undocumented_                                                                                                                                                         |
@@ -47,7 +48,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (78)
+## path (79)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -55,6 +56,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH`                  | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_AGY_CLI_BIN`                                           | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_AGY_CLI_LOG_FILE`                                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_AGY_SDK_PYTHON`                                        | path | no       | Python 3.10+ interpreter used by the official google-antigravity SDK bridge.                                                  |
 | `KYBERION_ANTIGRAVITY_CLI_BIN`                                   | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_AUTONOMOUS_OPS_POLICY_PATH`                            | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CLAUDE_CLI_BIN`                                        | path | no       | Path override for the claude CLI binary.                                                                                      |
@@ -188,12 +190,13 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
 | `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
 
-## provider (67)
+## provider (68)
 
 | Variable                                  | Type                                         | Required | Description                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `KYBERION_A2UI_BRIDGE_URL`                | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST`  | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_AGY_AGENT`                      | string                                       | no       | Generated AGY workspace agent name selected for CLI sessions, for example kyberion-reviewer.                                                                                                                                                                                                                                    |
 | `KYBERION_AGY_CLI_MODEL`                  | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_ANTHROPIC_FAST_MODEL`           | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_ANTHROPIC_MODEL`                | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
@@ -260,7 +263,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (143)
+## runtime (144)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -270,6 +273,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT`  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_TIER`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGY_SANDBOX`                         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGY_SDK_CWD`                         | string | no       | Working directory passed from the AGY SDK adapter to its Python bridge.                                 |
 | `KYBERION_APPLE_FM`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM_SAMPLE_AUDIO`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIO_BUS`                           | string | no       | _undocumented_                                                                                          |

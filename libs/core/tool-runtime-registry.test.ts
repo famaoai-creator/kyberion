@@ -20,10 +20,19 @@ vi.mock('./secure-io.js', async () => {
   return {
     ...actual,
     safeExecResult: vi.fn((command: string, args: string[] = []) => {
-      if (command === 'which' && ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(args[0] || '')) {
+      if (
+        command === 'which' &&
+        ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(
+          args[0] || ''
+        )
+      ) {
         return { status: 0, stdout: `/mock/${args[0]}\n`, stderr: '', error: null };
       }
-      if (['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(command)) {
+      if (
+        ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(
+          command
+        )
+      ) {
         return { status: 0, stdout: `/mock/${command}`, stderr: '', error: null };
       }
       return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
@@ -62,9 +71,9 @@ describe('tool runtime registry', () => {
           },
         },
         null,
-        2,
+        2
       ),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     safeWriteFile(
       registryPath,
@@ -96,6 +105,31 @@ describe('tool runtime registry', () => {
                 args: ['tool', 'run', 'mflux-generate'],
               },
               managed_env_subpath: 'tool-runtimes/mflux',
+              notes: 'test fixture',
+            },
+            {
+              tool_id: 'agy_sdk',
+              display_name: 'Antigravity Python SDK Runtime',
+              ecosystem: 'python',
+              status: 'active',
+              platforms: ['any'],
+              supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+              trial_backend: {
+                kind: 'uvx',
+                command: 'uvx',
+                args: ['--from', 'google-antigravity', 'python', '-c', 'import google.antigravity'],
+              },
+              install_backend: {
+                kind: 'uv',
+                command: 'uv',
+                args: ['pip', 'install', 'google-antigravity'],
+              },
+              installed_backend: {
+                kind: 'system',
+                command: 'python3',
+                args: ['-c', 'import google.antigravity; print("ok")'],
+              },
+              managed_env_subpath: 'tool-runtimes/agy-sdk',
               notes: 'test fixture',
             },
             {
@@ -251,9 +285,9 @@ describe('tool runtime registry', () => {
           ],
         },
         null,
-        2,
+        2
       ),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', policyPath);
     vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', registryPath);
@@ -276,6 +310,11 @@ describe('tool runtime registry', () => {
     expect(getToolRuntimeRecord('playwright').trial_backend.command).toBe('npx');
     expect(getToolRuntimeRecord('ffmpeg').install_backend?.command).toBe('brew');
     expect(getToolRuntimeRecord('mlx_audio').install_backend?.command).toBe('uv');
+    expect(getToolRuntimeRecord('agy_sdk').install_backend?.args).toEqual([
+      'pip',
+      'install',
+      'google-antigravity',
+    ]);
   });
 
   it('prefers trial execution when no install state exists', () => {
@@ -301,11 +340,26 @@ describe('tool runtime registry', () => {
   it('lists inventory items with lifecycle stages', () => {
     const inventory = listToolRuntimeInventory('trial', 'darwin');
     expect(inventory.default_tool_id).toBe('mflux');
-    expect(inventory.items).toHaveLength(7);
-    expect(inventory.items.map((item) => item.tool.tool_id)).toEqual(['mflux', 'playwright', 'ffmpeg', 'sox', 'tesseract', 'mlx_audio', 'mlx_whisper']);
-    expect(inventory.items.find((item) => item.tool.tool_id === 'playwright')?.lifecycle_stage).toBe('trial');
-    expect(inventory.items.find((item) => item.tool.tool_id === 'ffmpeg')?.selected_action).toBe('run_trial');
-    expect(inventory.items.find((item) => item.tool.tool_id === 'mlx_audio')?.selected_backend?.command).toBe('python3');
+    expect(inventory.items).toHaveLength(8);
+    expect(inventory.items.map((item) => item.tool.tool_id)).toEqual([
+      'mflux',
+      'agy_sdk',
+      'playwright',
+      'ffmpeg',
+      'sox',
+      'tesseract',
+      'mlx_audio',
+      'mlx_whisper',
+    ]);
+    expect(
+      inventory.items.find((item) => item.tool.tool_id === 'playwright')?.lifecycle_stage
+    ).toBe('trial');
+    expect(inventory.items.find((item) => item.tool.tool_id === 'ffmpeg')?.selected_action).toBe(
+      'run_trial'
+    );
+    expect(
+      inventory.items.find((item) => item.tool.tool_id === 'mlx_audio')?.selected_backend?.command
+    ).toBe('python3');
 
     const installed = getToolRuntimeInventoryItem('mflux', 'installed', 'darwin');
     expect(installed.tool.tool_id).toBe('mflux');

@@ -36,9 +36,6 @@ import type {
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
-import type { ClaudeAgentTaskParams, ClaudeAgentTaskResult } from './claude-agent-query.js';
-import type { GovernedAgentPromptInput } from './claude-agent-governance.js';
-import type { CanUseTool, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -67,6 +64,18 @@ function dispatchWithConcurrencyGovernance<T>(
   wireDelegationKillSwitchIntegration();
   const provider = resolveDelegationProvider(backend);
   return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
+}
+
+/** Preserve the legacy two-argument call shape when no routing options exist. */
+function delegateWithOptions(
+  backend: ReasoningBackend,
+  instruction: string,
+  context: string | undefined,
+  options?: ReasoningCallOptions
+): Promise<string> {
+  return options
+    ? backend.delegateTask(instruction, context, options)
+    : backend.delegateTask(instruction, context);
 }
 
 /**
@@ -108,10 +117,11 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
   dispatch(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     return dispatchWithConcurrencyGovernance(backend, () =>
-      backend.delegateTask(instruction, context)
+      delegateWithOptions(backend, instruction, context, options)
     );
   }
 }
@@ -136,17 +146,19 @@ export class InSessionDispatcher implements AgentDispatcher {
   dispatch(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     return dispatchWithConcurrencyGovernance(backend, () =>
-      this.dispatchInner(instruction, context, backend)
+      this.dispatchInner(instruction, context, backend, options)
     );
   }
 
   private async dispatchInner(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string> {
     logger.info('[agent-dispatch:in-session] Initiating in-session delegation for task...');
 
@@ -160,7 +172,7 @@ export class InSessionDispatcher implements AgentDispatcher {
       // that same governance itself; nesting the two would double-count (and,
       // under a saturated per-provider cap, self-deadlock: the outer slot
       // would never free while waiting on an inner acquire from the same pool).
-      return backend.delegateTask(instruction, context);
+      return delegateWithOptions(backend, instruction, context, options);
     }
 
     // KD-05: the tier catalog is rebuilt from the registry on every dispatch,
@@ -225,7 +237,7 @@ export class InSessionDispatcher implements AgentDispatcher {
           this.repeatGovernor = createToolCallRepeatGovernorState();
           // XP-06: see the comment on the other fallback path above — call
           // the backend directly to avoid nesting concurrency governance.
-          return backend.delegateTask(instruction, context);
+          return delegateWithOptions(backend, instruction, context, options);
         }
         if (decision.reminder) {
           logger.warn(`[agent-dispatch:in-session] [repeat-governor] ${decision.reminder}`);
@@ -290,35 +302,29 @@ export class InSessionDispatcher implements AgentDispatcher {
 }
 
 /**
- * The governed Agent SDK runtime pieces {@link HarnessSubagentDispatcher} needs.
- * Loaded lazily (see {@link loadDefaultGovernedRuntime}) so importing this
- * module never touches the real `@anthropic-ai/claude-agent-sdk` package —
- * only an actual `dispatch()` call does, and only when
- * `KYBERION_HARNESS_SUBAGENT=1` selects this dispatcher. Tests inject a fake
- * runtime (or a rejecting loader, to simulate "SDK unavailable") via the
- * constructor, so they never load the real SDK either.
+ * Provider-neutral runtime seam retained for generic harness integrations.
+ * Provider-native implementations should use `NativeSubagentAdopter` instead;
+ * this module never loads or names a provider SDK.
  */
-interface GovernedHarnessRuntime {
-  runTask: (params: ClaudeAgentTaskParams) => Promise<ClaudeAgentTaskResult>;
-  buildGovernedAgentSystemPrompt: (input: GovernedAgentPromptInput) => string;
-  buildKyberionMcpServerConfig: () => Record<string, McpServerConfig>;
-  createKyberionCanUseTool: () => CanUseTool;
-  /** Advisory allowlist ceiling (GOVERNED_AGENT_ALLOWED_TOOLS); canUseTool is the real enforcer. */
+export interface HarnessSubagentRuntime {
+  runTask: (params: HarnessSubagentTaskRequest) => Promise<HarnessSubagentTaskResult>;
+  buildGovernedAgentSystemPrompt: (input: { base: string; missionContext?: string }) => string;
+  buildKyberionMcpServerConfig: () => Record<string, unknown>;
+  createKyberionCanUseTool: () => unknown;
+  /** Advisory allowlist ceiling; the runtime owns the real enforcement. */
   allowedTools: readonly string[];
 }
 
-async function loadDefaultGovernedRuntime(): Promise<GovernedHarnessRuntime> {
-  const [{ runClaudeAgentTask }, governance] = await Promise.all([
-    import('./claude-agent-query.js'),
-    import('./claude-agent-governance.js'),
-  ]);
-  return {
-    runTask: runClaudeAgentTask,
-    buildGovernedAgentSystemPrompt: governance.buildGovernedAgentSystemPrompt,
-    buildKyberionMcpServerConfig: governance.buildKyberionMcpServerConfig,
-    createKyberionCanUseTool: governance.createKyberionCanUseTool,
-    allowedTools: governance.GOVERNED_AGENT_ALLOWED_TOOLS,
-  };
+export interface HarnessSubagentTaskRequest {
+  systemPrompt: string;
+  userPrompt: string;
+  mcpServers: Record<string, unknown>;
+  allowedTools: readonly string[];
+  canUseTool: unknown;
+}
+
+export interface HarnessSubagentTaskResult {
+  text: string;
 }
 
 /** Intersect a KD-05 tier's CLI tool projection with the governed ceiling. */
@@ -333,37 +339,36 @@ function resolveHarnessAllowedTools(
 
 export interface HarnessSubagentDispatcherDeps {
   /**
-   * Seam replacing {@link loadDefaultGovernedRuntime}. Tests inject a fake
-   * runtime to keep the real Agent SDK out of the test process entirely; a
-   * rejecting loader deterministically exercises the SDK-unavailable
-   * fallback without needing to uninstall or unmock anything.
+   * Optional provider-neutral runtime seam for legacy/generic harnesses.
+   * Provider-native implementations should use `NativeSubagentAdopter`
+   * instead; the dispatcher does not load or name a provider SDK.
    */
-  loadRuntime?: () => Promise<GovernedHarnessRuntime>;
+  loadRuntime?: () => Promise<HarnessSubagentRuntime>;
 }
 
 /**
- * CT-02: dispatches delegated tasks through the CLI harness's own Agent SDK
- * sub-agent mechanism (Direction B / governed path — `runClaudeAgentTask` +
- * Kyberion MCP + `canUseTool` + governed system prompt), applying a KD-05
+ * CT-02: dispatches delegated tasks through a provider-neutral governed runtime
+ * or a `NativeSubagentAdopter`, applying a KD-05
  * capability profile: the profile's `allowedOps` tier is projected onto the
  * SDK's `allowedTools` (intersected with `GOVERNED_AGENT_ALLOWED_TOOLS`,
  * which stays the real ceiling — `canUseTool` enforces it) and its
  * `systemPromptPrefix` is prepended to the sub-agent's system prompt.
  *
  * Selected via `KYBERION_HARNESS_SUBAGENT=1` (see {@link maybeWrapWithDispatcher}).
- * Fail-open: if the Agent SDK is unavailable at runtime (import/probe
- * failure), dispatch falls back to {@link ProcessSpawnDispatcher} exactly
- * like {@link InSessionDispatcher}'s own fallback — the env flag must never
- * hard-fail a delegation.
+ * Backends may adopt a provider-native surface through the
+ * `NativeSubagentAdopter` contract. If a backend marks native adoption as
+ * required but its adopter is unavailable, the dispatcher emits
+ * `subagent_unavailable` and fails closed rather than pretending that a
+ * process-spawn delegation was native.
  */
 export class HarnessSubagentDispatcher implements AgentDispatcher {
   readonly name = 'harness-subagent';
   /** Typed as the interface (not the concrete class) so the 4-arg dispatch call below type-checks. */
   private readonly fallback: AgentDispatcher = new ProcessSpawnDispatcher();
-  private readonly loadRuntime: () => Promise<GovernedHarnessRuntime>;
+  private readonly loadRuntime?: () => Promise<HarnessSubagentRuntime>;
 
   constructor(deps: HarnessSubagentDispatcherDeps = {}) {
-    this.loadRuntime = deps.loadRuntime ?? loadDefaultGovernedRuntime;
+    this.loadRuntime = deps.loadRuntime;
   }
 
   dispatch(
@@ -391,7 +396,59 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       profile: profile.name,
     });
 
-    let runtime: GovernedHarnessRuntime;
+    const nativeAdopter = backend.getNativeSubagentAdopter?.();
+    if (nativeAdopter) {
+      try {
+        const result = await nativeAdopter.dispatch(instruction, context, {
+          ...options,
+          profile: profile.name,
+        });
+        this.emit(stream, 'subagent_end', {
+          dispatcher: this.name,
+          adopter_id: nativeAdopter.id,
+          profile: profile.name,
+          status: 'success',
+          native: true,
+          ...nativeHarnessEventFields(nativeAdopter.id, nativeAdopter.getInfo?.()),
+        });
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) {
+          this.emitUnavailable(stream, profile.name, message, nativeAdopter.id);
+        } else {
+          this.emit(stream, 'subagent_end', {
+            dispatcher: this.name,
+            adopter_id: nativeAdopter.id,
+            profile: profile.name,
+            status: 'failure',
+            error: message,
+          });
+        }
+        throw err;
+      }
+    }
+
+    if (backend.requiresNativeSubagent?.()) {
+      const reason =
+        'The selected backend requires a native subagent adopter, but none is available.';
+      this.emitUnavailable(stream, profile.name, reason);
+      throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
+    }
+
+    if (!this.loadRuntime) {
+      const reason = 'No provider-native adopter or governed runtime is configured.';
+      this.emit(stream, 'subagent_end', {
+        dispatcher: this.name,
+        profile: profile.name,
+        status: 'fallback',
+        fallback_to: this.fallback.name,
+        reason,
+      });
+      return delegateWithOptions(backend, instruction, context, options);
+    }
+
+    let runtime: HarnessSubagentRuntime;
     try {
       runtime = await this.loadRuntime();
     } catch (err) {
@@ -411,7 +468,7 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       // (see `dispatch()` below), and nesting it via `ProcessSpawnDispatcher`
       // would double-wrap (and risk self-deadlock under a saturated
       // per-provider cap). `this.fallback` is kept only for its `.name`.
-      return backend.delegateTask(instruction, context);
+      return delegateWithOptions(backend, instruction, context, options);
     }
 
     try {
@@ -465,7 +522,7 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
 
   private emit(
     stream: WorkerEventStream,
-    type: 'subagent_begin' | 'subagent_end',
+    type: 'subagent_begin' | 'subagent_end' | 'subagent_unavailable',
     payload: Record<string, unknown>
   ): void {
     try {
@@ -474,6 +531,45 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
       // Event stream projection is best-effort; it must never break dispatch.
     }
   }
+
+  private emitUnavailable(
+    stream: WorkerEventStream,
+    profile: string,
+    reason: string,
+    adopterId?: string
+  ): void {
+    logger.warn(`[agent-dispatch:harness-subagent] Native subagent unavailable: ${reason}`);
+    this.emit(stream, 'subagent_unavailable', {
+      dispatcher: this.name,
+      profile,
+      ...(adopterId ? { adopter_id: adopterId } : {}),
+      reason,
+      fallback_allowed: false,
+      native_unavailable: true,
+    });
+  }
+}
+
+function nativeHarnessEventFields(
+  adopterId: string,
+  info: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  if (!info) return { adopter_id: adopterId };
+  return {
+    adopter_id: adopterId,
+    ...(typeof info.provider === 'string' ? { provider: info.provider } : {}),
+    ...(typeof info.parentThreadId === 'string' ? { parent_thread_id: info.parentThreadId } : {}),
+    ...(typeof info.threadId === 'string' ? { thread_id: info.threadId } : {}),
+    ...(typeof info.turnId === 'string' ? { turn_id: info.turnId } : {}),
+    ...(typeof info.forked === 'boolean' ? { native_fork: info.forked } : {}),
+    ...(typeof info.mode === 'string' ? { native_mode: info.mode } : {}),
+    ...(info.effort === 'low' ||
+    info.effort === 'medium' ||
+    info.effort === 'high' ||
+    info.effort === 'ultra'
+      ? { effort: info.effort }
+      : {}),
+  };
 }
 
 /**
