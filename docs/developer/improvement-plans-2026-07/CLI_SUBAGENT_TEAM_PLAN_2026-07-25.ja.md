@@ -128,6 +128,8 @@ Codex を `ProcessSpawnDispatcher` のまま委譲ごとに起動する経路か
 3. CT-01 の role 定義と KD-05 capability profile を Codex の sandbox / approval / tool permission へ射影し、explorer の write deny、planner の no-tool、implementer の許可範囲を adapter 固有の文字列に複製しない。射影表は XP-02 の単一正本を共有する。
 4. provider capability が未検出・未認証・protocol 非対応の場合、既定では ProcessSpawn へ黙って降格しない。`subagent_unavailable` と理由を KC-02 event / trace / operator surface に記録し、必要ならオペレータが明示的に legacy spawn fallback を選ぶ。
 
+実装境界: `HarnessSubagentDispatcher` は provider 名や protocol method を直接参照せず、`NativeSubagentAdopter`(adopter id / dispatch / metadata)だけを消費する。Codex の app-server、`thread/fork`、`effort: "ultra"`、thread metadata は Codex 側 adopter に閉じ込め、将来の Claude/Gemini 等は同じ契約へ追加する。
+
 **受入条件**
 
 1. fake Codex app-server で、1つの server process に対して複数 logical subagent/thread を委譲でき、委譲回数に比例した `spawn` が発生しないことを検証する。

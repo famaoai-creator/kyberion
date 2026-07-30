@@ -21,6 +21,7 @@ import type {
   HypothesisSketch,
   PersonaSynthesisInput,
   ReasoningBackend,
+  ReasoningCallOptions,
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
@@ -41,10 +42,13 @@ import {
   type SubagentCapabilityProfile,
 } from './subagent-capability-profiles.js';
 import { resolveProviderPermissionArgs } from './provider-permission-profiles.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 
 export interface CodexHarnessSession {
   boot(): Promise<void>;
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  getRuntimeInfo?(): Record<string, unknown>;
 }
 
 export interface CodexCliReasoningBackendOptions extends CodexCliQueryOptions {
@@ -59,10 +63,18 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   private harnessSession?: CodexHarnessSession;
   private harnessBoot?: Promise<void>;
   private harnessQueue: Promise<void> = Promise.resolve();
+  private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: CodexCliReasoningBackendOptions = {}) {
     this.options = options;
     this.injectedHarnessSession = options.harnessSession;
+    this.nativeSubagentAdopter = {
+      id: 'codex-app-server',
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
+    };
   }
 
   /** Run a shared structured-reasoning op through the codex CLI (schema-validated). */
@@ -145,10 +157,10 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
    * reasoning remains backward-compatible, while HarnessSubagentDispatcher
    * can opt into the provider-native execution surface explicitly.
    */
-  async dispatchHarnessSubagent(
+  private async dispatchNativeSubagent(
     instruction: string,
     context?: string,
-    options?: { role?: string; profile?: string; signal?: AbortSignal }
+    options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const profile = resolveProfile(options);
@@ -164,10 +176,11 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     });
     await previous;
     try {
-      const session = this.getHarnessSession(profile, permission.args);
+      const session = this.getHarnessSession(permission.args);
       if (!this.harnessBoot) this.harnessBoot = session.boot();
       await this.harnessBoot;
-      const response = await session.ask(
+      const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
+      const response = await ask(
         [
           profile.systemPromptPrefix,
           '<kyberion-delegated-task>',
@@ -186,6 +199,15 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
           sandboxPolicy: sandboxPolicyForArgs(permission.args),
         }
       );
+      const nativeInfo = response.metadata?.nativeSubagent;
+      const runtimeInfo = session.getRuntimeInfo?.();
+      const runtimeNativeInfo = runtimeInfo?.lastNativeSubagent;
+      this.lastHarnessSubagentInfo =
+        nativeInfo && typeof nativeInfo === 'object'
+          ? { ...(nativeInfo as Record<string, unknown>) }
+          : runtimeNativeInfo && typeof runtimeNativeInfo === 'object'
+            ? { ...(runtimeNativeInfo as Record<string, unknown>) }
+            : null;
       return response.text;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -196,10 +218,15 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     }
   }
 
-  private getHarnessSession(
-    profile: SubagentCapabilityProfile,
-    permissionArgs: readonly string[]
-  ): CodexHarnessSession {
+  getNativeSubagentAdopter(): NativeSubagentAdopter {
+    return this.nativeSubagentAdopter;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return true;
+  }
+
+  private getHarnessSession(permissionArgs: readonly string[]): CodexHarnessSession {
     if (this.harnessSession) return this.harnessSession;
     if (this.injectedHarnessSession) {
       this.harnessSession = this.injectedHarnessSession;
