@@ -4873,6 +4873,12 @@
       "type": "json"
     },
     {
+      "path": "product/pipeline-templates/email-filter-and-organize-workflow.json",
+      "tier": "public",
+      "size": 1679,
+      "type": "json"
+    },
+    {
       "path": "product/pipeline-templates/email-triage-and-reply-draft.json",
       "tier": "public",
       "size": 1680,
@@ -7864,6 +7870,12 @@
       "path": "product/task-scenarios/daily-email-triage.json",
       "tier": "public",
       "size": 1438,
+      "type": "json"
+    },
+    {
+      "path": "product/task-scenarios/email-filter-and-organize.json",
+      "tier": "public",
+      "size": 1673,
       "type": "json"
     },
     {

@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { logger } from './core.js';
 import { safeReadFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
