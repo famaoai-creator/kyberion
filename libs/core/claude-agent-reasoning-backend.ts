@@ -35,10 +35,13 @@ import type {
   HypothesisSketch,
   PersonaSynthesisInput,
   ReasoningBackend,
+  ReasoningCallOptions,
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
 } from './reasoning-backend.js';
+import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 
 const SYSTEM_PROMPT = `You are a judgment-support reasoning engine for a CEO work-automation platform.
 
@@ -299,9 +302,17 @@ export interface ClaudeAgentReasoningBackendOptions {
 export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   readonly name = 'claude-agent';
   private readonly model: string;
+  private lastNativeSubagentInfo: Record<string, unknown> | null = null;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: ClaudeAgentReasoningBackendOptions = {}) {
     this.model = options.model ?? 'opus';
+    this.nativeSubagentAdopter = {
+      id: 'claude-agent-sdk',
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastNativeSubagentInfo ? { ...this.lastNativeSubagentInfo } : null),
+    };
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -603,7 +614,58 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     return result.parsed.answer;
   }
 
+  /**
+   * Provider-native adopter used by HarnessSubagentDispatcher. The Claude
+   * Agent SDK governance surface stays entirely inside this concrete backend;
+   * the dispatcher only sees NativeSubagentAdopter.
+   */
+  private async dispatchNativeSubagent(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const profile = resolveClaudeSubagentProfile(options);
+    const allowedTools = profile.cliTools.filter((tool) =>
+      GOVERNED_AGENT_ALLOWED_TOOLS.includes(tool)
+    );
+    const result = await runClaudeAgentTask({
+      systemPrompt: buildGovernedAgentSystemPrompt({
+        base: profile.systemPromptPrefix,
+        missionContext: context,
+      }),
+      userPrompt: `Task: ${instruction}`,
+      model: this.model,
+      mcpServers: buildKyberionMcpServerConfig(),
+      allowedTools,
+      canUseTool: createKyberionCanUseTool(),
+    });
+    this.lastNativeSubagentInfo = {
+      provider: 'claude',
+      ...(result.sessionId ? { threadId: result.sessionId } : {}),
+      mode: 'agent-sdk',
+      effort: options?.effort ?? 'medium',
+    };
+    return result.text;
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter {
+    return this.nativeSubagentAdopter;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return true;
+  }
+
   async prompt(prompt: string): Promise<string> {
     return this.delegateTask(prompt);
+  }
+}
+
+function resolveClaudeSubagentProfile(options?: ReasoningCallOptions) {
+  const requested = options?.profile || options?.role || 'implementer';
+  try {
+    return getSubagentCapabilityProfile(requested);
+  } catch {
+    return getSubagentCapabilityProfile('implementer');
   }
 }
