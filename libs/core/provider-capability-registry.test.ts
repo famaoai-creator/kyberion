@@ -101,6 +101,24 @@ describe('provider-capability-registry', () => {
     });
   });
 
+  it('registers Grok as a headless structured-output provider', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const results = probeProviderCapabilities({
+      providerIds: ['grok'],
+      exec: fakeExec({ 'grok --version': true }),
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'grok',
+      binary_found: true,
+      authenticated: 'unknown',
+      headless: true,
+      structured_output: true,
+    });
+  });
+
   it('probe command failure marks the provider unavailable without throwing', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
