@@ -17,6 +17,6 @@
   "devDependencies": {
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.10"
   }
 }
