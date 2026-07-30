@@ -23,7 +23,7 @@ import {
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
 import { decomposeIntoTasks, taskPlanToNextTasks } from './task-plan-ops.js';
 
@@ -838,8 +838,7 @@ async function opTransform(op: string, params: any, ctx: any) {
     case 'resolution_plan_to_pipeline_bundle': {
       const plan = ctx[params.from || 'resolution_plan'];
       const brief = resolveExecutionBriefReference(ctx, params.brief_from) as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       if (!plan || typeof plan !== 'object')
         throw new Error('resolution_plan_to_pipeline_bundle requires actuator-resolution-plan');
       if (!brief || typeof brief !== 'object') {
