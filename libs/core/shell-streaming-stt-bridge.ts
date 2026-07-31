@@ -22,6 +22,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync } from './secure-io.js';
+import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
@@ -189,4 +192,25 @@ export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; r
     .filter(Boolean);
   installShellStreamingSttBridge({ bridge_id: 'shell', command, args });
   return { installed: true };
+}
+
+/**
+ * Install the resident MLX Whisper stream adapter when the managed runtime is
+ * available and no explicit deployment-specific command was supplied.
+ */
+export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): { installed: boolean; reason?: string; bridge_id?: string } {
+  if (env.KYBERION_STT_COMMAND?.trim()) {
+    return { installed: false, reason: 'KYBERION_STT_COMMAND already configured' };
+  }
+  const command = resolveManagedToolPythonBin('mlx_whisper');
+  const script = pathResolver.rootResolve('scripts/stt_mlx_whisper_stream.py');
+  if (!command || !safeExistsSync(script)) {
+    return { installed: false, reason: 'managed mlx_whisper stream runtime is unavailable' };
+  }
+  const bridgeId = 'managed_mlx_whisper';
+  installShellStreamingSttBridge({ bridge_id: bridgeId, command, args: [script] });
+  logger.success('[stt-bridge] installed managed mlx_whisper streaming bridge');
+  return { installed: true, bridge_id: bridgeId };
 }

@@ -11,14 +11,22 @@ import {
   createVoiceActuatorServeClient,
   ensureRealtimeVoiceConversationSession,
   generateRealtimeAssistantReply,
+  streamRealtimeAssistantReply,
   getSpeechToTextBridge,
   getStreamingSttBridge,
+  getStreamingTtsBridge,
+  installAppleSpeechToTextBridgeIfAvailable,
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
+  installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installReasoningBackends,
   installShellStreamingSttBridgeFromEnv,
+  installShellStreamingTtsBridgeFromEnv,
   installSileroVadBackend,
   installTenVadBackend,
   pathResolver,
   probeAudioPlayback,
+  probePcmAudioStreaming,
+  playPcmAudioStream,
   probeMicCapture,
   recordRealtimeVoiceConversationExchange,
   recordVadTurn,
@@ -30,8 +38,10 @@ import {
   startRealtimeVoiceLoop,
   synthesizeRealtimeVoice,
   type PlaybackHandle,
+  type AudioChunk,
   type RealtimeVoiceLoopEvent,
   type StreamingSpeechToTextBridge,
+  type StreamingTextToSpeechBridge,
   type VadTurnState,
 } from '@agent/core';
 
@@ -74,6 +84,8 @@ export interface RealtimeVoiceConversationCliOptions {
   mission?: string;
   /** End the conversation loop after this much listening silence. */
   idleTimeoutSeconds: number;
+  /** Max characters per pipelined TTS segment. */
+  speechSegmentChars?: number;
   turns?: number;
   recordBridgePath: string;
   pythonBin: string;
@@ -423,6 +435,12 @@ export async function runRealtimeVoiceConversationLoop(
     if (installed.installed) {
       streamingStt = getStreamingSttBridge('shell');
       console.log('🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)');
+    } else {
+      const managed = installManagedMlxWhisperStreamingSttBridgeIfAvailable();
+      if (managed.installed && managed.bridge_id) {
+        streamingStt = getStreamingSttBridge(managed.bridge_id);
+        console.log('🔁 streaming STT: managed mlx_whisper (resident per utterance)');
+      }
     }
   }
 
@@ -431,6 +449,24 @@ export async function runRealtimeVoiceConversationLoop(
     options.warmActuator && options.deliveryMode !== 'none'
       ? createVoiceActuatorServeClient()
       : null;
+
+  let streamingTts: StreamingTextToSpeechBridge | undefined;
+  const streamPlaybackCommand = process.env.KYBERION_TTS_PLAY_COMMAND?.split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (playbackEnabled) {
+    const installed = installShellStreamingTtsBridgeFromEnv();
+    if (installed.installed) {
+      const probe = probePcmAudioStreaming();
+      if (!probe.available) {
+        throw new Error(
+          `KYBERION_TTS_COMMAND is configured but direct PCM playback is unavailable: ${probe.reason}`
+        );
+      }
+      streamingTts = getStreamingTtsBridge('shell');
+      console.log('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
+    }
+  }
 
   const synthesizeSegment =
     options.deliveryMode === 'none'
@@ -493,11 +529,24 @@ export async function runRealtimeVoiceConversationLoop(
       bargeIn: { enabled: options.bargeIn },
       ...(options.turns !== undefined ? { maxTurns: options.turns } : {}),
       idleTimeoutMs: options.idleTimeoutSeconds * 1000,
+      maxSegmentChars: options.speechSegmentChars ?? 120,
       consent: { missionId: options.mission },
       ...(streamingStt ? { streamingStt } : {}),
       transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
       reply: (userText) => generateRealtimeAssistantReply(session.session_id, userText),
+      streamReply: (userText, _turn, onSegment, signal) =>
+        streamRealtimeAssistantReply(session.session_id, userText, onSegment, signal),
       synthesizeSegment,
+      ...(streamingTts
+        ? {
+            streamingTts,
+            voiceProfileId: session.profile_id,
+            playAudioStream: (audio: AsyncIterable<AudioChunk>, _index: number) =>
+              playPcmAudioStream(audio, {
+                ...(streamPlaybackCommand ? { command: streamPlaybackCommand } : {}),
+              }),
+          }
+        : {}),
       ...(!playbackEnabled ? { play: () => IMMEDIATE_PLAYBACK } : {}),
       onEvent: (event) => {
         const message = describeLoopEvent(event);
@@ -630,6 +679,13 @@ export function parseRealtimeVoiceConversationCli(
       }
       return value;
     })(),
+    speechSegmentChars: (() => {
+      const value = Number(argv['speech-segment-chars'] ?? 120);
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new Error('--speech-segment-chars must be a positive number');
+      }
+      return Math.floor(value);
+    })(),
     turns: normalizeTurns(argv.turns),
     recordBridgePath: argv['record-bridge-path']
       ? pathResolver.rootResolve(String(argv['record-bridge-path']))
@@ -643,6 +699,17 @@ export function parseRealtimeVoiceConversationCli(
 
 export async function main(): Promise<void> {
   await installReasoningBackends();
+  // The general bootstrap probes Apple Speech asynchronously. Await it here so
+  // the realtime CLI can use macOS-native STT before falling back to MLX.
+  if (
+    !process.env.KYBERION_STT_COMMAND?.trim() &&
+    !process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+  ) {
+    await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
+  }
+  if (getSpeechToTextBridge().name === 'stub') {
+    installManagedMlxWhisperSpeechToTextBridgeIfAvailable();
+  }
 
   const argv = await createStandardYargs()
     .option('session-id', { type: 'string', demandOption: true })
@@ -714,6 +781,11 @@ export async function main(): Promise<void> {
       type: 'boolean',
       default: true,
       describe: 'Keep one resident voice-actuator process for sentence synthesis',
+    })
+    .option('speech-segment-chars', {
+      type: 'number',
+      default: 120,
+      describe: 'Max characters per sentence-level TTS segment',
     })
     .option('mission', {
       type: 'string',
