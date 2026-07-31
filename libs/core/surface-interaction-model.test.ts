@@ -29,6 +29,7 @@ function cleanupSurfaceArtifacts(): void {
   process.env.MISSION_ROLE = 'surface_runtime';
   for (const surface of ['imessage', 'discord', 'telegram'] as const) {
     for (const message of listSurfaceOutboxMessages(surface)) {
+      if (!message.correlation_id.startsWith('corr-')) continue;
       clearSurfaceOutboxMessage(surface, message.message_id);
     }
     safeRmSync(
@@ -38,6 +39,7 @@ function cleanupSurfaceArtifacts(): void {
   }
   process.env.MISSION_ROLE = 'slack_bridge';
   for (const message of listSurfaceOutboxMessages('slack')) {
+    if (!message.correlation_id.startsWith('corr-')) continue;
     clearSurfaceOutboxMessage('slack', message.message_id);
   }
   safeRmSync(pathResolver.resolve('active/shared/coordination/channels/slack/notifications'), {
