@@ -292,14 +292,18 @@ function resolveAndValidateModel(input: {
 }): string | undefined {
   const model = input.model || input.modelRef;
   if (!model) return undefined;
-  const registered = loadModelRegistry().models.find((entry) => entry.model_id === model);
+  const registryModel =
+    input.adapter.selection?.model_provider && !model.includes(':')
+      ? `${input.adapter.selection.model_provider}:${model}`
+      : model;
+  const registered = loadModelRegistry().models.find((entry) => entry.model_id === registryModel);
   if (registered) {
     if (registered.status === 'blocked' || registered.status === 'deprecated') {
       throw new Error(
-        `Model ${model} is ${registered.status} and cannot be selected for ${input.profile}`
+        `Model ${registryModel} is ${registered.status} and cannot be selected for ${input.profile}`
       );
     }
-    return model;
+    return registryModel;
   }
   if (input.adapter.model_policy === 'local-unregistered') return model;
   throw new Error(`Model ${model} is not approved in model-registry.json for ${input.profile}`);

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildGeminiApiBackendFromEnv,
   GeminiApiBackend,
@@ -6,6 +6,10 @@ import {
 } from './gemini-api-backend.js';
 
 describe('GeminiApiBackend', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('builds from a Google AI Studio key without exposing the key in the model route', () => {
     const backend = buildGeminiApiBackendFromEnv({ GEMINI_API_KEY: 'test-gemini-key' });
 
@@ -50,5 +54,100 @@ describe('GeminiApiBackend', () => {
     });
 
     expect(backend?.getModel()).toBe('gemini-2.5-flash');
+  });
+
+  it('sends Gemini function declarations and maps function calls', async () => {
+    const request = vi.fn().mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ functionCall: { name: 'read_file', args: { path: 'README.md' } } }],
+          },
+        },
+      ],
+    });
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-flash-latest',
+      request,
+    });
+
+    const result = await backend.generateWithTools('Read the README', [
+      {
+        name: 'read_file',
+        description: 'Read a workspace file',
+        inputSchema: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      },
+    ]);
+
+    expect(result.toolCalls).toEqual([{ name: 'read_file', input: { path: 'README.md' } }]);
+    const body = request.mock.calls[0][0].data as {
+      tools: Array<{ functionDeclarations: Array<{ name: string; parameters: unknown }> }>;
+      toolConfig: { functionCallingConfig: { mode: string } };
+    };
+    expect(body.tools[0].functionDeclarations[0].name).toBe('read_file');
+    expect(body.tools[0].functionDeclarations[0].parameters).toMatchObject({ type: 'object' });
+    expect(body.toolConfig.functionCallingConfig.mode).toBe('AUTO');
+  });
+
+  it('inlines validated image attachments for vision prompts', async () => {
+    const request = vi.fn().mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: 'A Kyberion mark.' }] } }],
+    });
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-flash-latest',
+      request,
+    });
+
+    await expect(
+      backend.promptWithImages('What is shown?', [
+        { path: 'docs/assets/kyberion-social-preview.png', media_type: 'image/png' },
+      ])
+    ).resolves.toBe('A Kyberion mark.');
+
+    const body = request.mock.calls[0][0].data as {
+      contents: Array<{ parts: Array<{ inlineData?: { mimeType: string; data: string } }> }>;
+    };
+    expect(body.contents[0].parts[0].inlineData?.mimeType).toBe('image/png');
+    expect(body.contents[0].parts[0].inlineData?.data.length).toBeGreaterThan(100);
+  });
+
+  it('streams SSE text deltas from streamGenerateContent', async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"candidates":[{"content":{"parts":[{"text":"最初の"}]}}]}\n\n')
+        );
+        controller.enqueue(
+          encoder.encode('data: {"candidates":[{"content":{"parts":[{"text":"応答です。"}]}}]}\n\n')
+        );
+        controller.close();
+      },
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-flash-latest',
+    });
+
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('Tell me a short answer')) deltas.push(delta);
+
+    expect(deltas).toEqual(['最初の', '応答です。']);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      '/models/gemini-flash-latest:streamGenerateContent?alt=sse'
+    );
   });
 });
