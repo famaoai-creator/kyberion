@@ -1,6 +1,8 @@
 export interface SurfaceUxContractInput {
   text: string;
   approval_required?: boolean;
+  /** Allow natural replies for lightweight conversational turns such as greetings. */
+  allow_conversational_reply?: boolean;
 }
 
 export interface SurfaceUxContractResult {
@@ -125,7 +127,7 @@ export function validateSurfaceUxContract(input: SurfaceUxContractInput): Surfac
     (entry) => entry.signal
   );
 
-  if (signals.length === 0) {
+  if (signals.length === 0 && !input.allow_conversational_reply) {
     violations.push(
       'Response must include at least one user-facing signal (Request/Plan/State/Result/Next Action).'
     );

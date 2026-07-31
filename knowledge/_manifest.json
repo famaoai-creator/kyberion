@@ -19,6 +19,12 @@
       "type": "md"
     },
     {
+      "path": "product/agents/cli-surface-agent.agent.md",
+      "tier": "public",
+      "size": 1138,
+      "type": "md"
+    },
+    {
       "path": "product/agents/discord-surface-agent.agent.md",
       "tier": "public",
       "size": 1342,
@@ -1263,7 +1269,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 74068,
+      "size": 74254,
       "type": "json"
     },
     {
@@ -3111,7 +3117,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 8172,
+      "size": 8574,
       "type": "json"
     },
     {
@@ -3130,6 +3136,12 @@
       "path": "product/orchestration/agent-profiles/chronos-mirror.json",
       "tier": "public",
       "size": 480,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/cli-surface-agent.json",
+      "tier": "public",
+      "size": 445,
       "type": "json"
     },
     {
@@ -4617,7 +4629,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 124904,
+      "size": 140896,
       "type": "json"
     },
     {

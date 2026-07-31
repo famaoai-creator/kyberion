@@ -2259,6 +2259,493 @@
         "ja": "オンボーディングメニューを終了します。",
         "qps-ploc": "⟦Ėẋïŧïñɠ ŧħė őñƀőȧřḓïñɠ ɱėñů. ŀőřėɱ ïṗş⟧"
       }
+    },
+    "tui": {
+      "tui_tab_missions": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "tui_tab_tasks": {
+        "en": "Tasks",
+        "ja": "タスク",
+        "qps-ploc": "⟦Ŧȧşķş ŀőř⟧"
+      },
+      "tui_tab_schedules": {
+        "en": "Schedules",
+        "ja": "スケジュール",
+        "qps-ploc": "⟦Şƈħėḓůŀėş ŀőř⟧"
+      },
+      "tui_tab_processes": {
+        "en": "Processes",
+        "ja": "プロセス",
+        "qps-ploc": "⟦Ṗřőƈėşşėş ŀőř⟧"
+      },
+      "tui_tab_coordination": {
+        "en": "Coordination",
+        "ja": "エージェント連携",
+        "qps-ploc": "⟦Ƈőőřḓïñȧŧïőñ ŀőř⟧"
+      },
+      "tui_tab_stats": {
+        "en": "Stats",
+        "ja": "統計",
+        "qps-ploc": "⟦Şŧȧŧş ŀőř⟧"
+      },
+      "tui_tab_profile": {
+        "en": "Profile",
+        "ja": "プロフィール",
+        "qps-ploc": "⟦Ṗřőƒïŀė ŀőř⟧"
+      },
+      "tui_tab_settings": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "tui_help_title": {
+        "en": "Keyboard Shortcuts",
+        "ja": "キーボードショートカット",
+        "qps-ploc": "⟦Ķėẏƀőȧřḓ Şħőřŧƈůŧş ŀőřėɱ⟧"
+      },
+      "tui_help_hint": {
+        "en": "? help · q quit",
+        "ja": "? ヘルプ · q 終了",
+        "qps-ploc": "⟦? ħėŀṗ · ɋ ɋůïŧ ŀőřė⟧"
+      },
+      "tui_loading": {
+        "en": "Loading…",
+        "ja": "読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "tui_empty": {
+        "en": "No entries",
+        "ja": "項目がありません",
+        "qps-ploc": "⟦Ñő ėñŧřïėş ŀőř⟧"
+      },
+      "tui_error": {
+        "en": "Error",
+        "ja": "エラー",
+        "qps-ploc": "⟦Ėřřőř ŀőř⟧"
+      },
+      "tui_confirm_title": {
+        "en": "Confirm",
+        "ja": "確認",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ŀőř⟧"
+      },
+      "tui_confirm_yes": {
+        "en": "Yes (y)",
+        "ja": "はい (y)",
+        "qps-ploc": "⟦Ẏėş (ẏ) ŀőř⟧"
+      },
+      "tui_confirm_no": {
+        "en": "No (n)",
+        "ja": "いいえ (n)",
+        "qps-ploc": "⟦Ñő (ñ) ŀőř⟧"
+      },
+      "tui_quit_confirm": {
+        "en": "Quit the HUD?",
+        "ja": "HUD を終了しますか？",
+        "qps-ploc": "⟦Ɋůïŧ ŧħė ĦŮḒ? ŀőřė⟧"
+      },
+      "tui_refreshed": {
+        "en": "Refreshed",
+        "ja": "更新しました",
+        "qps-ploc": "⟦Řėƒřėşħėḓ ŀőř⟧"
+      },
+      "tui_detail_title": {
+        "en": "Detail",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀ ŀőř⟧"
+      },
+      "tui_status_backend": {
+        "en": "Backend",
+        "ja": "バックエンド",
+        "qps-ploc": "⟦Ƀȧƈķėñḓ ŀőř⟧"
+      },
+      "tui_status_customer": {
+        "en": "Customer",
+        "ja": "顧客",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ŀőř⟧"
+      },
+      "tui_status_locale": {
+        "en": "Locale",
+        "ja": "ロケール",
+        "qps-ploc": "⟦Ŀőƈȧŀė ŀőř⟧"
+      },
+      "tui_status_daemons": {
+        "en": "Daemons",
+        "ja": "デーモン",
+        "qps-ploc": "⟦Ḓȧėɱőñş ŀőř⟧"
+      },
+      "tui_status_offline": {
+        "en": "offline",
+        "ja": "停止中",
+        "qps-ploc": "⟦őƒƒŀïñė ŀőř⟧"
+      },
+      "tui_status_online": {
+        "en": "online",
+        "ja": "稼働中",
+        "qps-ploc": "⟦őñŀïñė ŀőř⟧"
+      },
+      "tui_key_switch_panel": {
+        "en": "Switch panel",
+        "ja": "パネル切替",
+        "qps-ploc": "⟦Şẇïŧƈħ ṗȧñėŀ ŀőř⟧"
+      },
+      "tui_key_cycle": {
+        "en": "Next / previous panel",
+        "ja": "パネル巡回",
+        "qps-ploc": "⟦Ñėẋŧ / ṗřėṽïőůş ṗȧñėŀ ŀőřėɱ ⟧"
+      },
+      "tui_key_move": {
+        "en": "Move selection",
+        "ja": "選択移動",
+        "qps-ploc": "⟦Ɱőṽė şėŀėƈŧïőñ ŀőřė⟧"
+      },
+      "tui_key_detail": {
+        "en": "Open detail",
+        "ja": "詳細を開く",
+        "qps-ploc": "⟦Őṗėñ ḓėŧȧïŀ ŀőř⟧"
+      },
+      "tui_key_refresh": {
+        "en": "Refresh",
+        "ja": "再読込",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "tui_key_input": {
+        "en": "Focus input",
+        "ja": "入力欄へ",
+        "qps-ploc": "⟦Ƒőƈůş ïñṗůŧ ŀőř⟧"
+      },
+      "tui_key_palette": {
+        "en": "Command palette",
+        "ja": "コマンドパレット",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ ṗȧŀėŧŧė ŀőřė⟧"
+      },
+      "tui_key_voice": {
+        "en": "Voice input",
+        "ja": "音声入力",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ŀőř⟧"
+      },
+      "tui_key_help": {
+        "en": "Toggle help",
+        "ja": "ヘルプ",
+        "qps-ploc": "⟦Ŧőɠɠŀė ħėŀṗ ŀőř⟧"
+      },
+      "tui_key_quit": {
+        "en": "Quit",
+        "ja": "終了",
+        "qps-ploc": "⟦Ɋůïŧ ŀőř⟧"
+      },
+      "tui_key_close": {
+        "en": "Close",
+        "ja": "閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ŀőř⟧"
+      },
+      "tui_input_placeholder": {
+        "en": "Ask Kyberion… (: for commands)",
+        "ja": "Kyberion に質問…（: でコマンド）",
+        "qps-ploc": "⟦Ȧşķ Ķẏƀėřïőñ… (: ƒőř ƈőɱɱȧñḓş) ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_input_thinking": {
+        "en": "Thinking…",
+        "ja": "応答生成中…",
+        "qps-ploc": "⟦Ŧħïñķïñɠ… ŀőř⟧"
+      },
+      "tui_ask_empty_reply": {
+        "en": "No reply from the reasoning backend",
+        "ja": "推論バックエンドから応答がありません",
+        "qps-ploc": "⟦Ñő řėṗŀẏ ƒřőɱ ŧħė řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tui_palette_unknown": {
+        "en": "Unknown command: {command}",
+        "ja": "不明なコマンド: {command}",
+        "qps-ploc": "⟦Ůñķñőẇñ ƈőɱɱȧñḓ: {command} ŀőřėɱ ïṗ⟧"
+      },
+      "tui_palette_usage": {
+        "en": "Usage",
+        "ja": "使い方",
+        "qps-ploc": "⟦Ůşȧɠė ŀőř⟧"
+      },
+      "tui_voice_recording": {
+        "en": "Recording… (v to stop)",
+        "ja": "録音中…（v で停止）",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… (ṽ ŧő şŧőṗ) ŀőřėɱ ï⟧"
+      },
+      "tui_voice_transcribing": {
+        "en": "Transcribing…",
+        "ja": "文字起こし中…",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ… ŀőřė⟧"
+      },
+      "tui_voice_unavailable": {
+        "en": "Voice input unavailable: {reason}",
+        "ja": "音声入力を利用できません: {reason}",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ůñȧṽȧïŀȧƀŀė: {reason} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tui_voice_filled": {
+        "en": "Transcript inserted. Review and press Enter.",
+        "ja": "文字起こしを挿入しました。確認して Enter を押してください。",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧ ïñşėřŧėḓ. Řėṽïėẇ ȧñḓ ṗřėşş Ėñŧėř. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "tui_mission_col_status": {
+        "en": "Status",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "tui_mission_col_tier": {
+        "en": "Tier",
+        "ja": "階層",
+        "qps-ploc": "⟦Ŧïėř ŀőř⟧"
+      },
+      "tui_mission_next_action": {
+        "en": "Next action",
+        "ja": "次の一手",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
+      "tui_mission_action_start": {
+        "en": "Start",
+        "ja": "開始",
+        "qps-ploc": "⟦Şŧȧřŧ ŀőř⟧"
+      },
+      "tui_mission_action_pause": {
+        "en": "Pause",
+        "ja": "一時停止",
+        "qps-ploc": "⟦Ṗȧůşė ŀőř⟧"
+      },
+      "tui_mission_action_resume": {
+        "en": "Resume",
+        "ja": "再開",
+        "qps-ploc": "⟦Řėşůɱė ŀőř⟧"
+      },
+      "tui_mission_action_checkpoint": {
+        "en": "Checkpoint",
+        "ja": "チェックポイント",
+        "qps-ploc": "⟦Ƈħėƈķṗőïñŧ ŀőř⟧"
+      },
+      "tui_mission_action_verify": {
+        "en": "Verify",
+        "ja": "検証",
+        "qps-ploc": "⟦Ṽėřïƒẏ ŀőř⟧"
+      },
+      "tui_mission_action_finish": {
+        "en": "Finish",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƒïñïşħ ŀőř⟧"
+      },
+      "tui_mission_action_cancel": {
+        "en": "Cancel",
+        "ja": "中止",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "tui_mission_confirm_finish": {
+        "en": "Finish mission {id}?",
+        "ja": "ミッション {id} を完了しますか？",
+        "qps-ploc": "⟦Ƒïñïşħ ɱïşşïőñ {id}? ŀőřėɱ ⟧"
+      },
+      "tui_mission_confirm_cancel": {
+        "en": "Cancel mission {id}?",
+        "ja": "ミッション {id} を中止しますか？",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ɱïşşïőñ {id}? ŀőřėɱ ⟧"
+      },
+      "tui_task_action_new": {
+        "en": "New item",
+        "ja": "新規作成",
+        "qps-ploc": "⟦Ñėẇ ïŧėɱ ŀőř⟧"
+      },
+      "tui_task_action_claim": {
+        "en": "Claim",
+        "ja": "引き受け",
+        "qps-ploc": "⟦Ƈŀȧïɱ ŀőř⟧"
+      },
+      "tui_task_action_release": {
+        "en": "Release",
+        "ja": "解放",
+        "qps-ploc": "⟦Řėŀėȧşė ŀőř⟧"
+      },
+      "tui_task_action_handoff": {
+        "en": "Handoff",
+        "ja": "引き継ぎ",
+        "qps-ploc": "⟦Ħȧñḓőƒƒ ŀőř⟧"
+      },
+      "tui_task_action_status": {
+        "en": "Change status",
+        "ja": "状態変更",
+        "qps-ploc": "⟦Ƈħȧñɠė şŧȧŧůş ŀőřė⟧"
+      },
+      "tui_task_col_priority": {
+        "en": "Priority",
+        "ja": "優先度",
+        "qps-ploc": "⟦Ṗřïőřïŧẏ ŀőř⟧"
+      },
+      "tui_task_col_assignee": {
+        "en": "Assignee",
+        "ja": "担当",
+        "qps-ploc": "⟦Ȧşşïɠñėė ŀőř⟧"
+      },
+      "tui_schedule_action_new": {
+        "en": "Register",
+        "ja": "登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ŀőř⟧"
+      },
+      "tui_schedule_action_remove": {
+        "en": "Unregister",
+        "ja": "削除",
+        "qps-ploc": "⟦Ůñřėɠïşŧėř ŀőř⟧"
+      },
+      "tui_schedule_action_run": {
+        "en": "Run now",
+        "ja": "今すぐ実行",
+        "qps-ploc": "⟦Řůñ ñőẇ ŀőř⟧"
+      },
+      "tui_schedule_due": {
+        "en": "due",
+        "ja": "実行予定",
+        "qps-ploc": "⟦ḓůė ŀőř⟧"
+      },
+      "tui_schedule_last_run": {
+        "en": "Last run",
+        "ja": "前回実行",
+        "qps-ploc": "⟦Ŀȧşŧ řůñ ŀőř⟧"
+      },
+      "tui_schedule_next_run": {
+        "en": "Next run",
+        "ja": "次回実行",
+        "qps-ploc": "⟦Ñėẋŧ řůñ ŀőř⟧"
+      },
+      "tui_process_action_start": {
+        "en": "Start",
+        "ja": "起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŀőř⟧"
+      },
+      "tui_process_action_stop": {
+        "en": "Stop",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "tui_process_action_restart": {
+        "en": "Restart",
+        "ja": "再起動",
+        "qps-ploc": "⟦Řėşŧȧřŧ ŀőř⟧"
+      },
+      "tui_process_log_tail": {
+        "en": "Log tail",
+        "ja": "ログ末尾",
+        "qps-ploc": "⟦Ŀőɠ ŧȧïŀ ŀőř⟧"
+      },
+      "tui_process_health": {
+        "en": "Health",
+        "ja": "ヘルス",
+        "qps-ploc": "⟦Ħėȧŀŧħ ŀőř⟧"
+      },
+      "tui_coord_providers": {
+        "en": "Providers",
+        "ja": "プロバイダ",
+        "qps-ploc": "⟦Ṗřőṽïḓėřş ŀőř⟧"
+      },
+      "tui_coord_runtimes": {
+        "en": "Agent runtimes",
+        "ja": "エージェントランタイム",
+        "qps-ploc": "⟦Ȧɠėñŧ řůñŧïɱėş ŀőřė⟧"
+      },
+      "tui_coord_outbox": {
+        "en": "Outbox",
+        "ja": "送信キュー",
+        "qps-ploc": "⟦Őůŧƀőẋ ŀőř⟧"
+      },
+      "tui_coord_dead_letters": {
+        "en": "Dead letters",
+        "ja": "配送不能",
+        "qps-ploc": "⟦Ḓėȧḓ ŀėŧŧėřş ŀőř⟧"
+      },
+      "tui_coord_attention": {
+        "en": "Attention",
+        "ja": "要注意",
+        "qps-ploc": "⟦Ȧŧŧėñŧïőñ ŀőř⟧"
+      },
+      "tui_coord_daemon_offline": {
+        "en": "Supervisor daemon offline (E to start)",
+        "ja": "スーパーバイザーデーモン停止中（E で起動）",
+        "qps-ploc": "⟦Şůṗėřṽïşőř ḓȧėɱőñ őƒƒŀïñė (Ė ŧő şŧȧřŧ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "tui_coord_action_ask": {
+        "en": "Ask runtime",
+        "ja": "ランタイムに質問",
+        "qps-ploc": "⟦Ȧşķ řůñŧïɱė ŀőř⟧"
+      },
+      "tui_coord_action_restart": {
+        "en": "Restart runtime",
+        "ja": "ランタイム再起動",
+        "qps-ploc": "⟦Řėşŧȧřŧ řůñŧïɱė ŀőřė⟧"
+      },
+      "tui_stats_metrics": {
+        "en": "Execution metrics",
+        "ja": "実行メトリクス",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ ɱėŧřïƈş ŀőřėɱ⟧"
+      },
+      "tui_stats_cost": {
+        "en": "Cost",
+        "ja": "コスト",
+        "qps-ploc": "⟦Ƈőşŧ ŀőř⟧"
+      },
+      "tui_stats_traces": {
+        "en": "Recent traces",
+        "ja": "最近のトレース",
+        "qps-ploc": "⟦Řėƈėñŧ ŧřȧƈėş ŀőřė⟧"
+      },
+      "tui_stats_regressions": {
+        "en": "Regressions",
+        "ja": "性能退行",
+        "qps-ploc": "⟦Řėɠřėşşïőñş ŀőř⟧"
+      },
+      "tui_stats_action_doctor": {
+        "en": "Run doctor",
+        "ja": "ドクター実行",
+        "qps-ploc": "⟦Řůñ ḓőƈŧőř ŀőř⟧"
+      },
+      "tui_stats_action_vital": {
+        "en": "Vital check",
+        "ja": "バイタル確認",
+        "qps-ploc": "⟦Ṽïŧȧŀ ƈħėƈķ ŀőř⟧"
+      },
+      "tui_profile_operator": {
+        "en": "Operator",
+        "ja": "オペレーター",
+        "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
+      },
+      "tui_profile_onboarding": {
+        "en": "Onboarding",
+        "ja": "オンボーディング",
+        "qps-ploc": "⟦Őñƀőȧřḓïñɠ ŀőř⟧"
+      },
+      "tui_profile_identities": {
+        "en": "Agent identities (NHI)",
+        "ja": "エージェント ID (NHI)",
+        "qps-ploc": "⟦Ȧɠėñŧ ïḓėñŧïŧïėş (ÑĦÏ) ŀőřėɱ ï⟧"
+      },
+      "tui_profile_org": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "tui_settings_reasoning": {
+        "en": "Reasoning backend",
+        "ja": "推論バックエンド",
+        "qps-ploc": "⟦Řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ⟧"
+      },
+      "tui_settings_profile_root": {
+        "en": "Profile root",
+        "ja": "プロフィールルート",
+        "qps-ploc": "⟦Ṗřőƒïŀė řőőŧ ŀőř⟧"
+      },
+      "tui_settings_locale_toggle": {
+        "en": "Toggle locale (L, session only)",
+        "ja": "ロケール切替（L・セッション内のみ）",
+        "qps-ploc": "⟦Ŧőɠɠŀė ŀőƈȧŀė (Ŀ, şėşşïőñ őñŀẏ) ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_settings_readonly_hint": {
+        "en": "Change via {command}",
+        "ja": "変更は {command} で",
+        "qps-ploc": "⟦Ƈħȧñɠė ṽïȧ {command} ŀőřėɱ ⟧"
+      }
     }
   }
 }
