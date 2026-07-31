@@ -250,8 +250,8 @@ describe('reasoning-bootstrap', () => {
     expect(getVoiceBridge().name).toBe('codex-cli-text');
   });
 
-  it('normalizes gemini-api to the CLI-backed gemini mode', () => {
-    expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
+  it('keeps gemini-api as the direct Google AI Studio mode', () => {
+    expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-api');
     expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
     expect(normalizeReasoningBackendMode('nemotron')).toBe('nemotron-api');
   });

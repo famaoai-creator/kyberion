@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 74440,
+      "size": 74620,
       "type": "json"
     },
     {
@@ -1731,7 +1731,7 @@
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 10079,
+      "size": 10863,
       "type": "json"
     },
     {
@@ -2061,7 +2061,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2462,
+      "size": 2590,
       "type": "json"
     },
     {
@@ -2073,7 +2073,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 11446,
+      "size": 12204,
       "type": "json"
     },
     {
@@ -9453,7 +9453,7 @@
     {
       "path": "public/procedures/select-reasoning-provider-and-model.md",
       "tier": "public",
-      "size": 4813,
+      "size": 5003,
       "type": "md"
     },
     {

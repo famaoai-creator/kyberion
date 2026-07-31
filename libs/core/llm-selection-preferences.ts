@@ -1,6 +1,10 @@
 import * as path from 'node:path';
 
 import { discoverProviders } from './provider-discovery.js';
+import {
+  discoverReasoningEndpoints,
+  type ReasoningEndpointInfo,
+} from './reasoning-endpoint-discovery.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
@@ -68,9 +72,11 @@ function hasProfileForMode(policy: ReasoningRoutePolicy, mode: string): boolean 
 }
 
 function isAvailable(
+  runtime: string,
   selection: NonNullable<ReasoningRoutePolicy['runtime_adapters'][string]['selection']>,
   discovered: ReturnType<typeof discoverProviders>,
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  endpointDiscovery: ReasoningEndpointInfo[]
 ): boolean {
   if (selection.availability.kind === 'always') return true;
   if (selection.availability.kind === 'provider_discovery') {
@@ -84,7 +90,10 @@ function isAvailable(
       )
     );
   }
-  return (selection.availability.names || []).some((name) => Boolean(env[name]?.trim()));
+  return Boolean(
+    endpointDiscovery.find((endpoint) => endpoint.runtime === runtime)?.configured ??
+    (selection.availability.names || []).some((name) => Boolean(env[name]?.trim()))
+  );
 }
 
 function modelIdsFor(
@@ -136,12 +145,15 @@ export function getLlmSelectionSnapshot(
 ): LlmSelectionSnapshot {
   const policy = loadReasoningRoutePolicy();
   const discovered = discoverProviders();
+  const endpointDiscovery = discoverReasoningEndpoints(env, policy);
   const preferences = getPreferences(policy);
   const candidates = Object.entries(policy.runtime_adapters).map(([provider, adapter]) => {
     const selection = adapter.selection;
     const profileAvailable = hasProfileForMode(policy, provider);
     const available = Boolean(
-      selection && profileAvailable && isAvailable(selection, discovered, env)
+      selection &&
+      profileAvailable &&
+      isAvailable(provider, selection, discovered, env, endpointDiscovery)
     );
     const status: LlmSelectionStatus =
       !selection || !profileAvailable ? 'unsupported' : available ? 'ready' : 'needs_setup';

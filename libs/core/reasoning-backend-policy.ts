@@ -30,12 +30,12 @@ export interface ReasoningBackendSelectionRule {
   env_any?: string[];
   env_equals?: Record<string, string>;
   provider?: string;
-  mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+  mode: ReasoningBackendMode;
 }
 
 export interface ReasoningBackendEnvPriorityRule {
   env: string;
-  mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+  mode: ReasoningBackendMode;
 }
 
 export interface ReasoningBackendOpenRouterPolicy {
@@ -47,15 +47,15 @@ export interface ReasoningBackendOpenRouterPolicy {
 export interface ReasoningBackendPolicy {
   version: string;
   route_policy_ref?: string;
-  mode_aliases: Record<string, Exclude<ReasoningBackendMode, 'gemini-api'>>;
-  allowed_modes: Array<Exclude<ReasoningBackendMode, 'gemini-api'>>;
+  mode_aliases: Record<string, ReasoningBackendMode>;
+  allowed_modes: ReasoningBackendMode[];
   auto_select_env_priority: ReasoningBackendEnvPriorityRule[];
   cli_preference_rules: ReasoningBackendSelectionRule[];
   provider_fallback_order: Array<{
     provider: string;
-    mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+    mode: ReasoningBackendMode;
   }>;
-  default_mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+  default_mode: ReasoningBackendMode;
   openrouter?: ReasoningBackendOpenRouterPolicy;
 }
 
@@ -74,7 +74,6 @@ const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-po
 const FALLBACK_POLICY: ReasoningBackendPolicy = {
   version: '1.0.0',
   mode_aliases: {
-    'gemini-api': 'gemini-cli',
     nemotron: 'nemotron-api',
     grok: 'grok-cli',
     'grok-build': 'grok-cli',
@@ -85,6 +84,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'claude-agent',
     'anthropic',
     'gemini-cli',
+    'gemini-api',
     'agy-cli',
     'grok-cli',
     'copilot',
@@ -101,6 +101,8 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   ],
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
+    { env: 'GEMINI_API_KEY', mode: 'gemini-api' },
+    { env: 'GOOGLE_API_KEY', mode: 'gemini-api' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_OLLAMA_URL', mode: 'ollama' },
     { env: 'KYBERION_VLLM_URL', mode: 'vllm' },
@@ -185,9 +187,9 @@ export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
 export function normalizeReasoningBackendMode(
   mode: ReasoningBackendMode,
   policy: ReasoningBackendPolicy = loadReasoningBackendPolicy()
-): Exclude<ReasoningBackendMode, 'gemini-api'> {
+): ReasoningBackendMode {
   const normalized = policy.mode_aliases[mode] || mode;
-  return normalized as Exclude<ReasoningBackendMode, 'gemini-api'>;
+  return normalized;
 }
 
 function matchesSelectionRule(
@@ -221,7 +223,7 @@ export function resolveReasoningBackendModeFromContext(input: {
   env?: NodeJS.ProcessEnv;
   providers?: ReasoningBackendProviderSnapshot[];
   policy?: ReasoningBackendPolicy;
-}): Exclude<ReasoningBackendMode, 'gemini-api'> {
+}): ReasoningBackendMode {
   const policy = input.policy ?? loadReasoningBackendPolicy();
   const env = input.env ?? process.env;
   const providers = input.providers ?? [];
