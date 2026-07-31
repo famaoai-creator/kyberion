@@ -466,7 +466,6 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   logger.info(
     `[PROVIDER_DISCOVERY] Found ${available.length}/${providers.length}: ${available.map((p) => p.provider).join(', ')}`
   );
-
   cachedProviders = providers;
   cacheTimestamp = Date.now();
   writeDiskCache(providers);
