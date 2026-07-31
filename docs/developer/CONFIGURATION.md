@@ -263,7 +263,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (144)
+## runtime (145)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -400,6 +400,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TEST_MISSING_ENV`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TIMEZONE`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TTS_ARGS`                            | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TUI_DISABLE_AUDIT`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_UI_LOCALE`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_UNDOCUMENTED`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VAD`                                 | string | no       | _undocumented_                                                                                          |
