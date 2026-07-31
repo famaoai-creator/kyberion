@@ -37,6 +37,15 @@ describe('surface-ux-contract', () => {
     expect(missionResult.signals).toContain('governed_mission');
   });
 
+  it('accepts a natural reply for a lightweight conversational turn when explicitly allowed', () => {
+    const result = validateSurfaceUxContract({
+      text: 'こんにちは！何かお手伝いできることはありますか？',
+      allow_conversational_reply: true,
+    });
+    expect(result.valid, result.violations.join('; ')).toBe(true);
+    expect(result.signals).toEqual([]);
+  });
+
   it('accepts review guidance that states purpose, role, and tenant context', () => {
     const result = validateSurfaceUxContract({
       text: [

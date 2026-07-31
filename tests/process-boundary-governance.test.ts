@@ -23,6 +23,10 @@ const allowedManagedProcessConsumers = [
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
   'libs/core/mission-orchestration-worker.resume.test.ts',
+  // Terminal HUD schedule actions launch detached pipelines through the
+  // managed-process owner so the UI loop remains responsive and the child
+  // process has an explicit surface owner.
+  'presence/displays/terminal-hud/src/actions/schedule-actions.ts',
   // MCP server: background pipeline jobs outlive the 60s sync window and are
   // supervised so they die with the server session instead of leaking.
   'libs/shared-network/src/mcp-server-engine.ts',
