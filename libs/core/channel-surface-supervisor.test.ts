@@ -122,6 +122,55 @@ describe('channel-surface supervisor routing', () => {
     expect(result.text).toBe('daemon reply');
   });
 
+  it('forwards the manifest provider policy to both runtime paths', async () => {
+    mocks.getAgentManifest.mockReturnValue({
+      agentId: 'cli-surface-agent',
+      selection_hints: {
+        preferred_provider: 'codex',
+        preferred_modelId: 'codex',
+        provider_strategy: 'adaptive',
+        fallback_providers: ['claude', 'grok', 'copilot'],
+      },
+      systemPrompt: 'test CLI system prompt',
+      capabilities: ['cli', 'surface', 'conversation', 'delegation'],
+    });
+    mocks.resolveAgentSelectionHints.mockReturnValue({
+      provider: 'codex',
+      modelId: 'codex',
+    });
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('supervisor unavailable'));
+    mocks.ensureAgentRuntime.mockResolvedValue({
+      agentId: 'cli-surface-agent',
+      ask: vi.fn().mockResolvedValue('Result: hello from CLI'),
+      shutdown: vi.fn(),
+      getRecord: vi.fn().mockReturnValue({ status: 'ready' }),
+    });
+
+    const { runSurfaceConversation } = await import('./channel-surface.js');
+    await runSurfaceConversation({
+      agentId: 'cli-surface-agent',
+      query: 'hello',
+      senderAgentId: 'terminal-hud',
+    });
+
+    expect(mocks.toSupervisorEnsurePayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtimeMetadata: expect.objectContaining({
+          provider_strategy: 'adaptive',
+          fallback_providers: ['claude', 'grok', 'copilot'],
+        }),
+      })
+    );
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtimeMetadata: expect.objectContaining({
+          provider_strategy: 'adaptive',
+          fallback_providers: ['claude', 'grok', 'copilot'],
+        }),
+      })
+    );
+  });
+
   it('routes slack-surface-agent through the supervisor daemon path as well', async () => {
     const daemonHandle = {
       agentId: 'slack-surface-agent',
@@ -234,6 +283,21 @@ describe('channel-surface supervisor routing', () => {
       );
     });
 
+    it('does not escalate a lightweight greeting into an internal-contract conversation', async () => {
+      const ask = vi.fn().mockResolvedValue('こんにちは！何かお手伝いできますか？');
+      stubDaemonHandle(ask);
+
+      const { runSurfaceConversation } = await import('./channel-surface.js');
+      const result = await runSurfaceConversation({
+        agentId: 'presence-surface-agent',
+        query: 'こんにちは',
+        senderAgentId: 'voice-hub',
+      });
+
+      expect(ask).toHaveBeenCalledTimes(1);
+      expect(result.text).toBe('こんにちは！何かお手伝いできますか？');
+    });
+
     it('escalates exactly once to standard tier when the fast response fails UX-contract validation and cannot be repaired', async () => {
       // "daemon reply" contains none of the UX-contract signal words and
       // nothing repairSurfaceUxContractText's vocabulary rules touch, so it
@@ -245,14 +309,16 @@ describe('channel-surface supervisor routing', () => {
       const { runSurfaceConversation } = await import('./channel-surface.js');
       const result = await runSurfaceConversation({
         agentId: 'presence-surface-agent',
-        query: 'hello',
+        query: 'Tell me more',
         senderAgentId: 'voice-hub',
       });
 
       expect(ask).toHaveBeenCalledTimes(2);
       expect(ask.mock.calls[0][1]).toMatchObject({ model_tier: 'fast' });
       expect(ask.mock.calls[1][1]).toMatchObject({ model_tier: 'standard' });
-      expect(ask.mock.calls[1][0]).toContain('ux_contract_validation_failed');
+      expect(ask.mock.calls[1][0]).toContain('Original user request:');
+      expect(ask.mock.calls[1][0]).toContain('Tell me more');
+      expect(ask.mock.calls[1][0]).not.toContain('ux_contract_validation_failed');
       expect(result.text).toBe('daemon reply');
 
       expect(mocks.loggerInfo).toHaveBeenCalledWith(

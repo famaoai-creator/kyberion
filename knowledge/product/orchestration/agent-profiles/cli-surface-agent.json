@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "cli-surface-agent": {
+      "authority_roles": ["surface_runtime"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": ["cli", "surface", "conversation", "delegation"],
+      "selection_hints": {
+        "preferred_provider": "codex",
+        "preferred_modelId": "codex"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "grok", "copilot"]
+    }
+  }
+}
