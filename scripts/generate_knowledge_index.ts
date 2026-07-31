@@ -56,6 +56,36 @@ function parseMarkdownMetadata(filePath: string): { title: string; author: strin
   }
 }
 
+function isMissingPathError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ENOENT'
+  );
+}
+
+function trySafeLstat(filePath: string): ReturnType<typeof safeLstat> | undefined {
+  try {
+    return safeLstat(filePath);
+  } catch (error) {
+    // Knowledge checks can run alongside short-lived governance probes. If a
+    // file disappears after directory enumeration, omit that ephemeral entry
+    // while preserving permission and other I/O failures.
+    if (isMissingPathError(error)) return undefined;
+    throw error;
+  }
+}
+
+function trySafeStat(filePath: string): ReturnType<typeof safeStat> | undefined {
+  try {
+    return safeStat(filePath);
+  } catch (error) {
+    if (isMissingPathError(error)) return undefined;
+    throw error;
+  }
+}
+
 function walk(dir: string, baseDir: string, files: string[] = []): string[] {
   if (!safeExistsSync(dir)) return files;
   const entries = safeReaddir(dir);
@@ -69,7 +99,8 @@ function walk(dir: string, baseDir: string, files: string[] = []): string[] {
     // class as HINTS.md).
     if (dir === baseDir && entry === 'evolution') continue;
     const fullPath = path.join(dir, entry);
-    const stat = safeLstat(fullPath);
+    const stat = trySafeLstat(fullPath);
+    if (!stat) continue;
     if (stat.isDirectory()) {
       if (path.relative(baseDir, fullPath).replace(/\\/g, '/') === 'product/evolution') continue;
       walk(fullPath, baseDir, files);
@@ -116,7 +147,8 @@ function generateIndexInner(checkOnly: boolean): boolean {
   for (const file of allFiles) {
     if (file === '_index.md' || file === '_manifest.json') continue;
     const fullPath = path.join(kbRoot, file);
-    const stat = safeStat(fullPath);
+    const stat = trySafeStat(fullPath);
+    if (!stat) continue;
     const tier = getTier(file);
     const ext = path.extname(file).replace('.', '');
 

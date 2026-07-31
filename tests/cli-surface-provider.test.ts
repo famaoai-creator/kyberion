@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getSurfaceProviderDefinition, getSurfaceProviderManifest } from '@agent/core';
+import {
+  getAgentManifest,
+  getSurfaceProviderDefinition,
+  getSurfaceProviderManifest,
+} from '@agent/core';
 
 /**
  * UX brush-up: the terminal is a first-class surface. `pnpm kyberion ask`
@@ -19,5 +23,17 @@ describe('cli surface provider', () => {
     expect(manifest.agentId).toBe('cli-surface-agent');
     expect(manifest.interactionMode).toBe('session');
     expect(manifest.delivery.supportsOutbox).toBe(false);
+  });
+
+  it('has a matching executable agent manifest', () => {
+    const manifest = getAgentManifest('cli-surface-agent');
+    expect(manifest?.agentId).toBe('cli-surface-agent');
+    expect(manifest?.capabilities).toContain('conversation');
+    expect(manifest?.selection_hints).toMatchObject({
+      preferred_provider: 'codex',
+      preferred_modelId: 'codex',
+      provider_strategy: 'adaptive',
+    });
+    expect(manifest?.selection_hints?.fallback_providers).not.toContain('gemini');
   });
 });
