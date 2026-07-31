@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import {
   auditChain,
   discoverProviders,
+  discoverReasoningEndpoints,
   getInstalledReasoningMode,
   installReasoningBackends,
   customerResolver,
@@ -1305,6 +1306,13 @@ function showReasoningBackendStatus() {
       : 'missing';
     const version = provider.version || 'n/a';
     console.log(`    ${provider.provider.padEnd(6)} ${state.padEnd(18)} ${version}`);
+  }
+  console.log('    Endpoint runtimes:');
+  for (const endpoint of discoverReasoningEndpoints()) {
+    const state = endpoint.configured ? 'configured' : 'not-configured';
+    console.log(
+      `      ${endpoint.runtime.padEnd(14)} ${state.padEnd(18)} ${endpoint.configuration_env.join(' | ')}`
+    );
   }
   console.log('');
 }
