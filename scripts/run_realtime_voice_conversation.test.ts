@@ -44,6 +44,7 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(parsed.streamingStt).toBe(true);
     expect(parsed.warmActuator).toBe(true);
     expect(parsed.idleTimeoutSeconds).toBe(120);
+    expect(parsed.speechSegmentChars).toBe(120);
     expect(parsed.mission).toBe('MSN-CLI-TEST-001');
     expect(parsed.vadBackend).toBeUndefined();
   });
@@ -74,6 +75,14 @@ describe('run_realtime_voice_conversation cli', () => {
         'idle-timeout-seconds': 0,
       })
     ).toThrow(/--idle-timeout-seconds/);
+    expect(() =>
+      parseRealtimeVoiceConversationCli({
+        'session-id': 'rtc-loop',
+        interactive: true,
+        mission: 'MSN-CLI-TEST-002',
+        'speech-segment-chars': 0,
+      })
+    ).toThrow(/--speech-segment-chars/);
   });
 
   it('parses VAD recorder overrides and rejects invalid values', () => {

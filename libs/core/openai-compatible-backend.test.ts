@@ -179,6 +179,40 @@ describe('openai-compatible-backend', () => {
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
 
+  it('streams OpenAI-compatible text deltas without waiting for the full response', async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"choices":[{"delta":{"content":"最初の"}}]}\n\n')
+        );
+        controller.enqueue(
+          encoder.encode('data: {"choices":[{"delta":{"content":"文です。"}}]}\n\n')
+        );
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+    });
+
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('say hello')) deltas.push(delta);
+
+    expect(deltas).toEqual(['最初の', '文です。']);
+    const bodyJson = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(bodyJson.stream).toBe(true);
+  });
+
   it('does not advertise tools unless the route explicitly enables an allowlist', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(okTextResponse());
     vi.stubGlobal('fetch', fetchMock);

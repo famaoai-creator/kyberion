@@ -19,9 +19,10 @@
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
+import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -329,5 +330,70 @@ export function installShellSpeechToTextBridgeIfAvailable(
     })
   );
   logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
+  return true;
+}
+
+/**
+ * Use the governed MLX Whisper runtime when no explicit STT adapter was set.
+ * This keeps the model process behind the SpeechToTextBridge boundary while
+ * allowing the realtime CLI to work immediately after `voice:setup --apply`.
+ */
+export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.KYBERION_STT_COMMAND?.trim() || env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()) {
+    return false;
+  }
+  const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
+  const bridgeScript = rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py');
+  if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
+
+  registerSpeechToTextBridge({
+    name: 'mlx_whisper',
+    priority: 90,
+    capabilities: { timestamps: true, granularity: 'segment', local_only: true },
+    async transcribe(input) {
+      const audioAbs = rootResolve(input.audioPath);
+      if (!safeExistsSync(audioAbs)) {
+        throw new Error(`[stt-bridge:mlx_whisper] audio file not found: ${input.audioPath}`);
+      }
+      const result = safeExecResult(pythonBin, [bridgeScript], {
+        input: JSON.stringify({
+          action: 'transcribe',
+          params: { audio_path: audioAbs, ...(input.language ? { language: input.language } : {}) },
+        }),
+        env: { KYBERION_PROJECT_ROOT: rootResolve('.') },
+        timeoutMs: 120_000,
+        maxOutputMB: 2,
+      });
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          `[stt-bridge:mlx_whisper] backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
+        );
+      }
+      const response = parseStructuredOutput(result.stdout);
+      const text = String(response.text || '').trim();
+      if (!text) throw new Error('[stt-bridge:mlx_whisper] backend returned empty text');
+      const outputPath = input.outputPath
+        ? rootResolve(input.outputPath)
+        : defaultTranscriptPath(audioAbs);
+      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      return {
+        text,
+        language: String(response.language || input.language || resolveLocale()),
+        written_to: outputPath,
+        backend: 'mlx_whisper',
+        capabilities: response.capabilities || {
+          timestamps: true,
+          granularity: 'segment',
+          local_only: true,
+        },
+        ...(Array.isArray(response.segments)
+          ? { segments: response.segments as TranscriptSegment[] }
+          : {}),
+      };
+    },
+  });
+  logger.success('[stt-bridge] installed managed mlx_whisper SpeechToTextBridge');
   return true;
 }

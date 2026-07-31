@@ -24,7 +24,11 @@ This is the procedure behind the `live-voice` intent and its default execution p
 - personal voice usage requires a registered and promoted `active` profile
 - the active profile's sample refs should resolve under `active/shared/runtime/voice-profiles/<profile_id>/`
 - strict mode rejects `shadow` profiles and clone-engine fallback
-- `KYBERION_STT_COMMAND` should be configured unless transcript sidecars are used
+- `KYBERION_STT_COMMAND` may be configured for a deployment-specific streaming
+  backend; when it is unset, the managed `mlx_whisper` runtime installed by
+  `pnpm voice:setup --apply` is selected automatically when available
+- On Apple Silicon macOS, the CLI first tries the native Apple SpeechAnalyzer
+  bridge and maps short language codes such as `ja` to `ja-JP`.
 - a reasoning backend should be available through `installReasoningBackends()`
 
 ## CLI
@@ -43,7 +47,9 @@ Interactive loop mode (the default) runs the full-duplex realtime loop:
 each turn starts when you begin speaking and ends automatically after ~700ms of
 silence (VAD endpoint), the reply is synthesized **sentence-by-sentence** so the
 first audio starts fast, and per-turn latency metrics (stt/llm/first-audio) are
-printed for every exchange.
+printed for every exchange. Spoken replies are capped at two short sentences
+and 160 characters so an overlong provider response cannot become a TTS
+monologue.
 
 Interactive recording requires a mission-scoped `voice-consent.json`; grant it
 before starting the microphone session:
@@ -80,16 +86,25 @@ Realtime loop flags (all optional):
   skips virtual devices such as BlackHole. Use this option when several
   physical microphones are connected.
 - `--no-streaming-stt` — disable in-utterance streaming transcription (used when
-  `KYBERION_STT_COMMAND` is configured; batch STT on the turn WAV is the fallback)
+  a streaming backend is configured; batch STT on the turn WAV is the fallback)
 - `--no-warm-actuator` — spawn the voice actuator per segment instead of keeping
   one resident `--serve` process
+- `KYBERION_TTS_COMMAND` — optional streaming TTS executable. It receives
+  newline-delimited text segments and writes raw PCM_S16LE to stdout; with
+  `artifact_and_playback`, the loop sends those chunks directly to `ffplay`.
+  Optional comma-separated arguments use `KYBERION_TTS_ARGS`; set
+  `KYBERION_TTS_PLAY_COMMAND` to override the PCM player argv.
+- `--speech-segment-chars 120` — maximum size of each sentence-level TTS
+  segment; smaller segments can start playback sooner, while the warm actuator
+  synthesizes the next segment in parallel
 - `--mission MSN-...` — required recording consent gate (fail-closed, same
   `voice-consent.json` evidence contract as meeting participation)
 - `--idle-timeout-seconds 120` — end the loop after continuous silence
 
 The VAD recorder needs `ffmpeg` (macOS) or `arecord` (Linux) on PATH, and
 playback is used only with `--delivery-mode artifact_and_playback` and needs
-`afplay` / `aplay`. On macOS playback follows the system default output device;
+`afplay` / `aplay`. The direct PCM streaming path additionally needs `ffplay`.
+On macOS playback follows the system default output device;
 select the desired speaker in macOS Sound settings before starting the loop.
 `--delivery-mode artifact` writes audio without playing it.
 The artifact format is selected from the active engine's supported formats;
@@ -109,7 +124,27 @@ pnpm voice:conversation:turn \
 If you need the recorder to capture from a different local setup, set:
 
 - `KYBERION_PYTHON_BIN` for the Python bridge runner (fixed recorder only)
-- `KYBERION_STT_COMMAND` for the speech-to-text backend
+- `KYBERION_STT_COMMAND` and optional `KYBERION_STT_ARGS` for a deployment-
+  specific streaming speech-to-text backend. The command must read raw
+  PCM_S16LE mono 16 kHz from stdin and emit NDJSON transcript chunks.
+
+When the managed MLX Whisper runtime is available, the default streaming path
+uses `scripts/stt_mlx_whisper_stream.py`. It keeps the Python process and model
+resident for the utterance, transcribing short windows while the user is still
+speaking. `KYBERION_MLX_WHISPER_MODEL`, `KYBERION_STT_LANGUAGE`, and
+`KYBERION_STT_WINDOW_SEC` can tune that adapter.
+
+The reasoning stage uses the plain `ReasoningBackend.prompt()` path for voice
+turns rather than delegated task reports. When the selected backend supports
+`streamPrompt()` (for example an OpenAI-compatible local endpoint), token deltas
+are grouped into short spoken segments and sent to TTS immediately. CLI-only
+providers transparently fall back to the completed prompt response.
+
+With `KYBERION_TTS_COMMAND`, the same segments are passed to the governed
+streaming-TTS bridge and PCM chunks are played directly; without it, the active
+voice profile's warm actuator and sentence-level artifact playback remain the
+fallback. On Apple Silicon, native Apple SpeechAnalyzer remains the first STT
+choice, with managed MLX fallback when native STT is unavailable.
 
 ## Result
 
