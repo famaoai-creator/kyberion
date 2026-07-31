@@ -2818,6 +2818,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TUI_DISABLE_AUDIT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_UI_LOCALE",
       "category": "runtime",
       "type": "string",
