@@ -236,6 +236,7 @@ function parseBinding(binding: string): { profile?: string; mode?: string; model
 
 function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | undefined {
   const keys: Record<string, string[]> = {
+    'gemini-api': ['KYBERION_GEMINI_MODEL'],
     openrouter: ['KYBERION_OPENROUTER_MODEL'],
     'nemotron-api': ['KYBERION_NEMOTRON_MODEL'],
     ollama: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],

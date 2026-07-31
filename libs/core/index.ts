@@ -907,6 +907,7 @@ export * from './a2a-bridge.js';
 export * from './a2a-conversation-store.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
+export * from './reasoning-endpoint-discovery.js';
 export * from './provider-capability-registry.js';
 export * from './provider-egress-gate.js';
 export * from './provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
@@ -1476,6 +1477,12 @@ export type {
   OpenRouterModelRecord,
 } from './openrouter-model-policy.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
+export {
+  GeminiApiBackend,
+  buildGeminiApiBackendFromEnv,
+  probeGeminiApiBackendAvailability,
+} from './gemini-api-backend.js';
+export type { GeminiApiBackendOptions } from './gemini-api-backend.js';
 export { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
 export type { GeminiCliIntentExtractorOptions } from './gemini-cli-intent-extractor.js';
 export { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
