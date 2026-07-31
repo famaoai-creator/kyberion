@@ -32,6 +32,7 @@ import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import type {
   ReasoningBackend,
   ReasoningCallOptions,
+  ReasoningTextStream,
   ToolDefinition,
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
@@ -742,6 +743,14 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
   }
   prompt(...a: Parameters<ReasoningBackend['prompt']>) {
     return this.base.prompt(...a);
+  }
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    if (this.base.streamPrompt) return this.base.streamPrompt(prompt, options);
+    const base = this.base;
+    return (async function* fallback(): AsyncGenerator<string> {
+      const text = await base.prompt(prompt, options);
+      if (text) yield text;
+    })();
   }
   generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
     if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools);

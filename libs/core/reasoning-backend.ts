@@ -448,6 +448,16 @@ export interface ReasoningCallOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Provider-native text deltas for latency-sensitive surfaces such as voice.
+ *
+ * This is intentionally optional: CLI providers may only expose a completed
+ * response, in which case callers must fall back to `prompt()` and emit one
+ * delta. Providers that support HTTP/SSE or an equivalent native stream can
+ * yield deltas without changing the existing reasoning contract.
+ */
+export type ReasoningTextStream = AsyncIterable<string>;
+
 export interface StructuredDelegationOptions {
   context?: string;
   maxRetries?: number;
@@ -535,6 +545,8 @@ export interface ReasoningBackend {
   ): DelegationHandle;
   /** Run a plain prompt against the active reasoning backend. */
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string>;
+  /** Optional provider-native text stream; callers must support prompt fallback. */
+  streamPrompt?(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream;
   /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
   generateWithTools?(
     prompt: string,
@@ -1078,6 +1090,42 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     );
   }
 
+  async *streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    throwIfReasoningAborted(options?.signal);
+    enforceSpendGuardForReasoning();
+    const candidates = this.candidates.slice(0, this.failoverPolicy.max_attempts);
+    const demotedProviders = new Set(listDemotedProviders());
+    for (const candidate of candidates) {
+      const provider = normalizeProviderName(candidate.provider);
+      if (provider && demotedProviders.has(provider)) continue;
+      const stream = candidate.backend.streamPrompt;
+      if (!stream) continue;
+      let yielded = false;
+      try {
+        throwIfReasoningAborted(options?.signal);
+        const endpoint = (candidate.backend as ReasoningBackend & { egressEndpoint?: string })
+          .egressEndpoint;
+        if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
+        else assertReasoningEgressAllowed(candidate.backend.name);
+        for await (const delta of stream.call(candidate.backend, prompt, options)) {
+          yielded = true;
+          yield delta;
+        }
+        if (yielded) return;
+      } catch (error) {
+        // Once output has reached the caller, replaying on another provider
+        // would duplicate speech. Before the first delta, try the next route.
+        if (yielded) throw error;
+        logger.warn(
+          `[reasoning-backend] streaming candidate ${candidateLabel(candidate)} failed before output: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    const completed = await this.prompt(prompt, options);
+    if (completed) yield completed;
+  }
+
   async generateWithTools(
     prompt: string,
     tools: ToolDefinition[],
@@ -1233,6 +1281,14 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
   }
   prompt(prompt: string, options?: ReasoningCallOptions) {
     return this.pick(options).prompt(prompt, options);
+  }
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    const backend = this.pick(options);
+    if (backend.streamPrompt) return backend.streamPrompt(prompt, options);
+    return (async function* fallback(): AsyncGenerator<string> {
+      const text = await backend.prompt(prompt, options);
+      if (text) yield text;
+    })();
   }
   generateWithTools(prompt: string, tools: ToolDefinition[], options?: ReasoningCallOptions) {
     const backend = this.pick(options);

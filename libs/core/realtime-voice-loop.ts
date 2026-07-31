@@ -36,6 +36,12 @@ import {
   type SegmentedSpeechController,
   DEFAULT_SPEECH_SEGMENT_CHARS,
 } from './segmented-voice-playback.js';
+import {
+  streamVoicePlayback,
+  streamTtsAudioPlayback,
+  type StreamingVoicePlaybackController,
+} from './streaming-voice-playback.js';
+import type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
 import { VadTurnSegmenter, type VadTurnSegmenterOptions } from './vad-turn-recorder.js';
 import { BargeInController } from './barge-in-controller.js';
 import type { TraceContext } from './src/trace.js';
@@ -106,6 +112,13 @@ export interface RealtimeVoiceLoopOptions {
   transcribe: (audioPath: string) => Promise<string>;
   /** Produce the assistant reply for a final user utterance. */
   reply: (userText: string, turn: number) => Promise<string>;
+  /** Optional provider-native reply stream. Text segments are sent to TTS immediately. */
+  streamReply?: (
+    userText: string,
+    turn: number,
+    onSegment: (segment: string) => void | Promise<void>,
+    signal?: AbortSignal
+  ) => Promise<string>;
   /** Synthesize one reply segment to an audio file (sentence-level). */
   synthesizeSegment: (
     segment: string,
@@ -113,6 +126,17 @@ export interface RealtimeVoiceLoopOptions {
     turn: number,
     signal?: AbortSignal
   ) => Promise<string>;
+  /** Optional direct PCM stream synthesis; artifact synthesis remains the fallback. */
+  synthesizeAudioStream?: (
+    segment: string,
+    segmentIndex: number,
+    turn: number,
+    signal?: AbortSignal
+  ) => Promise<AsyncIterable<AudioChunk>>;
+  /** Existing governed streaming-TTS bridge for direct PCM output. */
+  streamingTts?: StreamingTextToSpeechBridge;
+  voiceProfileId?: string;
+  playAudioStream?: (audio: AsyncIterable<AudioChunk>, index: number) => PlaybackHandle;
   /** Play an audio file (default: platform player). */
   play?: (audioPath: string, segmentIndex: number) => PlaybackHandle;
   maxSegmentChars?: number;
@@ -246,7 +270,7 @@ export async function startRealtimeVoiceLoop(
   let endedBy: RealtimeVoiceLoopReport['ended_by'] = 'stream_end';
   let loopError: string | undefined;
 
-  let speech: SegmentedSpeechController | null = null;
+  let speech: (SegmentedSpeechController | StreamingVoicePlaybackController) | null = null;
   let pendingTurn: Promise<void> | null = null;
   let sttFeed: SttFeed | null = null;
   let bargedDuringTurn = false;
@@ -315,7 +339,54 @@ export async function startRealtimeVoiceLoop(
 
     // 2. Assistant reply.
     const llmStartedAt = Date.now();
-    const assistantText = (await options.reply(userText, turnIndex)).trim();
+    let assistantText = '';
+    let speechResult: Awaited<SegmentedSpeechController['done']> | null = null;
+    if (options.streamReply) {
+      const streamedSegments: string[] = [];
+      const streamingSpeech =
+        options.streamingTts && options.voiceProfileId
+          ? streamTtsAudioPlayback({
+              voiceProfileId: options.voiceProfileId,
+              synthesizeStream: (segments, profileId) =>
+                options.streamingTts!.synthesizeStream(segments, profileId),
+              ...(options.playAudioStream ? { playStream: options.playAudioStream } : {}),
+            })
+          : streamVoicePlayback({
+              synthesize: (segment, index, signal) =>
+                options.synthesizeAudioStream
+                  ? options.synthesizeAudioStream(segment, index, turnIndex, signal)
+                  : options.synthesizeSegment(segment, index, turnIndex, signal),
+              play,
+            });
+      speech = streamingSpeech;
+      bargedDuringTurn = false;
+      if (bargeInEnabled) armBargeVad();
+      state = 'speaking';
+      emitState(state);
+      try {
+        assistantText = (
+          await options.streamReply(
+            userText,
+            turnIndex,
+            (segment) => {
+              streamedSegments.push(segment);
+              streamingSpeech.push(segment);
+            },
+            streamingSpeech.signal
+          )
+        ).trim();
+      } catch (err) {
+        if (!streamingSpeech.signal.aborted) throw err;
+        assistantText = streamedSegments.join(' ').trim();
+      } finally {
+        streamingSpeech.end();
+      }
+      speechResult = await streamingSpeech.done;
+      speech = null;
+      if (!assistantText) assistantText = streamedSegments.join(' ').trim();
+    } else {
+      assistantText = (await options.reply(userText, turnIndex)).trim();
+    }
     const llmMs = Date.now() - llmStartedAt;
     if (!assistantText) {
       logger.warn(`[realtime-voice-loop] empty reply for turn ${turnIndex + 1}; skipping speech`);
@@ -325,18 +396,21 @@ export async function startRealtimeVoiceLoop(
     }
 
     // 3. Speak, sentence-pipelined; barge-in watches the mic meanwhile.
-    bargedDuringTurn = false;
-    if (bargeInEnabled) armBargeVad();
-    state = 'speaking';
-    emitState(state);
-    speech = speakSegmented({
-      text: assistantText,
-      ...(options.maxSegmentChars ? { maxSegmentChars: options.maxSegmentChars } : {}),
-      synthesize: (seg, index, signal) => options.synthesizeSegment(seg, index, turnIndex, signal),
-      play,
-    });
-    const speechResult = await speech.done;
-    speech = null;
+    if (!speechResult) {
+      bargedDuringTurn = false;
+      if (bargeInEnabled) armBargeVad();
+      state = 'speaking';
+      emitState(state);
+      speech = speakSegmented({
+        text: assistantText,
+        ...(options.maxSegmentChars ? { maxSegmentChars: options.maxSegmentChars } : {}),
+        synthesize: (seg, index, signal) =>
+          options.synthesizeSegment(seg, index, turnIndex, signal),
+        play,
+      });
+      speechResult = await speech.done;
+      speech = null;
+    }
     selfAudioSuppressionUntilMs = speechResult.interrupted
       ? 0
       : Date.now() +
