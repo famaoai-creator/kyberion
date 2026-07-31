@@ -1315,6 +1315,7 @@ export {
 export type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
 export {
   ShellStreamingSpeechToTextBridge,
+  installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridge,
   installShellStreamingSttBridgeFromEnv,
 } from './shell-streaming-stt-bridge.js';
@@ -1511,6 +1512,7 @@ export {
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
   installFluidAudioSpeechToTextBridgeIfAvailable,
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
   NO_TIMESTAMP_STT_CAPABILITIES,
   registerSpeechToTextBridge,
@@ -1913,6 +1915,7 @@ export * from './pcm-wav.js';
 export * from './vad-turn-recorder.js';
 export * from './audio-playback.js';
 export * from './segmented-voice-playback.js';
+export * from './streaming-voice-playback.js';
 export * from './audio-tee.js';
 export * from './vad-registry.js';
 export * from './silero-vad-bridge.js';

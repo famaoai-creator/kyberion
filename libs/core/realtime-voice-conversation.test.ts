@@ -16,7 +16,9 @@ import { resetVoiceProfileRegistryCache } from './voice-profile-registry.js';
 import {
   ensureRealtimeVoiceConversationSession,
   buildRealtimeVoiceGenerationPayload,
+  normalizeRealtimeVoiceReply,
   runRealtimeVoiceConversationTurn,
+  streamRealtimeAssistantReply,
 } from './realtime-voice-conversation.js';
 
 const TMP_DIR = pathResolver.sharedTmp('realtime-voice-conversation-tests');
@@ -146,14 +148,20 @@ describe('realtime voice conversation', () => {
       },
     };
     registerSpeechToTextBridge(fakeStt);
+    let promptText = '';
     registerReasoningBackend({
       ...stubReasoningBackend,
       name: 'fake-reasoner',
       async delegateTask() {
+        throw new Error('realtime voice must use the low-latency prompt path');
+      },
+      async prompt(prompt) {
+        promptText = prompt;
         return '今日はレビューと実装を進めます。';
       },
-      async prompt() {
-        return '今日はレビューと実装を進めます。';
+      async *streamPrompt() {
+        yield 'ストリームの';
+        yield '返答です。';
       },
     });
 
@@ -173,6 +181,8 @@ describe('realtime voice conversation', () => {
 
     expect(result.user_text).toBe('今日の予定を教えて');
     expect(result.assistant_text).toBe('今日はレビューと実装を進めます。');
+    expect(promptText).toContain('160 characters');
+    expect(promptText).toContain('Do not mention internal processing');
     expect(result.profile_id).toBe('me-ja');
     const saved = JSON.parse(
       safeReadFile(result.transcript_path, { encoding: 'utf8' }) as string
@@ -181,6 +191,21 @@ describe('realtime voice conversation', () => {
     };
     expect(saved.transcript).toHaveLength(2);
     expect(saved.transcript?.[1]?.speaker).toBe('assistant');
+
+    const streamedSegments: string[] = [];
+    const streamed = await streamRealtimeAssistantReply('rtc-1', '続けて', (segment) =>
+      streamedSegments.push(segment)
+    );
+    expect(streamed).toBe('ストリームの返答です。');
+    expect(streamedSegments).toEqual(['ストリームの返答です。']);
+  });
+
+  it('bounds provider output to a short spoken reply', () => {
+    const normalized = normalizeRealtimeVoiceReply(
+      'これは一文目です。これは二文目です。これは音声会話では不要な三文目です。'
+    );
+    expect(normalized).toBe('これは一文目です。これは二文目です。');
+    expect(normalizeRealtimeVoiceReply('Assistant: こんにちは。')).toBe('こんにちは。');
   });
 
   it('blocks shadow voice profiles before realtime use', () => {
