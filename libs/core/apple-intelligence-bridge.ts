@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import {
+  getSpeechToTextBridges,
   registerSpeechToTextBridge,
   type SpeechToTextBridge,
   type TranscribeInput,
@@ -171,6 +172,21 @@ async function ensureAfmBinary(): Promise<string | null> {
 
 let cachedAvailability: { checkedAt: number; value: AppleIntelligenceAvailability } | null = null;
 const AVAILABILITY_TTL_MS = 10 * 60 * 1000;
+
+const APPLE_SPEECH_LOCALE_DEFAULTS: Record<string, string> = {
+  de: 'de-DE',
+  en: 'en-US',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  zh: 'zh-CN',
+};
+
+function resolveAppleSpeechLocale(language?: string): string {
+  const normalized = language?.trim() || 'ja-JP';
+  return APPLE_SPEECH_LOCALE_DEFAULTS[normalized.toLowerCase()] || normalized;
+}
 
 export function resetAppleIntelligenceAvailabilityCache(): void {
   cachedAvailability = null;
@@ -364,7 +380,7 @@ export async function transcribeAudioLocallyWithAppleSpeech(
       '--audio',
       audioPath,
       '--locale',
-      options.locale ?? 'ja-JP',
+      resolveAppleSpeechLocale(options.locale),
       '--timeout',
       String(Math.ceil(timeoutMs / 1000)),
     ],
@@ -499,7 +515,7 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
       if (!safeExistsSync(audioAbs)) {
         throw new Error(`[stt-bridge:apple-speech] audio file not found: ${input.audioPath}`);
       }
-      const language = input.language?.trim() || 'ja-JP';
+      const language = resolveAppleSpeechLocale(input.language);
       const text = await transcribeAudioLocallyWithAppleSpeech(audioAbs, { locale: language });
       if (text === null) {
         throw new Error(
@@ -528,6 +544,13 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
  * KYBERION_STT_COMMAND always wins over the implicit local capability.
  */
 export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boolean> {
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'apple-speech')) return true;
+  if (
+    process.env.KYBERION_STT_COMMAND?.trim() ||
+    process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+  ) {
+    return false;
+  }
   const availability = await probeAppleIntelligence();
   if (!availability.available) return false;
   registerSpeechToTextBridge(createAppleSpeechToTextBridge());
