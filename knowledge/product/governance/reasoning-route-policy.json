@@ -89,7 +89,7 @@
       },
       "endpoint_policy": "public",
       "model_policy": "approved",
-      "capabilities": ["text", "structured_output"],
+      "capabilities": ["text", "structured_output", "tools", "vision", "streaming"],
       "supported_parameters": ["temperature", "top_p", "top_k", "stop"]
     },
     "openrouter": {
@@ -324,7 +324,9 @@
     },
     "gemini-api-default": {
       "mode": "gemini-api",
-      "capabilities": ["text", "structured_output"]
+      "capabilities": ["text", "structured_output", "tools", "vision", "streaming"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
     },
     "openrouter-default": {
       "mode": "openrouter",

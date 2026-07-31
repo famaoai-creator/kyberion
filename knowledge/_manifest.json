@@ -1731,7 +1731,7 @@
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 10079,
+      "size": 10863,
       "type": "json"
     },
     {
@@ -2073,7 +2073,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 12055,
+      "size": 12204,
       "type": "json"
     },
     {
