@@ -66,6 +66,7 @@ export function reasoningBackendEndpoint(backendName: string): string {
     openai: 'https://api.openai.com',
     'codex-cli': 'https://api.openai.com',
     gemini: 'https://generativelanguage.googleapis.com',
+    'gemini-api': 'https://generativelanguage.googleapis.com',
     'gemini-cli': 'https://generativelanguage.googleapis.com',
     copilot: 'https://api.githubcopilot.com',
     'copilot-acp': 'https://api.githubcopilot.com',

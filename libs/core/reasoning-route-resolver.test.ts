@@ -31,6 +31,20 @@ describe('reasoning-route-resolver', () => {
     expect(() => normalizeReasoningRole('unknown-role')).toThrow(/Allowed roles/);
   });
 
+  it('normalizes an unprefixed Gemini model env value through the approved model registry', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'gemini-api-default',
+      env: {
+        GEMINI_API_KEY: 'test-gemini-key',
+        KYBERION_GEMINI_MODEL: 'gemini-flash-latest',
+      },
+    });
+    expect(route.mode).toBe('gemini-api');
+    expect(route.model).toBe('gemini:gemini-flash-latest');
+    expect(route.capabilities).toEqual(expect.arrayContaining(['tools', 'vision', 'streaming']));
+  });
+
   it('rejects parameters unsupported by an adapter', () => {
     expect(() =>
       resolveSamplingParams({ mode: 'codex-cli', sampling: { temperature: 0.2 } })

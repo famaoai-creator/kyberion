@@ -11,11 +11,12 @@ describe('reasoning-backend-policy', () => {
 
     expect(policy.default_mode).toBe('codex-cli');
     expect(policy.allowed_modes).toContain('gemini-cli');
+    expect(policy.allowed_modes).toContain('gemini-api');
     expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
     expect(policy.allowed_modes).toContain('grok-cli');
-    expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
+    expect(policy.mode_aliases['gemini-api']).toBeUndefined();
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
     expect(policy.mode_aliases.grok).toBe('grok-cli');
     expect(policy.mode_aliases['grok-build']).toBe('grok-cli');
@@ -27,8 +28,8 @@ describe('reasoning-backend-policy', () => {
     });
   });
 
-  it('normalizes deprecated mode aliases', () => {
-    expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
+  it('keeps the Google AI Studio REST mode distinct from the CLI mode', () => {
+    expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-api');
     expect(normalizeReasoningBackendMode('codex-cli')).toBe('codex-cli');
   });
 
@@ -91,10 +92,10 @@ describe('reasoning-backend-policy', () => {
     expect(
       resolveReasoningBackendModeFromContext({
         policy,
-        env: { GEMINI_API_KEY: 'legacy-key', GEMINI_CLI: '1' },
+        env: { GEMINI_API_KEY: 'test-gemini-key', GEMINI_CLI: '1' },
         providers: [{ provider: 'gemini', installed: true, healthy: true }],
       })
-    ).toBe('codex-cli');
+    ).toBe('gemini-api');
 
     expect(
       resolveReasoningBackendModeFromContext({

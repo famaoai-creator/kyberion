@@ -22,7 +22,7 @@ Kyberion の推論経路は、特定の SDK やベンダーをアプリケーシ
 
 同じ `Models` ステップには、登録済みの adapter-backed runtime の既定値も表示される。画像、動画、音楽、service runtime、tool runtime、VAD の選択は [Adapter-backed runtime default selection procedure](./select-adapter-backed-runtime-defaults.md) に従う。TTS/STT は音声専用の選択手順を使用する。
 
-保存先は active profile の `onboarding/llm-selection.json` である。プロファイルを切り替えると選択状態も切り替わる。選択候補は `knowledge/product/governance/reasoning-route-policy.json` の adapter metadata、`reasoning-model-registry.json`、provider discovery の結果から生成される。
+保存先は active profile の `onboarding/llm-selection.json` である。プロファイルを切り替えると選択状態も切り替わる。選択候補は `knowledge/product/governance/reasoning-route-policy.json` の adapter metadata、`reasoning-model-registry.json`、CLI provider discovery、endpoint-backed reasoning discovery の結果から生成される。CLI は `provider discovery`、Nemotron/local/Ollama などの URL/API 経路は `reasoning endpoint discovery` として別カテゴリで扱う。
 
 ## 選択基準
 

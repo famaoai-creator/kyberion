@@ -36,6 +36,7 @@ import {
   probeLocalAiBackendAvailability,
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
+import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
 
 export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
@@ -64,6 +65,10 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   }
   if (Boolean(process.env.ANTHROPIC_API_KEY)) {
     return { available: true };
+  }
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+    const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
+    if (geminiProbe.available) return { available: true };
   }
   if (process.env.OPENROUTER_API_KEY || process.env.KYBERION_OPENROUTER_KEY) {
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
@@ -113,7 +118,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

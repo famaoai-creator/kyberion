@@ -236,6 +236,7 @@ function parseBinding(binding: string): { profile?: string; mode?: string; model
 
 function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | undefined {
   const keys: Record<string, string[]> = {
+    'gemini-api': ['KYBERION_GEMINI_MODEL'],
     openrouter: ['KYBERION_OPENROUTER_MODEL'],
     'nemotron-api': ['KYBERION_NEMOTRON_MODEL'],
     ollama: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
@@ -291,14 +292,18 @@ function resolveAndValidateModel(input: {
 }): string | undefined {
   const model = input.model || input.modelRef;
   if (!model) return undefined;
-  const registered = loadModelRegistry().models.find((entry) => entry.model_id === model);
+  const registryModel =
+    input.adapter.selection?.model_provider && !model.includes(':')
+      ? `${input.adapter.selection.model_provider}:${model}`
+      : model;
+  const registered = loadModelRegistry().models.find((entry) => entry.model_id === registryModel);
   if (registered) {
     if (registered.status === 'blocked' || registered.status === 'deprecated') {
       throw new Error(
-        `Model ${model} is ${registered.status} and cannot be selected for ${input.profile}`
+        `Model ${registryModel} is ${registered.status} and cannot be selected for ${input.profile}`
       );
     }
-    return model;
+    return registryModel;
   }
   if (input.adapter.model_policy === 'local-unregistered') return model;
   throw new Error(`Model ${model} is not approved in model-registry.json for ${input.profile}`);

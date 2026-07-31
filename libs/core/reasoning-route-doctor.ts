@@ -10,6 +10,7 @@ import {
   probeVllmBackendAvailability,
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
+import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
 import {
   loadReasoningRoutePolicy,
   resolveReasoningRoute,
@@ -17,11 +18,7 @@ import {
 } from './reasoning-route-resolver.js';
 
 export type ReasoningRouteDoctorStatus =
-  | 'ready'
-  | 'degraded'
-  | 'not_configured'
-  | 'unavailable'
-  | 'invalid';
+  'ready' | 'degraded' | 'not_configured' | 'unavailable' | 'invalid';
 
 export interface ReasoningRouteDoctorEntry {
   role: string;
@@ -63,6 +60,15 @@ async function probeMode(
     return process.env.ANTHROPIC_API_KEY?.trim()
       ? { status: 'ready', reason: 'ANTHROPIC_API_KEY configured; live call not consumed' }
       : { status: 'not_configured', reason: 'ANTHROPIC_API_KEY is not configured' };
+  }
+  if (mode === 'gemini-api') {
+    const result = await probeGeminiApiBackendAvailability();
+    return result.available
+      ? {
+          status: 'ready',
+          reason: 'Google AI Studio API reachable; model-specific completion not consumed',
+        }
+      : { status: 'not_configured', reason: result.reason || 'Google AI Studio API probe failed' };
   }
   const provider = cliProviderForMode(mode);
   if (provider) {

@@ -1075,6 +1075,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GEMINI_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_GEMINI_VIDEO_API_KEY",
       "category": "secret",
       "type": "string",

@@ -15,9 +15,8 @@
  *   `local`         — use a local OpenAI-compatible server on localhost.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
- * `gemini-api` is kept as a deprecated alias and resolves to `gemini-cli`.
- * Kyberion does not maintain a separate Gemini API backend here; Gemini
- * auth is consumed through the CLI-backed adapter.
+ *   `gemini-api`  — use the Google AI Studio Gemini REST API. Requires
+ *                   GEMINI_API_KEY or GOOGLE_API_KEY.
  *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
@@ -52,6 +51,7 @@ import { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
 import { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 import { buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
 import { buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
+import { buildGeminiApiBackendFromEnv } from './gemini-api-backend.js';
 import { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
 import { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
 import { buildClaudeCliOptionsFromEnv } from './claude-cli-backend.js';
@@ -114,6 +114,7 @@ import { installSecretResolverIfAvailable } from './secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
+import { discoverReasoningEndpoints } from './reasoning-endpoint-discovery.js';
 import { peekProviderCapabilityRegistry } from './provider-capability-registry.js';
 import { resolveProviderDecision } from './capability-broker.js';
 import {
@@ -134,12 +135,7 @@ export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
 
-export function normalizeReasoningBackendMode(
-  mode: ReasoningBackendMode
-): Exclude<ReasoningBackendMode, 'gemini-api'> {
-  if (mode === 'gemini-api') {
-    logger.warn('[reasoning-bootstrap] mode=gemini-api is deprecated; using gemini-cli instead.');
-  }
+export function normalizeReasoningBackendMode(mode: ReasoningBackendMode): ReasoningBackendMode {
   return normalizeReasoningBackendModeFromPolicy(mode, loadReasoningBackendPolicy());
 }
 
@@ -168,10 +164,19 @@ export interface InstallReasoningOptions {
 export type InstallAnthropicOptions = InstallReasoningOptions;
 
 function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
+  const discoveredProviders = discoverProviders(shouldRefreshProviders(options));
+  const configuredEndpoints = discoverReasoningEndpoints().filter(
+    (endpoint) => endpoint.configured
+  );
+  logger.info(
+    `[REASONING_ENDPOINT_DISCOVERY] Configured ${configuredEndpoints.length}: ${
+      configuredEndpoints.map((endpoint) => endpoint.runtime).join(', ') || 'none'
+    }`
+  );
   return resolveReasoningBackendModeFromContext({
     requestedMode: options.mode,
     env: process.env,
-    providers: discoverProviders(shouldRefreshProviders(options)),
+    providers: discoveredProviders,
     policy: loadReasoningBackendPolicy(),
   }) as ReasoningBackendMode;
 }
@@ -198,6 +203,8 @@ function providerForReasoningMode(mode: ReasoningBackendMode): string | undefine
       return 'codex';
     case 'gemini-cli':
       return 'gemini';
+    case 'gemini-api':
+      return 'gemini-api';
     case 'agy-cli':
       return 'agy';
     case 'grok-cli':
@@ -278,6 +285,19 @@ function buildReasoningRuntimeBundle(
         },
         voiceBridge: {
           bridge: new AnthropicVoiceBridge({ client, model: options.model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'gemini-api': {
+      const geminiBackend = buildGeminiApiBackendFromEnv(process.env, options.model);
+      if (!geminiBackend && !options.force) return null;
+      if (!geminiBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: maybeWrapWithDispatcher(geminiBackend),
           provider,
           label: mode,
         },

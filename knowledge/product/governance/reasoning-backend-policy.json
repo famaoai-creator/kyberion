@@ -2,7 +2,6 @@
   "version": "1.0.0",
   "route_policy_ref": "knowledge/product/governance/reasoning-route-policy.json",
   "mode_aliases": {
-    "gemini-api": "gemini-cli",
     "nemotron": "nemotron-api",
     "grok": "grok-cli",
     "grok-build": "grok-cli"
@@ -13,6 +12,7 @@
     "claude-agent",
     "anthropic",
     "gemini-cli",
+    "gemini-api",
     "agy-cli",
     "grok-cli",
     "copilot",
@@ -31,6 +31,14 @@
     {
       "env": "ANTHROPIC_API_KEY",
       "mode": "anthropic"
+    },
+    {
+      "env": "GEMINI_API_KEY",
+      "mode": "gemini-api"
+    },
+    {
+      "env": "GOOGLE_API_KEY",
+      "mode": "gemini-api"
     },
     {
       "env": "KYBERION_NEMOTRON_URL",
