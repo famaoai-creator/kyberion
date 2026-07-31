@@ -10,6 +10,7 @@
 
 ## 📁 product/agents
 - [chronos-mirror.agent](./product/agents/chronos-mirror.agent.md) (public | Unknown)
+- [cli-surface-agent.agent](./product/agents/cli-surface-agent.agent.md) (public | Unknown)
 - [discord-surface-agent.agent](./product/agents/discord-surface-agent.agent.md) (public | Unknown)
 - [imessage-surface-agent.agent](./product/agents/imessage-surface-agent.agent.md) (public | Unknown)
 - [implementation-architect.agent](./product/agents/implementation-architect.agent.md) (public | Unknown)

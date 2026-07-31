@@ -23,6 +23,7 @@ import {
   compileUserIntentFlow,
   formatClarificationPacket,
   formatClarificationPacketConcise,
+  isSimpleGreetingText,
 } from './intent-contract.js';
 import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
@@ -1795,6 +1796,8 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
     runtimeMetadata: {
       lease_kind: 'surface',
       surface_agent_id: agentId,
+      provider_strategy: manifest.selection_hints?.provider_strategy,
+      fallback_providers: manifest.selection_hints?.fallback_providers,
     },
   } as const;
 
@@ -1822,9 +1825,7 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
 // narrower call-site union and the existing name for this file's 3 call
 // sites unchanged.
 type SurfaceReasoningTierCallSite =
-  | 'surface_intent_compile'
-  | 'surface_main_ask'
-  | 'surface_summary_ask';
+  'surface_intent_compile' | 'surface_main_ask' | 'surface_summary_ask';
 
 function recordSurfaceReasoningTierDeclaration(input: {
   callSite: SurfaceReasoningTierCallSite;
@@ -1860,11 +1861,21 @@ async function escalateSurfaceTextIfNeeded(
   // the outer chokepoint's deterministic repair is responsible for shaping it.
   if (!text.trim()) return text;
 
-  const verdict = validateSurfaceUxContract({ text });
+  const allowConversationalReply = isSimpleGreetingText(prompt);
+  const verdict = validateSurfaceUxContract({
+    text,
+    allow_conversational_reply: allowConversationalReply,
+  });
   if (verdict.valid) return text;
 
   const repairedText = repairSurfaceUxContractText(text);
-  if (repairedText !== text && validateSurfaceUxContract({ text: repairedText }).valid) {
+  if (
+    repairedText !== text &&
+    validateSurfaceUxContract({
+      text: repairedText,
+      allow_conversational_reply: allowConversationalReply,
+    }).valid
+  ) {
     return repairedText;
   }
 
@@ -1875,9 +1886,13 @@ async function escalateSurfaceTextIfNeeded(
     escalatedReason: escalationReason,
   });
   const escalatedPrompt = [
+    'Regenerate the final reply to the original user request below.',
+    'Original user request:',
     prompt,
     '',
-    `[Escalation notice: the previous fast-tier response failed UX-contract validation (${escalationReason}) and could not be auto-repaired. Regenerate a compliant response for the same request.]`,
+    'The previous draft failed an internal response-quality check and could not be repaired automatically.',
+    'Do not mention this check, escalation, hidden context, or internal contract in the reply.',
+    'Answer the original request directly in the user language.',
   ].join('\n');
   // Fail-open on every escalation defect (throw, non-string, empty): the
   // conversation must never get worse because the escalation attempt failed —
@@ -2626,11 +2641,18 @@ export async function runSurfaceMessageConversation(
   try {
     const text = (result as { text?: unknown })?.text;
     if (typeof text === 'string' && text.trim()) {
-      const verdict = validateSurfaceUxContract({ text });
+      const allowConversationalReply = isSimpleGreetingText(input.text);
+      const verdict = validateSurfaceUxContract({
+        text,
+        allow_conversational_reply: allowConversationalReply,
+      });
       if (!verdict.valid) {
         const repairedText = repairSurfaceUxContractText(text);
         if (repairedText !== text) {
-          const repairedVerdict = validateSurfaceUxContract({ text: repairedText });
+          const repairedVerdict = validateSurfaceUxContract({
+            text: repairedText,
+            allow_conversational_reply: allowConversationalReply,
+          });
           if (repairedVerdict.valid) {
             (result as { text?: string }).text = repairedText;
             (result as { uxContract?: unknown }).uxContract = repairedVerdict;
