@@ -1,0 +1,24 @@
+{
+  "name": "@presence/terminal-hud",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Interactive full-screen terminal HUD (Ink) for Kyberion operations",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "chokidar": "^5.0.0",
+    "ink": "^6.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.0.0",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.9.3"
+  }
+}

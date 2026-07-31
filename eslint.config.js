@@ -228,7 +228,12 @@ export default [
     },
   },
   {
-    files: ['libs/actuators/**/*.ts', 'satellites/**/*.ts', 'presence/**/*.ts'],
+    files: [
+      'libs/actuators/**/*.ts',
+      'satellites/**/*.ts',
+      'presence/**/*.ts',
+      'presence/**/*.tsx',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

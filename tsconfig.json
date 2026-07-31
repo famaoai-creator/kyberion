@@ -34,6 +34,7 @@
     "coverage",
     "test-results",
     "presence/displays/chronos-mirror-v2/",
+    "presence/displays/terminal-hud/",
     "presence/displays/operator-surface/",
     "presence/displays/concierge/"
   ]

@@ -120,10 +120,7 @@ export interface IntentDeliveryDecision {
 
 export type AgentRoutingMode = 'prompt' | 'subagent' | 'coordination';
 export type AgentRoutingScope =
-  | 'single_artifact'
-  | 'multi_artifact'
-  | 'stateful_flow'
-  | 'boundary_crossing';
+  'single_artifact' | 'multi_artifact' | 'stateful_flow' | 'boundary_crossing';
 export type AgentRoutingAutonomy = 'low' | 'medium' | 'high';
 export type AgentRoutingFanout = 'none' | 'parallel' | 'review' | 'cross_critique';
 
@@ -1562,6 +1559,10 @@ export function deriveAgentRoutingDecision(
 const SIMPLE_GREETING_REGEX =
   /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
 
+export function isSimpleGreetingText(text: string): boolean {
+  return SIMPLE_GREETING_REGEX.test(text.trim());
+}
+
 function emitIntentCompilationCompletedEvent(
   trace: Pick<TraceContext, 'addEvent'> | undefined,
   input: {
@@ -1626,7 +1627,7 @@ export async function compileUserIntentFlow(
   });
   const reasoningDecision = resolveReasoningLevelDecision(
     {
-      isSimpleGreeting: SIMPLE_GREETING_REGEX.test(input.text.trim()),
+      isSimpleGreeting: isSimpleGreetingText(input.text),
       resolutionPacket,
       selectedIntent,
     },
