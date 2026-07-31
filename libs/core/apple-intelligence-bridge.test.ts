@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -22,6 +24,7 @@ import {
 } from './apple-intelligence-bridge.js';
 
 const calls: Array<{ command: string; args: string[]; stdin?: string }> = [];
+const TEST_AUDIO = pathResolver.sharedTmp('apple-intelligence-bridge-test/input.wav');
 
 function installRunner(
   respond: (command: string, args: string[]) => { ok: boolean; stdout: string; stderr: string }
@@ -43,6 +46,10 @@ describe('apple intelligence bridge', () => {
 
   afterEach(() => {
     setAfmRunnerForTests(null);
+    safeRmSync(pathResolver.sharedTmp('apple-intelligence-bridge-test'), {
+      recursive: true,
+      force: true,
+    });
     delete process.env.KYBERION_APPLE_FM;
   });
 
@@ -187,9 +194,13 @@ describe('apple intelligence bridge', () => {
         return { ok: true, stdout: '{"text":"議事録テスト"}\n', stderr: '' };
       return { ok: true, stdout: '{"available":true}', stderr: '' };
     });
+    safeMkdir(pathResolver.sharedTmp('apple-intelligence-bridge-test'), { recursive: true });
+    safeWriteFile(TEST_AUDIO, 'fake-audio');
     const bridge = createAppleSpeechToTextBridge();
     expect(bridge.name).toBe('apple-speech');
-    // nonexistent audio → contract-conformant throw
+    const result = await bridge.transcribe({ audioPath: TEST_AUDIO, language: 'ja' });
+    expect(result.language).toBe('ja-JP');
+    expect(calls.find((call) => call.args[0] === 'transcribe')?.args).toContain('ja-JP');
     await expect(bridge.transcribe({ audioPath: '/nonexistent/audio.aiff' })).rejects.toThrow(
       /audio file not found/
     );

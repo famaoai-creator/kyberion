@@ -36,13 +36,7 @@ import { StablePrefixGuard, type StablePrefixSnapshot } from './prompt-cache-dis
 import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
 
 export type LocalLlmProviderPreset =
-  | 'generic'
-  | 'ollama'
-  | 'vllm'
-  | 'lmstudio'
-  | 'llamacpp'
-  | 'mlx'
-  | 'localai';
+  'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';
 
 export interface OpenAiCompatibleBackendOptions {
   baseURL: string;
@@ -115,6 +109,7 @@ interface ChatCompletionRequest {
     };
   }>;
   tool_choice?: 'auto' | 'none';
+  stream?: boolean;
   max_tokens?: number;
   temperature?: number;
   top_p?: number;
@@ -500,6 +495,75 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     return parsed;
   }
 
+  private async *fetchStreamingChatCompletion(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<string> {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error('[DELEGATION_CANCELLED] local reasoning operation aborted');
+    }
+    assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (this.apiKey && this.apiKey !== 'not-needed') {
+      headers.authorization = `Bearer ${this.apiKey}`;
+    }
+    const body: ChatCompletionRequest = {
+      model: this.model,
+      messages: redactSensitiveObject(messages),
+      stream: true,
+      ...this.samplingParams,
+    };
+    const maxTokens = this.completionBudget(body);
+    if (maxTokens !== undefined) body.max_tokens = maxTokens;
+
+    const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: buildAbortSignal(this.timeoutMs, signal),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+      throw new Error(
+        `[openai-compatible] streaming chat completion failed: ${parsed?.error?.message || text || `HTTP ${response.status}`}`
+      );
+    }
+    if (!response.body) throw new Error('[openai-compatible] streaming response has no body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const consumeLine = (line: string): string | null => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return null;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') return null;
+      const parsed = safeJsonParse(data) as {
+        choices?: Array<{ delta?: { content?: unknown } }>;
+      } | null;
+      const content = parsed?.choices?.[0]?.delta?.content;
+      return typeof content === 'string' ? content : null;
+    };
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      let newline: number;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        const delta = consumeLine(line);
+        if (delta) yield delta;
+      }
+      if (done) break;
+    }
+    const finalDelta = consumeLine(buffer);
+    if (finalDelta) yield finalDelta;
+  }
+
   private async handleToolCall(name: string, rawArguments: string): Promise<string> {
     if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
       return `Error: Tool ${name} is not enabled for this reasoning route.`;
@@ -605,6 +669,19 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     }
 
     return extractTextContent(message.content);
+  }
+
+  async *streamPrompt(prompt: string, options?: ReasoningCallOptions): AsyncGenerator<string> {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are Kyberion. Return only the natural spoken reply when the caller requests voice output. ' +
+          'Do not use tools or explain internal processing.',
+      },
+      { role: 'user', content: prompt },
+    ];
+    yield* this.fetchStreamingChatCompletion(messages, options?.signal);
   }
 
   /** Single toolless completion returning raw model text — used for structured reasoning. */

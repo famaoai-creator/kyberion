@@ -83,6 +83,13 @@ export interface RealtimeVoiceConversationTurnResult {
 
 const SESSION_DIR = pathResolver.shared('runtime/realtime-voice-conversations');
 
+/** Keep spoken replies short enough to start TTS quickly and sound natural. */
+export const REALTIME_VOICE_REPLY_MAX_CHARS = 160;
+export const REALTIME_VOICE_REPLY_MAX_SENTENCES = 2;
+export const REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS = 120;
+
+export type RealtimeVoiceReplySegmentHandler = (segment: string) => void | Promise<void>;
+
 function sessionPath(sessionId: string): string {
   return path.join(SESSION_DIR, `${sessionId}.json`);
 }
@@ -179,14 +186,70 @@ function buildConversationContext(
   return [
     session.system_prompt || 'You are Kyberion in a realtime spoken conversation.',
     'Reply for speech output, not for reading.',
-    'Keep the answer concise, natural, and easy to say aloud.',
-    'Prefer one short paragraph. Ask at most one follow-up question.',
+    `Use at most ${REALTIME_VOICE_REPLY_MAX_SENTENCES} short sentences and ${REALTIME_VOICE_REPLY_MAX_CHARS} characters.`,
+    'For a greeting or simple acknowledgement, use one natural sentence.',
+    'Do not mention internal processing, tools, files, validation, contracts, artifacts, or Kyberion implementation details unless the user explicitly asks about them.',
+    'Ask at most one brief follow-up question.',
     recentTurns.length ? 'Conversation so far:' : '',
     recentTurns.join('\n'),
     `Latest user utterance: ${userText}`,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+function buildRealtimeVoiceReplyPrompt(
+  session: RealtimeVoiceConversationSession,
+  userText: string
+): string {
+  return `Respond to the user's spoken message in ${session.language}. Return only the natural spoken reply; do not explain your process.\n\n${buildConversationContext(session, userText)}`;
+}
+
+function sentenceEndAt(text: string, start: number): number {
+  for (let index = start; index < text.length; index += 1) {
+    if ('。！？!?'.includes(text[index])) return index;
+  }
+  return -1;
+}
+
+/**
+ * Apply a deterministic speech budget after the model response. The prompt is
+ * the primary control; this guard prevents an overlong provider response from
+ * turning into a slow TTS monologue.
+ */
+export function normalizeRealtimeVoiceReply(text: string): string {
+  const cleaned = text
+    .replace(/```[\s\S]*?```/gu, '')
+    .replace(/^(?:assistant|kyberion)\s*[:：]\s*/iu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!cleaned) return '';
+
+  let bounded = cleaned;
+  let cursor = 0;
+  for (let sentence = 0; sentence < REALTIME_VOICE_REPLY_MAX_SENTENCES; sentence += 1) {
+    const end = sentenceEndAt(cleaned, cursor);
+    if (end < 0) {
+      cursor = cleaned.length;
+      break;
+    }
+    cursor = end + 1;
+  }
+  if (cursor > 0 && cursor < cleaned.length) bounded = cleaned.slice(0, cursor).trim();
+
+  if (bounded.length <= REALTIME_VOICE_REPLY_MAX_CHARS) return bounded;
+  const clipped = bounded.slice(0, REALTIME_VOICE_REPLY_MAX_CHARS);
+  const lastEnd = Math.max(
+    clipped.lastIndexOf('。'),
+    clipped.lastIndexOf('！'),
+    clipped.lastIndexOf('？'),
+    clipped.lastIndexOf('!'),
+    clipped.lastIndexOf('?')
+  );
+  if (lastEnd >= Math.floor(REALTIME_VOICE_REPLY_MAX_CHARS * 0.5)) {
+    return clipped.slice(0, lastEnd + 1).trim();
+  }
+  return `${clipped.trimEnd()}…`;
 }
 
 export interface RealtimeVoiceSynthesisInput {
@@ -318,12 +381,77 @@ export async function generateRealtimeAssistantReply(
     throw new Error(`Realtime voice conversation session not found: ${sessionId}`);
   }
   const backend = getReasoningBackend();
-  const assistantText = (
-    await backend.delegateTask(
-      `Respond to the user's spoken message in ${session.language}. Return only the assistant reply.`,
-      buildConversationContext(session, userText)
-    )
-  ).trim();
+  const assistantText = normalizeRealtimeVoiceReply(
+    await backend.prompt(buildRealtimeVoiceReplyPrompt(session, userText))
+  );
+  if (!assistantText) {
+    throw new Error(
+      `Reasoning backend returned an empty assistant reply for session ${session.session_id}`
+    );
+  }
+  return assistantText;
+}
+
+/**
+ * Stream a spoken reply into sentence-sized chunks as soon as the provider
+ * produces enough text. Providers without native streaming transparently
+ * yield their completed prompt response once, preserving the old behavior.
+ */
+export async function streamRealtimeAssistantReply(
+  sessionId: string,
+  userText: string,
+  onSegment: RealtimeVoiceReplySegmentHandler,
+  signal?: AbortSignal
+): Promise<string> {
+  const session = loadRealtimeVoiceConversationSession(normalizeSessionId(sessionId));
+  if (!session) {
+    throw new Error(`Realtime voice conversation session not found: ${sessionId}`);
+  }
+  const backend = getReasoningBackend();
+  const prompt = buildRealtimeVoiceReplyPrompt(session, userText);
+  const source = backend.streamPrompt
+    ? backend.streamPrompt(prompt, signal ? { signal } : undefined)
+    : (async function* fallback(): AsyncGenerator<string> {
+        yield await backend.prompt(prompt, signal ? { signal } : undefined);
+      })();
+
+  let rawText = '';
+  let pending = '';
+  let sentencesEmitted = 0;
+  const emit = async (text: string): Promise<void> => {
+    const normalized = normalizeRealtimeVoiceReply(text);
+    if (!normalized) return;
+    sentencesEmitted += (normalized.match(/[。！？!?]/gu) || []).length;
+    await onSegment(normalized);
+  };
+
+  for await (const delta of source) {
+    if (signal?.aborted) throw new Error('realtime voice reply stream aborted');
+    if (!delta) continue;
+    rawText += delta;
+    pending += delta;
+    while (sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES) {
+      const end = sentenceEndAt(pending, 0);
+      if (end < 0) break;
+      const segment = pending.slice(0, end + 1).trim();
+      pending = pending.slice(end + 1).trimStart();
+      await emit(segment);
+    }
+    if (
+      sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES &&
+      pending.length >= REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS
+    ) {
+      const segment = pending.slice(0, REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS).trim();
+      pending = pending.slice(REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS).trimStart();
+      await emit(segment);
+    }
+    if (sentencesEmitted >= REALTIME_VOICE_REPLY_MAX_SENTENCES) break;
+  }
+
+  if (pending.trim() && sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES) {
+    await emit(pending);
+  }
+  const assistantText = normalizeRealtimeVoiceReply(rawText);
   if (!assistantText) {
     throw new Error(
       `Reasoning backend returned an empty assistant reply for session ${session.session_id}`
@@ -385,12 +513,9 @@ export async function runRealtimeVoiceConversationTurn(
   }
 
   const backend = getReasoningBackend();
-  const assistantText = (
-    await backend.delegateTask(
-      `Respond to the user's spoken message in ${session.language}. Return only the assistant reply.`,
-      buildConversationContext(session, userText)
-    )
-  ).trim();
+  const assistantText = normalizeRealtimeVoiceReply(
+    await backend.prompt(buildRealtimeVoiceReplyPrompt(session, userText))
+  );
   if (!assistantText) {
     throw new Error(
       `Reasoning backend returned an empty assistant reply for session ${session.session_id}`
