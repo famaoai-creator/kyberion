@@ -49,13 +49,29 @@ export interface SoakReport {
   evidence: {
     run_log_path: string;
     summary_path: string;
-    window_mode: 'compressed';
+    window_mode: 'compressed' | 'live';
     window_days_equivalent: number;
+    manifest_path?: string;
+  };
+}
+
+export interface SoakEvidenceManifest {
+  version: '1.0';
+  started_at: string;
+  last_run_at: string;
+  run_count: number;
+  total_cycles: number;
+  window_days_equivalent: number;
+  last_validation: {
+    ok: boolean;
+    regression_count: number;
+    issues: string[];
   };
 }
 
 export interface SoakEvidenceValidation {
   ok: boolean;
+  mature: boolean;
   issues: string[];
   regression_count: number;
   evidence_files: string[];
@@ -84,6 +100,9 @@ export interface SoakHarnessOptions {
   metricsFile?: string;
   evidenceRetentionCount?: number;
   failOnRegression?: boolean;
+  mode?: 'compressed' | 'live';
+  /** Durable root for live evidence; defaults under active/shared/runtime. */
+  evidenceDir?: string;
   quiet?: boolean;
   exercise?: (cycle: number) => Promise<void> | void;
 }
@@ -97,6 +116,7 @@ const DEFAULT_SAMPLE_PATHS = [
 const DEFAULT_REPORT_PATH = pathResolver.sharedTmp('soak-endurance/soak-report.json');
 const DEFAULT_METRICS_DIR = pathResolver.sharedTmp('soak-endurance');
 const DEFAULT_METRICS_FILE = 'latency-history.jsonl';
+const DEFAULT_LIVE_EVIDENCE_DIR = pathResolver.shared('runtime/health/soak');
 
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
@@ -280,8 +300,9 @@ export function validateSoakEvidence(report: SoakReport): SoakEvidenceValidation
   const issues: string[] = [];
   const actionableResourceRegressions = report.resource_regressions.filter(isActionableRegression);
   const regressionCount = actionableResourceRegressions.length + report.latency_regressions.length;
+  const mature = report.evidence.window_mode === 'live' || report.cycles >= 4;
 
-  if (report.cycles < 4) {
+  if (report.evidence.window_mode === 'compressed' && report.cycles < 4) {
     issues.push('at least 4 cycles are required for a meaningful trend');
   }
   if (!report.evidence.run_log_path || !safeExistsSync(report.evidence.run_log_path)) {
@@ -296,6 +317,7 @@ export function validateSoakEvidence(report: SoakReport): SoakEvidenceValidation
 
   return {
     ok: issues.length === 0,
+    mature,
     issues,
     regression_count: regressionCount,
     evidence_files: [report.evidence.run_log_path, report.evidence.summary_path].filter(Boolean),
@@ -307,13 +329,18 @@ function sanitizeEvidenceLabel(input: string): string {
   return normalized.length > 0 ? normalized : 'resource';
 }
 
-function createEvidenceBundlePaths(report: SoakReport): {
+function createEvidenceBundlePaths(
+  report: SoakReport,
+  evidenceRoot?: string
+): {
   dir: string;
   logPath: string;
   summaryPath: string;
 } {
   const stamp = report.timestamp.replace(/[:.]/g, '-');
-  const dir = pathResolver.sharedTmp(path.join('soak-evidence', `${stamp}-${process.pid}`));
+  const dir = evidenceRoot
+    ? path.join(evidenceRoot, 'evidence', `${stamp}-${process.pid}`)
+    : pathResolver.sharedTmp(path.join('soak-evidence', `${stamp}-${process.pid}`));
   return {
     dir,
     logPath: path.join(dir, '30day-run-log.jsonl'),
@@ -321,8 +348,8 @@ function createEvidenceBundlePaths(report: SoakReport): {
   };
 }
 
-function appendEvidenceBundle(report: SoakReport): void {
-  const { dir, logPath, summaryPath } = createEvidenceBundlePaths(report);
+function appendEvidenceBundle(report: SoakReport, evidenceRoot?: string): void {
+  const { dir, logPath, summaryPath } = createEvidenceBundlePaths(report, evidenceRoot);
   safeMkdir(dir, { recursive: true });
   for (const sample of report.samples) {
     safeAppendFileSync(
@@ -347,6 +374,42 @@ function appendEvidenceBundle(report: SoakReport): void {
   safeWriteFile(summaryPath, renderEvidenceSummary(report));
   report.evidence.run_log_path = logPath;
   report.evidence.summary_path = summaryPath;
+}
+
+function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): void {
+  const manifestPath = path.join(evidenceRoot, 'manifest.json');
+  let previous: SoakEvidenceManifest | null = null;
+  if (safeExistsSync(manifestPath)) {
+    try {
+      previous = JSON.parse(
+        String(safeReadFile(manifestPath, { encoding: 'utf8' }) || '')
+      ) as SoakEvidenceManifest;
+    } catch {
+      previous = null;
+    }
+  }
+  const validation = validateSoakEvidence(report);
+  const firstAt = previous?.started_at ?? report.timestamp;
+  const lastAt = report.timestamp;
+  const elapsedDays = Math.max(0, (Date.parse(lastAt) - Date.parse(firstAt)) / 86_400_000);
+  const manifest: SoakEvidenceManifest = {
+    version: '1.0',
+    started_at: firstAt,
+    last_run_at: lastAt,
+    run_count: (previous?.run_count ?? 0) + 1,
+    total_cycles: (previous?.total_cycles ?? 0) + report.cycles,
+    window_days_equivalent: Math.round(elapsedDays * 100) / 100,
+    last_validation: {
+      ok: validation.ok,
+      regression_count: validation.regression_count,
+      issues: validation.issues,
+    },
+  };
+  safeMkdir(evidenceRoot, { recursive: true });
+  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+  report.evidence.manifest_path = manifestPath;
+  report.evidence.window_days_equivalent = manifest.window_days_equivalent;
+  safeWriteFile(report.evidence.summary_path, renderEvidenceSummary(report));
 }
 
 function applyEvidenceRollover(filePath: string, retentionCount: number): void {
@@ -390,13 +453,24 @@ async function runDefaultMaintenancePulse(): Promise<{
 export async function runSoakEnduranceHarness(
   options: SoakHarnessOptions = {}
 ): Promise<SoakReport> {
+  const mode = options.mode ?? 'compressed';
+  const evidenceRoot =
+    mode === 'live' ? (options.evidenceDir ?? DEFAULT_LIVE_EVIDENCE_DIR) : undefined;
   const cycles = Math.max(1, Math.floor(options.cycles ?? 12));
   const delayMs = Math.max(0, Math.floor(options.delayMs ?? 0));
   const samplePaths = Array.from(
     new Set([...(options.samplePaths ?? []), ...DEFAULT_SAMPLE_PATHS])
   );
-  const reportPath = options.reportPath ?? DEFAULT_REPORT_PATH;
-  const metricsDir = options.metricsDir ?? DEFAULT_METRICS_DIR;
+  const reportPath =
+    options.reportPath ??
+    (mode === 'live'
+      ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'latest-report.json')
+      : DEFAULT_REPORT_PATH);
+  const metricsDir =
+    options.metricsDir ??
+    (mode === 'live'
+      ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'metrics')
+      : DEFAULT_METRICS_DIR);
   const metricsFile = options.metricsFile ?? DEFAULT_METRICS_FILE;
   const evidenceRetentionCount = Math.max(1, Math.floor(options.evidenceRetentionCount ?? 30));
   const samples: SoakSample[] = [];
@@ -442,15 +516,16 @@ export async function runSoakEnduranceHarness(
     evidence: {
       run_log_path: '',
       summary_path: '',
-      window_mode: 'compressed',
+      window_mode: mode,
       window_days_equivalent: cycles,
     },
   };
 
   safeMkdir(path.dirname(reportPath), { recursive: true });
   safeWriteFile(reportPath, JSON.stringify(report, null, 2));
-  appendEvidenceBundle(report);
+  appendEvidenceBundle(report, evidenceRoot);
   applyEvidenceRollover(report.evidence.run_log_path, evidenceRetentionCount);
+  if (mode === 'live' && evidenceRoot) updateLiveEvidenceManifest(report, evidenceRoot);
 
   return report;
 }
@@ -463,6 +538,7 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
     reportPath: DEFAULT_REPORT_PATH,
     metricsDir: DEFAULT_METRICS_DIR,
     metricsFile: DEFAULT_METRICS_FILE,
+    mode: 'compressed',
     quiet: false,
     json: false,
   };
@@ -493,6 +569,12 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
         break;
       case '--fail-on-regression':
         options.failOnRegression = true;
+        break;
+      case '--live':
+        options.mode = 'live';
+        break;
+      case '--evidence-dir':
+        options.evidenceDir = argv[++i] || options.evidenceDir;
         break;
       case '--json':
         options.json = true;

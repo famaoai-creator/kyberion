@@ -33,6 +33,13 @@ export interface EnvValidationReport {
   checked: number;
 }
 
+export interface RegisteredEnvReadOptions<T = string> {
+  env?: Record<string, string | undefined>;
+  defaultValue?: T;
+  /** Throw when a registered value is invalid instead of using the default. */
+  strict?: boolean;
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
 const BOOLEAN_VALUE_RE = /^(1|0|true|false|yes|no|on|off)$/i;
 
@@ -100,6 +107,50 @@ export function validateEnv(
   env: Record<string, string | undefined> = process.env
 ): EnvValidationReport {
   return validateEnvAgainstRegistry(loadEnvRegistryEntries(), env);
+}
+
+/**
+ * Read a setting through the canonical env registry.
+ *
+ * Existing call sites can migrate incrementally without changing the
+ * warn-by-default startup policy. Values are parsed according to the
+ * registered type; invalid values fall back to the caller's default unless
+ * `strict` is requested. Secret values are never included in errors.
+ */
+export function getRegisteredEnv<T = string>(
+  name: string,
+  options: RegisteredEnvReadOptions<T> = {}
+): string | number | boolean | T | undefined {
+  const env = options.env ?? process.env;
+  const raw = env[name];
+  if (raw === undefined || raw === '') return options.defaultValue;
+
+  const entry = loadEnvRegistryEntries().find((candidate) => candidate.name === name);
+  if (!entry) return raw;
+
+  const invalid = (): string | number | boolean | T | undefined => {
+    if (options.strict) {
+      throw new Error(`Invalid value for registered environment variable ${name}`);
+    }
+    return options.defaultValue;
+  };
+
+  switch (entry.type) {
+    case 'boolean':
+      if (/^(1|true|yes|on)$/i.test(raw)) return true;
+      if (/^(0|false|no|off)$/i.test(raw)) return false;
+      return invalid();
+    case 'number': {
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : invalid();
+    }
+    case 'enum':
+      return entry.enum?.includes(raw) ? raw : invalid();
+    case 'path':
+    case 'string':
+    default:
+      return raw;
+  }
 }
 
 export function formatEnvValidationReport(report: EnvValidationReport): string[] {

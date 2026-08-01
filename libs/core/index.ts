@@ -1124,12 +1124,14 @@ export {
 export { installCoreEnvironmentProbes } from './environment-capability-probes.js';
 export {
   formatEnvValidationReport,
+  getRegisteredEnv,
   loadEnvRegistryEntries,
   validateEnv,
   validateEnvAgainstRegistry,
 } from './env-validator.js';
 export type {
   EnvRegistryValidationEntry,
+  RegisteredEnvReadOptions,
   EnvValidationIssue,
   EnvValidationReport,
 } from './env-validator.js';
