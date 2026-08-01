@@ -9,6 +9,7 @@ import {
   firstJsonObject,
   quarantineStub,
   recordQuarantine,
+  resolveConfiguredPosture,
   unscreenedNotice,
 } from './security-screen.js';
 
@@ -19,8 +20,18 @@ export interface ScanOptions {
    * QM-04: when suspicion triggers, persist the content to the security
    * quarantine and return an operator-reviewable stub instead of the wrapped
    * content, keeping it out of model context entirely.
+   *
+   * Default (option omitted): posture-driven — quarantine is ON unless the
+   * configured security posture is `dangerous`. Pass `false` to opt a call
+   * site out explicitly. This is the layer all untrusted-ingest paths flow
+   * through (slack channel-surface, email triage, file/browser actuators),
+   * so every ingest inherits the posture without per-caller wiring.
    */
   quarantine?: boolean;
+}
+
+function quarantineEnabled(options?: ScanOptions): boolean {
+  return options?.quarantine ?? resolveConfiguredPosture() !== 'dangerous';
 }
 
 export interface ScanResult {
@@ -325,7 +336,7 @@ export function processUntrustedContent(
       /* alert emission must not block content processing */
     }
 
-    if (options?.quarantine) {
+    if (quarantineEnabled(options)) {
       const record = recordQuarantine({
         source,
         content,
@@ -440,7 +451,9 @@ export async function processUntrustedContentAsync(
   if (scan.injection_suspected) {
     setInjectionSuspected(true, options?.scope);
 
-    if (options?.useLlm) {
+    // Quarantine wins before sanitization — a sanitize pass whose output is
+    // then discarded for the quarantine stub is a wasted LLM call.
+    if (options?.useLlm && !quarantineEnabled(options)) {
       finalContent = await sanitizeUntrustedContentAsync(content, source);
       logger.info(
         `[SA-03] Content sanitized via LLM. Length: ${content.length} -> ${finalContent.length}`
@@ -459,7 +472,7 @@ export async function processUntrustedContentAsync(
           indicators: scan.indicators,
           source,
           scope: options?.scope,
-          sanitized: options?.useLlm,
+          sanitized: Boolean(options?.useLlm) && !quarantineEnabled(options),
         },
       });
     } catch {
@@ -470,7 +483,7 @@ export async function processUntrustedContentAsync(
       `[SA-03] Prompt injection suspected from source "${source}". Indicators: ${scan.indicators.join(', ')}`
     );
 
-    if (options?.quarantine) {
+    if (quarantineEnabled(options)) {
       const record = recordQuarantine({
         source,
         content,

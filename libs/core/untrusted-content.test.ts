@@ -167,10 +167,32 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
       expect(result.wrapped).toContain(result.quarantineId!);
     });
 
-    it('keeps the wrapped-content behavior when quarantine is not requested', () => {
-      const result = processUntrustedContent(injectionText, 'tool_result:browser');
-      expect(result.quarantineId).toBeUndefined();
-      expect(result.wrapped).toContain('<untrusted-external');
+    it('quarantines by default under the auto posture (posture-driven wiring)', () => {
+      process.env.KYBERION_SECURITY_POSTURE = 'auto';
+      try {
+        const result = processUntrustedContent(injectionText, 'tool_result:browser');
+        expect(result.quarantineId).toBeDefined();
+        expect(result.wrapped).toContain('[SECURITY QUARANTINE]');
+      } finally {
+        delete process.env.KYBERION_SECURITY_POSTURE;
+      }
+    });
+
+    it('keeps the wrapped-content behavior on explicit opt-out or dangerous posture', () => {
+      const optedOut = processUntrustedContent(injectionText, 'tool_result:browser', {
+        quarantine: false,
+      });
+      expect(optedOut.quarantineId).toBeUndefined();
+      expect(optedOut.wrapped).toContain('<untrusted-external');
+
+      process.env.KYBERION_SECURITY_POSTURE = 'dangerous';
+      try {
+        const dangerous = processUntrustedContent(injectionText, 'tool_result:browser');
+        expect(dangerous.quarantineId).toBeUndefined();
+        expect(dangerous.wrapped).toContain('<untrusted-external');
+      } finally {
+        delete process.env.KYBERION_SECURITY_POSTURE;
+      }
     });
 
     it('does not quarantine clean content', () => {
@@ -179,6 +201,46 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
       });
       expect(result.quarantineId).toBeUndefined();
       expect(result.wrapped).toContain('<untrusted-external');
+    });
+  });
+
+  describe('QM-04 strict posture approval floor', () => {
+    afterEach(() => {
+      delete process.env.KYBERION_SECURITY_POSTURE;
+    });
+
+    it('strict posture forces approval for every intent', () => {
+      process.env.KYBERION_SECURITY_POSTURE = 'strict';
+      const result = resolveApprovalPolicy({ intentId: 'local:test' });
+      expect(result.requiresApproval).toBe(true);
+      expect(result.matchedRuleId).toBe('strict-posture-floor');
+    });
+
+    it('strict tightens monotonically: dual-key on secrets survives (review P1-1)', () => {
+      process.env.KYBERION_SECURITY_POSTURE = 'strict';
+      const result = resolveApprovalPolicy({ intentId: 'vault:write' });
+      expect(result.requiresApproval).toBe(true);
+      expect(result.missingRequirements).toContain('dual_key_confirmation');
+      expect(result.matchedRuleId).not.toBe('strict-posture-floor');
+    });
+
+    it('strict keeps the injection-suspected override rule id (review P1-1)', () => {
+      process.env.KYBERION_SECURITY_POSTURE = 'strict';
+      setInjectionSuspected(true);
+      try {
+        const result = resolveApprovalPolicy({ intentId: 'network:fetch' });
+        expect(result.matchedRuleId).toBe('injection-suspected-override');
+        expect(result.missingRequirements).toContain('approval_confirmation');
+      } finally {
+        setInjectionSuspected(false);
+      }
+    });
+
+    it('auto posture leaves per-intent rules in charge', () => {
+      process.env.KYBERION_SECURITY_POSTURE = 'auto';
+      setInjectionSuspected(false);
+      const result = resolveApprovalPolicy({ intentId: 'local:test' });
+      expect(result.matchedRuleId).not.toBe('strict-posture-floor');
     });
   });
 });

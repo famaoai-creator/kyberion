@@ -2284,6 +2284,7 @@ export {
   parsePosture,
   composeSecurityPosture,
   resolveConfiguredPosture,
+  resetConfiguredPostureCache,
   MAX_SCREEN_PAYLOAD_CHARS,
   buildScreenPayload,
   firstJsonObject,
@@ -2303,6 +2304,37 @@ export {
   simpleCommands,
 } from './shell-command-normalize.js';
 export type { SimpleCommand } from './shell-command-normalize.js';
+
+// QM-03: memory notebook line grammar — the single source of truth for
+// bullet-notebook memory (`- (YYYY-MM-DD) fact`), fold, and consolidation.
+export type {
+  FoldCaptureResult,
+  ConsolidationAction,
+  ConsolidationPlan,
+} from './memory-notebook.js';
+export {
+  RECALL_MAX_CHARS,
+  MAX_FACTS,
+  MEMORY_HEADER,
+  isBullet,
+  bulletText,
+  captureDate,
+  bullets,
+  normalize,
+  dateStr,
+  capTail,
+  recallBody,
+  neutralizeUntrustedProvenance,
+  foldCapture,
+  queryBullets,
+  DEFAULT_CONSOLIDATE_AFTER,
+  consolidationMarker,
+  bulletsBelowMarker,
+  MEMORY_CONSOLIDATION_PROMPT,
+  parseConsolidationActions,
+  applyConsolidationActions,
+  planConsolidation,
+} from './memory-notebook.js';
 
 // Software QA lifecycle (QA-01)
 export type {
