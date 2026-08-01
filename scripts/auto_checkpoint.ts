@@ -1,4 +1,9 @@
-import { logger, safeExec, evaluateAutonomousOpsAction, withExecutionContext } from '@agent/core';
+import {
+  logger,
+  safeExec,
+  evaluateAutonomousOpsAction,
+  withExecutionContextAsync,
+} from '@agent/core';
 import { createCheckpoint } from './refactor/mission-maintenance.js';
 import { listActiveMissions, loadState } from './refactor/mission-state.js';
 function getGitHash(cwd: string): string {
@@ -25,7 +30,7 @@ async function runAutoCheckpoint(): Promise<number> {
     return 0;
   }
 
-  return withExecutionContext('mission_controller', async () => {
+  return withExecutionContextAsync('mission_controller', async () => {
     const activeMissions = listActiveMissions();
     if (activeMissions.length === 0) {
       logger.info('[auto-checkpoint] no active missions found');
@@ -33,8 +38,14 @@ async function runAutoCheckpoint(): Promise<number> {
     }
 
     let checkpointed = 0;
+    let skipped = 0;
     for (const { missionId, missionPath } of activeMissions) {
       const state = loadState(missionId);
+      if (!state?.git || !Array.isArray(state.git.checkpoints)) {
+        skipped += 1;
+        logger.warn(`[auto-checkpoint] skipping ${missionId}: mission git state is incomplete`);
+        continue;
+      }
       const note = buildCheckpointNote(state);
       logger.info(`[auto-checkpoint] checkpointing ${missionId} at ${missionPath}`);
       await createCheckpoint({
@@ -49,7 +60,10 @@ async function runAutoCheckpoint(): Promise<number> {
       checkpointed += 1;
     }
 
-    logger.success(`[auto-checkpoint] checkpointed ${checkpointed} active mission(s)`);
+    logger.success(
+      `[auto-checkpoint] checkpointed ${checkpointed} active mission(s)` +
+        (skipped > 0 ? `; skipped ${skipped} incomplete mission(s)` : '')
+    );
     return 0;
   });
 }
