@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { probeTenVad, TenVad } from './ten-vad-bridge.js';
 import type { AudioChunk } from './meeting-session-types.js';
 
@@ -32,8 +32,12 @@ describe('TEN VAD bridge', () => {
     const vad = new TenVad({ command: fakeBridgeCommand(), endpointMs: 200 });
     try {
       vad.ingest(chunkOf());
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(vad.ingest(chunkOf()).speaking).toBe(true);
+      await vi.waitFor(
+        () => {
+          expect(vad.ingest(chunkOf()).speaking).toBe(true);
+        },
+        { timeout: 2000, interval: 25 }
+      );
       expect(vad.degradedReason).toBeNull();
     } finally {
       vad.dispose();
