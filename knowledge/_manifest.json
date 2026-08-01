@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 74620,
+      "size": 75190,
       "type": "json"
     },
     {
@@ -1293,13 +1293,13 @@
     {
       "path": "product/governance/environment-manifests/kyberion-runtime-baseline.json",
       "tier": "public",
-      "size": 3054,
+      "size": 5018,
       "type": "json"
     },
     {
       "path": "product/governance/environment-manifests/kyberion-toolchain.json",
       "tier": "public",
-      "size": 4288,
+      "size": 6249,
       "type": "json"
     },
     {
