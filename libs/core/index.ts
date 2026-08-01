@@ -1118,6 +1118,7 @@ export {
   listEnvironmentManifestIds,
   probeManifest,
   registerEnvironmentCapabilityProbe,
+  resolveCapabilityInstall,
   resetEnvironmentCapabilityProbeRegistry,
   verifyManifestSignature,
   verifyReady,
@@ -1139,6 +1140,7 @@ export type {
 export type {
   BootstrapOptions,
   CapabilityInstall,
+  CapabilityInstallOverride,
   CapabilityKind,
   CapabilityProbe,
   CapabilityStatus,

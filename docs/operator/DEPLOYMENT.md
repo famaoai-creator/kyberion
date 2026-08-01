@@ -209,6 +209,57 @@ cd ~/kyberion
 pnpm doctor
 ```
 
+## Windows Workstation
+
+For: Windows operators and developers using PowerShell with the Windows Package Manager (`winget`).
+
+### Prerequisites
+
+Run these commands in PowerShell. The `--exact` and `--source winget` flags keep package resolution deterministic.
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-source-agreements --accept-package-agreements
+winget install --id pnpm.pnpm --exact --source winget --accept-source-agreements --accept-package-agreements
+winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements
+```
+
+Open a new PowerShell session after installation, then verify the required floors:
+
+```powershell
+node --version       # must be >= 24.0.0
+pnpm --version       # workspace packageManager: pnpm@11.15.1
+git --version
+```
+
+### Install and configure
+
+```powershell
+git clone https://github.com/famaoai-creator/kyberion.git
+Set-Location kyberion
+pnpm install --frozen-lockfile
+pnpm build
+pnpm surfaces:reconcile
+pnpm onboard
+```
+
+The same setup is available through the governed environment manifests. Use a dry run first, then apply operator-confirmed installs when a tool is missing:
+
+```powershell
+pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
+pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
+```
+
+### Verify
+
+```powershell
+pnpm doctor
+pnpm cli list --check
+pnpm pipeline --input pipelines/baseline-check.json
+```
+
+Windows-native services should be managed through the existing surface commands (`pnpm surfaces:status`, `pnpm surfaces:repair`). Linux `systemd` and macOS `launchd` unit files do not apply on Windows.
+
 ---
 
 ## 3. Docker (slim image)

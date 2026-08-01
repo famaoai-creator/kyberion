@@ -75,6 +75,17 @@ export interface CapabilityInstall {
   docs_url?: string;
   /** When true, re-run the probe after install to confirm success. */
   retry_after_install?: boolean;
+  /** Platform-specific installer details layered over the default install. */
+  platform_overrides?: Partial<Record<NodeJS.Platform, CapabilityInstallOverride>>;
+}
+
+export interface CapabilityInstallOverride {
+  command?: string;
+  args?: readonly string[];
+  instruction?: string;
+  docs_url?: string;
+  retry_after_install?: boolean;
+  operator_confirmed?: boolean;
 }
 
 export interface EnvironmentCapability {
@@ -172,9 +183,23 @@ function stableManifestFingerprint(manifest: EnvironmentManifest): string {
       applies_to_platforms: [...(cap.applies_to_platforms || [])].sort(),
       probe: cap.probe,
       optional: Boolean(cap.optional),
+      install: cap.install ?? null,
     })),
   };
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+export function resolveCapabilityInstall(
+  install: CapabilityInstall,
+  platform: NodeJS.Platform = process.platform
+): CapabilityInstall {
+  const override = install.platform_overrides?.[platform];
+  if (!override) return install;
+  return {
+    ...install,
+    ...override,
+    operator_confirmed: override.operator_confirmed ?? install.operator_confirmed,
+  };
 }
 
 function stableHostFingerprint(): string {
@@ -350,7 +375,8 @@ export async function bootstrapManifest(
       satisfied.push(status);
       continue;
     }
-    if (!cap.install) {
+    const install = cap.install ? resolveCapabilityInstall(cap.install) : undefined;
+    if (!install) {
       unsatisfied.push({
         ...status,
         reason: `${status.reason ?? 'unsatisfied'} (no install instruction)`,
@@ -364,17 +390,17 @@ export async function bootstrapManifest(
       });
       continue;
     }
-    if (cap.install.operator_confirmed && !opts.force_yes) {
+    if (install.operator_confirmed && !opts.force_yes) {
       unsatisfied.push({
         ...status,
         reason: `${status.reason ?? 'unsatisfied'} (operator-confirmed install — preview the command and rerun with --apply --force)`,
       });
       continue;
     }
-    if (!cap.install.command) {
+    if (!install.command) {
       unsatisfied.push({
         ...status,
-        reason: `${status.reason ?? 'unsatisfied'} (manual instruction: ${cap.install.instruction ?? 'see docs'})`,
+        reason: `${status.reason ?? 'unsatisfied'} (manual instruction: ${install.instruction ?? 'see docs'})`,
       });
       continue;
     }
@@ -385,18 +411,18 @@ export async function bootstrapManifest(
       });
       continue;
     }
-    const installResult = spawnSync(cap.install.command, [...(cap.install.args ?? [])], {
+    const installResult = spawnSync(install.command, [...(install.args ?? [])], {
       stdio: 'inherit',
     });
     const auditId = safeEmitAudit('env_bootstrap.install', cap.capability_id, {
-      command: cap.install.command,
-      args: cap.install.args,
+      command: install.command,
+      args: install.args,
       exit_code: installResult.status ?? -1,
       mission_id: opts.mission_id,
     });
     installsPerformed.push({
       capability_id: cap.capability_id,
-      command: cap.install.command,
+      command: install.command,
       ...(auditId ? { audit_event_id: auditId } : {}),
     });
     if (installResult.status !== 0) {
@@ -406,7 +432,7 @@ export async function bootstrapManifest(
       });
       continue;
     }
-    if (cap.install.retry_after_install !== false) {
+    if (install.retry_after_install !== false) {
       const recheck = await runProbe(cap.probe, opts.mission_id, allowExecutableManifest);
       if (recheck.available) {
         satisfied.push({ capability_id: cap.capability_id, satisfied: true });
