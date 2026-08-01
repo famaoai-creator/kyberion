@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   pathResolver,
@@ -173,5 +174,26 @@ describe('soak_endurance', () => {
         issue.includes('resource or latency regression(s) detected')
       )
     ).toBe(true);
+  });
+
+  it('persists live evidence and a cumulative manifest outside shared tmp', async () => {
+    const evidenceDir = pathResolver.sharedTmp('soak-endurance-tests/live-evidence');
+    safeRmSync(evidenceDir, { recursive: true, force: true });
+
+    const report = await runSoakEnduranceHarness({
+      mode: 'live',
+      cycles: 1,
+      evidenceDir,
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/live-report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/live-metrics'),
+      exercise: async () => {},
+    });
+
+    expect(report.evidence.window_mode).toBe('live');
+    expect(report.evidence.manifest_path).toBe(path.join(evidenceDir, 'manifest.json'));
+    expect(safeExistsSync(report.evidence.manifest_path)).toBe(true);
+    expect(safeReadFile(report.evidence.manifest_path, { encoding: 'utf8' })).toContain(
+      '"run_count": 1'
+    );
   });
 });

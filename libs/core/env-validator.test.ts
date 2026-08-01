@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getRegisteredEnv,
   loadEnvRegistryEntries,
   validateEnv,
   validateEnvAgainstRegistry,
@@ -85,5 +86,22 @@ describe('registry-backed validation', () => {
     // produce errors (warn-only posture, OP-05).
     const report = validateEnv();
     expect(report.errors).toHaveLength(0);
+  });
+
+  it('parses registered operational settings without exposing values', () => {
+    const env = { KYBERION_PROVIDER_DEMOTION_TTL_MS: '2500' };
+    expect(getRegisteredEnv<number>('KYBERION_PROVIDER_DEMOTION_TTL_MS', { env })).toBe(2500);
+    expect(
+      getRegisteredEnv<number>('KYBERION_PROVIDER_DEMOTION_TTL_MS', {
+        env: { KYBERION_PROVIDER_DEMOTION_TTL_MS: 'invalid' },
+        defaultValue: 60000,
+      })
+    ).toBe(60000);
+    expect(() =>
+      getRegisteredEnv<number>('KYBERION_PROVIDER_DEMOTION_TTL_MS', {
+        env: { KYBERION_PROVIDER_DEMOTION_TTL_MS: 'invalid' },
+        strict: true,
+      })
+    ).toThrow('KYBERION_PROVIDER_DEMOTION_TTL_MS');
   });
 });
