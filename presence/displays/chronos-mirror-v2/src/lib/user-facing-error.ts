@@ -1,6 +1,10 @@
 import { uxText, uxTextOr } from './ux-vocabulary';
+import {
+  normalizeLocale as normalizeSupportedLocale,
+  type SupportedLocale,
+} from '@agent/core/locale-normalize';
 
-type Locale = 'en' | 'ja';
+type Locale = SupportedLocale;
 
 export interface UserFacingErrorEnvelope {
   title: string;
@@ -10,12 +14,7 @@ export interface UserFacingErrorEnvelope {
 }
 
 function normalizeLocale(locale?: string): Locale {
-  return String(locale || '')
-    .trim()
-    .toLowerCase()
-    .startsWith('ja')
-    ? 'ja'
-    : 'en';
+  return normalizeSupportedLocale(locale) ?? 'en';
 }
 
 function categoryFromMessage(message: string): string {

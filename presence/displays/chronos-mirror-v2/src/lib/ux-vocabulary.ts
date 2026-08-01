@@ -1,5 +1,9 @@
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
-import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
+import {
+  normalizeLocale,
+  nextSupportedLocale,
+  type SupportedLocale,
+} from '@agent/core/locale-normalize';
 import { renderMessage } from '@agent/core/message-format';
 
 /**
@@ -108,6 +112,10 @@ export function setChronosLocalePreference(locale: SupportedLocale): void {
   window.dispatchEvent(new CustomEvent(CHRONOS_LOCALE_EVENT, { detail: locale }));
 }
 
+export function nextChronosLocale(locale: SupportedLocale): SupportedLocale {
+  return nextSupportedLocale(locale);
+}
+
 /**
  * I18N-01: the browser-safe subset of `libs/core/locale.ts`'s
  * `resolveLocale` precedence chain — steps 2 (surface preference, here the
@@ -131,7 +139,7 @@ export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
 
 export function selectChronosLocaleText(
   locale: SupportedLocale,
-  variants: { en: string; ja?: string }
+  variants: Partial<Record<SupportedLocale, string>> & { en: string }
 ): string {
   return variants[locale] || variants[catalog.default_locale] || variants.en;
 }

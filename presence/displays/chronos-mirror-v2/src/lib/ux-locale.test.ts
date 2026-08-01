@@ -3,8 +3,10 @@ import {
   CHRONOS_LOCALE_EVENT,
   CHRONOS_LOCALE_STORAGE_KEY,
   normalizeChronosLocale,
+  nextChronosLocale,
   readStoredChronosLocale,
   resolveChronosLocale,
+  selectChronosLocaleText,
   setChronosLocalePreference,
 } from './ux-vocabulary';
 
@@ -80,5 +82,20 @@ describe('chronos locale persistence (UX-03)', () => {
   it('normalizeChronosLocale keeps accepting raw browser tags', () => {
     expect(normalizeChronosLocale('ja_JP')).toBe('ja');
     expect(normalizeChronosLocale('en-GB')).toBe('en');
+  });
+
+  it('selects a newly supported locale when a caller provides its variant', () => {
+    expect(
+      selectChronosLocaleText('qps-ploc', {
+        en: 'English',
+        ja: '日本語',
+        'qps-ploc': 'Pseudo',
+      })
+    ).toBe('Pseudo');
+  });
+
+  it('cycles Chronos preferences through the shared generated locale list', () => {
+    expect(nextChronosLocale('en')).toBe('ja');
+    expect(nextChronosLocale('qps-ploc')).toBe('en');
   });
 });

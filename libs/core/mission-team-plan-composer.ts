@@ -258,6 +258,14 @@ export function composeMissionTeamPlan(input: {
   // actor than the reviewer.
   const assignedByRole = new Map<string, { agentId: string | null; provider: string | null }>();
   const separationForRole = (role: string): RoleSeparationConstraints | undefined => {
+    if (role === 'researcher') {
+      const owner = assignedByRole.get('owner');
+      if (!owner) return undefined;
+      return {
+        excludeAgents: [owner.agentId],
+        avoidProviders: [owner.provider],
+      };
+    }
     if (role === 'reviewer') {
       const implementer = assignedByRole.get('implementer');
       if (!implementer) return undefined;
