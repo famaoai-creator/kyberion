@@ -40,6 +40,10 @@ import { AgentPanel } from '../components/AgentPanel';
 import { FirstRunBanner } from '../components/FirstRunBanner';
 import { IdentityBadge } from '../components/IdentityBadge';
 import { MissionIntelligence } from '../components/MissionIntelligence';
+import { MissionJourneySummary } from '../components/MissionJourneySummary';
+import { ChronosOffice } from '../components/ChronosOffice';
+import { WorkItemsWorkspace } from '../components/WorkItemsWorkspace';
+import { SurfaceControlWorkspace } from '../components/SurfaceControlWorkspace';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -85,6 +89,57 @@ type StatusCard = {
   accent: string;
   targetId: string;
 };
+
+type ConsoleSectionId =
+  | 'home'
+  | 'missions'
+  | 'work-items'
+  | 'surface-control'
+  | 'deliverables'
+  | 'operations'
+  | 'governance'
+  | 'diagnostics'
+  | 'surface';
+type ConsoleContentSection = Exclude<ConsoleSectionId, 'surface'>;
+
+const CONSOLE_SECTIONS: Array<{
+  id: ConsoleSectionId;
+  labelKey: string;
+  detailKey: string;
+}> = [
+  { id: 'home', labelKey: 'chronos_nav_home', detailKey: 'chronos_nav_home_hint' },
+  { id: 'missions', labelKey: 'chronos_nav_missions', detailKey: 'chronos_nav_missions_hint' },
+  {
+    id: 'work-items',
+    labelKey: 'chronos_nav_work_items',
+    detailKey: 'chronos_nav_work_items_hint',
+  },
+  {
+    id: 'deliverables',
+    labelKey: 'chronos_nav_deliverables',
+    detailKey: 'chronos_nav_deliverables_hint',
+  },
+  {
+    id: 'operations',
+    labelKey: 'chronos_nav_operations',
+    detailKey: 'chronos_nav_operations_hint',
+  },
+  {
+    id: 'governance',
+    labelKey: 'chronos_nav_governance',
+    detailKey: 'chronos_nav_governance_hint',
+  },
+  {
+    id: 'surface-control',
+    labelKey: 'chronos_nav_surface_control',
+    detailKey: 'chronos_nav_surface_control_hint',
+  },
+  {
+    id: 'diagnostics',
+    labelKey: 'chronos_nav_diagnostics',
+    detailKey: 'chronos_nav_diagnostics_hint',
+  },
+];
 
 const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
 const CHRONOS_THEME_PREFS_KEY = 'chronos.theme-mode';
@@ -411,7 +466,6 @@ export default function ChronosMirrorV2() {
   const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
     'reject' | 'request-changes' | null
   >(null);
-  const [approvalAskWhyId, setApprovalAskWhyId] = useState<string | null>(null);
   const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
   const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
   const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
@@ -426,10 +480,6 @@ export default function ChronosMirrorV2() {
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
   const [costSummary, setCostSummary] = useState<any | null>(null);
   const [costSummaryError, setCostSummaryError] = useState<string | null>(null);
-  const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
-  const [approvalQueueError, setApprovalQueueError] = useState<string | null>(null);
-  const [approvalQueueQuery, setApprovalQueueQuery] = useState('');
-  const [approvalDecisionBusyId, setApprovalDecisionBusyId] = useState<string | null>(null);
   const [planApprovalBusy, setPlanApprovalBusy] = useState(false);
   const [planApprovalMessage, setPlanApprovalMessage] = useState<string | null>(null);
   const [planApprovalSessionId, setPlanApprovalSessionId] = useState<string | null>(null);
@@ -590,34 +640,6 @@ export default function ChronosMirrorV2() {
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams();
-    params.set('status', 'pending');
-    params.set('limit', '24');
-    if (approvalQueueQuery) params.set('query', approvalQueueQuery);
-    void fetch(`/api/approvals?${params.toString()}`, {
-      headers: { 'Cache-Control': 'no-cache' },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`approvals ${response.status}`);
-        return (await response.json()) as { approvals?: any[] };
-      })
-      .then((payload) => {
-        if (cancelled) return;
-        setApprovalQueue(Array.isArray(payload.approvals) ? payload.approvals : []);
-        setApprovalQueueError(null);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setApprovalQueue([]);
-        setApprovalQueueError(error instanceof Error ? error.message : String(error));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [approvalQueueQuery]);
-
-  useEffect(() => {
-    let cancelled = false;
     void fetch('/api/connections', {
       headers: { 'Cache-Control': 'no-cache' },
     })
@@ -681,16 +703,20 @@ export default function ChronosMirrorV2() {
 
   const handleA2UIMessage = useCallback((message: any) => {
     if (message.createSurface) {
+      setConsoleSection('surface');
       setSurface({
         surfaceId: message.createSurface.surfaceId,
         title: message.createSurface.title,
+        titleKey: message.createSurface.titleKey,
         components: [],
       });
     }
     if (message.updateComponents) {
+      setConsoleSection('surface');
       setSurface((prev: any) => ({
         surfaceId: message.updateComponents.surfaceId,
         title: prev?.title || message.updateComponents.surfaceId,
+        titleKey: prev?.titleKey,
         components: message.updateComponents.components,
       }));
     }
@@ -699,6 +725,7 @@ export default function ChronosMirrorV2() {
     }
     if (message.type && message.type.startsWith('display:')) {
       const id = message.id || `auto-${Date.now()}`;
+      setConsoleSection('surface');
       setSurface({
         surfaceId: 'auto-surface',
         title: 'Dashboard',
@@ -710,6 +737,7 @@ export default function ChronosMirrorV2() {
   const handleQuickAction = useCallback((query: string) => {
     const operatorViewMatch = query.match(/^chronos:\/\/operator-view\/(.+)$/);
     if (operatorViewMatch) {
+      setConsoleSection('surface');
       setFocusedOperatorView(operatorViewMatch[1]);
       setSurface(null);
       return;
@@ -724,7 +752,20 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
-  const [showOpsBoards, setShowOpsBoards] = useState(false);
+  const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>('home');
+  const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>('home');
+
+  const openConsoleSection = useCallback((section: ConsoleSectionId) => {
+    if (section === 'surface') {
+      setSurfaceOrigin('home');
+    }
+    setConsoleSection(section);
+    setSurface(null);
+    setFocusedOperatorView(null);
+    setFocusedOperatorMissionId(null);
+    setMissionIntelligenceFocus(null);
+    setMissionIntelligenceFocusedMissionId(null);
+  }, []);
 
   // SU-02: operator clicks on actionable A2UI components move things forward.
   const handleA2UIComponentAction = useCallback(async (action: any) => {
@@ -958,46 +999,6 @@ export default function ChronosMirrorV2() {
     [deliverableReviewComment, deliverables, refreshDeliverables, selectedDeliverableId]
   );
 
-  const submitApprovalDecision = useCallback(
-    async (
-      item: any,
-      decision: 'approved' | 'rejected',
-      options?: { reasonCategory?: string; skipAskWhy?: boolean }
-    ) => {
-      // LC-10 ask-why: a rejection with no reason teaches nothing — ask one
-      // skippable question before submitting.
-      if (decision === 'rejected' && !options?.reasonCategory && !options?.skipAskWhy) {
-        setApprovalAskWhyId(item.id);
-        return;
-      }
-      setApprovalAskWhyId(null);
-      setApprovalDecisionBusyId(item.id);
-      try {
-        const response = await fetch('/api/intelligence', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'approval_decision',
-            requestId: item.id,
-            storageChannel: item.storageChannel,
-            channel: item.channel,
-            decision,
-            reasonCategory: options?.reasonCategory,
-          }),
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'approval decision failed');
-        setApprovalQueue((current) => current.filter((entry) => entry.id !== item.id));
-        setOperatorHomeRefreshTick((value) => value + 1);
-      } catch (error) {
-        setApprovalQueueError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setApprovalDecisionBusyId(null);
-      }
-    },
-    []
-  );
-
   const submitConnectionReview = useCallback(
     async (bindingId: string, action: 'approve' | 'hold' | 'delete' | 'modify') => {
       setConnectionReviewBusyId(bindingId);
@@ -1038,6 +1039,8 @@ export default function ChronosMirrorV2() {
 
   const handleOperatorViewOpen = useCallback(
     (targetId: string, missionId: string | null = null) => {
+      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setConsoleSection('surface');
       if (targetId === 'mission-control-plane' && missionId) {
         setFocusedOperatorView(null);
         setFocusedOperatorMissionId(null);
@@ -1049,15 +1052,15 @@ export default function ChronosMirrorV2() {
       setMissionIntelligenceFocus(null);
       setMissionIntelligenceFocusedMissionId(null);
       setFocusedOperatorMissionId(targetId === 'mission-control-plane' ? missionId : null);
-      if (surface) {
-        setSurface(null);
-      }
+      setSurface(null);
     },
-    [surface]
+    [consoleSection]
   );
 
   const handleScenarioOpen = useCallback(
     (targetId: string, surfaceMode: 'mission-intelligence' | 'focused-operator') => {
+      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setConsoleSection('surface');
       if (surfaceMode === 'mission-intelligence') {
         setMissionIntelligenceFocus(targetId);
         setFocusedOperatorView(null);
@@ -1071,12 +1074,15 @@ export default function ChronosMirrorV2() {
       }
       setSurface(null);
     },
-    []
+    [consoleSection]
   );
 
   const activeSurfaceTitle = useMemo(
-    () => surface?.title || uxText('chronos_mission_intelligence', locale),
-    [surface?.title, locale]
+    () =>
+      surface?.titleKey
+        ? uxText(surface.titleKey, locale)
+        : surface?.title || uxText('chronos_mission_intelligence', locale),
+    [surface?.title, surface?.titleKey, locale]
   );
   const activeScenario = useMemo(
     () =>
@@ -1191,6 +1197,9 @@ export default function ChronosMirrorV2() {
 
   const webTheme = webDesignSystem.theme.theme;
   const webLayout = webDesignSystem.layout;
+  // Keep the former sidebar + embedded pane available for an explicit rollback
+  // while the simplified screen model is the only default operator path.
+  const legacyWorkspaceEnabled = process.env.NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE === '1';
   const isLightTheme = themeMode === 'light';
   const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'kb-text-primary';
   const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-muted';
@@ -1273,10 +1282,10 @@ export default function ChronosMirrorV2() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowOpsBoards((current) => !current)}
-                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'kb-border-accent kb-surface-accent kb-text-accent' : isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised'}`}
+                  onClick={() => openConsoleSection('operations')}
+                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${consoleSection === 'operations' ? 'kb-border-accent kb-surface-accent kb-text-accent' : isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised'}`}
                 >
-                  {locale === 'ja' ? 'エージェント/看板' : 'Agents / Boards'}
+                  {uxText('chronos_nav_operations', locale)}
                 </button>
               </div>
               {tenantLabel ? (
@@ -1317,6 +1326,35 @@ export default function ChronosMirrorV2() {
               </div>
             </div>
           </header>
+
+          <nav
+            aria-label="Chronos sections"
+            className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-2xl border kb-border-subtle kb-surface-sunken p-2"
+          >
+            <div className="mr-2 hidden px-2 text-[10px] font-bold uppercase tracking-[0.2em] kb-text-muted lg:block">
+              {uxText('chronos_workspace', locale)}
+            </div>
+            {CONSOLE_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => openConsoleSection(section.id)}
+                aria-current={consoleSection === section.id ? 'page' : undefined}
+                className={`rounded-xl border px-3 py-2 text-left transition ${
+                  consoleSection === section.id
+                    ? 'kb-border-accent kb-surface-accent kb-text-accent'
+                    : 'kb-border-subtle kb-surface-raised kb-text-secondary hover:kb-border-accent'
+                }`}
+              >
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em]">
+                  {uxText(section.labelKey, locale)}
+                </div>
+                <div className="mt-0.5 hidden text-[9px] kb-text-muted sm:block">
+                  {uxText(section.detailKey, locale)}
+                </div>
+              </button>
+            ))}
+          </nav>
 
           {/* The command band: role, current state, the one action to take,
               and counters that double as navigation. This is deliberately the
@@ -1432,408 +1470,711 @@ export default function ChronosMirrorV2() {
             ) : null}
           </section>
 
-          <FirstRunBanner />
+          {consoleSection === 'home' ? (
+            <>
+              <ChronosOffice compact onOpenOperations={() => openConsoleSection('operations')} />
+              <MissionJourneySummary
+                summary={operatorHomeSummary}
+                onOpenMissions={() => openConsoleSection('missions')}
+                onOpenOperations={() => openConsoleSection('operations')}
+              />
+              <FirstRunBanner />
+            </>
+          ) : null}
 
-          <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
-            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                    SU history
+          {(consoleSection === 'missions' || consoleSection === 'diagnostics') && (
+            <section
+              className={`grid gap-4 ${
+                consoleSection === 'missions' ? 'xl:grid-cols-1' : 'xl:grid-cols-[1.05fr,0.95fr]'
+              }`}
+            >
+              {consoleSection === 'missions' ? (
+                <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+                        SU history
+                      </div>
+                      <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
+                        Mission history
+                      </h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={missionHistoryQuery}
+                        onChange={(event) => setMissionHistoryQuery(event.target.value)}
+                        placeholder="search"
+                        className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
+                      />
+                      <select
+                        value={missionHistoryStatus}
+                        onChange={(event) => setMissionHistoryStatus(event.target.value)}
+                        className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
+                      >
+                        <option value="">{uxText('chronos_mh_all_statuses', locale)}</option>
+                        <option value="completed">completed</option>
+                        <option value="active">active</option>
+                        <option value="paused">paused</option>
+                        <option value="failed">failed</option>
+                      </select>
+                      <select
+                        value={missionHistoryTier}
+                        onChange={(event) => setMissionHistoryTier(event.target.value)}
+                        className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
+                      >
+                        <option value="">all tiers</option>
+                        <option value="public">public</option>
+                        <option value="confidential">confidential</option>
+                        <option value="personal">personal</option>
+                      </select>
+                    </div>
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                    Mission history
-                  </h2>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    value={missionHistoryQuery}
-                    onChange={(event) => setMissionHistoryQuery(event.target.value)}
-                    placeholder="search"
-                    className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
-                  />
-                  <select
-                    value={missionHistoryStatus}
-                    onChange={(event) => setMissionHistoryStatus(event.target.value)}
-                    className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
-                  >
-                    <option value="">{uxText('chronos_mh_all_statuses', locale)}</option>
-                    <option value="completed">completed</option>
-                    <option value="active">active</option>
-                    <option value="paused">paused</option>
-                    <option value="failed">failed</option>
-                  </select>
-                  <select
-                    value={missionHistoryTier}
-                    onChange={(event) => setMissionHistoryTier(event.target.value)}
-                    className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
-                  >
-                    <option value="">all tiers</option>
-                    <option value="public">public</option>
-                    <option value="confidential">confidential</option>
-                    <option value="personal">personal</option>
-                  </select>
-                </div>
-              </div>
-              {missionHistoryError ? (
-                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                  {missionHistoryError}
+                  {missionHistoryError ? (
+                    <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                      {missionHistoryError}
+                    </div>
+                  ) : null}
+                  <div className="mt-4 max-h-[420px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                    {missionHistory.length === 0 ? (
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
+                        {uxText('chronos_mh_no_match', locale)}
+                      </div>
+                    ) : (
+                      missionHistory.map((mission) => (
+                        <button
+                          key={mission.missionId}
+                          type="button"
+                          onClick={() => setSelectedMissionId(mission.missionId)}
+                          className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                            selectedMissionId === mission.missionId
+                              ? 'kb-border-accent kb-surface-accent'
+                              : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                {mission.missionId}
+                              </div>
+                              <div className="mt-1 text-sm font-semibold kb-text-primary">
+                                {mission.goalSummary ||
+                                  mission.intentText ||
+                                  mission.missionType ||
+                                  'Mission'}
+                              </div>
+                            </div>
+                            <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                              {mission.status}
+                            </div>
+                          </div>
+                          <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
+                            <div>
+                              {uxText('chronos_mission_goal', locale)}:{' '}
+                              <span className="kb-text-secondary">
+                                {mission.goalSummary ||
+                                  mission.intentText ||
+                                  mission.successCondition ||
+                                  '-'}
+                              </span>
+                            </div>
+                            <div>
+                              {uxText('chronos_mission_type', locale)}:{' '}
+                              <span className="kb-text-secondary">
+                                {mission.missionType || '-'}
+                              </span>
+                            </div>
+                            <div>
+                              {uxText('chronos_mission_artifacts', locale)}:{' '}
+                              <span className="kb-text-secondary">
+                                {mission.artifactCount || 0}
+                                {mission.artifactKinds?.length
+                                  ? ` · ${mission.artifactKinds.slice(0, 3).join(', ')}`
+                                  : ''}
+                              </span>
+                            </div>
+                            <div>
+                              {uxText('chronos_mission_tier', locale)}:{' '}
+                              <span className="kb-text-secondary">{mission.tier || '-'}</span>
+                            </div>
+                            <div>updated {mission.updatedAt || mission.startedAt || '-'}</div>
+                            <div className="truncate">
+                              tenant {mission.tenantSlug || mission.tenantId || '-'}
+                            </div>
+                          </div>
+                          {mission.successCondition ? (
+                            <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
+                              {mission.successCondition}
+                            </div>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               ) : null}
-              <div className="mt-4 max-h-[420px] overflow-y-auto pr-1 chronos-scroll space-y-3">
-                {missionHistory.length === 0 ? (
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
-                    {uxText('chronos_mh_no_match', locale)}
-                  </div>
-                ) : (
-                  missionHistory.map((mission) => (
-                    <button
-                      key={mission.missionId}
-                      type="button"
-                      onClick={() => setSelectedMissionId(mission.missionId)}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                        selectedMissionId === mission.missionId
-                          ? 'kb-border-accent kb-surface-accent'
-                          : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {mission.missionId}
-                          </div>
-                          <div className="mt-1 text-sm font-semibold kb-text-primary">
-                            {mission.goalSummary ||
-                              mission.intentText ||
-                              mission.missionType ||
-                              'Mission'}
-                          </div>
-                        </div>
-                        <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                          {mission.status}
-                        </div>
-                      </div>
-                      <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
-                        <div>tier {mission.tier}</div>
-                        <div>artifacts {mission.artifactCount}</div>
-                        <div>updated {mission.updatedAt || mission.startedAt || '-'}</div>
-                        <div className="truncate">
-                          tenant {mission.tenantSlug || mission.tenantId || '-'}
-                        </div>
-                      </div>
-                      {mission.successCondition ? (
-                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
-                          {mission.successCondition}
-                        </div>
-                      ) : null}
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
 
-            <div className="grid gap-4">
-              <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                      SU cost
-                    </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                      Cost visibility
-                    </h2>
-                  </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
-                    {selectedMissionId ? selectedMissionId : 'today'}
-                  </div>
-                </div>
-                {costSummaryError ? (
-                  <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                    {costSummaryError}
-                  </div>
-                ) : null}
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">usd</div>
-                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
-                      {typeof costSummary?.totalUsd === 'number'
-                        ? `$${costSummary.totalUsd.toFixed(3)}`
-                        : '-'}
-                    </div>
-                    <div className="mt-1 text-[10px] kb-text-muted">
-                      {costSummary?.entryCount || 0} entries
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      tokens
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
-                      {typeof costSummary?.totalTokens === 'number'
-                        ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
-                        : '-'}
-                    </div>
-                    <div className="mt-1 text-[10px] kb-text-muted">
-                      {costSummary?.missionCount || 0} missions
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      budget
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold kb-text-primary">
-                      {typeof costSummary?.budgetUsd === 'number'
-                        ? `$${costSummary.budgetUsd.toFixed(3)}`
-                        : 'n/a'}
-                    </div>
-                    <div className="mt-1 text-[10px] kb-text-muted">
-                      {typeof costSummary?.remainingUsd === 'number'
-                        ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
-                        : 'no spend guard configured'}
-                    </div>
-                  </div>
-                </div>
-                {Array.isArray(costSummary?.missionBreakdown) &&
-                costSummary.missionBreakdown.length > 0 ? (
-                  <div className="mt-4 space-y-2">
-                    {costSummary.missionBreakdown.slice(0, 4).map((item: any) => (
-                      <div
-                        key={item.missionId}
-                        className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] kb-text-muted"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedMissionId(
-                                item.missionId === 'UNASSIGNED' ? null : item.missionId
-                              )
-                            }
-                            className="font-mono text-[10px] uppercase tracking-[0.16em] kb-text-accent"
-                          >
-                            {item.missionId}
-                          </button>
-                          <div className="kb-text-primary">${item.usd.toFixed(3)}</div>
+              {consoleSection === 'diagnostics' ? (
+                <div className="grid gap-4">
+                  <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
+                          SU cost
                         </div>
-                        <div className="mt-1 kb-text-muted">
-                          {item.tokens.toLocaleString(chronosSpeechLocale())} tokens ·{' '}
-                          {item.entryCount} entries
+                        <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
+                          Cost visibility
+                        </h2>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                        {selectedMissionId ? selectedMissionId : 'today'}
+                      </div>
+                    </div>
+                    {costSummaryError ? (
+                      <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                        {costSummaryError}
+                      </div>
+                    ) : null}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          usd
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold kb-text-primary">
+                          {typeof costSummary?.totalUsd === 'number'
+                            ? `$${costSummary.totalUsd.toFixed(3)}`
+                            : '-'}
+                        </div>
+                        <div className="mt-1 text-[10px] kb-text-muted">
+                          {costSummary?.entryCount || 0} entries
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                      SU approvals
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          tokens
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold kb-text-primary">
+                          {typeof costSummary?.totalTokens === 'number'
+                            ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
+                            : '-'}
+                        </div>
+                        <div className="mt-1 text-[10px] kb-text-muted">
+                          {costSummary?.missionCount || 0} missions
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          budget
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold kb-text-primary">
+                          {typeof costSummary?.budgetUsd === 'number'
+                            ? `$${costSummary.budgetUsd.toFixed(3)}`
+                            : 'n/a'}
+                        </div>
+                        <div className="mt-1 text-[10px] kb-text-muted">
+                          {typeof costSummary?.remainingUsd === 'number'
+                            ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
+                            : 'no spend guard configured'}
+                        </div>
+                      </div>
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                      Approval queue
-                    </h2>
-                  </div>
-                  <input
-                    value={approvalQueueQuery}
-                    onChange={(event) => setApprovalQueueQuery(event.target.value)}
-                    placeholder="search"
-                    className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
-                  />
-                </div>
-                {approvalQueueError ? (
-                  <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                    {approvalQueueError}
-                  </div>
-                ) : null}
-                <div className="mt-4 max-h-[310px] overflow-y-auto pr-1 chronos-scroll space-y-3">
-                  {approvalQueue.length === 0 ? (
-                    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
-                      No pending approvals.
-                    </div>
-                  ) : (
-                    approvalQueue.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                              {item.kind} · {item.channel}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold kb-text-primary">
-                              {item.title}
-                            </div>
-                          </div>
-                          <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                            {item.status}
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
-                          {item.summary}
-                        </div>
-                        <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
-                          <div>mission {item.missionId || '-'}</div>
-                          <div>service {item.serviceId || '-'}</div>
-                          <div>risk {item.riskLevel || '-'}</div>
-                          <div>requested {item.requestedAt}</div>
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            disabled={approvalDecisionBusyId === item.id}
-                            onClick={() => submitApprovalDecision(item, 'approved')}
-                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
+                    {Array.isArray(costSummary?.missionBreakdown) &&
+                    costSummary.missionBreakdown.length > 0 ? (
+                      <div className="mt-4 space-y-2">
+                        {costSummary.missionBreakdown.slice(0, 4).map((item: any) => (
+                          <div
+                            key={item.missionId}
+                            className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] kb-text-muted"
                           >
-                            approve
-                          </button>
-                          <button
-                            type="button"
-                            disabled={approvalDecisionBusyId === item.id}
-                            onClick={() => submitApprovalDecision(item, 'rejected')}
-                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
-                          >
-                            reject
-                          </button>
-                        </div>
-                        {approvalAskWhyId === item.id ? (
-                          <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3">
-                            <div className="text-[11px] kb-status-warning">
-                              どこが期待と違いましたか？（1問だけ・スキップ可）
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {(
-                                [
-                                  ['incorrect_content', '内容が誤り'],
-                                  ['wrong_direction', '方向が違う'],
-                                  ['quality', '品質不足'],
-                                  ['scope', 'スコープ過不足'],
-                                  ['other', 'その他'],
-                                ] as const
-                              ).map(([category, label]) => (
-                                <button
-                                  key={category}
-                                  type="button"
-                                  disabled={approvalDecisionBusyId === item.id}
-                                  onClick={() =>
-                                    submitApprovalDecision(item, 'rejected', {
-                                      reasonCategory: category,
-                                    })
-                                  }
-                                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('alert')}`}
-                                >
-                                  {label}
-                                </button>
-                              ))}
+                            <div className="flex items-center justify-between gap-3">
                               <button
                                 type="button"
-                                disabled={approvalDecisionBusyId === item.id}
                                 onClick={() =>
-                                  submitApprovalDecision(item, 'rejected', { skipAskWhy: true })
+                                  setSelectedMissionId(
+                                    item.missionId === 'UNASSIGNED' ? null : item.missionId
+                                  )
                                 }
-                                className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('neutral')}`}
+                                className="font-mono text-[10px] uppercase tracking-[0.16em] kb-text-accent"
                               >
-                                スキップ
+                                {item.missionId}
                               </button>
+                              <div className="kb-text-primary">${item.usd.toFixed(3)}</div>
                             </div>
+                            <div className="mt-1 kb-text-muted">
+                              {item.tokens.toLocaleString(chronosSpeechLocale())} tokens ·{' '}
+                              {item.entryCount} entries
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
+                          SU connections
+                        </div>
+                        <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
+                          Connection review
+                        </h2>
+                      </div>
+                      <input
+                        value={connectionsQuery}
+                        onChange={(event) => setConnectionsQuery(event.target.value)}
+                        placeholder="search"
+                        className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
+                      />
+                    </div>
+                    {connectionsError ? (
+                      <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                        {connectionsError}
+                      </div>
+                    ) : null}
+                    <div className="mt-4 max-h-[240px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                      {connections
+                        .filter((item) => {
+                          if (!connectionsQuery.trim()) return true;
+                          const haystack = [
+                            item.binding_id,
+                            item.service_id,
+                            item.service_type,
+                            item.scope,
+                            item.target,
+                            item.reviewAction,
+                            item.reviewNote,
+                          ]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return haystack.includes(connectionsQuery.trim().toLowerCase());
+                        })
+                        .map((item) => (
+                          <button
+                            key={item.binding_id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedConnectionId(item.binding_id);
+                              setConnectionsError(null);
+                            }}
+                            className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                              selectedConnectionId === item.binding_id
+                                ? 'kb-border-accent kb-surface-accent'
+                                : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                  {item.service_type || 'service'} · {item.binding_id}
+                                </div>
+                                <div className="mt-1 text-sm font-semibold kb-text-primary">
+                                  {item.service_id || item.target}
+                                </div>
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                                {item.reviewAction || 'pending'}
+                              </div>
+                            </div>
+                            <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
+                              <div>scope {item.scope}</div>
+                              <div>target {item.target}</div>
+                              <div>policy {Object.keys(item.approval_policy || {}).length}</div>
+                              <div>reviewed {item.reviewedAt || '-'}</div>
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                    {selectedConnectionId ? (
+                      <div className="mt-4 rounded-2xl border kb-border-accent kb-surface-accent p-4">
+                        {(() => {
+                          const selected = connections.find(
+                            (item) => item.binding_id === selectedConnectionId
+                          );
+                          if (!selected)
+                            return (
+                              <div className="text-[11px] kb-text-muted">
+                                Selected connection not found.
+                              </div>
+                            );
+                          return (
+                            <>
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
+                                    review
+                                  </div>
+                                  <div className="mt-1 text-sm font-semibold kb-text-primary">
+                                    {selected.service_id || selected.binding_id}
+                                  </div>
+                                </div>
+                                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                  {selected.reviewAction || 'pending'}
+                                </div>
+                              </div>
+                              <textarea
+                                value={connectionReviewNote}
+                                onChange={(event) => setConnectionReviewNote(event.target.value)}
+                                placeholder="review note"
+                                className="mt-3 min-h-[80px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
+                              />
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={connectionReviewBusyId === selected.binding_id}
+                                  onClick={() =>
+                                    submitConnectionReview(selected.binding_id, 'approve')
+                                  }
+                                  className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
+                                >
+                                  approve
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={connectionReviewBusyId === selected.binding_id}
+                                  onClick={() =>
+                                    submitConnectionReview(selected.binding_id, 'modify')
+                                  }
+                                  className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
+                                >
+                                  modify
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={connectionReviewBusyId === selected.binding_id}
+                                  onClick={() =>
+                                    submitConnectionReview(selected.binding_id, 'hold')
+                                  }
+                                  className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('alert')}`}
+                                >
+                                  hold
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={connectionReviewBusyId === selected.binding_id}
+                                  onClick={() =>
+                                    submitConnectionReview(selected.binding_id, 'delete')
+                                  }
+                                  className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
+                                >
+                                  delete
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+
+          {(consoleSection === 'missions' || consoleSection === 'deliverables') && (
+            <section
+              className={`grid gap-4 ${
+                consoleSection === 'deliverables' ? 'xl:grid-cols-1' : 'xl:grid-cols-[1.1fr,0.9fr]'
+              }`}
+            >
+              {consoleSection === 'missions' ? (
+                <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+                        SU workbench
+                      </div>
+                      <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
+                        Plan preview and approval
+                      </h2>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={runPlanPreview}
+                        disabled={planPreviewBusy}
+                        className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {planPreviewBusy ? 'previewing' : 'preview'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={approvePlanAndStart}
+                        disabled={planApprovalBusy || !planPreview || planPreviewIsStale}
+                        className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {planApprovalBusy ? 'starting' : 'approve & start'}
+                      </button>
+                    </div>
+                  </div>
+                  {planPreview && planPreviewIsStale ? (
+                    <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3 text-[11px] kb-status-warning">
+                      Preview is stale. Re-run preview before approving.
+                    </div>
+                  ) : null}
+                  <textarea
+                    value={planRequestText}
+                    onChange={(event) => setPlanRequestText(event.target.value)}
+                    placeholder="例: 来週までに顧客向け提案資料を作って、承認前にレビューしたい"
+                    className="mt-4 min-h-[120px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
+                  />
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      mission type
+                      <input
+                        value={planMissionType}
+                        onChange={(event) => setPlanMissionType(event.target.value)}
+                        className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
+                      />
+                    </label>
+                    <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      persona
+                      <input
+                        value={planPersona}
+                        onChange={(event) => setPlanPersona(event.target.value)}
+                        className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
+                      />
+                    </label>
+                    <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      tier
+                      <select
+                        value={planTier}
+                        onChange={(event) =>
+                          setPlanTier(event.target.value as 'personal' | 'confidential' | 'public')
+                        }
+                        className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
+                      >
+                        <option value="personal">personal</option>
+                        <option value="confidential">confidential</option>
+                        <option value="public">public</option>
+                      </select>
+                    </label>
+                  </div>
+                  {planPreviewError ? (
+                    <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                      {planPreviewError}
+                    </div>
+                  ) : null}
+                  {planApprovalMessage ? (
+                    <div className="mt-3 rounded-xl border kb-status-positive-border kb-status-positive-surface px-4 py-3 text-[11px] kb-status-positive">
+                      {planApprovalMessage}
+                    </div>
+                  ) : null}
+                  {planPreview ? (
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,0.85fr]">
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          goal
+                        </div>
+                        <div className="mt-2 text-sm font-semibold kb-text-primary">
+                          {planPreview.goal?.summary}
+                        </div>
+                        <div className="mt-2 text-[11px] leading-6 kb-text-muted">
+                          {planPreview.goal?.successCondition}
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-[10px] kb-text-muted">
+                          <div>
+                            delivery mode{' '}
+                            <span className="font-mono kb-text-primary">
+                              {planPreview.delivery?.mode}
+                            </span>
+                          </div>
+                          <div>
+                            clarification{' '}
+                            <span className="font-mono kb-text-primary">
+                              {planPreview.delivery?.clarificationNeeded ? 'needed' : 'clear'}
+                            </span>
+                          </div>
+                          <div>
+                            execution{' '}
+                            <span className="font-mono kb-text-primary">
+                              {planPreview.execution?.shape}
+                            </span>
+                          </div>
+                          <div>
+                            confidence{' '}
+                            <span className="font-mono kb-text-primary">
+                              {Math.round((Number(planPreview.confidence) || 0) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                        {Array.isArray(planPreview.execution?.clarificationQuestions) &&
+                        planPreview.execution.clarificationQuestions.length > 0 ? (
+                          <div className="mt-4">
+                            <KbInterventionPanel
+                              reason="Clarification is required before approval. 質問をクリックすると依頼文に回答欄が追加されます。"
+                              isBlocking
+                              options={planPreview.execution.clarificationQuestions.map(
+                                (question: any) => ({
+                                  label: question.question,
+                                  variant: 'neutral' as const,
+                                  value: question.id,
+                                })
+                              )}
+                              onSelectOption={(option) => {
+                                setPlanRequestText(
+                                  (current) =>
+                                    `${current.trimEnd()}\n\n【確認事項への回答】${option.label}\n→ `
+                                );
+                                setPlanApprovalMessage(
+                                  '確認事項を依頼文に追記しました。回答を書いてから再プレビューしてください。'
+                                );
+                              }}
+                            />
                           </div>
                         ) : null}
                       </div>
-                    ))
-                  )}
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          team + workflow
+                        </div>
+                        <div className="mt-2 text-[11px] kb-text-muted">
+                          {planPreview.team?.assignments?.length || 0} assignments ·{' '}
+                          {planPreview.team?.team_governance?.composition?.required_roles?.length ||
+                            0}{' '}
+                          required roles
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {(planPreview.team?.assignments || [])
+                            .slice(0, 5)
+                            .map((assignment: any) => (
+                              <div
+                                key={`${assignment.team_role}-${assignment.agent_id || 'unfilled'}`}
+                                className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                                    {assignment.team_role}
+                                  </div>
+                                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                                    {assignment.status}
+                                  </div>
+                                </div>
+                                <div className="mt-1 font-mono text-[10px] kb-text-secondary">
+                                  {assignment.agent_id || 'unfilled'}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                        <div className="mt-4 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                          workflow steps
+                        </div>
+                        <div className="mt-2 space-y-2">
+                          {(planPreview.workflow || []).slice(0, 5).map((step: any) => (
+                            <div
+                              key={step.id}
+                              className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
+                            >
+                              <div className="text-[10px] kb-text-primary">{step.label}</div>
+                              <div className="mt-1 text-[9px] leading-5 kb-text-muted">
+                                {step.description}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
+              ) : null}
 
               <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                      SU connections
+                      SU inbox
                     </div>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                      Connection review
+                      Deliverables
                     </h2>
                   </div>
                   <input
-                    value={connectionsQuery}
-                    onChange={(event) => setConnectionsQuery(event.target.value)}
+                    value={deliverablesQuery}
+                    onChange={(event) => setDeliverablesQuery(event.target.value)}
                     placeholder="search"
                     className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                   />
                 </div>
-                {connectionsError ? (
+                {deliverablesError ? (
                   <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                    {connectionsError}
+                    {deliverablesError}
                   </div>
                 ) : null}
-                <div className="mt-4 max-h-[240px] overflow-y-auto pr-1 chronos-scroll space-y-3">
-                  {connections
-                    .filter((item) => {
-                      if (!connectionsQuery.trim()) return true;
-                      const haystack = [
-                        item.binding_id,
-                        item.service_id,
-                        item.service_type,
-                        item.scope,
-                        item.target,
-                        item.reviewAction,
-                        item.reviewNote,
-                      ]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase();
-                      return haystack.includes(connectionsQuery.trim().toLowerCase());
-                    })
-                    .map((item) => (
-                      <button
-                        key={item.binding_id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedConnectionId(item.binding_id);
-                          setConnectionsError(null);
+                {cleanedDeliverableCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCleanedDeliverables((current) => !current)}
+                    className={`mt-3 rounded-xl border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                  >
+                    {uxMessage(
+                      showCleanedDeliverables
+                        ? 'chronos_dl_hide_cleaned'
+                        : 'chronos_dl_show_cleaned',
+                      { count: cleanedDeliverableCount },
+                      '{count} cleaned-up record(s)',
+                      locale
+                    )}
+                  </button>
+                ) : null}
+                <div className="mt-4 max-h-[540px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                  {visibleDeliverables.length === 0 ? (
+                    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
+                      {deliverables.length === 0
+                        ? 'No deliverables found yet.'
+                        : uxText('chronos_dl_none_live', locale)}
+                    </div>
+                  ) : (
+                    visibleDeliverables.map((item) => (
+                      <KbArtifactTile
+                        key={item.artifactId}
+                        type={item.kind}
+                        path={item.path || item.externalRef || item.artifactId}
+                        missionId={item.missionId}
+                        updatedAt={item.updatedAt}
+                        missing={item.missing}
+                        previewContent={[
+                          item.previewText || item.kind,
+                          item.integratedSummary ? `summary: ${item.integratedSummary}` : '',
+                          ...(item.roleSections || []).map(
+                            (section: { role: string; summary: string }) =>
+                              `${section.role}: ${section.summary}`
+                          ),
+                          item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
+                          item.reviewVersion ? `v${item.reviewVersion}` : '',
+                          item.supersededCount
+                            ? uxMessage(
+                                'chronos_dl_superseded',
+                                { count: item.supersededCount },
+                                '+{count} older record(s) for the same file',
+                                locale
+                              )
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        onSelect={() => {
+                          setSelectedDeliverableId(item.artifactId);
+                          setDeliverableReviewError(null);
                         }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                          selectedConnectionId === item.binding_id
-                            ? 'kb-border-accent kb-surface-accent'
-                            : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                              {item.service_type || 'service'} · {item.binding_id}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold kb-text-primary">
-                              {item.service_id || item.target}
-                            </div>
-                          </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                            {item.reviewAction || 'pending'}
-                          </div>
-                        </div>
-                        <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
-                          <div>scope {item.scope}</div>
-                          <div>target {item.target}</div>
-                          <div>policy {Object.keys(item.approval_policy || {}).length}</div>
-                          <div>reviewed {item.reviewedAt || '-'}</div>
-                        </div>
-                      </button>
-                    ))}
+                        onOpen={() => openDeliverableAsset(item)}
+                        onPreview={() => openDeliverableAsset(item)}
+                      />
+                    ))
+                  )}
                 </div>
-                {selectedConnectionId ? (
+                {selectedDeliverableId ? (
                   <div className="mt-4 rounded-2xl border kb-border-accent kb-surface-accent p-4">
                     {(() => {
-                      const selected = connections.find(
-                        (item) => item.binding_id === selectedConnectionId
+                      const selected = deliverables.find(
+                        (item) => item.artifactId === selectedDeliverableId
                       );
-                      if (!selected)
+                      if (!selected) {
                         return (
                           <div className="text-[11px] kb-text-muted">
-                            Selected connection not found.
+                            Selected deliverable not found.
                           </div>
                         );
+                      }
                       return (
                         <>
                           <div className="flex items-center justify-between gap-3">
@@ -1842,52 +2183,105 @@ export default function ChronosMirrorV2() {
                                 review
                               </div>
                               <div className="mt-1 text-sm font-semibold kb-text-primary">
-                                {selected.service_id || selected.binding_id}
+                                {selected.artifactId}
                               </div>
                             </div>
                             <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                              {selected.reviewAction || 'pending'}
+                              {selected.reviewVerdict
+                                ? `latest ${selected.reviewVerdict}`
+                                : 'not reviewed'}
                             </div>
                           </div>
+                          <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
+                            {selected.previewText || selected.kind}
+                          </div>
                           <textarea
-                            value={connectionReviewNote}
-                            onChange={(event) => setConnectionReviewNote(event.target.value)}
-                            placeholder="review note"
-                            className="mt-3 min-h-[80px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
+                            value={deliverableReviewComment}
+                            onChange={(event) => setDeliverableReviewComment(event.target.value)}
+                            placeholder="review comment"
+                            className="mt-3 min-h-[88px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
                           />
+                          {deliverableReviewError ? (
+                            <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                              {deliverableReviewError}
+                            </div>
+                          ) : null}
+                          {deliverableAskWhyVerdict ? (
+                            <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3">
+                              <div className="text-[11px] kb-status-warning">
+                                どこが期待と違いましたか？（1問だけ・スキップ可）
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {(
+                                  [
+                                    ['incorrect_content', '内容が誤り'],
+                                    ['wrong_direction', '方向が違う'],
+                                    ['quality', '品質不足'],
+                                    ['scope', 'スコープ過不足'],
+                                    ['other', 'その他'],
+                                  ] as const
+                                ).map(([category, label]) => (
+                                  <button
+                                    key={category}
+                                    type="button"
+                                    disabled={deliverableReviewBusy}
+                                    onClick={() =>
+                                      submitDeliverableReview(deliverableAskWhyVerdict, {
+                                        reasonCategory: category,
+                                      })
+                                    }
+                                    className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('alert')}`}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  disabled={deliverableReviewBusy}
+                                  onClick={() =>
+                                    submitDeliverableReview(deliverableAskWhyVerdict, {
+                                      skipAskWhy: true,
+                                    })
+                                  }
+                                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('neutral')}`}
+                                >
+                                  スキップ
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              disabled={connectionReviewBusyId === selected.binding_id}
-                              onClick={() => submitConnectionReview(selected.binding_id, 'approve')}
+                              disabled={deliverableReviewBusy}
+                              onClick={() => submitDeliverableReview('accept')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
                             >
-                              approve
+                              accept
                             </button>
                             <button
                               type="button"
-                              disabled={connectionReviewBusyId === selected.binding_id}
-                              onClick={() => submitConnectionReview(selected.binding_id, 'modify')}
+                              disabled={deliverableReviewBusy}
+                              onClick={() => submitDeliverableReview('request-changes')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
                             >
-                              modify
+                              request-changes
                             </button>
                             <button
                               type="button"
-                              disabled={connectionReviewBusyId === selected.binding_id}
-                              onClick={() => submitConnectionReview(selected.binding_id, 'hold')}
-                              className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('alert')}`}
-                            >
-                              hold
-                            </button>
-                            <button
-                              type="button"
-                              disabled={connectionReviewBusyId === selected.binding_id}
-                              onClick={() => submitConnectionReview(selected.binding_id, 'delete')}
+                              disabled={deliverableReviewBusy}
+                              onClick={() => submitDeliverableReview('reject')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
                             >
-                              delete
+                              reject
                             </button>
+                          </div>
+                          <div className="mt-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                            version {selected.reviewVersion || 1}
+                            {selected.reviewCurrentArtifactId &&
+                            selected.reviewCurrentArtifactId !== selected.artifactId
+                              ? ` · current ${selected.reviewCurrentArtifactId}`
+                              : ''}
                           </div>
                         </>
                       );
@@ -1895,941 +2289,727 @@ export default function ChronosMirrorV2() {
                   </div>
                 ) : null}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
-          <section className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                    SU workbench
-                  </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                    Plan preview and approval
-                  </h2>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={runPlanPreview}
-                    disabled={planPreviewBusy}
-                    className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {planPreviewBusy ? 'previewing' : 'preview'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={approvePlanAndStart}
-                    disabled={planApprovalBusy || !planPreview || planPreviewIsStale}
-                    className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {planApprovalBusy ? 'starting' : 'approve & start'}
-                  </button>
-                </div>
-              </div>
-              {planPreview && planPreviewIsStale ? (
-                <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3 text-[11px] kb-status-warning">
-                  Preview is stale. Re-run preview before approving.
-                </div>
-              ) : null}
-              <textarea
-                value={planRequestText}
-                onChange={(event) => setPlanRequestText(event.target.value)}
-                placeholder="例: 来週までに顧客向け提案資料を作って、承認前にレビューしたい"
-                className="mt-4 min-h-[120px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
+          {consoleSection === 'missions' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <MissionIntelligence
+                workspace="missions"
+                onOpenWorkspace={(target) => openConsoleSection(target)}
               />
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                  mission type
-                  <input
-                    value={planMissionType}
-                    onChange={(event) => setPlanMissionType(event.target.value)}
-                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
-                  />
-                </label>
-                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                  persona
-                  <input
-                    value={planPersona}
-                    onChange={(event) => setPlanPersona(event.target.value)}
-                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
-                  />
-                </label>
-                <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                  tier
-                  <select
-                    value={planTier}
-                    onChange={(event) =>
-                      setPlanTier(event.target.value as 'personal' | 'confidential' | 'public')
-                    }
-                    className="mt-2 w-full rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] tracking-normal kb-text-primary outline-none focus:kb-border-accent"
-                  >
-                    <option value="personal">personal</option>
-                    <option value="confidential">confidential</option>
-                    <option value="public">public</option>
-                  </select>
-                </label>
-              </div>
-              {planPreviewError ? (
-                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                  {planPreviewError}
-                </div>
-              ) : null}
-              {planApprovalMessage ? (
-                <div className="mt-3 rounded-xl border kb-status-positive-border kb-status-positive-surface px-4 py-3 text-[11px] kb-status-positive">
-                  {planApprovalMessage}
-                </div>
-              ) : null}
-              {planPreview ? (
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,0.85fr]">
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      goal
-                    </div>
-                    <div className="mt-2 text-sm font-semibold kb-text-primary">
-                      {planPreview.goal?.summary}
-                    </div>
-                    <div className="mt-2 text-[11px] leading-6 kb-text-muted">
-                      {planPreview.goal?.successCondition}
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-[10px] kb-text-muted">
-                      <div>
-                        delivery mode{' '}
-                        <span className="font-mono kb-text-primary">
-                          {planPreview.delivery?.mode}
-                        </span>
-                      </div>
-                      <div>
-                        clarification{' '}
-                        <span className="font-mono kb-text-primary">
-                          {planPreview.delivery?.clarificationNeeded ? 'needed' : 'clear'}
-                        </span>
-                      </div>
-                      <div>
-                        execution{' '}
-                        <span className="font-mono kb-text-primary">
-                          {planPreview.execution?.shape}
-                        </span>
-                      </div>
-                      <div>
-                        confidence{' '}
-                        <span className="font-mono kb-text-primary">
-                          {Math.round((Number(planPreview.confidence) || 0) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                    {Array.isArray(planPreview.execution?.clarificationQuestions) &&
-                    planPreview.execution.clarificationQuestions.length > 0 ? (
-                      <div className="mt-4">
-                        <KbInterventionPanel
-                          reason="Clarification is required before approval. 質問をクリックすると依頼文に回答欄が追加されます。"
-                          isBlocking
-                          options={planPreview.execution.clarificationQuestions.map(
-                            (question: any) => ({
-                              label: question.question,
-                              variant: 'neutral' as const,
-                              value: question.id,
-                            })
-                          )}
-                          onSelectOption={(option) => {
-                            setPlanRequestText(
-                              (current) =>
-                                `${current.trimEnd()}\n\n【確認事項への回答】${option.label}\n→ `
-                            );
-                            setPlanApprovalMessage(
-                              '確認事項を依頼文に追記しました。回答を書いてから再プレビューしてください。'
-                            );
-                          }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      team + workflow
-                    </div>
-                    <div className="mt-2 text-[11px] kb-text-muted">
-                      {planPreview.team?.assignments?.length || 0} assignments ·{' '}
-                      {planPreview.team?.team_governance?.composition?.required_roles?.length || 0}{' '}
-                      required roles
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {(planPreview.team?.assignments || []).slice(0, 5).map((assignment: any) => (
-                        <div
-                          key={`${assignment.team_role}-${assignment.agent_id || 'unfilled'}`}
-                          className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                              {assignment.team_role}
-                            </div>
-                            <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                              {assignment.status}
-                            </div>
-                          </div>
-                          <div className="mt-1 font-mono text-[10px] kb-text-secondary">
-                            {assignment.agent_id || 'unfilled'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      workflow steps
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      {(planPreview.workflow || []).slice(0, 5).map((step: any) => (
-                        <div
-                          key={step.id}
-                          className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
-                        >
-                          <div className="text-[10px] kb-text-primary">{step.label}</div>
-                          <div className="mt-1 text-[9px] leading-5 kb-text-muted">
-                            {step.description}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            </section>
+          ) : null}
 
-            <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                    SU inbox
-                  </div>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                    Deliverables
-                  </h2>
-                </div>
-                <input
-                  value={deliverablesQuery}
-                  onChange={(event) => setDeliverablesQuery(event.target.value)}
-                  placeholder="search"
-                  className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
-                />
-              </div>
-              {deliverablesError ? (
-                <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                  {deliverablesError}
-                </div>
-              ) : null}
-              {cleanedDeliverableCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCleanedDeliverables((current) => !current)}
-                  className={`mt-3 rounded-xl border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
-                >
-                  {uxMessage(
-                    showCleanedDeliverables ? 'chronos_dl_hide_cleaned' : 'chronos_dl_show_cleaned',
-                    { count: cleanedDeliverableCount },
-                    '{count} cleaned-up record(s)',
-                    locale
-                  )}
-                </button>
-              ) : null}
-              <div className="mt-4 max-h-[540px] overflow-y-auto pr-1 chronos-scroll space-y-3">
-                {visibleDeliverables.length === 0 ? (
-                  <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
-                    {deliverables.length === 0
-                      ? 'No deliverables found yet.'
-                      : uxText('chronos_dl_none_live', locale)}
-                  </div>
-                ) : (
-                  visibleDeliverables.map((item) => (
-                    <KbArtifactTile
-                      key={item.artifactId}
-                      type={item.kind}
-                      path={item.path || item.externalRef || item.artifactId}
-                      missionId={item.missionId}
-                      updatedAt={item.updatedAt}
-                      missing={item.missing}
-                      previewContent={[
-                        item.previewText || item.kind,
-                        item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
-                        item.reviewVersion ? `v${item.reviewVersion}` : '',
-                        item.supersededCount
-                          ? uxMessage(
-                              'chronos_dl_superseded',
-                              { count: item.supersededCount },
-                              '+{count} older record(s) for the same file',
-                              locale
-                            )
-                          : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                      onSelect={() => {
-                        setSelectedDeliverableId(item.artifactId);
-                        setDeliverableReviewError(null);
-                      }}
-                      onOpen={() => openDeliverableAsset(item)}
-                      onPreview={() => openDeliverableAsset(item)}
-                    />
-                  ))
-                )}
-              </div>
-              {selectedDeliverableId ? (
-                <div className="mt-4 rounded-2xl border kb-border-accent kb-surface-accent p-4">
-                  {(() => {
-                    const selected = deliverables.find(
-                      (item) => item.artifactId === selectedDeliverableId
-                    );
-                    if (!selected) {
-                      return (
-                        <div className="text-[11px] kb-text-muted">
-                          Selected deliverable not found.
-                        </div>
-                      );
-                    }
-                    return (
-                      <>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
-                              review
-                            </div>
-                            <div className="mt-1 text-sm font-semibold kb-text-primary">
-                              {selected.artifactId}
-                            </div>
-                          </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {selected.reviewVerdict
-                              ? `latest ${selected.reviewVerdict}`
-                              : 'not reviewed'}
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
-                          {selected.previewText || selected.kind}
-                        </div>
-                        <textarea
-                          value={deliverableReviewComment}
-                          onChange={(event) => setDeliverableReviewComment(event.target.value)}
-                          placeholder="review comment"
-                          className="mt-3 min-h-[88px] w-full rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px] leading-6 kb-text-primary placeholder:kb-text-muted outline-none ring-0 focus:kb-border-accent"
-                        />
-                        {deliverableReviewError ? (
-                          <div className="mt-3 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                            {deliverableReviewError}
-                          </div>
-                        ) : null}
-                        {deliverableAskWhyVerdict ? (
-                          <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3">
-                            <div className="text-[11px] kb-status-warning">
-                              どこが期待と違いましたか？（1問だけ・スキップ可）
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {(
-                                [
-                                  ['incorrect_content', '内容が誤り'],
-                                  ['wrong_direction', '方向が違う'],
-                                  ['quality', '品質不足'],
-                                  ['scope', 'スコープ過不足'],
-                                  ['other', 'その他'],
-                                ] as const
-                              ).map(([category, label]) => (
-                                <button
-                                  key={category}
-                                  type="button"
-                                  disabled={deliverableReviewBusy}
-                                  onClick={() =>
-                                    submitDeliverableReview(deliverableAskWhyVerdict, {
-                                      reasonCategory: category,
-                                    })
-                                  }
-                                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('alert')}`}
-                                >
-                                  {label}
-                                </button>
-                              ))}
-                              <button
-                                type="button"
-                                disabled={deliverableReviewBusy}
-                                onClick={() =>
-                                  submitDeliverableReview(deliverableAskWhyVerdict, {
-                                    skipAskWhy: true,
-                                  })
-                                }
-                                className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-50 ${toneChipClass('neutral')}`}
-                              >
-                                スキップ
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={deliverableReviewBusy}
-                            onClick={() => submitDeliverableReview('accept')}
-                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
-                          >
-                            accept
-                          </button>
-                          <button
-                            type="button"
-                            disabled={deliverableReviewBusy}
-                            onClick={() => submitDeliverableReview('request-changes')}
-                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
-                          >
-                            request-changes
-                          </button>
-                          <button
-                            type="button"
-                            disabled={deliverableReviewBusy}
-                            onClick={() => submitDeliverableReview('reject')}
-                            className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
-                          >
-                            reject
-                          </button>
-                        </div>
-                        <div className="mt-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                          version {selected.reviewVersion || 1}
-                          {selected.reviewCurrentArtifactId &&
-                          selected.reviewCurrentArtifactId !== selected.artifactId
-                            ? ` · current ${selected.reviewCurrentArtifactId}`
-                            : ''}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : null}
-            </div>
-          </section>
+          {consoleSection === 'deliverables' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <MissionIntelligence
+                workspace="deliverables"
+                onOpenWorkspace={(target) => openConsoleSection(target)}
+              />
+            </section>
+          ) : null}
 
-          <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
-            <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
-              <div className="flex flex-col gap-6">
-                {/* The single primary entry point. Everything else in this
+          {legacyWorkspaceEnabled &&
+          consoleSection !== 'deliverables' &&
+          consoleSection !== 'work-items' &&
+          consoleSection !== 'surface-control' ? (
+            <div
+              className={`grid flex-1 gap-6 min-h-0 ${
+                consoleSection === 'diagnostics' ? 'xl:grid-cols-[280px,1fr]' : 'xl:grid-cols-1'
+              }`}
+            >
+              {consoleSection === 'diagnostics' ? (
+                <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
+                  <div className="flex flex-col gap-6">
+                    {/* The single primary entry point. Everything else in this
                     sidebar is a drawer below it. */}
-                <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
-                  <div className="kyberion-glass rounded-[24px] border kb-border-accent bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.28em] kb-text-accent">
-                          {uxText('chronos_nav_start_here', locale)}
+                    <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
+                      <div className="kyberion-glass rounded-[24px] border kb-border-accent bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-[0.28em] kb-text-accent">
+                              {uxText('chronos_nav_start_here', locale)}
+                            </div>
+                            <div className="mt-1 text-sm kb-text-secondary">
+                              {uxText('chronos_nav_start_here_hint', locale)}
+                            </div>
+                          </div>
+                          <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
+                            1-7
+                          </div>
                         </div>
-                        <div className="mt-1 text-sm kb-text-secondary">
-                          {uxText('chronos_nav_start_here_hint', locale)}
-                        </div>
-                      </div>
-                      <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
-                        1-7
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
-                        const active =
-                          (scenario.surface === 'mission-intelligence' &&
-                            missionIntelligenceFocus === scenario.targetId) ||
-                          (scenario.surface === 'focused-operator' &&
-                            focusedOperatorView === scenario.targetId);
-                        return (
-                          <button
-                            key={scenario.label}
-                            type="button"
-                            onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              active
-                                ? 'kb-border-accent kb-surface-accent'
-                                : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                            }`}
-                          >
-                            {/* Stacked, not side-by-side: this list lives in a
+                        <div className="mt-4 grid gap-2">
+                          {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
+                            const active =
+                              (scenario.surface === 'mission-intelligence' &&
+                                missionIntelligenceFocus === scenario.targetId) ||
+                              (scenario.surface === 'focused-operator' &&
+                                focusedOperatorView === scenario.targetId);
+                            return (
+                              <button
+                                key={scenario.label}
+                                type="button"
+                                onClick={() =>
+                                  handleScenarioOpen(scenario.targetId, scenario.surface)
+                                }
+                                className={`rounded-2xl border px-3 py-3 text-left transition ${
+                                  active
+                                    ? 'kb-border-accent kb-surface-accent'
+                                    : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
+                                }`}
+                              >
+                                {/* Stacked, not side-by-side: this list lives in a
                                 280px column, where a right-aligned action label
                                 collided with the scenario name. */}
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border kb-border-subtle kb-surface-sunken text-[9px] uppercase tracking-[0.16em] kb-text-secondary">
-                                {index + 1}
-                              </div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] kb-text-secondary">
-                                {scenario.label}
-                              </div>
-                            </div>
-                            <div className="mt-1.5 text-[11px] leading-5 kb-text-secondary">
-                              {scenario.detail}
-                            </div>
-                            <div className="mt-2 text-[10px] uppercase tracking-[0.16em] kb-text-accent">
-                              {scenario.actionLabel} →
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
-                        Scenarios · 1-7
-                      </div>
-                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
-                        Thread · T / C
-                      </div>
-                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
-                        Sessions · 1-9 / J K
-                      </div>
-                      <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
-                        Traces · 1-9 / J K / R
-                      </div>
-                    </div>
-                    {/* The five surface cards used to be their own full-size card
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border kb-border-subtle kb-surface-sunken text-[9px] uppercase tracking-[0.16em] kb-text-secondary">
+                                    {index + 1}
+                                  </div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] kb-text-secondary">
+                                    {scenario.label}
+                                  </div>
+                                </div>
+                                <div className="mt-1.5 text-[11px] leading-5 kb-text-secondary">
+                                  {scenario.detail}
+                                </div>
+                                <div className="mt-2 text-[10px] uppercase tracking-[0.16em] kb-text-accent">
+                                  {scenario.actionLabel} →
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
+                            Scenarios · 1-7
+                          </div>
+                          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
+                            Thread · T / C
+                          </div>
+                          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
+                            Sessions · 1-9 / J K
+                          </div>
+                          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
+                            Traces · 1-9 / J K / R
+                          </div>
+                        </div>
+                        {/* The five surface cards used to be their own full-size card
                         grid — a fourth navigation system saying "jump to
                         section". Same destinations, one line each, inside the
                         one place an operator is meant to start. */}
-                    <div className="mt-4 border-t kb-border-subtle pt-3">
-                      <div className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}>
-                        {uxText('chronos_jump_to_section', locale)}
+                        <div className="mt-4 border-t kb-border-subtle pt-3">
+                          <div
+                            className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                          >
+                            {uxText('chronos_jump_to_section', locale)}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {statusCards.map((card) => {
+                              const Icon = card.icon;
+                              return (
+                                <button
+                                  key={card.label}
+                                  type="button"
+                                  onClick={() => handleSectionJump(card.targetId)}
+                                  title={card.detail}
+                                  className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                                >
+                                  <Icon size={11} />
+                                  <span>{card.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {statusCards.map((card) => {
-                          const Icon = card.icon;
-                          return (
-                            <button
-                              key={card.label}
-                              type="button"
-                              onClick={() => handleSectionJump(card.targetId)}
-                              title={card.detail}
-                              className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
-                            >
-                              <Icon size={11} />
-                              <span>{card.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
 
-                  {activeScenario ? (
-                    <section className="kyberion-glass rounded-[24px] border kb-border-accent kb-surface-accent p-4">
-                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                        Current
-                      </div>
-                      <div className="mt-1 text-sm font-semibold kb-text-primary">
-                        {activeScenario.label}
-                      </div>
-                      <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                        <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
-                          Next
-                        </div>
-                        <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
-                          {activeScenario.nextStep}
-                        </div>
-                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
-                          Hotkey{' '}
-                          {OPERATOR_SCENARIO_PRESETS.findIndex(
-                            (scenario) => scenario.label === activeScenario.label
-                          ) + 1}
-                        </div>
-                      </div>
-                      {activeScenario.surface === 'mission-intelligence' ? (
-                        <button
-                          type="button"
-                          onClick={() => setMissionIntelligenceFocus(null)}
-                          className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
-                        >
-                          Clear
-                        </button>
+                      {activeScenario ? (
+                        <section className="kyberion-glass rounded-[24px] border kb-border-accent kb-surface-accent p-4">
+                          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+                            Current
+                          </div>
+                          <div className="mt-1 text-sm font-semibold kb-text-primary">
+                            {activeScenario.label}
+                          </div>
+                          <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                            <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                              Next
+                            </div>
+                            <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
+                              {activeScenario.nextStep}
+                            </div>
+                            <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
+                              Hotkey{' '}
+                              {OPERATOR_SCENARIO_PRESETS.findIndex(
+                                (scenario) => scenario.label === activeScenario.label
+                              ) + 1}
+                            </div>
+                          </div>
+                          {activeScenario.surface === 'mission-intelligence' ? (
+                            <button
+                              type="button"
+                              onClick={() => setMissionIntelligenceFocus(null)}
+                              className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                            >
+                              Clear
+                            </button>
+                          ) : null}
+                        </section>
                       ) : null}
                     </section>
-                  ) : null}
-                </section>
 
-                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                  <button
-                    onClick={() => toggleSection('views')}
-                    aria-expanded={expandedSections.views}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
-                  >
-                    <span>{uxText('chronos_nav_focus_views', locale)}</span>
-                    {expandedSections.views ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-                  {expandedSections.views && (
-                    <>
-                      <div className="mt-2 text-sm kb-text-secondary">
-                        {uxText('chronos_nav_focus_views_hint', locale)}
-                      </div>
-                      <div className="mt-4 grid gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setFocusedOperatorView(null)}
-                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            focusedOperatorView === null
-                              ? 'kb-border-accent kb-surface-accent'
-                              : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                          }`}
-                        >
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {uxText('chronos_nav_full_console', locale)}
+                    <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                      <button
+                        onClick={() => toggleSection('views')}
+                        aria-expanded={expandedSections.views}
+                        className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
+                      >
+                        <span>{uxText('chronos_nav_focus_views', locale)}</span>
+                        {expandedSections.views ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                      </button>
+                      {expandedSections.views && (
+                        <>
+                          <div className="mt-2 text-sm kb-text-secondary">
+                            {uxText('chronos_nav_focus_views_hint', locale)}
                           </div>
-                          <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                            {uxText('chronos_nav_full_console_hint', locale)}
-                          </div>
-                        </button>
-                        {OPERATOR_VIEW_LINKS.map((view) => (
-                          <button
-                            key={view.targetId}
-                            type="button"
-                            onClick={() => handleOperatorViewOpen(view.targetId)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              focusedOperatorView === view.targetId
-                                ? 'kb-border-accent kb-surface-accent'
-                                : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                            }`}
-                          >
-                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                              {view.label}
-                            </div>
-                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                              {view.detail}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
-
-                {/* Diagnostics, not a starting point: 17 buttons competing with
-                    the scenario list is what made the console read as a menu of
-                    menus. Collapsed until something looks wrong. */}
-                <section
-                  id="operator-quick-actions"
-                  className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSection('checks')}
-                    aria-expanded={expandedSections.checks}
-                    className={`flex w-full items-center justify-between gap-3 text-left transition ${shellTitleClass}`}
-                  >
-                    <div>
-                      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                        {uxText('chronos_nav_checks', locale)}
-                      </div>
-                      <div className="mt-1 text-sm kb-text-secondary">
-                        {uxText('chronos_nav_checks_hint', locale)}
-                      </div>
-                    </div>
-                    {expandedSections.checks ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-
-                  <div className={expandedSections.checks ? 'mt-4 space-y-5' : 'hidden'}>
-                    {quickActionGroups.map((group) => {
-                      const Icon = group.icon;
-                      return (
-                        <div
-                          key={group.title}
-                          className="overflow-hidden rounded-2xl border kb-border-subtle kb-surface-sunken"
-                        >
-                          <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
-                            <div className="flex items-start gap-3">
-                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border kb-border-subtle kb-surface-raised/6">
-                                <Icon size={14} className={group.accentText} />
+                          <div className="mt-4 grid gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFocusedOperatorView(null)}
+                              className={`rounded-2xl border px-3 py-3 text-left transition ${
+                                focusedOperatorView === null
+                                  ? 'kb-border-accent kb-surface-accent'
+                                  : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
+                              }`}
+                            >
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                {uxText('chronos_nav_full_console', locale)}
                               </div>
-                              <div>
-                                <div
-                                  className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${group.accentText}`}
-                                >
-                                  {group.title}
-                                </div>
-                                <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
-                                  {group.hint}
-                                </div>
+                              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                                {uxText('chronos_nav_full_console_hint', locale)}
                               </div>
-                            </div>
-                          </div>
-
-                          <div className="grid gap-2 p-3">
-                            {group.actions.map((action) => (
+                            </button>
+                            {OPERATOR_VIEW_LINKS.map((view) => (
                               <button
-                                key={action.label}
-                                onClick={() => handleQuickAction(action.query)}
-                                className="flex items-center justify-between rounded-xl border kb-border-subtle kb-surface-well px-3 py-2 text-left transition hover:kb-border-subtle hover:kb-surface-well"
+                                key={view.targetId}
+                                type="button"
+                                onClick={() => handleOperatorViewOpen(view.targetId)}
+                                className={`rounded-2xl border px-3 py-3 text-left transition ${
+                                  focusedOperatorView === view.targetId
+                                    ? 'kb-border-accent kb-surface-accent'
+                                    : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
+                                }`}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="text-sm">{action.icon}</div>
-                                  <div>
-                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] kb-text-primary">
-                                      {action.label}
-                                    </div>
-                                    <div className="text-[10px] uppercase tracking-[0.14em] kb-text-secondary">
-                                      {action.tone}
-                                    </div>
-                                  </div>
+                                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                  {view.label}
                                 </div>
-                                <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
-                                  Run
+                                <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                                  {view.detail}
                                 </div>
                               </button>
                             ))}
                           </div>
+                        </>
+                      )}
+                    </section>
+
+                    {/* Diagnostics, not a starting point: 17 buttons competing with
+                    the scenario list is what made the console read as a menu of
+                    menus. Collapsed until something looks wrong. */}
+                    <section
+                      id="operator-quick-actions"
+                      className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('checks')}
+                        aria-expanded={expandedSections.checks}
+                        className={`flex w-full items-center justify-between gap-3 text-left transition ${shellTitleClass}`}
+                      >
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
+                            {uxText('chronos_nav_checks', locale)}
+                          </div>
+                          <div className="mt-1 text-sm kb-text-secondary">
+                            {uxText('chronos_nav_checks_hint', locale)}
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </section>
+                        {expandedSections.checks ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                      </button>
 
-                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
-                  <button
-                    onClick={() => toggleSection('taxonomy')}
-                    aria-expanded={expandedSections.taxonomy}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
-                  >
-                    <span>Surface Taxonomy</span>
-                    {expandedSections.taxonomy ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-                  {expandedSections.taxonomy && (
-                    <>
-                      <div className="mt-2 text-sm kb-text-secondary">
-                        Every surface connects people and agent execution in a different mode.
-                        Chronos is the control surface, while A2UI provides drill-down work
-                        surfaces.
+                      <div className={expandedSections.checks ? 'mt-4 space-y-5' : 'hidden'}>
+                        {quickActionGroups.map((group) => {
+                          const Icon = group.icon;
+                          return (
+                            <div
+                              key={group.title}
+                              className="overflow-hidden rounded-2xl border kb-border-subtle kb-surface-sunken"
+                            >
+                              <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border kb-border-subtle kb-surface-raised/6">
+                                    <Icon size={14} className={group.accentText} />
+                                  </div>
+                                  <div>
+                                    <div
+                                      className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${group.accentText}`}
+                                    >
+                                      {group.title}
+                                    </div>
+                                    <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
+                                      {group.hint}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-2 p-3">
+                                {group.actions.map((action) => (
+                                  <button
+                                    key={action.label}
+                                    onClick={() => handleQuickAction(action.query)}
+                                    className="flex items-center justify-between rounded-xl border kb-border-subtle kb-surface-well px-3 py-2 text-left transition hover:kb-border-subtle hover:kb-surface-well"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="text-sm">{action.icon}</div>
+                                      <div>
+                                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] kb-text-primary">
+                                          {action.label}
+                                        </div>
+                                        <div className="text-[10px] uppercase tracking-[0.14em] kb-text-secondary">
+                                          {action.tone}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                                      Run
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="mt-4 space-y-3">
-                        {SURFACE_ROLES.map((role) => (
-                          <div
-                            key={role.label}
-                            className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                                {role.label}
-                              </div>
-                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                                {role.value}
-                              </div>
-                            </div>
-                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                              {role.detail}
-                            </div>
+                    </section>
+
+                    <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                      <button
+                        onClick={() => toggleSection('taxonomy')}
+                        aria-expanded={expandedSections.taxonomy}
+                        className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
+                      >
+                        <span>Surface Taxonomy</span>
+                        {expandedSections.taxonomy ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                      </button>
+                      {expandedSections.taxonomy && (
+                        <>
+                          <div className="mt-2 text-sm kb-text-secondary">
+                            Every surface connects people and agent execution in a different mode.
+                            Chronos is the control surface, while A2UI provides drill-down work
+                            surfaces.
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
-
-                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
-                  <button
-                    onClick={() => toggleSection('cycle')}
-                    aria-expanded={expandedSections.cycle}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
-                  >
-                    <span>Mission Cycle</span>
-                    {expandedSections.cycle ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-                  {expandedSections.cycle && (
-                    <>
-                      <div className="mt-2 text-sm kb-text-secondary">
-                        Kyberion should always make this loop legible: a request becomes a mission,
-                        execution stays explainable, and the result remains inspectable and
-                        reusable.
-                      </div>
-                      <div className="mt-4 grid gap-2">
-                        {MISSION_CYCLE.map((step, index) => (
-                          <div
-                            key={step.label}
-                            className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border kb-border-accent kb-surface-accent text-[10px] font-semibold kb-text-accent">
-                                {index + 1}
+                          <div className="mt-4 space-y-3">
+                            {SURFACE_ROLES.map((role) => (
+                              <div
+                                key={role.label}
+                                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                    {role.label}
+                                  </div>
+                                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                                    {role.value}
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                                  {role.detail}
+                                </div>
                               </div>
-                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                                {step.label}
-                              </div>
-                            </div>
-                            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                              {step.detail}
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
+                        </>
+                      )}
+                    </section>
 
-                {/* Relocated from the top of the page. It describes how the
+                    <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                      <button
+                        onClick={() => toggleSection('cycle')}
+                        aria-expanded={expandedSections.cycle}
+                        className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
+                      >
+                        <span>Mission Cycle</span>
+                        {expandedSections.cycle ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                      </button>
+                      {expandedSections.cycle && (
+                        <>
+                          <div className="mt-2 text-sm kb-text-secondary">
+                            Kyberion should always make this loop legible: a request becomes a
+                            mission, execution stays explainable, and the result remains inspectable
+                            and reusable.
+                          </div>
+                          <div className="mt-4 grid gap-2">
+                            {MISSION_CYCLE.map((step, index) => (
+                              <div
+                                key={step.label}
+                                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full border kb-border-accent kb-surface-accent text-[10px] font-semibold kb-text-accent">
+                                    {index + 1}
+                                  </div>
+                                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                    {step.label}
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                                  {step.detail}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </section>
+
+                    {/* Relocated from the top of the page. It describes how the
                     surface is themed — reference material for whoever is
                     styling it, never the operator's first question. */}
-                <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
-                  <button
-                    onClick={() => toggleSection('designSystem')}
-                    aria-expanded={expandedSections.designSystem}
-                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
-                  >
-                    <span>{uxText('chronos_nav_design_system', locale)}</span>
-                    {expandedSections.designSystem ? (
-                      <ChevronDown size={12} />
-                    ) : (
-                      <ChevronRight size={12} />
-                    )}
-                  </button>
-                  {expandedSections.designSystem && (
-                    <>
-                      <div
-                        className={`mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.24em] ${shellMutedClass}`}
+                    <section className="kyberion-glass rounded-[24px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                      <button
+                        onClick={() => toggleSection('designSystem')}
+                        aria-expanded={expandedSections.designSystem}
+                        className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                       >
-                        <span>{webTheme.name}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{webDesignSystem.design_system.pack_id}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{webTheme.colors.accent}</span>
-                      </div>
-                      <div className="mt-3 grid gap-2">
-                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                        <span>{uxText('chronos_nav_design_system', locale)}</span>
+                        {expandedSections.designSystem ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                      </button>
+                      {expandedSections.designSystem && (
+                        <>
                           <div
-                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                            className={`mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.24em] ${shellMutedClass}`}
                           >
-                            <Palette size={11} />
-                            Theme
+                            <span>{webTheme.name}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{webDesignSystem.design_system.pack_id}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{webTheme.colors.accent}</span>
                           </div>
-                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                            {webDesignSystem.theme.web.snapshot_summary}
+                          <div className="mt-3 grid gap-2">
+                            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                              <div
+                                className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                              >
+                                <Palette size={11} />
+                                Theme
+                              </div>
+                              <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                                {webDesignSystem.theme.web.snapshot_summary}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                              <div
+                                className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                              >
+                                <LayoutGrid size={11} />
+                                Layout
+                              </div>
+                              <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                                {webLayout.grid_columns}-column grid · container{' '}
+                                {webLayout.container_max_width} · {webLayout.section_gap} section
+                                gap
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                              <div
+                                className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                              >
+                                <Type size={11} />
+                                Typography
+                              </div>
+                              <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                                {webTheme.fonts.heading}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                              <div
+                                className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
+                              >
+                                <Ruler size={11} />
+                                Surface
+                              </div>
+                              <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                                {webLayout.panel_radius} / {webLayout.surface_radius}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                          <div
-                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
-                          >
-                            <LayoutGrid size={11} />
-                            Layout
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {webDesignSystem.section_order.map((sectionId) => (
+                              <span
+                                key={sectionId}
+                                className={`rounded-full border px-2.5 py-1 text-[9px] uppercase tracking-[0.16em] ${toneChipClass('neutral')}`}
+                              >
+                                {sectionId}
+                              </span>
+                            ))}
                           </div>
-                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                            {webLayout.grid_columns}-column grid · container{' '}
-                            {webLayout.container_max_width} · {webLayout.section_gap} section gap
-                          </div>
-                        </div>
-                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                          <div
-                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
-                          >
-                            <Type size={11} />
-                            Typography
-                          </div>
-                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                            {webTheme.fonts.heading}
-                          </div>
-                        </div>
-                        <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                          <div
-                            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}
-                          >
-                            <Ruler size={11} />
-                            Surface
-                          </div>
-                          <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                            {webLayout.panel_radius} / {webLayout.surface_radius}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {webDesignSystem.section_order.map((sectionId) => (
-                          <span
-                            key={sectionId}
-                            className={`rounded-full border px-2.5 py-1 text-[9px] uppercase tracking-[0.16em] ${toneChipClass('neutral')}`}
-                          >
-                            {sectionId}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
-              </div>
-            </aside>
+                        </>
+                      )}
+                    </section>
+                  </div>
+                </aside>
+              ) : null}
 
+              <section
+                ref={mainSurfaceRef}
+                className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
+              >
+                <div className="flex items-center justify-between border-b kb-border-subtle px-5 py-4 md:px-6">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.34em] kb-text-muted">
+                      Active Surface
+                    </div>
+                    <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
+                      {activeSurfaceTitle}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.22em] kb-text-secondary">
+                    <PanelsTopLeft size={12} />
+                    <span>
+                      {surface
+                        ? 'a2ui drill-down'
+                        : focusedOperatorView
+                          ? 'focused operator view'
+                          : missionIntelligenceFocus
+                            ? 'focused mission console'
+                            : 'default operator view'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+                  {!surface ? (
+                    focusedOperatorView ? (
+                      <FocusedOperatorView
+                        viewId={
+                          focusedOperatorView as
+                            | 'needs-attention'
+                            | 'mission-control-plane'
+                            | 'runtime-topology-map'
+                            | 'runtime-lease-doctor'
+                            | 'recent-surface-outbox'
+                            | 'secret-approval-queue'
+                            | 'owner-summaries'
+                            | 'trace-viewer'
+                        }
+                        onBack={() => {
+                          setFocusedOperatorView(null);
+                          setFocusedOperatorMissionId(null);
+                        }}
+                        onOpenView={(targetId, missionId) =>
+                          handleOperatorViewOpen(targetId, missionId || null)
+                        }
+                        focusedMissionId={focusedOperatorMissionId}
+                        onOpenMissionThread={(missionId) =>
+                          handleOperatorViewOpen('mission-control-plane', missionId)
+                        }
+                      />
+                    ) : (
+                      <MissionIntelligence
+                        focusedView={missionIntelligenceFocus}
+                        hideSurfaceControl
+                        onClearFocus={() => {
+                          setMissionIntelligenceFocus(null);
+                          setMissionIntelligenceFocusedMissionId(null);
+                        }}
+                        focusedMissionId={missionIntelligenceFocusedMissionId}
+                      />
+                    )
+                  ) : consoleSection === 'operations' ? (
+                    <AgentOpsBoards
+                      onOpenMission={(missionId) =>
+                        handleOperatorViewOpen('mission-control-plane', missionId)
+                      }
+                      onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
+                    />
+                  ) : (
+                    <div className="flex flex-col gap-6">
+                      {a2uiActionNotice ? (
+                        <div className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] kb-text-accent">
+                          {a2uiActionNotice}
+                        </div>
+                      ) : null}
+                      {surface.components?.map((component: any, index: number) => (
+                        <A2UIRenderer
+                          key={component.id || index}
+                          type={component.type}
+                          props={component.props || {}}
+                          onAction={handleA2UIComponentAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {consoleSection === 'operations' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+                    {uxText('chronos_nav_operations', locale)}
+                  </div>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
+                    {uxText('chronos_office', locale)}
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
+                    {uxText('chronos_office_description', locale)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleScenarioOpen('mission-control-plane', 'mission-intelligence')
+                  }
+                  className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-accent"
+                >
+                  {uxText('chronos_nav_active_surface', locale)} →
+                </button>
+              </div>
+              <AgentOpsBoards
+                onOpenMission={(missionId) =>
+                  handleOperatorViewOpen('mission-control-plane', missionId)
+                }
+                onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
+              />
+              <div className="mt-6">
+                <MissionIntelligence
+                  workspace="operations"
+                  onOpenWorkspace={(target) => openConsoleSection(target)}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {consoleSection === 'work-items' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <WorkItemsWorkspace
+                onOpenMission={(missionId) =>
+                  handleOperatorViewOpen('mission-control-plane', missionId)
+                }
+              />
+            </section>
+          ) : null}
+
+          {consoleSection === 'surface-control' ? (
+            <>
+              <SurfaceControlWorkspace />
+              <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                <MissionIntelligence
+                  workspace="surface-control"
+                  hideSurfaceControl
+                  onOpenWorkspace={(target) => openConsoleSection(target)}
+                />
+              </section>
+            </>
+          ) : null}
+
+          {consoleSection === 'governance' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="mb-5">
+                <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+                  {uxText('chronos_nav_governance', locale)}
+                </div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
+                  {uxText('chronos_nav_governance_hint', locale)}
+                </h2>
+              </div>
+              <MissionIntelligence
+                workspace="governance"
+                onOpenWorkspace={(target) => openConsoleSection(target)}
+              />
+            </section>
+          ) : null}
+
+          {consoleSection === 'diagnostics' && focusedOperatorView ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <FocusedOperatorView
+                viewId={focusedOperatorView as any}
+                onBack={() => {
+                  setFocusedOperatorView(null);
+                  setFocusedOperatorMissionId(null);
+                }}
+                onOpenView={(targetId, missionId) =>
+                  handleOperatorViewOpen(targetId, missionId || null)
+                }
+                focusedMissionId={focusedOperatorMissionId}
+                onOpenMissionThread={(missionId) =>
+                  handleOperatorViewOpen('mission-control-plane', missionId)
+                }
+              />
+            </section>
+          ) : null}
+
+          {consoleSection === 'diagnostics' ? (
+            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <MissionIntelligence
+                workspace="diagnostics"
+                onOpenWorkspace={(target) => openConsoleSection(target)}
+              />
+            </section>
+          ) : null}
+
+          {consoleSection === 'surface' ? (
             <section
               ref={mainSurfaceRef}
-              className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
+              className="kyberion-glass flex min-h-[65vh] flex-col overflow-hidden rounded-[30px] border kb-border-accent bg-[linear-gradient(180deg,rgba(247,240,223,0.045),rgba(255,255,255,0.02))]"
             >
-              <div className="flex items-center justify-between border-b kb-border-subtle px-5 py-4 md:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b kb-border-subtle px-5 py-4 md:px-6">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.34em] kb-text-muted">
-                    Active Surface
+                  <div className="text-[10px] uppercase tracking-[0.34em] kb-text-accent">
+                    {uxText('chronos_nav_active_surface', locale)}
                   </div>
                   <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                     {activeSurfaceTitle}
                   </div>
+                  <div className="mt-1 text-[11px] kb-text-secondary">
+                    {uxText('chronos_nav_active_surface_hint', locale)}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.22em] kb-text-secondary">
-                  <PanelsTopLeft size={12} />
-                  <span>
-                    {surface
-                      ? 'a2ui drill-down'
-                      : focusedOperatorView
-                        ? 'focused operator view'
-                        : missionIntelligenceFocus
-                          ? 'focused mission console'
-                          : 'default operator view'}
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => openConsoleSection(surfaceOrigin)}
+                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-secondary hover:kb-surface-raised"
+                >
+                  ← {uxText('chronos_cb_back', locale)}
+                </button>
               </div>
-
               <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-                {!surface ? (
-                  focusedOperatorView ? (
-                    <FocusedOperatorView
-                      viewId={
-                        focusedOperatorView as
-                          | 'needs-attention'
-                          | 'mission-control-plane'
-                          | 'runtime-topology-map'
-                          | 'runtime-lease-doctor'
-                          | 'recent-surface-outbox'
-                          | 'secret-approval-queue'
-                          | 'owner-summaries'
-                          | 'trace-viewer'
-                      }
-                      onBack={() => {
-                        setFocusedOperatorView(null);
-                        setFocusedOperatorMissionId(null);
-                      }}
-                      onOpenView={(targetId, missionId) =>
-                        handleOperatorViewOpen(targetId, missionId || null)
-                      }
-                      focusedMissionId={focusedOperatorMissionId}
-                      onOpenMissionThread={(missionId) =>
-                        handleOperatorViewOpen('mission-control-plane', missionId)
-                      }
-                    />
-                  ) : (
-                    <MissionIntelligence
-                      focusedView={missionIntelligenceFocus}
-                      onClearFocus={() => {
-                        setMissionIntelligenceFocus(null);
-                        setMissionIntelligenceFocusedMissionId(null);
-                      }}
-                      focusedMissionId={missionIntelligenceFocusedMissionId}
-                    />
-                  )
-                ) : showOpsBoards ? (
-                  <AgentOpsBoards
-                    onOpenMission={(missionId) =>
-                      handleOperatorViewOpen('mission-control-plane', missionId)
-                    }
-                    onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
-                  />
-                ) : (
+                {surface ? (
                   <div className="flex flex-col gap-6">
                     {a2uiActionNotice ? (
                       <div className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] kb-text-accent">
@@ -2845,12 +3025,39 @@ export default function ChronosMirrorV2() {
                       />
                     ))}
                   </div>
+                ) : focusedOperatorView ? (
+                  <FocusedOperatorView
+                    viewId={focusedOperatorView as any}
+                    onBack={() => {
+                      setFocusedOperatorView(null);
+                      setFocusedOperatorMissionId(null);
+                    }}
+                    onOpenView={(targetId, missionId) =>
+                      handleOperatorViewOpen(targetId, missionId || null)
+                    }
+                    focusedMissionId={focusedOperatorMissionId}
+                    onOpenMissionThread={(missionId) =>
+                      handleOperatorViewOpen('mission-control-plane', missionId)
+                    }
+                  />
+                ) : (
+                  <MissionIntelligence
+                    focusedView={missionIntelligenceFocus}
+                    hideSurfaceControl
+                    onClearFocus={() => {
+                      setMissionIntelligenceFocus(null);
+                      setMissionIntelligenceFocusedMissionId(null);
+                    }}
+                    focusedMissionId={missionIntelligenceFocusedMissionId}
+                  />
                 )}
               </div>
             </section>
-          </div>
+          ) : null}
 
-          <SovereignChat onA2UIMessage={handleA2UIMessage} onReady={handleReady} />
+          {consoleSection === 'home' ? (
+            <SovereignChat onA2UIMessage={handleA2UIMessage} onReady={handleReady} />
+          ) : null}
           <AgentPanel isOpen={agentPanelOpen} onClose={() => setAgentPanelOpen(false)} />
         </div>
       </main>
