@@ -3,6 +3,15 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
 import { findSensitivePathInText } from './sensitive-path-policy.js';
+import {
+  allowableCommands,
+  compileSafeRegex,
+  scannableUnits,
+  simpleCommands,
+  type AllowCandidate,
+  type SimpleCommand,
+} from './shell-command-normalize.js';
+import { logger } from './core.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
 
@@ -63,21 +72,42 @@ export function loadShellCommandPolicy(): ShellCommandPolicyFile {
   return parsed;
 }
 
-function tokenizeCommand(command: string): string[] {
-  const tokens: string[] = [];
-  const pattern = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^']*)'|`([^`]*)`|([^\s]+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(command)) !== null) {
-    const token = match[1] ?? match[2] ?? match[3] ?? match[4];
-    if (token) tokens.push(token.replace(/\\(["'`\\])/g, '$1'));
+const regexCache = new Map<string, RegExp | null>();
+
+function compiledRule(pattern: string): RegExp | null {
+  const cached = regexCache.get(pattern);
+  if (cached !== undefined) return cached;
+  let compiled: RegExp | null;
+  try {
+    compiled = compileSafeRegex(pattern);
+  } catch (error) {
+    logger.warn(
+      `[shell-command-policy] unsafe/invalid rule pattern ${JSON.stringify(pattern)}: ${
+        error instanceof Error ? error.message : String(error)
+      } — rewrite it without backreferences, lookarounds, or nested repetition.`
+    );
+    compiled = null;
   }
-  return tokens;
+  regexCache.set(pattern, compiled);
+  return compiled;
 }
 
-function resolveExecutable(tokens: string[]): { executable: string; args: string[] } {
-  const filtered = tokens.filter((token) => !/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(token));
-  const executable = filtered[0] ? path.basename(filtered[0]) : '';
-  return { executable, args: filtered.slice(1) };
+function safeRegexTest(pattern: string, text: string): boolean {
+  return compiledRule(pattern)?.test(text) ?? false;
+}
+
+/**
+ * Review finding (batch-1): an uncompilable DENY pattern must not fail open.
+ * The rule can no longer block anything, so the whole policy degrades to
+ * approval-only until the pattern is fixed.
+ */
+function hasBrokenPattern(rules: ShellCommandPolicyRule[]): string | undefined {
+  for (const rule of rules) {
+    for (const pattern of [...(rule.command_regex || []), ...(rule.arg_regex || [])]) {
+      if (compiledRule(pattern) === null) return rule.id;
+    }
+  }
+  return undefined;
 }
 
 function matchesRule(
@@ -93,91 +123,143 @@ function matchesRule(
   )
     return false;
   if (rule.command_regex?.length) {
-    const matched = rule.command_regex.some((pattern) => {
-      try {
-        return new RegExp(pattern).test(command);
-      } catch {
-        return false;
-      }
-    });
-    if (!matched) return false;
+    if (!rule.command_regex.some((pattern) => safeRegexTest(pattern, command))) return false;
   }
   if (rule.arg_contains?.length && !rule.arg_contains.some((part) => args.join(' ').includes(part)))
     return false;
   if (rule.arg_regex?.length) {
     const argText = args.join(' ');
-    const matched = rule.arg_regex.some((pattern) => {
-      try {
-        return new RegExp(pattern).test(argText);
-      } catch {
-        return false;
-      }
-    });
-    if (!matched) return false;
+    if (!rule.arg_regex.some((pattern) => safeRegexTest(pattern, argText))) return false;
   }
   return true;
+}
+
+interface EvaluationUnit {
+  text: string;
+  commands: SimpleCommand[];
+}
+
+function matchesUnit(rule: ShellCommandPolicyRule, unit: EvaluationUnit): boolean {
+  if (unit.commands.length === 0) return matchesRule(rule, unit.text, '', []);
+  return unit.commands.some((cmd) =>
+    matchesRule(rule, unit.text, path.basename(cmd.executable), cmd.args)
+  );
 }
 
 function resolveReason(rule: ShellCommandPolicyRule | undefined, fallback: string): string {
   return rule?.reason?.trim() || fallback;
 }
 
+function commandText(cmd: SimpleCommand): string {
+  return [cmd.executable, ...cmd.args].join(' ');
+}
+
+const MAX_COMMAND_SCAN_CHARS = 64_000;
+
+/**
+ * Asymmetric evaluation (batch-1 review):
+ *  - DENY sees the union of every interpretation — the raw command text plus
+ *    every de-obfuscated unit — so neither quoting nor wrapping can hide a
+ *    payload from a deny rule or the sensitive-path check.
+ *  - ALLOW sees only the original word sequence (allowableCommands), which
+ *    refuses privilege wrappers, unsafe env assignments, write redirects and
+ *    risky command arguments outright. De-obfuscation never creates an allow.
+ */
 export function evaluateShellCommandPolicy(
   command: string,
   policy: ShellCommandPolicyFile = loadShellCommandPolicy()
 ): ShellCommandPolicyDecision {
-  const normalized = String(command || '')
-    .trim()
-    .replace(/\s+/g, ' ');
-  const tokens = tokenizeCommand(normalized);
-  const { executable, args } = resolveExecutable(tokens);
-  const sensitivePath = findSensitivePathInText(normalized);
-  if (sensitivePath) {
+  const raw = String(command || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\\n/g, ' ')
+    .trim();
+  const normalized = raw.replace(/\s+/g, ' ');
+  const allowCandidates = allowableCommands(raw);
+  const primary = allowCandidates?.[0];
+  const executable = primary ? path.basename(primary.executable) : '';
+  const args = primary?.args ?? [];
+  const base = { command: normalized, executable, args };
+
+  if (raw.length > MAX_COMMAND_SCAN_CHARS) {
     return {
-      verdict: 'deny',
-      command: normalized,
-      executable,
-      args,
-      matchedRuleId: sensitivePath.ruleId,
-      reason: `[SENSITIVE_PATH_DENIED] ${sensitivePath.description} is protected from shell access.`,
-    };
-  }
-  const denyRule = (policy.denylist || []).find((rule) =>
-    matchesRule(rule, normalized, executable, args)
-  );
-  if (denyRule) {
-    return {
-      verdict: 'deny',
-      command: normalized,
-      executable,
-      args,
-      matchedRuleId: denyRule.id,
-      reason: resolveReason(
-        denyRule,
-        policy.defaults?.deny_message || 'Denied by shell command policy.'
-      ),
+      verdict: 'require_approval',
+      ...base,
+      reason: `Command exceeds ${MAX_COMMAND_SCAN_CHARS} chars and cannot be fully scanned; unscannable input requires approval.`,
     };
   }
 
-  const allowRule = (policy.allowlist || []).find((rule) =>
-    matchesRule(rule, normalized, executable, args)
-  );
-  if (allowRule) {
+  const denyTextSet = new Set<string>([normalized]);
+  for (const unit of scannableUnits(raw)) denyTextSet.add(unit);
+  const denyUnits: EvaluationUnit[] = [...denyTextSet].map((text) => ({
+    text,
+    commands: simpleCommands(text),
+  }));
+
+  for (const unit of denyUnits) {
+    const sensitivePath = findSensitivePathInText(unit.text);
+    if (sensitivePath) {
+      return {
+        verdict: 'deny',
+        ...base,
+        matchedRuleId: sensitivePath.ruleId,
+        reason: `[SENSITIVE_PATH_DENIED] ${sensitivePath.description} is protected from shell access.`,
+      };
+    }
+  }
+
+  for (const unit of denyUnits) {
+    const denyRule = (policy.denylist || []).find(
+      (rule) =>
+        matchesUnit(rule, unit) ||
+        unit.commands.some((cmd) =>
+          matchesRule(rule, commandText(cmd), path.basename(cmd.executable), cmd.args)
+        )
+    );
+    if (denyRule) {
+      return {
+        verdict: 'deny',
+        ...base,
+        matchedRuleId: denyRule.id,
+        reason: resolveReason(
+          denyRule,
+          policy.defaults?.deny_message || 'Denied by shell command policy.'
+        ),
+      };
+    }
+  }
+
+  const brokenDenyRuleId = hasBrokenPattern(policy.denylist || []);
+  if (brokenDenyRuleId) {
+    return {
+      verdict: 'require_approval',
+      ...base,
+      matchedRuleId: brokenDenyRuleId,
+      reason: `Deny rule '${brokenDenyRuleId}' has an uncompilable pattern; the policy cannot fail open, so everything requires approval until it is fixed.`,
+    };
+  }
+
+  const allowRules = policy.allowlist || [];
+  const allowRuleFor = (candidate: AllowCandidate): ShellCommandPolicyRule | undefined =>
+    allowRules.find((rule) =>
+      matchesRule(rule, candidate.display, candidate.executable, candidate.args)
+    );
+  const everyCommandAllowed =
+    allowCandidates !== null &&
+    allowCandidates.length > 0 &&
+    allowCandidates.every((candidate) => allowRuleFor(candidate));
+  if (everyCommandAllowed) {
+    const allowRule = allowRuleFor(primary!)!;
     if (isInjectionSuspected()) {
       return {
         verdict: 'require_approval',
-        command: normalized,
-        executable,
-        args,
+        ...base,
         matchedRuleId: allowRule.id,
         reason: `Kyberion safety: Command normally allowed by '${allowRule.id}' requires approval due to suspected prompt injection in active context.`,
       };
     }
     return {
       verdict: 'allow',
-      command: normalized,
-      executable,
-      args,
+      ...base,
       matchedRuleId: allowRule.id,
       reason: resolveReason(allowRule, 'Allowed by shell command policy.'),
     };
@@ -185,9 +267,7 @@ export function evaluateShellCommandPolicy(
 
   return {
     verdict: 'require_approval',
-    command: normalized,
-    executable,
-    args,
+    ...base,
     reason:
       policy.defaults?.require_approval_message ||
       'Shell command requires approval under Kyberion governance.',

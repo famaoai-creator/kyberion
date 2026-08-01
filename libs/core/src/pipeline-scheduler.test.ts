@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  normalizeScheduledPipelinePath,
+  resolveScheduledPipelinePath,
+} from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   claimScheduledPipelineRun,
@@ -31,7 +35,7 @@ describe('pipeline scheduler', () => {
     const schedule = {
       id: 'daily-routine',
       name: 'Daily routine',
-      pipelinePath: '/tmp/daily-routine.json',
+      pipelinePath: 'pipelines/daily-routine.json',
       actuator: 'run_pipeline',
       enabled: true,
       trigger: {
@@ -74,7 +78,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'hourly-health',
         name: 'Hourly health check',
-        pipelinePath: '/tmp/hourly-health.json',
+        pipelinePath: 'pipelines/hourly-health.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -121,7 +125,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine',
-        pipelinePath: '/tmp/daily-routine.json',
+        pipelinePath: 'pipelines/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -150,7 +154,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine',
-        pipelinePath: '/tmp/daily-routine.json',
+        pipelinePath: 'pipelines/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -169,7 +173,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine (updated)',
-        pipelinePath: '/tmp/daily-routine.json',
+        pipelinePath: 'pipelines/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -185,5 +189,54 @@ describe('pipeline scheduler', () => {
     expect(registry.schedules[0]?.name).toBe('Daily routine (updated)');
     expect(registry.schedules[0]?.lastRun).toBe(claimed?.runLock?.acquiredAt);
     expect(registry.schedules[0]?.runLock?.token).toBe(claimed?.runLock?.token);
+  });
+
+  describe('QM-02 registry portability', () => {
+    it('stores repo-relative paths when registering absolute in-root paths', () => {
+      const rootDir = makeRootDir();
+      registerScheduledPipeline(
+        {
+          id: 'portable',
+          name: 'portable',
+          pipelinePath: path.join(rootDir, 'pipelines/portable.json'),
+          actuator: 'run_pipeline',
+          trigger: { type: 'cron', cron: '0 6 * * *' },
+          enabled: true,
+        },
+        { rootDir }
+      );
+      const registry = loadScheduleRegistry({ rootDir });
+      expect(registry.schedules[0]?.pipelinePath).toBe('pipelines/portable.json');
+    });
+
+    it('migrates a legacy absolute path from another checkout via its pipelines/ segment', () => {
+      expect(
+        normalizeScheduledPipelinePath(
+          '/Users/somebody/old-checkout/pipelines/daily.json',
+          '/tmp/new-root'
+        )
+      ).toBe('pipelines/daily.json');
+    });
+
+    it('rejects absolute paths that cannot be made repo-relative', () => {
+      expect(() => normalizeScheduledPipelinePath('/etc/passwd', '/tmp/new-root')).toThrowError(
+        /repo-relative/
+      );
+      expect(() => normalizeScheduledPipelinePath('', '/tmp/new-root')).toThrowError(/non-empty/);
+    });
+
+    it('resolves stored relative paths against the current root', () => {
+      const resolved = resolveScheduledPipelinePath(
+        { pipelinePath: 'pipelines/daily.json' },
+        { rootDir: '/current/root' }
+      );
+      expect(resolved).toBe(path.join('/current/root', 'pipelines/daily.json'));
+    });
+
+    it('keeps relative paths untouched on registration', () => {
+      expect(normalizeScheduledPipelinePath('pipelines/x.json', '/any/root')).toBe(
+        'pipelines/x.json'
+      );
+    });
   });
 });

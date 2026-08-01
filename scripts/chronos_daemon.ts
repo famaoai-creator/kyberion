@@ -17,6 +17,7 @@ import {
   safeReaddir,
   sendOpsAlert,
   registerScheduledPipeline,
+  resolveScheduledPipelinePath,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
@@ -113,11 +114,12 @@ async function tick(): Promise<void> {
     logger.info(`[CHRONOS] → Starting: ${scheduled.id}`);
 
     try {
-      const adf = readValidatedPipelineAdf(scheduled.pipelinePath);
+      const resolvedPipelinePath = resolveScheduledPipelinePath(scheduled);
+      const adf = readValidatedPipelineAdf(resolvedPipelinePath);
       const result = await runSteps(
         adf.steps,
         { ...(scheduled.context ?? {}), ...(adf.context ?? {}) },
-        { pipelinePath: scheduled.pipelinePath }
+        { pipelinePath: resolvedPipelinePath }
       );
 
       let deliverySucceeded = true;
