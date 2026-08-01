@@ -1,0 +1,9 @@
+{
+  "kind": "delivery-receipt",
+  "mission_id": "QM-ADOPTION-SECURITY-B1",
+  "task_id": "delivery-deliver",
+  "pr_url": "https://github.com/famaoai-creator/kyberion/pull/648",
+  "branch": "agent/qm-adoption-batch1",
+  "delivered_at": "2026-08-01T09:04:30.000Z",
+  "operator_approval": "PR creation explicitly requested by operator message \"PR\" (2026-08-01)"
+}
