@@ -48,7 +48,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (79)
+## path (80)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -106,6 +106,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PYTHON`                                                | path | no       | Python interpreter override for python-backed bridges.                                                                        |
 | `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).                                                |
 | `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root).                                            |
+| `KYBERION_SECURITY_QUARANTINE_DIR`                               | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_PRESETS_DIR`                                   | path | no       | _undocumented_                                                                                                                |
@@ -265,7 +266,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (145)
+## runtime (147)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -372,6 +373,8 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_REMOVED`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_ACTIONS_POLICY`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_APPROVED_ITEMS`           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SECURITY_POSTURE`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SECURITY_QUARANTINE_MAX_BYTES`       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SILERO_VAD_PYTHON`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SKILL_PLUGIN_TEST_MARKER`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SMTP_PASS`                           | string | no       | _undocumented_                                                                                          |
