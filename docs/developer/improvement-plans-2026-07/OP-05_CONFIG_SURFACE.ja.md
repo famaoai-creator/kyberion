@@ -52,3 +52,5 @@
 - env 検証が秘密の値をログに出さないこと(名前と有無のみ報告、値は出さない)。
 
 - 2026-07-27: `validateEnv()` と baseline の `env` レポートに未文書化エントリを追加し、設定ミスの前段で文書化負債を確認できるようにした。`KYBERION_ENV_REGISTRY_STRICT=1 pnpm check:env-registry` で、生成物のドリフトに加えて未文書化エントリも fail として確認できる。既存の段階的な集中ローダー移行は継続課題。
+
+- 2026-08-01: レジストリ経由の型付き accessor `getRegisteredEnv()` を追加し、provider health の state path / demotion TTL を先行移行。`pnpm config:report` で値を出さずに登録数・文書化数・未知/型不正/必須欠落を確認できるようにした。既存の散在読み込みは一括変更せず、運用系の新規・主要経路から段階移行する。
