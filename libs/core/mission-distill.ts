@@ -295,7 +295,14 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   safeWriteFile(wisdomFilePath, wisdomMd);
   logger.info(`📝 Wisdom written to ${path.relative(rootDir, wisdomFilePath)}`);
 
+  const completedAt = new Date().toISOString();
   state.status = transitionStatus(state.status, 'completed');
+  state.completed_at = completedAt;
+  state.distillation = {
+    status: 'completed',
+    completed_at: completedAt,
+    output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),
+  };
   state.context = {
     ...(state.context || {}),
     distill_output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),

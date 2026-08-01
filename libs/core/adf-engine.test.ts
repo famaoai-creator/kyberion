@@ -105,12 +105,13 @@ describe('executeAdfSteps', () => {
     expect(events).toEqual(['start:first', 'end:first', 'start:second', 'end:second']);
   });
 
-  it('derives conservative typed file claims for graph steps without explicit claims', async () => {
+  it('allows independent typed read claims to run concurrently', async () => {
     const events: string[] = [];
     let releaseFirst!: () => void;
     const firstReleased = new Promise<void>((resolve) => {
       releaseFirst = resolve;
     });
+    let firstRead = true;
     const execution = executeAdfSteps(
       [
         {
@@ -135,8 +136,9 @@ describe('executeAdfSteps', () => {
         transform: async (_op, _params, ctx) => ctx,
         apply: async (op, _params, ctx) => {
           events.push(`start:${op}`);
-          if (op === 'file:read_file') {
-            if (events.length === 1) await firstReleased;
+          if (op === 'file:read_file' && firstRead) {
+            firstRead = false;
+            await firstReleased;
           }
           events.push(`end:${op}`);
           return ctx;
@@ -145,13 +147,13 @@ describe('executeAdfSteps', () => {
     );
 
     await new Promise((resolve) => setImmediate(resolve));
-    expect(events).toEqual(['start:file:read_file']);
+    expect(events).toEqual(['start:file:read_file', 'start:file:read_file', 'end:file:read_file']);
     releaseFirst();
     await execution;
     expect(events).toEqual([
       'start:file:read_file',
-      'end:file:read_file',
       'start:file:read_file',
+      'end:file:read_file',
       'end:file:read_file',
     ]);
   });

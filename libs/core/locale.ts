@@ -3,7 +3,7 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
-import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
+import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
 
 /**
  * I18N-01: single source of truth for locale *resolution*.
@@ -12,7 +12,7 @@ import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
  * import-free `locale-normalize.ts` so browser surfaces can share them; they
  * are re-exported here so Node callers have a single import site.
  */
-export { normalizeLocale, type SupportedLocale };
+export { normalizeLocale, nextSupportedLocale, type SupportedLocale };
 
 /**
  * Inputs a caller may supply to short-circuit the precedence chain at a

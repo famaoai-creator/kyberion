@@ -53,8 +53,7 @@ export interface ScheduledCall<T = unknown> {
 }
 
 export type ScheduledCallResult<T> =
-  | { status: 'fulfilled'; value: T }
-  | { status: 'rejected'; reason: unknown };
+  { status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown };
 
 function normalizeClaimPath(rawPath: string): string {
   const posix = rawPath.replace(/\\/gu, '/');
@@ -72,7 +71,12 @@ function pathsOverlap(a: FileResourceClaim, b: FileResourceClaim): boolean {
   return false;
 }
 
-function claimsConflict(a: ResourceClaim, b: ResourceClaim): boolean {
+/**
+ * Return whether two typed resource claims may execute concurrently.
+ * Exported so graph-level scheduling can use the same access semantics as
+ * tool-call batching instead of maintaining a second path-overlap policy.
+ */
+export function resourceClaimsConflict(a: ResourceClaim, b: ResourceClaim): boolean {
   if (a.kind === 'all' || b.kind === 'all') return true;
   // Two reads never conflict, even on the same/overlapping path.
   if (a.operation === 'read' && b.operation === 'read') return false;
@@ -82,7 +86,7 @@ function claimsConflict(a: ResourceClaim, b: ResourceClaim): boolean {
 function callsConflict(a: ResourceClaim[], b: ResourceClaim[]): boolean {
   for (const claimA of a) {
     for (const claimB of b) {
-      if (claimsConflict(claimA, claimB)) return true;
+      if (resourceClaimsConflict(claimA, claimB)) return true;
     }
   }
   return false;

@@ -3,9 +3,13 @@ import { secretGuard } from './secret-guard.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { getServicePresetPolicy } from './service-preset-policy.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { listSurfaceAsyncRequests, listSurfaceNotifications } from './surface-coordination-store.js';
+import {
+  listSurfaceAsyncRequests,
+  listSurfaceNotifications,
+} from './surface-coordination-store.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from './next-action.js';
+import type { SupportedLocale } from './locale-normalize.js';
 
 export interface SurfaceDirectoryRow {
   id: string;
@@ -88,11 +92,14 @@ function isProcessRunning(pid: number | undefined): boolean {
 function surfaceScenarioIds(surfaceId: string): string[] {
   const ids = new Set<string>();
   if (['presence-studio', 'voice-hub'].includes(surfaceId)) ids.add('voice-first-win');
-  if (['slack-bridge', 'imessage-bridge', 'telegram-bridge', 'discord-bridge'].includes(surfaceId)) ids.add('messaging-ingress');
-  if (['chronos-mirror-v2', 'terminal-bridge', 'computer-surface'].includes(surfaceId)) ids.add('operator-control');
+  if (['slack-bridge', 'imessage-bridge', 'telegram-bridge', 'discord-bridge'].includes(surfaceId))
+    ids.add('messaging-ingress');
+  if (['chronos-mirror-v2', 'terminal-bridge', 'computer-surface'].includes(surfaceId))
+    ids.add('operator-control');
   if (surfaceId === 'oauth-callback-surface') ids.add('oauth-bootstrap');
   if (surfaceId === 'mcp-server-cowork') ids.add('desktop-cowork');
-  if (['chronos-mirror-v2', 'slack-bridge', 'oauth-callback-surface'].includes(surfaceId)) ids.add('customer-engagement');
+  if (['chronos-mirror-v2', 'slack-bridge', 'oauth-callback-surface'].includes(surfaceId))
+    ids.add('customer-engagement');
   return [...ids];
 }
 
@@ -140,7 +147,9 @@ function surfaceBestFor(surfaceId: string): string {
   }
 }
 
-function surfaceNextCommand(row: Pick<SurfaceDirectoryRow, 'auth_requirement' | 'auth_status' | 'runtime_status' | 'id'>): string {
+function surfaceNextCommand(
+  row: Pick<SurfaceDirectoryRow, 'auth_requirement' | 'auth_status' | 'runtime_status' | 'id'>
+): string {
   if (row.auth_requirement !== 'host-managed' && row.auth_status === 'missing') {
     return 'pnpm surfaces:setup';
   }
@@ -155,19 +164,21 @@ function surfaceNextCommand(row: Pick<SurfaceDirectoryRow, 'auth_requirement' | 
 
 function loadAuthorityRoleIndex(): Record<string, any> {
   const payload = readJsonSafe<{ authority_roles?: Record<string, any> }>(
-    pathResolver.rootResolve('knowledge/product/governance/authority-role-index.json'),
+    pathResolver.rootResolve('knowledge/product/governance/authority-role-index.json')
   );
   return payload?.authority_roles || {};
 }
 
 function loadServiceEndpointCatalog(): Record<string, any> {
   const payload = readJsonSafe<{ services?: Record<string, any> }>(
-    pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints.json'),
+    pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints.json')
   );
   return payload?.services || {};
 }
 
-function inspectSurfaceAuthReadOnly(definition: Record<string, any>): Pick<
+function inspectSurfaceAuthReadOnly(
+  definition: Record<string, any>
+): Pick<
   SurfaceDirectoryRow,
   'auth_requirement' | 'auth_strategy' | 'auth_status' | 'required_secrets'
 > {
@@ -185,26 +196,29 @@ function inspectSurfaceAuthReadOnly(definition: Record<string, any>): Pick<
   const preset = readJsonSafe<Record<string, any>>(resolvedPresetPath);
   const policy = getServicePresetPolicy(preset);
   const strategy = (policy.auth_strategy || 'none').toLowerCase();
-  const serviceId = typeof definition.service_id === 'string' ? definition.service_id : String(definition.id || '');
+  const serviceId =
+    typeof definition.service_id === 'string' ? definition.service_id : String(definition.id || '');
   const endpoint = loadServiceEndpointCatalog()[serviceId];
   const suffixes = endpoint?.credential_suffixes || {};
-  const requiredSecrets = Array.from(new Set(
-    strategy === 'bearer'
-      ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
-      : strategy === 'basic'
-        ? [
-            ...(suffixes.clientId || ['CLIENT_ID']),
-            ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-            ...(suffixes.accessToken || ['ACCESS_TOKEN']),
-          ]
-        : strategy === 'session'
+  const requiredSecrets = Array.from(
+    new Set(
+      strategy === 'bearer'
+        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
+        : strategy === 'basic'
           ? [
               ...(suffixes.clientId || ['CLIENT_ID']),
               ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-              ...(suffixes.redirectUri || ['REDIRECT_URI']),
+              ...(suffixes.accessToken || ['ACCESS_TOKEN']),
             ]
-          : []
-  )).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
+          : strategy === 'session'
+            ? [
+                ...(suffixes.clientId || ['CLIENT_ID']),
+                ...(suffixes.clientSecret || ['CLIENT_SECRET']),
+                ...(suffixes.redirectUri || ['REDIRECT_URI']),
+              ]
+            : []
+    )
+  ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
   const hasAnySecret = requiredSecrets.some((envName) => Boolean(secretGuard.getSecret(envName)));
 
   if (strategy === 'session') {
@@ -233,7 +247,9 @@ function inspectSurfaceAuthReadOnly(definition: Record<string, any>): Pick<
   };
 }
 
-function detectBlockedBy(row: Pick<SurfaceDirectoryRow, 'enabled' | 'auth_status' | 'runtime_status'>): string[] {
+function detectBlockedBy(
+  row: Pick<SurfaceDirectoryRow, 'enabled' | 'auth_status' | 'runtime_status'>
+): string[] {
   const blocked: string[] = [];
   if (!row.enabled) blocked.push('disabled');
   if (row.auth_status === 'missing') blocked.push('auth');
@@ -251,7 +267,9 @@ export function getSurfaceDirectory(): SurfaceDirectoryRow[] {
     .map((definition) => {
       const record = state.surfaces[definition.id];
       const runtimeStatus: SurfaceDirectoryRow['runtime_status'] = record
-        ? isProcessRunning(record.pid) ? 'running' : 'stale'
+        ? isProcessRunning(record.pid)
+          ? 'running'
+          : 'stale'
         : 'stopped';
       const auth = inspectSurfaceAuthReadOnly(definition as Record<string, any>);
       const authorityRole = String((definition as any).env?.MISSION_ROLE || 'surface_runtime');
@@ -289,76 +307,99 @@ export function getSurfaceScenarioGuide(): SurfaceScenarioGuide[] {
     {
       id: 'voice-first-win',
       title: 'Voice first win',
-      summary: 'Use when demonstrating the first conversational loop with transcript and audio feedback.',
+      summary:
+        'Use when demonstrating the first conversational loop with transcript and audio feedback.',
       surface_ids: ['presence-studio', 'voice-hub'],
-      guidance: 'Check browser and OS permissions before debugging runtime health. If the loop fails, treat permissions as the first suspect.',
+      guidance:
+        'Check browser and OS permissions before debugging runtime health. If the loop fails, treat permissions as the first suspect.',
     },
     {
       id: 'messaging-ingress',
       title: 'Messaging ingress',
-      summary: 'Use when the operator wants natural-language requests to arrive through Slack or another message channel.',
+      summary:
+        'Use when the operator wants natural-language requests to arrive through Slack or another message channel.',
       surface_ids: ['slack-bridge', 'imessage-bridge', 'telegram-bridge', 'discord-bridge'],
-      guidance: 'Auth readiness comes before runtime repair. Start with pnpm surfaces:setup, then reconcile the specific bridge.',
+      guidance:
+        'Auth readiness comes before runtime repair. Start with pnpm surfaces:setup, then reconcile the specific bridge.',
     },
     {
       id: 'operator-control',
       title: 'Operator control',
-      summary: 'Use for mission visibility, browser walkthroughs, and governed runtime supervision.',
+      summary:
+        'Use for mission visibility, browser walkthroughs, and governed runtime supervision.',
       surface_ids: ['chronos-mirror-v2', 'terminal-bridge', 'computer-surface'],
-      guidance: 'This is the default control path for browser-heavy or long-running work. Repair stale background bridges before blaming the UI.',
+      guidance:
+        'This is the default control path for browser-heavy or long-running work. Repair stale background bridges before blaming the UI.',
     },
     {
       id: 'oauth-bootstrap',
       title: 'OAuth bootstrap',
-      summary: 'Use when a service integration needs an interactive callback to finish session-based auth.',
+      summary:
+        'Use when a service integration needs an interactive callback to finish session-based auth.',
       surface_ids: ['oauth-callback-surface'],
-      guidance: 'Keep this loopback helper available during onboarding and service setup. It is not the day-to-day operator UI.',
+      guidance:
+        'Keep this loopback helper available during onboarding and service setup. It is not the day-to-day operator UI.',
     },
     {
       id: 'customer-engagement',
       title: 'Customer engagement handoff',
-      summary: 'Use when switching overlays and validating which surfaces are fit for the active customer engagement.',
+      summary:
+        'Use when switching overlays and validating which surfaces are fit for the active customer engagement.',
       surface_ids: ['chronos-mirror-v2', 'slack-bridge', 'oauth-callback-surface'],
-      guidance: 'After customer switch and doctor/onboard, confirm the operator UI, the target channel, and any auth helper needed for that engagement.',
+      guidance:
+        'After customer switch and doctor/onboard, confirm the operator UI, the target channel, and any auth helper needed for that engagement.',
     },
     {
       id: 'desktop-cowork',
       title: 'Desktop cowork',
-      summary: 'Use when Kyberion should surface capabilities through an MCP-connected desktop client.',
+      summary:
+        'Use when Kyberion should surface capabilities through an MCP-connected desktop client.',
       surface_ids: ['mcp-server-cowork'],
-      guidance: 'Prefer this when the operator already works inside an MCP host and does not need a separate web surface.',
+      guidance:
+        'Prefer this when the operator already works inside an MCP host and does not need a separate web surface.',
     },
   ];
 }
 
 export function getSurfaceDirectorySummary(): SurfaceDirectorySummary {
   const rows = getSurfaceDirectory();
-  return rows.reduce<SurfaceDirectorySummary>((acc, row) => {
-    acc.total += 1;
-    if (row.enabled) acc.enabled += 1;
-    if (row.auth_requirement !== 'host-managed') acc.auth_required += 1;
-    if (row.auth_status === 'missing') acc.auth_missing += 1;
-    if (row.runtime_status === 'running') acc.running += 1;
-    if (row.runtime_status === 'stale') acc.stale += 1;
-    if (row.blocked_by.length > 0) acc.blocked += 1;
-    return acc;
-  }, {
-    total: 0,
-    enabled: 0,
-    auth_required: 0,
-    auth_missing: 0,
-    running: 0,
-    stale: 0,
-    blocked: 0,
-  });
+  return rows.reduce<SurfaceDirectorySummary>(
+    (acc, row) => {
+      acc.total += 1;
+      if (row.enabled) acc.enabled += 1;
+      if (row.auth_requirement !== 'host-managed') acc.auth_required += 1;
+      if (row.auth_status === 'missing') acc.auth_missing += 1;
+      if (row.runtime_status === 'running') acc.running += 1;
+      if (row.runtime_status === 'stale') acc.stale += 1;
+      if (row.blocked_by.length > 0) acc.blocked += 1;
+      return acc;
+    },
+    {
+      total: 0,
+      enabled: 0,
+      auth_required: 0,
+      auth_missing: 0,
+      running: 0,
+      stale: 0,
+      blocked: 0,
+    }
+  );
 }
 
-function findSurfaceRow(rows: SurfaceDirectoryRow[], surfaceId: string): SurfaceDirectoryRow | undefined {
+function findSurfaceRow(
+  rows: SurfaceDirectoryRow[],
+  surfaceId: string
+): SurfaceDirectoryRow | undefined {
   return rows.find((row) => row.id === surfaceId);
 }
 
-function summarizeSurfaceReadiness(rows: SurfaceDirectoryRow[], surfaceIds: string[]): 'ready' | 'needs_setup' | 'unavailable' {
-  const matched = surfaceIds.map((surfaceId) => findSurfaceRow(rows, surfaceId)).filter(Boolean) as SurfaceDirectoryRow[];
+function summarizeSurfaceReadiness(
+  rows: SurfaceDirectoryRow[],
+  surfaceIds: string[]
+): 'ready' | 'needs_setup' | 'unavailable' {
+  const matched = surfaceIds
+    .map((surfaceId) => findSurfaceRow(rows, surfaceId))
+    .filter(Boolean) as SurfaceDirectoryRow[];
   if (matched.length !== surfaceIds.length || matched.some((row) => !row.enabled)) {
     return 'unavailable';
   }
@@ -368,12 +409,16 @@ function summarizeSurfaceReadiness(rows: SurfaceDirectoryRow[], surfaceIds: stri
   return 'ready';
 }
 
-export function buildSurfaceLauncherRecommendations(params: {
-  rows?: SurfaceDirectoryRow[];
-  doctorSummaries?: SurfaceDoctorSummary[];
-} = {}): SurfaceLauncherRecommendation[] {
+export function buildSurfaceLauncherRecommendations(
+  params: {
+    rows?: SurfaceDirectoryRow[];
+    doctorSummaries?: SurfaceDoctorSummary[];
+  } = {}
+): SurfaceLauncherRecommendation[] {
   const rows = params.rows || getSurfaceDirectory();
-  const doctorByManifest = new Map((params.doctorSummaries || []).map((summary) => [summary.manifestId, summary]));
+  const doctorByManifest = new Map(
+    (params.doctorSummaries || []).map((summary) => [summary.manifestId, summary])
+  );
   const chronos = findSurfaceRow(rows, 'chronos-mirror-v2');
   const voiceRows = ['presence-studio', 'voice-hub'];
   const slack = findSurfaceRow(rows, 'slack-bridge');
@@ -388,7 +433,9 @@ export function buildSurfaceLauncherRecommendations(params: {
 
   const voiceReadinessBase = summarizeSurfaceReadiness(rows, voiceRows);
   const voiceReadiness: SurfaceLauncherRecommendation['readiness'] =
-    voiceReadinessBase === 'ready' && meetingDoctor && (meetingDoctor.counts.must + meetingDoctor.counts.should > 0)
+    voiceReadinessBase === 'ready' &&
+    meetingDoctor &&
+    meetingDoctor.counts.must + meetingDoctor.counts.should > 0
       ? 'needs_setup'
       : voiceReadinessBase;
 
@@ -403,7 +450,8 @@ export function buildSurfaceLauncherRecommendations(params: {
     {
       id: 'chronos',
       title: 'Chronos control surface',
-      whenToUse: 'Open this first when you want durable work, mission visibility, and runtime control.',
+      whenToUse:
+        'Open this first when you want durable work, mission visibility, and runtime control.',
       surfaces: ['chronos-mirror-v2'],
       readiness: chronosReadiness,
       reason:
@@ -422,7 +470,8 @@ export function buildSurfaceLauncherRecommendations(params: {
     {
       id: 'voice-first-win',
       title: 'Presence Studio + voice path',
-      whenToUse: 'Use this when you want a short conversation loop with transcript and realtime voice feedback.',
+      whenToUse:
+        'Use this when you want a short conversation loop with transcript and realtime voice feedback.',
       surfaces: voiceRows,
       readiness: voiceReadiness,
       reason:
@@ -467,41 +516,51 @@ export function buildSurfaceLauncherNextActions(params: {
   const actions: Array<ReturnType<typeof buildNextAction>> = [];
 
   if (summary.auth_missing > 0) {
-    actions.push(buildNextAction({
-      title: 'Repair surface authentication',
-      reason: `${summary.auth_missing} surfaces are blocked by missing auth or session setup.`,
-      next_action_type: 'bootstrap_environment',
-      suggested_command: 'pnpm surfaces:setup',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Repair surface authentication',
+        reason: `${summary.auth_missing} surfaces are blocked by missing auth or session setup.`,
+        next_action_type: 'bootstrap_environment',
+        suggested_command: 'pnpm surfaces:setup',
+      })
+    );
   }
 
   const staleRows = rows.filter((row) => row.runtime_status === 'stale');
   if (staleRows.length > 0) {
-    actions.push(buildNextAction({
-      title: 'Repair stale runtimes',
-      reason: `${staleRows.length} surfaces have stale runtime records and should be reconciled before use.`,
-      next_action_type: 'run_command',
-      suggested_command: 'pnpm surfaces:reconcile',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Repair stale runtimes',
+        reason: `${staleRows.length} surfaces have stale runtime records and should be reconciled before use.`,
+        next_action_type: 'run_command',
+        suggested_command: 'pnpm surfaces:reconcile',
+      })
+    );
   }
 
-  const doctorSummary = doctorSummaries.find((entry) => entry.counts.must + entry.counts.should > 0);
+  const doctorSummary = doctorSummaries.find(
+    (entry) => entry.counts.must + entry.counts.should > 0
+  );
   if (doctorSummary) {
-    actions.push(buildNextAction({
-      title: `Bootstrap ${doctorSummary.manifestId}`,
-      reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
-      next_action_type: 'bootstrap_environment',
-      suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
-    }));
+    actions.push(
+      buildNextAction({
+        title: `Bootstrap ${doctorSummary.manifestId}`,
+        reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
+        next_action_type: 'bootstrap_environment',
+        suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
+      })
+    );
   }
 
   if (actions.length === 0) {
-    actions.push(buildNextAction({
-      title: 'Inspect the current surface status',
-      reason: 'Surfaces look ready right now. Re-check before switching workflows.',
-      next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm surfaces:status',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Inspect the current surface status',
+        reason: 'Surfaces look ready right now. Re-check before switching workflows.',
+        next_action_type: 'inspect_artifact',
+        suggested_command: 'pnpm surfaces:status',
+      })
+    );
   }
 
   return actions.slice(0, 4);
@@ -529,7 +588,7 @@ export function listSurfaceNotificationsAcrossChannels(): Array<Record<string, a
 
 export function formatSurfaceRecoveryAction(
   action: SurfaceRecoveryAction,
-  language: 'ja' | 'en',
+  language: SupportedLocale
 ): string {
   if (language === 'ja') {
     const parts = [action.reason];
@@ -548,7 +607,7 @@ export function formatSurfaceRecoveryAction(
 export function buildSurfaceAsyncAcceptedReply(params: {
   requestId: string;
   receiver: string;
-  language: 'ja' | 'en';
+  language: SupportedLocale;
 }): string {
   if (params.language === 'ja') {
     return `依頼を受け付けました。${params.receiver} に回しています。リクエストIDは ${params.requestId} です。進行状況は Presence Studio の async requests で確認でき、完了したらこの surface に通知します。`;

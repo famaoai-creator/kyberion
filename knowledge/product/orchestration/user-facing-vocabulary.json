@@ -1441,6 +1441,11 @@
         "ja": "  schedule list        chronos に登録済みのスケジュール一覧",
         "qps-ploc": "⟦  şƈħėḓůŀė ŀïşŧ        Ŀïşŧ şƈħėḓůŀėḓ ṗïṗėŀïñėş řėɠïşŧėřėḓ ẇïŧħ ƈħřőñőş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "cli_help_schedule_register_syntax": {
+        "en": "  schedule register <id> <pipeline> <actuator> \"<cron>\"",
+        "ja": "  schedule register <id> <pipeline> <actuator> \"<cron>\"",
+        "qps-ploc": "⟦  şƈħėḓůŀė řėɠïşŧėř <ïḓ> <ṗïṗėŀïñė> <ȧƈŧůȧŧőř> \"<ƈřőñ>\" ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "cli_help_schedule_register_desc": {
         "en": "                       Register a new scheduled pipeline",
         "ja": "                       スケジュール実行するパイプラインを新規登録",
