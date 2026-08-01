@@ -1,0 +1,309 @@
+'use client';
+
+import * as React from 'react';
+import { AlertTriangle, CheckCircle2, CircleStop, Play, RefreshCw } from 'lucide-react';
+import { useChronosLocale } from '../lib/hooks';
+import { uxText } from '../lib/ux-vocabulary';
+
+type ActionDefinition = {
+  operation: string;
+  label: string;
+  risk: 'safe' | 'risky';
+  enabled: boolean;
+  disabledReason?: string;
+};
+
+type Surface = {
+  id: string;
+  kind: string;
+  startupMode?: string;
+  running: boolean;
+  health: string;
+  detail?: string;
+  controlSummary?: string;
+  controlRequestedBy?: string;
+};
+
+type ActionSummary = {
+  event_id?: string;
+  ts?: string;
+  kind: 'mission' | 'surface';
+  target: string;
+  operation: string;
+  status: 'queued' | 'completed' | 'failed';
+  requested_by?: string;
+  error?: string;
+};
+
+type IntelligencePayload = {
+  surfaces: Surface[];
+  controlActions: ActionSummary[];
+  controlActionAvailability: {
+    globalSurface: ActionDefinition[];
+    surface: Record<string, ActionDefinition[]>;
+  };
+};
+
+const EMPTY_PAYLOAD: IntelligencePayload = {
+  surfaces: [],
+  controlActions: [],
+  controlActionAvailability: { globalSurface: [], surface: {} },
+};
+
+export function SurfaceControlWorkspace() {
+  const locale = useChronosLocale();
+  const [data, setData] = React.useState<IntelligencePayload>(EMPTY_PAYLOAD);
+  const [busyKey, setBusyKey] = React.useState<string | null>(null);
+  const [pendingAction, setPendingAction] = React.useState<{
+    surfaceId: string | null;
+    action: ActionDefinition;
+  } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const refresh = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/intelligence', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'surface control failed');
+      setData({
+        ...EMPTY_PAYLOAD,
+        ...payload,
+        surfaces: Array.isArray(payload.surfaces) ? payload.surfaces : [],
+        controlActions: Array.isArray(payload.controlActions) ? payload.controlActions : [],
+        controlActionAvailability: {
+          ...EMPTY_PAYLOAD.controlActionAvailability,
+          ...(payload.controlActionAvailability || {}),
+          globalSurface: Array.isArray(payload.controlActionAvailability?.globalSurface)
+            ? payload.controlActionAvailability.globalSurface
+            : [],
+          surface: payload.controlActionAvailability?.surface || {},
+        },
+      });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh();
+    const timer = setInterval(() => void refresh(), 10_000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  const execute = React.useCallback(
+    async (surfaceId: string | null, action: ActionDefinition) => {
+      const key = `${surfaceId || 'all'}:${action.operation}`;
+      setBusyKey(key);
+      try {
+        const response = await fetch('/api/intelligence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'surface_control',
+            surfaceId,
+            operation: action.operation,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Surface control action failed');
+        await refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusyKey(null);
+        setPendingAction(null);
+      }
+    },
+    [refresh]
+  );
+
+  const requestAction = (surfaceId: string | null, action: ActionDefinition) => {
+    if (!action.enabled) return;
+    if (action.risk === 'risky') {
+      setPendingAction({ surfaceId, action });
+      return;
+    }
+    void execute(surfaceId, action);
+  };
+
+  const latestAction = (target: string): ActionSummary | null =>
+    data.controlActions.find((action) => action.kind === 'surface' && action.target === target) ||
+    null;
+
+  return (
+    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+            {uxText('chronos_nav_surface_control', locale)}
+          </div>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
+            {uxText('chronos_surface_control', locale)}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
+            {uxText('chronos_surface_control_description', locale)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="rounded-xl border kb-border-subtle kb-surface-sunken p-2 kb-text-secondary"
+          aria-label={uxText('chronos_refresh', locale)}
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+          {error}
+        </div>
+      ) : null}
+
+      {pendingAction ? (
+        <div className="mt-4 rounded-2xl border kb-status-warning-border kb-status-warning-surface p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={16} className="mt-0.5 kb-status-warning" />
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold kb-status-warning">
+                {uxText('chronos_surface_control_confirm_title', locale)}
+              </div>
+              <div className="mt-1 text-[11px] kb-text-secondary">
+                {pendingAction.action.label} ·{' '}
+                {pendingAction.surfaceId || uxText('chronos_surfaces', locale)}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void execute(pendingAction.surfaceId, pendingAction.action)}
+                  className="rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-status-warning"
+                >
+                  {uxText('chronos_surface_control_confirm', locale)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingAction(null)}
+                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary"
+                >
+                  {uxText('chronos_cb_back', locale)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] kb-text-secondary">
+          <Play size={13} />
+          {uxText('chronos_surface_control_global', locale)}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {data.controlActionAvailability.globalSurface.map((action) => (
+            <ActionButton
+              key={action.operation}
+              action={action}
+              busy={busyKey === `all:${action.operation}`}
+              onClick={() => requestAction(null, action)}
+            />
+          ))}
+          {data.controlActionAvailability.globalSurface.length === 0 ? (
+            <span className="text-[11px] kb-text-muted">
+              {uxText('chronos_surface_control_no_actions', locale)}
+            </span>
+          ) : null}
+        </div>
+        {latestAction('surface-runtime') ? (
+          <ActionStatus action={latestAction('surface-runtime') as ActionSummary} />
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {data.surfaces.length === 0 ? (
+          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
+            {uxText('chronos_no_managed_surfaces', locale)}
+          </div>
+        ) : (
+          data.surfaces.map((surface) => {
+            const actions = data.controlActionAvailability.surface[surface.id] || [];
+            return (
+              <article
+                key={surface.id}
+                className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold kb-text-primary">{surface.id}</div>
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      {surface.kind} · {surface.running ? 'running' : 'stopped'} · {surface.health}
+                    </div>
+                  </div>
+                  <div
+                    className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
+                  >
+                    {surface.running ? (
+                      <CheckCircle2 size={11} className="inline" />
+                    ) : (
+                      <CircleStop size={11} className="inline" />
+                    )}{' '}
+                    {surface.health}
+                  </div>
+                </div>
+                {surface.detail ? (
+                  <div className="mt-2 text-[10px] kb-text-muted">{surface.detail}</div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {actions.map((action) => (
+                    <ActionButton
+                      key={action.operation}
+                      action={action}
+                      busy={busyKey === `${surface.id}:${action.operation}`}
+                      onClick={() => requestAction(surface.id, action)}
+                    />
+                  ))}
+                </div>
+                {latestAction(surface.id) ? (
+                  <ActionStatus action={latestAction(surface.id) as ActionSummary} />
+                ) : null}
+              </article>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ActionButton({
+  action,
+  busy,
+  onClick,
+}: {
+  action: ActionDefinition;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!action.enabled || busy}
+      title={action.disabledReason}
+      className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-40 ${action.risk === 'risky' ? 'kb-status-negative-border kb-status-negative-surface kb-status-negative' : 'kb-border-accent kb-surface-accent kb-text-accent'}`}
+    >
+      {busy ? 'working' : action.label}
+    </button>
+  );
+}
+
+function ActionStatus({ action }: { action: ActionSummary }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
+      <span>{action.operation}</span>
+      <span className="font-mono kb-text-secondary">{action.status}</span>
+      {action.requested_by ? <span>by {action.requested_by}</span> : null}
+      {action.error ? <span className="kb-status-negative">{action.error}</span> : null}
+    </div>
+  );
+}

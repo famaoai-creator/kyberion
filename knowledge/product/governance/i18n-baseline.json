@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-30T13:21:03.544Z",
+  "generated_at": "2026-08-01T19:47:06.901Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -49,6 +49,7 @@
     "presence/displays/concierge",
     "presence/displays/operator-surface",
     "presence/displays/presence-studio",
+    "presence/displays/terminal-hud",
     "presence/bridge/approvals",
     "presence/bridge/runtime",
     "presence/bridge/terminal",
@@ -141,7 +142,7 @@
     "satellites/voice-hub/server.ts": 142,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 5,
     "presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/page.tsx": 35,
+    "presence/displays/chronos-mirror-v2/src/app/page.tsx": 28,
     "presence/displays/chronos-mirror-v2/src/components/A2UIComponentLibrary.tsx": 1,
     "presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx": 5,
     "presence/displays/chronos-mirror-v2/src/components/AgentOpsBoards.tsx": 5,
