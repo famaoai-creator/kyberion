@@ -1,3 +1,10 @@
+---
+title: 'Phase Protocol: Review & Distillation'
+tags: [governance, lifecycle, review]
+last_updated: 2026-08-01
+runtime_stages: [verification, delivery, retrospective]
+---
+
 # Phase Protocol: ⑤ Review & Distillation
 
 ## Goal

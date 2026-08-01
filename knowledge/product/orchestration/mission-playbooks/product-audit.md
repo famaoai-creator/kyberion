@@ -5,6 +5,7 @@ tags: [orchestration, mission-playbooks, product, audit, security]
 importance: 8
 author: Ecosystem Architect
 last_updated: 2026-03-06
+workflow_ids: [stage-gated-high-stakes]
 ---
 
 # ミッション・プレイブック：プロダクト健全性 ＆ リリース監査

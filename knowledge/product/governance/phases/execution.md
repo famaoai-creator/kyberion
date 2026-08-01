@@ -1,3 +1,10 @@
+---
+title: 'Phase Protocol: Mission Execution'
+tags: [governance, lifecycle, execution]
+last_updated: 2026-08-01
+runtime_stages: [contract_authoring, preflight, execution]
+---
+
 # Phase Protocol: ④ Mission Execution
 
 ## Goal
