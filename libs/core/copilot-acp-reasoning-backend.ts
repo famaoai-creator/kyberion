@@ -83,6 +83,15 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
     await this.bootPromise;
   }
 
+  /**
+   * QM-06: drop the persistent ACP session so a post-failover-switch call
+   * boots fresh instead of continuing a stale provider-side conversation.
+   */
+  async resetSession(): Promise<void> {
+    await this.mediator.shutdown().catch(() => undefined);
+    this.bootPromise = null;
+  }
+
   private async complete(systemPrompt: string, userPrompt: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     await this.ensureBooted();

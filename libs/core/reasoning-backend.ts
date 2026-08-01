@@ -1271,6 +1271,20 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
       .replace(/[-\s]+/g, '_');
     return (role && this.roleBackends.get(role)) || this.defaultBackend;
   }
+  /** QM-06: forward session resets to every wrapped backend, best-effort. */
+  async resetSession(): Promise<void> {
+    const backends = new Set<ReasoningBackend>([
+      this.defaultBackend,
+      ...this.roleBackends.values(),
+    ]);
+    for (const backend of backends) {
+      try {
+        await backend.resetSession?.();
+      } catch (error) {
+        logger.warn(`[QM-06] resetSession on wrapped backend ${backend.name} failed: ${error}`);
+      }
+    }
+  }
   divergePersonas(input: DivergeHypothesisInput, options?: ReasoningCallOptions) {
     return this.pick(options).divergePersonas(input, options);
   }
