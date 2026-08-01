@@ -1,7 +1,11 @@
 {
   "version": "2.0",
   "default_locale": "en",
-  "required_locales": ["en", "ja", "qps-ploc"],
+  "required_locales": [
+    "en",
+    "ja",
+    "qps-ploc"
+  ],
   "domains": {
     "chronos": {
       "chronos_a2a_handoff_trail": {
@@ -2267,62 +2271,62 @@
       "chronos_nav_home": {
         "en": "Home",
         "ja": "ホーム",
-        "qps-ploc": "⟦Ħőɱė ŀőřė⟧"
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
       },
       "chronos_nav_home_hint": {
         "en": "Current state and next action",
         "ja": "現在地と次の一手",
-        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧė ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧė ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗş⟧"
       },
       "chronos_nav_missions": {
         "en": "Missions",
         "ja": "ミッション",
-        "qps-ploc": "⟦Ɱïşşïőñş ŀőřė⟧"
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
       },
       "chronos_nav_missions_hint": {
         "en": "Progress, plans, and history",
         "ja": "進行・計画・履歴",
-        "qps-ploc": "⟦Ṗřőɠřėşş, ṗŀȧñş, ȧñḓ ħïşŧőřẏ ŀőřė⟧"
+        "qps-ploc": "⟦Ṗřőɠřėşş, ṗŀȧñş, ȧñḓ ħïşŧőřẏ ŀőřėɱ ïṗş⟧"
       },
       "chronos_nav_deliverables": {
         "en": "Deliverables",
         "ja": "成果物",
-        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş ŀőřė⟧"
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş ŀőř⟧"
       },
       "chronos_nav_deliverables_hint": {
         "en": "Review and delivery",
         "ja": "レビューと納品",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėŀïṽėřẏ ŀőřė⟧"
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėŀïṽėřẏ ŀőřėɱ ⟧"
       },
       "chronos_nav_operations": {
         "en": "Operations",
         "ja": "運用",
-        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőřė⟧"
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
       },
       "chronos_nav_operations_hint": {
         "en": "Agents and live execution",
         "ja": "エージェントとライブ状況",
-        "qps-ploc": "⟦Ȧɠėñŧş ȧñḓ ŀïṽė ėẋėƈůŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧɠėñŧş ȧñḓ ŀïṽė ėẋėƈůŧïőñ ŀőřėɱ ïṗ⟧"
       },
       "chronos_nav_governance": {
         "en": "Governance",
         "ja": "ガバナンス",
-        "qps-ploc": "⟦Ġőṽėřñȧñƈė ŀőřė⟧"
+        "qps-ploc": "⟦Ɠőṽėřñȧñƈė ŀőř⟧"
       },
       "chronos_nav_governance_hint": {
         "en": "Approvals and knowledge promotion",
         "ja": "承認とナレッジ昇格",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ȧñḓ ķñőẇŀėḓɠė ṗřőɱőŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ȧñḓ ķñőẇŀėḓɠė ṗřőɱőŧïőñ ŀőřėɱ ïṗşůɱ⟧"
       },
       "chronos_nav_diagnostics": {
         "en": "Diagnostics",
         "ja": "診断",
-        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈş ŀőřė⟧"
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈş ŀőř⟧"
       },
       "chronos_nav_diagnostics_hint": {
         "en": "Cost, connections, and diagnostic evidence",
         "ja": "コスト・接続・診断エビデンス",
-        "qps-ploc": "⟦Ƈőşŧ, ƈőññėƈŧïőñş, ȧñḓ ḓïȧɠñőşŧïƈ ėṽïḓėñƈė ŀőřė⟧"
+        "qps-ploc": "⟦Ƈőşŧ, ƈőññėƈŧïőñş, ȧñḓ ḓïȧɠñőşŧïƈ ėṽïḓėñƈė ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "chronos_nav_active_surface": {
         "en": "Active Surface",
@@ -2332,7 +2336,7 @@
       "chronos_nav_active_surface_hint": {
         "en": "One focused work surface at a time",
         "ja": "作業画面を1つに集中",
-        "qps-ploc": "⟦Őñė ƒőƈůşėḓ ẇőřķ şůřƒȧƈė ȧŧ ȧ ŧïɱė ŀőřė⟧"
+        "qps-ploc": "⟦Őñė ƒőƈůşėḓ ẇőřķ şůřƒȧƈė ȧŧ ȧ ŧïɱė ŀőřėɱ ïṗşůɱ⟧"
       },
       "chronos_nav_surface_control": {
         "en": "Surface Control",
@@ -2342,7 +2346,7 @@
       "chronos_nav_surface_control_hint": {
         "en": "Start, stop, and inspect managed surfaces",
         "ja": "管理対象Surfaceの起動・停止・状態確認",
-        "qps-ploc": "⟦Şŧȧřŧ, şŧőṗ, ȧñḓ ïñşṗėƈŧ ɱȧñȧɠėḓ şůřƒȧƈėş ŀőřė⟧"
+        "qps-ploc": "⟦Şŧȧřŧ, şŧőṗ, ȧñḓ ïñşṗėƈŧ ɱȧñȧɠėḓ şůřƒȧƈėş ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "chronos_surface_control": {
         "en": "Surface Control",
@@ -2352,22 +2356,22 @@
       "chronos_surface_control_description": {
         "en": "Manage runtime surfaces in their own workspace, with the latest action and safety boundary visible.",
         "ja": "最新操作と安全境界を確認しながら、ランタイムSurfaceを専用画面で管理します。",
-        "qps-ploc": "⟦Ɱȧñȧɠė řůñŧïɱė şůřƒȧƈėş ïñ ŧħėïř őẇñ ẇőřķşṗȧƈė, ẇïŧħ ŧħė ŀȧŧėşŧ ȧƈŧïőñ ȧñḓ şȧƒėŧẏ ƀőůñḓȧřẏ ṽïşïƀŀė. ŀőřė⟧"
+        "qps-ploc": "⟦Ɱȧñȧɠė řůñŧïɱė şůřƒȧƈėş ïñ ŧħėïř őẇñ ẇőřķşṗȧƈė, ẇïŧħ ŧħė ŀȧŧėşŧ ȧƈŧïőñ ȧñḓ şȧƒėŧẏ ƀőůñḓȧřẏ ṽïşïƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "chronos_surface_control_global": {
         "en": "Global surface runtime",
         "ja": "全Surfaceランタイム",
-        "qps-ploc": "⟦Ġŀőƀȧŀ şůřƒȧƈė řůñŧïɱė ŀőřė⟧"
+        "qps-ploc": "⟦Ɠŀőƀȧŀ şůřƒȧƈė řůñŧïɱė ŀőřėɱ ï⟧"
       },
       "chronos_surface_control_no_actions": {
         "en": "No surface control actions are available.",
         "ja": "利用可能なSurface操作はありません。",
-        "qps-ploc": "⟦Ñő şůřƒȧƈė ƈőñŧřőŀ ȧƈŧïőñş ȧřė ȧṽȧïŀȧƀŀė. ŀőřė⟧"
+        "qps-ploc": "⟦Ñő şůřƒȧƈė ƈőñŧřőŀ ȧƈŧïőñş ȧřė ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "chronos_surface_control_confirm_title": {
         "en": "Confirm risky surface action",
         "ja": "Surfaceの危険操作を確認",
-        "qps-ploc": "⟦Ƈőñƒïřɱ řïşķẏ şůřƒȧƈė ȧƈŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈőñƒïřɱ řïşķẏ şůřƒȧƈė ȧƈŧïőñ ŀőřėɱ ïṗş⟧"
       },
       "chronos_surface_control_confirm": {
         "en": "Confirm action",
@@ -2377,27 +2381,27 @@
       "chronos_nav_work_items": {
         "en": "Work Items",
         "ja": "ワークアイテム",
-        "qps-ploc": "⟦Ẇőřķ Ïŧėɱş ŀőřė⟧"
+        "qps-ploc": "⟦Ẇőřķ Ïŧėɱş ŀőř⟧"
       },
       "chronos_nav_work_items_hint": {
         "en": "Assignments, owners, and delivery state",
         "ja": "割当・担当者・進行状態",
-        "qps-ploc": "⟦Ȧşşïɠñɱėñŧş, őẇñėřş, ȧñḓ ḓėŀïṽėřẏ şŧȧŧė ŀőřė⟧"
+        "qps-ploc": "⟦Ȧşşïɠñɱėñŧş, őẇñėřş, ȧñḓ ḓėŀïṽėřẏ şŧȧŧė ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "chronos_workspace": {
         "en": "Workspace",
         "ja": "ワークスペース",
-        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőřė⟧"
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
       },
       "chronos_journey_title": {
         "en": "Where are we, and what happens next?",
         "ja": "今、どこにいて、次に何をするか",
-        "qps-ploc": "⟦Ẇħėřė ȧřė ẇė, ȧñḓ ẇħȧŧ ħȧṗṗėñş ñėẋŧ? ŀőřė⟧"
+        "qps-ploc": "⟦Ẇħėřė ȧřė ẇė, ȧñḓ ẇħȧŧ ħȧṗṗėñş ñėẋŧ? ŀőřėɱ ïṗşůɱ ⟧"
       },
       "chronos_journey_description": {
         "en": "Follow one mission line and open details only when needed.",
         "ja": "ミッションの流れを一つの線で確認し、必要なときだけ詳細画面へ進みます。",
-        "qps-ploc": "⟦Ƒőŀŀőẇ őñė ɱïşşïőñ ŀïñė ȧñḓ őṗėñ ḓėŧȧïŀş őñŀẏ ẇħėñ ñėėḓėḓ. ŀőřė⟧"
+        "qps-ploc": "⟦Ƒőŀŀőẇ őñė ɱïşşïőñ ŀïñė ȧñḓ őṗėñ ḓėŧȧïŀş őñŀẏ ẇħėñ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "chronos_journey_current_mission": {
         "en": "Current mission",
@@ -2407,32 +2411,32 @@
       "chronos_journey_next_action": {
         "en": "Next action",
         "ja": "次のアクション",
-        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
       },
       "chronos_journey_current_location": {
         "en": "Current",
         "ja": "現在地",
-        "qps-ploc": "⟦Ƈůřřėñŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈůřřėñŧ ŀőř⟧"
       },
       "chronos_journey_no_mission": {
         "en": "Select a mission",
         "ja": "ミッションを選択してください",
-        "qps-ploc": "⟦Şėŀėƈŧ ȧ ɱïşşïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ɱïşşïőñ ŀőřėɱ⟧"
       },
       "chronos_journey_no_active_mission": {
         "en": "No active mission.",
         "ja": "稼働中のミッションはありません。",
-        "qps-ploc": "⟦Ñő ȧƈŧïṽė ɱïşşïőñ. ŀőřė⟧"
+        "qps-ploc": "⟦Ñő ȧƈŧïṽė ɱïşşïőñ. ŀőřėɱ⟧"
       },
       "chronos_journey_open_mission": {
         "en": "Open mission details",
         "ja": "ミッション詳細を開く",
-        "qps-ploc": "⟦Őṗėñ ɱïşşïőñ ḓėŧȧïŀş ŀőřė⟧"
+        "qps-ploc": "⟦Őṗėñ ɱïşşïőñ ḓėŧȧïŀş ŀőřėɱ ⟧"
       },
       "chronos_journey_view_agents": {
         "en": "View agent status",
         "ja": "エージェントの状況を見る",
-        "qps-ploc": "⟦Ṽïėẇ ȧɠėñŧ şŧȧŧůş ŀőřė⟧"
+        "qps-ploc": "⟦Ṽïėẇ ȧɠėñŧ şŧȧŧůş ŀőřėɱ⟧"
       },
       "chronos_journey_eyebrow": {
         "en": "Mission Journey",
@@ -2442,7 +2446,7 @@
       "chronos_journey_open_detail_hint": {
         "en": "Open details to inspect owners, evidence, and deliverables.",
         "ja": "詳細を開くと、担当・証跡・成果物を確認できます。",
-        "qps-ploc": "⟦Őṗėñ ḓėŧȧïŀş ŧő ïñşṗėƈŧ őẇñėřş, ėṽïḓėñƈė, ȧñḓ ḓėŀïṽėřȧƀŀėş. ŀőřė⟧"
+        "qps-ploc": "⟦Őṗėñ ḓėŧȧïŀş ŧő ïñşṗėƈŧ őẇñėřş, ėṽïḓėñƈė, ȧñḓ ḓėŀïṽėřȧƀŀėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "chronos_needs_attention": {
         "en": "Review blockers",
@@ -2452,107 +2456,107 @@
       "chronos_active": {
         "en": "active",
         "ja": "稼働中",
-        "qps-ploc": "⟦Ȧƈŧïṽė ŀőřė⟧"
+        "qps-ploc": "⟦ȧƈŧïṽė ŀőř⟧"
       },
       "chronos_journey_attention": {
         "en": "attention",
         "ja": "要対応",
-        "qps-ploc": "⟦Ȧŧŧėñŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦ȧŧŧėñŧïőñ ŀőř⟧"
       },
       "chronos_office_description": {
         "en": "Map state transitions to rooms, seats, and attention badges.",
         "ja": "状態遷移を部屋・席・注意バッジへ写像します。",
-        "qps-ploc": "⟦Ɱȧṗ şŧȧŧė ŧřȧñşïŧïőñş ŧő řőőɱş, şėȧŧş, ȧñḓ ȧŧŧėñŧïőñ ƀȧḓɠėş. ŀőřė⟧"
+        "qps-ploc": "⟦Ɱȧṗ şŧȧŧė ŧřȧñşïŧïőñş ŧő řőőɱş, şėȧŧş, ȧñḓ ȧŧŧėñŧïőñ ƀȧḓɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "chronos_cb_back": {
         "en": "Back",
         "ja": "戻る",
-        "qps-ploc": "⟦Ƃȧƈķ ŀőřė⟧"
+        "qps-ploc": "⟦Ƀȧƈķ ŀőř⟧"
       },
       "chronos_home_office_hint": {
         "en": "See the people and agents currently moving work forward.",
         "ja": "今、仕事を前に進めている人とエージェントを確認します。",
-        "qps-ploc": "⟦Şėė ŧħė ṗėőṗŀė ȧñḓ ȧɠėñŧş ƈůřřėñŧŀẏ ɱőṽïñɠ ẇőřķ ƒőřẇȧřḓ. ŀőřė⟧"
+        "qps-ploc": "⟦Şėė ŧħė ṗėőṗŀė ȧñḓ ȧɠėñŧş ƈůřřėñŧŀẏ ɱőṽïñɠ ẇőřķ ƒőřẇȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "chronos_work_item_assignee": {
         "en": "Assignee",
         "ja": "担当者",
-        "qps-ploc": "⟦Ȧşşïɠñėė ŀőřė⟧"
+        "qps-ploc": "⟦Ȧşşïɠñėė ŀőř⟧"
       },
       "chronos_work_item_assigned_by": {
         "en": "Assigned by",
         "ja": "割当元",
-        "qps-ploc": "⟦Ȧşşïɠñėḓ ƀẏ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧşşïɠñėḓ ƀẏ ŀőř⟧"
       },
       "chronos_work_item_source": {
         "en": "Source",
         "ja": "起点",
-        "qps-ploc": "⟦Şőůřƈė ŀőřė⟧"
+        "qps-ploc": "⟦Şőůřƈė ŀőř⟧"
       },
       "chronos_work_item_priority": {
         "en": "Priority",
         "ja": "優先度",
-        "qps-ploc": "⟦Ṗřïőřïŧẏ ŀőřė⟧"
+        "qps-ploc": "⟦Ṗřïőřïŧẏ ŀőř⟧"
       },
       "chronos_work_item_created": {
         "en": "Created",
         "ja": "作成",
-        "qps-ploc": "⟦Ƈřėȧŧėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ŀőř⟧"
       },
       "chronos_work_item_updated": {
         "en": "Updated",
         "ja": "更新",
-        "qps-ploc": "⟦Ůṗḓȧŧėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ůṗḓȧŧėḓ ŀőř⟧"
       },
       "chronos_work_item_description": {
         "en": "Description",
         "ja": "説明",
-        "qps-ploc": "⟦Ḓėşƈřïṗŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ḓėşƈřïṗŧïőñ ŀőř⟧"
       },
       "chronos_work_item_unassigned": {
         "en": "Unassigned",
         "ja": "未割当",
-        "qps-ploc": "⟦Ůñȧşşïɠñėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ůñȧşşïɠñėḓ ŀőř⟧"
       },
       "chronos_work_item_no_items": {
         "en": "No work items found.",
         "ja": "ワークアイテムはありません。",
-        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱş ƒőůñḓ. ŀőřė⟧"
+        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱş ƒőůñḓ. ŀőřėɱ ⟧"
       },
       "chronos_mission_goal": {
         "en": "Goal",
         "ja": "ゴール",
-        "qps-ploc": "⟦Ġőȧŀ ŀőřė⟧"
+        "qps-ploc": "⟦Ɠőȧŀ ŀőř⟧"
       },
       "chronos_mission_type": {
         "en": "Mission type",
         "ja": "ミッションタイプ",
-        "qps-ploc": "⟦Ɱïşşïőñ ŧẏṗė ŀőřė⟧"
+        "qps-ploc": "⟦Ɱïşşïőñ ŧẏṗė ŀőř⟧"
       },
       "chronos_mission_artifacts": {
         "en": "Artifacts",
         "ja": "成果物",
-        "qps-ploc": "⟦Ȧřŧïƒȧƈŧş ŀőřė⟧"
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧş ŀőř⟧"
       },
       "chronos_mission_tier": {
         "en": "Tier",
         "ja": "ティア",
-        "qps-ploc": "⟦Ŧïėř ŀőřė⟧"
+        "qps-ploc": "⟦Ŧïėř ŀőř⟧"
       },
       "chronos_all_tenants": {
         "en": "All tenants",
         "ja": "全テナント",
-        "qps-ploc": "⟦Ȧŀŀ ŧėñȧñŧş ŀőřė⟧"
+        "qps-ploc": "⟦Ȧŀŀ ŧėñȧñŧş ŀőř⟧"
       },
       "chronos_no_active_agent_work": {
         "en": "No active agent work.",
         "ja": "アクティブなエージェント作業はありません。",
-        "qps-ploc": "⟦Ñő ȧƈŧïṽė ȧɠėñŧ ẇőřķ. ŀőřė⟧"
+        "qps-ploc": "⟦Ñő ȧƈŧïṽė ȧɠėñŧ ẇőřķ. ŀőřėɱ ⟧"
       },
       "chronos_live_terminal": {
         "en": "Open live terminal",
         "ja": "ライブ端末を開く",
-        "qps-ploc": "⟦Őṗėñ ŀïṽė ŧėřɱïñȧŀ ŀőřė⟧"
+        "qps-ploc": "⟦Őṗėñ ŀïṽė ŧėřɱïñȧŀ ŀőřėɱ⟧"
       },
       "chronos_terminal_title": {
         "en": "Live terminal",
@@ -2567,22 +2571,22 @@
       "chronos_terminal_waiting_signal": {
         "en": "Waiting for a progress signal from the agent",
         "ja": "エージェントからの進行信号を待っています",
-        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ȧ ṗřőɠřėşş şïɠñȧŀ ƒřőɱ ŧħė ȧɠėñŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ȧ ṗřőɠřėşş şïɠñȧŀ ƒřőɱ ŧħė ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "chronos_terminal_steering_placeholder": {
         "en": "Safe steering instruction",
         "ja": "安全な steering 指示",
-        "qps-ploc": "⟦Şȧƒė şŧėėřïñɠ ïñşŧřůƈŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Şȧƒė şŧėėřïñɠ ïñşŧřůƈŧïőñ ŀőřėɱ ïṗ⟧"
       },
       "chronos_terminal_send": {
         "en": "Steer",
         "ja": "指示する",
-        "qps-ploc": "⟦Şŧėėř ŀőřė⟧"
+        "qps-ploc": "⟦Şŧėėř ŀőř⟧"
       },
       "chronos_terminal_sending": {
         "en": "Sending…",
         "ja": "送信中…",
-        "qps-ploc": "⟦Şėñḓïñɠ… ŀőřė⟧"
+        "qps-ploc": "⟦Şėñḓïñɠ… ŀőř⟧"
       },
       "chronos_terminal_pause": {
         "en": "Pause mission",
@@ -2597,82 +2601,82 @@
       "chronos_terminal_owner_boundary": {
         "en": "governed control with owner boundary",
         "ja": "owner 境界付きの governed control",
-        "qps-ploc": "⟦ɠőṽėřñėḓ ƈőñŧřőŀ ẇïŧħ őẇñėř ƀőůñḓȧřẏ ŀőřė⟧"
+        "qps-ploc": "⟦ɠőṽėřñėḓ ƈőñŧřőŀ ẇïŧħ őẇñėř ƀőůñḓȧřẏ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "chronos_terminal_no_mission_boundary": {
         "en": "This work has no mission boundary, so it cannot be controlled.",
         "ja": "この作業には mission 境界がないため制御できません",
-        "qps-ploc": "⟦Ŧħïş ẇőřķ ħȧş ñő ɱïşşïőñ ƀőůñḓȧřẏ, şő ïŧ ƈȧññőŧ ƀė ƈőñŧřőŀŀėḓ. ŀőřė⟧"
+        "qps-ploc": "⟦Ŧħïş ẇőřķ ħȧş ñő ɱïşşïőñ ƀőůñḓȧřẏ, şő ïŧ ƈȧññőŧ ƀė ƈőñŧřőŀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "chronos_a2ui_intervention_required": {
         "en": "Intervention required",
         "ja": "介入が必要です",
-        "qps-ploc": "⟦Ïñŧėřṽėñŧïőñ řėƣůïřėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ïñŧėřṽėñŧïőñ řėɋůïřėḓ ŀőřėɱ ⟧"
       },
       "chronos_a2ui_progress": {
         "en": "Progress",
         "ja": "進捗",
-        "qps-ploc": "⟦Ṗřőɠřėşş ŀőřė⟧"
+        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
       },
       "chronos_a2ui_status": {
         "en": "Status",
         "ja": "状態",
-        "qps-ploc": "⟦Şŧȧŧůş ŀőřė⟧"
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
       },
       "chronos_a2ui_preview": {
         "en": "Preview",
         "ja": "プレビュー",
-        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőřė⟧"
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőř⟧"
       },
       "chronos_a2ui_intent": {
         "en": "Intent",
         "ja": "意図",
-        "qps-ploc": "⟦Ïñŧėñŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ïñŧėñŧ ŀőř⟧"
       },
       "chronos_a2ui_plan": {
         "en": "Plan",
         "ja": "計画",
-        "qps-ploc": "⟦Ṗŀȧñ ŀőřė⟧"
+        "qps-ploc": "⟦Ṗŀȧñ ŀőř⟧"
       },
       "chronos_a2ui_state": {
         "en": "State",
         "ja": "状態",
-        "qps-ploc": "⟦Şŧȧŧė ŀőřė⟧"
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
       },
       "chronos_a2ui_result": {
         "en": "Result",
         "ja": "結果",
-        "qps-ploc": "⟦Řėşůŀŧ ŀőřė⟧"
+        "qps-ploc": "⟦Řėşůŀŧ ŀőř⟧"
       },
       "chronos_a2ui_pipeline_execution": {
         "en": "Pipeline Execution",
         "ja": "パイプライン実行",
-        "qps-ploc": "⟦Ṗïṗėŀïñė Ėẋėƈůŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ṗïṗėŀïñė Ėẋėƈůŧïőñ ŀőřėɱ⟧"
       },
       "chronos_a2ui_execution_output": {
         "en": "Execution Output",
         "ja": "実行結果",
-        "qps-ploc": "⟦Ėẋėƈůŧïőñ Őůŧṗůŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ Őůŧṗůŧ ŀőřėɱ⟧"
       },
       "chronos_a2ui_readiness": {
         "en": "Readiness",
         "ja": "準備状況",
-        "qps-ploc": "⟦Řėȧḓïñėşş ŀőřė⟧"
+        "qps-ploc": "⟦Řėȧḓïñėşş ŀőř⟧"
       },
       "chronos_a2ui_schedule": {
         "en": "Schedule",
         "ja": "スケジュール",
-        "qps-ploc": "⟦Şƈħėḓůŀė ŀőřė⟧"
+        "qps-ploc": "⟦Şƈħėḓůŀė ŀőř⟧"
       },
       "chronos_a2ui_operator_snapshot": {
         "en": "Operator Snapshot",
         "ja": "オペレーター概要",
-        "qps-ploc": "⟦Őṗėřȧŧőř Şñȧṗşħőŧ ŀőřė⟧"
+        "qps-ploc": "⟦Őṗėřȧŧőř Şñȧṗşħőŧ ŀőřėɱ⟧"
       },
       "chronos_a2ui_dashboard": {
         "en": "Chronos Dashboard",
         "ja": "Chronos ダッシュボード",
-        "qps-ploc": "⟦Ƈħřőñőş Ḓȧşħƀőȧřḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈħřőñőş Ḓȧşħƀőȧřḓ ŀőřėɱ⟧"
       },
       "chronos_a2ui_active_missions": {
         "en": "Active Missions",
@@ -2687,12 +2691,12 @@
       "chronos_a2ui_visible_missions": {
         "en": "Visible Missions",
         "ja": "表示中のミッション",
-        "qps-ploc": "⟦Ṽïşïƀŀė Ɱïşşïőñş ŀőřė⟧"
+        "qps-ploc": "⟦Ṽïşïƀŀė Ɱïşşïőñş ŀőřėɱ⟧"
       },
       "chronos_a2ui_mission_registry": {
         "en": "Mission Registry View",
         "ja": "ミッション台帳ビュー",
-        "qps-ploc": "⟦Ɱïşşïőñ Řėɠïşŧřẏ Ṽïėẇ ŀőřė⟧"
+        "qps-ploc": "⟦Ɱïşşïőñ Řėɠïşŧřẏ Ṽïėẇ ŀőřėɱ ⟧"
       },
       "chronos_a2ui_agent_catalog": {
         "en": "Agent Catalog",
@@ -2702,22 +2706,22 @@
       "chronos_a2ui_available_agents": {
         "en": "Available Agents",
         "ja": "利用可能なエージェント",
-        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė Ȧɠėñŧş ŀőřė⟧"
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė Ȧɠėñŧş ŀőřėɱ⟧"
       },
       "chronos_a2ui_vital_check": {
         "en": "Vital Check",
         "ja": "稼働確認",
-        "qps-ploc": "⟦Ṽïŧȧŀ Ƈħėƈķ ŀőřė⟧"
+        "qps-ploc": "⟦Ṽïŧȧŀ Ƈħėƈķ ŀőř⟧"
       },
       "chronos_a2ui_system_vital_signs": {
         "en": "System Vital Signs",
         "ja": "システム稼働状況",
-        "qps-ploc": "⟦Şẏşŧėɱ Ṽïŧȧŀ Şïɠñş ŀőřė⟧"
+        "qps-ploc": "⟦Şẏşŧėɱ Ṽïŧȧŀ Şïɠñş ŀőřėɱ⟧"
       },
       "chronos_a2ui_runtime_diagnostics": {
         "en": "Runtime Diagnostics",
         "ja": "ランタイム診断",
-        "qps-ploc": "⟦Řůñŧïɱė Ḓïȧɠñőşŧïƈş ŀőřė⟧"
+        "qps-ploc": "⟦Řůñŧïɱė Ḓïȧɠñőşŧïƈş ŀőřėɱ ⟧"
       },
       "chronos_a2ui_recent_events": {
         "en": "Recent Events",
@@ -2727,87 +2731,87 @@
       "chronos_a2ui_governance": {
         "en": "Governance",
         "ja": "ガバナンス",
-        "qps-ploc": "⟦Ġőṽėřñȧñƈė ŀőřė⟧"
+        "qps-ploc": "⟦Ɠőṽėřñȧñƈė ŀőř⟧"
       },
       "chronos_a2ui_build_test": {
         "en": "Build & Test",
         "ja": "ビルドとテスト",
-        "qps-ploc": "⟦Ƃůïŀḓ & Ŧėşŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ƀůïŀḓ & Ŧėşŧ ŀőř⟧"
       },
       "chronos_a2ui_missions": {
         "en": "Missions",
         "ja": "ミッション",
-        "qps-ploc": "⟦Ɱïşşïőñş ŀőřė⟧"
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
       },
       "chronos_a2ui_runtime": {
         "en": "Runtime",
         "ja": "ランタイム",
-        "qps-ploc": "⟦Řůñŧïɱė ŀőřė⟧"
+        "qps-ploc": "⟦Řůñŧïɱė ŀőř⟧"
       },
       "chronos_a2ui_runtimes": {
         "en": "Runtimes",
         "ja": "ランタイム数",
-        "qps-ploc": "⟦Řůñŧïɱėş ŀőřė⟧"
+        "qps-ploc": "⟦Řůñŧïɱėş ŀőř⟧"
       },
       "chronos_a2ui_outbox": {
         "en": "Outbox",
         "ja": "送信待ち",
-        "qps-ploc": "⟦Őůŧƀőẋ ŀőřė⟧"
+        "qps-ploc": "⟦Őůŧƀőẋ ŀőř⟧"
       },
       "chronos_a2ui_exit_code": {
         "en": "Exit code",
         "ja": "終了コード",
-        "qps-ploc": "⟦Ėẋïŧ ƈőḓė ŀőřė⟧"
+        "qps-ploc": "⟦Ėẋïŧ ƈőḓė ŀőř⟧"
       },
       "chronos_a2ui_tier": {
         "en": "Tier",
         "ja": "ティア",
-        "qps-ploc": "⟦Ŧïėř ŀőřė⟧"
+        "qps-ploc": "⟦Ŧïėř ŀőř⟧"
       },
       "chronos_a2ui_type": {
         "en": "Type",
         "ja": "種別",
-        "qps-ploc": "⟦Ŧẏṗė ŀőřė⟧"
+        "qps-ploc": "⟦Ŧẏṗė ŀőř⟧"
       },
       "chronos_a2ui_next": {
         "en": "Next",
         "ja": "次",
-        "qps-ploc": "⟦Ñėẋŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
       },
       "chronos_a2ui_provider": {
         "en": "Provider",
         "ja": "プロバイダー",
-        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőřė⟧"
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
       },
       "chronos_a2ui_model": {
         "en": "Model",
         "ja": "モデル",
-        "qps-ploc": "⟦Ɱőḓėŀ ŀőřė⟧"
+        "qps-ploc": "⟦Ɱőḓėŀ ŀőř⟧"
       },
       "chronos_a2ui_capabilities": {
         "en": "Capabilities",
         "ja": "能力",
-        "qps-ploc": "⟦Ƈȧṗȧƀïŀïŧïėş ŀőřė⟧"
+        "qps-ploc": "⟦Ƈȧṗȧƀïŀïŧïėş ŀőř⟧"
       },
       "chronos_a2ui_checkpoints": {
         "en": "Checkpoints",
         "ja": "チェックポイント",
-        "qps-ploc": "⟦Ƈħėƈķṗőïñŧş ŀőřė⟧"
+        "qps-ploc": "⟦Ƈħėƈķṗőïñŧş ŀőř⟧"
       },
       "chronos_a2ui_next_tasks": {
         "en": "Next Tasks",
         "ja": "次のタスク",
-        "qps-ploc": "⟦Ñėẋŧ Ŧȧşķş ŀőřė⟧"
+        "qps-ploc": "⟦Ñėẋŧ Ŧȧşķş ŀőř⟧"
       },
       "chronos_a2ui_file_missing": {
         "en": "file missing",
         "ja": "ファイルなし",
-        "qps-ploc": "⟦ƒïŀė ɱïşşïñɠ ŀőřė⟧"
+        "qps-ploc": "⟦ƒïŀė ɱïşşïñɠ ŀőř⟧"
       },
       "chronos_a2ui_original_file_cleaned": {
         "en": "The original file was cleaned up; only the record remains.",
         "ja": "元ファイルは掃除済みです（記録のみ残っています）",
-        "qps-ploc": "⟦Ŧħė őřïɠïñȧŀ ƒïŀė ẇȧş ƈŀėȧñėḓ ůṗ; őñŀẏ ŧħė řėƈőřḓ řėɱȧïñş. ŀőřė⟧"
+        "qps-ploc": "⟦Ŧħė őřïɠïñȧŀ ƒïŀė ẇȧş ƈŀėȧñėḓ ůṗ; őñŀẏ ŧħė řėƈőřḓ řėɱȧïñş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "chronos_office": {
         "en": "Chronos Office",
@@ -2817,7 +2821,7 @@
       "chronos_track_record": {
         "en": "Agent track record",
         "ja": "エージェントの実績",
-        "qps-ploc": "⟦Ȧɠėñŧ ŧřȧƈķ řėƈőřḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧɠėñŧ ŧřȧƈķ řėƈőřḓ ŀőřėɱ⟧"
       },
       "chronos_agent_activity": {
         "en": "Agent activity",
@@ -2827,92 +2831,92 @@
       "chronos_work_items": {
         "en": "Work items board",
         "ja": "ワークアイテム看板",
-        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ƀőȧřḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ƀőȧřḓ ŀőřėɱ⟧"
       },
       "chronos_work_coordination": {
         "en": "Work Coordination",
         "ja": "ワークコーディネーション",
-        "qps-ploc": "⟦Ẇőřķ Ƈőőřḓïñȧŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ẇőřķ Ƈőőřḓïñȧŧïőñ ŀőřėɱ⟧"
       },
       "chronos_work_coordination_description": {
         "en": "Live coordination statistics for handoff, blocking, and execution attempts.",
         "ja": "引き継ぎ・ブロック・実行試行を確認するライブ統計です。",
-        "qps-ploc": "⟦Ŀïṽė ƈőőřḓïñȧŧïőñ şŧȧŧïşŧïƈş ƒőř ħȧñḓőƒƒ, ƀŀőƈķïñɠ, ȧñḓ ėẋėƈůŧïőñ ȧŧŧėɱṗŧş. ŀőřė⟧"
+        "qps-ploc": "⟦Ŀïṽė ƈőőřḓïñȧŧïőñ şŧȧŧïşŧïƈş ƒőř ħȧñḓőƒƒ, ƀŀőƈķïñɠ, ȧñḓ ėẋėƈůŧïőñ ȧŧŧėɱṗŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "chronos_work_coordination_total_detail": {
         "en": "Tracked work items across the coordination store",
         "ja": "コーディネーションストアで追跡中のワークアイテム",
-        "qps-ploc": "⟦Ŧřȧƈķėḓ ẇőřķ ïŧėɱş ȧƈřőşş ŧħė ƈőőřḓïñȧŧïőñ şŧőřė ŀőřė⟧"
+        "qps-ploc": "⟦Ŧřȧƈķėḓ ẇőřķ ïŧėɱş ȧƈřőşş ŧħė ƈőőřḓïñȧŧïőñ şŧőřė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "chronos_work_coordination_in_progress_detail": {
         "en": "Items currently being worked on",
         "ja": "現在作業中のアイテム",
-        "qps-ploc": "⟦Ïŧėɱş ƈůřřėñŧŀẏ ƀėïñɠ ẇőřķėḓ őñ ŀőřė⟧"
+        "qps-ploc": "⟦Ïŧėɱş ƈůřřėñŧŀẏ ƀėïñɠ ẇőřķėḓ őñ ŀőřėɱ ïṗşů⟧"
       },
       "chronos_work_coordination_blocked_detail": {
         "en": "Items with a declared block or failed attempt",
         "ja": "ブロックまたは失敗した試行があるアイテム",
-        "qps-ploc": "⟦Ïŧėɱş ẇïŧħ ȧ ḓėƈŀȧřėḓ ƀŀőƈķ őř ƒȧïŀėḓ ȧŧŧėɱṗŧ ŀőřė⟧"
+        "qps-ploc": "⟦Ïŧėɱş ẇïŧħ ȧ ḓėƈŀȧřėḓ ƀŀőƈķ őř ƒȧïŀėḓ ȧŧŧėɱṗŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "chronos_work_coordination_running_attempts": {
         "en": "Running attempts",
         "ja": "実行中の試行",
-        "qps-ploc": "⟦Řůññïñɠ ȧŧŧėɱṗŧş ŀőřė⟧"
+        "qps-ploc": "⟦Řůññïñɠ ȧŧŧėɱṗŧş ŀőřėɱ⟧"
       },
       "chronos_work_coordination_running_attempts_detail": {
         "en": "Active execution attempts across all items",
         "ja": "全アイテムで実行中の試行",
-        "qps-ploc": "⟦Ȧƈŧïṽė ėẋėƈůŧïőñ ȧŧŧėɱṗŧş ȧƈřőşş ȧŀŀ ïŧėɱş ŀőřė⟧"
+        "qps-ploc": "⟦Ȧƈŧïṽė ėẋėƈůŧïőñ ȧŧŧėɱṗŧş ȧƈřőşş ȧŀŀ ïŧėɱş ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "chronos_attention": {
         "en": "attention",
         "ja": "要対応",
-        "qps-ploc": "⟦Ȧŧŧėñŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦ȧŧŧėñŧïőñ ŀőř⟧"
       },
       "chronos_blocked_count": {
         "en": "blocked",
         "ja": "ブロック",
-        "qps-ploc": "⟦ƀŀőƈķėḓ ŀőřė⟧"
+        "qps-ploc": "⟦ƀŀőƈķėḓ ŀőř⟧"
       },
       "chronos_review_waiting": {
         "en": "awaiting review",
         "ja": "レビュー待ち",
-        "qps-ploc": "⟦Ȧẇȧïŧïñɠ řėṽïėẇ ŀőřė⟧"
+        "qps-ploc": "⟦ȧẇȧïŧïñɠ řėṽïėẇ ŀőřė⟧"
       },
       "chronos_status_backlog": {
         "en": "Backlog",
         "ja": "バックログ",
-        "qps-ploc": "⟦Ƃȧƈķŀőɠ ŀőřė⟧"
+        "qps-ploc": "⟦Ƀȧƈķŀőɠ ŀőř⟧"
       },
       "chronos_status_ready": {
         "en": "Ready",
         "ja": "準備済み",
-        "qps-ploc": "⟦Řėȧḓẏ ŀőřė⟧"
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
       },
       "chronos_status_in_progress": {
         "en": "In progress",
         "ja": "進行中",
-        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőřė⟧"
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
       },
       "chronos_status_review": {
         "en": "Review",
         "ja": "レビュー",
-        "qps-ploc": "⟦Řėṽïėẇ ŀőřė⟧"
+        "qps-ploc": "⟦Řėṽïėẇ ŀőř⟧"
       },
       "chronos_status_done": {
         "en": "Done",
         "ja": "完了",
-        "qps-ploc": "⟦Ḓőñė ŀőřė⟧"
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
       },
       "chronos_status_archived": {
         "en": "Archived",
         "ja": "アーカイブ済み",
-        "qps-ploc": "⟦Ȧřƈħïṽėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧřƈħïṽėḓ ŀőř⟧"
       },
       "chronos_status_unknown": {
         "en": "Unknown",
         "ja": "不明",
-        "qps-ploc": "⟦Ůñķñőẇñ ŀőřė⟧"
+        "qps-ploc": "⟦Ůñķñőẇñ ŀőř⟧"
       }
     },
     "tui": {
