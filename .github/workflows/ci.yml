@@ -54,6 +54,9 @@ jobs:
       - name: Check ESM integrity
         run: pnpm run check:esm
 
+      - name: Check packaging contract
+        run: pnpm run check:packaging-contract
+
       - name: Check contract schemas
         run: pnpm run check:contract-schemas
 

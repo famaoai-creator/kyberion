@@ -50,6 +50,9 @@ jobs:
       - name: Check ESM integrity
         run: pnpm run check:esm
 
+      - name: Check packaging contract
+        run: pnpm run check:packaging-contract
+
       - name: Lint check
         run: pnpm run lint
 

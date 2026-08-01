@@ -18,6 +18,7 @@ import { assertOperationPolicy, currentDelegationDepth } from './operation-polic
 import type { A2ATaskContract, PlanningPacket, TaskResultBlock } from './channel-surface-types.js';
 import { slugify } from './text-utils.js';
 import { frameUntrustedInput } from './untrusted-input-framing.js';
+import { createGapRecorder, type GapPhaseSample } from './gap-phase.js';
 import { parseStructuredJson } from './structured-reasoning.js';
 import {
   resolveStructuredOutputSchema,
@@ -1473,13 +1474,35 @@ export async function delegateTaskWithUntrustedData(
   backend: Pick<ReasoningBackend, 'delegateTask'>,
   instruction: string,
   params: UntrustedDataParams,
-  options?: ReasoningCallOptions & { context?: string }
+  options?: ReasoningCallOptions & {
+    context?: string;
+    /** QM-09: receives the named-phase latency breakdown of this delegation. */
+    onGapPhases?: (samples: GapPhaseSample[]) => void;
+  }
 ): Promise<string> {
-  const prompt = `${instruction}
+  const gaps = createGapRecorder();
+  // Strip the observer before forwarding: backends receive plain data options,
+  // never a function-valued key a future structuredClone would choke on.
+  const { onGapPhases, ...backendOptions } = options ?? {};
+  try {
+    const prompt = gaps.measureSync(
+      'prompt_build',
+      () => `${instruction}
 
-${frameUntrustedInput({ data: params.untrustedData, source: params.sourceLabel || 'external data' })}`;
-
-  return backend.delegateTask(prompt, options?.context, options);
+${frameUntrustedInput({ data: params.untrustedData, source: params.sourceLabel || 'external data' })}`
+    );
+    return await gaps.measure('backend_dispatch', () =>
+      backend.delegateTask(prompt, backendOptions.context, backendOptions)
+    );
+  } finally {
+    if (onGapPhases) {
+      try {
+        onGapPhases(gaps.samples());
+      } catch (error) {
+        logger.warn(`[QM-09] gap-phase observer failed (ignored): ${error}`);
+      }
+    }
+  }
 }
 
 const PEER_ADVICE_SCHEMA = z.object({

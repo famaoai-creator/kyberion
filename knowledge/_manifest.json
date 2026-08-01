@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 74620,
+      "size": 75190,
       "type": "json"
     },
     {
@@ -1533,7 +1533,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 15142,
+      "size": 17040,
       "type": "md"
     },
     {
