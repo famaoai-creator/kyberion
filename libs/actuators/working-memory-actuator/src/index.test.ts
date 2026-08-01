@@ -42,4 +42,32 @@ describe('working-memory-actuator', () => {
       })
     ).rejects.toThrow('working-memory-actuator: unknown op "working-memory:unknown-op"');
   });
+
+  describe('QM-03 notebook fold semantics', () => {
+    const note = (content: string, extra: Record<string, unknown> = {}) =>
+      handleAction({
+        action: 'note',
+        params: { scope: 'session', scope_ref: TEST_SCOPE_REF, content, ...extra },
+      });
+    const mdPath = `${TEST_ROOT}/MEMORY.md`;
+    const read = () => String(safeReadFile(mdPath, { encoding: 'utf8' }));
+
+    it('date-stamps notes and dedupes by normalized text', async () => {
+      await note('User prefers vim');
+      const result = (await note('user prefers VIM')) as {
+        working_memory_result: { deduped?: boolean };
+      };
+      expect(result.working_memory_result.deduped).toBe(true);
+      const body = read();
+      expect(body.match(/prefers vim/gi)).toHaveLength(1);
+      expect(body).toMatch(/- \(\d{4}-\d\d-\d\d\) User prefers vim/);
+    });
+
+    it('neutralizes untrusted provenance but keeps trusted notes verbatim', async () => {
+      await note('likes tea (said in #private)');
+      expect(read()).toContain('[claimed source: #private]');
+      await note('likes coffee (said in #general)', { trusted: true });
+      expect(read()).toContain('likes coffee (said in #general)');
+    });
+  });
 });
