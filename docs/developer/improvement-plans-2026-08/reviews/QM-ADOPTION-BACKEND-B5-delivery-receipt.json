@@ -1,0 +1,10 @@
+{
+  "kind": "delivery-receipt",
+  "mission_id": "QM-ADOPTION-BACKEND-B5",
+  "task_id": "delivery-deliver",
+  "pr_url": "https://github.com/famaoai-creator/kyberion/pull/651",
+  "branch": "agent/qm-adoption-batch5",
+  "base": "agent/qm-adoption-batch4",
+  "delivered_at": "2026-08-01T15:02:36.000Z",
+  "operator_approval": "Operator-approved delivery pattern (PRs #648/#649 merged, #650 open); batch requested via 続けて (2026-08-01)"
+}
