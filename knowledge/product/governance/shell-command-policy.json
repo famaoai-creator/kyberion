@@ -7,10 +7,15 @@
   "allowlist": [
     {
       "id": "read-only-fs",
+      "command_regex": ["^(?:ls|cat|grep|find|head|tail|pwd|which|type|sed|awk|rg)(?:\\s|$)"],
+      "reason": "Read-only shell inspection is allowed. Env-var prefixes and wrapper commands (env, timeout, …) are stripped by de-obfuscation before matching (QM-05)."
+    },
+    {
+      "id": "pure-filters",
       "command_regex": [
-        "^(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:ls|cat|grep|find|head|tail|pwd|which|type|sed|awk|rg)(?:\\s|$)"
+        "^(?:wc|sort|uniq|cut|tr|column|nl|jq|diff|comm|paste|rev|xxd|od)(?:\\s|$)"
       ],
-      "reason": "Read-only shell inspection is allowed."
+      "reason": "Pure read-only filters so ordinary pipelines (ls | wc -l, git log | jq) stay allowlisted; write-capable forms (sort -o) are rejected by the allow-path arg guards (QM-05)."
     },
     {
       "id": "git-readonly",
@@ -22,10 +27,10 @@
     {
       "id": "test-and-lint",
       "command_regex": [
-        "^pnpm\\s+(?:lint|typecheck|test(?:[:\\w-]+)?|run\\s+(?:lint|typecheck|test(?:[:\\w-]+)?|build(?:[:\\w-]+)?))(?:\\s|$)",
+        "^pnpm\\s+(?:lint|typecheck|test[:\\w-]*|run\\s+(?:lint|typecheck|test[:\\w-]*|build[:\\w-]*))(?:\\s|$)",
         "^pnpm\\s+exec\\s+vitest(?:\\s|$)"
       ],
-      "reason": "Test and lint commands are allowed."
+      "reason": "Test and lint commands are allowed. Patterns stay within the safe-regex subset (no nested repetition; QM-05)."
     },
     {
       "id": "mobile-toolchain",
@@ -52,19 +57,25 @@
     {
       "id": "destructive-rm",
       "command_regex": [
-        "(?:^|\\s)rm\\s+.*-rf(?:\\s|$)",
-        "(?:^|\\s)rm\\s+.*--recursive.*--force(?:\\s|$)",
-        "(?:^|\\s)rm\\s+.*--force.*--recursive(?:\\s|$)"
+        "(?:^|[\\s\"'`(;|&{])rm\\s-[a-zA-Z]*r[a-zA-Z]*f",
+        "(?:^|[\\s\"'`(;|&{])rm\\s-[a-zA-Z]*f[a-zA-Z]*r",
+        "(?:^|[\\s\"'`(;|&{])rm\\s[^\\n]*\\s-[a-zA-Z]*r[a-zA-Z]*f",
+        "(?:^|[\\s\"'`(;|&{])rm\\s[^\\n]*\\s-[a-zA-Z]*f[a-zA-Z]*r",
+        "(?:^|[\\s\"'`(;|&{])rm\\s[^\\n]*--recursive[^\\n]*--force",
+        "(?:^|[\\s\"'`(;|&{])rm\\s[^\\n]*--force[^\\n]*--recursive",
+        "(?:^|[\\s\"'`(;|&{])rm\\s-[rR]\\s[^\\n]*-[fF](?:\\s|$)",
+        "(?:^|[\\s\"'`(;|&{])rm\\s-[fF]\\s[^\\n]*-[rR](?:\\s|$)"
       ],
-      "reason": "Recursive destructive deletion is blocked."
+      "reason": "Recursive destructive deletion is blocked in any flag order or clustering (-rf, -fr, -rfv, -r -f, --recursive --force). Flag clusters must follow whitespace so hyphenated filenames cannot false-match; the boundary class catches payloads inside quotes because deny scans the raw text (QM-05)."
     },
     {
       "id": "pipe-to-shell",
       "command_regex": [
-        "\\|\\s*(?:sh|bash|zsh|fish|ksh)(?:\\s|$)",
+        "\\|\\s*(?:sh|bash|zsh|fish|ksh|dash)(?:\\s|$)",
+        "\\|\\s*/[^\\s|]*/(?:sh|bash|zsh|fish|ksh|dash)(?:\\s|$)",
         "(?:^|\\s)(?:sh|bash|zsh|fish|ksh)\\s+-c\\s+.*(?:curl|wget)"
       ],
-      "reason": "Piping untrusted output into a shell is blocked."
+      "reason": "Piping untrusted output into a shell is blocked (bare and path-qualified shells)."
     },
     {
       "id": "dangerous-binary-tools",

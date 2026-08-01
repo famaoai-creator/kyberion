@@ -13,6 +13,8 @@ import {
   listWorkItemAttempts,
   listWorkItems,
   releaseWorkItem,
+  renewWorkItemLease,
+  reapExpiredWorkLeases,
   handoffWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
@@ -219,5 +221,113 @@ describe('work coordination', () => {
         nextStatus: 'ready',
       })
     ).toThrowError(/lease/i);
+  });
+
+  describe('QM-01 lease reaping and poison-pill parking', () => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const makeItem = () =>
+      createWorkItem({
+        title: 'Reap target',
+        description: 'lease semantics test',
+        projectId: 'PRJ-REAP',
+      });
+
+    it('refuses renewal by a non-holder', async () => {
+      const item = makeItem();
+      const { lease } = claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: 'peer-a',
+        purpose: 'work',
+      });
+      expect(() =>
+        renewWorkItemLease({ leaseId: lease.lease_id, actorPeerId: 'peer-b' })
+      ).toThrowError(/holder mismatch/i);
+      expect(renewWorkItemLease({ leaseId: lease.lease_id, actorPeerId: 'peer-a' }).lease_id).toBe(
+        lease.lease_id
+      );
+    });
+
+    it('refuses renewal of a lapsed lease', async () => {
+      const item = makeItem();
+      const { lease } = claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: 'peer-a',
+        purpose: 'work',
+        ttlMs: 1,
+      });
+      await sleep(10);
+      expect(() => renewWorkItemLease({ leaseId: lease.lease_id })).toThrowError(/lapsed/i);
+    });
+
+    it('recovers a stranded in_progress item back to ready', async () => {
+      const item = makeItem();
+      claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
+      await sleep(10);
+      expect(listWorkItems()[0].status).toBe('in_progress');
+
+      const result = reapExpiredWorkLeases();
+      expect(result.recovered.map((i) => i.item_id)).toContain(item.item_id);
+      const after = listWorkItems()[0];
+      expect(after.status).toBe('ready');
+      expect(after.lease_id).toBeUndefined();
+      expect(after.claimed_by_peer_id).toBeUndefined();
+      expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
+        status: 'released',
+        failure_reason: 'lease_expired',
+      });
+    });
+
+    it('a zombie holder cannot release after the item was re-claimed', async () => {
+      const item = makeItem();
+      const zombie = claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: 'peer-a',
+        purpose: 'work',
+        ttlMs: 1,
+      });
+      await sleep(10);
+      reapExpiredWorkLeases();
+      const fresh = claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-b', purpose: 'work' });
+      expect(() =>
+        releaseWorkItem({
+          itemId: item.item_id,
+          leaseId: zombie.lease.lease_id,
+          actorPeerId: 'peer-a',
+        })
+      ).toThrowError(/lease/i);
+      expect(
+        releaseWorkItem({
+          itemId: item.item_id,
+          leaseId: fresh.lease.lease_id,
+          actorPeerId: 'peer-b',
+          nextStatus: 'done',
+        }).item.status
+      ).toBe('done');
+    });
+
+    it('parks a crash-looping item after its attempt budget is exhausted', async () => {
+      const item = makeItem();
+      for (let round = 0; round < 3; round++) {
+        claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
+        await sleep(10);
+        const result = reapExpiredWorkLeases({ maxErrorAttempts: 3 });
+        if (round < 2) {
+          expect(result.parked).toHaveLength(0);
+          expect(listWorkItems()[0].status).toBe('ready');
+        } else {
+          expect(result.parked.map((i) => i.item_id)).toContain(item.item_id);
+        }
+      }
+      const after = listWorkItems()[0];
+      expect(after.status).toBe('blocked');
+      expect(after.metadata).toMatchObject({ parked: true });
+      expect(String(after.metadata?.parked_reason)).toMatch(/attempt budget exhausted/);
+      expect(
+        listCoordinationEvents().some(
+          (event) => event.event_type === 'item_blocked' && event.item_id === item.item_id
+        )
+      ).toBe(true);
+    });
   });
 });
