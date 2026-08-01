@@ -18,6 +18,7 @@ import {
   completeDelegatedTaskTrace,
   startDelegatedTaskTrace,
 } from './delegated-task-observability.js';
+import { createGapRecorder } from './gap-phase.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from './src/knowledge-feedback-loop.js';
 import { isLocalReasoningBackend } from './reasoning-egress-scope.js';
@@ -260,16 +261,15 @@ ${schemaContent}
 Output constraints: pure JSON, no markdown fences, no comments, no trailing commas.
 `.trim();
 
+  const gaps = createGapRecorder();
   try {
     const originalContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
-    const repairContext = await buildAdfRepairKnowledgeContext(
-      adfPath,
-      schemaName,
-      errorSummary,
-      hints,
-      backend.name
+    const repairContext = await gaps.measure('knowledge_slice', () =>
+      buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
     );
-    const report = await backend.delegateTask(instruction, repairContext);
+    const report = await gaps.measure('backend_dispatch', () =>
+      backend.delegateTask(instruction, repairContext)
+    );
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
 
     // Re-verify after repair
@@ -295,20 +295,24 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
         safeWriteFile(adfPath, repairJsonString(updatedContent)!, { encoding: 'utf8' });
         updatedParsed = recovered;
       } else {
-        completeDelegatedTaskTrace(trace, { error: 'sub-agent output is still unparseable JSON' });
+        completeDelegatedTaskTrace(trace, {
+          error: 'sub-agent output is still unparseable JSON',
+          gapPhases: gaps.samples(),
+        });
         return { repaired: false, errors: ['sub-agent output is still unparseable JSON'], report };
       }
     }
 
     const finalValidation = validate(updatedParsed, schemaName);
     if (finalValidation.valid) {
-      completeDelegatedTaskTrace(trace, { resultSummary: report });
+      completeDelegatedTaskTrace(trace, { resultSummary: report, gapPhases: gaps.samples() });
       return { repaired: true, report };
     }
 
     const finalErrors = finalValidation.errors.map((e) => `${e.field}: ${e.message}`);
     completeDelegatedTaskTrace(trace, {
       resultSummary: `repair completed but validation still failed: ${finalErrors.join('; ')}`,
+      gapPhases: gaps.samples(),
     });
     return {
       repaired: false,
@@ -316,7 +320,10 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       report: `Sub-agent attempted repair but file is still invalid: ${finalErrors.join('; ')}`,
     };
   } catch (err: any) {
-    completeDelegatedTaskTrace(trace, { error: err.message });
+    completeDelegatedTaskTrace(trace, {
+      error: err instanceof Error ? err.message : String(err),
+      gapPhases: gaps.samples(),
+    });
     return {
       repaired: false,
       errors: [err.message],
