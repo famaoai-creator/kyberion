@@ -54,6 +54,12 @@ export function composeSecurityPosture(
 }
 
 const POSTURE_PATH = pathResolver.knowledge('product/governance/security-posture.json');
+const POSTURE_CACHE_TTL_MS = 15_000;
+let postureFileCache: { value: SecurityPosture; at: number } | null = null;
+
+export function resetConfiguredPostureCache(): void {
+  postureFileCache = null;
+}
 
 export function resolveConfiguredPosture(): SecurityPosture {
   const envValue = process.env.KYBERION_SECURITY_POSTURE?.trim();
@@ -64,6 +70,15 @@ export function resolveConfiguredPosture(): SecurityPosture {
       `[QM-04] KYBERION_SECURITY_POSTURE=${JSON.stringify(envValue)} is not dangerous|auto|strict; ignoring it.`
     );
   }
+  if (postureFileCache && Date.now() - postureFileCache.at < POSTURE_CACHE_TTL_MS) {
+    return postureFileCache.value;
+  }
+  const resolved = resolvePostureFromFile();
+  postureFileCache = { value: resolved, at: Date.now() };
+  return resolved;
+}
+
+function resolvePostureFromFile(): SecurityPosture {
   if (safeExistsSync(POSTURE_PATH)) {
     try {
       const raw = safeReadFile(POSTURE_PATH, { encoding: 'utf8' }) as string;

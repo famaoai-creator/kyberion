@@ -145,7 +145,11 @@ export function prepareSlackSurfaceArtifact(input: SlackSurfaceInput): SlackSurf
   const processed = processUntrustedContent(rawPayload, `slack:${input.user || 'unknown'}`);
   const cleanPayload = processed.wrapped;
   const shouldAck = input.channelType === 'im';
-  const ackText = 'Received. I am routing this to Kyberion now.';
+  // QM-04 (review P1-2): never tell the user their message is being routed
+  // when it was actually quarantined — the honest ack names the quarantine.
+  const ackText = processed.quarantineId
+    ? `Your message tripped the security screen and was quarantined (id ${processed.quarantineId}). An operator can review and release it; it will not be processed as-is.`
+    : 'Received. I am routing this to Kyberion now.';
 
   const stimulus = {
     id: stimulusId,
