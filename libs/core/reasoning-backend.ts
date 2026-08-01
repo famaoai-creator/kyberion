@@ -534,6 +534,12 @@ export interface ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string>;
+  /**
+   * QM-06: drop any provider-side session state. Called on both sides of a
+   * failover switch so neither backend serves a later call with a stale
+   * provider session. Optional — backends without session continuity omit it.
+   */
+  resetSession?(): Promise<void> | void;
   /** Optional adopter for a provider-native subagent surface. */
   getNativeSubagentAdopter?(): NativeSubagentAdopter | null;
   /** Whether this backend requires the native adopter when delegation is requested. */
@@ -776,6 +782,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   readonly name: string;
   private readonly candidates: ReasoningBackendCandidate[];
   private readonly failoverPolicy: ReasoningFailoverPolicy;
+  /** QM-06: label of the candidate that served the previous call. */
+  private lastServedLabel: string | null = null;
 
   constructor(
     candidates: ReasoningBackendCandidate[],
@@ -827,6 +835,27 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     return matches[0] || peers[0] || null;
   }
 
+  /**
+   * QM-06 (qm harness-router pattern): when the serving candidate changes
+   * between calls, the INCOMING backend is reset BEFORE it is invoked (so
+   * the first post-switch call can never be served on a stale provider
+   * session from an earlier stint) and the OUTGOING backend is reset after
+   * the switch is confirmed. Best-effort — a reset failure never affects the
+   * served result.
+   */
+  private async resetBackendSession(label: string, phase: 'incoming' | 'outgoing'): Promise<void> {
+    const candidate = this.candidates.find((entry) => candidateLabel(entry) === label);
+    const reset = candidate?.backend.resetSession?.bind(candidate.backend);
+    if (!reset) return;
+    try {
+      await reset();
+    } catch (error) {
+      logger.warn(
+        `[QM-06] resetSession (${phase}) on ${label} around failover switch failed (ignored): ${error}`
+      );
+    }
+  }
+
   private async runWithFailover<T>(
     operation: string,
     invoke: (backend: ReasoningBackend) => Promise<T>,
@@ -851,6 +880,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     for (const candidate of this.candidates.slice(0, this.failoverPolicy.max_attempts)) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
+      const label = candidateLabel(candidate);
+      const isSwitch = this.lastServedLabel !== null && label !== this.lastServedLabel;
+      if (isSwitch) await this.resetBackendSession(label, 'incoming');
       const attempt = await this.attemptCandidateWithRetries(
         operation,
         candidate,
@@ -859,12 +891,16 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         signal
       );
       if (attempt.ok === false) {
-        errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        errors.push(`${label}: ${attempt.message}`);
         if (attempt.stop) break;
         continue;
       }
       if (this.candidates[0])
         recordCandidateServed(operation, this.candidates[0], candidate, errors);
+      if (isSwitch && this.lastServedLabel) {
+        await this.resetBackendSession(this.lastServedLabel, 'outgoing');
+      }
+      this.lastServedLabel = label;
       return attempt.result;
     }
 

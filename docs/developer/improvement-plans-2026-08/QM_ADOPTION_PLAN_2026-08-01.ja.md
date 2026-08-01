@@ -236,7 +236,9 @@ qm は「スタートアップ向けマルチプレイヤー agent ハーネス�
 - **QM-08: 完了(バッチ④、ミッション `QM-ADOPTION-OPS-B4`)。** `PACKAGING_CONTRACT.md` に配布契約の条項ステータス表(ENFORCED / VALIDATED-ONLY / RESERVED + 検証器名)を新設。`scripts/check_packaging_contract.ts` が ENFORCED 条項(image.tier-isolation の .dockerignore 除外群、config.no-secret-values の env.example 値検出)を機械検証し、package.json + CI 両ワークフローに登録。**残**: onboarding wizard の「runbook as skill」生成(ONB 系と合流)。
 - **QM-10: 完了(バッチ④)。** `tests/docs-honesty-contract.test.ts` 新設 — AGENTS.md の不変条件(secure-io lint 境界・symlink 正本・plugin fail-closed・tier 定義)、**条項表の ENFORCED 行が実在する検証器を指すこと**、posture 単調性、採択計画 §6 の主要な主張をコードと突合。qm 思想 7 原則を `kyberion-development-practices.md` §7 に distill(fail-open ラベル・純関数ポリシー・切詰め=審査不能・rename 禁止・正直な限界宣言・非対称脱難読化・単調強化)。**残**: store 契約テスト形式のテンプレート化(2 代表 store の改修)。
 - **QM-09: コア完了(バッチ④)。** `libs/core/gap-phase.ts`(語彙 = コード単一正本、recorder、書込時語彙検証 `sanitizeGapSamples`)。`DelegatedTaskTrace.gap_phases` を追加し、`delegateTaskWithUntrustedData`(`onGapPhases` オプション)と adf-repair-agent の trace 完了に配線。**残**: mission-dispatch 経路への展開と operator-surface の内訳表示。語彙の governance JSON registry 化は「コードが registry」方式に変更(checker は docs-honesty テストが兼務)。
-- QM-06 / QM-07 / QM-11: 未着手(後続バッチ)。
+- **QM-11: 完了(バッチ⑤、ミッション `QM-ADOPTION-BACKEND-B5`)。** `egress-policy.ts` に `composeAudienceFloor`(allow **∩** / deny **∪**、ホスト正規化、サブドメイン継承、空 audience = 全拒否)+ `evaluateAudienceEgress`。`sendToCustomer` は本文中リンクを tenant+operator の合成床で検査し、違反があれば承認ゲート前に拒否(1 参加者の拒否が全員に効く)。新規 ID 基盤は作らず既存 tenant/operator ポリシー保持者で合成。
+- **QM-06: コア完了(バッチ⑤)。** `backend-capability-profile.ts` — 全 20 モードの transport/能力/utility 適性を宣言(Record 型で網羅性をコンパイル時強制。stub は utility_fit 空 = wisdom 系が絶対に route しない宣言)。`ReasoningBackend.resetSession?` フックを追加し、**failover の serving candidate が切り替わった呼び出しで新旧両 backend の provider セッションをリセット**(qm harness-router パターン)。**残**: 各 CLI を実際に叩く適合マトリクス(宣言の実証)、`reasoning-route-resolver` の profile 参照化。
+- QM-07(skill pack git 取込): 未着手 — 最終残項目。ネットワーク fetch・SSRF ガード・衝突検査を含む M 規模のため単独バッチとして実施する。
 
 ## 7. 検証コマンド(実装時)
 
