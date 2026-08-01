@@ -8,6 +8,7 @@ import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { getRegisteredEnv } from './env-validator.js';
 
 /**
  * Provider Health Registry v1.0
@@ -58,12 +59,12 @@ let loadedFromPath: string | null = null;
 // leak demotions across unrelated test files (same pattern as
 // operator-notifications' VITEST guard).
 function persistenceEnabled(): boolean {
-  return !process.env.VITEST || Boolean(process.env[STATE_PATH_ENV]);
+  return !process.env.VITEST || Boolean(getRegisteredEnv(STATE_PATH_ENV));
 }
 
 function stateFilePath(): string {
-  const override = process.env[STATE_PATH_ENV];
-  if (override) return pathResolver.rootResolve(override);
+  const override = getRegisteredEnv<string>(STATE_PATH_ENV);
+  if (typeof override === 'string' && override) return pathResolver.rootResolve(override);
   return pathResolver.active('shared/runtime/provider-health.json');
 }
 
@@ -113,11 +114,12 @@ export function reloadProviderHealthFromDisk(now: number = Date.now()): void {
 }
 
 export function getProviderHealthDemotionTtlMs(): number {
-  const configured = Number(process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS || '');
-  if (Number.isFinite(configured) && configured > 0) {
-    return Math.round(configured);
-  }
-  return DEFAULT_DEMOTION_MS;
+  const configured = getRegisteredEnv<number>('KYBERION_PROVIDER_DEMOTION_TTL_MS', {
+    defaultValue: DEFAULT_DEMOTION_MS,
+  });
+  return typeof configured === 'number' && configured > 0
+    ? Math.round(configured)
+    : DEFAULT_DEMOTION_MS;
 }
 
 function keyFor(provider: string, instance: string): string {

@@ -65,3 +65,12 @@
 - `libs/core/runtime-health-history.ts`: 長寿命プロセスの RSS/heap(+ per-agent 累積 restart 数)を `active/shared/runtime/health/runtime-health.jsonl` に毎時サンプル(5000行で自動プルーニング)。supervisor daemon が起動時 + 毎時サンプル。
 - トレンド評価を `evaluateDegradation` に統合: 24h 窓の **RSS 成長率**(1.5x warn / 2.5x red)と **restart 頻度**(3 warn / 10 red)。閾値は health-thresholds.json に外出し(既存の観測→引き締め方針)。hourly の degradation watch が自動的に履歴を読む。
 - テスト4本(成長 warn/red・安定時静穏・restart 集計・verdict 統合)。soak 実証は数日の実運用データ蓄積後に確認。
+
+## 実装状況 追記 (2026-08-01)
+
+**運用証跡の収集経路を実装。** `scripts/soak_endurance.ts --live` は、圧縮テスト用の `shared/tmp` ではなく
+`active/shared/runtime/health/soak/` に実行証跡・最新レポート・累積 `manifest.json` を保存する。日次 pulse 用に
+`pipelines/soak-endurance-live.json` と `pnpm soak:live` を追加した。manifest は開始日時・最終実行日時・累積サイクル数・
+経過日数・直近の regression 判定を持つため、実30日運用の証跡を後から検証できる。
+
+残りは、外部ボリューム/実ホストでこの daily pulse を継続し、30日分の manifest をレビューする運用実績のみ。
