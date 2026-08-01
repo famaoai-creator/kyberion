@@ -1914,6 +1914,8 @@ export * from './mission-task-events.js';
 export * from './worker-assignment-policy.js';
 export * from './pipeline-contract.js';
 export * from './graph-scheduler.js';
+export * from './mission-graph-handoff.js';
+export * from './mission-graph-run-journal.js';
 export * from './pipeline-run-journal.js';
 export * from './graph-run-artifact.js';
 export * from './realtime-voice-conversation.js';

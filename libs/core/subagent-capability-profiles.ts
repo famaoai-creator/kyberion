@@ -177,6 +177,9 @@ export const TEAM_ROLE_CAPABILITY_PROFILE: Readonly<Record<string, string>> = {
   relationship_curator: 'explorer',
   facilitator: 'planner',
   planner: 'planner',
+  // Research packets are read-oriented and must not gain implementation
+  // tools merely because the role can write its assigned mission evidence.
+  researcher: 'explorer',
   product_strategist: 'planner',
   orchestrator: 'planner',
   owner: 'planner',

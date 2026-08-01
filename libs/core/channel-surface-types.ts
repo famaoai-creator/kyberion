@@ -106,12 +106,7 @@ export interface SlackOutboxMessage extends SurfaceOutboxMessage {}
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 export type OnboardingField =
-  | 'name'
-  | 'language'
-  | 'interaction_style'
-  | 'primary_domain'
-  | 'vision'
-  | 'agent_id';
+  'name' | 'language' | 'interaction_style' | 'primary_domain' | 'vision' | 'agent_id';
 
 export interface SlackOnboardingPrompt {
   field: OnboardingField;
@@ -246,9 +241,17 @@ export interface A2ATaskContext {
   user_language?: string;
   task_model_hint?: Record<string, unknown>;
   model_hint?: Record<string, unknown>;
+  // Mission team assignment routing. These are explicit runtime targets,
+  // separate from the advisory task_model_hint used for effort selection.
+  provider?: string;
+  provider_model_id?: string;
   // Set by dispatchMissionNextTasks so the worker runtime can attribute the
   // ask to a NEXT_TASKS entry; consumed by the a2a bridge for scoping.
   task_id?: string;
+  // Mission task wall-clock budget forwarded to the supervisor-backed ask.
+  // This prevents the transport timeout from expiring before the task's own
+  // dispatch budget and starting a duplicate fallback ask.
+  dispatch_timeout_ms?: number;
   // ContextSecurityScope object from the mission context pack; the a2a bridge
   // uses it to fingerprint conversation storage and validate egress.
   security_scope?: Record<string, unknown>;
@@ -430,12 +433,7 @@ export interface SurfaceNotificationRecord {
 }
 
 export type SurfaceDeliveryErrorKind =
-  | 'too_long'
-  | 'bad_format'
-  | 'forbidden'
-  | 'not_found'
-  | 'rate_limited'
-  | 'transient';
+  'too_long' | 'bad_format' | 'forbidden' | 'not_found' | 'rate_limited' | 'transient';
 
 export interface SurfaceDeliveryFailure {
   kind: SurfaceDeliveryErrorKind;

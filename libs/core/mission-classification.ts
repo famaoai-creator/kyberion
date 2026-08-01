@@ -82,7 +82,11 @@ type ClassificationPolicy = {
   };
   stage_progression: MissionStage[];
   mission_class_rules: Array<{ id: string; match?: RoutingMatch; mission_class: MissionClass }>;
-  delivery_shape_rules: Array<{ id: string; match?: RoutingMatch; delivery_shape: MissionDeliveryShape }>;
+  delivery_shape_rules: Array<{
+    id: string;
+    match?: RoutingMatch;
+    delivery_shape: MissionDeliveryShape;
+  }>;
   risk_profile_rules: Array<{ id: string; match?: RoutingMatch; risk_profile: MissionRiskProfile }>;
   stage_rules: Array<{
     id: string;
@@ -98,9 +102,13 @@ type ClassificationPolicy = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-classification-policy.schema.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-classification-policy.schema.json'
+);
 const POLICY_PATH = pathResolver.knowledge('product/governance/mission-classification-policy.json');
-const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-classification.schema.json');
+const RESULT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-classification.schema.json'
+);
 
 let policyValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;
@@ -146,13 +154,16 @@ function matchesPattern(utterance: string | undefined, patterns: string[] | unde
   return patterns.some((pattern) => utterance.includes(pattern));
 }
 
-function ruleMatches(input: {
-  missionTypeHint?: string;
-  intentId?: string;
-  taskType?: string;
-  shape?: string;
-  utterance?: string;
-}, match?: RoutingMatch): boolean {
+function ruleMatches(
+  input: {
+    missionTypeHint?: string;
+    intentId?: string;
+    taskType?: string;
+    shape?: string;
+    utterance?: string;
+  },
+  match?: RoutingMatch
+): boolean {
   if (!match) return false;
   return (
     matchesValue(input.missionTypeHint, match.mission_type_hints) &&
@@ -163,10 +174,13 @@ function ruleMatches(input: {
   );
 }
 
-function stageRuleMatches(input: {
-  artifacts: string[];
-  signals: string[];
-}, rule: ClassificationPolicy['stage_rules'][number]): boolean {
+function stageRuleMatches(
+  input: {
+    artifacts: string[];
+    signals: string[];
+  },
+  rule: ClassificationPolicy['stage_rules'][number]
+): boolean {
   const artifacts = input.artifacts;
   const signals = input.signals;
   const signalSet = new Set(signals);
@@ -175,10 +189,16 @@ function stageRuleMatches(input: {
   const signalsAny = normalizeList(rule.when?.signals_any);
   const signalsAll = normalizeList(rule.when?.signals_all);
 
-  if (artifactsAny.length && !artifactsAny.some((pattern) => artifacts.some((path) => path.includes(pattern)))) {
+  if (
+    artifactsAny.length &&
+    !artifactsAny.some((pattern) => artifacts.some((path) => path.includes(pattern)))
+  ) {
     return false;
   }
-  if (artifactsAll.length && !artifactsAll.every((pattern) => artifacts.some((path) => path.includes(pattern)))) {
+  if (
+    artifactsAll.length &&
+    !artifactsAll.every((pattern) => artifacts.some((path) => path.includes(pattern)))
+  ) {
     return false;
   }
   if (signalsAny.length && !signalsAny.some((signal) => signalSet.has(signal))) {
@@ -195,10 +215,14 @@ function stageRuleMatches(input: {
 }
 
 function loadPolicy(): ClassificationPolicy {
-  const parsed = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string) as ClassificationPolicy;
+  const parsed = JSON.parse(
+    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
+  ) as ClassificationPolicy;
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid mission-classification-policy: ${errors}`);
   }
   return parsed;
@@ -216,7 +240,9 @@ function coerceInput(input: MissionClassificationInput) {
   };
 }
 
-export function resolveMissionClassification(input: MissionClassificationInput): MissionClassification {
+export function resolveMissionClassification(
+  input: MissionClassificationInput
+): MissionClassification {
   const policy = loadPolicy();
   const normalized = coerceInput(input);
   const matchInput = {
@@ -228,11 +254,13 @@ export function resolveMissionClassification(input: MissionClassificationInput):
   };
 
   const classRule = policy.mission_class_rules.find((rule) => ruleMatches(matchInput, rule.match));
-  const deliveryRule = policy.delivery_shape_rules.find((rule) => ruleMatches(matchInput, rule.match));
+  const deliveryRule = policy.delivery_shape_rules.find((rule) =>
+    ruleMatches(matchInput, rule.match)
+  );
   const riskRule = policy.risk_profile_rules.find((rule) => ruleMatches(matchInput, rule.match));
 
   const stageRuleMatchesAll = policy.stage_rules.filter((rule) =>
-    stageRuleMatches({ artifacts: normalized.artifacts, signals: normalized.signals }, rule),
+    stageRuleMatches({ artifacts: normalized.artifacts, signals: normalized.signals }, rule)
   );
   const stageOrder = new Map(policy.stage_progression.map((stage, index) => [stage, index]));
   const stageRule = stageRuleMatchesAll.sort((left, right) => {
@@ -260,7 +288,9 @@ export function resolveMissionClassification(input: MissionClassificationInput):
 
   const validate = ensureResultValidator();
   if (!validate(resolved)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid mission classification result: ${errors}`);
   }
   return resolved;
@@ -275,7 +305,7 @@ export function mapMissionClassToMissionTypeTemplate(missionClass: MissionClass)
     case 'environment_and_recovery':
       return 'incident';
     case 'research_and_absorption':
-      return 'system_query';
+      return 'research';
     case 'customer_engagement':
       return 'surface_concierge';
     case 'platform_onboarding':
