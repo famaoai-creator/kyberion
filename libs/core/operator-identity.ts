@@ -47,6 +47,10 @@ export function resolveOperatorDisplayName(fallback = 'sovereign-user'): string 
  * (the type this function already delegates to) rather than special-casing
  * the new locale.
  */
-export function resolveOperatorLocale(fallback: SupportedLocale = 'ja'): SupportedLocale {
-  return resolveLocale() ?? fallback;
+export function resolveOperatorLocale(fallback?: SupportedLocale): SupportedLocale {
+  // `resolveLocale()` is total. Keep the optional parameter only as a source
+  // compatible bridge for callers that still pass the pre-I18N fallback; it
+  // must never become a second locale authority when a new locale is added.
+  void fallback;
+  return resolveLocale();
 }

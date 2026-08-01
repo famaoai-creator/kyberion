@@ -13,6 +13,7 @@ import {
   summarizeApprovalAuditTrail,
   type ApprovalAuditDrilldownSummary,
 } from '@agent/core';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { resolveFinanceControllerDecision, type FinanceControllerDecision } from '@agent/core';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {
@@ -355,10 +356,7 @@ interface NextActionSummary {
   risk: 'low' | 'medium' | 'high';
   suggested_command?: string;
   suggested_surface_action?:
-    | 'approvals'
-    | 'mission-seeds'
-    | 'memory-promotion-queue'
-    | 'next-actions';
+    'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
   approval_required: boolean;
 }
 
@@ -609,7 +607,7 @@ function buildMissionSeedPromotionMetadata(
 
 function buildLearnedNotificationText(input: {
   projectId?: string;
-  language?: 'ja' | 'en';
+  language?: SupportedLocale;
 }): string {
   if (!input.projectId) return '';
   const titles = listDistillCandidateRecords()
@@ -2360,13 +2358,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing surface operation' }, { status: 400 });
       }
 
-      if (
-        !(
-          operation === 'reconcile' ||
-          operation === 'status' ||
-          ((operation === 'start' || operation === 'stop') && surfaceId)
-        )
-      ) {
+      if (!(
+        operation === 'reconcile' ||
+        operation === 'status' ||
+        ((operation === 'start' || operation === 'stop') && surfaceId)
+      )) {
         return NextResponse.json({ error: 'Unsupported surface operation' }, { status: 400 });
       }
       const event = enqueueMissionOrchestrationEvent({

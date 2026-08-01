@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards, slugify } from '@agent/core';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -139,7 +140,7 @@ function resolveVoiceHubPythonBin(): string {
 
 function buildIntentPatternHint(
   intentId: string | undefined,
-  language: 'ja' | 'en',
+  language: SupportedLocale,
   section: 'completion' | 'follow_up'
 ): string {
   const pattern = findIntentOutcomePattern(intentId);
@@ -509,7 +510,7 @@ function saveMissionSeedWithAssessment(record: Parameters<typeof saveMissionSeed
 }
 
 function buildLearnedHintText(input: {
-  language: 'ja' | 'en';
+  language: SupportedLocale;
   reusableRefs?: Array<{ title?: string }>;
   projectId?: string;
 }): string {
@@ -1662,7 +1663,7 @@ function detectReplyLanguage(text: string): 'ja' | 'en' {
   return /[ぁ-んァ-ン一-龯]/.test(text) ? 'ja' : 'en';
 }
 
-function normalizeTextForTts(text: string, language: 'ja' | 'en'): string {
+function normalizeTextForTts(text: string, language: SupportedLocale): string {
   const profile = getVoiceTtsLanguageConfig(language);
   const compact = text
     .replace(/\s+/g, ' ')
@@ -1691,7 +1692,7 @@ function normalizeTextForTts(text: string, language: 'ja' | 'en'): string {
     .trim();
 }
 
-function buildCapabilityReply(language: 'ja' | 'en'): string {
+function buildCapabilityReply(language: SupportedLocale): string {
   const profile = getSurfaceAgentCatalogEntry('presence-surface-agent');
   const capabilities = (
     profile?.capabilities || ['presence', 'surface', 'conversation', 'realtime']
@@ -1836,7 +1837,7 @@ async function tryBuildLocationReply(userText: string): Promise<string | null> {
     : `Current location is not shared yet, so I will use the available location information for ${fallback}.`;
 }
 
-function weatherCodeLabel(code: number, language: 'ja' | 'en'): string {
+function weatherCodeLabel(code: number, language: SupportedLocale): string {
   const table: Record<number, [string, string]> = {
     0: ['快晴', 'clear'],
     1: ['おおむね晴れ', 'mostly clear'],
@@ -2533,7 +2534,10 @@ function inferTaskRequirementUpdate(
   };
 }
 
-function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
+function buildTaskSessionAcceptedReply(
+  session: TaskSessionShape,
+  language: SupportedLocale
+): string {
   const missing = session.requirements?.missing || [];
   const profile = resolveVoiceTaskProfile({
     taskType: session.task_type,
@@ -2620,7 +2624,10 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   return `I received the ${label} request. ${specialistLabel} will plan it, run it, and report back when it's done. ${learnedHint}${completionHint}`.trim();
 }
 
-function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
+function buildTaskSessionProgressReply(
+  session: TaskSessionShape,
+  language: SupportedLocale
+): string {
   const missing = session.requirements?.missing || [];
   const profile = resolveVoiceTaskProfile({
     taskType: session.task_type,
@@ -4214,7 +4221,7 @@ function tryBuildAsyncStatusReply(userText: string): string | null {
 function buildAsyncAcceptedReply(
   requestId: string,
   receiver: 'chronos-mirror' | 'nerve-agent',
-  language: 'ja' | 'en'
+  language: SupportedLocale
 ): string {
   return buildSurfaceAsyncAcceptedReply({ requestId, receiver, language });
 }
