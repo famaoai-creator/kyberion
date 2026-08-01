@@ -14,13 +14,7 @@ import {
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 
 export type WorkItemStatus =
-  | 'backlog'
-  | 'ready'
-  | 'in_progress'
-  | 'blocked'
-  | 'review'
-  | 'done'
-  | 'archived';
+  'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived';
 export type WorkItemPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type WorkItemSource = 'local' | 'github' | 'jira' | 'peer';
 export type WorkBoardType = 'project' | 'personal' | 'peer' | 'review' | 'external';
@@ -53,12 +47,7 @@ export interface WorkItem {
 }
 
 export type WorkItemAttemptStatus =
-  | 'running'
-  | 'released'
-  | 'completed'
-  | 'blocked'
-  | 'failed'
-  | 'handed_off';
+  'running' | 'released' | 'completed' | 'blocked' | 'failed' | 'handed_off';
 
 export interface WorkItemAttempt {
   attempt_id: string;
@@ -241,6 +230,12 @@ export interface RenewWorkItemLeaseInput {
   leaseId: string;
   ttlMs?: number;
   expectedVersion?: number;
+  /**
+   * QM-01: when provided, the renewal is refused unless this actor still holds
+   * the lease — a zombie worker whose lease was reaped and re-claimed cannot
+   * keep an item alive by heartbeating the old lease id.
+   */
+  actorPeerId?: string;
 }
 
 export interface HandoffWorkItemInput {
@@ -1165,6 +1160,24 @@ export function renewWorkItemLease(input: RenewWorkItemLeaseInput): WorkLease {
       status: current.status,
     });
   }
+  if (input.actorPeerId && current.holder_peer_id !== input.actorPeerId) {
+    throw new WorkCoordinationError(
+      'lease_conflict',
+      `lease holder mismatch for renewal: ${input.leaseId}`,
+      {
+        lease_id: input.leaseId,
+        holder_peer_id: current.holder_peer_id,
+        actor_peer_id: input.actorPeerId,
+      }
+    );
+  }
+  const expiresAtMs = new Date(current.expires_at).getTime();
+  if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+    throw new WorkCoordinationError('lease_conflict', `lease already lapsed: ${input.leaseId}`, {
+      lease_id: input.leaseId,
+      expires_at: current.expires_at,
+    });
+  }
   const renewed: WorkLease = {
     ...current,
     expires_at: new Date(Date.now() + (input.ttlMs || 15 * 60 * 1000)).toISOString(),
@@ -1189,6 +1202,109 @@ export function expireWorkItemLeases(now: string = nowIso()): WorkLease[] {
     }
   }
   return expired;
+}
+
+export interface ReapWorkLeasesOptions {
+  now?: string;
+  /**
+   * Poison-pill guard (QM-01): a worker crash never records a failed attempt,
+   * so parking must also trigger on total claim count, not only on failures.
+   */
+  maxClaimAttempts?: number;
+  maxErrorAttempts?: number;
+}
+
+export interface ReapWorkLeasesResult {
+  expired: WorkLease[];
+  /** Items whose stranded claim state was reset back to ready. */
+  recovered: WorkItem[];
+  /** Items parked (status: blocked) after exhausting their attempt budget. */
+  parked: WorkItem[];
+}
+
+export const DEFAULT_MAX_CLAIM_ATTEMPTS = 5;
+export const DEFAULT_MAX_ERROR_ATTEMPTS = 3;
+
+/**
+ * QM-01 reaper: expires lapsed leases AND reconciles the items they stranded —
+ * an in_progress item without an active lease is reset to ready (its running
+ * attempt finalized as released), or parked as blocked once its attempt budget
+ * is exhausted. Without this, a crashed worker leaves the item claiming to be
+ * in_progress forever, and a crash-looping item is re-claimed indefinitely.
+ */
+export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): ReapWorkLeasesResult {
+  const now = options.now ?? nowIso();
+  const maxClaims = options.maxClaimAttempts ?? DEFAULT_MAX_CLAIM_ATTEMPTS;
+  const maxErrors = options.maxErrorAttempts ?? DEFAULT_MAX_ERROR_ATTEMPTS;
+  const expired = expireWorkItemLeases(now);
+  const recovered: WorkItem[] = [];
+  const parked: WorkItem[] = [];
+
+  for (const item of currentWorkItems()) {
+    if (item.status !== 'in_progress') continue;
+    if (activeLeaseForItem(item.item_id)) continue;
+
+    const finalAttempt = finalizeWorkItemAttempt(item, 'released', {
+      failureReason: 'lease_expired',
+      summary: 'lease expired without release; reaped',
+    });
+    const attempts = finalAttempt.attempts;
+    const claimAttempts = attempts.length;
+    const errorAttempts = attempts.filter(
+      (attempt) => attempt.status === 'failed' || attempt.failure_reason === 'lease_expired'
+    ).length;
+    const shouldPark = claimAttempts >= maxClaims || errorAttempts >= maxErrors;
+
+    const next: WorkItem = appendItemSnapshot({
+      ...item,
+      status: shouldPark ? 'blocked' : 'ready',
+      version: item.version + 1,
+      updated_at: now,
+      lease_id: undefined,
+      claimed_at: undefined,
+      released_at: now,
+      claimed_by_peer_id: undefined,
+      claimed_by_user_id: undefined,
+      current_attempt_id: finalAttempt.currentAttemptId,
+      attempts,
+      ...(shouldPark
+        ? {
+            metadata: {
+              ...(item.metadata || {}),
+              parked: true,
+              parked_at: now,
+              parked_reason: `attempt budget exhausted (claims=${claimAttempts}/${maxClaims}, errors=${errorAttempts}/${maxErrors})`,
+            },
+          }
+        : {}),
+    });
+
+    appendWorkItemAttemptEvent(
+      'item_attempt_released',
+      item.item_id,
+      finalAttempt.attempt,
+      'attempt reaped after lease expiry'
+    );
+    if (shouldPark) {
+      appendEvent({
+        eventType: 'item_blocked',
+        itemId: item.item_id,
+        status: 'blocked',
+        note: `parked by reaper: attempt budget exhausted (claims=${claimAttempts}, errors=${errorAttempts})`,
+      });
+      parked.push(next);
+    } else {
+      appendEvent({
+        eventType: 'item_updated',
+        itemId: item.item_id,
+        status: 'ready',
+        note: 'stranded claim reset by reaper after lease expiry',
+      });
+      recovered.push(next);
+    }
+  }
+
+  return { expired, recovered, parked };
 }
 
 export function handoffWorkItem(input: HandoffWorkItemInput): {

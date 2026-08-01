@@ -2266,6 +2266,44 @@ export {
   sanitizeUntrustedContentAsync,
 } from './untrusted-content.js';
 
+// QM-04: inbound security-screening primitives (shadow rollout, fail-closed
+// verdicts, quarantine, posture floor). QM-05 lives in shell-command-normalize
+// and is re-exported through shell-command-policy consumers.
+export type {
+  SecurityPosture,
+  ScreenSource,
+  ScreenPayload,
+  ScreenDecision,
+  ScreenOutcome,
+  ShadowAgreement,
+  ShadowComparison,
+  QuarantineRecord,
+} from './security-screen.js';
+export {
+  POSTURE_RANK,
+  parsePosture,
+  composeSecurityPosture,
+  resolveConfiguredPosture,
+  MAX_SCREEN_PAYLOAD_CHARS,
+  buildScreenPayload,
+  firstJsonObject,
+  parseScreenVerdict,
+  unscreenedNotice,
+  runShadowScreen,
+  auditShadowComparison,
+  recordQuarantine,
+  listQuarantineRecords,
+  quarantineStub,
+  filterTaintedForModelContext,
+} from './security-screen.js';
+export {
+  compileSafeRegex,
+  scannableCommand,
+  scannableUnits,
+  simpleCommands,
+} from './shell-command-normalize.js';
+export type { SimpleCommand } from './shell-command-normalize.js';
+
 // Software QA lifecycle (QA-01)
 export type {
   QualityCheckStatus,
