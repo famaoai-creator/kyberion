@@ -2349,6 +2349,30 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SECURITY_POSTURE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SECURITY_QUARANTINE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SECURITY_QUARANTINE_MAX_BYTES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_SERVICE_ENDPOINTS_DIR",
       "category": "path",
       "type": "path",
