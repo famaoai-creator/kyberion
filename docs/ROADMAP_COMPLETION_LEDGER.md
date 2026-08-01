@@ -91,6 +91,7 @@
 - [x] **AC-03**: Deploy CI/CD Capability (`AC-03_DEPLOY_CICD_CAPABILITY.ja.md`)
 - [x] **MO-04**: Worker Context Economy (`MO-04_WORKER_CONTEXT_ECONOMY.ja.md`)
 - [x] **MO-05**: Task Model Effort Routing (`MO-05_MODEL_EFFORT_ROUTING.ja.md`)
+- [x] **OH-06**: Request-level pipeline dry-run (`OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md`) — `run_pipeline --dry-run [--json]` with static contract, capability, provider/auth, demotion, and channel checks
 - [x] **IP-01**: ESLint Governance Enforcement (`IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md`)
 - [x] **IP-02**: Native Engine secure-io Migration (`IP-02_NATIVE_ENGINE_SECURE_IO.ja.md`) — 残余の child_process disable は IP-08 スコープ
 - [x] **AA-01**: Agent Runtime Resilience (`AA-01_RUNTIME_RESILIENCE.ja.md`)
