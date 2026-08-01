@@ -17,6 +17,7 @@ import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
+import type { OrganizationWorkLoopSummary } from '@agent/core';
 
 interface MissionSummary {
   missionId: string;
@@ -209,7 +210,7 @@ export function resolveMissionThreadHotkeyAction(key: string): 'thread' | 'card'
 }
 
 export function resolveMissionControlFocusId(
-  missions: MissionSummary[],
+  missions: Array<Pick<MissionSummary, 'missionId' | 'controlTone' | 'nextTaskCount'>>,
   selectedMissionId: string | null,
   focusedMissionId: string | null
 ): string | null {
@@ -217,7 +218,7 @@ export function resolveMissionControlFocusId(
 }
 
 export function pickDefaultMissionId(
-  missions: MissionSummary[],
+  missions: Array<Pick<MissionSummary, 'missionId' | 'controlTone' | 'nextTaskCount'>>,
   selectedMissionId: string | null
 ): string | null {
   if (selectedMissionId && missions.some((mission) => mission.missionId === selectedMissionId)) {
@@ -295,38 +296,6 @@ interface MissionProgressSummary {
   }>;
 }
 
-interface WorkCoordinationItemSummary {
-  item_id: string;
-  title: string;
-  status: string;
-  priority: string;
-  project_id: string;
-  source_ref: string;
-  updated_at: string;
-  attempt_count: number;
-  current_attempt_id?: string;
-  current_attempt_status?: string;
-  current_attempt_started_at?: string;
-  current_attempt_summary?: string;
-  blocked_reason?: string;
-  failure_reason?: string;
-  claimed_by_peer_id?: string;
-  claimed_by_user_id?: string;
-}
-
-interface WorkCoordinationSummary {
-  total: number;
-  backlog: number;
-  ready: number;
-  inProgress: number;
-  blocked: number;
-  review: number;
-  done: number;
-  archived: number;
-  runningAttempts: number;
-  recentItems: WorkCoordinationItemSummary[];
-}
-
 interface OwnerSummary {
   ts: string;
   mission_id: string;
@@ -395,13 +364,7 @@ interface ProjectTrackRecordSummary {
   summary: string;
   status: 'planned' | 'active' | 'paused' | 'completed' | 'archived';
   track_type:
-    | 'delivery'
-    | 'change'
-    | 'release'
-    | 'incident'
-    | 'compliance'
-    | 'operations'
-    | 'research';
+    'delivery' | 'change' | 'release' | 'incident' | 'compliance' | 'operations' | 'research';
   lifecycle_model:
     | 'sdlc'
     | 'continuous_delivery'
@@ -452,7 +415,8 @@ interface MissionSeedRecordSummary {
   outcome_id?: string;
   mission_type_hint?: string;
   locale?: string;
-  work_loop?: ArtifactRecordSummary['work_loop'];
+  work_loop?: OrganizationWorkLoopSummary;
+  metadata?: Record<string, unknown>;
   promoted_mission_id?: string;
 }
 
@@ -506,7 +470,7 @@ interface PendingApprovalSummary {
   missionId?: string;
   trackId?: string;
   serviceId?: string;
-  work_loop?: ArtifactRecordSummary['work_loop'];
+  work_loop?: OrganizationWorkLoopSummary;
 }
 
 interface DistillCandidateSummary {
@@ -525,7 +489,7 @@ interface DistillCandidateSummary {
   target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
   specialist_id?: string;
   locale?: string;
-  work_loop?: ArtifactRecordSummary['work_loop'];
+  work_loop?: OrganizationWorkLoopSummary;
   promoted_ref?: string;
   evidence_refs?: string[];
 }
@@ -1036,25 +1000,6 @@ function surfaceSummaryBadgeClass(tone: SurfaceSummary['controlTone']): string {
   return 'kb-status-warning-surface kb-status-warning';
 }
 
-function workCoordinationStatusBadgeClass(status: string): string {
-  if (status === 'blocked') return 'kb-status-negative-surface kb-status-negative';
-  if (status === 'in_progress') return 'kb-surface-accent kb-text-accent';
-  if (status === 'review') return 'kb-status-warning-surface kb-status-warning';
-  if (status === 'done' || status === 'archived')
-    return 'kb-status-positive-surface kb-status-positive';
-  if (status === 'ready') return 'kb-status-info-surface kb-status-info';
-  return 'kb-surface-raised kb-text-secondary';
-}
-
-function formatWorkCoordinationAttemptLabel(item: WorkCoordinationItemSummary): string {
-  const parts: string[] = [];
-  if (item.current_attempt_status) parts.push(item.current_attempt_status);
-  if (item.current_attempt_summary) parts.push(item.current_attempt_summary);
-  if (item.blocked_reason) parts.push(`blocked: ${item.blocked_reason}`);
-  if (item.failure_reason) parts.push(`failed: ${item.failure_reason}`);
-  return parts.join(' · ');
-}
-
 interface IntelligencePayload {
   accessRole: 'readonly' | 'localadmin';
   company?: CompanySnapshot;
@@ -1068,6 +1013,10 @@ interface IntelligencePayload {
     current_gate_id?: string;
     current_phase?: string;
     ready: boolean;
+    next_required_artifacts?: Array<{
+      artifact_id: string;
+      template_ref?: string;
+    }>;
   }>;
   missionSeeds: MissionSeedRecordSummary[];
   missionSeedAssessment?: {
@@ -1103,10 +1052,7 @@ interface IntelligencePayload {
     risk: 'low' | 'medium' | 'high';
     suggested_command?: string;
     suggested_surface_action?:
-      | 'approvals'
-      | 'mission-seeds'
-      | 'memory-promotion-queue'
-      | 'next-actions';
+      'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
     approval_required: boolean;
   }>;
   serviceBindings: ServiceBindingRecordSummary[];
@@ -1116,7 +1062,6 @@ interface IntelligencePayload {
   recentEvents: OrchestrationEvent[];
   agentMessages: AgentMessageSummary[];
   a2aHandoffs: A2AHandoffSummary[];
-  workCoordination: WorkCoordinationSummary;
   controlActionCatalog: ControlActionCatalog;
   controlActionAvailability: ControlActionAvailability;
   controlActions: ControlActionSummary[];
@@ -1206,14 +1151,32 @@ interface ReferenceDetail {
   openLabel: string;
 }
 
+export type MissionIntelligenceWorkspace =
+  | 'surface'
+  | 'missions'
+  | 'deliverables'
+  | 'operations'
+  | 'governance'
+  | 'diagnostics'
+  | 'surface-control';
+
 export function MissionIntelligence({
+  workspace = 'surface',
   focusedView = null,
   onClearFocus,
+  onOpenWorkspace,
   focusedMissionId = null,
+  hideSurfaceControl = false,
 }: {
+  workspace?: MissionIntelligenceWorkspace;
   focusedView?: string | null;
   onClearFocus?: () => void;
+  onOpenWorkspace?: (
+    workspace: Exclude<MissionIntelligenceWorkspace, 'surface'>,
+    panelId: string
+  ) => void;
   focusedMissionId?: string | null;
+  hideSurfaceControl?: boolean;
 }) {
   const locale = resolveChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
@@ -1238,6 +1201,7 @@ export function MissionIntelligence({
     title: string;
     detail: string;
     confirmLabel: string;
+    cancelLabel?: string;
     onConfirm: () => Promise<void> | void;
   } | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
@@ -1385,7 +1349,6 @@ export function MissionIntelligence({
           recentEvents?: OrchestrationEvent[];
           agentMessages?: AgentMessageSummary[];
           a2aHandoffs?: A2AHandoffSummary[];
-          workCoordination?: IntelligencePayload['workCoordination'];
           controlActions?: ControlActionSummary[];
           controlActionDetails?: Record<string, ControlActionDetail[]>;
           ownerSummaries?: OwnerSummary[];
@@ -1396,7 +1359,7 @@ export function MissionIntelligence({
             busy: number;
             error: number;
           };
-          runtimeTopology?: MissionIntelligenceProps['data']['runtimeTopology'];
+          runtimeTopology?: IntelligencePayload['runtimeTopology'];
         };
         setData((current) =>
           current
@@ -1411,7 +1374,6 @@ export function MissionIntelligence({
                 a2aHandoffs: Array.isArray(payload.a2aHandoffs)
                   ? payload.a2aHandoffs
                   : current.a2aHandoffs,
-                workCoordination: payload.workCoordination || current.workCoordination,
                 controlActions: Array.isArray(payload.controlActions)
                   ? payload.controlActions
                   : current.controlActions,
@@ -1821,6 +1783,17 @@ export function MissionIntelligence({
     }
   };
 
+  const navigateToPanel = (
+    targetWorkspace: Exclude<MissionIntelligenceWorkspace, 'surface'>,
+    panelId: string
+  ) => {
+    if (workspace !== targetWorkspace && onOpenWorkspace) {
+      onOpenWorkspace(targetWorkspace, panelId);
+      return;
+    }
+    document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
   const runNextAction = async (action: NonNullable<IntelligencePayload['nextActions']>[number]) => {
     try {
       setNextActionTarget(action.action_id);
@@ -1835,9 +1808,7 @@ export function MissionIntelligence({
         return;
       }
       if (action.action_id === 'chronos-approve-pending' || action.next_action_type === 'approve') {
-        document
-          .getElementById('approvals')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        navigateToPanel('governance', 'approvals');
         setActionResult(`next action routed: ${action.action_id} -> approvals`);
         await recordNextActionExecution({
           actionId: action.action_id,
@@ -1851,9 +1822,7 @@ export function MissionIntelligence({
         action.action_id === 'chronos-promote-seed' ||
         action.next_action_type === 'promote_mission_seed'
       ) {
-        document
-          .getElementById('mission-seeds')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        navigateToPanel('missions', 'mission-seeds');
         setActionResult(`next action routed: ${action.action_id} -> mission seeds`);
         await recordNextActionExecution({
           actionId: action.action_id,
@@ -1936,7 +1905,11 @@ export function MissionIntelligence({
       setActionResult(`next action route unavailable: ${action.action_id}`);
       return;
     }
-    document.getElementById(route.panelId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const targetWorkspace =
+      route.panelId === 'approvals' || route.panelId === 'memory-promotion-queue'
+        ? 'governance'
+        : 'missions';
+    navigateToPanel(targetWorkspace, route.panelId);
     setActionResult(`next action route preview: ${action.action_id} -> ${route.label}`);
   };
 
@@ -2213,9 +2186,13 @@ export function MissionIntelligence({
     if (item.targetType === 'mission') {
       setSelectedMissionId(item.targetId);
       setMessageMissionFilter(item.targetId);
-      document
-        .getElementById(toDomId('mission', item.targetId))
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (workspace !== 'missions' && onOpenWorkspace) {
+        onOpenWorkspace('missions', 'mission-control-plane');
+      } else {
+        document
+          .getElementById(toDomId('mission', item.targetId))
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
     if (item.targetType === 'runtime' && item.remediationAction) {
@@ -2223,17 +2200,62 @@ export function MissionIntelligence({
       return;
     }
     if (item.targetType === 'surface') {
-      document
-        .getElementById(toDomId('surface', item.targetId))
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (workspace !== 'surface-control' && onOpenWorkspace) {
+        onOpenWorkspace('surface-control', 'surface-control');
+      } else {
+        document
+          .getElementById(toDomId('surface', item.targetId))
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
-    document
-      .getElementById('recent-surface-outbox')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    navigateToPanel('diagnostics', 'recent-surface-outbox');
   };
-  const showAllViews = focusedView == null;
-  const isVisible = (sectionId: string) => showAllViews || focusedView === sectionId;
+  const panelVisible = (panelId: string) => {
+    if (workspace === 'surface') {
+      if (!focusedView) return false;
+      if (focusedView === 'mission-control-plane') {
+        return ['mission-control-plane', 'selected-mission-thread', 'a2a-handoff-trail'].includes(
+          panelId
+        );
+      }
+      return focusedView === panelId;
+    }
+
+    const panelWorkspaces: Record<Exclude<MissionIntelligenceWorkspace, 'surface'>, string[]> = {
+      missions: [
+        'next-actions',
+        'needs-attention',
+        'mission-control-plane',
+        'projects',
+        'tracks',
+        'service-bindings',
+        'mission-seeds',
+        'skeleton-detail',
+        'selected-mission-thread',
+        'a2a-handoff-trail',
+      ],
+      deliverables: ['recent-artifacts'],
+      operations: [
+        'runtime-topology-map',
+        'runtime-lease-doctor',
+        'runtime-summary',
+        'browser-sessions',
+        'browser-guidance',
+        'browser-conversation-sessions',
+        'agent-traffic',
+      ],
+      governance: ['approvals', 'distill-candidates', 'memory-promotion-queue'],
+      diagnostics: [
+        'needs-attention',
+        'recent-surface-outbox',
+        'orchestration-audit',
+        'owner-summaries',
+      ],
+      'surface-control': ['recent-control-actions', 'control-model'],
+    };
+    return panelWorkspaces[workspace].includes(panelId);
+  };
   const focusTitle = focusedView
     ? (
         {
@@ -2262,19 +2284,6 @@ export function MissionIntelligence({
   const nextAction = data.nextActions?.[0] || null;
   const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
   const memoryCandidateCount = (data.memoryCandidates || []).length;
-  const workCoordination: WorkCoordinationSummary = data.workCoordination || {
-    total: 0,
-    backlog: 0,
-    ready: 0,
-    inProgress: 0,
-    blocked: 0,
-    review: 0,
-    done: 0,
-    archived: 0,
-    runningAttempts: 0,
-    recentItems: [],
-  };
-
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
       {dangerousAction ? (
@@ -2308,7 +2317,7 @@ export function MissionIntelligence({
                 onClick={clearDangerousAction}
                 className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
               >
-                {dangerousAction.cancelLabel}
+                {dangerousAction.cancelLabel || 'Cancel'}
               </button>
               <button
                 type="button"
@@ -2322,7 +2331,7 @@ export function MissionIntelligence({
         </div>
       ) : null}
       {/* Command Center: High-Visibility Action Dashboard */}
-      {!selectedProject && !selectedMissionId && (
+      {workspace === 'surface' && !selectedProject && !selectedMissionId && (
         <section className="flex flex-col gap-8 py-4">
           <div className="flex flex-col gap-2">
             <div className="text-[12px] uppercase tracking-[0.4em] kb-text-accent font-bold">
@@ -2413,7 +2422,7 @@ export function MissionIntelligence({
         </section>
       )}
 
-      {focusedView && (
+      {workspace === 'surface' && focusedView && (
         <section className="rounded-[24px] border kb-border-accent kb-surface-accent px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -2439,358 +2448,288 @@ export function MissionIntelligence({
           </div>
         </section>
       )}
-      <section className="rounded-[26px] border kb-status-warning-border bg-gradient-to-br from-[var(--kb-status-warning-surface)] via-[var(--kb-surface-raised)] to-[var(--kb-surface-sunken)] px-5 py-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">
-              {mt('chronos_operator_console', 'Operator Console')}
-            </div>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
-              {mt(
-                'chronos_mission_hero_title',
-                'Start with exceptions, then intervene only where mission flow or runtime governance needs help.'
-              )}
-            </h2>
-            <p className="mt-2 max-w-3xl text-[12px] leading-6 kb-text-muted">
-              {mt(
-                'chronos_mission_hero_description',
-                'Chronos is the operational mirror for Kyberion. Confirm what is active, identify what is blocked, open A2UI drill-downs when you need detail, and keep control actions deliberate and minimal.'
-              )}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-4">
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div>needs attention</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
-                {attentionItems.length}
+      {workspace === 'surface' ? (
+        <section className="rounded-[26px] border kb-status-warning-border bg-gradient-to-br from-[var(--kb-status-warning-surface)] via-[var(--kb-surface-raised)] to-[var(--kb-surface-sunken)] px-5 py-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">
+                {mt('chronos_operator_console', 'Operator Console')}
               </div>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
+                {mt(
+                  'chronos_mission_hero_title',
+                  'Start with exceptions, then intervene only where mission flow or runtime governance needs help.'
+                )}
+              </h2>
+              <p className="mt-2 max-w-3xl text-[12px] leading-6 kb-text-muted">
+                {mt(
+                  'chronos_mission_hero_description',
+                  'Chronos is the operational mirror for Kyberion. Confirm what is active, identify what is blocked, open A2UI drill-downs when you need detail, and keep control actions deliberate and minimal.'
+                )}
+              </p>
             </div>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div>missions</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
-                {data.activeMissions.length}
-              </div>
-            </div>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div>runtime incidents</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
-                {data.runtimeDoctor.length}
-              </div>
-            </div>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div>delivery queue</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
-                {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
-              </div>
-            </div>
-          </div>
-        </div>
-        {actionResult && (
-          <div className="mt-4 rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] kb-text-accent">
-            {mt('chronos_last_action', 'last action')}: {actionResult}
-          </div>
-        )}
-        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary">
-          {mt('chronos_access', 'access')}:{' '}
-          <span className="font-mono kb-text-primary">{data.accessRole}</span>
-          {data.accessRole === 'readonly'
-            ? mt(
-                'chronos_control_actions_disabled',
-                ' · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.'
-              )
-            : mt('chronos_control_actions_enabled', ' · control actions enabled.')}
-        </div>
-        {data.company && (
-          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
-            <div className="text-[10px] uppercase tracking-[0.24em] kb-text-accent">
-              Company Context
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] kb-text-primary">
-              <span className="font-semibold kb-text-primary">{data.company.name}</span>
-              <span className="kb-text-muted">·</span>
-              <span className="font-mono kb-text-secondary">{data.company.companyId}</span>
-              <span className="kb-text-muted">·</span>
-              <span className="kb-text-secondary">
-                sovereign {data.company.sovereign || 'unknown'}
-              </span>
-            </div>
-            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-              vision <span className="font-mono kb-text-primary">{data.company.visionRef}</span>
-              <span className="mx-2 kb-text-muted">·</span>
-              <span>{data.company.vision.title || data.company.vision.sourcePath}</span>
-            </div>
-            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-              org chart {data.company.orgChart.positionCount} positions /{' '}
-              {data.company.orgChart.domainCount} domains
-              {data.company.orgChart.topLevelRoles.length > 0 ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  top roles {data.company.orgChart.topLevelRoles.join(', ')}
-                </>
-              ) : null}
-            </div>
-            <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-              decision rights {data.company.decisionRights.ruleCount} rules
-              {data.company.decisionRights.sourceKind ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.decisionRights.sourceKind}
-                </>
-              ) : null}
-              <span className="mx-2 kb-text-muted">·</span>
-              financial {data.company.financial.exists ? 'available' : 'missing'}
-              {data.company.financial.exists ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.financial.periodCount} period
-                  {data.company.financial.periodCount === 1 ? '' : 's'}
-                  {data.company.financial.latestPeriodId ? (
-                    <>
-                      <span className="mx-2 kb-text-muted">·</span>
-                      latest {data.company.financial.latestPeriodId}
-                    </>
-                  ) : null}
-                  {typeof data.company.financial.latestGrossProfitJpy === 'number' ? (
-                    <>
-                      <span className="mx-2 kb-text-muted">·</span>
-                      gross profit ¥
-                      {data.company.financial.latestGrossProfitJpy.toLocaleString(
-                        chronosSpeechLocale()
-                      )}
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-              <span className="mx-2 kb-text-muted">·</span>
-              finance controller {data.company.financeController.mode}
-              {data.company.financeController.shouldCutCosts ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  cost cutting
-                </>
-              ) : null}
-              {data.company.financeController.reasons.length > 0 ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.financeController.reasons.length} reason
-                  {data.company.financeController.reasons.length === 1 ? '' : 's'}
-                </>
-              ) : null}
-              <span className="mx-2 kb-text-muted">·</span>
-              OKR {data.company.okr.exists ? 'available' : 'missing'}
-              {data.company.okr.exists ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.okr.objectiveCount} objective
-                  {data.company.okr.objectiveCount === 1 ? '' : 's'}
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.okr.keyResultCount} KR
-                  <span className="mx-2 kb-text-muted">·</span>
-                  {data.company.okr.progressPercent}% progress
-                  {data.company.okr.latestObjective ? (
-                    <>
-                      <span className="mx-2 kb-text-muted">·</span>
-                      latest {data.company.okr.latestObjective}
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-              <span className="mx-2 kb-text-muted">·</span>
-              audit {data.company.approvalAudit.total}
-              <span className="mx-2 kb-text-muted">·</span>
-              allowed {data.company.approvalAudit.allowed}
-              <span className="mx-2 kb-text-muted">·</span>
-              denied {data.company.approvalAudit.denied}
-              {data.company.approvalAudit.latestCorrelationId ? (
-                <>
-                  <span className="mx-2 kb-text-muted">·</span>
-                  latest {data.company.approvalAudit.latestCorrelationId}
-                </>
-              ) : null}
-              <span className="mx-2 kb-text-muted">·</span>
-              audit drilldown {data.company.approvalAuditDrilldown.byDecisionType.length} types /{' '}
-              {data.company.approvalAuditDrilldown.byCorrelationId.length} chains
-            </div>
-          </div>
-        )}
-        {selectedProject && (
-          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
-            project focus:{' '}
-            <span className="font-semibold kb-text-primary">{selectedProject.name}</span>
-            <span className="mx-2 kb-text-muted">·</span>
-            <span className="font-mono kb-text-secondary">{selectedProject.project_id}</span>
-            <button
-              type="button"
-              onClick={() => setSelectedProjectId(null)}
-              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
-            >
-              clear focus
-            </button>
-          </div>
-        )}
-        {selectedMission && (
-          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
-            mission focus:{' '}
-            <span className="font-semibold kb-text-primary">{selectedMission.missionId}</span>
-            <span className="mx-2 kb-text-muted">·</span>
-            <span className="kb-text-primary">
-              {buildMissionIntentSummary(data, selectedMission)}
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedMissionId(null)}
-              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
-            >
-              clear focus
-            </button>
-          </div>
-        )}
-        {selectedTrack && (
-          <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
-            track focus: <span className="font-semibold kb-text-primary">{selectedTrack.name}</span>
-            <span className="mx-2 kb-text-muted">·</span>
-            <span className="font-mono kb-text-secondary">{selectedTrack.track_id}</span>
-            <button
-              type="button"
-              onClick={() => setSelectedTrackId(null)}
-              className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
-            >
-              clear focus
-            </button>
-          </div>
-        )}
-        <div className="mt-3 rounded-xl border kb-status-warning-border kb-surface-raised-subtle px-3 py-3 text-[11px] leading-5 kb-text-secondary">
-          Surfaces are the explainable boundary between people and agent execution. Chronos is the
-          control surface: it should clarify mission flow, runtime risk, and intervention points
-          before it offers controls.
-        </div>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard
-          icon={<ShieldAlert size={14} />}
-          label={mt('chronos_attention_queue', 'Needs Attention')}
-          value={String(attentionItems.length)}
-          detail={mt(
-            'chronos_attention_queue_detail',
-            'Mission blockers, runtime incidents, and delivery exceptions'
-          )}
-        />
-        <MetricCard
-          icon={<Bot size={14} />}
-          label="Runtime Governance"
-          value={`${data.runtimeDoctor.length}/${data.runtimeLeases.length}`}
-          detail={`ready=${data.runtime.ready} busy=${data.runtime.busy} error=${data.runtime.error}`}
-        />
-        <MetricCard
-          icon={<Send size={14} />}
-          label={mt('chronos_delivery_exceptions', 'Delivery Exceptions')}
-          value={String(data.surfaceOutbox.slack + data.surfaceOutbox.chronos)}
-          detail={mt(
-            'chronos_delivery_exceptions_detail',
-            'Outbox entries awaiting operator attention'
-          )}
-        />
-        <MetricCard
-          icon={<Brain size={14} />}
-          label="Memory Promotion"
-          value={String(memoryCandidateCount)}
-          detail={
-            nextAction ? `next: ${nextAction.reason}` : 'No immediate memory action recommended'
-          }
-        />
-      </div>
-
-      <Panel id="work-coordination" title="Work Coordination">
-        <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-          This view shows durable work item state, including current attempts, to make handoff,
-          blocking, and completion visible before they turn into surprise fixes.
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MiniSummaryCard
-            icon={<GitBranch size={13} />}
-            label="Total items"
-            value={workCoordination.total}
-            detail="Tracked work items across the coordination store"
-          />
-          <MiniSummaryCard
-            icon={<Activity size={13} />}
-            label="In progress"
-            value={workCoordination.inProgress}
-            detail="Items currently being worked on"
-          />
-          <MiniSummaryCard
-            icon={<AlertTriangle size={13} />}
-            label="Blocked"
-            value={workCoordination.blocked}
-            detail="Items with a declared block or failed attempt"
-          />
-          <MiniSummaryCard
-            icon={<Brain size={13} />}
-            label="Running attempts"
-            value={workCoordination.runningAttempts}
-            detail="Active execution attempts across all items"
-          />
-        </div>
-        <div className="mt-4 space-y-2">
-          {workCoordination.recentItems.length === 0 ? (
-            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] kb-text-muted">
-              No work items have been imported into the coordination store yet.
-            </div>
-          ) : (
-            workCoordination.recentItems.map((item) => {
-              const attemptSummary = formatWorkCoordinationAttemptLabel(item);
-              return (
-                <div
-                  key={item.item_id}
-                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-[11px] font-semibold tracking-[0.04em] kb-text-primary">
-                        {item.title}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
-                        <span className="font-mono kb-text-secondary">{item.item_id}</span>
-                        <span>{item.project_id}</span>
-                        <span>{item.source_ref}</span>
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${workCoordinationStatusBadgeClass(item.status)}`}
-                    >
-                      {item.status}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
-                    <div>
-                      priority: <span className="font-mono kb-text-secondary">{item.priority}</span>
-                    </div>
-                    <div>
-                      attempts:{' '}
-                      <span className="font-mono kb-text-secondary">{item.attempt_count}</span>
-                    </div>
-                    <div className="sm:col-span-2">
-                      updated:{' '}
-                      <span className="font-mono kb-text-secondary">
-                        {new Date(item.updated_at).toLocaleString(chronosSpeechLocale())}
-                      </span>
-                    </div>
-                  </div>
-                  {attemptSummary ? (
-                    <div className="mt-2 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] kb-text-secondary">
-                      {attemptSummary}
-                    </div>
-                  ) : null}
+            <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-4">
+              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div>needs attention</div>
+                <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
+                  {attentionItems.length}
                 </div>
-              );
-            })
+              </div>
+              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div>missions</div>
+                <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
+                  {data.activeMissions.length}
+                </div>
+              </div>
+              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div>runtime incidents</div>
+                <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
+                  {data.runtimeDoctor.length}
+                </div>
+              </div>
+              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                <div>delivery queue</div>
+                <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
+                  {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
+                </div>
+              </div>
+            </div>
+          </div>
+          {actionResult && (
+            <div className="mt-4 rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] kb-text-accent">
+              {mt('chronos_last_action', 'last action')}: {actionResult}
+            </div>
           )}
+          <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary">
+            {mt('chronos_access', 'access')}:{' '}
+            <span className="font-mono kb-text-primary">{data.accessRole}</span>
+            {data.accessRole === 'readonly'
+              ? mt(
+                  'chronos_control_actions_disabled',
+                  ' · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.'
+                )
+              : mt('chronos_control_actions_enabled', ' · control actions enabled.')}
+          </div>
+          {data.company && (
+            <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+              <div className="text-[10px] uppercase tracking-[0.24em] kb-text-accent">
+                Company Context
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] kb-text-primary">
+                <span className="font-semibold kb-text-primary">{data.company.name}</span>
+                <span className="kb-text-muted">·</span>
+                <span className="font-mono kb-text-secondary">{data.company.companyId}</span>
+                <span className="kb-text-muted">·</span>
+                <span className="kb-text-secondary">
+                  sovereign {data.company.sovereign || 'unknown'}
+                </span>
+              </div>
+              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                vision <span className="font-mono kb-text-primary">{data.company.visionRef}</span>
+                <span className="mx-2 kb-text-muted">·</span>
+                <span>{data.company.vision.title || data.company.vision.sourcePath}</span>
+              </div>
+              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                org chart {data.company.orgChart.positionCount} positions /{' '}
+                {data.company.orgChart.domainCount} domains
+                {data.company.orgChart.topLevelRoles.length > 0 ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    top roles {data.company.orgChart.topLevelRoles.join(', ')}
+                  </>
+                ) : null}
+              </div>
+              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                decision rights {data.company.decisionRights.ruleCount} rules
+                {data.company.decisionRights.sourceKind ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.decisionRights.sourceKind}
+                  </>
+                ) : null}
+                <span className="mx-2 kb-text-muted">·</span>
+                financial {data.company.financial.exists ? 'available' : 'missing'}
+                {data.company.financial.exists ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.financial.periodCount} period
+                    {data.company.financial.periodCount === 1 ? '' : 's'}
+                    {data.company.financial.latestPeriodId ? (
+                      <>
+                        <span className="mx-2 kb-text-muted">·</span>
+                        latest {data.company.financial.latestPeriodId}
+                      </>
+                    ) : null}
+                    {typeof data.company.financial.latestGrossProfitJpy === 'number' ? (
+                      <>
+                        <span className="mx-2 kb-text-muted">·</span>
+                        gross profit ¥
+                        {data.company.financial.latestGrossProfitJpy.toLocaleString(
+                          chronosSpeechLocale()
+                        )}
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
+                <span className="mx-2 kb-text-muted">·</span>
+                finance controller {data.company.financeController.mode}
+                {data.company.financeController.shouldCutCosts ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    cost cutting
+                  </>
+                ) : null}
+                {data.company.financeController.reasons.length > 0 ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.financeController.reasons.length} reason
+                    {data.company.financeController.reasons.length === 1 ? '' : 's'}
+                  </>
+                ) : null}
+                <span className="mx-2 kb-text-muted">·</span>
+                OKR {data.company.okr.exists ? 'available' : 'missing'}
+                {data.company.okr.exists ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.okr.objectiveCount} objective
+                    {data.company.okr.objectiveCount === 1 ? '' : 's'}
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.okr.keyResultCount} KR
+                    <span className="mx-2 kb-text-muted">·</span>
+                    {data.company.okr.progressPercent}% progress
+                    {data.company.okr.latestObjective ? (
+                      <>
+                        <span className="mx-2 kb-text-muted">·</span>
+                        latest {data.company.okr.latestObjective}
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
+                <span className="mx-2 kb-text-muted">·</span>
+                audit {data.company.approvalAudit.total}
+                <span className="mx-2 kb-text-muted">·</span>
+                allowed {data.company.approvalAudit.allowed}
+                <span className="mx-2 kb-text-muted">·</span>
+                denied {data.company.approvalAudit.denied}
+                {data.company.approvalAudit.latestCorrelationId ? (
+                  <>
+                    <span className="mx-2 kb-text-muted">·</span>
+                    latest {data.company.approvalAudit.latestCorrelationId}
+                  </>
+                ) : null}
+                <span className="mx-2 kb-text-muted">·</span>
+                audit drilldown {data.company.approvalAuditDrilldown.byDecisionType.length} types /{' '}
+                {data.company.approvalAuditDrilldown.byCorrelationId.length} chains
+              </div>
+            </div>
+          )}
+          {selectedProject && (
+            <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+              project focus:{' '}
+              <span className="font-semibold kb-text-primary">{selectedProject.name}</span>
+              <span className="mx-2 kb-text-muted">·</span>
+              <span className="font-mono kb-text-secondary">{selectedProject.project_id}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedProjectId(null)}
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+              >
+                clear focus
+              </button>
+            </div>
+          )}
+          {selectedMission && (
+            <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+              mission focus:{' '}
+              <span className="font-semibold kb-text-primary">{selectedMission.missionId}</span>
+              <span className="mx-2 kb-text-muted">·</span>
+              <span className="kb-text-primary">
+                {buildMissionIntentSummary(data, selectedMission)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedMissionId(null)}
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+              >
+                clear focus
+              </button>
+            </div>
+          )}
+          {selectedTrack && (
+            <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
+              track focus:{' '}
+              <span className="font-semibold kb-text-primary">{selectedTrack.name}</span>
+              <span className="mx-2 kb-text-muted">·</span>
+              <span className="font-mono kb-text-secondary">{selectedTrack.track_id}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedTrackId(null)}
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+              >
+                clear focus
+              </button>
+            </div>
+          )}
+          <div className="mt-3 rounded-xl border kb-status-warning-border kb-surface-raised-subtle px-3 py-3 text-[11px] leading-5 kb-text-secondary">
+            Surfaces are the explainable boundary between people and agent execution. Chronos is the
+            control surface: it should clarify mission flow, runtime risk, and intervention points
+            before it offers controls.
+          </div>
+        </section>
+      ) : null}
+
+      {workspace === 'surface' ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricCard
+            icon={<ShieldAlert size={14} />}
+            label={mt('chronos_attention_queue', 'Needs Attention')}
+            value={String(attentionItems.length)}
+            detail={mt(
+              'chronos_attention_queue_detail',
+              'Mission blockers, runtime incidents, and delivery exceptions'
+            )}
+          />
+          <MetricCard
+            icon={<Bot size={14} />}
+            label="Runtime Governance"
+            value={`${data.runtimeDoctor.length}/${data.runtimeLeases.length}`}
+            detail={`ready=${data.runtime.ready} busy=${data.runtime.busy} error=${data.runtime.error}`}
+          />
+          <MetricCard
+            icon={<Send size={14} />}
+            label={mt('chronos_delivery_exceptions', 'Delivery Exceptions')}
+            value={String(data.surfaceOutbox.slack + data.surfaceOutbox.chronos)}
+            detail={mt(
+              'chronos_delivery_exceptions_detail',
+              'Outbox entries awaiting operator attention'
+            )}
+          />
+          <MetricCard
+            icon={<Brain size={14} />}
+            label="Memory Promotion"
+            value={String(memoryCandidateCount)}
+            detail={
+              nextAction ? `next: ${nextAction.reason}` : 'No immediate memory action recommended'
+            }
+          />
         </div>
-      </Panel>
+      ) : null}
+
+      {workspace === 'surface' && !focusedView ? (
+        <SurfaceStatusPanel
+          eyebrow="Active Surface"
+          title="Select a mission or task to open its focused surface"
+          detail="Active Surface is intentionally limited to the current task context. Use Missions, Work Items, or Operations to choose what to inspect."
+          tone="info"
+        />
+      ) : null}
 
       <section className="grid gap-4">
-        <Panel id="next-actions" title="Recommended Next Actions">
+        <Panel
+          id="next-actions"
+          visible={panelVisible('next-actions')}
+          title="Recommended Next Actions"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             These actions are generated from current control-plane state. Execute only what is
             necessary to unblock mission flow.
@@ -2894,7 +2833,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="needs-attention" title="Needs Attention">
+        <Panel
+          id="needs-attention"
+          visible={panelVisible('needs-attention')}
+          title="Needs Attention"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Start here. These are the items most likely to block mission progress or degrade
             operator trust. Use the action only when the control plane does not self-heal.
@@ -2973,7 +2916,11 @@ export function MissionIntelligence({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.25fr,1fr,1fr]">
-        <Panel id="mission-control-plane" title="Mission Control">
+        <Panel
+          id="mission-control-plane"
+          visible={panelVisible('mission-control-plane')}
+          title="Mission Control"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_mission_control_description',
@@ -3288,7 +3235,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="runtime-topology-map" title="Runtime Topology Map">
+        <Panel
+          id="runtime-topology-map"
+          visible={panelVisible('runtime-topology-map')}
+          title="Runtime Topology Map"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             This map shows what the supervisor daemon is currently holding: who owns each runtime,
             which runtimes are active, and which agent-to-agent or owner-to-agent flows were seen
@@ -3439,7 +3390,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="runtime-lease-doctor" title="Runtime Governance">
+        <Panel
+          id="runtime-lease-doctor"
+          visible={panelVisible('runtime-lease-doctor')}
+          title="Runtime Governance"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Managed runtimes are part of operations, not a separate playground. Use this section to
             resolve stale leases, errored runtimes, and ownership drift without over-restarting
@@ -3530,7 +3485,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="recent-surface-outbox" title="Delivery Exceptions">
+        <Panel
+          id="recent-surface-outbox"
+          visible={panelVisible('recent-surface-outbox')}
+          title="Delivery Exceptions"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Outbox items are operator-facing delivery residue. Resolve them here only when the
             autonomous path has already stalled or a human-visible queue needs cleanup.
@@ -3586,7 +3545,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_projects', 'Projects')}>
+        <Panel
+          id="projects"
+          visible={panelVisible('projects')}
+          title={mt('chronos_projects', 'Projects')}
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_projects_description',
@@ -3730,7 +3693,7 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_tracks', 'Tracks')}>
+        <Panel id="tracks" visible={panelVisible('tracks')} title={mt('chronos_tracks', 'Tracks')}>
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_tracks_description',
@@ -3845,7 +3808,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_service_bindings', 'Service Bindings')}>
+        <Panel
+          id="service-bindings"
+          visible={panelVisible('service-bindings')}
+          title={mt('chronos_service_bindings', 'Service Bindings')}
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_service_bindings_description',
@@ -3889,7 +3856,7 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="mission-seeds" title="Mission Seeds">
+        <Panel id="mission-seeds" visible={panelVisible('mission-seeds')} title="Mission Seeds">
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Proposed durable work can stay here before it becomes a full mission. Use this panel to
             confirm bootstrap output is structured and attributable.
@@ -4076,7 +4043,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_skeleton_detail', 'Skeleton Detail')}>
+        <Panel
+          id="skeleton-detail"
+          visible={panelVisible('skeleton-detail')}
+          title={mt('chronos_skeleton_detail', 'Skeleton Detail')}
+        >
           {!selectedReferencePath || !referenceDetail ? (
             <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
               {mt(
@@ -4268,7 +4239,11 @@ export function MissionIntelligence({
       </section>
 
       <section className="grid gap-4">
-        <Panel id="approvals" title={mt('chronos_approvals', 'Approvals')}>
+        <Panel
+          id="approvals"
+          visible={panelVisible('approvals')}
+          title={mt('chronos_approvals', 'Approvals')}
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_approvals_description',
@@ -4389,7 +4364,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title="Recent Artifacts">
+        <Panel
+          id="recent-artifacts"
+          visible={panelVisible('recent-artifacts')}
+          title="Recent Artifacts"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Outcomes should stay attributable. This panel shows the latest recorded artifacts with
             their project, mission, task, and storage placement.
@@ -4488,7 +4467,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_distill_candidates', 'Distill Candidates')}>
+        <Panel
+          id="distill-candidates"
+          visible={panelVisible('distill-candidates')}
+          title={mt('chronos_distill_candidates', 'Distill Candidates')}
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
               'chronos_distill_candidates_description',
@@ -4653,7 +4636,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="memory-promotion-queue" title="Memory Promotion Queue">
+        <Panel
+          id="memory-promotion-queue"
+          visible={panelVisible('memory-promotion-queue')}
+          title="Memory Promotion Queue"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Approved memory candidates can be promoted into governed knowledge in bulk. Run a
             dry-run first to inspect queue scope, then execute promotion.
@@ -4737,7 +4724,11 @@ export function MissionIntelligence({
       </section>
 
       <section className="grid gap-4">
-        <Panel title="Recent Control Actions">
+        <Panel
+          id="recent-control-actions"
+          visible={panelVisible('recent-control-actions')}
+          title="Recent Control Actions"
+        >
           <div className="space-y-3">
             {data.controlActions.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">
@@ -4803,7 +4794,11 @@ export function MissionIntelligence({
         </Panel>
       </section>
       <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
-        <Panel title="Orchestration Audit">
+        <Panel
+          id="orchestration-audit"
+          visible={panelVisible('orchestration-audit')}
+          title="Orchestration Audit"
+        >
           <div className="space-y-3">
             {data.recentEvents.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">
@@ -4831,7 +4826,11 @@ export function MissionIntelligence({
             )}
           </div>
         </Panel>
-        <Panel id="owner-summaries" title="Owner Summaries">
+        <Panel
+          id="owner-summaries"
+          visible={panelVisible('owner-summaries')}
+          title="Owner Summaries"
+        >
           <div className="space-y-3">
             {data.ownerSummaries.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">No owner summaries yet.</div>
@@ -4873,7 +4872,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel id="runtime-summary" title="Operator Summary">
+        <Panel
+          id="runtime-summary"
+          visible={panelVisible('runtime-summary')}
+          title="Operator Summary"
+        >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Keep the operator loop narrow: look at exceptions first, then mission readiness, then
             runtime and delivery counters. When these stay green, use quick actions to open governed
@@ -4891,7 +4894,11 @@ export function MissionIntelligence({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
-        <Panel id="browser-sessions" title="Browser Session Oversight">
+        <Panel
+          id="browser-sessions"
+          visible={panelVisible('browser-sessions')}
+          title="Browser Session Oversight"
+        >
           <div className="space-y-3">
             {data.browserSessions.length === 0 ? (
               <SurfaceStatusPanel
@@ -5045,7 +5052,11 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title="Browser Guidance">
+        <Panel
+          id="browser-guidance"
+          visible={panelVisible('browser-guidance')}
+          title="Browser Guidance"
+        >
           <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             Browser sessions stay fast only while they are leased. Prefer `snapshot + ref`, then
             export recorded trails as Playwright specs in either strict or hint mode.
@@ -5077,7 +5088,11 @@ export function MissionIntelligence({
             />
           </div>
         </Panel>
-        <Panel id="browser-conversation-sessions" title="Browser Tasks">
+        <Panel
+          id="browser-conversation-sessions"
+          visible={panelVisible('browser-conversation-sessions')}
+          title="Browser Tasks"
+        >
           <div className="space-y-3">
             {data.browserConversationSessions.length === 0 ? (
               <SurfaceStatusPanel
@@ -5152,335 +5167,356 @@ export function MissionIntelligence({
         </Panel>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
-        <Panel id="surface-control" title="Surface Control">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {(() => {
-              const latestAction = getGlobalSurfaceControlAction(data.controlActions);
-              const retryAction = latestAction
-                ? getActionDefinition(
-                    data.controlActionAvailability.globalSurface,
-                    latestAction.operation
-                  )
-                : null;
-              return latestAction ? (
-                <>
-                  <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[10px] kb-text-muted">
-                    {mt('chronos_surfaces', 'surfaces')}
-                    <span className="ml-2">{latestAction.operation}</span>
-                    <span className="ml-2">
-                      <ActionStatusBadge action={latestAction} />
-                    </span>
-                  </div>
-                  {latestAction.event_id && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedGlobalSurfaceActionId((current) =>
-                          current === latestAction.event_id ? null : latestAction.event_id || null
-                        )
-                      }
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
-                    >
-                      {expandedGlobalSurfaceActionId === latestAction.event_id
-                        ? mt('chronos_hide_latest_action', 'hide latest action')
-                        : mt('chronos_show_latest_action', 'show latest action')}
-                    </button>
-                  )}
-                  {latestAction.status === 'failed' && (
-                    <button
-                      type="button"
-                      onClick={() => runSurfaceControl(null, latestAction.operation)}
-                      disabled={
-                        !retryAction?.enabled ||
-                        surfaceActionTarget === `all:${latestAction.operation}`
-                      }
-                      title={retryAction?.disabledReason}
-                      className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {surfaceActionTarget === `all:${latestAction.operation}`
-                        ? mt('chronos_retrying', 'retrying')
-                        : mt('chronos_retry_latest_action', 'retry latest action')}
-                    </button>
-                  )}
-                </>
-              ) : null;
-            })()}
-            {data.controlActionAvailability.globalSurface.map((action) => (
-              <button
-                key={action.operation}
-                type="button"
-                onClick={() => runSurfaceControl(null, action.operation)}
-                disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
-                title={action.disabledReason}
-                className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {surfaceActionTarget === `all:${action.operation}` ? 'working' : action.label}
-              </button>
-            ))}
-            {getSharedDisabledReason(data.controlActionAvailability.globalSurface) && (
-              <div className="w-full text-[10px] kb-text-muted">
-                {getSharedDisabledReason(data.controlActionAvailability.globalSurface)}
-              </div>
-            )}
-          </div>
-          {(() => {
-            const latestAction = getGlobalSurfaceControlAction(data.controlActions);
-            return latestAction?.event_id &&
-              expandedGlobalSurfaceActionId === latestAction.event_id ? (
-              <div className="mb-3">
-                <ActionDetailList
-                  actionId={latestAction.event_id}
-                  details={data.controlActionDetails}
-                />
-                <ActionGuidance
-                  latestAction={latestAction}
-                  availableActions={data.controlActionAvailability.globalSurface}
-                />
-              </div>
-            ) : null;
-          })()}
-          <div className="space-y-3">
-            {data.surfaces.length === 0 ? (
-              <div className="text-[11px] italic kb-status-warning">
-                {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
-              </div>
-            ) : (
-              data.surfaces.map((surface) => {
-                const surfaceActions = getAvailableSurfaceActions(data, surface.id);
-                const safeSurfaceActions = getActionsByRisk(surfaceActions, 'safe');
-                const riskySurfaceActions = getActionsByRisk(surfaceActions, 'risky');
-                const safeDisabledReason = getSharedDisabledReason(safeSurfaceActions);
-                const riskyDisabledReason = getSharedDisabledReason(riskySurfaceActions);
-                return (
-                  <div
-                    id={toDomId('surface', surface.id)}
-                    key={surface.id}
-                    className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
-                  >
-                    {(() => {
-                      const latestAction = getLatestSurfaceControlAction(
-                        data.controlActions,
-                        surface.id
-                      );
-                      return latestAction ? (
-                        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {mt('chronos_last_control_action', 'last control action')}
-                          </div>
+      {!hideSurfaceControl || panelVisible('control-model') ? (
+        <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+          {!hideSurfaceControl ? (
+            <Panel
+              id="surface-control"
+              visible={panelVisible('surface-control')}
+              title="Surface Control"
+            >
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(() => {
+                  const latestAction = getGlobalSurfaceControlAction(data.controlActions);
+                  const retryAction = latestAction
+                    ? getActionDefinition(
+                        data.controlActionAvailability.globalSurface,
+                        latestAction.operation
+                      )
+                    : null;
+                  return latestAction ? (
+                    <>
+                      <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[10px] kb-text-muted">
+                        {mt('chronos_surfaces', 'surfaces')}
+                        <span className="ml-2">{latestAction.operation}</span>
+                        <span className="ml-2">
                           <ActionStatusBadge action={latestAction} />
-                        </div>
-                      ) : null;
-                    })()}
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
-                          {surface.id}
-                        </div>
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
-                          {surface.kind} ·{' '}
-                          {surface.startupMode || mt('chronos_background', 'background')} ·{' '}
-                          {surface.running
-                            ? mt('chronos_running', 'running')
-                            : mt('chronos_stopped', 'stopped')}
-                        </div>
+                        </span>
                       </div>
-                      <div
-                        className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
-                          surface.health === 'healthy'
-                            ? 'kb-status-positive-surface kb-status-positive'
-                            : surface.health === 'unhealthy'
-                              ? 'kb-status-negative-surface kb-status-negative'
-                              : 'kb-status-warning-surface kb-status-warning'
-                        }`}
-                      >
-                        {surface.health}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[10px] kb-text-muted">
-                      pid: <span className="font-mono kb-text-secondary">{surface.pid ?? '-'}</span>
-                      {surface.detail ? (
-                        <>
-                          {' '}
-                          · {mt('chronos_detail', 'detail')}:{' '}
-                          <span className="font-mono kb-text-secondary">{surface.detail}</span>
-                        </>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div
-                        className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${surfaceSummaryBadgeClass(surface.controlTone)}`}
-                      >
-                        {surface.controlSummary}
-                      </div>
-                      <div className="text-[10px] kb-text-muted">
-                        {mt('chronos_control_summary', 'control summary')}
-                      </div>
-                      {surface.controlRequestedBy && (
-                        <div className="text-[10px] kb-text-muted">
-                          {mt('chronos_requested_by', 'requested by')}{' '}
-                          <span className="font-mono kb-text-secondary">
-                            {surface.controlRequestedBy}
-                          </span>
-                        </div>
+                      {latestAction.event_id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedGlobalSurfaceActionId((current) =>
+                              current === latestAction.event_id
+                                ? null
+                                : latestAction.event_id || null
+                            )
+                          }
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                        >
+                          {expandedGlobalSurfaceActionId === latestAction.event_id
+                            ? mt('chronos_hide_latest_action', 'hide latest action')
+                            : mt('chronos_show_latest_action', 'show latest action')}
+                        </button>
                       )}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(() => {
-                        const latestAction = getLatestSurfaceControlAction(
-                          data.controlActions,
-                          surface.id
-                        );
-                        const retryAction = latestAction
-                          ? getActionDefinition(surfaceActions, latestAction.operation)
-                          : null;
-                        if (!latestAction?.event_id) return null;
-                        return (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedSurfaceCardActionId((current) =>
-                                  current === latestAction.event_id
-                                    ? null
-                                    : latestAction.event_id || null
-                                )
-                              }
-                              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
-                            >
-                              {expandedSurfaceCardActionId === latestAction.event_id
-                                ? mt('chronos_hide_latest_action', 'hide latest action')
-                                : mt('chronos_show_latest_action', 'show latest action')}
-                            </button>
-                            {latestAction.status === 'failed' && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  runSurfaceControl(surface.id, latestAction.operation)
-                                }
-                                disabled={
-                                  !retryAction?.enabled ||
-                                  surfaceActionTarget === `${surface.id}:${latestAction.operation}`
-                                }
-                                title={retryAction?.disabledReason}
-                                className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                {surfaceActionTarget === `${surface.id}:${latestAction.operation}`
-                                  ? mt('chronos_retrying', 'retrying')
-                                  : mt('chronos_retry_latest_action', 'retry latest action')}
-                              </button>
-                            )}
-                          </>
-                        );
-                      })()}
-                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
-                          {mt('chronos_safe_actions', 'safe actions')}
-                        </div>
-                        {safeSurfaceActions.map((action) => (
-                          <button
-                            key={action.operation}
-                            type="button"
-                            onClick={() => runSurfaceControl(surface.id, action.operation)}
-                            disabled={
-                              !action.enabled ||
-                              surfaceActionTarget === `${surface.id}:${action.operation}`
-                            }
-                            title={action.disabledReason}
-                            className={actionButtonClass('safe')}
-                          >
-                            {surfaceActionTarget === `${surface.id}:${action.operation}`
-                              ? mt('chronos_working', 'working')
-                              : action.label}
-                          </button>
-                        ))}
-                        {safeDisabledReason && (
-                          <div className="w-full text-[10px] kb-text-muted">
-                            {safeDisabledReason}
+                      {latestAction.status === 'failed' && (
+                        <button
+                          type="button"
+                          onClick={() => runSurfaceControl(null, latestAction.operation)}
+                          disabled={
+                            !retryAction?.enabled ||
+                            surfaceActionTarget === `all:${latestAction.operation}`
+                          }
+                          title={retryAction?.disabledReason}
+                          className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {surfaceActionTarget === `all:${latestAction.operation}`
+                            ? mt('chronos_retrying', 'retrying')
+                            : mt('chronos_retry_latest_action', 'retry latest action')}
+                        </button>
+                      )}
+                    </>
+                  ) : null;
+                })()}
+                {data.controlActionAvailability.globalSurface.map((action) => (
+                  <button
+                    key={action.operation}
+                    type="button"
+                    onClick={() => runSurfaceControl(null, action.operation)}
+                    disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
+                    title={action.disabledReason}
+                    className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {surfaceActionTarget === `all:${action.operation}` ? 'working' : action.label}
+                  </button>
+                ))}
+                {getSharedDisabledReason(data.controlActionAvailability.globalSurface) && (
+                  <div className="w-full text-[10px] kb-text-muted">
+                    {getSharedDisabledReason(data.controlActionAvailability.globalSurface)}
+                  </div>
+                )}
+              </div>
+              {(() => {
+                const latestAction = getGlobalSurfaceControlAction(data.controlActions);
+                return latestAction?.event_id &&
+                  expandedGlobalSurfaceActionId === latestAction.event_id ? (
+                  <div className="mb-3">
+                    <ActionDetailList
+                      actionId={latestAction.event_id}
+                      details={data.controlActionDetails}
+                    />
+                    <ActionGuidance
+                      latestAction={latestAction}
+                      availableActions={data.controlActionAvailability.globalSurface}
+                    />
+                  </div>
+                ) : null;
+              })()}
+              <div className="space-y-3">
+                {data.surfaces.length === 0 ? (
+                  <div className="text-[11px] italic kb-status-warning">
+                    {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
+                  </div>
+                ) : (
+                  data.surfaces.map((surface) => {
+                    const surfaceActions = getAvailableSurfaceActions(data, surface.id);
+                    const safeSurfaceActions = getActionsByRisk(surfaceActions, 'safe');
+                    const riskySurfaceActions = getActionsByRisk(surfaceActions, 'risky');
+                    const safeDisabledReason = getSharedDisabledReason(safeSurfaceActions);
+                    const riskyDisabledReason = getSharedDisabledReason(riskySurfaceActions);
+                    return (
+                      <div
+                        id={toDomId('surface', surface.id)}
+                        key={surface.id}
+                        className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
+                      >
+                        {(() => {
+                          const latestAction = getLatestSurfaceControlAction(
+                            data.controlActions,
+                            surface.id
+                          );
+                          return latestAction ? (
+                            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
+                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                                {mt('chronos_last_control_action', 'last control action')}
+                              </div>
+                              <ActionStatusBadge action={latestAction} />
+                            </div>
+                          ) : null;
+                        })()}
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                              {surface.id}
+                            </div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                              {surface.kind} ·{' '}
+                              {surface.startupMode || mt('chronos_background', 'background')} ·{' '}
+                              {surface.running
+                                ? mt('chronos_running', 'running')
+                                : mt('chronos_stopped', 'stopped')}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
-                        <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
-                          {mt(
-                            'chronos_risky_actions_approval_required',
-                            'risky actions · approval required'
+                          <div
+                            className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                              surface.health === 'healthy'
+                                ? 'kb-status-positive-surface kb-status-positive'
+                                : surface.health === 'unhealthy'
+                                  ? 'kb-status-negative-surface kb-status-negative'
+                                  : 'kb-status-warning-surface kb-status-warning'
+                            }`}
+                          >
+                            {surface.health}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[10px] kb-text-muted">
+                          pid:{' '}
+                          <span className="font-mono kb-text-secondary">{surface.pid ?? '-'}</span>
+                          {surface.detail ? (
+                            <>
+                              {' '}
+                              · {mt('chronos_detail', 'detail')}:{' '}
+                              <span className="font-mono kb-text-secondary">{surface.detail}</span>
+                            </>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                          <div
+                            className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${surfaceSummaryBadgeClass(surface.controlTone)}`}
+                          >
+                            {surface.controlSummary}
+                          </div>
+                          <div className="text-[10px] kb-text-muted">
+                            {mt('chronos_control_summary', 'control summary')}
+                          </div>
+                          {surface.controlRequestedBy && (
+                            <div className="text-[10px] kb-text-muted">
+                              {mt('chronos_requested_by', 'requested by')}{' '}
+                              <span className="font-mono kb-text-secondary">
+                                {surface.controlRequestedBy}
+                              </span>
+                            </div>
                           )}
                         </div>
-                        {riskySurfaceActions.map((action) => (
-                          <button
-                            key={action.operation}
-                            type="button"
-                            onClick={() => {
-                              const prompt = buildDangerousActionPrompt(
-                                `surface ${surface.id}`,
-                                action.label,
-                                false
-                              );
-                              requestDangerousAction(
-                                prompt.title,
-                                prompt.detail,
-                                prompt.confirmLabel,
-                                () => runSurfaceControl(surface.id, action.operation)
-                              );
-                            }}
-                            disabled={
-                              !action.enabled ||
-                              surfaceActionTarget === `${surface.id}:${action.operation}`
-                            }
-                            title={action.disabledReason}
-                            className={actionButtonClass('risky')}
-                          >
-                            {surfaceActionTarget === `${surface.id}:${action.operation}`
-                              ? mt('chronos_working', 'working')
-                              : action.label}
-                          </button>
-                        ))}
-                        {riskyDisabledReason && (
-                          <div className="w-full text-[10px] kb-text-muted">
-                            {riskyDisabledReason}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {(() => {
+                            const latestAction = getLatestSurfaceControlAction(
+                              data.controlActions,
+                              surface.id
+                            );
+                            const retryAction = latestAction
+                              ? getActionDefinition(surfaceActions, latestAction.operation)
+                              : null;
+                            if (!latestAction?.event_id) return null;
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedSurfaceCardActionId((current) =>
+                                      current === latestAction.event_id
+                                        ? null
+                                        : latestAction.event_id || null
+                                    )
+                                  }
+                                  className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                                >
+                                  {expandedSurfaceCardActionId === latestAction.event_id
+                                    ? mt('chronos_hide_latest_action', 'hide latest action')
+                                    : mt('chronos_show_latest_action', 'show latest action')}
+                                </button>
+                                {latestAction.status === 'failed' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      runSurfaceControl(surface.id, latestAction.operation)
+                                    }
+                                    disabled={
+                                      !retryAction?.enabled ||
+                                      surfaceActionTarget ===
+                                        `${surface.id}:${latestAction.operation}`
+                                    }
+                                    title={retryAction?.disabledReason}
+                                    className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    {surfaceActionTarget ===
+                                    `${surface.id}:${latestAction.operation}`
+                                      ? mt('chronos_retrying', 'retrying')
+                                      : mt('chronos_retry_latest_action', 'retry latest action')}
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
+                          <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
+                            <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
+                              {mt('chronos_safe_actions', 'safe actions')}
+                            </div>
+                            {safeSurfaceActions.map((action) => (
+                              <button
+                                key={action.operation}
+                                type="button"
+                                onClick={() => runSurfaceControl(surface.id, action.operation)}
+                                disabled={
+                                  !action.enabled ||
+                                  surfaceActionTarget === `${surface.id}:${action.operation}`
+                                }
+                                title={action.disabledReason}
+                                className={actionButtonClass('safe')}
+                              >
+                                {surfaceActionTarget === `${surface.id}:${action.operation}`
+                                  ? mt('chronos_working', 'working')
+                                  : action.label}
+                              </button>
+                            ))}
+                            {safeDisabledReason && (
+                              <div className="w-full text-[10px] kb-text-muted">
+                                {safeDisabledReason}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
+                            <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
+                              {mt(
+                                'chronos_risky_actions_approval_required',
+                                'risky actions · approval required'
+                              )}
+                            </div>
+                            {riskySurfaceActions.map((action) => (
+                              <button
+                                key={action.operation}
+                                type="button"
+                                onClick={() => {
+                                  const prompt = buildDangerousActionPrompt(
+                                    `surface ${surface.id}`,
+                                    action.label,
+                                    false
+                                  );
+                                  requestDangerousAction(
+                                    prompt.title,
+                                    prompt.detail,
+                                    prompt.confirmLabel,
+                                    () => runSurfaceControl(surface.id, action.operation)
+                                  );
+                                }}
+                                disabled={
+                                  !action.enabled ||
+                                  surfaceActionTarget === `${surface.id}:${action.operation}`
+                                }
+                                title={action.disabledReason}
+                                className={actionButtonClass('risky')}
+                              >
+                                {surfaceActionTarget === `${surface.id}:${action.operation}`
+                                  ? mt('chronos_working', 'working')
+                                  : action.label}
+                              </button>
+                            ))}
+                            {riskyDisabledReason && (
+                              <div className="w-full text-[10px] kb-text-muted">
+                                {riskyDisabledReason}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {(() => {
+                          const latestAction = getLatestSurfaceControlAction(
+                            data.controlActions,
+                            surface.id
+                          );
+                          return latestAction?.event_id &&
+                            expandedSurfaceCardActionId === latestAction.event_id ? (
+                            <>
+                              <ActionDetailList
+                                actionId={latestAction.event_id}
+                                details={data.controlActionDetails}
+                              />
+                              <ActionGuidance
+                                latestAction={latestAction}
+                                availableActions={surfaceActions}
+                              />
+                            </>
+                          ) : null;
+                        })()}
                       </div>
-                    </div>
-                    {(() => {
-                      const latestAction = getLatestSurfaceControlAction(
-                        data.controlActions,
-                        surface.id
-                      );
-                      return latestAction?.event_id &&
-                        expandedSurfaceCardActionId === latestAction.event_id ? (
-                        <>
-                          <ActionDetailList
-                            actionId={latestAction.event_id}
-                            details={data.controlActionDetails}
-                          />
-                          <ActionGuidance
-                            latestAction={latestAction}
-                            availableActions={surfaceActions}
-                          />
-                        </>
-                      ) : null;
-                    })()}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </Panel>
+                    );
+                  })
+                )}
+              </div>
+            </Panel>
+          ) : null}
 
-        <Panel title={mt('chronos_control_model', 'Control Model')}>
-          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] leading-6 kb-text-muted">
-            {mt(
-              'chronos_control_model_description',
-              'Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.'
-            )}
-          </div>
-        </Panel>
-      </section>
+          <Panel
+            id="control-model"
+            visible={panelVisible('control-model')}
+            title={mt('chronos_control_model', 'Control Model')}
+          >
+            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] leading-6 kb-text-muted">
+              {mt(
+                'chronos_control_model_description',
+                'Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.'
+              )}
+            </div>
+          </Panel>
+        </section>
+      ) : null}
 
       <section className="grid gap-4">
-        <Panel title={mt('chronos_live_agent_conversation', 'Agent Traffic')}>
+        <Panel
+          id="agent-traffic"
+          visible={panelVisible('agent-traffic')}
+          title={mt('chronos_live_agent_conversation', 'Agent Traffic')}
+        >
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -5574,7 +5610,11 @@ export function MissionIntelligence({
         </Panel>
 
         <div ref={missionThreadPanelRef}>
-          <Panel title={mt('chronos_selected_mission_thread', 'Selected Mission Thread')}>
+          <Panel
+            id="selected-mission-thread"
+            visible={panelVisible('selected-mission-thread')}
+            title={mt('chronos_selected_mission_thread', 'Selected Mission Thread')}
+          >
             <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
               <span>
                 {effectiveMissionId
@@ -5656,7 +5696,11 @@ export function MissionIntelligence({
           </Panel>
         </div>
 
-        <Panel title={mt('chronos_a2a_handoff_trail', 'A2A Handoff Trail')}>
+        <Panel
+          id="a2a-handoff-trail"
+          visible={panelVisible('a2a-handoff-trail')}
+          title={mt('chronos_a2a_handoff_trail', 'A2A Handoff Trail')}
+        >
           <div className="space-y-3">
             {filteredA2AHandoffs.length === 0 ? (
               <SurfaceStatusPanel
@@ -5767,7 +5811,18 @@ function MiniSummaryCard({
   );
 }
 
-function Panel({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
+function Panel({
+  id,
+  title,
+  children,
+  visible = true,
+}: {
+  id?: string;
+  title: string;
+  children: ReactNode;
+  visible?: boolean;
+}) {
+  if (!visible) return null;
   return (
     <div id={id} className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4 scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">

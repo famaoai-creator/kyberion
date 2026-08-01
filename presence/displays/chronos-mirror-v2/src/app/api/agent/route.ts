@@ -396,6 +396,7 @@ async function issueChronosMissionFromProposal(
     orchestrationStatus,
     orchestrationJobPath,
     orchestrationError,
+    routingDecision: params.routingDecision,
   };
 }
 
@@ -965,7 +966,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
           return acc;
         }, {});
       const rows = Object.entries(capabilityCounts)
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
         .slice(0, 16)
         .map(([capability, count]) => [capability, String(count)]);
       return {
@@ -1049,8 +1050,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
         for (const line of lines.slice(-12)) {
           const event = JSON.parse(line);
           const routingDecision = event.metadata?.routing_decision as
-            | { mode?: string; owner?: string; fanout?: string }
-            | undefined;
+            { mode?: string; owner?: string; fanout?: string } | undefined;
           const routingSummary = routingDecision
             ? [
                 routingDecision.mode,
@@ -1208,7 +1208,26 @@ export async function POST(req: NextRequest) {
       runSurfaceConversation,
       runSurfaceMessageConversation,
       safeReadFile,
+      logger,
     } = core;
+    const dispatchPresenceFrameBestEffort = async (frame: any) => {
+      try {
+        await dispatchPresenceFrame(frame);
+      } catch (error: any) {
+        logger.warn(
+          `[CHRONOS_PRESENCE] Presence Studio unavailable; continuing Sovereign Link response: ${error?.message || String(error)}`
+        );
+      }
+    };
+    const reflectPresenceAgentReplyBestEffort = async (reply: any) => {
+      try {
+        await reflectPresenceAgentReply(reply);
+      } catch (error: any) {
+        logger.warn(
+          `[CHRONOS_PRESENCE] Presence Studio reply reflection unavailable; response remains available: ${error?.message || String(error)}`
+        );
+      }
+    };
     const body = await req.json();
     const locale = normalizeChronosLocale(body.locale);
     const query = (body.query || body.intent || '').trim();
@@ -1320,7 +1339,7 @@ export async function POST(req: NextRequest) {
       teamRole,
       requesterId: body.requesterId || 'chronos-ui',
     });
-    await dispatchPresenceFrame({
+    await dispatchPresenceFrameBestEffort({
       agentId: CHRONOS_AGENT_ID,
       title: 'Presence Studio',
       status: 'thinking',
@@ -1360,7 +1379,7 @@ export async function POST(req: NextRequest) {
 
     if (conversation.missionProposals && conversation.missionProposals.length > 0) {
       const proposal = conversation.missionProposals[0];
-      await dispatchPresenceFrame({
+      await dispatchPresenceFrameBestEffort({
         agentId: CHRONOS_AGENT_ID,
         title: 'Presence Studio',
         status: 'speaking',
@@ -1446,7 +1465,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (conversation.text) {
-      await reflectPresenceAgentReply({
+      await reflectPresenceAgentReplyBestEffort({
         agentId: CHRONOS_AGENT_ID,
         speaker: 'Chronos',
         text: conversation.text,
