@@ -1,0 +1,37 @@
+{
+  "kind": "artifact-review-receipt",
+  "version": "1.0.0",
+  "review_id": "qm-adoption-b4-fresh-context-review-2026-08-01",
+  "mission_id": "QM-ADOPTION-OPS-B4",
+  "review_task_id": "self_review-code-review",
+  "review_target_task_id": "execution-implement",
+  "artifact": {
+    "path": "scripts/check_packaging_contract.ts",
+    "sha256": "61bdb1ba94502a9400fc1c971de8e7498a3d75435bfe5478299b3a665b2163cc",
+    "kind": "code"
+  },
+  "reviewer": {
+    "agent_id": "fresh-context-reviewer-fable5",
+    "team_role": "reviewer",
+    "specialist_roles": ["code-reviewer", "security"],
+    "independent_from": ["famao"],
+    "independence_verified": true
+  },
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "suggestion",
+      "category": "observability",
+      "description": "onGapPhases observer is skipped when prompt_build itself throws (samples recorded but not delivered); wrap the whole body if that path matters.",
+      "location": "libs/core/reasoning-backend.ts"
+    },
+    {
+      "severity": "suggestion",
+      "category": "concurrency",
+      "description": "Overlapping measures on one GapRecorder each record wall clock, so totalMs can exceed elapsed under concurrency; both current call sites are sequential.",
+      "location": "libs/core/gap-phase.ts"
+    }
+  ],
+  "acceptance_criteria": ["must_fix 指摘が解消済み"],
+  "reviewed_at": "2026-08-01T14:28:35.000Z"
+}

@@ -2,7 +2,21 @@
 
 Kyberion uses `pnpm` workspaces, but runtime code must not depend on workspace layout details.
 
-This document defines the package-boundary rules that keep builds stable across Node, Next, scripts, and tests.
+This document defines the package-boundary rules that keep builds stable across Node, Next, scripts, and tests, and the distribution contract for anything that leaves this machine (images, published artifacts).
+
+## Distribution contract (clause status table)
+
+Every clause declares an honest status — `ENFORCED` (a named verifier proves it in CI), `VALIDATED-ONLY` (checked at build/validate time, no runtime enforcement claimed), or `RESERVED` (a compatibility slot; no implementation is claimed) — following the qm deployment-directory contract pattern (QM-08). A clause without a passing verifier must not be labelled ENFORCED.
+
+| Clause                     | What it guarantees                                                                                                                                                                      | Status         | Verifier                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------- |
+| `esm-discipline`           | ESM-first runtime: `type: "module"`, `.js`-suffixed relative imports, no shadow `.js` artifacts                                                                                         | **ENFORCED**   | `pnpm run check:esm`                                  |
+| `package-boundaries`       | Runtime imports by package name only; `exports` is the public API; no `src/`/`dist/` bypass                                                                                             | **ENFORCED**   | `tests/package-boundary-contract.test.ts`             |
+| `image.tier-isolation`     | `.dockerignore` excludes every data-tier path (`knowledge/personal/`, `knowledge/confidential/`, `customer/`, `work/`, `.env*`, keys) so confidential data is never baked into an image | **ENFORCED**   | `pnpm run check:packaging-contract`                   |
+| `config.no-secret-values`  | `docs/developer/env.example` documents names and descriptions, never values; no credential-shaped strings anywhere in it                                                                | **ENFORCED**   | `pnpm run check:packaging-contract`                   |
+| `image.build-reproducible` | The production image builds from prebuilt `dist/` with `pnpm prune --prod` (no runtime build)                                                                                           | VALIDATED-ONLY | `Dockerfile` multi-stage layout; no runtime assertion |
+| `container.egress-control` | Network egress restrictions inside a container                                                                                                                                          | RESERVED       | — (no enforcement claimed; SA-04 scope)               |
+| `published-distribution`   | Official registry image / npx installer                                                                                                                                                 | RESERVED       | — (deferred by OP-03 as a management decision)        |
 
 ## ESM Discipline
 
@@ -28,17 +42,17 @@ This check is part of `pnpm run validate` and CI.
 Allowed:
 
 ```ts
-import { logger } from "@agent/core";
-import { safeReadFile } from "@agent/core/secure-io";
+import { logger } from '@agent/core';
+import { safeReadFile } from '@agent/core/secure-io';
 ```
 
 Forbidden:
 
 ```ts
-import { logger } from "../libs/core/index.js";
-import { safeReadFile } from "@agent/core/src/secure-io.js";
-import { safeReadFile } from "@agent/core/dist/secure-io.js";
-import { safeReadFile } from "@agent/core/secure-io.js";
+import { logger } from '../libs/core/index.js';
+import { safeReadFile } from '@agent/core/src/secure-io.js';
+import { safeReadFile } from '@agent/core/dist/secure-io.js';
+import { safeReadFile } from '@agent/core/secure-io.js';
 ```
 
 These runtime restrictions apply to:
@@ -55,7 +69,7 @@ Tests are allowed to import local source modules directly when the test is expli
 Allowed in tests:
 
 ```ts
-const { ensureMissionTeamRuntime } = await import("../libs/core/mission-team-orchestrator.js");
+const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
 ```
 
 This is a white-box exception, not a general convenience rule.
@@ -73,9 +87,9 @@ The preferred shape is still:
 Still forbidden in tests:
 
 ```ts
-import { safeReadFile } from "@agent/core/src/secure-io.js";
-import { safeReadFile } from "@agent/core/dist/secure-io.js";
-import { safeReadFile } from "../libs/core/dist/secure-io.js";
+import { safeReadFile } from '@agent/core/src/secure-io.js';
+import { safeReadFile } from '@agent/core/dist/secure-io.js';
+import { safeReadFile } from '../libs/core/dist/secure-io.js';
 ```
 
 ### `exports` is the runtime contract
