@@ -178,6 +178,12 @@
       "note": "plugin install staging dir"
     },
     {
+      "file": "libs/core/plugin-pack.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "ephemeral git clone staging dir; removed after plugin-pack import"
+    },
+    {
       "file": "libs/core/programmatic-tool-calling.ts",
       "count": 1,
       "classification": "legit-tmp",

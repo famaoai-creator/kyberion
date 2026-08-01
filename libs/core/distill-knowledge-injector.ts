@@ -32,6 +32,7 @@ import {
   getEmbeddingBackend,
   cosineSimilarity,
   reciprocalRankFusion,
+  type EmbeddingBackend,
 } from './embedding-backend.js';
 
 const CURRENT_DISTILL_DIR = 'knowledge/product/evolution';
@@ -208,19 +209,33 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
 
 // In-process embedding cache: path/key → vector.
 // Small corpus (O(10s) of distill files) — no eviction needed.
-const _embedCache = new Map<string, Float32Array>();
+// Keep vectors isolated by backend instance. Backends can be swapped at
+// runtime (and tests intentionally do so); reusing a path-keyed vector from a
+// different model can silently corrupt semantic ranking.
+const _embedCache = new WeakMap<EmbeddingBackend, Map<string, Float32Array>>();
+
+function cacheForBackend(backend: EmbeddingBackend): Map<string, Float32Array> {
+  const existing = _embedCache.get(backend);
+  if (existing) return existing;
+  const created = new Map<string, Float32Array>();
+  _embedCache.set(backend, created);
+  return created;
+}
 
 function _corpusText(entry: DistilledKnowledgeEntry): string {
   return [entry.title, ...entry.tags, entry.excerpt.slice(0, 300)].filter(Boolean).join(' ');
 }
 
-async function _embedWithCache(key: string, text: string): Promise<Float32Array | null> {
-  if (_embedCache.has(key)) return _embedCache.get(key)!;
-  const backend = getEmbeddingBackend();
-  if (!backend) return null;
+async function _embedWithCache(
+  backend: EmbeddingBackend,
+  key: string,
+  text: string
+): Promise<Float32Array | null> {
+  const cache = cacheForBackend(backend);
+  if (cache.has(key)) return cache.get(key)!;
   try {
     const vec = await backend.embed(text);
-    _embedCache.set(key, vec);
+    cache.set(key, vec);
     return vec;
   } catch {
     return null;
@@ -300,7 +315,8 @@ export async function findRelevantDistilledKnowledge(
 
   // ── Semantic ranking (hybrid path) ──────────────────────────────────────
   const queryText = [input.topic, ...(input.tags ?? [])].filter(Boolean).join(' ');
-  const queryVec = await _embedWithCache(`__q__${queryText}`, queryText);
+  const cache = cacheForBackend(backend);
+  const queryVec = await _embedWithCache(backend, `__q__${queryText}`, queryText);
 
   if (!queryVec) {
     // Backend present but embed failed — fall back to lexical
@@ -308,11 +324,11 @@ export async function findRelevantDistilledKnowledge(
   }
 
   // Embed corpus entries in batch for efficiency
-  const unembed = all.filter((e) => !_embedCache.has(e.path));
+  const unembed = all.filter((e) => !cache.has(e.path));
   if (unembed.length > 0) {
     try {
       const vectors = await backend.embedBatch(unembed.map(_corpusText));
-      unembed.forEach((e, i) => _embedCache.set(e.path, vectors[i]));
+      unembed.forEach((e, i) => cache.set(e.path, vectors[i]));
     } catch {
       // If batch fails, individual entries will miss and fall through
     }
@@ -320,7 +336,7 @@ export async function findRelevantDistilledKnowledge(
 
   const semanticScored = all
     .map((e) => {
-      const vec = _embedCache.get(e.path);
+      const vec = cache.get(e.path);
       return { entry: e, sim: vec ? cosineSimilarity(queryVec, vec) : 0 };
     })
     .filter((x) => x.sim > 0)

@@ -1,0 +1,37 @@
+{
+  "kind": "artifact-review-receipt",
+  "version": "1.0.0",
+  "review_id": "qm-adoption-b5-fresh-context-review-2026-08-01",
+  "mission_id": "QM-ADOPTION-BACKEND-B5",
+  "review_task_id": "self_review-code-review",
+  "review_target_task_id": "execution-implement",
+  "artifact": {
+    "path": "libs/core/customer-conversation.ts",
+    "sha256": "cc5b098c530813e2fdf23dede20839bee101dedcc293364f31d0b6c89af1a447",
+    "kind": "code"
+  },
+  "reviewer": {
+    "agent_id": "fresh-context-reviewer-fable5",
+    "team_role": "reviewer",
+    "specialist_roles": ["code-reviewer", "security"],
+    "independent_from": ["famao"],
+    "independence_verified": true
+  },
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "suggestion",
+      "category": "observability",
+      "description": "No production backend implements resetSession yet (copilot ACP and codex app-server sessions are the targets); wrapper backends do not forward it. Recorded as 残 in the plan.",
+      "location": "libs/core/reasoning-backend.ts"
+    },
+    {
+      "severity": "suggestion",
+      "category": "api-design",
+      "description": "An inactive CustomerAudienceFloor composes to allow-all; only sendToCustomer gates on floor.active. Future callers must check active before enforcement.",
+      "location": "libs/core/customer-conversation.ts"
+    }
+  ],
+  "acceptance_criteria": ["must_fix 指摘が解消済み"],
+  "reviewed_at": "2026-08-01T15:02:36.000Z"
+}
