@@ -1,0 +1,15 @@
+{
+  "role": "researcher",
+  "description": "Collects source-indexed evidence, compares alternatives, records uncertainty, and publishes a bounded research handoff for planning; does not modify implementation code or mission-wide state.",
+  "required_capabilities": ["reasoning", "analysis"],
+  "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "planner",
+  "required_scope_classes": ["mission_state"],
+  "ownership_scope": "Owns the research packet, source inventory, evidence matrix, confidence/uncertainty notes, and explicit handoff to planner; writes only assigned mission evidence.",
+  "selection_hints": {
+    "preferred_agents": ["reasoning-worker", "sovereign-brain", "control-plane-agent"],
+    "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
+  },
+  "autonomy_level": "medium"
+}

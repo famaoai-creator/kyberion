@@ -298,6 +298,8 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       mocks.resolveMissionTeamReceiver
         .mockReturnValueOnce({
           agent_id: 'implementation-architect',
+          provider: 'codex',
+          modelId: 'gpt-5.6-sol',
           model_hint: {
             tier: 'small',
             effort: 'low',
@@ -307,6 +309,8 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         })
         .mockReturnValueOnce({
           agent_id: 'independent-reviewer',
+          provider: 'claude',
+          modelId: 'claude-sonnet-4-20250514',
           model_hint: {
             tier: 'small',
             effort: 'low',
@@ -348,6 +352,8 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
               effort: 'low',
               route_reason: 'phase_kind=mechanical -> small/low',
             }),
+            provider: 'codex',
+            provider_model_id: 'gpt-5.6-sol',
           },
         },
       });

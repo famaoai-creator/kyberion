@@ -75,6 +75,20 @@ export interface MissionState {
     | 'paused'
     | 'failed'
     | 'archived';
+  /** Canonical lifecycle evidence for the verification transition. */
+  verification?: {
+    status: 'verified' | 'rejected';
+    verified_at: string;
+    note: string;
+  };
+  /** Canonical lifecycle evidence for the distillation transition. */
+  distillation?: {
+    status: 'completed';
+    completed_at: string;
+    output_path: string;
+  };
+  /** Set when governed distillation closes the mission lifecycle. */
+  completed_at?: string;
   execution_mode: 'local' | 'delegated';
   relationships?: {
     prerequisites?: string[];

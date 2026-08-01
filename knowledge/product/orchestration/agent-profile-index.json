@@ -38,6 +38,7 @@
       "team_roles": [
         "owner",
         "planner",
+        "researcher",
         "product_strategist",
         "tracker",
         "facilitator",
@@ -78,7 +79,16 @@
         "software_developer"
       ],
       "team_roles": ["planner", "implementer", "reviewer", "tester", "experience_designer"],
-      "capabilities": ["architecture", "code", "review", "testing", "planning", "a2a"],
+      "capabilities": [
+        "architecture",
+        "code",
+        "review",
+        "testing",
+        "planning",
+        "documentation",
+        "analysis",
+        "a2a"
+      ],
       "selection_hints": {
         "preferred_provider": "agy",
         "preferred_modelId": "Gemini 3.5 Flash (Medium)"
@@ -167,6 +177,7 @@
       ],
       "team_roles": [
         "planner",
+        "researcher",
         "implementer",
         "reviewer",
         "tester",
@@ -223,7 +234,15 @@
         "knowledge_steward",
         "ecosystem_architect"
       ],
-      "team_roles": ["owner", "planner", "reviewer", "product_strategist", "tracker", "defender"],
+      "team_roles": [
+        "owner",
+        "planner",
+        "researcher",
+        "reviewer",
+        "product_strategist",
+        "tracker",
+        "defender"
+      ],
       "capabilities": ["reasoning", "strategy", "coordination", "analysis", "security"],
       "selection_hints": {
         "preferred_provider": "agy",

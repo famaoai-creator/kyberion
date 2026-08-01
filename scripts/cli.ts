@@ -121,11 +121,7 @@ interface NextActionExecutionOutcome {
   execution_failed: boolean;
   failure_summary?: string;
   recommended_next_action_type:
-    | 'execute_now'
-    | 'inspect'
-    | 'clarify'
-    | 'start_mission'
-    | 'resume_mission';
+    'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
   deterministic_reason: string;
   llm_consult_recommended: boolean;
   llm_consult_prompt?: string;
@@ -329,7 +325,7 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log(t('cli_help_sec_pipelines', locale));
   console.log(t('cli_help_preview', locale));
   console.log(t('cli_help_schedule_list', locale));
-  console.log('  schedule register <id> <pipeline> <actuator> "<cron>"');
+  console.log(t('cli_help_schedule_register_syntax', locale));
   console.log(t('cli_help_schedule_register_desc', locale));
   console.log(t('cli_help_schedule_remove', locale));
   console.log('');

@@ -23,9 +23,15 @@ export interface EnsureMissionTeamRuntimeOptions {
   teamRoles?: string[];
 }
 
-function isReady(agentId: string): boolean {
+function isReady(
+  agentId: string,
+  expected?: Pick<MissionTeamRuntimeAssignment, 'provider' | 'modelId'>
+): boolean {
   const record = agentRegistry.get(agentId);
-  return record?.status === 'ready' || record?.status === 'busy';
+  if (record?.status !== 'ready' && record?.status !== 'busy') return false;
+  if (expected?.provider && record.provider !== expected.provider) return false;
+  if (expected?.modelId && record.modelId !== expected.modelId) return false;
+  return true;
 }
 
 export async function ensureMissionTeamRuntime(
@@ -66,7 +72,7 @@ export async function ensureMissionTeamRuntime(
       continue;
     }
 
-    if (isReady(assignment.agent_id)) {
+    if (isReady(assignment.agent_id, assignment)) {
       const resolved = {
         ...assignment,
         runtime_status: 'already_ready',

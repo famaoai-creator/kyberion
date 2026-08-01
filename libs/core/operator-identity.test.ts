@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveOperatorLocale } from './operator-identity.js';
 import { _resetLocaleModuleStateForTests } from './locale.js';
+import { SUPPORTED_LOCALES } from './locale-normalize.js';
 
 // I18N-01: resolveOperatorLocale is now a thin wrapper over the unified
 // resolveLocale() precedence chain (identity → KYBERION_LOCALE →
@@ -34,12 +35,17 @@ describe('resolveOperatorLocale', () => {
 
   it('ignores invalid env values and falls through', () => {
     process.env.KYBERION_LOCALE = 'fr';
-    expect(['ja', 'en']).toContain(resolveOperatorLocale());
+    expect(SUPPORTED_LOCALES).toContain(resolveOperatorLocale());
   });
 
   it('returns a supported locale when no identity exists', () => {
     // (identity may exist in a real profile; both outcomes are valid locales)
-    expect(['ja', 'en']).toContain(resolveOperatorLocale('en'));
+    expect(SUPPORTED_LOCALES).toContain(resolveOperatorLocale('en'));
+  });
+
+  it('does not use the legacy fallback as a second locale authority', () => {
+    process.env.LANG = 'C';
+    expect(resolveOperatorLocale('ja')).toBe('en');
   });
 
   // Behavior-change pin (I18N-01): the old hardcoded 'ja' fallback is gone.

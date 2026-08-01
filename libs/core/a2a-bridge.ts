@@ -302,7 +302,9 @@ class A2ABridgeImpl {
       routedDelegationChain && envelope.header.signature ? routedDelegationChain : undefined;
 
     // Parse receiver
-    const { agentId, provider } = this.parseReceiver(receiver);
+    const { agentId, provider: receiverProvider } = this.parseReceiver(receiver);
+    const payloadProvider = this.extractProvider(envelope.payload);
+    const provider = payloadProvider || receiverProvider;
     const securityScope = this.extractSecurityScope(envelope.payload);
     if (securityScope) {
       const scopeErrors = validateContextSecurityScope(securityScope);
@@ -316,6 +318,7 @@ class A2ABridgeImpl {
     }
     const correlationId = this.resolveCorrelationId(envelope);
     const taskModelHint = this.extractTaskModelHint(envelope.payload);
+    const dispatchTimeoutMs = this.extractDispatchTimeoutMs(envelope.payload);
     const taskContractValidation = this.validateTaskContractPayload(envelope.payload);
     if (!taskContractValidation.valid) {
       auditChain.record({
@@ -450,6 +453,7 @@ class A2ABridgeImpl {
           prompt: runtimePrompt,
           requestedBy: 'a2a_bridge',
           correlationId,
+          ...(dispatchTimeoutMs ? { timeoutMs: dispatchTimeoutMs } : {}),
           ...(taskModelHint ? { taskModelHint } : {}),
         });
         responseText = result.text;
@@ -480,6 +484,7 @@ class A2ABridgeImpl {
             prompt: retriedPrompt,
             requestedBy: 'a2a_bridge',
             correlationId,
+            ...(dispatchTimeoutMs ? { timeoutMs: dispatchTimeoutMs } : {}),
             ...(taskModelHint ? { taskModelHint } : {}),
           });
           responseText = result.text;
@@ -624,6 +629,14 @@ class A2ABridgeImpl {
 
     const supervisorHandle = getAgentRuntimeHandle(agentId);
     const existing = supervisorHandle || this.handles.get(agentId);
+    const requestedProvider = this.extractProvider(payload) || provider;
+    const requestedModelId = this.extractProviderModelId(payload);
+    const existingHandleRecord =
+      existing && typeof existing.getRecord === 'function' ? existing.getRecord() : undefined;
+    const existingRecord = existingHandleRecord || agentRegistry.get(agentId);
+    const runtimeMatches =
+      (!requestedProvider || existingRecord?.provider === requestedProvider) &&
+      (!requestedModelId || existingRecord?.modelId === requestedModelId);
     if (existing && this.runtimeContexts.get(agentId) === runtimeContextKey) {
       const record = agentRegistry.get(agentId);
       if (record && ['ready', 'busy', 'booting'].includes(record.status)) {
@@ -631,12 +644,14 @@ class A2ABridgeImpl {
         // must not be reused — fall through to the recreate path so the spawn
         // below re-resolves the provider dynamically.
         const providerDemoted = listDemotedProviders().includes(record.provider);
-        if (!providerDemoted) {
+        if (!providerDemoted && runtimeMatches) {
           this.handles.set(agentId, existing);
           return existing;
         }
         logger.info(
-          `[A2A_BRIDGE] Not reusing ${agentId}: provider ${record.provider} is demoted — recreating with dynamic provider resolution.`
+          `[A2A_BRIDGE] Recreating ${agentId}: ${
+            providerDemoted ? `provider ${record.provider} is demoted` : 'runtime target changed'
+          }.`
         );
         try {
           await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
@@ -668,7 +683,14 @@ class A2ABridgeImpl {
       );
     }
 
-    const hinted = resolveAgentSelectionHints(manifest, provider);
+    const manifestHint = resolveAgentSelectionHints(manifest, provider);
+    const hasExplicitRuntimeTarget = Boolean(requestedProvider && requestedModelId);
+    const hinted = requestedProvider
+      ? {
+          provider: requestedProvider,
+          modelId: requestedModelId || manifestHint.modelId,
+        }
+      : manifestHint;
     // Dynamic-selection alignment: run the static hint through the provider
     // resolver so a demoted backend (rate limit reported into the shared
     // provider-health registry) fails over per the profile's strategy instead
@@ -676,12 +698,21 @@ class A2ABridgeImpl {
     const dynamicTarget = resolveAgentProviderTarget({
       preferredProvider: hinted.provider,
       preferredModelId: hinted.modelId,
-      providerStrategy: manifest.selection_hints?.provider_strategy,
+      providerStrategy: hasExplicitRuntimeTarget
+        ? 'strict'
+        : manifest.selection_hints?.provider_strategy,
       fallbackProviders: manifest.selection_hints?.fallback_providers,
       requiredCapabilities: manifest.capabilities,
     });
     const resolvedProvider = dynamicTarget.provider as AgentProvider;
-    const resolvedModelId = dynamicTarget.modelId;
+    // A mission assignment is a concrete provider/model target, not merely a
+    // preference hint. Keep the requested model when the provider remains the
+    // requested provider; the resolver may still fail over the provider when
+    // health policy requires it.
+    const resolvedModelId =
+      requestedProvider && requestedModelId && resolvedProvider === requestedProvider
+        ? requestedModelId
+        : dynamicTarget.modelId;
     if (resolvedProvider !== hinted.provider) {
       logger.info(
         `[A2A_BRIDGE] Provider failover for ${agentId}: ${hinted.provider} → ${resolvedProvider} (${dynamicTarget.strategy})`
@@ -732,6 +763,12 @@ class A2ABridgeImpl {
           typeof (payload as any)?.context?.correlation_id === 'string'
             ? String((payload as any).context.correlation_id)
             : undefined,
+        // Mission assignments are concrete runtime targets. Do not run the
+        // lifecycle's capability-based provider resolver a second time and
+        // silently replace an explicitly assigned provider/model.
+        ...(hasExplicitRuntimeTarget
+          ? { provider_strategy: 'strict', skip_provider_resolution: true }
+          : {}),
         task_model_hint: this.extractTaskModelHint(payload),
         intent:
           typeof (payload as any)?.intent === 'string'
@@ -871,6 +908,32 @@ class A2ABridgeImpl {
       effort: effort as TaskModelHint['effort'],
       route_reason: routeReason,
     };
+  }
+
+  private extractProvider(payload: unknown): AgentProvider | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return undefined;
+    const provider = (context as Record<string, unknown>).provider;
+    return typeof provider === 'string' && provider.trim()
+      ? (provider.trim() as AgentProvider)
+      : undefined;
+  }
+
+  private extractProviderModelId(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return undefined;
+    const modelId = (context as Record<string, unknown>).provider_model_id;
+    return typeof modelId === 'string' && modelId.trim() ? modelId.trim() : undefined;
+  }
+
+  private extractDispatchTimeoutMs(payload: unknown): number | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return undefined;
+    const value = (context as Record<string, unknown>).dispatch_timeout_ms;
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
   }
 
   private validateTaskContractPayload(payload: unknown): { valid: boolean; errors: string[] } {

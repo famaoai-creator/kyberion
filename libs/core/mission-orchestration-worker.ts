@@ -132,6 +132,15 @@ import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
 import { getReasoningBackend, getLastServedReasoningMode } from './reasoning-backend.js';
 import { deriveExecutionGraph, executeGraph, type GraphNode } from './graph-scheduler.js';
+import {
+  buildMissionGraphInputs,
+  collectMissionGraphHandoffs,
+  type MissionGraphHandoff,
+} from './mission-graph-handoff.js';
+import {
+  openOrCreateMissionGraphRunJournal,
+  type MissionGraphRunJournalHandle,
+} from './mission-graph-run-journal.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
@@ -278,13 +287,7 @@ function payloadSurface(payload: SlackPayload): string {
 
 interface MissionControlPayload {
   operation:
-    | 'resume'
-    | 'pause'
-    | 'cancel'
-    | 'refresh_team'
-    | 'prewarm_team'
-    | 'staff_team'
-    | 'finish';
+    'resume' | 'pause' | 'cancel' | 'refresh_team' | 'prewarm_team' | 'staff_team' | 'finish';
   requested_by_surface?: 'chronos';
 }
 
@@ -312,6 +315,7 @@ interface PlannedNextTask {
   risk?: string;
   expected_output_format?: 'text' | 'files' | 'structured';
   estimated_scope?: 'S' | 'M' | 'L';
+  timeout_ms?: number;
   review_target?: string;
   review_round?: number;
   artifact_review_profile?: ArtifactReviewerProfile & {
@@ -500,6 +504,11 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
       ...(typeof task.estimated_scope === 'string' && task.estimated_scope.trim()
         ? { estimated_scope: task.estimated_scope.trim() as PlannedNextTask['estimated_scope'] }
         : {}),
+      ...(typeof task.timeout_ms === 'number' &&
+      Number.isFinite(task.timeout_ms) &&
+      task.timeout_ms > 0
+        ? { timeout_ms: task.timeout_ms }
+        : {}),
       ...(reviewTarget ? { review_target: reviewTarget } : {}),
       ...(typeof task.review_round === 'number' && Number.isFinite(task.review_round)
         ? { review_round: task.review_round }
@@ -678,6 +687,7 @@ interface DispatchMissionTaskOutcome {
   dispatched: boolean;
   allowSameInvocationRedispatch?: boolean;
   redispatchTaskIds?: string[];
+  dispatch_error?: string;
   context_chars?: number;
   pruned_chars?: number;
   rollup_used: boolean;
@@ -952,6 +962,24 @@ function buildUpstreamResultLines(task: PlannedNextTask, tasks: PlannedNextTask[
     }
     return `- ${dependency} [${role}]: ${summary}`;
   });
+}
+
+function buildGraphHandoffLines(
+  handoffs: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>
+): string[] {
+  if (handoffs.length === 0) return [];
+  return [
+    'Graph handoff payloads from direct predecessor tasks (authoritative for this dispatch):',
+    ...handoffs.slice(0, 10).map((handoff) => {
+      const summary = handoff.task_result
+        ? summarizeTaskResultForPrompt({
+            task_id: handoff.from_task_id,
+            last_result: handoff.task_result,
+          } as PlannedNextTask)
+        : null;
+      return `- ${handoff.from_task_id}: status=${handoff.status}${summary ? ` / ${summary}` : ''}`;
+    }),
+  ];
 }
 
 function buildTeamSnapshotLines(tasks: PlannedNextTask[]): string[] {
@@ -1733,6 +1761,7 @@ async function buildTaskDispatchContext(input: {
   authorityRole?: string | null;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   allTasks: PlannedNextTask[];
+  upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>;
   /** OH-01 reactive path: force compaction after a prompt-too-long dispatch failure. */
   forceContextCompaction?: boolean;
 }): Promise<{
@@ -1827,6 +1856,7 @@ async function buildTaskDispatchContext(input: {
     missionContextPackText,
     missionGoalLines,
     upstreamResultLines: [
+      ...buildGraphHandoffLines(input.upstreamHandoffs || []),
       ...buildUpstreamResultLines(input.task, input.allTasks),
       ...buildReviewDiffLines(input.missionId, input.task),
     ],
@@ -2532,6 +2562,7 @@ interface DispatchPlannedMissionTaskInput {
     modelId?: string | null;
   };
   allTasks: PlannedNextTask[];
+  upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>;
   iterationPolicy: {
     max_rework_attempts: number;
     max_review_rounds: number;
@@ -2724,6 +2755,7 @@ async function dispatchPlannedMissionTaskCore(
       authorityRole: input.assignment.authority_role,
       taskModelHint: input.assignment.model_hint,
       allTasks: input.allTasks,
+      ...(input.upstreamHandoffs ? { upstreamHandoffs: input.upstreamHandoffs } : {}),
       ...(forceContextCompaction ? { forceContextCompaction: true } : {}),
     });
   const dispatchOnce = (context: Awaited<ReturnType<typeof buildTaskDispatchContext>>) => {
@@ -2733,6 +2765,8 @@ async function dispatchPlannedMissionTaskCore(
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
+      provider: input.assignment.provider || undefined,
+      providerModelId: input.assignment.modelId || undefined,
       prompt: context.prompt,
       securityScope: context.securityScope,
       // KP-04: lets a needs-driven retry's second-round retrieval exclude
@@ -3550,6 +3584,8 @@ async function obtainTaskResultResponse(input: {
   teamRole: string;
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+  provider?: string;
+  providerModelId?: string;
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   /**
@@ -3614,6 +3650,9 @@ async function obtainTaskResultResponse(input: {
         task_id: input.task.task_id,
         execution_mode: 'task',
         task_model_hint: input.taskModelHint,
+        dispatch_timeout_ms: resolveTaskDispatchTimeoutMs(input.task),
+        ...(input.provider ? { provider: input.provider } : {}),
+        ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
         security_scope: input.securityScope,
         ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
       },
@@ -3691,6 +3730,9 @@ async function obtainTaskResultResponse(input: {
           task_id: input.task.task_id,
           execution_mode: 'task',
           task_model_hint: input.taskModelHint,
+          dispatch_timeout_ms: resolveTaskDispatchTimeoutMs(input.task),
+          ...(input.provider ? { provider: input.provider } : {}),
+          ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
           security_scope: input.securityScope,
           ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
         },
@@ -4574,6 +4616,34 @@ function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
   safeWriteFile(nextTasksPath, JSON.stringify(mergedTasks, null, 2));
 }
 
+function restoreMissionGraphRunTaskSnapshots(
+  tasks: PlannedNextTask[],
+  journal: MissionGraphRunJournalHandle
+): void {
+  const nodeStates = journal.state().node_states;
+  const executionFields = [
+    'status',
+    'rework_count',
+    'review_round',
+    'last_result',
+    'review_findings',
+    'rework_packet',
+    'artifact_review_receipt',
+    'reconciliation',
+  ] as const;
+  const taskById = new Map(tasks.map((task) => [task.task_id, task]));
+  for (const node of nodeStates.values()) {
+    const snapshot = node.task_snapshot;
+    const task = snapshot ? taskById.get(node.task_id) : undefined;
+    if (!task || !snapshot) continue;
+    for (const field of executionFields) {
+      if (Object.prototype.hasOwnProperty.call(snapshot, field)) {
+        (task as unknown as Record<string, unknown>)[field] = snapshot[field];
+      }
+    }
+  }
+}
+
 function readExistingTaskEventKeys(missionId: string): Set<string> {
   const taskEventsPath = `${missionDir(missionId, 'public')}/coordination/events/task-events.jsonl`;
   if (!safeExistsSync(taskEventsPath)) return new Set();
@@ -4710,17 +4780,36 @@ function markTaskBoardInProgress(missionId: string): void {
 
 async function dispatchMissionNextTasksCore(
   missionId: string,
-  missionRunTrace?: TraceContext
+  missionRunTrace?: TraceContext,
+  graphRunId?: string
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
   ensureWorkerBackendsInstalled();
   const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const allTasks = loadAllNextTasks(missionId);
-  const plannedTasks = allTasks.filter((task) => {
+  let plannedTasks = allTasks.filter((task) => {
     const status = String(task.status || 'planned');
     return status === 'planned' || status === 'rework';
   });
   if (plannedTasks.length === 0) return [];
+
+  const runId = graphRunId?.trim() || `manual-${Date.now()}`;
+  const graphRunJournal = openOrCreateMissionGraphRunJournal({
+    missionId,
+    runId,
+    taskIds: allTasks.map((task) => task.task_id),
+  });
+  restoreMissionGraphRunTaskSnapshots(allTasks, graphRunJournal);
+  plannedTasks = allTasks.filter((task) => {
+    const status = String(task.status || 'planned');
+    return status === 'planned' || status === 'rework';
+  });
+  if (plannedTasks.length === 0) {
+    writeNextTasks(missionId, allTasks);
+    graphRunJournal.append('graph_finished', { status: 'completed', recovered_only: true });
+    reconcileMissionProgress(missionId);
+    return [];
+  }
 
   const uniqueRoles = Array.from(
     new Set(
@@ -4760,7 +4849,10 @@ async function dispatchMissionNextTasksCore(
   let followupIterations = 0;
 
   while (true) {
-    const readyTasks = plannedTasks
+    // The graph owns dependency readiness. The worker prepares every planned
+    // node once so a completed predecessor can activate its successor in the
+    // same graph run instead of waiting for this outer loop to rescan state.
+    const graphTasks = plannedTasks
       .filter(
         (task) =>
           (task.status === 'planned' || task.status === 'rework') &&
@@ -4768,7 +4860,7 @@ async function dispatchMissionNextTasksCore(
       )
       .sort((left, right) => left.task_id.localeCompare(right.task_id));
 
-    if (readyTasks.length === 0) break;
+    if (graphTasks.length === 0) break;
     followupIterations += 1;
     if (followupIterations > maxFollowupIterations) {
       const summary = `Mission follow-up iteration limit reached (${maxFollowupIterations}); remaining tasks were blocked.`;
@@ -4795,7 +4887,7 @@ async function dispatchMissionNextTasksCore(
           `[worker] failed to pause mission ${missionId} after iteration limit (non-fatal): ${err instanceof Error ? err.message : String(err)}`
         );
       }
-      for (const task of readyTasks) {
+      for (const task of graphTasks) {
         task.status = 'blocked';
         recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
           summary,
@@ -4809,9 +4901,14 @@ async function dispatchMissionNextTasksCore(
       break;
     }
 
-    const batchExecutors = new Map<string, () => Promise<DispatchMissionTaskOutcome | null>>();
+    const batchExecutors = new Map<
+      string,
+      (
+        upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>
+      ) => Promise<DispatchMissionTaskOutcome | null>
+    >();
     let waveMadeProgress = false;
-    for (const task of readyTasks) {
+    for (const task of graphTasks) {
       const teamRole = task.assigned_to?.role;
       if (!teamRole) {
         task.status = 'blocked';
@@ -4991,23 +5088,56 @@ async function dispatchMissionNextTasksCore(
         continue;
       }
 
-      batchExecutors.set(task.task_id, async () => {
+      batchExecutors.set(task.task_id, async (upstreamHandoffs = []) => {
         missionRunTrace?.addEvent('mission_task_dispatch_started', {
           task_id: task.task_id,
           team_role: teamRole,
           agent_id: assignment.agent_id,
         });
-        const outcome = await withTaskDispatchTimeout(
-          task,
-          dispatchPlannedMissionTask({
-            missionId,
+        let outcome: DispatchMissionTaskOutcome | null | 'timeout' = null;
+        let dispatchError: string | undefined;
+        try {
+          outcome = await withTaskDispatchTimeout(
             task,
-            teamRole,
-            assignment,
-            allTasks,
-            iterationPolicy,
-          })
-        );
+            dispatchPlannedMissionTask({
+              missionId,
+              task,
+              teamRole,
+              assignment,
+              allTasks,
+              iterationPolicy,
+              upstreamHandoffs,
+            })
+          );
+        } catch (error) {
+          dispatchError = error instanceof Error ? error.message : String(error);
+          task.status = 'blocked';
+          const summary = `Task ${task.task_id} failed during graph dispatch: ${dispatchError}`;
+          logger.error(`[worker] ${summary}`);
+          recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+            summary,
+            next_step: 'inspect the graph node failure evidence before retrying the task',
+            work_item_id: task.task_id,
+            team_role: teamRole,
+            reason: 'blocked(dispatch_error)',
+            error: dispatchError,
+          });
+          missionRunTrace?.addEvent('mission_task_dispatch_finished', {
+            task_id: task.task_id,
+            status: 'error',
+            error: dispatchError,
+          });
+          return {
+            task_id: task.task_id,
+            team_role: teamRole,
+            agent_id: assignment.agent_id,
+            dispatched: false,
+            dispatch_error: dispatchError,
+            rollup_used: false,
+            result_schema_ok: false,
+            needs_count: 0,
+          };
+        }
         if (outcome === 'timeout') {
           task.status = 'blocked';
           const summary = `Task ${task.task_id} exceeded its dispatch budget (${resolveTaskDispatchTimeoutMs(task)}ms) — blocked(timeout).`;
@@ -5045,10 +5175,7 @@ async function dispatchMissionNextTasksCore(
     const graphTaskOrder = [...allTasks].sort((left, right) =>
       left.task_id.localeCompare(right.task_id)
     );
-    const graphInputs = graphTaskOrder.map((task) => ({
-      id: task.task_id,
-      depends_on: Array.isArray(task.dependencies) ? task.dependencies : [],
-    }));
+    const graphInputs = buildMissionGraphInputs(graphTaskOrder);
     const derivedFrontier = deriveExecutionGraph(graphInputs);
     if (derivedFrontier.errors.length > 0) {
       throw new Error(
@@ -5070,17 +5197,47 @@ async function dispatchMissionNextTasksCore(
     const terminalBlockedIds = allTasks
       .filter((task) => ['blocked', 'requested'].includes(String(task.status || '')))
       .map((task) => task.task_id);
-    const frontierResult = await executeGraph<
-      PlannedNextTask,
-      { outcome?: DispatchMissionTaskOutcome }
-    >(
+    const frontierResult = await executeGraph<PlannedNextTask, Record<string, unknown>>(
       frontierGraph,
-      async (node: GraphNode<PlannedNextTask>) => {
+      async (node: GraphNode<PlannedNextTask>, graphContext) => {
         const executor = batchExecutors.get(node.id);
         if (!executor) return { status: 'skipped' as const, error: 'task is not dispatchable' };
-        const outcome = await executor();
+        const upstreamHandoffs = collectMissionGraphHandoffs<
+          DispatchMissionTaskOutcome,
+          TaskResultBlock
+        >(graphContext, node.dependencies);
+        const outcome = await executor(upstreamHandoffs);
+        const dispatchError = outcome?.dispatch_error;
+        const task = taskById.get(node.id);
+        const handoff = task
+          ? {
+              from_task_id: node.id,
+              status: String(task.status || 'planned'),
+              ...(outcome ? { outcome } : {}),
+              ...(task.last_result ? { task_result: task.last_result } : {}),
+            }
+          : undefined;
+        const nodeState =
+          task?.status === 'blocked' || task?.status === 'requested'
+            ? 'blocked'
+            : outcome?.dispatched
+              ? 'completed'
+              : 'rework';
+        graphRunJournal.append('node_state', {
+          task_id: node.id,
+          state: nodeState,
+          ...(outcome ? { outcome: outcome as unknown as Record<string, unknown> } : {}),
+          ...(task ? { task_snapshot: task as unknown as Record<string, unknown> } : {}),
+        });
+        if (dispatchError) {
+          return { status: 'failed' as const, error: dispatchError };
+        }
         return outcome
-          ? { status: 'success' as const, context: { outcome } }
+          ? {
+              status: outcome.dispatched ? ('success' as const) : ('failed' as const),
+              context: handoff ? { handoff } : undefined,
+              ...(outcome.dispatched ? {} : { error: 'task handoff requires re-dispatch' }),
+            }
           : { status: 'failed' as const, error: 'task was blocked before dispatch' };
       },
       {
@@ -5088,18 +5245,37 @@ async function dispatchMissionNextTasksCore(
         maxConcurrency: maxParallelMembers,
         precompletedNodeIds: terminalSuccessIds,
         preskippedNodeIds: terminalBlockedIds,
+        precompletedNodeContext: (node) => {
+          const task = node.value as PlannedNextTask;
+          const persisted = graphRunJournal.state().node_states.get(task.task_id);
+          const persistedOutcome = persisted?.outcome;
+          const persistedTaskResult = persisted?.task_snapshot?.last_result;
+          return task.last_result || persistedOutcome || persistedTaskResult
+            ? {
+                handoff: {
+                  from_task_id: task.task_id,
+                  status: String(task.status || 'completed'),
+                  ...(persistedOutcome ? { outcome: persistedOutcome } : {}),
+                  ...(task.last_result || persistedTaskResult
+                    ? { task_result: task.last_result || persistedTaskResult }
+                    : {}),
+                },
+              }
+            : undefined;
+        },
         resourceClaims: (node) => {
           const task = node.value as PlannedNextTask;
           return task.resource_claims || [];
         },
       }
     );
-    const results = readyTasks
+    const results = graphTasks
       .map(
         (task) =>
-          frontierResult.outcomes[task.task_id]?.context?.outcome as
-            | DispatchMissionTaskOutcome
-            | undefined
+          (
+            frontierResult.outcomes[task.task_id]?.context as
+              { handoff?: { outcome?: DispatchMissionTaskOutcome } } | undefined
+          )?.handoff?.outcome as DispatchMissionTaskOutcome | undefined
       )
       .filter((outcome): outcome is DispatchMissionTaskOutcome => Boolean(outcome));
     const cascadedIds = cascadeBlockedDependents(plannedTasks);
@@ -5136,6 +5312,10 @@ async function dispatchMissionNextTasksCore(
   writeNextTasks(missionId, allTasks);
   markTaskBoardInProgress(missionId);
   reconcileMissionProgress(missionId);
+  graphRunJournal.append('graph_finished', {
+    status: 'completed',
+    remaining_planned_count: loadPlannedNextTasks(missionId).length,
+  });
   const contextChars = dispatchObservability
     .map((entry) => entry.context_chars)
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
@@ -5178,7 +5358,8 @@ async function dispatchMissionNextTasksCore(
  * event stream linking every task attempt to the same trace id.
  */
 export async function dispatchMissionNextTasks(
-  missionId: string
+  missionId: string,
+  graphRunId?: string
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
   const traceCtx = new TraceContext('mission_run', {
     missionId,
@@ -5187,7 +5368,7 @@ export async function dispatchMissionNextTasks(
   let dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
   try {
     traceCtx.addEvent('mission_run_started', { mission_id: missionId });
-    dispatched = await dispatchMissionNextTasksCore(missionId, traceCtx);
+    dispatched = await dispatchMissionNextTasksCore(missionId, traceCtx, graphRunId);
     traceCtx.setAttributes({
       mission_id: missionId,
       dispatched_task_count: dispatched.length,
@@ -6066,7 +6247,7 @@ async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<S
     'mission_followup_requested',
     'Planner artifacts were reconciled and follow-up delegation started.'
   );
-  const dispatched = await dispatchMissionNextTasks(missionId);
+  const dispatched = await dispatchMissionNextTasks(missionId, event.event_id);
   emitSlackMissionEvent(
     payload,
     missionId,

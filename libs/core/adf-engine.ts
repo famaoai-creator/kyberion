@@ -16,6 +16,7 @@ import {
   type ToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
 import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.js';
+import type { ResourceClaim } from './tool-call-scheduler.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -24,27 +25,14 @@ export interface AdfStep {
   op: string;
   params: any;
   /** Explicit shared-resource claims used by the graph frontier scheduler. */
-  resource_claims?: string[];
-}
-
-function serializeAdfResourceClaim(claim: {
-  kind: 'all' | 'file';
-  path?: string;
-  recursive?: boolean;
-}): string {
-  if (claim.kind === 'all') return 'resource:all';
-  // The graph scheduler deliberately uses a conservative string key. Reads
-  // and writes therefore serialize on the same path, and recursive claims
-  // become global-exclusive rather than risking an incomplete overlap test.
-  if (claim.recursive) return 'resource:all';
-  return `resource:file:${claim.path || '/'}`;
+  resource_claims?: Array<string | ResourceClaim>;
 }
 
 function resolveAdfResourceClaims(
   step: AdfStep,
   context: AdfEngineContext,
   resolve: (value: any, ctx: Record<string, any>) => any
-): string[] {
+): Array<string | ResourceClaim> {
   if (step.resource_claims !== undefined) return [...new Set(step.resource_claims)];
   const normalizedOp = String(step.op || '').replace(/^([a-z]+):/u, '$1:');
   const [domain, action] = normalizedOp.split(':');
@@ -54,9 +42,7 @@ function resolveAdfResourceClaims(
   if (domain !== 'browser' && domain !== 'file' && domain !== 'system') return [];
   try {
     const params = (resolve(step.params || {}, context) || {}) as Record<string, unknown>;
-    return resolveOpAccessClaims(domain as OpInputDomain, action, params).map(
-      serializeAdfResourceClaim
-    );
+    return resolveOpAccessClaims(domain as OpInputDomain, action, params);
   } catch {
     return ['resource:all'];
   }
