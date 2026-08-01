@@ -19,6 +19,21 @@ pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona f
 - Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
 - `pnpm`
 
+Windows では、PowerShell から winget で基盤ツールを導入できます。
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-source-agreements --accept-package-agreements
+winget install --id pnpm.pnpm --exact --source winget --accept-source-agreements --accept-package-agreements
+winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements
+```
+
+導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
+
+```powershell
+pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
+```
+
 ````bash
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
