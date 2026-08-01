@@ -2303,6 +2303,18 @@ export {
 } from './shell-command-normalize.js';
 export type { SimpleCommand } from './shell-command-normalize.js';
 
+// QM-06: declared backend capability profiles + failover reset-on-switch.
+export type {
+  BackendCapabilityProfile,
+  BackendTransport,
+  BackendUtilityFit,
+} from './backend-capability-profile.js';
+export {
+  BACKEND_CAPABILITY_PROFILES,
+  backendCapabilityProfile,
+  modesWithUtilityFit,
+} from './backend-capability-profile.js';
+
 // QM-09: gap-phase latency attribution for LLM delegations.
 export type { BaseGapPhase, GapPhaseSample, GapRecorder } from './gap-phase.js';
 export { GAP_PHASES, isKnownGapPhase, createGapRecorder, sanitizeGapSamples } from './gap-phase.js';

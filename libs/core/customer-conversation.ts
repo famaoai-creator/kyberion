@@ -7,6 +7,12 @@ import { normalizeLocale } from './locale-normalize.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { enforceApprovalGate } from './approval-gate.js';
+import {
+  composeAudienceFloor,
+  evaluateAudienceEgress,
+  loadEgressPolicy,
+  type AudienceEgressFloor,
+} from './egress-policy.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
@@ -324,7 +330,107 @@ export interface SendToCustomerResult {
   reason?: string;
 }
 
+/**
+ * QM-11: links in a customer-bound message must satisfy the AUDIENCE floor —
+ * the intersection of every configured policy holder's LINK allowlist minus
+ * the union of denials. Design decisions (batch-5 review):
+ *  - The floor is OPT-IN per policy holder: a participant joins the
+ *    intersection only when it has configured a link allowlist
+ *    (`tenant_allowed_domains[slug]`/`['*']` for the tenant,
+ *    `link_allowed_domains` for the operator). A default install with
+ *    neither configured enforces nothing — customer messaging keeps working.
+ *  - The operator's LINK policy is deliberately separate from the
+ *    network-egress allowlist: mentioning a URL must not require widening
+ *    actual network egress. `blocked_domains` still contributes denials.
+ *  - Violations are surfaced INTO the approval gate (deny-recommended
+ *    draft), not hard-denied before it — the human override stays in-band.
+ */
+export interface CustomerAudienceFloor extends AudienceEgressFloor {
+  /** False when no policy holder configured a link allowlist — nothing to enforce. */
+  active: boolean;
+}
+
+export function resolveCustomerAudienceFloor(tenantSlug: string): CustomerAudienceFloor {
+  const policy = loadEgressPolicy();
+  const tenantAllowed = [
+    ...(policy.tenant_allowed_domains?.[tenantSlug] ?? []),
+    ...(policy.tenant_allowed_domains?.['*'] ?? []),
+  ];
+  const participants: Array<{
+    participant: string;
+    allowed_domains: string[];
+    blocked_domains?: string[];
+  }> = [];
+  if (tenantAllowed.length > 0) {
+    participants.push({ participant: `tenant:${tenantSlug}`, allowed_domains: tenantAllowed });
+  }
+  if (policy.link_allowed_domains !== undefined) {
+    participants.push({ participant: 'operator', allowed_domains: policy.link_allowed_domains });
+  }
+  // Deny-union is NEVER opt-in (review defect 2): blocked_domains contribute
+  // denials regardless of which participants configured allowlists. A
+  // blocked-only configuration activates the floor with an unrestricted
+  // allow side, so explicit denials are enforced even before any allowlist
+  // exists.
+  const blockedOnly = participants.length === 0 && (policy.blocked_domains ?? []).length > 0;
+  const floor = composeAudienceFloor([
+    ...(participants.length > 0
+      ? participants
+      : blockedOnly
+        ? [{ participant: 'unrestricted', allowed_domains: ['*'] }]
+        : []),
+    {
+      participant: 'policy-denials',
+      allowed_domains: ['*'],
+      blocked_domains: policy.blocked_domains ?? [],
+    },
+  ]);
+  return { ...floor, active: participants.length > 0 || blockedOnly };
+}
+
+// Matches full URLs plus the two forms chat surfaces auto-link anyway:
+// scheme-less www.* and protocol-relative //host.
+const URL_IN_TEXT =
+  /(https?:\/\/[^\s"'<>)\]]+|(?<![\w/.])www\.[^\s"'<>)\]]+|(?<![:\w])\/\/[^\s"'<>)\]/]+)/gi;
+
+function extractLinkHost(raw: string): string | null {
+  // Trailing prose punctuation is not part of the URL ("see https://x.example,")
+  // — WHATWG URL would otherwise fold it into the hostname (review minor 4).
+  let candidate = raw.replace(/[.,;:!?]+$/, '');
+  if (candidate.startsWith('//')) candidate = `https:${candidate}`;
+  else if (/^www\./i.test(candidate)) candidate = `https://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    // Fail closed on userinfo: `https://allowed.example:x@evil.example` must
+    // never resolve to the allowed host.
+    if (url.username || url.password) return null;
+    return url.hostname;
+  } catch {
+    return null;
+  }
+}
+
+export function findAudienceFloorViolations(body: string, floor: AudienceEgressFloor): string[] {
+  const violations = new Set<string>();
+  for (const match of String(body || '').matchAll(URL_IN_TEXT)) {
+    const host = extractLinkHost(match[0]!);
+    if (host === null) {
+      violations.add(`${match[0]}: unparseable or userinfo-bearing URL (fail closed)`);
+      continue;
+    }
+    const decision = evaluateAudienceEgress(host, floor);
+    if (decision.verdict === 'deny') violations.add(`${decision.hostname}: ${decision.reason}`);
+  }
+  return [...violations];
+}
+
 export async function sendToCustomer(input: SendToCustomerInput): Promise<SendToCustomerResult> {
+  const floor = resolveCustomerAudienceFloor(input.binding.tenantSlug);
+  const floorViolations = floor.active ? findAudienceFloorViolations(input.body, floor) : [];
+  const violationNote =
+    floorViolations.length > 0
+      ? `⚠ AUDIENCE EGRESS FLOOR VIOLATIONS (recommend deny or edit): ${floorViolations.join('; ')} — `
+      : '';
   const approval = enforceApprovalGate({
     intentId: 'customer:outbound',
     operationId: 'customer:outbound',
@@ -334,8 +440,8 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       `customer-outbound:${input.binding.tenantSlug}:${Date.now().toString(36)}`,
     channel: input.binding.binding.surface,
     draft: {
-      title: input.title,
-      summary: input.body.slice(0, 400),
+      title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
+      summary: `${violationNote}${input.body.slice(0, 400)}`,
       severity: 'high',
     },
   });
