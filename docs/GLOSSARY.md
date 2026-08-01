@@ -28,6 +28,10 @@ Distilled operational knowledge or reusable method stored in the knowledge tier,
 
 A declarative, per-mission-class process definition in the mission workflow catalog (`knowledge/product/governance/mission-workflow-catalog.json`): an ordered phase list where each phase may declare default tasks, entry/exit gates, and the pipeline that executes it. At mission creation (or via `mission_controller plan-tasks`), phases expand deterministically into `NEXT_TASKS.json` tasks and gate definitions, so the process (e.g. audience → story → content → design → review → production for presentation decks) is executable rather than a label. See MO-01.
 
+### Mission Process Registry (three layers)
+
+The manifest at `knowledge/product/governance/mission-process-registry.json` declares the boundary between **Runtime (R)** definitions, **Verification (V)** golden/controlled-failure packs, and **Knowledge (K)** human-facing playbooks and lifecycle runbooks. R is consumed by runtime code, V executes R to detect drift, and K is retrieved for people/context packs without being parsed as executable workflow logic.
+
 ### ADF (Agentic Data Format)
 
 A human-readable structured contract between reasoning and execution layers. In Kyberion, ADF is preferred over opaque script fragments.

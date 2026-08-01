@@ -1,5 +1,6 @@
 {
   "version": "1.0.0",
+  "purpose": "regression-fixture",
   "scenarios": [
     {
       "scenario_id": "golden-code-change-reviewed",
@@ -28,7 +29,12 @@
       "delivery_shape": "multi_artifact_pipeline",
       "workflow_pattern": "coordinated_multi_track_execution",
       "prompt": "声登録から紹介動画作成までを完遂してください",
-      "expected_signals": ["contract_valid", "execution_started", "verification_passed", "delivery_ready"],
+      "expected_signals": [
+        "contract_valid",
+        "execution_started",
+        "verification_passed",
+        "delivery_ready"
+      ],
       "notes": "Multi-track media pipeline with dependent artifacts."
     },
     {
@@ -38,7 +44,12 @@
       "delivery_shape": "cross_system_change",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "変更を commit して PR を作成し main へマージしてください",
-      "expected_signals": ["architecture_ready", "security_ready", "release_ready", "delivery_ready"],
+      "expected_signals": [
+        "architecture_ready",
+        "security_ready",
+        "release_ready",
+        "delivery_ready"
+      ],
       "notes": "High-risk release sequence requiring strict review mode."
     },
     {
@@ -58,7 +69,13 @@
       "delivery_shape": "interactive_exploration",
       "workflow_pattern": "exploratory_to_deterministic_conversion",
       "prompt": "新組織構造の提案を Power/Interest 順でキーパーソンに事前擦り合わせし、readiness_matrix を作ってください",
-      "expected_signals": ["classification", "planning", "execution_started", "stakeholder_alignment", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "planning",
+        "execution_started",
+        "stakeholder_alignment",
+        "delivery_ready"
+      ],
       "notes": "Variant=nemawashi expected. Facilitator + relationship_curator delegation."
     },
     {
@@ -68,7 +85,12 @@
       "delivery_shape": "single_artifact",
       "workflow_pattern": "exploratory_to_deterministic_conversion",
       "prompt": "3 つの異なる視点で新事業仮説を並行で作り、互いに批評してから dissent-log に残してください",
-      "expected_signals": ["classification", "execution_started", "dissent_resolution", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "execution_started",
+        "dissent_resolution",
+        "delivery_ready"
+      ],
       "notes": "Devils_advocate delegation. Hypothesis-tree pipeline."
     },
     {
@@ -108,7 +130,12 @@
       "delivery_shape": "single_artifact",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "A 社と打ち合わせして要件定義書を書いてください",
-      "expected_signals": ["classification", "execution_started", "requirements_completeness", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "execution_started",
+        "requirements_completeness",
+        "delivery_ready"
+      ],
       "notes": "Transcript → extract_requirements → document → REQUIREMENTS_COMPLETENESS gate. CUSTOMER_SIGNOFF only required in strict mode."
     },
     {
@@ -128,7 +155,12 @@
       "delivery_shape": "cross_system_change",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "新規事業開発部門で Kyberion を導入したい。GitHub Actions + AWS Transcribe + Slack 承認を既存スタックとして統合する",
-      "expected_signals": ["classification", "architecture_ready", "security_ready", "release_ready"],
+      "expected_signals": [
+        "classification",
+        "architecture_ready",
+        "security_ready",
+        "release_ready"
+      ],
       "notes": "CI/CD + STT + approval channel + audit forwarder + secret resolver の統合。execute_task_plan で adapter 実装を自動生成し、本番デプロイは config:update approval-gate を経由。Organization-specific values（vendor 契約名・内部 URL・承認者リスト・GitHub org slug）は confidential tier で上書き。"
     },
     {
@@ -148,7 +180,12 @@
       "delivery_shape": "multi_artifact_pipeline",
       "workflow_pattern": "pipeline_crystallization_loop",
       "prompt": "月次経営レポートのために、GA, Salesforce, Datadog のダッシュボードを巡回してデータを集約してください",
-      "expected_signals": ["classification", "contract_valid", "execution_started", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "contract_valid",
+        "execution_started",
+        "delivery_ready"
+      ],
       "notes": "Deterministic Pattern D path. Preferred fragment: pipelines/fragments/executive-report-patrol.json."
     },
     {
@@ -158,7 +195,13 @@
       "delivery_shape": "multi_artifact_pipeline",
       "workflow_pattern": "coordinated_multi_track_execution",
       "prompt": "取締役会資料の PPTX に、CEO の声でナレーション動画を付けてプレビューを生成してください",
-      "expected_signals": ["classification", "contract_valid", "execution_started", "verification_passed", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "contract_valid",
+        "execution_started",
+        "verification_passed",
+        "delivery_ready"
+      ],
       "notes": "Governed Voice/Video Stack path. Preferred fragment: pipelines/fragments/governed-voice-narration.json."
     },
     {
@@ -168,7 +211,13 @@
       "delivery_shape": "cross_system_change",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "セキュリティインシデントが発生しました。ログを収集し、承認を得てから対象サーバーを隔離し、全工程を監査ログに残してください",
-      "expected_signals": ["classification", "security_ready", "approval_required", "audit_recorded", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "security_ready",
+        "approval_required",
+        "audit_recorded",
+        "delivery_ready"
+      ],
       "notes": "Scenario 9 deterministic audit path. Preferred fragment: pipelines/fragments/security-incident-containment.json."
     },
     {
@@ -178,7 +227,13 @@
       "delivery_shape": "single_artifact",
       "workflow_pattern": "coordinated_multi_track_execution",
       "prompt": "ハピタス経由で楽天にログインし、お気に入りの洗剤を購入してください",
-      "expected_signals": ["classification", "approval_required", "execution_started", "audit_recorded", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "approval_required",
+        "execution_started",
+        "audit_recorded",
+        "delivery_ready"
+      ],
       "notes": "Points-mediated purchase. Preferred fragments: browser-point-site-hop + browser-purchase-checkout."
     },
     {
@@ -188,7 +243,12 @@
       "delivery_shape": "single_artifact",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "来週月曜日の午前中、羽田発福岡行きの飛行機を予約してください。一番安い JAL 便でお願いします",
-      "expected_signals": ["classification", "execution_started", "approval_required", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "execution_started",
+        "approval_required",
+        "delivery_ready"
+      ],
       "notes": "End-to-end travel booking. Preferred fragments: browser-travel-search-select + browser-purchase-checkout."
     },
     {
@@ -198,7 +258,14 @@
       "delivery_shape": "cross_system_change",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "Zoom 会議に代理参加し、必要な時だけ発言し、議事録とフォローアップを残してください",
-      "expected_signals": ["classification", "runtime_ready", "voice_consent_granted", "execution_started", "audit_recorded", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "runtime_ready",
+        "voice_consent_granted",
+        "execution_started",
+        "audit_recorded",
+        "delivery_ready"
+      ],
       "notes": "Live browser participation path. Use pnpm env:bootstrap --manifest meeting-participation-runtime, pnpm meeting:consent, then pnpm meeting:participate."
     },
     {
@@ -208,7 +275,14 @@
       "delivery_shape": "multi_artifact_pipeline",
       "workflow_pattern": "coordinated_multi_track_execution",
       "prompt": "会議を進行し、決定事項とアクションアイテムを抽出して、自分の担当分は実行し、他者担当分は追跡してください",
-      "expected_signals": ["classification", "execution_started", "action_items_recorded", "self_items_dispatched", "tracking_reported", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "execution_started",
+        "action_items_recorded",
+        "self_items_dispatched",
+        "tracking_reported",
+        "delivery_ready"
+      ],
       "notes": "AI meeting facilitator path. Chain meeting-facilitation-workflow, meeting-facilitation-postprocess, action-item-execute-self, and action-item-tracking."
     },
     {
@@ -228,7 +302,12 @@
       "delivery_shape": "single_artifact",
       "workflow_pattern": "stage_gated_delivery",
       "prompt": "未完了の会議アクションアイテムを確認し、担当者ごとにリマインドを送って追跡レポートを残してください",
-      "expected_signals": ["classification", "pending_items_loaded", "reminders_recorded", "delivery_ready"],
+      "expected_signals": [
+        "classification",
+        "pending_items_loaded",
+        "reminders_recorded",
+        "delivery_ready"
+      ],
       "notes": "Recurring follow-up path using pipelines/action-item-tracking.json and the append-only action-item-store."
     }
   ]

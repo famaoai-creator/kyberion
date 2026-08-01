@@ -1,3 +1,10 @@
+---
+title: 'Phase Protocol: Onboarding'
+tags: [governance, lifecycle, onboarding]
+last_updated: 2026-08-01
+runtime_stages: [intake, classification]
+---
+
 # Phase Protocol: ① Onboarding (Ecosystem Initialization)
 
 ## Goal

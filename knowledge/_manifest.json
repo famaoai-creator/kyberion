@@ -535,6 +535,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/mission-process-registry-three-layer-model.md",
+      "tier": "public",
+      "size": 949,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/mission-runtime-primitives.md",
       "tier": "public",
       "size": 3088,
@@ -1683,7 +1689,13 @@
     {
       "path": "product/governance/mission-orchestration-scenario-pack.json",
       "tier": "public",
-      "size": 14204,
+      "size": 14863,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/mission-process-registry.json",
+      "tier": "public",
+      "size": 2324,
       "type": "json"
     },
     {
@@ -1695,7 +1707,7 @@
     {
       "path": "product/governance/mission-task-classification-scenarios.json",
       "tier": "public",
-      "size": 21588,
+      "size": 21623,
       "type": "json"
     },
     {
@@ -1707,7 +1719,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 198769,
+      "size": 199811,
       "type": "json"
     },
     {
@@ -1875,31 +1887,31 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 2135,
+      "size": 2296,
       "type": "md"
     },
     {
       "path": "product/governance/phases/execution.md",
       "tier": "public",
-      "size": 4454,
+      "size": 4631,
       "type": "md"
     },
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 4525,
+      "size": 4678,
       "type": "md"
     },
     {
       "path": "product/governance/phases/recovery.md",
       "tier": "public",
-      "size": 3204,
+      "size": 3376,
       "type": "md"
     },
     {
       "path": "product/governance/phases/review.md",
       "tier": "public",
-      "size": 3437,
+      "size": 3612,
       "type": "md"
     },
     {
@@ -2002,6 +2014,12 @@
       "path": "product/governance/presentation-preference-registry.json",
       "tier": "public",
       "size": 3914,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/process-definition-registry.json",
+      "tier": "public",
+      "size": 2677,
       "type": "json"
     },
     {
@@ -3501,43 +3519,43 @@
     {
       "path": "product/orchestration/mission-playbooks/asset-management-and-it-operations.md",
       "tier": "public",
-      "size": 9995,
+      "size": 10063,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/ceo-strategy.md",
       "tier": "public",
-      "size": 1383,
+      "size": 1428,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "tier": "public",
-      "size": 10475,
+      "size": 10558,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/messaging-bridge-orchestration.md",
       "tier": "public",
-      "size": 2280,
+      "size": 2660,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/product-audit.md",
       "tier": "public",
-      "size": 1203,
+      "size": 1243,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/saas-roi.md",
       "tier": "public",
-      "size": 1180,
+      "size": 1212,
       "type": "md"
     },
     {
       "path": "product/orchestration/mission-playbooks/security-audit-service.md",
       "tier": "public",
-      "size": 12261,
+      "size": 12300,
       "type": "md"
     },
     {
@@ -6795,7 +6813,13 @@
     {
       "path": "product/schemas/mission-orchestration-scenario-pack.schema.json",
       "tier": "public",
-      "size": 1286,
+      "size": 1347,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/mission-process-registry.schema.json",
+      "tier": "public",
+      "size": 1383,
       "type": "json"
     },
     {
@@ -6819,7 +6843,7 @@
     {
       "path": "product/schemas/mission-task-classification-scenarios.schema.json",
       "tier": "public",
-      "size": 5724,
+      "size": 5785,
       "type": "json"
     },
     {
@@ -6849,7 +6873,7 @@
     {
       "path": "product/schemas/mission-workflow-catalog.schema.json",
       "tier": "public",
-      "size": 6601,
+      "size": 6177,
       "type": "json"
     },
     {
@@ -7180,6 +7204,12 @@
       "path": "product/schemas/procedures.schema.json",
       "tier": "public",
       "size": 3391,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/process-definition-registry.schema.json",
+      "tier": "public",
+      "size": 1411,
       "type": "json"
     },
     {

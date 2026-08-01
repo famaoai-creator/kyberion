@@ -7,6 +7,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeStat,
+  assertProcessDefinitionRegistry,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { fileURLToPath } from 'node:url';
@@ -202,6 +203,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     id: 'mission-orchestration-scenario-pack',
     schemaPath: 'knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json',
     dataPath: 'knowledge/product/governance/mission-orchestration-scenario-pack.json',
+  },
+  {
+    id: 'process-definition-registry',
+    schemaPath: 'knowledge/product/schemas/process-definition-registry.schema.json',
+    dataPath: 'knowledge/product/governance/process-definition-registry.json',
+  },
+  {
+    id: 'mission-process-registry',
+    schemaPath: 'knowledge/product/schemas/mission-process-registry.schema.json',
+    dataPath: 'knowledge/product/governance/mission-process-registry.json',
   },
 ];
 
@@ -2076,6 +2087,13 @@ export function main() {
   validateActuatorCatalogDirectoryConsistency(violations);
   findMachineAbsolutePathViolations(violations);
   scanProductJsonForPlacementDrift(violations);
+  try {
+    assertProcessDefinitionRegistry();
+  } catch (error) {
+    violations.push(
+      `process-definition-registry: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   for (const deterministicCatalog of findDeterministicCatalogViolations()) {
     violations.push(
       `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`

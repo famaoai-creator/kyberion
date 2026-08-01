@@ -93,6 +93,7 @@
 - [Mission Context Injection Model](./product/architecture/mission-context-injection-model.md) (public | ecosystem_architect)
 - [Mission Lifecycle and Record Keeping](./product/architecture/mission-lifecycle-and-record-keeping.md) (public | ecosystem_architect)
 - [Mission Orchestration Control Plane](./product/architecture/mission-orchestration-control-plane.md) (public | ecosystem_architect)
+- [Mission Process Registry Three-Layer Model](./product/architecture/mission-process-registry-three-layer-model.md) (public | Unknown)
 - [Mission Runtime Primitives](./product/architecture/mission-runtime-primitives.md) (public | Ecosystem Architect)
 - [Mission Team Composition Model](./product/architecture/mission-team-composition-model.md) (public | ecosystem_architect)
 - [Mission and Task Classification Improvement Roadmap for GPT-5.4 mini](./product/architecture/mission-task-classification-roadmap-5.4-mini.md) (public | Ecosystem Architect)
@@ -193,11 +194,11 @@
 - [Organization Team Template Catalogs](./product/governance/organization-team-template-catalogs/README.md) (public | Ecosystem Architect)
 
 ## 📁 product/governance/phases
-- [Phase Protocol: ① Onboarding (Ecosystem Initialization)](./product/governance/phases/onboarding.md) (public | Unknown)
-- [Phase Protocol: ② Recovery & Resilience](./product/governance/phases/recovery.md) (public | Unknown)
-- [Phase Protocol: ③ Alignment](./product/governance/phases/alignment.md) (public | Unknown)
-- [Phase Protocol: ④ Mission Execution](./product/governance/phases/execution.md) (public | Unknown)
-- [Phase Protocol: ⑤ Review & Distillation](./product/governance/phases/review.md) (public | Unknown)
+- [Phase Protocol: Alignment](./product/governance/phases/alignment.md) (public | Unknown)
+- [Phase Protocol: Mission Execution](./product/governance/phases/execution.md) (public | Unknown)
+- [Phase Protocol: Onboarding](./product/governance/phases/onboarding.md) (public | Unknown)
+- [Phase Protocol: Recovery & Resilience](./product/governance/phases/recovery.md) (public | Unknown)
+- [Phase Protocol: Review & Distillation](./product/governance/phases/review.md) (public | Unknown)
 
 ## 📁 product/governance/retrospectives
 - [🧠 Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
@@ -365,7 +366,7 @@
 - [Continuous Learning Loop Protocol](./product/orchestration/fusion-protocols/learning_loop.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/mission-playbooks
-- [Scenario: Messaging Bridge Activation & Orchestration](./product/orchestration/mission-playbooks/messaging-bridge-orchestration.md) (public | Unknown)
+- [Messaging Bridge Activation & Orchestration](./product/orchestration/mission-playbooks/messaging-bridge-orchestration.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：CEO戦略的意思決定](./product/orchestration/mission-playbooks/ceo-strategy.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：IT デリバリ＆運用ガバナンス](./product/orchestration/mission-playbooks/it-delivery-operations-governance.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定](./product/orchestration/mission-playbooks/saas-roi.md) (public | Ecosystem Architect)

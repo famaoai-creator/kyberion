@@ -1839,6 +1839,7 @@
     },
     {
       "id": "research-report",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/saas-roi.md",
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "リサーチクエスチョン定義 → 情報収集 → 統合分析 → レビュー → レポート納品の調査プロセス。多角的な情報源の走査と出典管理を必須とする。",
       "match": {
@@ -3227,6 +3228,7 @@
     },
     {
       "id": "stage-gated-high-stakes",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/product-audit.md",
       "pattern": "stage_gated_delivery",
       "description": "High-stakes work requiring explicit checkpoint gates.",
       "match": {
@@ -3349,6 +3351,7 @@
     },
     {
       "id": "coordinated-multi-track",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/messaging-bridge-orchestration.md",
       "pattern": "coordinated_multi_track_execution",
       "description": "Cross-system work requiring a coordinated owner and delegated specialists.",
       "match": {
@@ -3367,6 +3370,7 @@
     },
     {
       "id": "decision-support-exploratory",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/ceo-strategy.md",
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "Decision-support missions start interactive (stakeholder 1-on-1s, hypothesis divergence, rehearsal) and end producing governed evidence artifacts (readiness_matrix / dissent-log / heuristic-entry).",
       "match": {
@@ -3780,6 +3784,7 @@
     },
     {
       "id": "security-audit-service",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/security-audit-service.md",
       "pattern": "stage_gated_delivery",
       "description": "ソースコード静的解析セキュリティ診断をサービスとして提供するステージゲート型プロセス。提案・承認 → スコープ合意 → 静的解析(security-audit-static-analysis パイプライン) → 所見の重大度較正・ADR突合 → Round 1 報告書レビュー・納品 → 修正対応検証(Round 2) → 最終報告書サインオフ。判断フェーズは semantic brief、静的解析は決定的パイプラインを再利用する。顧客ごとの実体化は knowledge/confidential/{tenant}/pipelines/ に置く。詳細は mission-playbooks/security-audit-service.md。",
       "match": {
@@ -4098,6 +4103,7 @@
     },
     {
       "id": "feature-expansion-delivery",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
       "description": "既存サービスの機能拡張プロジェクトを顧客要件ヒアリングからリリースまで進めるステージゲート型プロセス。企画(G1)→要件ヒアリング→要件定義(G2)→基本設計(G3)→設計審査→実装(G4)→検証(G5)→受入(UAT)→リリース(G6)→振り返り(G7)。各ゲートは gate-profiles/sdlc.json と governance-body-registry.json の会議体(企画審査会/要件定義レビュー会/設計審査会/CAB/検証判定会/リリース判定会議/クローズレビュー)に対応。判断フェーズは semantic brief、実装/検証は既存 code-change 系パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
       "match": {
@@ -4475,6 +4481,7 @@
     },
     {
       "id": "incident-response",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
       "description": "インシデント発生時の対応をエンドツーエンドで進めるステージゲート型プロセス。検知・受付 → トリアージ/重大度判定(SEV) → 封じ込め → 恒久対応 → 復旧確認 → ポストモーテム → 振り返りレビュー → 報告・クローズ。速報性を優先し intake/classification は省略。重大度判定は incident-severity-model.md、封じ込め/恒久対応/振り返りの判定は governance-body-registry.json の incident-command / post-incident-review 会議体に対応。封じ込めは security-incident-containment フラグメント、根本原因分析は incident-post-mortem パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
       "match": {
@@ -4762,6 +4769,7 @@
     },
     {
       "id": "gate-review-session",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
       "description": "ゲーティング会議体(会議体)を開催して判定を記録する汎用セレモニー。準備(gate-review-packet 作成) → 判定会(Go/Conditional Go/No-Go) → 議事録記録。どのゲート(gate-profiles)・どの会議体(governance-body-registry)にも適用でき、他のデリバリ/インシデントワークフローのゲートを正式な判断会議として運用するために用いる。",
       "match": {
@@ -4869,6 +4877,7 @@
     },
     {
       "id": "software-asset-management",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/asset-management-and-it-operations.md",
       "pattern": "stage_gated_delivery",
       "description": "ソフトウェア資材管理(資材管理)のステージゲート型プロセス。資材インベントリ → SBOM生成 → 依存脆弱性スキャン → 鍵/シークレット棚卸し → 版管理・リリースタグ → 資材台帳登録。SBOM完全性・脆弱性処理・鍵ローテーション期限・登録承認をゲートで統制する。脆弱性スキャンは dependency-vuln-scan パイプラインを再利用。顧客/テナント固有の資材は knowledge/confidential/{tenant}/ 管理。",
       "match": {
@@ -5082,6 +5091,7 @@
     },
     {
       "id": "it-operations-automation",
+      "playbook_ref": "knowledge/product/orchestration/mission-playbooks/asset-management-and-it-operations.md",
       "pattern": "stage_gated_delivery",
       "description": "他システムの IT運用を自動化するステージゲート型プロセス。監視・検知 → 診断 → 変更計画(CAB) → AWSシミュレーション(ドライラン) → 自動実行(承認) → 検証 → 運用台帳記録。実行前に aws-operations-simulation で副作用なしの影響評価を行い、承認ゲートを経てから自動化を実行する。実 AWS 適用は承認済み・sandbox 外で行うこと。",
       "match": {

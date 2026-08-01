@@ -15,6 +15,7 @@ tags:
 importance: 9
 author: Ecosystem Architect
 last_updated: 2026-07-08
+workflow_ids: [feature-expansion-delivery, incident-response, gate-review-session]
 ---
 
 # ミッション・プレイブック：IT デリバリ＆運用ガバナンス
