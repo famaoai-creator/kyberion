@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
+import { pathResolver } from '../path-resolver.js';
 import { matchesCron, getZonedDateParts } from './cron-utils.js';
 
 // ---------------------------------------------------------------------------
@@ -147,10 +148,54 @@ export function saveScheduleRegistry(
   logger.info(`[PIPELINE-SCHEDULER] Registry saved with ${registry.schedules.length} schedule(s)`);
 }
 
+/**
+ * QM-02: the registry must stay host-portable — a schedule registered on one
+ * machine (or repo checkout path) has to keep firing after the repo moves.
+ * Absolute paths inside the repo root are stored repo-relative; legacy
+ * absolute paths from another checkout are migrated via their `pipelines/`
+ * segment; anything else is rejected rather than silently frozen to one host.
+ */
+export function normalizeScheduledPipelinePath(pipelinePath: string, rootDir?: string): string {
+  const root = rootDir ?? pathResolver.rootDir();
+  const trimmed = String(pipelinePath || '').trim();
+  if (!trimmed) throw new Error('pipelinePath must be a non-empty path');
+  if (!path.isAbsolute(trimmed)) return trimmed.replace(/\\/g, '/');
+  const relative = path.relative(root, trimmed);
+  if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+    return relative.replace(/\\/g, '/');
+  }
+  const marker = `${path.sep}pipelines${path.sep}`;
+  const markerIndex = trimmed.indexOf(marker);
+  if (markerIndex >= 0) {
+    const migrated = trimmed.slice(markerIndex + 1).replace(/\\/g, '/');
+    logger.warn(
+      `[PIPELINE-SCHEDULER] migrated legacy absolute pipelinePath to repo-relative: ${trimmed} -> ${migrated}`
+    );
+    return migrated;
+  }
+  throw new Error(
+    `pipelinePath must be repo-relative or inside the repo root (got absolute path outside the repo: ${trimmed})`
+  );
+}
+
+export function resolveScheduledPipelinePath(
+  schedule: Pick<ScheduledPipeline, 'pipelinePath'>,
+  options: PipelineSchedulerOptions = {}
+): string {
+  const root = options.rootDir ?? pathResolver.rootDir();
+  const stored = String(schedule.pipelinePath || '').trim();
+  if (path.isAbsolute(stored)) return stored;
+  return path.join(root, stored);
+}
+
 export function registerScheduledPipeline(
   pipeline: ScheduledPipeline,
   options: PipelineSchedulerOptions = {}
 ): void {
+  pipeline = {
+    ...pipeline,
+    pipelinePath: normalizeScheduledPipelinePath(pipeline.pipelinePath, options.rootDir),
+  };
   const registry = loadScheduleRegistry(options);
   const existingIndex = registry.schedules.findIndex((s) => s.id === pipeline.id);
   if (existingIndex >= 0) {

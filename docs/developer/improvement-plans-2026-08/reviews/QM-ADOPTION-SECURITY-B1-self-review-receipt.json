@@ -1,0 +1,37 @@
+{
+  "kind": "artifact-review-receipt",
+  "version": "1.0.0",
+  "review_id": "qm-adoption-b1-fresh-context-review-2026-08-01",
+  "mission_id": "QM-ADOPTION-SECURITY-B1",
+  "review_task_id": "self_review-code-review",
+  "review_target_task_id": "execution-implement",
+  "artifact": {
+    "path": "libs/core/shell-command-policy.ts",
+    "sha256": "8933dd36ffa492e7cf03d469745e11d19fc059d5b98c6b4a7fd0bfe335d53531",
+    "kind": "code"
+  },
+  "reviewer": {
+    "agent_id": "fresh-context-reviewer-fable5",
+    "team_role": "reviewer",
+    "specialist_roles": ["code-reviewer", "security"],
+    "independent_from": ["famao"],
+    "independence_verified": true
+  },
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "suggestion",
+      "category": "performance",
+      "description": "rotateQuarantineIfOversized reads the entire quarantine file on every recordQuarantine; a stat-based size check would avoid the O(file) read.",
+      "location": "libs/core/security-screen.ts"
+    },
+    {
+      "severity": "suggestion",
+      "category": "usability",
+      "description": "The scan.nested refusal is deliberately conservative: benign forms like echo \"$(date)\" now require approval. Fail-safe direction per the asymmetric-allow design; expect occasional operator friction.",
+      "location": "libs/core/shell-command-normalize.ts"
+    }
+  ],
+  "acceptance_criteria": ["must_fix 指摘が解消済み"],
+  "reviewed_at": "2026-08-01T09:00:51.870Z"
+}
