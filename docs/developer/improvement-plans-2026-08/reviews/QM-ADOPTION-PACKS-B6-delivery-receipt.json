@@ -1,0 +1,10 @@
+{
+  "kind": "delivery-receipt",
+  "mission_id": "QM-ADOPTION-PACKS-B6",
+  "task_id": "delivery-deliver",
+  "pr_url": "https://github.com/famaoai-creator/kyberion/pull/652",
+  "branch": "agent/qm-adoption-batch6",
+  "base": "agent/qm-adoption-batch5",
+  "delivered_at": "2026-08-01T15:31:40.000Z",
+  "operator_approval": "Operator-approved delivery pattern; final batch requested via 残りもまとめて行っちゃいましょう (2026-08-01)"
+}

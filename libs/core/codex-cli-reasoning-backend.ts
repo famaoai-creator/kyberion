@@ -227,6 +227,25 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     return true;
   }
 
+  /**
+   * QM-06: drop the shared app-server session on a failover switch. An
+   * in-flight ask on the old session may fail with [SUBAGENT_UNAVAILABLE]
+   * when its child is shut down — acceptable, the failover chain retries.
+   * The next call boots a fresh session. An INJECTED session (test seam) is
+   * never shut down here — its lifecycle belongs to the injector; only the
+   * boot memo is cleared so boot() re-runs (review C2).
+   */
+  async resetSession(): Promise<void> {
+    const session = this.harnessSession;
+    this.harnessSession = undefined;
+    this.harnessBoot = undefined;
+    if (!session || session === this.injectedHarnessSession) return;
+    const shutdown = (session as { shutdown?: () => Promise<void> }).shutdown;
+    if (shutdown) {
+      await shutdown.call(session).catch(() => undefined);
+    }
+  }
+
   private getHarnessSession(permissionArgs: readonly string[]): CodexHarnessSession {
     if (this.harnessSession) return this.harnessSession;
     if (this.injectedHarnessSession) {
