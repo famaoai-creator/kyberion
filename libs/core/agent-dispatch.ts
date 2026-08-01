@@ -679,6 +679,11 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     this.name = `${base.name}+${dispatcher.name}`;
   }
 
+  /** QM-06: forward session resets to the wrapped base backend. */
+  async resetSession(): Promise<void> {
+    await this.base.resetSession?.();
+  }
+
   delegateTask(
     instruction: string,
     context?: string,

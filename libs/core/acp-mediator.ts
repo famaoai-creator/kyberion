@@ -593,6 +593,14 @@ export class ACPMediator {
   }
 
   public async shutdown(): Promise<void> {
+    // QM-06 (review C1): an in-flight ask must fail fast on shutdown, not
+    // hang until the turn timeout — markCrashed early-returns while
+    // shuttingDown, so reject it here before killing the child.
+    if (this.pendingAsk) {
+      if (this.pendingAsk.timeout) clearTimeout(this.pendingAsk.timeout);
+      this.pendingAsk.reject(new Error('ACP session shut down while the ask was in flight'));
+      this.pendingAsk = null;
+    }
     if (this.child) {
       this.shuttingDown = true;
       stopManagedProcess(this.runtimeResourceId, this.child);
