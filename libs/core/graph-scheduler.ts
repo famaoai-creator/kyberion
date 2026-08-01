@@ -1,3 +1,6 @@
+import { withDelegationSlot } from './delegation-concurrency.js';
+import { resourceClaimsConflict, type ResourceClaim } from './tool-call-scheduler.js';
+
 /**
  * Small, deterministic frontier scheduler shared by pipeline and mission
  * execution. The scheduler owns graph state only; node handlers own I/O,
@@ -48,7 +51,7 @@ export interface GraphStepLike {
   consumes?: string | string[];
   when?: unknown;
   merge?: GraphMergePolicy;
-  resource_claims?: string[];
+  resource_claims?: Array<string | ResourceClaim>;
   params?: Record<string, unknown>;
 }
 
@@ -197,7 +200,9 @@ export function deriveExecutionGraph<T>(
     id,
     index,
     value: steps[index],
-    dependencies: edges.filter((edge) => edge.to === id).map((edge) => edge.from),
+    dependencies: Array.from(
+      new Set(edges.filter((edge) => edge.to === id).map((edge) => edge.from))
+    ),
     incoming: edges.filter((edge) => edge.to === id),
     outgoing: edges.filter((edge) => edge.from === id),
     when: graphSteps[index].when,
@@ -235,10 +240,25 @@ export interface GraphExecutionOptions<C> {
   initialContext: C;
   /** Nodes restored from a durable run journal. They are terminal successes. */
   precompletedNodeIds?: Iterable<string>;
+  /** Rehydrate a restored node's namespaced output for downstream data edges. */
+  precompletedNodeContext?: (node: GraphNode<unknown>) => C | undefined;
   /** Nodes known to be blocked before this scheduler invocation. */
   preskippedNodeIds?: Iterable<string>;
   evaluateWhen?: (condition: unknown, context: C) => boolean;
-  resourceClaims?: (node: GraphNode<unknown>, context: C) => string[];
+  /**
+   * Resolve claims at dispatch time, after templated params are available.
+   * Strings are retained for legacy mission contracts; typed ResourceClaim
+   * values use the shared path/operation overlap policy.
+   */
+  resourceClaims?: (node: GraphNode<unknown>, context: C) => Array<string | ResourceClaim>;
+  /**
+   * Optional provider bucket for graph nodes that directly own a delegation.
+   * Most mission nodes must leave this unset because agent-dispatch already
+   * acquires the process-wide delegation slot; this hook is for graph callers
+   * that invoke a backend directly and need the scheduler's frontier limit to
+   * intersect with delegation governance.
+   */
+  delegationProvider?: (node: GraphNode<unknown>, context: C) => string | undefined;
   mergeContext?: (
     current: C,
     next: C,
@@ -277,18 +297,42 @@ export async function executeGraph<T, C>(
     graph.nodes.map((node) => [node.id, 'pending'])
   );
   const outcomes: Record<string, GraphExecutionOutcome<C>> = {};
+  type GraphClaim = string | ResourceClaim;
   const active = new Map<
     string,
-    { promise: Promise<GraphExecutionOutcome<C>>; claims: string[] }
+    { promise: Promise<GraphExecutionOutcome<C>>; claims: GraphClaim[] }
   >();
-  const claimsInUse = new Set<string>();
+  const claimsInUse: GraphClaim[] = [];
   const startedAt = new Map<string, number>();
 
   for (const id of options.precompletedNodeIds || []) {
     if (statuses[id] === 'pending') {
       statuses[id] = 'success';
-      outcomes[id] = { status: 'success', context };
       const restoredNode = graph.nodes.find((node) => node.id === id);
+      outcomes[id] = {
+        status: 'success',
+        context:
+          restoredNode && options.precompletedNodeContext
+            ? (options.precompletedNodeContext(restoredNode as GraphNode<unknown>) ?? context)
+            : context,
+      };
+      if (restoredNode && outcomes[id].context !== undefined) {
+        if (options.mergeContext) {
+          context = options.mergeContext(
+            context,
+            outcomes[id].context,
+            restoredNode as GraphNode<unknown>,
+            outcomes[id]
+          );
+        } else if (restoredNode.merge === 'namespace') {
+          context = {
+            ...(context as Record<string, unknown>),
+            [restoredNode.id]: outcomes[id].context,
+          } as C;
+        } else {
+          context = defaultMerge(context, outcomes[id].context);
+        }
+      }
       if (restoredNode) {
         options.onNodeSettled?.(restoredNode as GraphNode<unknown>, outcomes[id], 0);
       }
@@ -304,10 +348,17 @@ export async function executeGraph<T, C>(
   }
 
   const terminal = (id: string) => ['success', 'failed', 'skipped'].includes(statuses[id]);
-  const claimsConflict = (left: string, right: string): boolean =>
-    left === right || left === 'resource:all' || right === 'resource:all';
-  const canClaim = (claims: string[]) =>
-    claims.every((claim) => [...claimsInUse].every((inUse) => !claimsConflict(claim, inUse)));
+  const claimsConflict = (left: GraphClaim, right: GraphClaim): boolean => {
+    if (typeof left === 'string' && typeof right === 'string') {
+      return left === right || left === 'resource:all' || right === 'resource:all';
+    }
+    // An opaque legacy claim cannot be proven disjoint from a typed file
+    // claim, so fail closed. Typed claims share the KD-07 semantics.
+    if (typeof left === 'string' || typeof right === 'string') return true;
+    return resourceClaimsConflict(left, right);
+  };
+  const canClaim = (claims: GraphClaim[]) =>
+    claims.every((claim) => claimsInUse.every((inUse) => !claimsConflict(claim, inUse)));
 
   while (Object.values(statuses).some((status) => status === 'pending' || status === 'running')) {
     let progressed = false;
@@ -344,12 +395,16 @@ export async function executeGraph<T, C>(
       if (!canClaim(claims)) continue;
       statuses[node.id] = 'running';
       startedAt.set(node.id, Date.now());
-      claims.forEach((claim) => claimsInUse.add(claim));
+      claimsInUse.push(...claims);
       const nodeContext = context;
-      const promise = execute(node, nodeContext).catch((error: unknown) => ({
-        status: 'failed' as const,
-        error: error instanceof Error ? error.message : String(error),
-      }));
+      const run = () => execute(node, nodeContext);
+      const delegated = options.delegationProvider?.(node as GraphNode<unknown>, nodeContext);
+      const promise = (delegated ? withDelegationSlot({ provider: delegated }, run) : run()).catch(
+        (error: unknown) => ({
+          status: 'failed' as const,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
       active.set(node.id, { promise, claims });
       progressed = true;
     }
@@ -365,7 +420,10 @@ export async function executeGraph<T, C>(
     );
     const slot = active.get(completed.id)!;
     active.delete(completed.id);
-    slot.claims.forEach((claim) => claimsInUse.delete(claim));
+    for (const claim of slot.claims) {
+      const index = claimsInUse.indexOf(claim);
+      if (index >= 0) claimsInUse.splice(index, 1);
+    }
     statuses[completed.id] = completed.outcome.status;
     outcomes[completed.id] = completed.outcome;
     options.onNodeSettled?.(

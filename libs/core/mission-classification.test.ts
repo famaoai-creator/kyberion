@@ -132,7 +132,7 @@ describe('mission-classification', () => {
     expect(mapMissionClassToMissionTypeTemplate('product_delivery')).toBe('product_development');
     expect(mapMissionClassToMissionTypeTemplate('operations_and_release')).toBe('operations');
     expect(mapMissionClassToMissionTypeTemplate('environment_and_recovery')).toBe('incident');
-    expect(mapMissionClassToMissionTypeTemplate('research_and_absorption')).toBe('system_query');
+    expect(mapMissionClassToMissionTypeTemplate('research_and_absorption')).toBe('research');
     expect(mapMissionClassToMissionTypeTemplate('content_and_media')).toBe('development');
     expect(mapMissionClassToMissionTypeTemplate('code_change')).toBe('development');
     expect(mapMissionClassToMissionTypeTemplate('decision_support')).toBe('development');

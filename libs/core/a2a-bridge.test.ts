@@ -319,6 +319,57 @@ describe('a2a-bridge', () => {
     );
   });
 
+  it('honors an explicit mission provider and model target over the agent manifest hint', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    const handle = { ask: vi.fn(async () => 'ok') };
+    mocks.getAgentManifest.mockReturnValue({
+      selection_hints: {
+        preferred_provider: 'agy',
+        preferred_modelId: 'Gemini 3.5 Flash (Medium)',
+      },
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.getAgentRuntimeHandle.mockReturnValue(null);
+    mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.get.mockReturnValue(undefined);
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-PROVIDER-TARGET-1',
+        sender: 'kyberion:mission-orchestrator',
+        receiver: 'planner-agent',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'mission_task_execution',
+        text: 'run the assigned mission task',
+        context: {
+          mission_id: 'MISSION-PROVIDER-TARGET-1',
+          team_role: 'planner',
+          execution_mode: 'task',
+          provider: 'codex',
+          provider_model_id: 'gpt-5.6-sol',
+        },
+      },
+    });
+
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'codex',
+        modelId: 'gpt-5.6-sol',
+        runtimeMetadata: expect.objectContaining({
+          provider_strategy: 'strict',
+          skip_provider_resolution: true,
+        }),
+      })
+    );
+  });
+
   it('rejects structured task payloads that miss required contract fields', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
     mocks.getAgentManifest.mockReturnValue({
@@ -503,6 +554,53 @@ describe('a2a-bridge', () => {
     });
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.payload).toEqual({ text: 'daemon-ok' });
+  });
+
+  it('forwards a mission dispatch budget to the supervisor ask transport', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'codex',
+      modelId: 'gpt-5.6-luna',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+      agent_id: 'codex-nerve',
+      provider: 'codex',
+      model_id: 'gpt-5.6-luna',
+      status: 'ready',
+      session_id: 'sess-luna',
+    });
+    mocks.createSupervisorBackedAgentHandle.mockReturnValue({ ask: vi.fn() });
+    mocks.askAgentRuntimeViaDaemon.mockResolvedValue({ text: 'task-result' });
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-DISPATCH-TIMEOUT-1',
+        sender: 'sender-x',
+        receiver: 'codex-nerve',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'mission_task_execution',
+        text: 'complete the bounded task',
+        context: {
+          mission_id: 'MSN-TIMEOUT',
+          team_role: 'researcher',
+          task_id: 'TASK-1',
+          execution_mode: 'task',
+          dispatch_timeout_ms: 180_000,
+        },
+      },
+    });
+
+    expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'codex-nerve',
+        timeoutMs: 180_000,
+      })
+    );
   });
 
   it('emits a2a envelopes that satisfy the schema', () => {

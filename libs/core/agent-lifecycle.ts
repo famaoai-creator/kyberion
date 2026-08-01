@@ -280,11 +280,14 @@ class AgentLifecycleManagerImpl {
       // Only reuse a live runtime when it matches the requested provider.
       // Dynamic provider failover (demoted backend → new provider) must not
       // be silently satisfied by a runtime still bound to the old backend.
-      if (!options.provider || existingRecord?.provider === options.provider) {
+      if (
+        (!options.provider || existingRecord?.provider === options.provider) &&
+        (!options.modelId || existingRecord?.modelId === options.modelId)
+      ) {
         return existingHandle;
       }
       logger.info(
-        `[AGENT_LIFECYCLE] Recreating ${agentId}: held provider ${existingRecord?.provider} != requested ${options.provider}`
+        `[AGENT_LIFECYCLE] Recreating ${agentId}: held runtime ${existingRecord?.provider}/${existingRecord?.modelId} != requested ${options.provider}/${options.modelId || '-'}`
       );
       await this.shutdown(agentId);
     }
@@ -314,9 +317,7 @@ class AgentLifecycleManagerImpl {
           preferredProvider: options.provider,
           preferredModelId: resolvedModelId,
           providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as
-            | 'strict'
-            | 'preferred'
-            | 'adaptive',
+            'strict' | 'preferred' | 'adaptive',
           fallbackProviders: Array.isArray(runtimeMetadata.fallback_providers)
             ? (runtimeMetadata.fallback_providers as string[])
             : undefined,

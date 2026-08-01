@@ -37,6 +37,26 @@ describe('mission-team-composer classification integration', () => {
     expect(owner?.delegation_contract?.allowed_write_scopes.length).toBeGreaterThan(0);
   });
 
+  it('routes research missions through the researcher role and separates it from the owner', () => {
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-RESEARCH-001',
+      missionType: 'research',
+      intentId: 'market-research',
+      shape: 'research',
+      progressSignals: ['classified'],
+      tier: 'public',
+    });
+
+    expect(plan.template).toBe('research');
+    const owner = plan.assignments.find((assignment) => assignment.team_role === 'owner');
+    const researcher = plan.assignments.find((assignment) => assignment.team_role === 'researcher');
+    expect(researcher?.status).toBe('assigned');
+    expect(researcher?.agent_id).toBeTruthy();
+    expect(researcher?.agent_id).not.toBe(owner?.agent_id);
+    expect(researcher?.delegation_contract?.ownership_scope).toContain('research packet');
+    expect(researcher?.model_hint?.model_id).toBe('openai:gpt-5.6-luna');
+  });
+
   it('applies organization defaults when composing the team plan', () => {
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-ORG-001',

@@ -96,6 +96,8 @@ export interface AgentRuntimeSupervisorAskPayload {
   prompt: string;
   requestedBy: string;
   correlationId?: string;
+  /** Transport timeout for this ask; ordinary conversation asks use the default. */
+  timeoutMs?: number;
   taskModelHint?: TaskModelHint;
   /**
    * SO-05: declared reasoning tier for this ask (fast/standard/deep).
@@ -114,6 +116,20 @@ const HEALTH_TIMEOUT_MS = 4_000;
 const ENSURE_TIMEOUT_MS = 30_000;
 const ASK_TIMEOUT_MS = 60_000;
 const STATUS_TIMEOUT_MS = 5_000;
+const ASK_TRANSPORT_GRACE_MS = 5_000;
+
+/**
+ * Keep the supervisor socket open for the whole task budget. The runtime
+ * itself enforces timeoutMs, so a shorter transport timeout would turn a
+ * healthy long-running task into a misleading "not found or not ready"
+ * in-process fallback in the A2A bridge.
+ */
+export function resolveAskTransportTimeout(timeoutMs?: number): number {
+  if (!Number.isFinite(timeoutMs) || !timeoutMs || timeoutMs <= 0) {
+    return ASK_TIMEOUT_MS;
+  }
+  return Math.max(ASK_TIMEOUT_MS, Math.ceil(timeoutMs) + ASK_TRANSPORT_GRACE_MS);
+}
 
 function ensureSocketDir(): void {
   if (!safeExistsSync(SOCKET_DIR)) safeMkdir(SOCKET_DIR, { recursive: true });
@@ -294,7 +310,7 @@ export async function askAgentRuntimeViaDaemon(
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<AgentRuntimeSupervisorAskPayload, { text: string }>(
     makeRequest('ask', payload),
-    ASK_TIMEOUT_MS
+    resolveAskTransportTimeout(payload.timeoutMs)
   );
 }
 
@@ -372,6 +388,7 @@ export function createSupervisorBackedAgentHandle(
         agentId,
         prompt,
         requestedBy,
+        ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
         model_tier: options.model_tier,
       });
       return result.text;

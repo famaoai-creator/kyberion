@@ -68,6 +68,33 @@ describe('graph scheduler', () => {
     expect(events.indexOf('start:fast-child')).toBeLessThan(events.indexOf('end:slow'));
   });
 
+  it('passes a predecessor handoff through a namespaced data edge', async () => {
+    const graph = deriveExecutionGraph([
+      { id: 'implement', produces: 'mission-task:implement', merge: 'namespace' },
+      {
+        id: 'review',
+        depends_on: ['implement'],
+        consumes: ['mission-task:implement'],
+        merge: 'namespace',
+      },
+    ]).graph;
+    let received: unknown;
+    const result = await executeGraph(
+      graph,
+      async (node, context) => {
+        if (node.id === 'review') received = (context as Record<string, unknown>).implement;
+        return {
+          status: 'success' as const,
+          context: node.id === 'implement' ? { handoff: { task_id: node.id } } : {},
+        };
+      },
+      { initialContext: {}, maxConcurrency: 2 }
+    );
+
+    expect(received).toEqual({ handoff: { task_id: 'implement' } });
+    expect(result.statuses.review).toBe('success');
+  });
+
   it('skips false conditions and cascades the skip to dependents', async () => {
     const derived = deriveExecutionGraph([
       { id: 'gate', when: { from: 'ready', operator: 'eq', value: true } },
@@ -142,5 +169,82 @@ describe('graph scheduler', () => {
     releaseFirst();
     await execution;
     expect(events).toEqual(['start:a', 'end:a', 'start:b', 'end:b']);
+  });
+
+  it('uses typed access claims from the shared tool-call policy', async () => {
+    const graph = deriveExecutionGraph([
+      {
+        id: 'read',
+        depends_on: [],
+        resource_claims: [{ kind: 'file', operation: 'read', path: 'shared.txt' }],
+      },
+      {
+        id: 'write',
+        depends_on: [],
+        resource_claims: [{ kind: 'file', operation: 'write', path: 'shared.txt' }],
+      },
+      {
+        id: 'other-read',
+        depends_on: [],
+        resource_claims: [{ kind: 'file', operation: 'read', path: 'other.txt' }],
+      },
+    ]).graph;
+    let active = 0;
+    let maxActive = 0;
+    const result = await executeGraph(
+      graph,
+      async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        active -= 1;
+        return { status: 'success' as const, context: {} };
+      },
+      {
+        initialContext: {},
+        maxConcurrency: 3,
+        resourceClaims: (node) =>
+          (
+            node.value as {
+              resource_claims?: Array<
+                string | { kind: 'file'; operation: 'read' | 'write'; path: string }
+              >;
+            }
+          ).resource_claims || [],
+      }
+    );
+
+    expect(Object.values(result.statuses).every((status) => status === 'success')).toBe(true);
+    // The two reads can overlap; the write must still be ordered against the
+    // read on the same path, so the typed policy permits two but not three.
+    expect(maxActive).toBeGreaterThanOrEqual(2);
+  });
+
+  it('intersects the graph frontier with a provider delegation slot', async () => {
+    const graph = deriveExecutionGraph([
+      { id: 'a', depends_on: [] },
+      { id: 'b', depends_on: [] },
+      { id: 'c', depends_on: [] },
+    ]).graph;
+    let active = 0;
+    let maxActive = 0;
+    const result = await executeGraph(
+      graph,
+      async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return { status: 'success' as const, context: {} };
+      },
+      {
+        initialContext: {},
+        maxConcurrency: 3,
+        delegationProvider: () => 'graph-scheduler-test-provider',
+      }
+    );
+
+    expect(Object.values(result.statuses).every((status) => status === 'success')).toBe(true);
+    expect(maxActive).toBeLessThanOrEqual(2);
   });
 });

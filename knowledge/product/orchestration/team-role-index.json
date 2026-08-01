@@ -114,16 +114,23 @@
       "autonomy_level": "medium"
     },
     "orchestrator": {
-      "description": "Supervises the mission orchestration event chain: kickoff/followup sequencing, failure triage, retry and replay decisions, and provider-degradation response.",
+      "description": "Supervises the runtime orchestration event chain after planning: kickoff/followup sequencing, graph progress, failure triage, retry/replay decisions, provider degradation, and owner escalation; it does not author plans or deliverables.",
       "required_capabilities": ["reasoning", "coordination", "routing", "monitoring"],
       "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
-      "allowed_delegate_team_roles": ["planner", "implementer", "reviewer", "tester", "operator"],
+      "allowed_delegate_team_roles": [
+        "planner",
+        "researcher",
+        "implementer",
+        "reviewer",
+        "tester",
+        "operator"
+      ],
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns orchestration-event sequencing, retry/replay decisions, and chain health; never authors mission deliverables itself.",
+      "ownership_scope": "Owns orchestration-event sequencing, graph/run health, retry/replay decisions, provider degradation response, and owner escalation; never rewrites planner contracts or authors mission deliverables.",
       "selection_hints": {
         "preferred_agents": ["mission-orchestrator", "control-plane-agent", "nerve-agent"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
       },
       "autonomy_level": "high"
     },
@@ -155,13 +162,13 @@
       "autonomy_level": "high"
     },
     "planner": {
-      "description": "Breaks mission intent into an execution strategy and task graph.",
+      "description": "Turns aligned mission intent into a bounded execution strategy, task graph, and contract-complete handoff; delegates evidence gathering instead of doing research or deliverable work itself.",
       "required_capabilities": ["reasoning", "strategy", "planning"],
       "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
-      "allowed_delegate_team_roles": ["implementer", "reviewer", "tester"],
+      "allowed_delegate_team_roles": ["implementer", "researcher", "reviewer", "tester"],
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns decomposition, sequencing, and contract completeness.",
+      "ownership_scope": "Owns decomposition, sequencing, contract completeness, dependency handoff, and the boundary between research findings and executable tasks.",
       "selection_hints": {
         "preferred_agents": [
           "planner-agent",
@@ -169,7 +176,7 @@
           "implementation-architect",
           "sovereign-brain"
         ],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
       },
       "autonomy_level": "high"
     },
@@ -204,6 +211,20 @@
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "low"
+    },
+    "researcher": {
+      "description": "Collects source-indexed evidence, compares alternatives, records uncertainty, and publishes a bounded research handoff for planning; does not modify implementation code or mission-wide state.",
+      "required_capabilities": ["reasoning", "analysis"],
+      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "planner",
+      "required_scope_classes": ["mission_state"],
+      "ownership_scope": "Owns the research packet, source inventory, evidence matrix, confidence/uncertainty notes, and explicit handoff to planner; writes only assigned mission evidence.",
+      "selection_hints": {
+        "preferred_agents": ["reasoning-worker", "sovereign-brain", "control-plane-agent"],
+        "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
+      },
+      "autonomy_level": "medium"
     },
     "reviewer": {
       "description": "Reviews risk, regression potential, and boundary compliance.",

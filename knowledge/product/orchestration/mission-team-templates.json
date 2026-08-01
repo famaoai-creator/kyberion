@@ -120,6 +120,20 @@
         "cooldown_minutes": 5
       }
     },
+    "research": {
+      "required_roles": ["owner", "researcher", "planner", "reviewer"],
+      "optional_roles": ["operator", "tester"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 6,
+        "max_messages_per_run": 50,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
+    },
     "incident": {
       "required_roles": ["owner", "operator", "reviewer", "surface_liaison"],
       "optional_roles": ["planner", "tester"],

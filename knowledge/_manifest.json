@@ -25,6 +25,12 @@
       "type": "md"
     },
     {
+      "path": "product/agents/control-plane-agent.agent.md",
+      "tier": "public",
+      "size": 851,
+      "type": "md"
+    },
+    {
       "path": "product/agents/discord-surface-agent.agent.md",
       "tier": "public",
       "size": 1342,
@@ -39,7 +45,7 @@
     {
       "path": "product/agents/implementation-architect.agent.md",
       "tier": "public",
-      "size": 1295,
+      "size": 1324,
       "type": "md"
     },
     {
@@ -3135,7 +3141,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 8574,
+      "size": 8797,
       "type": "json"
     },
     {
@@ -3165,7 +3171,7 @@
     {
       "path": "product/orchestration/agent-profiles/control-plane-agent.json",
       "tier": "public",
-      "size": 711,
+      "size": 733,
       "type": "json"
     },
     {
@@ -3177,7 +3183,7 @@
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 646,
+      "size": 747,
       "type": "json"
     },
     {
@@ -3219,7 +3225,7 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 1161,
+      "size": 1183,
       "type": "json"
     },
     {
@@ -3231,7 +3237,7 @@
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 610,
+      "size": 688,
       "type": "json"
     },
     {
@@ -3395,6 +3401,12 @@
       "tier": "public",
       "size": 339,
       "type": "json"
+    },
+    {
+      "path": "product/orchestration/full-graph-handoff-recovery-flow.md",
+      "tier": "public",
+      "size": 7758,
+      "type": "md"
     },
     {
       "path": "product/orchestration/fusion-protocols/learning_loop.md",
@@ -3567,7 +3579,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 5426,
+      "size": 5891,
       "type": "json"
     },
     {
@@ -4497,7 +4509,7 @@
     {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
-      "size": 13944,
+      "size": 15379,
       "type": "json"
     },
     {
@@ -4557,7 +4569,7 @@
     {
       "path": "product/orchestration/team-roles/orchestrator.json",
       "tier": "public",
-      "size": 885,
+      "size": 1104,
       "type": "json"
     },
     {
@@ -4569,7 +4581,7 @@
     {
       "path": "product/orchestration/team-roles/planner.json",
       "tier": "public",
-      "size": 795,
+      "size": 974,
       "type": "json"
     },
     {
@@ -4582,6 +4594,12 @@
       "path": "product/orchestration/team-roles/relationship_curator.json",
       "tier": "public",
       "size": 791,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/team-roles/researcher.json",
+      "tier": "public",
+      "size": 898,
       "type": "json"
     },
     {
@@ -4647,7 +4665,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 140896,
+      "size": 141280,
       "type": "json"
     },
     {

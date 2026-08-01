@@ -10,7 +10,16 @@
         "software_developer"
       ],
       "team_roles": ["planner", "implementer", "reviewer", "tester", "experience_designer"],
-      "capabilities": ["architecture", "code", "review", "testing", "planning", "a2a"],
+      "capabilities": [
+        "architecture",
+        "code",
+        "review",
+        "testing",
+        "planning",
+        "documentation",
+        "analysis",
+        "a2a"
+      ],
       "selection_hints": {
         "preferred_provider": "agy",
         "preferred_modelId": "Gemini 3.5 Flash (Medium)"

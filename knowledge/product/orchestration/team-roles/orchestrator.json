@@ -1,15 +1,22 @@
 {
   "role": "orchestrator",
-  "description": "Supervises the mission orchestration event chain: kickoff/followup sequencing, failure triage, retry and replay decisions, and provider-degradation response.",
+  "description": "Supervises the runtime orchestration event chain after planning: kickoff/followup sequencing, graph progress, failure triage, retry/replay decisions, provider degradation, and owner escalation; it does not author plans or deliverables.",
   "required_capabilities": ["reasoning", "coordination", "routing", "monitoring"],
   "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
-  "allowed_delegate_team_roles": ["planner", "implementer", "reviewer", "tester", "operator"],
+  "allowed_delegate_team_roles": [
+    "planner",
+    "researcher",
+    "implementer",
+    "reviewer",
+    "tester",
+    "operator"
+  ],
   "escalation_parent_team_role": "owner",
   "required_scope_classes": ["mission_state"],
-  "ownership_scope": "Owns orchestration-event sequencing, retry/replay decisions, and chain health; never authors mission deliverables itself.",
+  "ownership_scope": "Owns orchestration-event sequencing, graph/run health, retry/replay decisions, provider degradation response, and owner escalation; never rewrites planner contracts or authors mission deliverables.",
   "selection_hints": {
     "preferred_agents": ["mission-orchestrator", "control-plane-agent", "nerve-agent"],
-    "preferred_models": ["auto-gemini-3"]
+    "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
   },
   "autonomy_level": "high"
 }

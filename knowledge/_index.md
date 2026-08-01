@@ -11,6 +11,7 @@
 ## 📁 product/agents
 - [chronos-mirror.agent](./product/agents/chronos-mirror.agent.md) (public | Unknown)
 - [cli-surface-agent.agent](./product/agents/cli-surface-agent.agent.md) (public | Unknown)
+- [control-plane-agent.agent](./product/agents/control-plane-agent.agent.md) (public | Unknown)
 - [discord-surface-agent.agent](./product/agents/discord-surface-agent.agent.md) (public | Unknown)
 - [imessage-surface-agent.agent](./product/agents/imessage-surface-agent.agent.md) (public | Unknown)
 - [implementation-architect.agent](./product/agents/implementation-architect.agent.md) (public | Unknown)
@@ -299,6 +300,7 @@
 - [Data Harvesting Best Practices: URL Resolution & Secure Download](./product/orchestration/data-harvesting-best-practices.md) (public | Ecosystem Architect)
 - [Delegated Task Observability](./product/orchestration/delegated-task-observability.md) (public | Ecosystem Architect)
 - [Design Clone Delivery Flow](./product/orchestration/design-clone-delivery-flow.md) (public | Unknown)
+- [Full Graph Handoff and Recovery Flow](./product/orchestration/full-graph-handoff-recovery-flow.md) (public | Unknown)
 - [Guided Coordination Protocol](./product/orchestration/guided-coordination-protocol.md) (public | Codex)
 - [Hypothesis Tree Protocol](./product/orchestration/hypothesis-tree-protocol.md) (public | Ecosystem Architect)
 - [Intuition Capture Protocol](./product/orchestration/intuition-capture-protocol.md) (public | Ecosystem Architect)
