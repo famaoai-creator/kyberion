@@ -15,6 +15,13 @@ export interface EgressPolicyFile {
    * default — tenant data has nowhere approved to go until someone says so.
    */
   tenant_allowed_domains?: Record<string, string[]>;
+  /**
+   * QM-11: operator policy for LINKS SHARED IN MESSAGES — deliberately
+   * separate from the network-egress allowlist above (mentioning a URL to a
+   * customer must not require widening actual network egress). Absent =
+   * the operator imposes no link restriction.
+   */
+  link_allowed_domains?: string[];
 }
 
 export interface EgressPolicyDecision {
@@ -38,6 +45,117 @@ export function resetEgressPolicyCache(): void {
   cachedPolicyPath = null;
   cachedPolicy = null;
   cachedAllowedDomains = null;
+}
+
+// ---------------------------------------------------------------------------
+// QM-11: audience egress floor (ported from qm's audience-floor).
+// A shared conversation's egress is NOT the room's own setting: a host is
+// reachable only if EVERY participant's policy allows it (allow-intersection)
+// and NO participant denies it (deny-union). ~matches qm src/resolution/
+// audience-floor.ts semantics; participants here are policy holders such as
+// the tenant and the operator, not a per-user identity system (roadmap
+// non-goal).
+// ---------------------------------------------------------------------------
+
+export interface EgressParticipantPolicy {
+  participant: string;
+  allowed_domains: string[];
+  blocked_domains?: string[];
+}
+
+export interface AudienceEgressFloor {
+  participants: string[];
+  /** Intersection of every participant's normalized allow set. */
+  allowed_domains: string[];
+  /** Union of every participant's normalized deny set. */
+  blocked_domains: string[];
+}
+
+export function normalizeEgressHost(host: string): string {
+  return String(host || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\*\./, '')
+    .replace(/\.$/, '');
+}
+
+export function composeAudienceFloor(policies: EgressParticipantPolicy[]): AudienceEgressFloor {
+  const participants = policies.map((policy) => policy.participant);
+  const blocked = new Set<string>();
+  for (const policy of policies) {
+    for (const host of policy.blocked_domains ?? []) {
+      const normalized = normalizeEgressHost(host);
+      if (normalized) blocked.add(normalized);
+    }
+  }
+  // A participant whose allow set contains '*' imposes no restriction of its
+  // own — it joins the audience without narrowing the intersection. If every
+  // participant is unrestricted, the floor allows all (denials still apply).
+  let allowed: Set<string> | null = null;
+  let sawUnrestricted = false;
+  for (const policy of policies) {
+    const own = new Set(
+      policy.allowed_domains.map(normalizeEgressHost).filter((host) => host.length > 0)
+    );
+    if (own.has('*')) {
+      sawUnrestricted = true;
+      continue;
+    }
+    if (allowed === null) {
+      allowed = own;
+    } else {
+      allowed = new Set([...allowed].filter((host) => own.has(host)));
+    }
+  }
+  if (allowed === null && sawUnrestricted) allowed = new Set(['*']);
+  return {
+    participants,
+    allowed_domains: [...(allowed ?? new Set<string>())].sort(),
+    blocked_domains: [...blocked].sort(),
+  };
+}
+
+function hostCoveredBy(hostname: string, domain: string): boolean {
+  if (domain === '*') return true;
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+export interface AudienceEgressDecision {
+  verdict: 'allow' | 'deny';
+  hostname: string;
+  reason: string;
+}
+
+/** Deny wins over allow; an empty audience permits nothing. */
+export function evaluateAudienceEgress(
+  hostname: string,
+  floor: AudienceEgressFloor
+): AudienceEgressDecision {
+  const host = normalizeEgressHost(hostname);
+  if (!host) {
+    return { verdict: 'deny', hostname: host, reason: 'empty hostname' };
+  }
+  const blockedBy = floor.blocked_domains.find((domain) => hostCoveredBy(host, domain));
+  if (blockedBy) {
+    return {
+      verdict: 'deny',
+      hostname: host,
+      reason: `denied by a participant policy (${blockedBy}) — one participant's denial denies everyone`,
+    };
+  }
+  const allowedBy = floor.allowed_domains.find((domain) => hostCoveredBy(host, domain));
+  if (allowedBy) {
+    return {
+      verdict: 'allow',
+      hostname: host,
+      reason: `allowed by every participant (${allowedBy})`,
+    };
+  }
+  return {
+    verdict: 'deny',
+    hostname: host,
+    reason: 'not in the audience floor — a host is reachable only when every participant allows it',
+  };
 }
 
 export function loadEgressPolicy(): EgressPolicyFile {
@@ -76,6 +194,9 @@ export function loadEgressPolicy(): EgressPolicyFile {
       parsed.tenant_allowed_domains && typeof parsed.tenant_allowed_domains === 'object'
         ? parsed.tenant_allowed_domains
         : {},
+    ...(Array.isArray(parsed.link_allowed_domains)
+      ? { link_allowed_domains: parsed.link_allowed_domains }
+      : {}),
   };
   return cachedPolicy;
 }
