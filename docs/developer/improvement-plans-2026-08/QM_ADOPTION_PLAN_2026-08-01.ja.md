@@ -231,7 +231,9 @@ qm は「スタートアップ向けマルチプレイヤー agent ハーネス�
 - **QM-04: コア完了。** `libs/core/security-screen.ts` 新設(posture 単調床 + `KYBERION_SECURITY_POSTURE`/`security-posture.json` 解決、provenance ラベル付きペイロード(切詰め=審査不能)、fail-closed 判定パーサ(`firstJsonObject`)、`runShadowScreen` + agree/disagree/unavailable 監査、検疫 JSONL ストア(`active/shared/runtime/security/quarantine.jsonl`、env 上書き可、**32KB/レコード上限 + 5MB ローテーション**)、`filterTaintedForModelContext`)。レビュー指摘反映: shadow promise の同期中立化(unhandled rejection 根絶)。`untrusted-content.ts`: LLM 判定を fail-closed 化(`invalid_llm_verdict`)、スクリーナ不在は unscreened ラベル + `input_failed_open` 監査 + notice 前置、`quarantine` オプション追加(既定 off、呼び出し側 opt-in)。**残**: slack-bridge / ingest / browser actuator への provenance ラベル付与・検疫 opt-in の配線と posture→approval-gate 接続(現状 primitives はテスト以外に本番呼び出し元なし — 配線が次バッチの第一課題)。
 - **QM-01: 完了。** `work-coordination.ts`: `renewWorkItemLease` が holder 検証 + 失効リース拒否。`reapExpiredWorkLeases` 新設(stranded `in_progress` の回復、claim/error 予算枯渇での park(status: blocked + `metadata.parked`)。ゾンビ holder の release 拒否は既存 lease 検証で担保(回帰テスト追加)。
 - **QM-02: 部分完了。** レジストリ可搬性: `normalizeScheduledPipelinePath`(root 内絶対→相対、レガシー絶対は `pipelines/` セグメントから移行、移行不能は拒否)+ `resolveScheduledPipelinePath`、chronos_daemon が解決を使用、実レジストリ 14 件を相対化。**残**: トリガ経路統一(`trigger-runner`)・権限非昇格・プロセス watch は後続ミッションへ。
-- QM-03 / QM-06〜11: 未着手(後続バッチ)。
+- **QM-03: コア完了(バッチ③、ミッション `QM-ADOPTION-MEMORY-B3`)。** `libs/core/memory-notebook.ts` 新設(行文法の単一正本、`foldCapture` = provenance 中立化 + 正規化 dedupe + 日付付与 + MAX_FACTS 最古落ち、`queryBullets`、consolidation アクション文法 UPDATE/DELETE/ADD/NONE + watermark マーカー + `planConsolidation`(適用せず計画のみ返す — 承認フロー接続用))。working-memory actuator の `opNote` が fold 準拠に(日付・dedupe・untrusted provenance 書換。セクション構造ファイルのため cap は意図的に非適用)。**残**: promotion queue 適用側への fold 組込、consolidation の background-review 配線、`bench:memory` 相当の V 層ハーネス。
+- **QM-04 配線: 完了(バッチ③)。** `processUntrustedContent` の quarantine 既定値を posture 駆動化(dangerous 以外は検疫 ON。全 6 ingest 呼び出し元が配線なしで継承 — 「全経路が通る層で解決」)。`resolveApprovalPolicy` に strict posture 床(`strict-posture-floor`)を接続。
+- QM-06〜11: 未着手(後続バッチ)。
 
 ## 7. 検証コマンド(実装時)
 

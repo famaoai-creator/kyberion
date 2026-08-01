@@ -834,6 +834,13 @@ export async function generateEmailReplyDraft(
   }
   const processed = processUntrustedContent(rawTriageText, 'email-triage');
   const triageText = processed.wrapped;
+  // QM-04 (review P1-2): quarantined triage must never become a
+  // plausible-looking reply draft built from the quarantine stub.
+  if (processed.quarantineId) {
+    throw new Error(
+      `email triage content was quarantined by the security screen (id ${processed.quarantineId}); review and release it before drafting a reply`
+    );
+  }
 
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });

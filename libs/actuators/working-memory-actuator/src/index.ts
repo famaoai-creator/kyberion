@@ -22,6 +22,12 @@ import {
   type MemoryCandidateTier,
 } from '@agent/core';
 import type { VolatileScope, VolatileCadence } from '@agent/core';
+import {
+  bullets as notebookBullets,
+  dateStr,
+  neutralizeUntrustedProvenance,
+  normalize as normalizeBullet,
+} from '@agent/core';
 
 const pr = pathResolver;
 
@@ -32,13 +38,7 @@ const pr = pathResolver;
 export type VolatileStatus = 'active' | 'expired' | 'rolled-over' | 'promoted' | 'archived';
 export type VolatileTier = 'personal' | 'confidential' | 'public';
 export type VolatileLifetime =
-  | 'session'
-  | 'mission'
-  | 'daily'
-  | 'weekly'
-  | 'ttl'
-  | 'until-distilled'
-  | 'sticky';
+  'session' | 'mission' | 'daily' | 'weekly' | 'ttl' | 'until-distilled' | 'sticky';
 
 export interface VolatileSidecar {
   $schema: string;
@@ -188,7 +188,16 @@ function opNote(params: Record<string, unknown>): unknown {
   const scopeRef = (params.scope_ref as string) ?? null;
   const tier = (params.tier as VolatileTier) ?? scopeDefaultTier(scope);
   const section = (params.section as string) ?? 'Notes';
-  const content = String(params.content ?? '');
+  // QM-03: notes follow the memory-notebook fold — untrusted provenance is
+  // neutralized, duplicates (by normalized text) are dropped, and the new
+  // bullet carries a capture date. `trusted: true` marks operator-authored
+  // notes whose provenance suffixes are kept verbatim.
+  const trusted = params.trusted === true;
+  let content = String(params.content ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[-*]\s+/, '');
+  if (!trusted) content = neutralizeUntrustedProvenance(content);
 
   const dir = pr.volatile(scope, scopeRef, { tier });
   ensureDir(dir);
@@ -196,17 +205,7 @@ function opNote(params: Record<string, unknown>): unknown {
   if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, memoryTemplate('Working Memory'));
 
   const existing = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
-  const target = `## ${section}`;
-  const idx = existing.indexOf(target);
-  let updated: string;
-  if (idx >= 0) {
-    const insertAt = existing.indexOf('\n', idx) + 1;
-    updated = existing.slice(0, insertAt) + `\n- ${content}\n` + existing.slice(insertAt);
-  } else {
-    updated = existing.trimEnd() + `\n\n## ${section}\n\n- ${content}\n`;
-  }
-  safeWriteFile(mdPath, updated);
-  const sidecar = touchSidecar(mdPath, {
+  const fullSidecarPatch: Partial<VolatileSidecar> = {
     $schema: SCHEMA_REF,
     scope,
     scope_ref: scopeRef,
@@ -221,7 +220,33 @@ function opNote(params: Record<string, unknown>): unknown {
     promotion_candidate_id: null,
     status: 'active',
     pinned: false,
-  });
+  };
+
+  const seen = new Set(notebookBullets(existing).map(normalizeBullet));
+  if (!content || seen.has(normalizeBullet(content))) {
+    // Deduped no-op: the .md was not touched, so only bump updated_at —
+    // never reset promotion state the way a full sidecar patch would. A
+    // first-ever touch (no sidecar yet) still gets the full shape so GC and
+    // the index never see a bare {updated_at} sidecar.
+    const sidecarUnchanged = loadSidecar(mdPath)
+      ? touchSidecar(mdPath, { updated_at: isoNow() })
+      : touchSidecar(mdPath, fullSidecarPatch);
+    return { path: mdPath, sidecar: sidecarUnchanged, deduped: true };
+  }
+
+  const bullet = `- (${dateStr(Date.now())}) ${content}`;
+  const target = `## ${section}`;
+  const idx = existing.indexOf(target);
+  let updated: string;
+  if (idx >= 0) {
+    const insertAt = existing.indexOf('\n', idx) + 1;
+    updated = existing.slice(0, insertAt) + `\n${bullet}\n` + existing.slice(insertAt);
+  } else {
+    updated = existing.trimEnd() + `\n\n## ${section}\n\n${bullet}\n`;
+  }
+
+  safeWriteFile(mdPath, updated);
+  const sidecar = touchSidecar(mdPath, fullSidecarPatch);
   return { path: mdPath, sidecar };
 }
 

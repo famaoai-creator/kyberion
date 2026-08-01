@@ -2,6 +2,7 @@ import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
+import { resolveConfiguredPosture } from './security-screen.js';
 
 export interface ApprovalPolicyRule {
   id: string;
@@ -88,6 +89,35 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
 }
 
 export function resolveApprovalPolicy(input: {
+  intentId?: string;
+  payload?: Record<string, unknown>;
+}): ApprovalPolicyResolution {
+  const base = resolveBaseApprovalPolicy(input);
+  // QM-04: strict posture = every intent pauses for a human. The floor is a
+  // MONOTONE tightening applied on top of the base resolution: a base rule
+  // that already requires approval keeps its rule id and its (possibly
+  // stronger) requirements — dual_key_confirmation and the
+  // injection-suspected-override must survive strict, because downstream
+  // (approval-gate session cache) keys its bypass rules on them.
+  if (resolveConfiguredPosture() === 'strict') {
+    if (base.requiresApproval) {
+      return {
+        ...base,
+        missingRequirements: Array.from(
+          new Set([...base.missingRequirements, 'approval_confirmation'])
+        ),
+      };
+    }
+    return {
+      requiresApproval: true,
+      missingRequirements: ['approval_confirmation'],
+      matchedRuleId: 'strict-posture-floor',
+    };
+  }
+  return base;
+}
+
+function resolveBaseApprovalPolicy(input: {
   intentId?: string;
   payload?: Record<string, unknown>;
 }): ApprovalPolicyResolution {
