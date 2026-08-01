@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildExecutionEnv, inferPersonaFromRole, resolveIdentityContext, withExecutionContext } from './authority.js';
+import {
+  buildExecutionEnv,
+  inferPersonaFromRole,
+  resolveIdentityContext,
+  withExecutionContext,
+  withExecutionContextAsync,
+} from './authority.js';
 
 describe('resolveIdentityContext', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
@@ -94,5 +100,22 @@ describe('resolveIdentityContext', () => {
     expect(inside).toEqual({ role: 'mission_controller', persona: 'worker' });
     expect(process.env.MISSION_ROLE).toBe('software_developer');
     expect(process.env.KYBERION_PERSONA).toBe('worker');
+  });
+
+  it('keeps execution context through async governed work', async () => {
+    delete process.env.MISSION_ROLE;
+    delete process.env.KYBERION_PERSONA;
+
+    const inside = await withExecutionContextAsync('mission_controller', async () => {
+      await Promise.resolve();
+      return {
+        role: process.env.MISSION_ROLE,
+        persona: process.env.KYBERION_PERSONA,
+      };
+    });
+
+    expect(inside).toEqual({ role: 'mission_controller', persona: 'worker' });
+    expect(process.env.MISSION_ROLE).toBeUndefined();
+    expect(process.env.KYBERION_PERSONA).toBeUndefined();
   });
 });

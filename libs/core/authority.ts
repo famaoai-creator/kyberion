@@ -234,6 +234,35 @@ export function withExecutionContext<T>(role: string, fn: () => T, persona?: Per
   }
 }
 
+/**
+ * Async counterpart of withExecutionContext. The synchronous helper restores
+ * process context as soon as an async callback returns its Promise, which is
+ * too early for governed writes after the first await.
+ */
+export async function withExecutionContextAsync<T>(
+  role: string,
+  fn: () => Promise<T> | T,
+  persona?: Persona
+): Promise<T> {
+  const previousRole = process.env.MISSION_ROLE;
+  const previousPersona = process.env.KYBERION_PERSONA;
+  process.env.MISSION_ROLE = role;
+  const resolvedPersona = persona || inferPersonaFromRole(role);
+  if (resolvedPersona !== 'unknown') {
+    process.env.KYBERION_PERSONA = resolvedPersona;
+  } else if (persona === undefined) {
+    delete process.env.KYBERION_PERSONA;
+  }
+  try {
+    return await fn();
+  } finally {
+    if (previousRole === undefined) delete process.env.MISSION_ROLE;
+    else process.env.MISSION_ROLE = previousRole;
+    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = previousPersona;
+  }
+}
+
 function resolveSudoScope(): string[] | undefined {
   const raw = process.env.KYBERION_SUDO_SCOPE;
   if (!raw) return undefined;

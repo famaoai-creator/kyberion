@@ -610,6 +610,7 @@ export {
   inferPersonaFromRole,
   buildExecutionEnv,
   withExecutionContext,
+  withExecutionContextAsync,
 } from './authority.js';
 
 export * as transformer from './transformer.js';
