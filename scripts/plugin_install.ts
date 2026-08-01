@@ -15,7 +15,7 @@
  *   pnpm plugin:install --source ./some/plugin --id my-plugin
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
  */
-import { createStandardYargs, installPluginManaged, logger } from '@agent/core';
+import { createStandardYargs, importPluginPack, installPluginManaged, logger } from '@agent/core';
 
 export function runPluginInstall(): number {
   const argv = createStandardYargs()
@@ -23,6 +23,17 @@ export function runPluginInstall(): number {
     .option('source', {
       type: 'string',
       describe: 'Filesystem path to the already-fetched plugin content to stage',
+    })
+    .option('pack', {
+      type: 'string',
+      describe:
+        'QM-07: https git URL of a plugin pack to import (every contained plugin is staged through the provenance-gated managed install and stays pending until approved)',
+    })
+    .option('ref', { type: 'string', describe: 'Git ref (branch/tag) for --pack' })
+    .option('tracked', {
+      type: 'boolean',
+      default: false,
+      describe: 'Mark the pack as tracked (expected to be re-synced) instead of pinned',
     })
     .option('id', { type: 'string', describe: 'Plugin id for the managed slot' })
     .option('requested-by', {
@@ -41,10 +52,42 @@ export function runPluginInstall(): number {
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
+  if (argv.pack) {
+    const result = importPluginPack({
+      url: String(argv.pack),
+      ...(argv.ref ? { ref: String(argv.ref) } : {}),
+      syncMode: argv.tracked ? 'tracked' : 'pinned',
+      ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
+      ...(argv.channel ? { approvalChannel: String(argv.channel) } : {}),
+      ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
+    });
+    // A no-op import (everything skipped) must be visible to scripted callers.
+    const exitCode = result.importRecord.installed.length > 0 ? 0 : 1;
+    if (argv.json) {
+      process.stdout.write(`${JSON.stringify(result.importRecord, null, 2)}\n`);
+      return exitCode;
+    }
+    const { importRecord } = result;
+    process.stdout.write(
+      [
+        `Pack '${importRecord.pack_id}' imported${importRecord.commit ? ` @ ${importRecord.commit.slice(0, 12)}` : ''} (${result.pack.sync_mode})`,
+        `  installed: ${importRecord.installed.join(', ') || '(none)'}`,
+        `  archived:  ${importRecord.archived.join(', ') || '(none)'}`,
+        ...importRecord.skipped.map((skip) => `  skipped:   ${skip.plugin_id} — ${skip.reason}`),
+        '',
+        'Every installed plugin is third-party by provenance and stays pending_approval',
+        'until approved (pnpm cli -- approvals); it is never executed before then.',
+      ].join('\n') + '\n'
+    );
+    return exitCode;
+  }
+
   const source = argv.source ? String(argv.source) : '';
   const pluginId = argv.id ? String(argv.id) : '';
   if (!source || !pluginId) {
-    logger.error('Usage: pnpm plugin:install --source <path> --id <plugin-id>');
+    logger.error(
+      'Usage: pnpm plugin:install --source <path> --id <plugin-id> | --pack <https-git-url>'
+    );
     return 1;
   }
 

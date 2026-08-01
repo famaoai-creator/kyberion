@@ -1,0 +1,37 @@
+{
+  "kind": "artifact-review-receipt",
+  "version": "1.0.0",
+  "review_id": "qm-adoption-b6-fresh-context-review-2026-08-02",
+  "mission_id": "QM-ADOPTION-PACKS-B6",
+  "review_task_id": "self_review-code-review",
+  "review_target_task_id": "execution-implement",
+  "artifact": {
+    "path": "libs/core/plugin-pack.ts",
+    "sha256": "b01900c50a669d9ef21d87643eb05f090ad6cc91cf7c7c877f65315105f6c607",
+    "kind": "code"
+  },
+  "reviewer": {
+    "agent_id": "fresh-context-reviewer-fable5",
+    "team_role": "reviewer",
+    "specialist_roles": ["code-reviewer", "security"],
+    "independent_from": ["famao"],
+    "independence_verified": true
+  },
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "suggestion",
+      "category": "test-coverage",
+      "description": "C1 (mediator shutdown rejecting in-flight asks) and B4 (root-layout stable ids) are code-verified but lack dedicated regression tests.",
+      "location": "libs/core/acp-mediator.ts"
+    },
+    {
+      "severity": "suggestion",
+      "category": "usability",
+      "description": "B2 refusal treats url and url+'.git' as different registrations (fail-closed false positive); consider normalizing .git off stored urls.",
+      "location": "libs/core/plugin-pack.ts"
+    }
+  ],
+  "acceptance_criteria": ["must_fix 指摘が解消済み"],
+  "reviewed_at": "2026-08-01T15:31:40.000Z"
+}
