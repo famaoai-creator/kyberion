@@ -196,6 +196,19 @@ describe('security-screen (QM-04)', () => {
       safeRmSync(dir, { recursive: true, force: true });
     });
 
+    it('rotates the quarantine file once it exceeds the size threshold', () => {
+      process.env.KYBERION_SECURITY_QUARANTINE_MAX_BYTES = '200';
+      try {
+        recordQuarantine({ source: 'a', content: 'x'.repeat(300), reason: 'fill' });
+        recordQuarantine({ source: 'b', content: 'fresh', reason: 'after rotation' });
+        const listed = listQuarantineRecords();
+        expect(listed).toHaveLength(1);
+        expect(listed[0]?.source).toBe('b');
+      } finally {
+        delete process.env.KYBERION_SECURITY_QUARANTINE_MAX_BYTES;
+      }
+    });
+
     it('caps oversized quarantined content and flags the truncation', () => {
       const record = recordQuarantine({
         source: 'tool_result:web',

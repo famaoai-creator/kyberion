@@ -273,14 +273,19 @@ function quarantinePath(): string {
  * but remains reviewable.
  */
 export const MAX_QUARANTINE_CONTENT_CHARS = 32_000;
-const MAX_QUARANTINE_FILE_BYTES = 5 * 1024 * 1024;
+const DEFAULT_MAX_QUARANTINE_FILE_BYTES = 5 * 1024 * 1024;
+
+function maxQuarantineFileBytes(): number {
+  const fromEnv = Number(process.env.KYBERION_SECURITY_QUARANTINE_MAX_BYTES);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_MAX_QUARANTINE_FILE_BYTES;
+}
 
 function rotateQuarantineIfOversized(): void {
   const current = quarantinePath();
   if (!safeExistsSync(current)) return;
   try {
     const raw = safeReadFile(current, { encoding: 'utf8' }) as string;
-    if (Buffer.byteLength(raw, 'utf8') < MAX_QUARANTINE_FILE_BYTES) return;
+    if (Buffer.byteLength(raw, 'utf8') < maxQuarantineFileBytes()) return;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     safeMoveSync(current, `${quarantineDir()}/quarantine-${stamp}.jsonl`);
   } catch (error) {

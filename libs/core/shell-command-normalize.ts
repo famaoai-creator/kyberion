@@ -818,7 +818,8 @@ function safeEnvAssignment(word: string): boolean {
 }
 
 function writeRedirectWord(word: string): boolean {
-  return /^(?:\d*|&)>/.test(word) || word === '>|';
+  if (/^\d*>&\d+$/.test(word)) return false;
+  return /^(?:\d*|&)>/.test(word) || word === '>|' || /^\d*<>/.test(word);
 }
 
 const RISKY_ARG_GUARDS: Record<string, (args: string[]) => boolean> = {
@@ -851,7 +852,14 @@ function riskyArgs(executable: string, args: string[]): boolean {
  */
 export function allowableCommands(input: string): AllowCandidate[] | null {
   const candidates: AllowCandidate[] = [];
-  for (const words of scanShell(input).commands) {
+  const scan = scanShell(input);
+  // Re-review NEW-1: a command substitution ($(...) or backticks) leaves an
+  // empty word riding the surrounding command, so `cat $(curl evil)` would
+  // otherwise collapse to an allowlisted `cat `. Any substitution — and any
+  // empty word — makes the whole input non-allowlistable.
+  if (scan.nested.length > 0) return null;
+  for (const words of scan.commands) {
+    if (words.some((word) => word === '')) return null;
     let index = 0;
     while (index < words.length) {
       const word = words[index]!;
@@ -864,11 +872,11 @@ export function allowableCommands(input: string): AllowCandidate[] | null {
         index++;
         continue;
       }
-      if (/^\d*(?:<<?|<>|<&)$/.test(word)) {
+      if (/^\d*(?:<<?|<&)$/.test(word)) {
         index += 2;
         continue;
       }
-      if (/^\d*(?:<<?|<>|<&)./.test(word)) {
+      if (/^\d*(?:<<?|<&)(?:[^>]|$)/.test(word)) {
         index++;
         continue;
       }
