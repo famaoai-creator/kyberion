@@ -2,12 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "version",
-    "defaults",
-    "patterns",
-    "templates"
-  ],
+  "required": ["version", "defaults", "patterns", "templates"],
   "properties": {
     "version": {
       "type": "string",
@@ -16,9 +11,7 @@
     "defaults": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "workflow_id"
-      ],
+      "required": ["workflow_id"],
       "properties": {
         "workflow_id": {
           "type": "string",
@@ -32,9 +25,7 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "description"
-        ],
+        "required": ["description"],
         "properties": {
           "description": {
             "type": "string",
@@ -49,12 +40,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "id",
-          "pattern",
-          "match",
-          "phases"
-        ],
+        "required": ["id", "pattern", "match", "phases"],
         "properties": {
           "id": {
             "type": "string",
@@ -66,6 +52,10 @@
           },
           "description": {
             "type": "string"
+          },
+          "playbook_ref": {
+            "type": "string",
+            "minLength": 1
           },
           "match": {
             "type": "object",
@@ -132,9 +122,7 @@
     "phaseSpec": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "properties": {
         "id": {
           "type": "string",
@@ -144,12 +132,7 @@
           "type": "string"
         },
         "kind": {
-          "enum": [
-            "judgment",
-            "deterministic",
-            "review",
-            "approval"
-          ]
+          "enum": ["judgment", "deterministic", "review", "approval"]
         },
         "pipeline_ref": {
           "type": "string",
@@ -176,10 +159,7 @@
     "phaseGate": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "checks"
-      ],
+      "required": ["id", "checks"],
       "properties": {
         "id": {
           "type": "string",
@@ -194,9 +174,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "kind"
-            ],
+            "required": ["kind"],
             "properties": {
               "kind": {
                 "enum": [
@@ -221,10 +199,7 @@
     "phaseTaskSpec": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "task_id_suffix",
-        "description"
-      ],
+      "required": ["task_id_suffix", "description"],
       "properties": {
         "task_id_suffix": {
           "type": "string",
@@ -239,10 +214,7 @@
           "minLength": 1
         },
         "phase_kind": {
-          "enum": [
-            "implement",
-            "review"
-          ]
+          "enum": ["implement", "review"]
         },
         "deliverable": {
           "type": "string",
@@ -257,39 +229,20 @@
           }
         },
         "risk": {
-          "enum": [
-            "low",
-            "medium",
-            "high",
-            "approval_required",
-            "high_stakes"
-          ]
+          "enum": ["low", "medium", "high", "approval_required", "high_stakes"]
         },
         "estimated_scope": {
-          "enum": [
-            "S",
-            "M",
-            "L"
-          ]
+          "enum": ["S", "M", "L"]
         },
         "expected_output_format": {
-          "enum": [
-            "text",
-            "files",
-            "structured"
-          ]
+          "enum": ["text", "files", "structured"]
         },
         "review_target_suffix": {
           "type": "string",
           "minLength": 1
         },
         "deliverable_kind": {
-          "enum": [
-            "doc",
-            "deck",
-            "code",
-            "media"
-          ]
+          "enum": ["doc", "deck", "code", "media"]
         },
         "pipeline_ref": {
           "type": "string",

@@ -5,6 +5,7 @@ tags: [orchestration, mission-playbooks, saas, roi]
 importance: 8
 author: Ecosystem Architect
 last_updated: 2026-03-06
+workflow_ids: [research-report]
 ---
 
 # ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定

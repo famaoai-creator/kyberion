@@ -1,0 +1,59 @@
+{
+  "$schema": "../schemas/mission-process-registry.schema.json",
+  "version": "1.0.0",
+  "layers": [
+    {
+      "id": "runtime",
+      "purpose": "Runtime reads governed classification, workflow, and gate definitions.",
+      "artifacts": [
+        {
+          "path": "knowledge/product/governance/mission-workflow-catalog.json",
+          "consumed_by": ["libs/core/mission-workflow-catalog.ts"],
+          "validated_by": ["scripts/check_workflow_catalog_refs.ts"]
+        },
+        {
+          "path": "knowledge/product/governance/mission-classification-policy.json",
+          "consumed_by": ["libs/core/mission-classification.ts"],
+          "validated_by": ["scripts/check_governance_rules.ts"]
+        },
+        {
+          "path": "knowledge/product/governance/gate-profiles/gate-profile-registry.json",
+          "consumed_by": ["libs/core/mission-review-gates.ts"],
+          "validated_by": ["scripts/check_governance_rules.ts"]
+        }
+      ]
+    },
+    {
+      "id": "verification",
+      "purpose": "Golden and controlled-failure packs execute the runtime chain and detect drift.",
+      "artifacts": [
+        {
+          "path": "knowledge/product/governance/mission-task-classification-scenarios.json",
+          "consumed_by": ["libs/core/mission-task-classification-scenarios.test.ts"],
+          "validated_by": ["scripts/check_mission_process_bindings.ts"]
+        },
+        {
+          "path": "knowledge/product/governance/mission-orchestration-scenario-pack.json",
+          "consumed_by": ["libs/core/mission-orchestration-scenario-pack.test.ts"],
+          "validated_by": ["scripts/check_mission_process_bindings.ts"]
+        }
+      ]
+    },
+    {
+      "id": "knowledge",
+      "purpose": "Human-facing runbooks and context-pack material; never parsed as runtime execution logic.",
+      "artifacts": [
+        {
+          "path": "knowledge/product/orchestration/mission-playbooks",
+          "consumed_by": ["knowledge retrieval and operator context packs"],
+          "validated_by": ["scripts/check_mission_process_bindings.ts"]
+        },
+        {
+          "path": "knowledge/product/governance/phases",
+          "consumed_by": ["AGENTS.md and lifecycle operator guidance"],
+          "validated_by": ["scripts/check_mission_process_bindings.ts"]
+        }
+      ]
+    }
+  ]
+}

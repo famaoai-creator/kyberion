@@ -1,3 +1,13 @@
+---
+title: Messaging Bridge Activation & Orchestration
+category: Orchestration
+tags: [orchestration, mission-playbooks, messaging, bridge]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-08-01
+workflow_ids: [coordinated-multi-track]
+---
+
 # Scenario: Messaging Bridge Activation & Orchestration
 
 This playbook describes how to request and manage declared messaging bridge implementations. Today, the shipped activation path covers Slack and iMessage; Telegram remains scaffold-required until a satellite and manifest entry exist.
@@ -8,11 +18,11 @@ You can request the activation of new messaging platforms using natural language
 
 ### Example Intents
 
-| Goal | Ask Kyberion |
-|---|---|
-| **Setup Slack** | `Slackブリッジを起動して` |
-| **Enable iMessage** | `iMessageの連携を設定して` |
-| **Status Check** | `メッセージングブリッジの状態を教えて` |
+| Goal                | Ask Kyberion                           |
+| ------------------- | -------------------------------------- |
+| **Setup Slack**     | `Slackブリッジを起動して`              |
+| **Enable iMessage** | `iMessageの連携を設定して`             |
+| **Status Check**    | `メッセージングブリッジの状態を教えて` |
 
 ## 2. Activation Workflow
 
@@ -40,4 +50,5 @@ For daily operations, you can control the communication services directly:
 - **Governance**: All bridges are monitored by the `runtimeSupervisor` and logged for auditability.
 
 ---
-*Created by Kyberion Ecosystem Architect | 2026-05-03*
+
+_Created by Kyberion Ecosystem Architect | 2026-05-03_
