@@ -2303,6 +2303,10 @@ export {
 } from './shell-command-normalize.js';
 export type { SimpleCommand } from './shell-command-normalize.js';
 
+// QM-09: gap-phase latency attribution for LLM delegations.
+export type { BaseGapPhase, GapPhaseSample, GapRecorder } from './gap-phase.js';
+export { GAP_PHASES, isKnownGapPhase, createGapRecorder, sanitizeGapSamples } from './gap-phase.js';
+
 // QM-03: memory notebook line grammar — the single source of truth for
 // bullet-notebook memory (`- (YYYY-MM-DD) fact`), fold, and consolidation.
 export type {

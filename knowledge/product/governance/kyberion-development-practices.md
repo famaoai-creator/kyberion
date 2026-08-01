@@ -154,6 +154,37 @@ libs/actuators/` — plus `pnpm check:catalogs` and, if you touched
   re-inventory with `git status` + grep for your key symbols before
   continuing — never assume your working tree survived.
 
+## 7. Design principles adopted from qm (QM adoption plan §3)
+
+Patterns proven in yc-software/qm and adopted as repo-wide discipline
+(implementation examples cited so the rule stays checkable):
+
+- **Fail-open is a first-class, audited, labelled state.** Never a silent
+  `catch {}` — a degraded path must tell its consumers it degraded, with a
+  source label, and leave an audit entry (example: the unscreened notice +
+  `input_failed_open` audit in `untrusted-content.ts`).
+- **Policy is small pure functions with dedicated tests.** Keep judgment
+  logic out of I/O so it can be pinned standalone (examples:
+  `composeSecurityPosture`, `routeWake`-style arbitration,
+  `errorParks`-style counters).
+- **Truncated means unscannable, not partially checked.** Past a size cap,
+  report "could not be checked" — never "checked what fit" (examples: the
+  screen-payload elision marker, the 64KB shell-command cap).
+- **Resolution keys are immutable — no renames.** Assets resolved by name
+  (skills, pipeline ids, schedule ids) are created-new + archived, never
+  renamed in place; renaming the key breaks every reference silently.
+- **Docs state limitations, and tests keep them honest.** Security-relevant
+  docs enumerate what is NOT enforced (clause status tables:
+  `docs/PACKAGING_CONTRACT.md`), and `tests/docs-honesty-contract.test.ts`
+  asserts the load-bearing claims against the code.
+- **Asymmetric trust for de-obfuscation.** Seeing through quotes, wrappers
+  and encodings is correct when looking for something to BLOCK, and wrong
+  when looking for a reason to PERMIT (`shell-command-normalize.ts`).
+- **Tighten monotonically, never replace.** A security floor (posture,
+  approval requirements) is applied as a union on top of the base
+  resolution — an early-return floor that REPLACES stronger requirements
+  is a downgrade wearing a strict label (`resolveApprovalPolicy`).
+
 ## Maintenance
 
 When a CI failure or review finding reveals a NEW repo-specific rule (not

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { enqueueDelegationNotification } from './delegation-notifications.js';
+import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeAppendFileSync,
@@ -30,6 +31,8 @@ export interface DelegatedTaskTrace {
   resumed_from?: string;
   mission_id?: string;
   task_id?: string;
+  /** QM-09: named-phase latency breakdown for this delegation. */
+  gap_phases?: Array<{ phase: string; ms: number }>;
 }
 
 /**
@@ -135,14 +138,22 @@ export function startDelegatedTaskTrace(input: {
 
 export function completeDelegatedTaskTrace(
   trace: DelegatedTaskTrace,
-  outcome: { resultSummary?: string; error?: string }
+  outcome: {
+    resultSummary?: string;
+    error?: string;
+    gapPhases?: Array<{ phase: string; ms: number }>;
+  }
 ): DelegatedTaskTrace {
+  const gapPhases = outcome.gapPhases
+    ? sanitizeGapSamples(outcome.gapPhases, (message) => logger.warn(message))
+    : undefined;
   const completed: DelegatedTaskTrace = {
     ...trace,
     completed_at: new Date().toISOString(),
     status: outcome.error ? 'failed' : 'completed',
     ...(outcome.resultSummary ? { result_summary: outcome.resultSummary } : {}),
     ...(outcome.error ? { error: outcome.error } : {}),
+    ...(gapPhases && gapPhases.length ? { gap_phases: gapPhases } : {}),
   };
   appendTrace(completed);
   persistRecord(completed);
