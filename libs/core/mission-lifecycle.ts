@@ -1140,6 +1140,12 @@ export async function verifyMission(
     updateTrustScore(state.delegation.agent_id, result);
   }
 
+  state.verification = {
+    status: result,
+    verified_at: new Date().toISOString(),
+    note,
+  };
+
   state.history.push({
     ts: new Date().toISOString(),
     event: 'VERIFY',

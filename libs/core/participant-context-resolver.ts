@@ -37,6 +37,11 @@ const TEAM_ROLE_DEFAULTS: Record<string, TeamRoleResolutionDefault> = {
     perspective_ids: ['pragmatic_cto'],
     organization_role_id: 'product_manager',
   },
+  researcher: {
+    authority_role_id: 'mission_controller',
+    perspective_ids: ['infinite_librarian'],
+    organization_role_id: 'knowledge_steward',
+  },
   product_strategist: {
     authority_role_id: 'ecosystem_architect',
     perspective_ids: ['visionary_inventor', 'value_maximizer'],

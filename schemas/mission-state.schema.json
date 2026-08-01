@@ -101,6 +101,27 @@
         "archived"
       ]
     },
+    "verification": {
+      "type": "object",
+      "required": ["status", "verified_at", "note"],
+      "properties": {
+        "status": { "type": "string", "enum": ["verified", "rejected"] },
+        "verified_at": { "type": "string", "minLength": 1 },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "distillation": {
+      "type": "object",
+      "required": ["status", "completed_at", "output_path"],
+      "properties": {
+        "status": { "type": "string", "enum": ["completed"] },
+        "completed_at": { "type": "string", "minLength": 1 },
+        "output_path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "completed_at": { "type": "string", "minLength": 1 },
     "execution_mode": { "type": "string", "enum": ["local", "delegated"] },
     "priority": { "type": "number" },
     "assigned_persona": { "type": "string", "minLength": 1 },
