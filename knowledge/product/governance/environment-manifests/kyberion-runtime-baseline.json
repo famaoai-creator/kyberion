@@ -1,7 +1,7 @@
 {
   "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
   "manifest_id": "kyberion-runtime-baseline",
-  "version": "2026-07-05",
+  "version": "2026-08-01",
   "description": "The minimum host requirements for *anything* in Kyberion to run: Node, pnpm, git, and a built workspace. Every other manifest implicitly depends on this one being satisfied first.",
   "capabilities": [
     {
@@ -13,7 +13,25 @@
       "install": {
         "operator_confirmed": true,
         "instruction": "Install Node.js 24+ via your version manager: `nvm install 24 && nvm use 24` or `mise install node@24` (matches `.nvmrc` and package.json engines). Operator-confirmed because the version manager change can affect other projects.",
-        "docs_url": "https://nodejs.org/en/download"
+        "docs_url": "https://nodejs.org/en/download",
+        "platform_overrides": {
+          "win32": {
+            "command": "winget",
+            "args": [
+              "install",
+              "--id",
+              "OpenJS.NodeJS.LTS",
+              "--exact",
+              "--source",
+              "winget",
+              "--accept-source-agreements",
+              "--accept-package-agreements"
+            ],
+            "instruction": "PowerShell: `winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-source-agreements --accept-package-agreements`.",
+            "docs_url": "https://learn.microsoft.com/windows/package-manager/winget/install",
+            "retry_after_install": true
+          }
+        }
       }
     },
     {
@@ -26,9 +44,27 @@
         "operator_confirmed": true,
         "command": "corepack",
         "args": ["enable", "pnpm"],
-        "instruction": "Use Corepack (`corepack enable pnpm`) or `npm i -g pnpm`. Pinned version: `pnpm@11.13.0` (Node.js 24+ required).",
+        "instruction": "Use Corepack (`corepack enable pnpm`) or `npm i -g pnpm`. Workspace version: `pnpm@11.15.1` (Node.js 24+ required).",
         "docs_url": "https://pnpm.io/installation",
-        "retry_after_install": true
+        "retry_after_install": true,
+        "platform_overrides": {
+          "win32": {
+            "command": "winget",
+            "args": [
+              "install",
+              "--id",
+              "pnpm.pnpm",
+              "--exact",
+              "--source",
+              "winget",
+              "--accept-source-agreements",
+              "--accept-package-agreements"
+            ],
+            "instruction": "PowerShell: `winget install --id pnpm.pnpm --exact --source winget --accept-source-agreements --accept-package-agreements`.",
+            "docs_url": "https://pnpm.io/installation",
+            "retry_after_install": true
+          }
+        }
       }
     },
     {
@@ -40,7 +76,25 @@
       "install": {
         "operator_confirmed": true,
         "instruction": "macOS: `brew install git`. Debian/Ubuntu: `apt-get install -y git`. Other platforms: see the docs link.",
-        "docs_url": "https://git-scm.com/downloads"
+        "docs_url": "https://git-scm.com/downloads",
+        "platform_overrides": {
+          "win32": {
+            "command": "winget",
+            "args": [
+              "install",
+              "--id",
+              "Git.Git",
+              "--exact",
+              "--source",
+              "winget",
+              "--accept-source-agreements",
+              "--accept-package-agreements"
+            ],
+            "instruction": "PowerShell: `winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements`.",
+            "docs_url": "https://git-scm.com/install/windows.html",
+            "retry_after_install": true
+          }
+        }
       }
     },
     {

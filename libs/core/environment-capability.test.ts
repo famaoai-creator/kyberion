@@ -8,6 +8,7 @@ import {
   pathResolver,
   probeManifest,
   registerEnvironmentCapabilityProbe,
+  resolveCapabilityInstall,
   resetEnvironmentCapabilityProbeRegistry,
   verifyManifestSignature,
   verifyReady,
@@ -129,6 +130,46 @@ describe('probeManifest', () => {
     expect(fs.existsSync(marker)).toBe(false);
     expect(process.env.UNTRUSTED_MODULE_RAN).toBeUndefined();
   });
+});
+
+describe('platform-specific environment installers', () => {
+  it('selects a win32 override while preserving the default installer elsewhere', () => {
+    const install = {
+      operator_confirmed: true,
+      command: 'corepack',
+      args: ['enable', 'pnpm'],
+      platform_overrides: {
+        win32: {
+          command: 'winget',
+          args: ['install', '--id', 'pnpm.pnpm', '--exact'],
+        },
+      },
+    } as const;
+
+    expect(resolveCapabilityInstall(install, 'darwin')).toMatchObject({
+      command: 'corepack',
+      args: ['enable', 'pnpm'],
+      operator_confirmed: true,
+    });
+    expect(resolveCapabilityInstall(install, 'win32')).toMatchObject({
+      command: 'winget',
+      args: ['install', '--id', 'pnpm.pnpm', '--exact'],
+      operator_confirmed: true,
+    });
+  });
+
+  it.each(['kyberion-runtime-baseline', 'kyberion-toolchain'] as const)(
+    'declares winget installers for the Windows base toolchain: %s',
+    (manifestId) => {
+      const manifest = loadEnvironmentManifest(manifestId);
+      for (const capabilityId of ['node-runtime', 'pnpm', 'git']) {
+        const capability = manifest.capabilities.find(
+          (entry) => entry.capability_id === capabilityId
+        );
+        expect(capability?.install?.platform_overrides?.win32?.command).toBe('winget');
+      }
+    }
+  );
 });
 
 describe('bootstrapManifest dry-run', () => {
