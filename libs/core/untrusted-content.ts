@@ -5,21 +5,40 @@ import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
+import {
+  firstJsonObject,
+  quarantineStub,
+  recordQuarantine,
+  unscreenedNotice,
+} from './security-screen.js';
 
 export interface ScanOptions {
   useLlm?: boolean;
   scope?: string;
+  /**
+   * QM-04: when suspicion triggers, persist the content to the security
+   * quarantine and return an operator-reviewable stub instead of the wrapped
+   * content, keeping it out of model context entirely.
+   */
+  quarantine?: boolean;
 }
 
 export interface ScanResult {
   score: number;
   indicators: string[];
   injection_suspected: boolean;
+  /**
+   * QM-04: true when a requested screener was unavailable, so this content was
+   * NOT fully checked. Labelled fail-open — downstream must prefix the
+   * unscreened notice, never pass the content through silently.
+   */
+  unscreened?: boolean;
 }
 
 export interface ProcessedUntrustedContent {
   wrapped: string;
   scan: ScanResult;
+  quarantineId?: string;
 }
 
 /**
@@ -305,6 +324,17 @@ export function processUntrustedContent(
     } catch {
       /* alert emission must not block content processing */
     }
+
+    if (options?.quarantine) {
+      const record = recordQuarantine({
+        source,
+        content,
+        reason: 'Suspected prompt injection detected in external content',
+        scope: options?.scope,
+        indicators: scan.indicators,
+      });
+      return { wrapped: quarantineStub(record), scan, quarantineId: record.id };
+    }
   }
 
   const wrapped = wrapUntrusted(content, source);
@@ -330,14 +360,49 @@ Return ONLY a JSON object with the following schema:
         { context: `llm-scan-${Date.now()}` }
       );
 
-      const jsonStr = response.match(/\{[\s\S]*\}/)?.[0] || response;
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.injection_suspected) {
+      // QM-04 fail-closed verdict parsing: an unparseable or malformed verdict
+      // escalates to suspicion instead of being silently ignored.
+      const jsonStr = firstJsonObject(response);
+      let parsed: unknown;
+      try {
+        parsed = jsonStr ? JSON.parse(jsonStr) : undefined;
+      } catch {
+        parsed = undefined;
+      }
+      if (typeof parsed !== 'object' || parsed === null) {
         scan.injection_suspected = true;
-        scan.indicators.push(...(parsed.indicators || ['llm_detected_injection']));
+        scan.indicators.push('invalid_llm_verdict');
+      } else {
+        const verdict = parsed as { injection_suspected?: unknown; indicators?: unknown };
+        if (typeof verdict.injection_suspected !== 'boolean') {
+          scan.injection_suspected = true;
+          scan.indicators.push('invalid_llm_verdict');
+        } else if (verdict.injection_suspected) {
+          scan.injection_suspected = true;
+          const extra = Array.isArray(verdict.indicators)
+            ? verdict.indicators.filter((i): i is string => typeof i === 'string')
+            : [];
+          scan.indicators.push(...(extra.length ? extra : ['llm_detected_injection']));
+        }
       }
     } catch (err) {
-      logger.warn(`[SA-03] LLM scan failed: ${err}`);
+      // QM-04 labelled fail-open: the screener being unavailable is a
+      // first-class, audited state — never a silent pass-through.
+      logger.warn(`[SA-03] LLM scan unavailable — content stays unscreened: ${err}`);
+      scan.unscreened = true;
+      scan.indicators.push('llm_scan_unavailable');
+      try {
+        auditChain.record({
+          agentId: 'untrusted-content-scanner',
+          action: 'security_posture.input_failed_open',
+          operation: 'scan_async',
+          result: 'allowed',
+          reason: 'LLM screener unavailable; content passed through with unscreened notice',
+          metadata: { scope: options?.scope },
+        });
+      } catch {
+        // ignore
+      }
     }
   }
   return scan;
@@ -404,8 +469,22 @@ export async function processUntrustedContentAsync(
     logger.warn(
       `[SA-03] Prompt injection suspected from source "${source}". Indicators: ${scan.indicators.join(', ')}`
     );
+
+    if (options?.quarantine) {
+      const record = recordQuarantine({
+        source,
+        content,
+        reason: 'Suspected prompt injection detected in external content',
+        scope: options?.scope,
+        indicators: scan.indicators,
+      });
+      return { wrapped: quarantineStub(record), scan, quarantineId: record.id };
+    }
   }
 
-  const wrapped = wrapUntrusted(finalContent, source);
+  let wrapped = wrapUntrusted(finalContent, source);
+  if (scan.unscreened) {
+    wrapped = `${unscreenedNotice('external content')}\n${wrapped}`;
+  }
   return { wrapped, scan };
 }
