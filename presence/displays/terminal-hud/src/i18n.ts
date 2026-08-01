@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import { t as coreT, type VocabularyKey } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
+import { nextSupportedLocale } from '@agent/core/locale-normalize';
 
 export type TranslateParams = Record<string, string | number>;
 
@@ -18,7 +19,7 @@ export function defaultLocale(): SupportedLocale {
 }
 
 export function toggleLocale(locale: SupportedLocale): SupportedLocale {
-  return locale === 'ja' ? 'en' : 'ja';
+  return nextSupportedLocale(locale);
 }
 
 export const I18nContext = createContext<I18n>(makeI18n(defaultLocale()));

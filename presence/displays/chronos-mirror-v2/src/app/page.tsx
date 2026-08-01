@@ -48,6 +48,7 @@ import {
 } from '../lib/operator-console';
 import {
   chronosSpeechLocale,
+  nextChronosLocale,
   setChronosLocalePreference,
   uxMessage,
   uxText,
@@ -1296,7 +1297,7 @@ export default function ChronosMirrorV2() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setChronosLocalePreference(locale === 'ja' ? 'en' : 'ja')}
+                  onClick={() => setChronosLocalePreference(nextChronosLocale(locale))}
                   aria-label={
                     locale === 'ja' ? 'Switch language to English' : '言語を日本語に切り替え'
                   }

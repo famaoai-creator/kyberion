@@ -37,6 +37,13 @@ export const SUPPORTED_LOCALES = ['en', 'ja', 'qps-ploc'] as const;
  */
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
+/** Returns the next catalog locale, wrapping at the end of the list. */
+export function nextSupportedLocale(locale: SupportedLocale): SupportedLocale {
+  const currentIndex = SUPPORTED_LOCALES.indexOf(locale);
+  if (currentIndex < 0) return SUPPORTED_LOCALES[0];
+  return SUPPORTED_LOCALES[(currentIndex + 1) % SUPPORTED_LOCALES.length];
+}
+
 /**
  * Normalizes a raw locale-ish value (`ja`, `ja-JP`, `ja_JP`, `JA`, `en-US`,
  * browser language tags, …) into a {@link SupportedLocale}.

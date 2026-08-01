@@ -5,6 +5,7 @@ import * as core from './core.js';
 import {
   _resetLocaleModuleStateForTests,
   normalizeLocale,
+  nextSupportedLocale,
   resolveDefaultLocale,
   resolveLocale,
 } from './locale.js';
@@ -38,6 +39,13 @@ afterEach(() => {
   _resetLocaleModuleStateForTests();
   if (safeExistsSync(testRoot)) safeRmSync(testRoot, { recursive: true, force: true });
   vi.restoreAllMocks();
+});
+
+describe('nextSupportedLocale', () => {
+  it('wraps through the generated locale list', () => {
+    expect(nextSupportedLocale('en')).toBe('ja');
+    expect(nextSupportedLocale('qps-ploc')).toBe('en');
+  });
 });
 
 const missingIdentityPath = () => fixturePath('does-not-exist.json');
