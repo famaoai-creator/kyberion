@@ -15,6 +15,7 @@ tags:
 importance: 9
 author: Ecosystem Architect
 last_updated: 2026-07-09
+workflow_ids: [software-asset-management, it-operations-automation]
 ---
 
 # ミッション・プレイブック：資材管理・IT運用・動的ワークフロー登録

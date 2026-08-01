@@ -66,6 +66,7 @@ import {
   recordGraphRunNode,
   persistGraphRunArtifact,
   type GraphRunArtifact,
+  assessPipelineDryRun,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -2050,8 +2051,7 @@ async function runStepsInternal(
   };
 
   const pipelineOptions = (initialCtx as any).__pipeline_options as
-    | { max_steps?: unknown; timeout_ms?: unknown; max_concurrency?: unknown }
-    | undefined;
+    { max_steps?: unknown; timeout_ms?: unknown; max_concurrency?: unknown } | undefined;
   const explicitMaxSteps = Number(pipelineOptions?.max_steps);
   const explicitTimeoutMs = Number(pipelineOptions?.timeout_ms);
   // AR-01: options.max_steps / timeout_ms are enforced (canonical-engine
@@ -2169,24 +2169,18 @@ export async function main() {
     process.env.KYBERION_PERSONA = identity.persona;
   }
 
-  // Bootstrap reasoning + voice backends before any actuator dispatch.
-  installReasoningBackends();
-  installPythonVoiceBridgeIfAvailable();
-  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
-
-  // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
-  // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.
-  // Without this, a user pressing Ctrl+C during a meeting join pipeline would
-  // leave their system microphone locked to BlackHole.
-  const cleanupAndExit = (code: number) => {
-    resetRouterSync();
-    process.exit(code);
-  };
-  process.once('SIGINT', () => cleanupAndExit(130));
-  process.once('SIGTERM', () => cleanupAndExit(143));
-
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: false })
+    .option('dry-run', {
+      type: 'boolean',
+      default: false,
+      describe: 'Statically assess the pipeline without dispatching tools or providers',
+    })
+    .option('json', {
+      type: 'boolean',
+      default: false,
+      describe: 'Emit machine-readable JSON for dry-run output',
+    })
     .option('resume', {
       type: 'string',
       describe: 'Resume a durable pipeline run by run id',
@@ -2209,6 +2203,60 @@ export async function main() {
     if (!argv.input) argv.input = resumeState.started?.input_path;
   }
   if (!argv.input) throw new Error('Either --input or --resume is required.');
+
+  if (argv['dry-run']) {
+    try {
+      const pipeline = await readValidatedWorkflowAdf(argv.input as string);
+      const report = assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
+      if (argv.json) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(`[pipeline-dry-run] ${report.verdict}: ${report.pipeline_id}\n`);
+        for (const check of report.checks) {
+          process.stdout.write(`- ${check.status}: ${check.message}\n`);
+        }
+        for (const action of report.next_actions) process.stdout.write(`next: ${action}\n`);
+      }
+      process.exitCode = report.verdict === 'blocked' ? 1 : 0;
+      return;
+    } catch (error) {
+      const report = {
+        version: '1.0' as const,
+        pipeline_id: String(argv.input),
+        verdict: 'blocked' as const,
+        side_effects: 'none' as const,
+        checks: [
+          {
+            id: 'contract-validation',
+            status: 'blocked' as const,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        next_actions: ['Fix the pipeline ADF/guardrail validation errors and rerun the dry-run.'],
+      };
+      if (argv.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      else process.stderr.write(`[pipeline-dry-run] blocked: ${report.checks[0].message}\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // Bootstrap reasoning + voice backends before any actuator dispatch.
+  installReasoningBackends();
+  installPythonVoiceBridgeIfAvailable();
+  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
+
+  // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
+  // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.
+  // Without this, a user pressing Ctrl+C during a meeting join pipeline would
+  // leave their system microphone locked to BlackHole.
+  const cleanupAndExit = (code: number) => {
+    resetRouterSync();
+    process.exit(code);
+  };
+  process.once('SIGINT', () => cleanupAndExit(130));
+  process.once('SIGTERM', () => cleanupAndExit(143));
+
   const pipeline = await readValidatedWorkflowAdf(argv.input as string);
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;

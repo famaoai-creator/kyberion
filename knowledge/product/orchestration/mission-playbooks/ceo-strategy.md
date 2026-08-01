@@ -5,6 +5,7 @@ tags: [orchestration, mission-playbooks, ceo, strategy]
 importance: 8
 author: Ecosystem Architect
 last_updated: 2026-03-06
+workflow_ids: [decision-support-exploratory]
 ---
 
 # ミッション・プレイブック：CEO戦略的意思決定
