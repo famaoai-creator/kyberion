@@ -1,0 +1,10 @@
+{
+  "kind": "delivery-receipt",
+  "mission_id": "QM-ADOPTION-MEMORY-B3",
+  "task_id": "delivery-deliver",
+  "pr_url": "https://github.com/famaoai-creator/kyberion/pull/649",
+  "branch": "agent/qm-adoption-batch3",
+  "base": "agent/qm-adoption-batch1",
+  "delivered_at": "2026-08-01T14:03:16.000Z",
+  "operator_approval": "Continuation of the operator-approved delivery pattern established for PR #648; batch requested via 次の改善も進めて (2026-08-01)"
+}
