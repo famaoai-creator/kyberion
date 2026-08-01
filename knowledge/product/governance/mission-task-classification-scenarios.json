@@ -1,5 +1,6 @@
 {
   "version": "1.0.0",
+  "purpose": "regression-fixture",
   "scenarios": [
     {
       "scenario_id": "schedule-read-agenda-ja",

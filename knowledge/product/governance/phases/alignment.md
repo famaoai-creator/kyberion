@@ -1,3 +1,10 @@
+---
+title: 'Phase Protocol: Alignment'
+tags: [governance, lifecycle, alignment]
+last_updated: 2026-08-01
+runtime_stages: [intake, classification, planning]
+---
+
 # Phase Protocol: ③ Alignment
 
 ## Goal

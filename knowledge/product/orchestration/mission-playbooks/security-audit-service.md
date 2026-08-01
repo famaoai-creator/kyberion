@@ -5,6 +5,7 @@ tags: [orchestration, mission-playbooks, security, audit, static-analysis, servi
 importance: 9
 author: Ecosystem Architect
 last_updated: 2026-07-08
+workflow_ids: [security-audit-service]
 ---
 
 # ミッション・プレイブック：ソースコード・セキュリティ診断サービス

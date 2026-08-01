@@ -1886,6 +1886,8 @@ export * from './mission-seed-registry.js';
 export * from './mission-working-memory.js';
 export * from './mission-classification.js';
 export * from './mission-workflow-catalog.js';
+export * from './process-definition-registry.js';
+export * from './pipeline-dry-run.js';
 export * from './mission-process-task-expansion.js';
 export * from './mission-review-gates.js';
 export * from './mission-team-index.js';

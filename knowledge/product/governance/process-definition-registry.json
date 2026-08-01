@@ -1,0 +1,82 @@
+{
+  "$schema": "../schemas/process-definition-registry.schema.json",
+  "version": "1.0.0",
+  "sources": [
+    {
+      "id": "mission-workflow-catalog",
+      "kind": "mission_workflow_catalog",
+      "path": "knowledge/product/governance/mission-workflow-catalog.json",
+      "execution_role": "runtime",
+      "consumer_paths": [
+        "libs/core/mission-workflow-catalog.ts",
+        "libs/core/mission-process-planning.ts",
+        "libs/core/mission-creation.ts",
+        "scripts/mission_controller.ts"
+      ],
+      "expected_counts": { "templates": 41, "patterns": 7 }
+    },
+    {
+      "id": "mission-orchestration-scenarios",
+      "kind": "scenario_pack",
+      "path": "knowledge/product/governance/mission-orchestration-scenario-pack.json",
+      "execution_role": "validation",
+      "consumer_paths": [
+        "scripts/check_contract_schemas.ts",
+        "scripts/check_governance_rules.ts",
+        "tests/scenario-coverage-contract.test.ts"
+      ],
+      "expected_counts": { "scenarios": 23 }
+    },
+    {
+      "id": "mission-task-classification-scenarios",
+      "kind": "scenario_pack",
+      "path": "knowledge/product/governance/mission-task-classification-scenarios.json",
+      "execution_role": "validation",
+      "consumer_paths": [
+        "scripts/check_contract_schemas.ts",
+        "scripts/check_governance_rules.ts",
+        "libs/core/mission-task-classification-scenarios.test.ts"
+      ],
+      "expected_counts": { "scenarios": 22 }
+    },
+    {
+      "id": "mission-playbooks",
+      "kind": "playbook_directory",
+      "path": "knowledge/product/orchestration/mission-playbooks",
+      "execution_role": "knowledge",
+      "consumer_paths": [
+        "docs/SCENARIOS.md",
+        "knowledge/product/orchestration/intent-scenario-catalog.md",
+        "knowledge/product/governance/mission-workflow-catalog.json"
+      ],
+      "expected_entries": [
+        "asset-management-and-it-operations.md",
+        "ceo-strategy.md",
+        "it-delivery-operations-governance.md",
+        "messaging-bridge-orchestration.md",
+        "product-audit.md",
+        "saas-roi.md",
+        "security-audit-service.md"
+      ]
+    },
+    {
+      "id": "mission-lifecycle-phases",
+      "kind": "phase_directory",
+      "path": "knowledge/product/governance/phases",
+      "execution_role": "protocol",
+      "consumer_paths": [
+        "AGENTS.md",
+        "knowledge/_index.md",
+        "libs/core/mission-lifecycle.ts",
+        "libs/core/mission-orchestration-worker.ts"
+      ],
+      "expected_entries": [
+        "alignment.md",
+        "execution.md",
+        "onboarding.md",
+        "recovery.md",
+        "review.md"
+      ]
+    }
+  ]
+}
