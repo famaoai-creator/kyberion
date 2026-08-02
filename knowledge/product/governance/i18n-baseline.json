@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-01T19:47:06.901Z",
+  "generated_at": "2026-08-01T22:17:33.013Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -43,7 +43,6 @@
     "satellites/slack-bridge",
     "satellites/telegram-bridge",
     "satellites/voice-hub",
-    "presence/displays/avatar-studio",
     "presence/displays/chronos-mirror-v2",
     "presence/displays/computer-surface",
     "presence/displays/concierge",
@@ -150,9 +149,6 @@
     "presence/displays/concierge/server.ts": 3,
     "presence/displays/concierge/src/app/api/approvals/[id]/route.ts": 1,
     "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts": 3,
-    "presence/displays/concierge/src/app/layout.tsx": 4,
-    "presence/displays/concierge/src/app/page.tsx": 38,
-    "presence/displays/concierge/src/app/setup/page.tsx": 12,
     "presence/displays/operator-surface/src/app/layout.tsx": 2,
     "presence/displays/presence-studio/server.ts": 4
   }

@@ -1,0 +1,327 @@
+{
+  "header.home": { "en": "Home", "ja": "ホーム" },
+  "header.setup": { "en": "Setup", "ja": "セットアップ" },
+  "header.tagline": {
+    "en": "Executive secretary — requests, approvals, outcomes, exceptions",
+    "ja": "CEO秘書 — 依頼・承認・成果・例外"
+  },
+  "locale.label": { "en": "Language", "ja": "言語" },
+  "locale.japanese": { "en": "Japanese", "ja": "日本語" },
+  "locale.english": { "en": "English", "ja": "英語" },
+  "home.briefing_label": { "en": "Today's briefing", "ja": "本日のご報告" },
+  "home.briefing_fallback": {
+    "en": "Here is today's concierge briefing.",
+    "ja": "本日の秘書室からのご報告です。"
+  },
+  "home.approvals_count": { "en": "awaiting approval", "ja": "ご承認待ち" },
+  "home.missions_count": { "en": "active requests", "ja": "進行中のご依頼" },
+  "home.outcomes_count": { "en": "unread outcomes", "ja": "未確認の成果物" },
+  "home.exceptions_count": { "en": "exceptions to review", "ja": "要確認の例外" },
+  "home.next_action": {
+    "en": "Recommended next action: {value}",
+    "ja": "おすすめの次の一手: {value}"
+  },
+  "home.approval_title": { "en": "Awaiting your approval", "ja": "ご承認待ち" },
+  "home.approval_description": {
+    "en": "These items need your decision. Choose approve or send back.",
+    "ja": "ご判断が必要な案件です。承認または差し戻しをお選びください。"
+  },
+  "home.approval_empty": {
+    "en": "There are no items awaiting approval.",
+    "ja": "現在、ご承認待ちの案件はございません。"
+  },
+  "home.approve": { "en": "Approve", "ja": "承認する" },
+  "home.reject": { "en": "Send back", "ja": "差し戻す" },
+  "home.request_title": { "en": "Request status", "ja": "ご依頼の状況" },
+  "home.request_description": {
+    "en": "Progress of the requests currently entrusted to us.",
+    "ja": "現在お預かりしているご依頼の進捗です。"
+  },
+  "home.request_empty": {
+    "en": "There are no active requests.",
+    "ja": "現在、進行中のご依頼はございません。"
+  },
+  "home.in_progress": { "en": "In progress", "ja": "進行中" },
+  "home.needs_attention": { "en": "Needs attention", "ja": "要確認" },
+  "home.completed_condition": { "en": "Completion condition: {value}", "ja": "完了条件: {value}" },
+  "home.last_updated": { "en": "Last updated {value}", "ja": "最終更新 {value}" },
+  "home.outcome_title": { "en": "Delivered outcomes", "ja": "お届けした成果" },
+  "home.outcome_description": {
+    "en": "Completed outcomes. Review them and choose accept or request changes.",
+    "ja": "完成した成果物です。ご確認のうえ、受領・修正依頼をお選びください。"
+  },
+  "home.outcome_empty": {
+    "en": "There are no new outcomes.",
+    "ja": "新しくお届けした成果物はございません。"
+  },
+  "home.accept": { "en": "Accept", "ja": "受領する" },
+  "home.request_changes": { "en": "Request changes", "ja": "修正を依頼する" },
+  "home.artifacts": { "en": "{count} artifacts", "ja": "成果物 {count}点" },
+  "home.exception_title": { "en": "Exceptions for your review", "ja": "ご確認いただきたい例外" },
+  "home.exception_description": {
+    "en": "Only events outside the normal flow are shown here.",
+    "ja": "通常の流れから外れた事象のみをお知らせします。"
+  },
+  "home.exception_empty": {
+    "en": "There are no exceptions. Everything is progressing smoothly.",
+    "ja": "現在、例外はございません。順調に進んでおります。"
+  },
+  "home.change_prompt": {
+    "en": "Tell us what you would like changed. It will be sent to the owner.",
+    "ja": "修正のご要望をお聞かせください（担当へそのまま伝わります）"
+  },
+  "home.approved_notice": {
+    "en": "Approved “{title}”. The owner has been notified.",
+    "ja": "「{title}」を承認いたしました。担当へお伝えします。"
+  },
+  "home.rejected_notice": { "en": "Sent “{title}” back.", "ja": "「{title}」を差し戻しました。" },
+  "home.accepted_notice": { "en": "Accepted “{title}”.", "ja": "「{title}」を受領いたしました。" },
+  "home.changes_notice": {
+    "en": "Sent a change request for “{title}”.",
+    "ja": "「{title}」の修正依頼を担当へ送りました。"
+  },
+  "home.load_error": {
+    "en": "We could not load the concierge data: {error}",
+    "ja": "データの取得に失敗しました: {error}"
+  },
+  "home.loading": { "en": "Checking today's status…", "ja": "本日の状況を確認しております…" },
+  "home.response_title": { "en": "Response status", "ja": "応答状況" },
+  "home.response_description": {
+    "en": "The concierge shows when a provider is working and what to do if it stops responding.",
+    "ja": "秘書室が応答を待っているときの状況と、止まった場合の次の対応を表示します。"
+  },
+  "home.response_state.ready": { "en": "Ready", "ja": "待機中" },
+  "home.response_state.waiting": { "en": "Collecting a response", "ja": "応答を取得中" },
+  "home.response_state.queued": { "en": "Queued before execution", "ja": "実行待ち" },
+  "home.response_next_action.ready": {
+    "en": "No response is currently pending.",
+    "ja": "現在、保留中の応答はありません。"
+  },
+  "home.response_next_action.waiting": {
+    "en": "The provider has a bounded deadline. If it expires, this request is blocked with a recovery action instead of waiting forever.",
+    "ja": "応答には期限があります。期限を超えた場合は無期限に待たず、復旧案付きで停止します。"
+  },
+  "home.response_next_action.queued": {
+    "en": "A concurrency slot is unavailable. It will start when capacity is released.",
+    "ja": "同時実行枠が空くのを待っています。枠が解放されると開始します。"
+  },
+  "home.response_task": { "en": "Task {value}", "ja": "タスク {value}" },
+  "home.response_elapsed": { "en": "elapsed {value}s", "ja": "経過 {value}秒" },
+  "home.response_backend": { "en": "backend {value}", "ja": "バックエンド {value}" },
+  "home.response_stale": {
+    "en": "{count} expired provider record(s) will be reconciled by maintenance.",
+    "ja": "期限切れのプロバイダー記録 {count}件は、メンテナンスで整理されます。"
+  },
+  "home.status.unread": { "en": "Unread", "ja": "未確認" },
+  "home.status.read": { "en": "Read", "ja": "確認済み" },
+  "home.status.accepted": { "en": "Accepted", "ja": "受領済み" },
+  "home.status.rejected": { "en": "Sent back", "ja": "差し戻し済み" },
+  "home.status.changes_requested": { "en": "Changes requested", "ja": "修正依頼中" },
+  "setup.loading": {
+    "en": "Checking personal secretary readiness…",
+    "ja": "個人秘書の準備状況を確認しております…"
+  },
+  "setup.load_error": {
+    "en": "Could not load setup information: {error}",
+    "ja": "セットアップ情報の取得に失敗しました: {error}"
+  },
+  "setup.briefing": {
+    "en": "We will prepare a secretary office dedicated to {name}.",
+    "ja": "{name}専属の秘書室を整えます。"
+  },
+  "setup.you": { "en": "you", "ja": "あなた" },
+  "setup.onboarding": { "en": "onboarding", "ja": "オンボーディング" },
+  "setup.completed": { "en": "complete", "ja": "完了" },
+  "setup.incomplete": { "en": "incomplete", "ja": "未完了" },
+  "setup.avatar": { "en": "avatar", "ja": "アバター" },
+  "setup.registered": { "en": "registered", "ja": "登録済み" },
+  "setup.unregistered": { "en": "not registered", "ja": "未登録" },
+  "setup.voice_profiles": { "en": "voice profiles", "ja": "音声プロフィール" },
+  "setup.running": { "en": "running", "ja": "稼働中" },
+  "setup.needs_setup": { "en": "needs setup", "ja": "要設定" },
+  "setup.reasoning_backend": { "en": "reasoning backend", "ja": "推論バックエンド" },
+  "setup.profile_title": { "en": "1. Your profile", "ja": "1. あなたのプロフィール" },
+  "setup.profile_description": {
+    "en": "Bind secretary decisions, replies, and scheduling to you.",
+    "ja": "秘書業務の判断・返信・予定調整を、あなた個人に紐づけます。"
+  },
+  "setup.default_vision": {
+    "en": "Run personal secretary operations safely and reliably.",
+    "ja": "個人の秘書業務を安全かつ確実に進める。"
+  },
+  "setup.tutorial_summary": {
+    "en": "The personal secretary workflow has been checked.",
+    "ja": "Concierge の個人秘書ワークフローを確認しました。"
+  },
+  "setup.display_name": { "en": "Display name", "ja": "表示名" },
+  "setup.primary_domain": { "en": "Primary domain", "ja": "主な領域" },
+  "setup.secretary_policy": { "en": "Secretary policy", "ja": "秘書への方針" },
+  "setup.priority_placeholder": {
+    "en": "What should be prioritized?",
+    "ja": "何を優先してほしいか"
+  },
+  "setup.save_profile": {
+    "en": "Save profile and connection preparation",
+    "ja": "プロフィールと接続準備を保存"
+  },
+  "setup.management_title": {
+    "en": "2. Tenant, vision, and Kyberion agent",
+    "ja": "2. テナント・ビジョン・Kyberionエージェント"
+  },
+  "setup.management_description": {
+    "en": "Manage the tenant context, secretary vision, and the Kyberion agent bound to this personal profile.",
+    "ja": "個人プロフィールに紐づくテナント、秘書のビジョン、Kyberionエージェントを管理します。"
+  },
+  "setup.tenant": { "en": "Tenant", "ja": "テナント" },
+  "setup.tenant_display_name": { "en": "Tenant display name", "ja": "テナント表示名" },
+  "setup.tenant_role": { "en": "Your role in this tenant", "ja": "このテナントでの役割" },
+  "setup.tenant_runtime_bound": {
+    "en": "Runtime tenant binding is active for this process.",
+    "ja": "このプロセスには実行時テナントが紐づいています。"
+  },
+  "setup.tenant_runtime_unbound": {
+    "en": "This selection is stored in your profile. Set KYBERION_TENANT at runtime to bind execution.",
+    "ja": "選択はプロフィールへ保存されます。実行時に KYBERION_TENANT を設定すると処理に紐づきます。"
+  },
+  "setup.agent_id": { "en": "Kyberion agent ID", "ja": "KyberionエージェントID" },
+  "setup.agent_display_name": { "en": "Agent display name", "ja": "エージェント表示名" },
+  "setup.agent_provider": { "en": "Provider", "ja": "プロバイダー" },
+  "setup.agent_model": { "en": "Model", "ja": "モデル" },
+  "setup.agent_registry_count": {
+    "en": "{count} durable Kyberion identities are registered.",
+    "ja": "永続 Kyberion エージェントID: {count}件"
+  },
+  "setup.save_management": {
+    "en": "Save tenant, vision, and agent settings",
+    "ja": "テナント・ビジョン・エージェント設定を保存"
+  },
+  "setup.management_saved": {
+    "en": "Tenant, vision, and Kyberion agent settings saved.",
+    "ja": "テナント・ビジョン・Kyberionエージェント設定を保存しました。"
+  },
+  "setup.media_title": { "en": "3. Avatar and voice", "ja": "3. アバターと音声" },
+  "setup.media_description": {
+    "en": "Photos and voice stay in your personal profile and are never shared without consent.",
+    "ja": "写真と音声は個人プロファイルに保存し、同意なく公開しません。"
+  },
+  "setup.photo_avatar": { "en": "Photo avatar", "ja": "写真アバター" },
+  "setup.image_label": { "en": "Avatar image", "ja": "アバター画像" },
+  "setup.voice_profile": { "en": "Voice profile", "ja": "音声プロフィール" },
+  "setup.consent": { "en": "consent required", "ja": "同意制" },
+  "setup.voice_id_label": { "en": "Voice profile ID", "ja": "音声プロフィールID" },
+  "setup.voice_name_label": { "en": "Voice display name", "ja": "音声表示名" },
+  "setup.voice_sample_label": { "en": "Voice sample", "ja": "音声サンプル" },
+  "setup.save_voice": { "en": "Register voice profile", "ja": "音声プロフィールを登録" },
+  "setup.voice_saved": {
+    "en": "Voice sample saved. Use the register button to enable it.",
+    "ja": "音声サンプルを保存しました。登録ボタンで有効化できます。"
+  },
+  "setup.services_title": { "en": "4. Connected services", "ja": "4. 連携サービス" },
+  "setup.services_description": {
+    "en": "Record connection preparation first; Secret Guard and OAuth handle credentials.",
+    "ja": "まず接続準備を記録し、認証情報そのものは Secret Guard / OAuth に委ねます。"
+  },
+  "setup.connected": { "en": "connected", "ja": "接続済み" },
+  "setup.save_connections": { "en": "Save connection preparation", "ja": "接続準備を保存" },
+  "setup.operations_title": { "en": "5. Secretary operations", "ja": "5. 秘書業務の入口" },
+  "setup.operations_description": {
+    "en": "Bring approvals, scheduling, and email into one personal entry point.",
+    "ja": "承認・予定・メールを一つの個人向け入口にまとめます。"
+  },
+  "setup.available": { "en": "available", "ja": "利用可能" },
+  "setup.guided": { "en": "guided", "ja": "案内付き" },
+  "setup.open_approval_queue": { "en": "Open approval queue", "ja": "承認キューを開く" },
+  "setup.pipeline": { "en": "pipeline: {value}", "ja": "pipeline: {value}" },
+  "setup.device_command": { "en": "command: {value}", "ja": "コマンド: {value}" },
+  "setup.avatar_flow": {
+    "en": "Take a camera photo to create a square avatar. If no camera is available, upload a photo instead.",
+    "ja": "カメラで撮影した写真から正方形のアバター画像を作成します。カメラがない場合は写真をアップロードできます。"
+  },
+  "setup.camera_preview": { "en": "Camera preview", "ja": "カメラプレビュー" },
+  "setup.open_camera": { "en": "Open camera", "ja": "カメラを起動" },
+  "setup.camera_starting": { "en": "Starting camera…", "ja": "カメラを起動中…" },
+  "setup.capture_avatar": { "en": "Capture and create avatar", "ja": "撮影してアバターを作成" },
+  "setup.close_camera": { "en": "Close camera", "ja": "カメラを閉じる" },
+  "setup.camera_fallback": {
+    "en": "No camera? Choose a PNG, JPEG, or WebP file. It will be cropped into the same avatar format.",
+    "ja": "カメラがない場合は PNG / JPEG / WebP を選択してください。同じアバター形式に切り抜きます。"
+  },
+  "setup.camera_unavailable": {
+    "en": "This browser does not provide camera access. Use the file upload below.",
+    "ja": "このブラウザではカメラを利用できません。下のファイルアップロードをお使いください。"
+  },
+  "setup.camera_permission": {
+    "en": "Camera access was not granted. Use the file upload below or allow camera access and try again.",
+    "ja": "カメラへのアクセスが許可されませんでした。下のファイルアップロードを使うか、カメラを許可して再試行してください。"
+  },
+  "setup.voice_sample_count": {
+    "en": "{count}/3 voice samples registered for this profile.",
+    "ja": "このプロフィールに登録済みの音声サンプル: {count}/3"
+  },
+  "setup.record_voice": { "en": "Record with microphone", "ja": "マイクで録音" },
+  "setup.stop_recording": { "en": "Stop recording", "ja": "録音を停止" },
+  "setup.voice_recording_unavailable": {
+    "en": "This browser does not provide microphone recording. Upload an audio file instead.",
+    "ja": "このブラウザではマイク録音を利用できません。音声ファイルをアップロードしてください。"
+  },
+  "setup.voice_permission": {
+    "en": "Microphone access was not granted. Upload an audio file instead or allow access and try again.",
+    "ja": "マイクへのアクセスが許可されませんでした。音声ファイルを使うか、マイクを許可して再試行してください。"
+  },
+  "setup.voice_sample_limit": {
+    "en": "Up to three voice samples can be registered.",
+    "ja": "音声サンプルは最大3件まで登録できます。"
+  },
+  "setup.avatar_saved": {
+    "en": "Avatar created and registered in your personal profile.",
+    "ja": "アバター画像を作成し、個人プロファイルへ登録しました。"
+  },
+  "setup.onboarding_saved": {
+    "en": "Profile and connection preparation saved.",
+    "ja": "プロフィールと連携サービスの接続準備を保存しました。"
+  },
+  "setup.voice_registered": {
+    "en": "Profile and voice profile registered.",
+    "ja": "プロフィールと音声プロフィールを登録しました。"
+  },
+  "api.file_required": { "en": "A file is required.", "ja": "ファイルが必要です。" },
+  "api.file_size": {
+    "en": "Please use a file no larger than 8 MiB.",
+    "ja": "ファイルは 8 MiB 以下にしてください。"
+  },
+  "api.image_type": {
+    "en": "Please select a PNG, JPEG, or WebP image.",
+    "ja": "PNG / JPEG / WebP の画像を指定してください。"
+  },
+  "api.unknown_action": {
+    "en": "Unknown upload action: {action}",
+    "ja": "不明なアップロード操作です: {action}"
+  },
+  "api.onboarding_input": {
+    "en": "action=apply_onboarding and draft are required.",
+    "ja": "action=apply_onboarding と draft が必要です。"
+  },
+  "service.google": { "en": "Google Workspace", "ja": "Google Workspace" },
+  "service.microsoft": { "en": "Microsoft 365", "ja": "Microsoft 365" },
+  "service.slack": { "en": "Slack", "ja": "Slack" },
+  "service.github": { "en": "GitHub", "ja": "GitHub" },
+  "service.browser": { "en": "Browser", "ja": "ブラウザ" },
+  "service.voice": { "en": "Voice", "ja": "音声" },
+  "auth.oauth": { "en": "OAuth", "ja": "OAuth" },
+  "auth.oauth_secret": { "en": "OAuth / Secret Guard", "ja": "OAuth / Secret Guard" },
+  "auth.session": { "en": "Session", "ja": "セッション" },
+  "auth.local_consent": { "en": "Local / consent required", "ja": "ローカル / 同意制" },
+  "cap.approvals": { "en": "Approvals / send back", "ja": "承認・差し戻し" },
+  "cap.schedule": { "en": "Schedule coordination", "ja": "予定調整" },
+  "cap.email": { "en": "Collect email / draft replies", "ja": "メール収集・返信案" },
+  "cap.voice": { "en": "Voice registration", "ja": "音声登録" },
+  "cap.device": { "en": "Device settings", "ja": "デバイス設定" },
+  "command.onboarding": {
+    "en": "pnpm install && pnpm build && pnpm surfaces:reconcile && pnpm onboard",
+    "ja": "pnpm install && pnpm build && pnpm surfaces:reconcile && pnpm onboard"
+  },
+  "command.reasoning": {
+    "en": "pnpm reasoning:setup (claude-cli recommended)",
+    "ja": "pnpm reasoning:setup (claude-cli 推奨)"
+  }
+}

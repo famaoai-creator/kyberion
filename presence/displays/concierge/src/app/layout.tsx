@@ -1,9 +1,10 @@
 import * as React from 'react';
 import './globals.css';
+import { ConciergeHeader } from './concierge-header';
 
 export const metadata = {
-  title: '秘書室 — Kyberion Concierge',
-  description: 'CEO秘書 — 依頼・承認・成果・例外',
+  title: 'Concierge — Kyberion',
+  description: 'Executive secretary surface for requests, approvals, outcomes, and exceptions.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,19 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/api/theme" />
       </head>
       <body>
-        <header className="concierge-header">
-          <div className="concierge-header-title">
-            <span className="concierge-crest">秘</span>
-            <div>
-              <strong>秘書室</strong>
-              <div className="concierge-tagline">CEO秘書 — 依頼・承認・成果・例外</div>
-            </div>
-          </div>
-          <div className="concierge-header-note">
-            <a href="/" style={{ marginRight: 12 }}>ホーム</a>
-            <a href="/setup">セットアップ</a>
-          </div>
-        </header>
+        <ConciergeHeader />
         <main className="concierge-main">{children}</main>
       </body>
     </html>

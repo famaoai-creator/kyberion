@@ -170,6 +170,28 @@ export function readTenantProfile(
 }
 
 /**
+ * Create or update a tenant profile through the same schema and path boundary
+ * used by the registry reader. Callers that write personal-tier profiles must
+ * establish a sovereign_concierge/sovereign execution context first.
+ */
+export function writeTenantProfile(
+  profile: TenantProfile,
+  options: TenantRegistryPathOptions = {}
+): TenantProfile {
+  assertTenantSlug(profile.tenant_slug);
+  const normalized: TenantProfile = {
+    ...profile,
+    tenant_id: profile.tenant_id || profile.tenant_slug,
+    knowledge_root: profile.knowledge_root || defaultTenantKnowledgeRoot(profile.tenant_slug),
+  };
+  assertTenantProfile(normalized);
+  const file = tenantProfilePath(normalized.tenant_slug, options);
+  safeMkdir(path.dirname(file), { recursive: true });
+  safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
+  return normalized;
+}
+
+/**
  * DA-01 spine: resolves a tenant slug to its profile, knowledge root, and
  * customer overlay root — uniquely. Throws when the profile is missing so
  * callers cannot silently operate on an unregistered tenant.
