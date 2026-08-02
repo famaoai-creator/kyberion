@@ -439,6 +439,10 @@
       "types": "./dist/config-fallback-registry.d.ts",
       "default": "./dist/config-fallback-registry.js"
     },
+    "./deliverable-inbox": {
+      "types": "./dist/deliverable-inbox.d.ts",
+      "default": "./dist/deliverable-inbox.js"
+    },
     "./path-resolver": {
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
