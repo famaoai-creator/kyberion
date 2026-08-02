@@ -11,16 +11,26 @@ function read(relPath: string): string {
 describe('Runtime surface operations contract', () => {
   it('exposes surface lifecycle scripts from package.json', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
-    expect(pkg.scripts['surfaces:reconcile']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action reconcile');
-    expect(pkg.scripts['surfaces:status']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action status');
-    expect(pkg.scripts['surfaces:repair']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action repair');
+    for (const action of ['reconcile', 'status', 'repair']) {
+      const script = pkg.scripts[`surfaces:${action}`];
+      expect(script).toContain('scripts/run_with_env.ts');
+      expect(script).toContain('KYBERION_PERSONA=worker');
+      expect(script).toContain('SYSTEM_ROLE=surface_runtime');
+      expect(script).toContain(`--action ${action}`);
+    }
     expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
-    expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
-    expect(pkg.scripts['dashboard:onboarding']).toBe('node dist/scripts/sovereign_dashboard.js --once --focus onboarding');
+    expect(pkg.scripts.bootstrap).toBe(
+      'pnpm build && node dist/scripts/surface_runtime.js --action reconcile'
+    );
+    expect(pkg.scripts['dashboard:onboarding']).toBe(
+      'node dist/scripts/sovereign_dashboard.js --once --focus onboarding'
+    );
   });
 
   it('includes surface checks in the vital pipeline', () => {
-    const vital = JSON.parse(read('pipelines/vital-check.json')) as { steps: Array<{ params?: { message?: string; cmd?: string } }> };
+    const vital = JSON.parse(read('pipelines/vital-check.json')) as {
+      steps: Array<{ params?: { message?: string; cmd?: string } }>;
+    };
     const rendered = JSON.stringify(vital.steps);
     expect(rendered).toContain('active-surfaces.json');
     expect(rendered).toContain('knowledge/product/governance/surfaces');
@@ -33,7 +43,9 @@ describe('Runtime surface operations contract', () => {
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('Next:');
-    expect(dashboard).toContain('Focused view: onboarding setup, connection review, tenant context, starter mission.');
+    expect(dashboard).toContain(
+      'Focused view: onboarding setup, connection review, tenant context, starter mission.'
+    );
     expect(dashboard).toContain('RUNTIME SURFACES');
     expect(onboarding).toContain('pnpm surfaces:reconcile');
     expect(operatorGuide).toContain('discord-bridge');
@@ -43,7 +55,9 @@ describe('Runtime surface operations contract', () => {
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
     const surfaceRuntime = read('scripts/surface_runtime.ts');
-    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
+    const lifecycleModel = read(
+      'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
+    );
     expect(surfaceRuntime).toContain("from '@agent/core'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
