@@ -99,6 +99,10 @@
       "types": "./dist/artifact-record.d.ts",
       "default": "./dist/artifact-record.js"
     },
+    "./metrics": {
+      "types": "./dist/metrics.d.ts",
+      "default": "./dist/metrics.js"
+    },
     "./authority": {
       "types": "./dist/authority.d.ts",
       "default": "./dist/authority.js"
