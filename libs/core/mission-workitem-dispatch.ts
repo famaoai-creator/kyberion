@@ -795,6 +795,7 @@ async function delegateSubagentTask(input: {
         write_tier: 'public',
         purpose: 'mission work item delegation',
       },
+      success_status: isIndependentReviewRequired(input.item) ? 'review' : 'done',
       instruction: input.prompt,
       context_refs: [`workitem:${input.item.item_id}`, JSON.stringify(input.routingOptions)],
       idempotency_key: `workitem:${input.item.item_id}:${input.item.version}`,

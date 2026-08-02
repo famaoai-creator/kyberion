@@ -88,4 +88,43 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(receipt.work_item_id).toBe(item.item_id);
     expect(getWorkItem(item.item_id)?.status).toBe('done');
   });
+
+  it('keeps review-required work items in review after successful execution', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-REVIEW',
+      title: 'review task',
+      description: 'execute then review',
+      projectId: 'MSN-COORDINATED-REVIEW',
+      status: 'ready',
+    });
+    await delegateCoordinatedAgentTask(
+      {
+        work_item_id: item.item_id,
+        task_id: 'task-review',
+        mission_id: 'MSN-COORDINATED-REVIEW',
+        success_status: 'review',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-REVIEW',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'review transition test',
+        },
+        instruction: 'execute review task',
+        idempotency_key: 'coord-review',
+      },
+      {
+        delegate: async (request) =>
+          ({
+            execution_kind: 'agent_delegation',
+            task_id: request.task_id,
+            agent_id: 'agent-review',
+            status: 'succeeded',
+            output: 'done',
+          }) as const,
+      }
+    );
+    expect(getWorkItem(item.item_id)?.status).toBe('review');
+  });
 });
