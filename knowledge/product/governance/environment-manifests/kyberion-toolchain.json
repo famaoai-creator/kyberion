@@ -154,6 +154,36 @@
         "docs_url": "https://playwright.dev/docs/browsers",
         "retry_after_install": true
       }
+    },
+    {
+      "capability_id": "windows-foundry-local",
+      "kind": "binary",
+      "description": "Optional Microsoft Foundry Local runtime for Windows local-AI assistance through the OpenAI-compatible loopback API.",
+      "required_for": ["windows-local-assist"],
+      "optional": true,
+      "probe": { "kind": "command", "command": "foundry", "args": ["--version"] },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Windows PowerShell: install Microsoft Foundry Local with winget, then start the local runtime before using local assist.",
+        "docs_url": "https://learn.microsoft.com/en-us/windows/ai/foundry-local/get-started",
+        "platform_overrides": {
+          "win32": {
+            "command": "winget",
+            "args": [
+              "install",
+              "--id",
+              "Microsoft.FoundryLocal",
+              "--exact",
+              "--source",
+              "winget",
+              "--accept-source-agreements",
+              "--accept-package-agreements"
+            ],
+            "instruction": "PowerShell: `winget install --id Microsoft.FoundryLocal --exact --source winget --accept-source-agreements --accept-package-agreements`.",
+            "retry_after_install": true
+          }
+        }
+      }
     }
   ]
 }

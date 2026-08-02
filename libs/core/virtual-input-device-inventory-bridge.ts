@@ -1,14 +1,16 @@
 import { safeExecResult } from './secure-io.js';
 
-export const VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-input-device-inventory-bridge' as const;
+export const VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID =
+  'virtual-input-device-inventory-bridge' as const;
 
-export type VirtualInputDeviceKind = 'keyboard' | 'mouse' | 'pointing-device' | 'other-input' | 'virtual-input';
+export type VirtualInputDeviceKind =
+  'keyboard' | 'mouse' | 'pointing-device' | 'other-input' | 'virtual-input';
 
 export interface VirtualInputDeviceRecord {
   kind: VirtualInputDeviceKind;
   name: string;
   platform: NodeJS.Platform;
-  source: 'hidutil' | 'libinput' | 'xinput' | 'heuristic';
+  source: 'hidutil' | 'libinput' | 'xinput' | 'powershell' | 'heuristic';
   available: boolean;
   details?: Record<string, unknown>;
 }
@@ -39,7 +41,11 @@ export interface VirtualInputDeviceInventoryOptions {
   hidutil_bin?: string;
   libinput_bin?: string;
   xinput_bin?: string;
-  command_runner?: (command: string, args: string[]) => {
+  powershell_bin?: string;
+  command_runner?: (
+    command: string,
+    args: string[]
+  ) => {
     stdout: string;
     stderr: string;
     status: number | null;
@@ -50,6 +56,7 @@ export interface VirtualInputDeviceInventoryOptions {
 const DEFAULT_HIDUTIL = 'hidutil';
 const DEFAULT_LIBINPUT = 'libinput';
 const DEFAULT_XINPUT = 'xinput';
+const DEFAULT_POWERSHELL = 'powershell.exe';
 
 function emptyInventory(): VirtualInputDeviceInventory {
   return {
@@ -74,7 +81,7 @@ function uniqueByName(records: VirtualInputDeviceRecord[]): VirtualInputDeviceRe
 function runCommand(
   opts: VirtualInputDeviceInventoryOptions,
   command: string,
-  args: string[],
+  args: string[]
 ): { stdout: string; stderr: string; status: number | null; error?: Error } {
   if (opts.command_runner) return opts.command_runner(command, args);
   return safeExecResult(command, args, { maxOutputMB: 4 });
@@ -82,6 +89,37 @@ function runCommand(
 
 function isVirtualName(name: string): boolean {
   return /virtual|loopback|blackhole|meeting_in|meeting_out|dummy|stub/i.test(name);
+}
+
+interface InputInventoryAdapter {
+  collect(opts: VirtualInputDeviceInventoryOptions): VirtualInputDeviceRecord[];
+  note?: string;
+}
+
+const darwinInputAdapter: InputInventoryAdapter = {
+  collect: (opts) => collectMacInputDevices(opts, opts.hidutil_bin ?? DEFAULT_HIDUTIL),
+};
+const linuxInputAdapter: InputInventoryAdapter = {
+  collect: (opts) => {
+    const libinput = collectLibinputDevices(opts, opts.libinput_bin ?? DEFAULT_LIBINPUT);
+    return libinput.length > 0
+      ? libinput
+      : collectXinputDevices(opts, opts.xinput_bin ?? DEFAULT_XINPUT);
+  },
+};
+const windowsInputAdapter: InputInventoryAdapter = {
+  collect: (opts) => collectWindowsInputDevices(opts, opts.powershell_bin ?? DEFAULT_POWERSHELL),
+};
+const stubInputAdapter: InputInventoryAdapter = {
+  collect: () => [],
+  note: 'current platform has no built-in input inventory probe; stub only',
+};
+
+function resolveInputInventoryAdapter(): InputInventoryAdapter {
+  if (process.platform === 'darwin') return darwinInputAdapter;
+  if (process.platform === 'linux') return linuxInputAdapter;
+  if (process.platform === 'win32') return windowsInputAdapter;
+  return stubInputAdapter;
 }
 
 function classifyUsage(usagePage: number, usage: number, name: string): VirtualInputDeviceKind {
@@ -112,11 +150,17 @@ function parseHidutilLines(stdout: string): VirtualInputDeviceRecord[] {
     const registryId = tokens[5];
     const userClass = tokens[tokens.length - 2];
     const builtIn = tokens[tokens.length - 1];
-    const classIndex = tokens.findIndex((token, index) => index >= 6 && /HIDDevice$|^IOHIDUserDevice$|^AppleBTM$|^AppleSPUHIDDevice$/.test(token));
+    const classIndex = tokens.findIndex(
+      (token, index) =>
+        index >= 6 && /HIDDevice$|^IOHIDUserDevice$|^AppleBTM$|^AppleSPUHIDDevice$/.test(token)
+    );
     if (classIndex < 0 || classIndex >= tokens.length - 2) continue;
     const transport = tokens.slice(6, classIndex).join(' ').trim();
     const className = tokens[classIndex];
-    const product = tokens.slice(classIndex + 1, -2).join(' ').trim();
+    const product = tokens
+      .slice(classIndex + 1, -2)
+      .join(' ')
+      .trim();
 
     if (!product) continue;
 
@@ -169,7 +213,7 @@ function parseHidutilLines(stdout: string): VirtualInputDeviceRecord[] {
 
 function collectMacInputDevices(
   opts: VirtualInputDeviceInventoryOptions,
-  hidutilBin: string,
+  hidutilBin: string
 ): VirtualInputDeviceRecord[] {
   const result = runCommand(opts, hidutilBin, ['list']);
   const text = `${result.stdout}\n${result.stderr}`;
@@ -194,7 +238,7 @@ function collectMacInputDevices(
 
 function collectLibinputDevices(
   opts: VirtualInputDeviceInventoryOptions,
-  libinputBin: string,
+  libinputBin: string
 ): VirtualInputDeviceRecord[] {
   const result = runCommand(opts, libinputBin, ['list-devices']);
   const text = `${result.stdout}\n${result.stderr}`;
@@ -267,7 +311,7 @@ function collectLibinputDevices(
 
 function collectXinputDevices(
   opts: VirtualInputDeviceInventoryOptions,
-  xinputBin: string,
+  xinputBin: string
 ): VirtualInputDeviceRecord[] {
   const result = runCommand(opts, xinputBin, ['list', '--name-only']);
   const text = `${result.stdout}\n${result.stderr}`;
@@ -303,6 +347,61 @@ function collectXinputDevices(
   return uniqueByName(records);
 }
 
+function collectWindowsInputDevices(
+  opts: VirtualInputDeviceInventoryOptions,
+  powershellBin: string
+): VirtualInputDeviceRecord[] {
+  const script =
+    "Get-PnpDevice -PresentOnly | Where-Object { $_.Class -in @('Keyboard','Mouse','HIDClass') } | Select-Object Class,FriendlyName,Status,InstanceId | ConvertTo-Json -Compress";
+  const result = runCommand(opts, powershellBin, [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ]);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(result.stdout);
+  } catch {
+    return [];
+  }
+  const rows = Array.isArray(payload) ? payload : payload ? [payload] : [];
+  const records: VirtualInputDeviceRecord[] = [];
+  for (const row of rows as Array<Record<string, unknown>>) {
+    const name = String(row.FriendlyName || '').trim();
+    if (!name) continue;
+    const lower = name.toLowerCase();
+    const deviceClass = String(row.Class || '');
+    const kind: VirtualInputDeviceKind =
+      deviceClass === 'Keyboard' || lower.includes('keyboard')
+        ? 'keyboard'
+        : deviceClass === 'Mouse' || lower.includes('mouse')
+          ? 'mouse'
+          : 'other-input';
+    const details = { status: row.Status, instance_id: row.InstanceId, class: deviceClass };
+    const available = row.Status === 'OK';
+    records.push({
+      kind,
+      name,
+      platform: process.platform,
+      source: 'powershell',
+      available,
+      details,
+    });
+    if (/virtual|loopback|remote|synthetic/i.test(name)) {
+      records.push({
+        kind: 'virtual-input',
+        name,
+        platform: process.platform,
+        source: 'powershell',
+        available,
+        details,
+      });
+    }
+  }
+  return uniqueByName(records);
+}
+
 export class VirtualInputDeviceInventoryBridgeImpl implements VirtualInputDeviceInventoryBridge {
   readonly bridge_id = VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID;
 
@@ -311,35 +410,19 @@ export class VirtualInputDeviceInventoryBridgeImpl implements VirtualInputDevice
   async scan(): Promise<VirtualInputDeviceInventory> {
     const inventory = emptyInventory();
 
-    if (process.platform === 'darwin') {
-      const hidutilBin = this.opts.hidutil_bin ?? DEFAULT_HIDUTIL;
-      const inputDevices = collectMacInputDevices(this.opts, hidutilBin);
-      inventory.keyboards.push(...inputDevices.filter((record) => record.kind === 'keyboard'));
-      inventory.mice.push(...inputDevices.filter((record) => record.kind === 'mouse'));
-      inventory.pointing_devices.push(...inputDevices.filter((record) => record.kind === 'pointing-device'));
-      inventory.virtual_input_devices.push(...inputDevices.filter((record) => record.kind === 'virtual-input'));
-      if (inputDevices.length === 0) {
-        inventory.notes.push('hidutil list returned no input devices');
-      }
-    } else if (process.platform === 'linux') {
-      const libinputBin = this.opts.libinput_bin ?? DEFAULT_LIBINPUT;
-      const xinputBin = this.opts.xinput_bin ?? DEFAULT_XINPUT;
-      const libinputDevices = collectLibinputDevices(this.opts, libinputBin);
-      if (libinputDevices.length > 0) {
-        inventory.keyboards.push(...libinputDevices.filter((record) => record.kind === 'keyboard'));
-        inventory.mice.push(...libinputDevices.filter((record) => record.kind === 'mouse'));
-        inventory.pointing_devices.push(...libinputDevices.filter((record) => record.kind === 'pointing-device'));
-        inventory.virtual_input_devices.push(...libinputDevices.filter((record) => record.kind === 'virtual-input'));
-      } else {
-        const xinputDevices = collectXinputDevices(this.opts, xinputBin);
-        inventory.keyboards.push(...xinputDevices.filter((record) => record.kind === 'keyboard'));
-        inventory.mice.push(...xinputDevices.filter((record) => record.kind === 'mouse'));
-        inventory.pointing_devices.push(...xinputDevices.filter((record) => record.kind === 'pointing-device'));
-        inventory.virtual_input_devices.push(...xinputDevices.filter((record) => record.kind === 'virtual-input'));
-      }
-    } else {
-      inventory.notes.push(`platform ${process.platform} has no built-in input inventory probe; stub only`);
-    }
+    const adapter = resolveInputInventoryAdapter();
+    const devices = adapter.collect(this.opts);
+    inventory.keyboards.push(...devices.filter((record) => record.kind === 'keyboard'));
+    inventory.mice.push(...devices.filter((record) => record.kind === 'mouse'));
+    inventory.pointing_devices.push(
+      ...devices.filter((record) => record.kind === 'pointing-device')
+    );
+    inventory.virtual_input_devices.push(
+      ...devices.filter((record) => record.kind === 'virtual-input')
+    );
+    if (adapter.note) inventory.notes.push(adapter.note);
+    if (devices.length === 0 && process.platform === 'darwin')
+      inventory.notes.push('hidutil list returned no input devices');
 
     if (
       inventory.keyboards.length === 0 &&
@@ -371,7 +454,7 @@ export class VirtualInputDeviceInventoryBridgeImpl implements VirtualInputDevice
 }
 
 export function createVirtualInputDeviceInventoryBridge(
-  opts: VirtualInputDeviceInventoryOptions = {},
+  opts: VirtualInputDeviceInventoryOptions = {}
 ): VirtualInputDeviceInventoryBridge {
   return new VirtualInputDeviceInventoryBridgeImpl(opts);
 }

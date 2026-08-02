@@ -6,6 +6,41 @@ import { safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { OcrRequest, OcrResult, OcrProvider } from './ocr-types.js';
+import {
+  probeWindowsNativeImageRecognition,
+  recognizeTextWithWindowsNativeApi,
+} from './windows-native-image-recognition-bridge.js';
+
+export class WindowsNativeOcrProvider implements OcrProvider {
+  readonly id = 'windows_native';
+
+  async isAvailable(): Promise<boolean> {
+    return probeWindowsNativeImageRecognition().ocr;
+  }
+
+  async recognize(request: OcrRequest): Promise<OcrResult> {
+    const startedAt = Date.now();
+    const result = recognizeTextWithWindowsNativeApi(request.path);
+    if (!result || result.status !== 'succeeded') {
+      return {
+        status: 'failed',
+        provider: this.id,
+        text: '',
+        confidence: 0,
+        error: 'windows_native_ocr_failed',
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    return {
+      status: 'succeeded',
+      provider: this.id,
+      text: result.text || '',
+      confidence: Number(result.confidence || 0),
+      lines: result.lines,
+      elapsedMs: Date.now() - startedAt,
+    };
+  }
+}
 
 function getMimeType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
@@ -447,13 +482,13 @@ export class AdaptivePolicyRouter {
 
     let defaultChain: string[] = [];
     if (mode === 'local_only') {
-      defaultChain = ['apple_vision', 'tesseract'];
+      defaultChain = ['windows_native', 'apple_vision', 'tesseract'];
     } else if (mode === 'privacy_first') {
-      defaultChain = ['local_vlm', 'apple_vision', 'tesseract'];
+      defaultChain = ['windows_native', 'local_vlm', 'apple_vision', 'tesseract'];
     } else if (mode === 'accurate') {
-      defaultChain = ['llm_api', 'local_vlm', 'apple_vision', 'tesseract'];
+      defaultChain = ['windows_native', 'llm_api', 'local_vlm', 'apple_vision', 'tesseract'];
     } else {
-      defaultChain = ['apple_vision', 'llm_api', 'tesseract'];
+      defaultChain = ['windows_native', 'apple_vision', 'llm_api', 'tesseract'];
     }
 
     const merged = [...preferred, ...defaultChain];
@@ -491,6 +526,7 @@ let globalRouter: AdaptivePolicyRouter | null = null;
 function getRouter(): AdaptivePolicyRouter {
   if (!globalRouter) {
     globalRouter = new AdaptivePolicyRouter([
+      new WindowsNativeOcrProvider(),
       new AppleVisionOcrProvider(),
       new LlmApiOcrProvider(),
       new LocalVlmOcrProvider(),

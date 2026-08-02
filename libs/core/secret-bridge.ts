@@ -10,6 +10,7 @@ import {
   safeReadFile,
   safeWriteFile,
   safeMkdir,
+  safeExecResult,
 } from './secure-io.js';
 import { SecretProvider, RegistryEntry, SecretResult } from './secret-types.js';
 
@@ -127,6 +128,106 @@ export class MacKeychainSecretProvider implements SecretProvider {
   }
 }
 
+// Windows Credential Manager provider. The Win32 CredRead/CredWrite APIs are
+// hosted in a short-lived PowerShell process so Node never needs to load a
+// platform-specific native module. Values are sent over stdin, never argv.
+export class WindowsCredentialManagerSecretProvider implements SecretProvider {
+  readonly id = 'windows_credential_manager';
+
+  async isAvailable(): Promise<boolean> {
+    return process.platform === 'win32';
+  }
+
+  private run(
+    operation: 'get' | 'set' | 'delete',
+    service: string,
+    account: string,
+    value?: string
+  ) {
+    const script = `
+Add-Type @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+public struct KCredential {
+  public uint Flags; public uint Type; public IntPtr TargetName; public IntPtr Comment;
+  public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+  public uint CredentialBlobSize; public IntPtr CredentialBlob; public uint Persist;
+  public uint AttributeCount; public IntPtr Attributes; public IntPtr TargetAlias; public IntPtr UserName;
+}
+public static class KCredentialApi {
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredRead(string target, uint type, uint flags, out IntPtr credential);
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredWrite(ref KCredential credential, uint flags);
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredDelete(string target, uint type, uint flags);
+  [DllImport("Advapi32.dll")] public static extern void CredFree(IntPtr buffer);
+}
+'@
+$target = [Console]::In.ReadLine()
+$account = [Console]::In.ReadLine()
+$value = [Console]::In.ReadToEnd()
+if ('${operation}' -eq 'get') {
+  $ptr = [IntPtr]::Zero
+  if (-not [KCredentialApi]::CredRead($target, 1, 0, [ref]$ptr)) { exit 2 }
+  try {
+    $cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [type][KCredential])
+    if ($cred.CredentialBlobSize -gt 0) {
+      $bytes = New-Object byte[] $cred.CredentialBlobSize
+      [Runtime.InteropServices.Marshal]::Copy($cred.CredentialBlob, $bytes, 0, $bytes.Length)
+      [Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes))
+    }
+  } finally { [KCredentialApi]::CredFree($ptr) }
+  exit 0
+}
+if ('${operation}' -eq 'delete') {
+  if (-not [KCredentialApi]::CredDelete($target, 1, 0)) { exit 2 }
+  exit 0
+}
+$targetPtr = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($target)
+$userPtr = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($account)
+$bytes = [Text.Encoding]::UTF8.GetBytes($value)
+$blobPtr = [Runtime.InteropServices.Marshal]::AllocCoTaskMem($bytes.Length)
+[Runtime.InteropServices.Marshal]::Copy($bytes, 0, $blobPtr, $bytes.Length)
+$cred = New-Object KCredential
+$cred.Type = 1; $cred.TargetName = $targetPtr; $cred.UserName = $userPtr
+$cred.CredentialBlob = $blobPtr; $cred.CredentialBlobSize = $bytes.Length; $cred.Persist = 2
+try { if (-not [KCredentialApi]::CredWrite([ref]$cred, 0)) { exit 2 } }
+finally {
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($targetPtr)
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($userPtr)
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($blobPtr)
+}
+`;
+    const input = `${service}\n${account}\n${value ?? ''}`;
+    return safeExecResult('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      timeoutMs: 10_000,
+      maxOutputMB: 2,
+      input,
+    });
+  }
+
+  async get(service: string, account: string): Promise<string | null> {
+    const result = this.run('get', service, account);
+    return result.status === 0 ? result.stdout : null;
+  }
+
+  async set(service: string, account: string, value: string): Promise<void> {
+    const result = this.run('set', service, account, value);
+    if (result.status !== 0)
+      throw new Error(`Windows Credential Manager write failed: ${result.stderr || result.status}`);
+    registryAdd(service, account);
+  }
+
+  async delete(service: string, account: string): Promise<void> {
+    const result = this.run('delete', service, account);
+    if (result.status !== 0 && result.status !== 2)
+      throw new Error(
+        `Windows Credential Manager delete failed: ${result.stderr || result.status}`
+      );
+    registryRemove(service, account);
+  }
+}
+
 // 2. Local File Secret Provider (Fallback for Headless Linux/Windows)
 export class FileSecretProvider implements SecretProvider {
   readonly id = 'file_secrets';
@@ -239,7 +340,7 @@ export class SecretPolicyRouter {
 
   async selectProvider(): Promise<SecretProvider> {
     // Platform priority: native keychain on macOS, file secrets/env secrets on others
-    const chain = ['mac_keychain', 'file_secrets', 'env_secrets'];
+    const chain = ['mac_keychain', 'windows_credential_manager', 'file_secrets', 'env_secrets'];
     for (const id of chain) {
       const provider = this.providers.get(id);
       if (provider && (await provider.isAvailable())) {
@@ -269,6 +370,7 @@ function getRouter(): SecretPolicyRouter {
   if (!globalRouter) {
     globalRouter = new SecretPolicyRouter([
       new MacKeychainSecretProvider(),
+      new WindowsCredentialManagerSecretProvider(),
       new FileSecretProvider(),
       new EnvSecretProvider(),
     ]);

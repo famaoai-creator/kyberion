@@ -693,6 +693,7 @@ export {
   LlmApiOcrProvider,
   LocalVlmOcrProvider,
   TesseractOcrProvider,
+  WindowsNativeOcrProvider,
   ocrImage,
   ocrImageWithRouter,
   AdaptivePolicyRouter as OcrAdaptivePolicyRouter,
@@ -2021,6 +2022,10 @@ export * from './artifact-registry.js';
 export * from './control-plane-client.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
+export * from './os-automation-platform.js';
+export * from './platform-command-adapters.js';
+export * from './desktop-launch-adapter.js';
+export * from './windows-native-image-generation-bridge.js';
 export * from './os-automation-bridge.js';
 export * from './macos-automation-bridge.js';
 export * from './os-app-adapters.js';
@@ -2387,6 +2392,11 @@ export type {
   SoftwareQualityReportSummary,
 } from './software-quality.js';
 export * from './software-quality-operations.js';
+export * from './windows-local-assist-bridge.js';
+export * from './windows-native-image-recognition-bridge.js';
+export * from './image-description-types.js';
+export * from './image-description-bridge.js';
+export * from './local-assist-bridge.js';
 export {
   evaluateQualityContract,
   evaluateDefinitionOfReady,

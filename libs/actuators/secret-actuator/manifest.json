@@ -18,23 +18,23 @@
   "capabilities": [
     {
       "op": "get",
-      "platforms": ["darwin"],
-      "requirements": { "bin": ["security"] }
+      "platforms": ["darwin", "win32"],
+      "requirements": {}
     },
     {
       "op": "set",
-      "platforms": ["darwin"],
-      "requirements": { "bin": ["security"] }
+      "platforms": ["darwin", "win32"],
+      "requirements": {}
     },
     {
       "op": "delete",
-      "platforms": ["darwin"],
-      "requirements": { "bin": ["security"] }
+      "platforms": ["darwin", "win32"],
+      "requirements": {}
     },
     {
       "op": "list",
-      "platforms": ["darwin"],
-      "requirements": { "bin": ["security"] }
+      "platforms": ["darwin", "win32"],
+      "requirements": {}
     }
   ]
 }

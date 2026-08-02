@@ -17,6 +17,7 @@
   },
   "capabilities": [
     { "op": "inspect_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "describe_image", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

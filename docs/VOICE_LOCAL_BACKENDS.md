@@ -26,6 +26,15 @@ direct artifact smoke test, use the voice actuator with `engine_id=kokoro` or
 
 ## STT / VAD
 
+- `faster_whisper`: Windows-friendly local Whisper Adapter. Set
+  `KYBERION_WINDOWS_STT_BACKEND=faster_whisper` (or pass
+  `stt_bridge_id=faster_whisper` to `verify_tts_loopback`). The bridge uses
+  `KYBERION_STT_MODEL_DIR` for an offline CTranslate2 model, or
+  `KYBERION_STT_MODEL` (default `small`) when model download is permitted.
+  `KYBERION_STT_DEVICE=cuda` and `KYBERION_STT_COMPUTE_TYPE=float16` enable
+  CUDA when the installed faster-whisper runtime supports it; CPU defaults to
+  `int8`.
+
 - `fluid_audio`: a local Parakeet bridge for macOS. Set
   `KYBERION_FLUID_AUDIO_STT_COMMAND` to the bundled Swift Package bridge (or
   another compatible command). The bundled command accepts
