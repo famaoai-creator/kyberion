@@ -99,6 +99,10 @@
       "types": "./dist/artifact-record.d.ts",
       "default": "./dist/artifact-record.js"
     },
+    "./agent-activity-board": {
+      "types": "./dist/agent-activity-board.d.ts",
+      "default": "./dist/agent-activity-board.js"
+    },
     "./metrics": {
       "types": "./dist/metrics.d.ts",
       "default": "./dist/metrics.js"
@@ -450,6 +454,10 @@
     "./operator-home-summary": {
       "types": "./dist/operator-home-summary.d.ts",
       "default": "./dist/operator-home-summary.js"
+    },
+    "./organization-profile": {
+      "types": "./dist/organization-profile.d.ts",
+      "default": "./dist/organization-profile.js"
     },
     "./kill-switch": {
       "types": "./dist/kill-switch.d.ts",
