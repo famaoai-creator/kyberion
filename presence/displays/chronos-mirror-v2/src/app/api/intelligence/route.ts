@@ -12,9 +12,12 @@ import {
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
   type ApprovalAuditDrilldownSummary,
-} from '@agent/core';
+} from '@agent/core/approval-audit';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
-import { resolveFinanceControllerDecision, type FinanceControllerDecision } from '@agent/core';
+import {
+  resolveFinanceControllerDecision,
+  type FinanceControllerDecision,
+} from '@agent/core/finance-controller';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {
   collectA2AHandoffs,

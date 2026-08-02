@@ -5,10 +5,11 @@ const mocks = vi.hoisted(() => ({
   executeServicePreset: vi.fn(),
   loggerWarn: vi.fn(),
   recognize: vi.fn(),
+  describeImage: vi.fn(),
 }));
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
@@ -17,6 +18,7 @@ vi.mock('@agent/core', async () => {
       ...actual.logger,
       warn: mocks.loggerWarn,
     },
+    describeImage: mocks.describeImage,
   };
 });
 
@@ -60,10 +62,12 @@ describe('vision-actuator legacy facade', () => {
   it('rejects non-legacy actions while vision is narrowed to perception', async () => {
     const { handleAction } = await import('./index.js');
 
-    await expect(handleAction({
-      action: 'analyze_image',
-      params: {},
-    })).rejects.toThrow('Vision actuator is being narrowed to perception workflows');
+    await expect(
+      handleAction({
+        action: 'analyze_image',
+        params: {},
+      })
+    ).rejects.toThrow('Vision actuator is being narrowed to perception workflows');
   });
 
   it('supports inspect_image as a perception action', async () => {
@@ -105,6 +109,27 @@ describe('vision-actuator legacy facade', () => {
       confidence: 93,
       lines: undefined,
       provider: 'tesseract',
+    });
+  });
+
+  it('supports describe_image through the image description provider', async () => {
+    mocks.describeImage.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'windows_native',
+      description: 'A test image',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await expect(
+      handleAction({
+        action: 'describe_image',
+        params: { path: 'active/shared/tmp/example.png', kind: 'brief' },
+      })
+    ).resolves.toEqual({
+      status: 'succeeded',
+      path: 'active/shared/tmp/example.png',
+      description: 'A test image',
+      provider: 'windows_native',
     });
   });
 });

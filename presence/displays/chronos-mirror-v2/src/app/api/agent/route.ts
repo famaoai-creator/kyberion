@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { resolveRuntimeModelId } from '@agent/core';
+import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';

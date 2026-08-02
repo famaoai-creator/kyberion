@@ -1094,7 +1094,12 @@ async function verifyTtsLoopback(
     busId as 'blackhole' | 'stub',
     dryRun
   );
-  const sttBridgeId = stringParam(params, 'stt_bridge_id');
+  const configuredSttBridge = stringParam(params, 'stt_bridge_id');
+  const sttBridgeId =
+    configuredSttBridge ||
+    (process.platform === 'win32' && process.env.KYBERION_WINDOWS_STT_BACKEND === 'faster_whisper'
+      ? 'faster_whisper'
+      : undefined);
   registerVoiceLoopbackSttAdapter(sttBridgeId, { request_id: requestId, language });
   if (sttBridgeId === 'shell' || process.env.KYBERION_STREAMING_STT_BRIDGE === 'shell') {
     const installation = installShellStreamingSttBridgeFromEnv();
@@ -1223,9 +1228,7 @@ function buildLoopbackRequest(
           format: {
             encoding: 'pcm_s16le',
             sample_rate_hz: numberParam(format, 'sample_rate_hz', 16_000) as
-              | 16_000
-              | 24_000
-              | 48_000,
+              16_000 | 24_000 | 48_000,
             channels: numberParam(format, 'channels', 1) as 1 | 2,
           },
         }
