@@ -4,6 +4,7 @@ import type {
   AgentExecutionReceipt,
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
+import { getAgentExecutionPort } from './agent-execution-port.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
   work_item_id: string;
@@ -69,6 +70,23 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       ...(attemptId ? { attempt_id: attemptId } : {}),
     };
   }
+}
+
+export function getCoordinatedAgentExecutionPort(
+  delegatePort: AgentExecutionPort = getAgentExecutionPort(),
+  actorPeerId = 'coordinated-agent-execution-port'
+): AgentExecutionPort {
+  return new CoordinatedAgentExecutionPort(delegatePort, actorPeerId);
+}
+
+export async function delegateCoordinatedAgentTask(
+  request: CoordinatedAgentTaskEnvelope,
+  delegatePort?: AgentExecutionPort,
+  actorPeerId?: string
+): Promise<CoordinatedAgentExecutionReceipt> {
+  return (await getCoordinatedAgentExecutionPort(delegatePort, actorPeerId).delegate(
+    request
+  )) as CoordinatedAgentExecutionReceipt;
 }
 
 function closeWorkItem(
