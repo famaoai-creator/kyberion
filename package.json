@@ -40,7 +40,7 @@
     "build:tui": "pnpm --filter @presence/terminal-hud run build",
     "build:actuators": "tsc -p tsconfig.actuators.json",
     "build:repo": "tsc",
-    "build:ui": "pnpm --dir presence/displays/chronos-mirror-v2 build",
+    "build:ui": "pnpm --dir presence/displays/chronos-mirror-v2 build && pnpm --dir presence/displays/concierge build",
     "check:esm": "node dist/scripts/check_esm_integrity.js",
     "check:catalogs": "node dist/scripts/check_catalog_integrity.js",
     "check:tenant-registry": "node dist/scripts/check_tenant_registry_consistency.js",

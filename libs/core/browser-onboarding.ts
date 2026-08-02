@@ -46,6 +46,11 @@ const identitySchema = z.object({
     .string()
     .trim()
     .regex(/^[A-Za-z][A-Za-z0-9._-]{2,63}$/),
+  tenant_slug: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9-]{1,30}$/)
+    .optional(),
 });
 
 const voiceSchema = z
@@ -240,11 +245,15 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         const now = new Date().toISOString();
         const artifacts: string[] = [];
         const identityPath = path.join(profileRoot(), 'my-identity.json');
+        const existingIdentity = readJson<Record<string, unknown>>(identityPath) || {};
         writeJson(identityPath, {
+          ...existingIdentity,
           name: draft.identity.name,
           language: draft.identity.language,
           interaction_style: draft.identity.interaction_style,
           primary_domain: draft.identity.primary_domain,
+          vision: draft.identity.vision,
+          ...(draft.identity.tenant_slug ? { tenant_slug: draft.identity.tenant_slug } : {}),
           created_at: now,
           status: 'active',
           version: '1.0.0',
@@ -362,7 +371,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         artifacts.push(statePath);
         return { ok: true as const, applied_at: now, artifacts, warnings: preview.warnings };
       },
-      'ecosystem_architect'
+      'sovereign'
     )
   );
 }
@@ -392,12 +401,14 @@ export function saveBrowserOnboardingVoiceSample(input: {
     throw new Error('voice sample must be between 1 byte and 12 MiB');
   }
   const sampleDir = path.join(profileRoot(), 'voice', 'samples', profileId);
-  safeMkdir(sampleDir, { recursive: true });
   const samplePath = path.join(sampleDir, `sample-${randomUUID()}.${extension}`);
   withExecutionContext(
     'sovereign_concierge',
-    () => safeWriteFile(samplePath, input.data),
-    'ecosystem_architect'
+    () => {
+      safeMkdir(sampleDir, { recursive: true });
+      safeWriteFile(samplePath, input.data);
+    },
+    'sovereign'
   );
   return { sample_ref: samplePath, bytes: input.data.length, content_type: contentType };
 }
@@ -413,10 +424,23 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
       const toolPreference = readJson<Record<string, unknown>>(
         onboardingPath('tool-runtime-policy.json')
       );
+      const identity = readJson<Record<string, unknown>>(
+        path.join(profileRoot(), 'my-identity.json')
+      );
+      const visionPath = path.join(profileRoot(), 'my-vision.md');
+      const vision = String(
+        identity?.vision ||
+          (safeExistsSync(visionPath)
+            ? String(safeReadFile(visionPath, { encoding: 'utf8' }) || '')
+                .replace(/^#\s+Sovereign Vision\s*/i, '')
+                .trim()
+            : '')
+      );
       return {
         ok: true,
         profile_root: profileRoot(),
-        identity: readJson(path.join(profileRoot(), 'my-identity.json')),
+        identity,
+        vision,
         agent_identity: readJson(path.join(profileRoot(), 'agent-identity.json')),
         onboarding: readJson(onboardingPath('browser-onboarding-state.json')),
         providers: providerPreference || {

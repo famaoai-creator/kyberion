@@ -463,6 +463,10 @@
       "types": "./dist/operator-home-summary.d.ts",
       "default": "./dist/operator-home-summary.js"
     },
+    "./operator-notifications": {
+      "types": "./dist/operator-notifications.d.ts",
+      "default": "./dist/operator-notifications.js"
+    },
     "./organization-profile": {
       "types": "./dist/organization-profile.d.ts",
       "default": "./dist/organization-profile.js"

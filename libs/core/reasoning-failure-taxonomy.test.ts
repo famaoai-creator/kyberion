@@ -28,4 +28,11 @@ describe('reasoning failure taxonomy', () => {
       allowFailover: true,
     });
   });
+  it('does not retry a governed Codex deadline in place', () => {
+    expect(
+      classifyReasoningFailure(
+        new Error('[codex-cli] structured query failed: [codex-cli] timed out after 120000ms')
+      )
+    ).toMatchObject({ class: 'transient', retryable: false, allowFailover: true });
+  });
 });

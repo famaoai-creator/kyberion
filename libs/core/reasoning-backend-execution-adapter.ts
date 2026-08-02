@@ -12,7 +12,10 @@ import {
 
 /** Adapts the legacy text delegateTask contract to the typed execution port. */
 export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
-  constructor(private readonly backend: ReasoningBackend) {}
+  constructor(
+    private readonly backend: ReasoningBackend,
+    private readonly signal?: AbortSignal
+  ) {}
 
   async delegate(request: AgentTaskEnvelope): Promise<AgentExecutionReceipt> {
     const startedAt = new Date().toISOString();
@@ -20,7 +23,7 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
       const output = await this.backend.delegateTask(
         request.instruction,
         request.context_refs?.join('\n'),
-        { signal: undefined }
+        { signal: this.signal }
       );
       return {
         execution_kind: 'agent_delegation',
@@ -52,11 +55,12 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
 export function delegateWorkItemWithReasoningBackend(
   backend: ReasoningBackend,
   request: CoordinatedAgentTaskEnvelope,
-  actorPeerId?: string
+  actorPeerId?: string,
+  signal?: AbortSignal
 ): Promise<CoordinatedAgentExecutionReceipt> {
   return delegateCoordinatedAgentTask(
     request,
-    new ReasoningBackendExecutionAdapter(backend),
+    new ReasoningBackendExecutionAdapter(backend, signal),
     actorPeerId
   );
 }
