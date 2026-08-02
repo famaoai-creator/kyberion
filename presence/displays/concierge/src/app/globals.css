@@ -757,3 +757,100 @@ body {
     animation: none;
   }
 }
+
+/* ---------- CS-04: unified inquiry queue ---------- */
+.inquiry-queue {
+  border-left: 3px solid var(--kb-accent, #8a6d3b);
+}
+.queue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.queue-item > .item-card {
+  flex: 1;
+  margin-bottom: 0;
+}
+.queue-chip {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+  color: var(--kb-accent, #8a6d3b);
+  border: 1px solid var(--kb-accent, #8a6d3b);
+}
+.queue-chip.approval {
+  font-weight: 600;
+}
+.queue-chip.exception {
+  border-style: dashed;
+}
+
+/* ---------- CS-04: command palette (⌘K) ---------- */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 60;
+}
+.command-palette {
+  width: min(520px, 92vw);
+  background: var(--kb-panel-bg, #fffdf8);
+  border: 1px solid var(--kb-border, #d9cfbc);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 10px;
+}
+.palette-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--kb-border, #d9cfbc);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.palette-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.palette-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.palette-item.active {
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+}
+.palette-empty,
+.palette-hint {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin: 0;
+}
+
+/* ---------- CS-04: keyboard accessibility ---------- */
+:focus-visible {
+  outline: 2px solid var(--kb-accent, #8a6d3b);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

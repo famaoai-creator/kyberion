@@ -261,7 +261,9 @@ describe('concierge surface contract', () => {
     expect(decisionRoute).toContain('readMissionStatus');
 
     // The pane uses an inline confirm step, never the blocking browser dialog.
-    expect(page).toContain("t('hygiene.title')");
+    // CS-04: the cards moved into the unified inquiry queue; the confirm
+    // mechanics (human-only decision) must survive the move.
+    expect(page).toContain('renderHygieneCard');
     expect(page).toContain("'hygiene.confirm_start'");
     expect(page).toContain("'hygiene.confirm_cancel'");
     expect(page).not.toContain('window.confirm');
@@ -381,7 +383,9 @@ describe('concierge surface contract', () => {
 
     // The pane uses inline confirm and translated plain-language labels — the
     // internal kind/tier codes never render verbatim.
-    expect(page).toContain("t('memory.title')");
+    // CS-04: the cards moved into the unified inquiry queue; the confirm
+    // mechanics (human-only decision) must survive the move.
+    expect(page).toContain('renderMemoryCard');
     expect(page).toContain('memory.kind.');
     expect(page).toContain('memory.tier.');
     expect(page).toContain("'memory.confirm_approve'");
@@ -504,5 +508,34 @@ describe('concierge surface contract', () => {
     expect(route).toContain('listActiveDelegatedTaskRecords');
     expect(route).toContain('peekPersistedDelegationChildrenRegistry');
     expect(route).toContain('staleChildCount');
+  });
+  it('CS-04: presents one prioritized inquiry queue whose cards are shared with the panes', () => {
+    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    // One queue section, ordered by decision urgency, rendered from the same
+    // card helpers the detail panes use (no duplicated action UI).
+    expect(page).toContain('inquiry-queue');
+    expect(page).toContain("t('queue.title')");
+    expect(page).toContain('renderApprovalCard');
+    expect(page).toContain('renderHygieneCard');
+    expect(page).toContain('renderMemoryCard');
+    expect(page).toContain('renderOutcomeCard');
+    expect(page).toContain('renderExceptionCard');
+    // The panes now defer to the queue instead of duplicating the cards.
+    expect(page).toContain("t('home.see_queue'");
+    expect(page).not.toContain('window.prompt');
+  });
+
+  it('CS-04: command palette is keyboard-first, dialog-labelled, and never performs decisions', () => {
+    const palette = fs.readFileSync(path.join(appDir, 'src/app/command-palette.tsx'), 'utf8');
+    const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
+    const css = fs.readFileSync(path.join(appDir, 'src/app/globals.css'), 'utf8');
+    expect(layout).toContain('<CommandPalette />');
+    expect(palette).toContain('role="dialog"');
+    expect(palette).toContain('aria-modal');
+    expect(palette).toContain('prefers-reduced-motion');
+    // Navigation and dock-opening only — no fetch, no mutation.
+    expect(palette).not.toContain('fetch(');
+    // Keyboard focus is visible across the surface.
+    expect(css).toContain(':focus-visible');
   });
 });
