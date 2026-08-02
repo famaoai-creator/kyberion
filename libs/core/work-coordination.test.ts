@@ -18,7 +18,9 @@ import {
   handoffWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
+  recordMissionHandoff,
 } from './work-coordination.js';
+import { buildHandoffPacket } from './handoff-packet.js';
 
 beforeEach(() => {
   setWorkCoordinationNamespace('work-coordination-core-test');
@@ -31,6 +33,34 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('records mission handoff metadata and coordination event', () => {
+    createWorkItem({
+      itemId: 'mission-item-1',
+      title: 'Mission task',
+      description: 'Mission task description',
+      projectId: 'M-HANDOFF',
+      metadata: { mission_id: 'M-HANDOFF', task_id: 'task-1' },
+    });
+    const packet = buildHandoffPacket({
+      kind: 'mission',
+      correlationId: 'handoff-1',
+      outgoingSummary: 'Continue mission',
+      sourceRef: 'persona:worker',
+      targetRef: 'persona:reviewer',
+    });
+    const updated = recordMissionHandoff({
+      missionId: 'M-HANDOFF',
+      fromPersona: 'worker',
+      toPersona: 'reviewer',
+      handoffPacket: packet,
+    });
+    expect(updated[0].metadata).toMatchObject({
+      handoff_status: 'written',
+      handoff_to_persona: 'reviewer',
+    });
+    expect(listCoordinationEvents({ event_type: 'mission_handoff_written' })).toHaveLength(1);
+  });
+
   it('creates and lists work items', () => {
     const item = createWorkItem({
       title: 'Ship coordination kernel',
