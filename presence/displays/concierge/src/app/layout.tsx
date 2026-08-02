@@ -4,9 +4,11 @@ import { ConciergeHeader } from './concierge-header';
 import { ConversationDock } from './conversation-dock';
 import { CommandPalette } from './command-palette';
 
+const SURFACE_TAGLINE = 'CEO秘書 — 依頼・承認・成果・例外';
+
 export const metadata = {
   title: 'Concierge — Kyberion',
-  description: 'Executive secretary surface for requests, approvals, outcomes, and exceptions.',
+  description: SURFACE_TAGLINE,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
