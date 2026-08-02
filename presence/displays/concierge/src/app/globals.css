@@ -297,6 +297,61 @@ body {
   margin-top: 10px;
 }
 
+/* CS-03 停滞ミッション伺いカード — the concierge asks; only the human decides.
+   The pane sits above the grid because a stalled decision outranks routine feeds. */
+
+.hygiene-pane {
+  margin-bottom: 20px;
+  border-left: 4px solid #d97706;
+}
+
+.hygiene-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+/* CS-03 受領プレビュー — inline artifact preview inside an outcome card.
+   No animation is used, so no prefers-reduced-motion override is needed. */
+
+.outcome-preview {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+.preview-file {
+  margin-bottom: 10px;
+}
+
+.preview-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.preview-content {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #efeae0;
+  border-radius: 8px;
+  background: #fffdf9;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.preview-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #efeae0;
+  border-radius: 8px;
+}
+
 /* Readiness checklist (CS-03) — attention items jump to their in-page section. */
 
 .readiness-pane {

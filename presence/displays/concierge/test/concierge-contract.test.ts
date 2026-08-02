@@ -24,6 +24,7 @@ describe('concierge surface contract', () => {
       'src/app/api/message/route.ts',
       'src/app/api/voice/listen-once/route.ts',
       'src/app/api/voice/stop/route.ts',
+      'src/app/api/hygiene/[id]/route.ts',
     ];
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
@@ -65,6 +66,8 @@ describe('concierge surface contract', () => {
       'src/app/api/response-status/route.ts',
       'src/app/api/events/route.ts',
       'src/app/api/voice/status/route.ts',
+      'src/app/api/hygiene/route.ts',
+      'src/app/api/outcomes/[id]/preview/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).not.toMatch(/export (async )?function (POST|PUT|DELETE|PATCH)/);
@@ -214,6 +217,83 @@ describe('concierge surface contract', () => {
     expect(setupPage).toContain("t('setup.notifications_title')");
     expect(setupPage).toContain("fetch('/api/notification-preferences'");
     expect(messages).toContain('通知設定を保存');
+  });
+
+  it('presents stalled missions as inquiry cards where only the human decides (CS-03)', () => {
+    const listRoute = fs.readFileSync(path.join(appDir, 'src/app/api/hygiene/route.ts'), 'utf8');
+    const decisionRoute = fs.readFileSync(
+      path.join(appDir, 'src/app/api/hygiene/[id]/route.ts'),
+      'utf8'
+    );
+    const server = fs.readFileSync(path.join(appDir, 'src/lib/hygiene-server.ts'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // Classification comes from the shared hygiene report; the GET is pure
+    // read and never touches the mission controller.
+    expect(server).toContain('collectMissionHygieneReport');
+    expect(listRoute).toContain('listHygieneInquiries');
+    expect(listRoute).not.toContain('mission_controller');
+    // The report's remediation strings carry CLI commands — they must never
+    // reach the client (ceo-ux.md: no internal execution vocabulary).
+    expect(server).not.toContain('finding.recommendation');
+    expect(server).not.toContain('pnpm');
+
+    // Mission state changes go exclusively through the mission controller
+    // (repo invariant), with the controller role and honest exit handling.
+    expect(decisionRoute).toContain('requireConciergeMutationAccess');
+    expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
+    expect(decisionRoute).toContain('safeExecResult');
+    expect(decisionRoute).toContain("MISSION_ROLE: 'mission_controller'");
+    // Human-only gate: the route accepts nothing but an explicit start/cancel
+    // decision from the request body, validates the mission is actually in
+    // the hygiene report, and there is no scheduler or auto-invocation path.
+    expect(decisionRoute).toContain("['start', 'cancel'] as const");
+    expect(decisionRoute).toContain('findHygieneInquiry');
+    expect(decisionRoute).not.toMatch(/setInterval|setTimeout/);
+    // Exit code 0 alone is not success — the transition is verified on disk.
+    expect(decisionRoute).toContain('readMissionStatus');
+
+    // The pane uses an inline confirm step, never the blocking browser dialog.
+    expect(page).toContain("t('hygiene.title')");
+    expect(page).toContain("'hygiene.confirm_start'");
+    expect(page).toContain("'hygiene.confirm_cancel'");
+    expect(page).not.toContain('window.confirm');
+    expect(messages).toContain('ご判断ください(停滞中のご依頼)');
+    expect(messages).toContain('開始する');
+    expect(messages).toContain('取りやめる');
+  });
+
+  it('renders inline artifact previews only from the entry-recorded paths (CS-03 / SU-03)', () => {
+    const route = fs.readFileSync(
+      path.join(appDir, 'src/app/api/outcomes/[id]/preview/route.ts'),
+      'utf8'
+    );
+    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // Path safety: the entry is looked up server-side and only its own
+    // artifact_paths are opened — no client-supplied path ever reaches a read.
+    expect(route).toContain('listInboxEntries');
+    expect(route).toContain('artifact_paths');
+    expect(route).not.toContain('searchParams');
+    // All reads go through secure-io under the concierge execution context;
+    // node:fs never appears (repo invariant).
+    expect(route).toContain("withExecutionContext('sovereign_concierge'");
+    expect(route).toContain('withSensitivePathMediation');
+    expect(route).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
+    // Bounded output: file count cap, text truncation, and an image size lid.
+    expect(route).toContain('MAX_FILES');
+    expect(route).toContain('MAX_TEXT_CHARS');
+    expect(route).toContain('MAX_IMAGE_BYTES');
+
+    // The outcome card fetches on demand and degrades politely for formats
+    // it cannot show inline.
+    expect(page).toContain("t('home.preview')");
+    expect(page).toContain('/preview');
+    expect(page).toContain('data_uri');
+    expect(messages).toContain('このファイル形式はここでは表示できません');
+    expect(messages).toContain('冒頭のみ表示');
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {
