@@ -117,6 +117,7 @@ export type WorkCoordinationEventType =
   | 'item_attempt_completed'
   | 'item_attempt_blocked'
   | 'item_attempt_failed'
+  | 'mission_handoff_written'
   | 'review_requested'
   | 'external_sync_pulled'
   | 'external_sync_pushed'
@@ -252,6 +253,13 @@ export interface HandoffWorkItemInput {
   correlationId?: string;
   handoffPacket?: HandoffPacket;
   metadata?: Record<string, unknown>;
+}
+
+export interface RecordMissionHandoffInput {
+  missionId: string;
+  fromPersona: string;
+  toPersona: string;
+  handoffPacket: HandoffPacket;
 }
 
 export interface WorkItemFilter {
@@ -570,6 +578,39 @@ function appendEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
   const event = createEvent(payload);
   appendJsonl(eventsPath(), event);
   return event;
+}
+
+/** Record a mission-level handoff on every canonical WorkItem for the mission. */
+export function recordMissionHandoff(input: RecordMissionHandoffInput): WorkItem[] {
+  const missionId = input.missionId.toUpperCase();
+  const items = listWorkItems().filter(
+    (item) => item.project_id.toUpperCase() === missionId || item.metadata?.mission_id === missionId
+  );
+  const updated = items.map((item) =>
+    updateWorkItem({
+      itemId: item.item_id,
+      expectedVersion: item.version,
+      metadata: {
+        ...(item.metadata || {}),
+        handoff_packet: input.handoffPacket,
+        handoff_from_persona: input.fromPersona,
+        handoff_to_persona: input.toPersona,
+        handoff_status: 'written',
+      },
+    })
+  );
+  appendEvent({
+    eventType: 'mission_handoff_written',
+    note: `mission handoff ${input.fromPersona} -> ${input.toPersona}`,
+    payload: {
+      mission_id: missionId,
+      from_persona: input.fromPersona,
+      to_persona: input.toPersona,
+      handoff_packet: input.handoffPacket,
+      item_ids: updated.map((item) => item.item_id),
+    },
+  });
+  return updated;
 }
 
 function activeLeaseForItem(itemId: string): WorkLease | null {
