@@ -20,6 +20,7 @@ describe('concierge surface contract', () => {
       'src/app/api/approvals/[id]/route.ts',
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/setup/route.ts',
+      'src/app/api/message/route.ts',
     ];
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
@@ -59,10 +60,57 @@ describe('concierge surface contract', () => {
       'src/app/api/summary/route.ts',
       'src/app/api/theme/route.ts',
       'src/app/api/response-status/route.ts',
+      'src/app/api/events/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).not.toMatch(/export (async )?function (POST|PUT|DELETE|PATCH)/);
     }
+  });
+
+  it('implements the CS-01 conversation core with the two-path failover', () => {
+    const route = fs.readFileSync(path.join(appDir, 'src/app/api/message/route.ts'), 'utf8');
+    expect(route).toContain('requireConciergeMutationAccess');
+    // Primary path: voice-hub ingest with a bounded timeout so the UI never hangs.
+    expect(route).toContain('/api/ingest-text');
+    expect(route).toContain('AbortSignal.timeout');
+    // Fallback path: lazy orchestrator import (no second daemon required).
+    expect(route).toContain("import('@agent/core/channel-surface')");
+    expect(route).toContain('runSurfaceMessageConversation');
+    // Both paths failing must produce a loud, actionable 503 — never silence.
+    expect(route).toContain("mode: 'unavailable'");
+    expect(route).toContain('503');
+  });
+
+  it('streams summary changes over SSE with heartbeat and abort cleanup', () => {
+    const route = fs.readFileSync(path.join(appDir, 'src/app/api/events/route.ts'), 'utf8');
+    expect(route).toContain('buildCeoSurfaceSummary');
+    expect(route).toContain('text/event-stream');
+    expect(route).toContain('heartbeat');
+    expect(route).toContain("addEventListener('abort'");
+  });
+
+  it('replaces window.prompt and 30 s summary polling on the home page', () => {
+    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    expect(page).not.toContain('window.prompt');
+    expect(page).toContain("t('home.change_send')");
+    expect(page).toContain("new EventSource('/api/events')");
+  });
+
+  it('mounts the conversation dock through the shared i18n mechanism', () => {
+    const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
+    const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    expect(layout).toContain('ConversationDock');
+    expect(dock).toContain('useConciergeI18n');
+    expect(dock).toContain("fetch('/api/message'");
+    // The four UX-contract conversation shapes render as labeled cards.
+    expect(dock).toContain('execution_preview');
+    expect(messages).toContain('dock.shape.clarification');
+    expect(messages).toContain('dock.shape.execution_preview');
+    expect(messages).toContain('dock.shape.status_summary');
+    expect(messages).toContain('dock.shape.delivery_summary');
+    // ceo-ux.md: no internal execution vocabulary in dock copy.
+    expect(dock).not.toMatch(/actuator|pipeline|ADF/i);
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {
