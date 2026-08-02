@@ -389,8 +389,12 @@ describe('marketing workload gates', () => {
     const customerB = customerResolver.customerRoot('policy/marketing-risk-policy.json', {
       KYBERION_CUSTOMER: 'customer-b',
     });
-    expect(customerA).toContain('/customer/customer-a/policy/marketing-risk-policy.json');
-    expect(customerB).toContain('/customer/customer-b/policy/marketing-risk-policy.json');
+    expect(customerA.replaceAll('\\', '/')).toContain(
+      '/customer/customer-a/policy/marketing-risk-policy.json'
+    );
+    expect(customerB.replaceAll('\\', '/')).toContain(
+      '/customer/customer-b/policy/marketing-risk-policy.json'
+    );
     expect(customerA).not.toBe(customerB);
     expect(customerResolver.customerRoot('policy/marketing-risk-policy.json', {})).toBeNull();
   });
