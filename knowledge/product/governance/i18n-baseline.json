@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-01T22:17:33.013Z",
+  "generated_at": "2026-08-02T13:55:07.169Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -146,7 +146,6 @@
     "presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx": 5,
     "presence/displays/chronos-mirror-v2/src/components/AgentOpsBoards.tsx": 5,
     "presence/displays/chronos-mirror-v2/src/components/FirstRunBanner.tsx": 11,
-    "presence/displays/concierge/server.ts": 3,
     "presence/displays/concierge/src/app/api/approvals/[id]/route.ts": 1,
     "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts": 3,
     "presence/displays/operator-surface/src/app/layout.tsx": 2,
