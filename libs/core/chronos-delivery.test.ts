@@ -65,7 +65,9 @@ describe('chronos-delivery', () => {
       (entry) => entry.correlation_id === 'chronos:daily-report:run-1'
     );
     if (message) createdMessageIds.push(message.message_id);
-    expect(messagePath).toContain('/active/shared/coordination/channels/slack/outbox/');
+    expect(messagePath.replaceAll('\\', '/')).toContain(
+      '/active/shared/coordination/channels/slack/outbox/'
+    );
     expect(message).toBeDefined();
 
     expect(message).toMatchObject({
@@ -113,7 +115,9 @@ describe('chronos-delivery', () => {
       (entry) => entry.correlation_id === 'chronos:channel-report:run-channel'
     );
     if (message) createdMessageIds.push(message.message_id);
-    expect(messagePath).toContain('/active/shared/coordination/channels/slack/outbox/');
+    expect(messagePath.replaceAll('\\', '/')).toContain(
+      '/active/shared/coordination/channels/slack/outbox/'
+    );
     expect(message).toMatchObject({ channel: 'C123', thread_ts: '' });
   });
 });
