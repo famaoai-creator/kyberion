@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   acceptInboxEntryWithHumanReceipt,
-  enqueueReviewReentryRequest,
   listInboxEntries,
   markInboxEntry,
+} from '@agent/core/deliverable-inbox';
+import { enqueueReviewReentryRequest } from '@agent/core/review-reentry';
+import {
   normalizeRejectionReasonCategory,
   type RejectionReasonCategory,
-} from '@agent/core';
+} from '@agent/core/rejection-reason';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
