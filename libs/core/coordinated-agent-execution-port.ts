@@ -1,4 +1,10 @@
-import { claimWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
+import {
+  claimWorkItem,
+  getWorkItem,
+  updateWorkItem,
+  type WorkItem,
+  type WorkItemStatus,
+} from './work-coordination.js';
 import type {
   AgentExecutionPort,
   AgentExecutionReceipt,
@@ -8,6 +14,7 @@ import { getAgentExecutionPort } from './agent-execution-port.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
   work_item_id: string;
+  success_status?: Extract<WorkItemStatus, 'done' | 'review'>;
 }
 
 export interface CoordinatedAgentExecutionReceipt extends AgentExecutionReceipt {
@@ -56,7 +63,8 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       throw error;
     }
 
-    const terminalStatus = receipt.status === 'succeeded' ? 'done' : 'blocked';
+    const terminalStatus =
+      receipt.status === 'succeeded' ? request.success_status || 'done' : 'blocked';
     closeWorkItem(
       claimed.item,
       terminalStatus,
@@ -91,7 +99,7 @@ export async function delegateCoordinatedAgentTask(
 
 function closeWorkItem(
   item: WorkItem,
-  status: 'done' | 'blocked',
+  status: 'done' | 'review' | 'blocked',
   summary: string,
   attemptId?: string,
   receipt?: AgentExecutionReceipt
