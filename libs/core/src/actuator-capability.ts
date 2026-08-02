@@ -291,18 +291,38 @@ registerCapabilityProbe('voice-actuator', async () => {
 
 // Vision actuator: check platform
 registerCapabilityProbe('vision-actuator', async () => {
-  const isDarwin = process.platform === 'darwin';
+  const { platform } = await import('../platform.js');
+  const { probeWindowsNativeImageRecognition } =
+    await import('../windows-native-image-recognition-bridge.js');
+  const capabilities = await platform.getCapabilities();
+  const available = capabilities.hasScreenCapture;
+  const nativeRecognition = probeWindowsNativeImageRecognition();
   return [
     {
       op: 'capture',
-      available: isDarwin,
-      reason: isDarwin ? undefined : 'screencapture requires macOS',
-      prerequisites: isDarwin ? undefined : ['Run on macOS'],
+      available,
+      reason: available ? undefined : 'No screen-capture backend is available',
+      prerequisites: available ? undefined : ['Install FFmpeg or a native screen-capture backend'],
     },
     {
       op: 'pipeline',
-      available: isDarwin,
-      reason: isDarwin ? undefined : 'vision pipeline requires macOS screen capture',
+      available,
+      reason: available ? undefined : 'vision pipeline requires a screen-capture backend',
+    },
+    {
+      op: 'ocr_image',
+      available: process.platform !== 'win32' || nativeRecognition.ocr,
+      reason:
+        process.platform !== 'win32' || nativeRecognition.ocr
+          ? undefined
+          : nativeRecognition.reason || 'Windows native OCR helper is unavailable',
+    },
+    {
+      op: 'describe_image',
+      available: nativeRecognition.description,
+      reason: nativeRecognition.description
+        ? undefined
+        : nativeRecognition.reason || 'No native image description provider is available',
     },
   ];
 });

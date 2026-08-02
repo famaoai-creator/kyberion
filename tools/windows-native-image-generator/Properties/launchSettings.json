@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "WindowsNativeImageGenerator (MSIX)": {
+      "commandName": "MsixPackage"
+    }
+  }
+}

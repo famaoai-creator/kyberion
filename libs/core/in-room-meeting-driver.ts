@@ -34,6 +34,7 @@ import type {
   MeetingTarget,
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
+import { resolveAudioPlaybackCommand } from './audio-playback.js';
 
 export interface InRoomMeetingDriverOptions {
   mic?: MicCaptureOptions;
@@ -68,9 +69,7 @@ function wavHeader(pcmBytes: number, sampleRateHz: number): Buffer {
 }
 
 function defaultPlaybackCommand(): string[] | null {
-  if (process.platform === 'darwin') return ['afplay'];
-  if (process.platform === 'linux') return ['aplay', '-q'];
-  return null;
+  return resolveAudioPlaybackCommand('{file}');
 }
 
 export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
@@ -120,7 +119,10 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
           resolve();
           return;
         }
-        const child = spawn(playback[0], [...playback.slice(1), wavPath], { stdio: 'ignore' });
+        const argv = playback.some((part) => part.includes('{file}'))
+          ? playback.map((part) => part.replaceAll('{file}', wavPath))
+          : [...playback, wavPath];
+        const child = spawn(argv[0], argv.slice(1), { stdio: 'ignore' });
         const stop = (): void => {
           child.kill('SIGTERM');
         };

@@ -16,6 +16,10 @@ import {
   ImageGenerationResult,
   ImageGenerationProvider,
 } from './image-generation-types.js';
+import {
+  generateImageWithWindowsNativeApi,
+  probeWindowsNativeImageGeneration,
+} from './windows-native-image-generation-bridge.js';
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
@@ -405,6 +409,38 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
   }
 }
 
+export class WindowsNativeImageGenerationProvider implements ImageGenerationProvider {
+  readonly id = 'windows_native';
+
+  async isAvailable(): Promise<boolean> {
+    return probeWindowsNativeImageGeneration().available;
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    const outputPath = getFallbackTargetPath(request).replace(/\.[^.]+$/, '.png');
+    const generated = generateImageWithWindowsNativeApi({
+      prompt: request.prompt,
+      outputPath,
+      ...(request.width ? { width: request.width } : {}),
+      ...(request.height ? { height: request.height } : {}),
+    });
+    return generated
+      ? {
+          status: 'succeeded',
+          provider: this.id,
+          path: generated,
+          elapsedMs: Date.now() - startedAt,
+        }
+      : {
+          status: 'failed',
+          provider: this.id,
+          elapsedMs: Date.now() - startedAt,
+          error: 'windows_native_image_generation_unavailable',
+        };
+  }
+}
+
 function getApplePlaygroundTargetPath(request: ImageGenerationRequest): string {
   const targetPath = getFallbackTargetPath(request);
   const extension = path.extname(targetPath);
@@ -602,13 +638,20 @@ export class AdaptivePolicyRouter {
 
     let defaultChain: string[] = [];
     if (mode === 'local_only' || mode === 'privacy_first') {
-      defaultChain = ['apple_playground', 'local_flux', 'local_diffusion', 'comfyui'];
+      defaultChain = [
+        'apple_playground',
+        'windows_native',
+        'local_flux',
+        'local_diffusion',
+        'comfyui',
+      ];
     } else if (mode === 'artistic') {
       defaultChain = [
         'codex_host_bridge',
         'agy_host_bridge',
         'host_agent',
         'apple_playground',
+        'windows_native',
         'gemini_service',
         'llm_api',
         'local_flux',
@@ -621,6 +664,7 @@ export class AdaptivePolicyRouter {
         'agy_host_bridge',
         'host_agent',
         'apple_playground',
+        'windows_native',
         'local_flux',
         'comfyui',
         'gemini_service',
@@ -648,6 +692,7 @@ function getRouter(): AdaptivePolicyRouter {
       new GeminiServiceImageGenerationProvider(),
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
+      new WindowsNativeImageGenerationProvider(),
       new LocalDiffusionImageGenerationProvider(),
       new ApplePlaygroundImageGenerationProvider(),
       new CodexHostBridgeImageGenerationProvider(),
