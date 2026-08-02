@@ -20,7 +20,10 @@ export function activateApplication(application: string) {
   if (!isDarwin()) {
     return;
   }
-  safeExec('osascript', ['-e', `tell application "${toAppleScriptString(application)}" to activate`]);
+  safeExec('osascript', [
+    '-e',
+    `tell application "${toAppleScriptString(application)}" to activate`,
+  ]);
 }
 
 export function detectFocusedInput(): FocusedInputState {
@@ -63,7 +66,8 @@ export function detectFocusedInput(): FocusedInputState {
   ].join('\n');
 
   const output = String(safeExec('osascript', ['-e', script])).trimEnd();
-  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
+  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] =
+    output.split('\n');
   return {
     application,
     windowTitle,
@@ -77,7 +81,10 @@ export function keystrokeText(text: string) {
   if (!isDarwin()) {
     return;
   }
-  safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${toAppleScriptString(text)}"`]);
+  safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to keystroke "${toAppleScriptString(text)}"`,
+  ]);
 }
 
 export function pasteText(text: string) {
@@ -103,7 +110,10 @@ export function pressKey(key: string) {
     safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
     return;
   }
-  safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${toAppleScriptString(normalizedKey)}"`]);
+  safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to keystroke "${toAppleScriptString(normalizedKey)}"`,
+  ]);
 }
 
 export function pressKeyCode(keyCode: number) {
@@ -114,7 +124,10 @@ export function pressKeyCode(keyCode: number) {
   if (!Number.isInteger(normalizedKeyCode) || normalizedKeyCode <= 0) {
     throw new Error(`Invalid key code for pressKeyCode: ${keyCode}`);
   }
-  safeExec('osascript', ['-e', `tell application "System Events" to key code ${normalizedKeyCode}`]);
+  safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to key code ${normalizedKeyCode}`,
+  ]);
 }
 
 export function toggleDictation(keyCode = 176) {
@@ -138,7 +151,10 @@ export function rightClickAt(x: number, y: number, clickCount = 1) {
     return;
   }
   for (let index = 0; index < clickCount; index += 1) {
-    safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`]);
+    safeExec('osascript', [
+      '-e',
+      `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`,
+    ]);
   }
 }
 
@@ -146,7 +162,10 @@ export function moveMouse(x: number, y: number) {
   if (!isDarwin()) {
     return;
   }
-  safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`]);
+  safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`,
+  ]);
 }
 
 function execCliclick(args: string[]): void {
@@ -161,14 +180,23 @@ function execCliclick(args: string[]): void {
   }
 }
 
-export function scrollAt(x: number, y: number, direction: 'up' | 'down' | 'left' | 'right', amount = 3) {
-  if (!isDarwin()) return;
+export function scrollAt(
+  x: number,
+  y: number,
+  direction: 'up' | 'down' | 'left' | 'right',
+  amount = 3
+) {
+  if (!isDarwin()) {
+    return;
+  }
   const dirCode = { up: 'su', down: 'sd', left: 'sl', right: 'sr' }[direction];
   execCliclick([`${dirCode}:${x},${y},${amount}`]);
 }
 
 export function dragFrom(x1: number, y1: number, x2: number, y2: number) {
-  if (!isDarwin()) return;
+  if (!isDarwin()) {
+    return;
+  }
   execCliclick([`dd:${x1},${y1}`, `du:${x2},${y2}`]);
 }
 
@@ -181,7 +209,7 @@ export function getScreenSize(): { width: number; height: number } {
   if (!isDarwin()) return { width: 0, height: 0 };
   try {
     const output = runAppleScript('tell application "Finder" to get bounds of window of desktop');
-    const parts = output.split(',').map(s => Number(s.trim()));
+    const parts = output.split(',').map((s) => Number(s.trim()));
     return { width: parts[2] ?? 0, height: parts[3] ?? 0 };
   } catch {
     return { width: 0, height: 0 };
@@ -205,13 +233,20 @@ export function getWindowList(appName: string): string[] {
     'end tell',
   ].join('\n');
   try {
-    return runAppleScript(script).split('\n').map(s => s.trim()).filter(Boolean);
+    return runAppleScript(script)
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
 }
 
-export function activateWindowByTitle(appName: string, windowTitle: string, matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains') {
+export function activateWindowByTitle(
+  appName: string,
+  windowTitle: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
+) {
   if (!isDarwin()) return false;
   const script = [
     'tell application "System Events"',
@@ -221,11 +256,13 @@ export function activateWindowByTitle(appName: string, windowTitle: string, matc
     'set targetWindow to missing value',
     'set windowNames to name of every window',
     'repeat with w in windowNames',
-    `if ${matchPolicy === 'strict'
-      ? 'w is "' + toAppleScriptString(windowTitle) + '"'
-      : matchPolicy === 'prefix'
-        ? '(w as string) starts with "' + toAppleScriptString(windowTitle) + '"'
-        : '(w as string) contains "' + toAppleScriptString(windowTitle) + '"'} then`,
+    `if ${
+      matchPolicy === 'strict'
+        ? 'w is "' + toAppleScriptString(windowTitle) + '"'
+        : matchPolicy === 'prefix'
+          ? '(w as string) starts with "' + toAppleScriptString(windowTitle) + '"'
+          : '(w as string) contains "' + toAppleScriptString(windowTitle) + '"'
+    } then`,
     'set targetWindow to (first window whose name is w)',
     'exit repeat',
     'end if',
@@ -254,12 +291,16 @@ export function activateWindowByTitle(appName: string, windowTitle: string, matc
 }
 
 export function quitApplication(appName: string) {
-  if (!isDarwin()) return;
+  if (!isDarwin()) {
+    return;
+  }
   safeExec('osascript', ['-e', `tell application "${toAppleScriptString(appName)}" to quit`]);
 }
 
 export function systemNotify(title: string, message: string, subtitle?: string) {
-  if (!isDarwin()) return;
+  if (!isDarwin()) {
+    return;
+  }
   const sub = subtitle ? ` subtitle "${toAppleScriptString(subtitle)}"` : '';
   try {
     safeExec('osascript', [
@@ -277,11 +318,16 @@ export function clipboardRead(): string {
 }
 
 export function clipboardWrite(text: string): void {
-  if (!isDarwin()) return;
+  if (!isDarwin()) {
+    return;
+  }
   safeExec('osascript', ['-e', `set the clipboard to "${toAppleScriptString(text)}"`]);
 }
 
-export function takeScreenshot(outputPath: string, options?: { silent?: boolean; displayIndex?: number }): string {
+export function takeScreenshot(
+  outputPath: string,
+  options?: { silent?: boolean; displayIndex?: number }
+): string {
   if (!isDarwin()) return '';
   const args = ['-x'];
   if (options?.displayIndex !== undefined) {

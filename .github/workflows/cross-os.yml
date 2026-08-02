@@ -3,7 +3,7 @@ name: Cross-OS Smoke
 env:
   PUPPETEER_SKIP_DOWNLOAD: 'true'
 
-# Phase B-2: ensure Kyberion's core build + representative contract scenarios pass on macOS and Ubuntu.
+# Phase B-2: ensure Kyberion's core build + representative contract scenarios pass on all supported OSes.
 # This closes the gap where one platform can drift while the other keeps passing.
 
 on:
@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [24]
     steps:
       - uses: actions/checkout@v4

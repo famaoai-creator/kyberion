@@ -49,6 +49,7 @@ import {
   generateReminderMessageOp,
   trackPendingActionItemsOp,
 } from './meeting-intelligence-ops.js';
+import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
 export interface MeetingAction {
   action: 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
@@ -498,6 +499,22 @@ export async function handleAction(
 ): Promise<MeetingActionResult | Record<string, unknown>> {
   if (input.action === 'pipeline') {
     return await executeMeetingPipeline(input.steps || [], input.context || {}, input.options);
+  }
+  const providerAdapter = resolveMeetingProvider(input.params.provider, input.params.url);
+  if (providerAdapter && input.params.provider === 'auto') {
+    input = {
+      ...input,
+      params: {
+        ...input.params,
+        provider:
+          providerAdapter.id === 'google_meet'
+            ? 'google_meet'
+            : providerAdapter.id === 'teams'
+              ? 'teams_pipeline'
+              : 'zoom',
+        platform: providerAdapter.id === 'google_meet' ? 'meet' : providerAdapter.id,
+      },
+    };
   }
   const traceCtx = createActuatorTrace('meeting-actuator', input.action, {
     pipelineId: input.params.meeting_id,

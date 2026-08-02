@@ -14,6 +14,7 @@ import {
 const VOICE_TOOL_IDS = [
   'mlx_audio',
   'mlx_whisper',
+  'faster_whisper',
   'kokoro_tts',
   'pocket_tts',
   'ten_vad',
@@ -73,6 +74,7 @@ function isManagedVoiceRuntimeHealthy(toolId: VoiceToolId, pythonBin: string | n
   const imports: Record<VoiceToolId, string> = {
     mlx_audio: 'import mlx_audio',
     mlx_whisper: 'import mlx_whisper',
+    faster_whisper: 'import faster_whisper',
     kokoro_tts: 'import kokoro, soundfile, unidic_lite',
     pocket_tts: 'import pocket_tts, scipy',
     ten_vad: 'import numpy, ten_vad',

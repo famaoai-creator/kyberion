@@ -7,6 +7,7 @@ import {
   classifyError,
   retry,
   ocrImage as coreOcrImage,
+  describeImage as coreDescribeImage,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -92,10 +93,26 @@ async function ocrImage(params: any) {
   };
 }
 
+async function describeImage(params: any) {
+  const logicalPath = String(params.path || '');
+  if (!logicalPath) throw new Error('describe_image requires params.path');
+  const result = await coreDescribeImage({
+    path: logicalPath,
+    kind: params.kind,
+  });
+  return {
+    status: result.status,
+    path: logicalPath,
+    description: result.description,
+    provider: result.provider,
+  };
+}
+
 async function handleSingleAction(input: any) {
   const { action, params } = input;
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
+  if (action === 'describe_image') return describeImage(params);
   if (!LEGACY_MEDIA_GENERATION_ACTIONS.has(action)) {
     throw new Error(
       `Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`

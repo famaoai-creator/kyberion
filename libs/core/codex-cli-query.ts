@@ -352,12 +352,13 @@ function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
   if (explicit) return explicit;
 
-  if (process.platform === 'darwin') {
-    return '/opt/homebrew/bin/codex';
-  }
-
   const repoRoot = pathResolver.rootDir();
-  const whichResult = safeExecResult('which', ['-a', 'codex'], {
+  // `which` is not a stock Windows command.  Using it on Git Bash can also
+  // return POSIX-style `/c/...` paths which Node resolves incorrectly as
+  // `C:\\c\\...`; ask the native resolver on Windows instead.
+  const resolver = process.platform === 'win32' ? 'where' : 'which';
+  const resolverArgs = process.platform === 'win32' ? ['codex'] : ['-a', 'codex'];
+  const whichResult = safeExecResult(resolver, resolverArgs, {
     env,
     cwd: repoRoot,
     timeoutMs: 5000,
@@ -367,7 +368,9 @@ function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
     .filter(Boolean);
 
   for (const candidate of candidates) {
-    const normalized = path.resolve(candidate);
+    // Keep POSIX-looking paths intact when tests or a POSIX-compatible shim
+    // provide them on Windows; native `where` output is already drive-based.
+    const normalized = candidate.startsWith('/') ? candidate : path.resolve(candidate);
     if (normalized.startsWith(path.join(repoRoot, 'node_modules', '.bin'))) continue;
     if (normalized.includes(`${path.sep}.codex${path.sep}tmp${path.sep}arg0${path.sep}`)) continue;
     if (normalized.includes(`${path.sep}.pnpm${path.sep}@openai+codex`)) continue;

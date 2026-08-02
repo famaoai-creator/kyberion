@@ -54,6 +54,58 @@ ALLOWED_HOSTS = {
 DEFAULT_DISPLAY_NAME = "Kyberion Agent"
 
 
+class _SpeechAdapter:
+    method = "speech"
+
+    def available(self):
+        return False
+
+    def speak(self, text):
+        raise NotImplementedError
+
+
+class _MacSpeechAdapter(_SpeechAdapter):
+    method = "macos_say"
+
+    def available(self):
+        return sys.platform == "darwin" and shutil.which("say") is not None
+
+    def speak(self, text):
+        return subprocess.run(["say", text]).returncode
+
+
+class _WindowsSpeechAdapter(_SpeechAdapter):
+    method = "windows_sapi"
+
+    def available(self):
+        return sys.platform == "win32" and shutil.which("powershell") is not None
+
+    def speak(self, text):
+        escaped = text.replace("'", "''")
+        script = (
+            "Add-Type -AssemblyName System.Speech; "
+            f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{escaped}')"
+        )
+        return subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script]).returncode
+
+
+class _EspeakAdapter(_SpeechAdapter):
+    method = "espeak"
+
+    def available(self):
+        return shutil.which("espeak") is not None
+
+    def speak(self, text):
+        return subprocess.run(["espeak", text]).returncode
+
+
+def _speech_adapter():
+    for adapter in (_MacSpeechAdapter(), _WindowsSpeechAdapter(), _EspeakAdapter()):
+        if adapter.available():
+            return adapter
+    return None
+
+
 def _resolve_default_python_bin():
     env_candidates = [
         os.environ.get("KYBERION_PYTHON_BIN"),
@@ -294,17 +346,12 @@ class MeetingBridge:
                     return _err(f"BlackHole playback failed: {exc}")
             return {"status": "success", "action": "speak", "chars": len(text), "method": "tts_only"}
 
-        # Fallback: macOS say
-        if sys.platform == "darwin":
-            rc = subprocess.run(["say", text]).returncode
+        adapter = _speech_adapter()
+        if adapter:
+            rc = adapter.speak(text)
             if rc != 0:
-                return _err(f"say failed (rc={rc})")
-            return {"status": "success", "action": "speak", "chars": len(text), "method": "macos_say"}
-        elif shutil.which("espeak"):
-            rc = subprocess.run(["espeak", text]).returncode
-            if rc != 0:
-                return _err(f"espeak failed (rc={rc})")
-            return {"status": "success", "action": "speak", "chars": len(text), "method": "espeak"}
+                return _err(f"{adapter.method} failed (rc={rc})")
+            return {"status": "success", "action": "speak", "chars": len(text), "method": adapter.method}
         return _err("no speech synthesizer available (need voice profile + BlackHole, or say/espeak)")
 
     # ---- listen -------------------------------------------------- #
