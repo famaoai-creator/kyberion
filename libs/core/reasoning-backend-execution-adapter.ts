@@ -4,6 +4,11 @@ import type {
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
+import {
+  delegateCoordinatedAgentTask,
+  type CoordinatedAgentExecutionReceipt,
+  type CoordinatedAgentTaskEnvelope,
+} from './coordinated-agent-execution-port.js';
 
 /** Adapts the legacy text delegateTask contract to the typed execution port. */
 export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
@@ -41,4 +46,17 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
       };
     }
   }
+}
+
+/** Execute a legacy reasoning delegation while preserving WorkItem lifecycle. */
+export function delegateWorkItemWithReasoningBackend(
+  backend: ReasoningBackend,
+  request: CoordinatedAgentTaskEnvelope,
+  actorPeerId?: string
+): Promise<CoordinatedAgentExecutionReceipt> {
+  return delegateCoordinatedAgentTask(
+    request,
+    new ReasoningBackendExecutionAdapter(backend),
+    actorPeerId
+  );
 }
