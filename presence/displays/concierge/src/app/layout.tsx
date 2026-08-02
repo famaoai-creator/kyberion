@@ -1,6 +1,7 @@
 import * as React from 'react';
 import './globals.css';
 import { ConciergeHeader } from './concierge-header';
+import { ConversationDock } from './conversation-dock';
 
 export const metadata = {
   title: 'Concierge — Kyberion',
@@ -18,6 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ConciergeHeader />
         <main className="concierge-main">{children}</main>
+        {/* CS-01: the secretary conversation is available on every page
+            (home and /setup), so it is mounted in the layout. */}
+        <ConversationDock />
       </body>
     </html>
   );

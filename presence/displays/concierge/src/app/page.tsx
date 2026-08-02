@@ -115,10 +115,35 @@ export default function ConciergePage() {
   React.useEffect(() => {
     void refresh();
     void refreshResponseStatus();
-    const timer = setInterval(() => void refresh(), 30_000);
+    // CS-01: live summary updates over SSE; degrade to the legacy 30 s
+    // polling only when the event stream is unavailable.
+    let source: EventSource | null = null;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    const startPollingFallback = () => {
+      if (!fallbackTimer) fallbackTimer = setInterval(() => void refresh(), 30_000);
+    };
+    try {
+      source = new EventSource('/api/events');
+      source.addEventListener('summary', (event) => {
+        try {
+          setSummary(JSON.parse((event as MessageEvent).data) as Summary);
+          setLoadError(null);
+        } catch {
+          // Keep the last good snapshot when one event fails to parse.
+        }
+      });
+      source.onerror = () => {
+        source?.close();
+        source = null;
+        startPollingFallback();
+      };
+    } catch {
+      startPollingFallback();
+    }
     const responseTimer = setInterval(() => void refreshResponseStatus(), 10_000);
     return () => {
-      clearInterval(timer);
+      source?.close();
+      if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(responseTimer);
     };
   }, [refresh, refreshResponseStatus]);
@@ -153,19 +178,20 @@ export default function ConciergePage() {
     [refresh, t]
   );
 
+  const [changeFormId, setChangeFormId] = React.useState<string | null>(null);
+  const [changeNote, setChangeNote] = React.useState('');
+
   const recordOutcomeVerdict = React.useCallback(
     async (
       item: Summary['outcome_feed'][number],
-      status: 'accepted' | 'changes_requested' | 'rejected'
+      status: 'accepted' | 'changes_requested' | 'rejected',
+      note = ''
     ) => {
+      // CS-01: change requests arrive through the inline form below (the
+      // blocking browser prompt is gone); an empty note never reaches the owner.
+      if (status === 'changes_requested' && !note.trim()) return;
       setBusyId(item.entry_id);
       try {
-        const note =
-          status === 'changes_requested' ? window.prompt(t('home.change_prompt')) || '' : '';
-        if (status === 'changes_requested' && !note) {
-          setBusyId(null);
-          return;
-        }
         const response = await fetch(`/api/outcomes/${encodeURIComponent(item.entry_id)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -183,6 +209,8 @@ export default function ConciergePage() {
             { title: item.title }
           ),
         });
+        setChangeFormId(null);
+        setChangeNote('');
         await refresh();
       } catch (error) {
         setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
@@ -380,7 +408,10 @@ export default function ConciergePage() {
                     type="button"
                     className="action-button secondary"
                     disabled={busyId === item.entry_id}
-                    onClick={() => void recordOutcomeVerdict(item, 'changes_requested')}
+                    onClick={() => {
+                      setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
+                      setChangeNote('');
+                    }}
                   >
                     {t('home.request_changes')}
                   </button>
@@ -393,6 +424,44 @@ export default function ConciergePage() {
                     {t('home.reject')}
                   </button>
                 </div>
+                {changeFormId === item.entry_id ? (
+                  <form
+                    className="change-request-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void recordOutcomeVerdict(item, 'changes_requested', changeNote);
+                    }}
+                  >
+                    <label className="field-label">
+                      {t('home.change_prompt')}
+                      <textarea
+                        value={changeNote}
+                        rows={3}
+                        required
+                        onChange={(event) => setChangeNote(event.target.value)}
+                      />
+                    </label>
+                    <div className="button-row">
+                      <button
+                        type="submit"
+                        className="action-button"
+                        disabled={busyId === item.entry_id || !changeNote.trim()}
+                      >
+                        {t('home.change_send')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action-button secondary"
+                        onClick={() => {
+                          setChangeFormId(null);
+                          setChangeNote('');
+                        }}
+                      >
+                        {t('home.change_cancel')}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
               </div>
             ))
           )}

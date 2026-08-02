@@ -70,6 +70,8 @@
     "en": "Tell us what you would like changed. It will be sent to the owner.",
     "ja": "修正のご要望をお聞かせください（担当へそのまま伝わります）"
   },
+  "home.change_send": { "en": "Send change request", "ja": "修正依頼を送る" },
+  "home.change_cancel": { "en": "Cancel", "ja": "取り消す" },
   "home.approved_notice": {
     "en": "Approved “{title}”. The owner has been notified.",
     "ja": "「{title}」を承認いたしました。担当へお伝えします。"
@@ -283,6 +285,50 @@
   "setup.voice_registered": {
     "en": "Profile and voice profile registered.",
     "ja": "プロフィールと音声プロフィールを登録しました。"
+  },
+  "dock.title": { "en": "Ask the secretary", "ja": "秘書に相談" },
+  "dock.open": { "en": "Open the conversation", "ja": "会話を開く" },
+  "dock.close": { "en": "Minimize the conversation", "ja": "会話を折りたたむ" },
+  "dock.empty": {
+    "en": "How can we help today? Requests, status checks, and change requests are all welcome.",
+    "ja": "ご用件をどうぞ。ご依頼・状況のご確認・修正のご相談を承ります。"
+  },
+  "dock.placeholder": {
+    "en": "Type a request for the secretary…",
+    "ja": "秘書へのご依頼をご記入ください…"
+  },
+  "dock.send": { "en": "Send", "ja": "送信" },
+  "dock.busy": {
+    "en": "The secretary is preparing a reply…",
+    "ja": "秘書が確認しております…"
+  },
+  "dock.error": {
+    "en": "The message could not be sent: {error}",
+    "ja": "送信できませんでした: {error}"
+  },
+  "dock.you": { "en": "You", "ja": "あなた" },
+  "dock.secretary": { "en": "Secretary", "ja": "秘書" },
+  "dock.shape.clarification": { "en": "Question for you", "ja": "確認の伺い" },
+  "dock.shape.execution_preview": { "en": "Execution preview", "ja": "実行前のご確認" },
+  "dock.shape.status_summary": { "en": "Status summary", "ja": "状況のご報告" },
+  "dock.shape.delivery_summary": { "en": "Delivery summary", "ja": "成果のご報告" },
+  "dock.promoted.mission": {
+    "en": "Registered as an execution unit: {label}",
+    "ja": "実行単位として登録: {label}"
+  },
+  "dock.promoted.task_session": {
+    "en": "Handed to a dedicated work session: {label}",
+    "ja": "担当セッションへ引き継ぎ: {label}"
+  },
+  "dock.confirm_proceed": { "en": "Yes, please proceed.", "ja": "はい、進めてください。" },
+  "dock.decline_proceed": { "en": "No, please hold off.", "ja": "いいえ、見送ってください。" },
+  "api.text_required": {
+    "en": "Please enter a message.",
+    "ja": "メッセージをご記入ください。"
+  },
+  "api.message_unavailable": {
+    "en": "The secretary cannot respond right now. Please check the reasoning backend status on the Setup page, then send your request again.",
+    "ja": "秘書がただ今応答できません。セットアップ画面で推論バックエンドの状態をご確認のうえ、もう一度お送りください。"
   },
   "api.file_required": { "en": "A file is required.", "ja": "ファイルが必要です。" },
   "api.file_size": {
