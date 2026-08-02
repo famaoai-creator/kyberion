@@ -21,6 +21,8 @@ describe('concierge surface contract', () => {
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/setup/route.ts',
       'src/app/api/message/route.ts',
+      'src/app/api/voice/listen-once/route.ts',
+      'src/app/api/voice/stop/route.ts',
     ];
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
@@ -61,6 +63,7 @@ describe('concierge surface contract', () => {
       'src/app/api/theme/route.ts',
       'src/app/api/response-status/route.ts',
       'src/app/api/events/route.ts',
+      'src/app/api/voice/status/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).not.toMatch(/export (async )?function (POST|PUT|DELETE|PATCH)/);
@@ -111,6 +114,47 @@ describe('concierge surface contract', () => {
     expect(messages).toContain('dock.shape.delivery_summary');
     // ceo-ux.md: no internal execution vocabulary in dock copy.
     expect(dock).not.toMatch(/actuator|pipeline|ADF/i);
+  });
+
+  it('implements the CS-02 voice tiers with guarded proxies and Tier-0 fallback', () => {
+    const status = fs.readFileSync(path.join(appDir, 'src/app/api/voice/status/route.ts'), 'utf8');
+    const listenOnce = fs.readFileSync(
+      path.join(appDir, 'src/app/api/voice/listen-once/route.ts'),
+      'utf8'
+    );
+    const stop = fs.readFileSync(path.join(appDir, 'src/app/api/voice/stop/route.ts'), 'utf8');
+    const hook = fs.readFileSync(path.join(appDir, 'src/lib/use-voice.ts'), 'utf8');
+    const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // Tier detection: bounded /health probe that degrades to available:false
+    // instead of throwing — the dock must work with voice-hub down.
+    expect(status).toContain('/health');
+    expect(status).toContain('AbortSignal.timeout');
+    expect(status).toContain('available: false');
+    // The mutating proxies forward to the real voice-hub endpoints and are
+    // guarded like every other write route.
+    expect(listenOnce).toContain('requireConciergeMutationAccess');
+    expect(listenOnce).toContain('/api/listen-once');
+    expect(listenOnce).toContain('AbortSignal.timeout');
+    expect(stop).toContain('requireConciergeMutationAccess');
+    expect(stop).toContain('/api/stop-speaking');
+    // Tier 0 lives in the hook: browser SpeechRecognition (webkit fallback)
+    // for input, speechSynthesis for output, persisted output preference.
+    expect(hook).toContain('webkitSpeechRecognition');
+    expect(hook).toContain('speechSynthesis');
+    expect(hook).toContain("fetch('/api/voice/status')");
+    expect(hook).toContain('localStorage');
+    expect(hook).toContain("fetch('/api/voice/listen-once'");
+    expect(hook).toContain("fetch('/api/voice/stop'");
+    // The dock wires the hook: mic button with pressed state, and voice-hub
+    // replies are never spoken twice by the browser.
+    expect(dock).toContain('useVoice');
+    expect(dock).toContain('aria-pressed');
+    expect(dock).toContain("payload.mode === 'voice-hub'");
+    expect(dock).toContain('notifyServerSpeech');
+    expect(messages).toContain('dock.voice.no_transcript');
+    expect(messages).toContain('dock.voice.stop_speaking');
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {

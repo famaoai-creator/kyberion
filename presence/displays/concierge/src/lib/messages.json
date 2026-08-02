@@ -322,6 +322,32 @@
   },
   "dock.confirm_proceed": { "en": "Yes, please proceed.", "ja": "はい、進めてください。" },
   "dock.decline_proceed": { "en": "No, please hold off.", "ja": "いいえ、見送ってください。" },
+  "dock.voice.mic_start": { "en": "Speak to the secretary", "ja": "音声で話す" },
+  "dock.voice.mic_stop": { "en": "Stop listening", "ja": "聞き取りを停止" },
+  "dock.voice.listening": { "en": "Listening…", "ja": "聞いています…" },
+  "dock.voice.output_on": {
+    "en": "Voice replies: on",
+    "ja": "読み上げ: オン"
+  },
+  "dock.voice.output_off": {
+    "en": "Voice replies: off",
+    "ja": "読み上げ: オフ"
+  },
+  "dock.voice.speaking": { "en": "Speaking…", "ja": "読み上げ中…" },
+  "dock.voice.stop_speaking": { "en": "Stop speaking", "ja": "読み上げを停止" },
+  "dock.voice.settings": { "en": "Voice settings", "ja": "音声設定" },
+  "dock.voice.backend": { "en": "Recognition backend", "ja": "音声認識バックエンド" },
+  "dock.voice.auto": { "en": "Auto", "ja": "自動" },
+  "dock.voice.device": { "en": "Microphone", "ja": "マイク" },
+  "dock.voice.default_device": { "en": "Default device", "ja": "既定のデバイス" },
+  "dock.voice.no_transcript": {
+    "en": "We could not catch that. Please try speaking again.",
+    "ja": "音声を聞き取れませんでした。もう一度お話しください。"
+  },
+  "dock.voice.error": {
+    "en": "Voice input did not work: {error}",
+    "ja": "音声入力がうまくいきませんでした: {error}"
+  },
   "api.text_required": {
     "en": "Please enter a message.",
     "ja": "メッセージをご記入ください。"
