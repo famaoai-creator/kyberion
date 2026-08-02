@@ -691,5 +691,149 @@
   "api.memory.rejected": {
     "en": "Understood — we will let this learning go.",
     "ja": "承知しました。この学びは見送ります。"
+  },
+  "setup.plugins_title": { "en": "Plugins", "ja": "プラグイン" },
+  "setup.plugins_description": {
+    "en": "Review each extension's standing and decide activations right here — no terminal steps.",
+    "ja": "拡張機能の状態確認とご承認を、この画面だけで完結できます。"
+  },
+  "setup.plugins_caveat": {
+    "en": "Third-party plugin code never runs until you approve it here.",
+    "ja": "外部由来のプラグインのコードは、ここでご承認いただくまで一切実行されません。"
+  },
+  "setup.plugins_empty": {
+    "en": "No plugins are registered yet.",
+    "ja": "登録済みのプラグインはまだありません。"
+  },
+  "setup.plugin_status_activatable": { "en": "Ready to run", "ja": "稼働可能" },
+  "setup.plugin_status_pending": { "en": "Awaiting your approval", "ja": "承認待ち" },
+  "setup.plugin_status_blocked": { "en": "Broken", "ja": "破損" },
+  "setup.plugin_status_not_loadable": { "en": "Not loadable", "ja": "読み込み対象外" },
+  "setup.plugin_status_denied": { "en": "Declined", "ja": "見送り済み" },
+  "setup.plugin_trust_official": { "en": "Official", "ja": "公式" },
+  "setup.plugin_trust_curated": { "en": "Curated", "ja": "選定済み" },
+  "setup.plugin_trust_third_party": { "en": "Third-party", "ja": "外部由来" },
+  "setup.plugin_requested_by": { "en": "Requested by {value}", "ja": "申請元: {value}" },
+  "setup.plugin_approve": { "en": "Approve", "ja": "承認する" },
+  "setup.plugin_deny": { "en": "Decline", "ja": "見送る" },
+  "setup.plugin_confirm_approve": {
+    "en": "Approve this plugin? Its third-party code will become runnable.",
+    "ja": "このプラグインを承認しますか?外部由来のコードが実行できるようになります。"
+  },
+  "setup.plugin_confirm_deny": {
+    "en": "Decline this plugin? It will stay blocked from running.",
+    "ja": "このプラグインを見送りますか?引き続き実行されません。"
+  },
+  "setup.confirm_yes": { "en": "Yes, confirm", "ja": "はい、確定します" },
+  "setup.confirm_back": { "en": "Go back", "ja": "戻る" },
+  "api.plugin.invalid": {
+    "en": "The plugin decision request is not valid.",
+    "ja": "リクエストの内容が正しくありません。"
+  },
+  "api.plugin.not_found": {
+    "en": "That plugin could not be found.",
+    "ja": "このプラグインは見つかりませんでした。"
+  },
+  "api.plugin.broken": {
+    "en": "This plugin's contents are broken, so it cannot be approved.",
+    "ja": "このプラグインは内容が壊れているため、承認できません。"
+  },
+  "api.plugin.no_decision_needed": {
+    "en": "This plugin is already allowed to run — no decision is needed.",
+    "ja": "このプラグインは既に稼働可能のため、ご判断は不要です。"
+  },
+  "api.plugin.no_approval": {
+    "en": "No approval request is attached to this plugin; it needs to be re-registered before a decision is possible.",
+    "ja": "このプラグインには承認手続きが見当たりません。ご判断の前に登録し直しが必要です。"
+  },
+  "api.plugin.already_decided": {
+    "en": "This plugin has already been decided.",
+    "ja": "このプラグインは既にご判断いただいております。"
+  },
+  "api.plugin.approved": {
+    "en": "Understood — plugin {id} is now allowed to run.",
+    "ja": "承知しました。プラグイン {id} は稼働可能になりました。"
+  },
+  "api.plugin.approved_pending": {
+    "en": "Your approval was recorded, but plugin {id} is not runnable yet — please check its status again shortly.",
+    "ja": "ご承認は記録しましたが、プラグイン {id} はまだ稼働可能になっていません。しばらくして状態をご確認ください。"
+  },
+  "api.plugin.denied": {
+    "en": "Understood — plugin {id} will stay blocked from running.",
+    "ja": "承知しました。プラグイン {id} は見送り、引き続き実行されません。"
+  },
+  "api.plugin.failed": {
+    "en": "We could not record the decision. Please try again in a moment.",
+    "ja": "ご判断を記録できませんでした。少し置いてからもう一度お試しください。"
+  },
+  "setup.governance_title": { "en": "Governance settings", "ja": "ガバナンス設定" },
+  "setup.governance_description": {
+    "en": "Settings are never edited directly. Your request is filed as a governed change and takes effect only after it passes its approval and checks.",
+    "ja": "設定は直接書き換えません。ご依頼は統制された変更依頼として起票され、承認と点検を通ってはじめて反映されます。"
+  },
+  "setup.governance_preset": { "en": "Change type", "ja": "変更の種類" },
+  "setup.governance_preset_placeholder": {
+    "en": "Select a change type…",
+    "ja": "選択してください…"
+  },
+  "setup.governance_tenant": { "en": "Tenant", "ja": "対象テナント" },
+  "setup.governance_targets": {
+    "en": "Touches {count} governed location(s)",
+    "ja": "変更対象: {count} 箇所"
+  },
+  "setup.governance_required": { "en": "required", "ja": "必須" },
+  "setup.governance_submit": { "en": "File the change request", "ja": "変更依頼を起票する" },
+  "setup.governance_confirm": {
+    "en": "File this change request? It takes effect only after it is approved.",
+    "ja": "この内容で変更依頼を起票しますか?反映はご承認の後になります。"
+  },
+  "setup.governance_recent": { "en": "Recent change requests", "ja": "最近の変更依頼" },
+  "setup.governance_recent_empty": {
+    "en": "No change requests have been filed yet.",
+    "ja": "変更依頼はまだありません。"
+  },
+  "setup.governance_status_draft": {
+    "en": "Filed — awaiting approval",
+    "ja": "起票済み(承認待ち)"
+  },
+  "setup.governance_status_in_progress": { "en": "Being carried out", "ja": "反映作業中" },
+  "setup.governance_status_done": { "en": "In effect", "ja": "反映済み" },
+  "setup.governance_status_failed": { "en": "Failed", "ja": "失敗" },
+  "api.config.preset_invalid": {
+    "en": "Please choose a valid change type.",
+    "ja": "変更の種類を正しくお選びください。"
+  },
+  "api.config.tenant_invalid": {
+    "en": "Please choose a registered tenant.",
+    "ja": "登録済みのテナントをお選びください。"
+  },
+  "api.config.input_invalid": {
+    "en": "The value for \"{key}\" is not acceptable.",
+    "ja": "「{key}」の入力内容が正しくありません。"
+  },
+  "api.config.input_missing": {
+    "en": "\"{key}\" is required.",
+    "ja": "「{key}」の入力が必要です。"
+  },
+  "api.config.created": {
+    "en": "Change request {id} has been filed. It will take effect only after it passes approval.",
+    "ja": "変更依頼 {id} を起票しました。反映はご承認を通ってからになります。"
+  },
+  "api.config.failed": {
+    "en": "We could not file the change request. Please try again in a moment.",
+    "ja": "変更依頼を起票できませんでした。少し置いてからもう一度お試しください。"
+  },
+  "dock.quick.label": { "en": "Quick requests", "ja": "よくあるご依頼" },
+  "dock.quick.meeting": {
+    "en": "Please join my meeting",
+    "ja": "会議に参加してほしい"
+  },
+  "dock.quick.email": {
+    "en": "I'd like to review an email draft",
+    "ja": "メールの下書きを確認したい"
+  },
+  "dock.quick.calendar": {
+    "en": "What's on my schedule today?",
+    "ja": "今日の予定を教えて"
   }
 }

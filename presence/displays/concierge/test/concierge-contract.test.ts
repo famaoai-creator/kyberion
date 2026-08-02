@@ -27,6 +27,8 @@ describe('concierge surface contract', () => {
       'src/app/api/hygiene/[id]/route.ts',
       'src/app/api/ingest/route.ts',
       'src/app/api/memory-queue/[id]/route.ts',
+      'src/app/api/plugins/[id]/route.ts',
+      'src/app/api/config-missions/route.ts',
     ];
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
@@ -71,6 +73,7 @@ describe('concierge surface contract', () => {
       'src/app/api/hygiene/route.ts',
       'src/app/api/outcomes/[id]/preview/route.ts',
       'src/app/api/memory-queue/route.ts',
+      'src/app/api/plugins/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).not.toMatch(/export (async )?function (POST|PUT|DELETE|PATCH)/);
@@ -386,6 +389,108 @@ describe('concierge surface contract', () => {
     expect(page).not.toContain('window.confirm');
     expect(messages).toContain('記憶にしてよいか(学びの承認)');
     expect(messages).toContain('コツとして残したい学び');
+  });
+
+  it('collapses plugin approval into one guarded screen (CS-03)', () => {
+    const listRoute = fs.readFileSync(path.join(appDir, 'src/app/api/plugins/route.ts'), 'utf8');
+    const decisionRoute = fs.readFileSync(
+      path.join(appDir, 'src/app/api/plugins/[id]/route.ts'),
+      'utf8'
+    );
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // The list reuses the loader's own provenance gate and the managed
+    // registry — it can never claim more than the loader would execute, and
+    // it never runs plugin code (listing is JSON.parse only, KD-06).
+    expect(listRoute).toContain('listManagedPlugins');
+    expect(listRoute).toContain('authorizeSkillPlugin');
+    expect(listRoute).toContain('readSkillPluginsConfig');
+    expect(listRoute).not.toContain('installPluginManaged');
+
+    // The decision route replaces the 3-step CLI ceremony: decide the bound
+    // approval request in the shared store, THEN refresh the persisted
+    // activation status and report what is now true on disk.
+    expect(decisionRoute).toContain('requireConciergeMutationAccess');
+    expect(decisionRoute).toContain('loadApprovalRequest');
+    expect(decisionRoute).toContain('decideApprovalRequest');
+    expect(decisionRoute).toContain('refreshManagedPluginActivation');
+    expect(decisionRoute).toContain("decidedByRole: 'sovereign'");
+    expect(decisionRoute).toContain("decidedByType: 'human'");
+    // Broken manifests stay permanently blocked — approving one is refused.
+    expect(decisionRoute).toContain('blocked_broken_manifest');
+    for (const source of [listRoute, decisionRoute]) {
+      expect(source).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
+      expect(source).not.toMatch(/setInterval\(|setTimeout\(/);
+    }
+
+    // The setup section shows status chips, decides via inline confirm only,
+    // and carries the trust caveat (third-party code runs only after approval).
+    expect(setupPage).toContain('id="setup-plugins"');
+    expect(setupPage).toContain("t('setup.plugins_caveat')");
+    expect(setupPage).toContain("'setup.plugin_confirm_approve'");
+    expect(setupPage).toContain("'setup.plugin_confirm_deny'");
+    expect(setupPage).not.toContain('window.confirm');
+    expect(messages).toContain('稼働可能');
+    expect(messages).toContain('承認待ち');
+    expect(messages).toContain('破損');
+    expect(messages).toContain('ご承認いただくまで一切実行されません');
+  });
+
+  it('files governance changes only as governed config missions (CS-03)', () => {
+    const route = fs.readFileSync(
+      path.join(appDir, 'src/app/api/config-missions/route.ts'),
+      'utf8'
+    );
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // Creation goes exclusively through the built config-mission CLI — the
+    // route never writes governance JSON directly, and it never executes the
+    // change: 'apply' must not appear anywhere in the route (the GUI stops at
+    // filing; the change takes effect only through the governed mission flow).
+    expect(route).toContain('requireConciergeMutationAccess');
+    expect(route).toContain('dist/scripts/config_mission.js');
+    expect(route).toContain('safeExecResult');
+    expect(route).toContain('buildExecutionEnv');
+    expect(route).not.toContain('apply');
+    expect(route).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
+    expect(route).not.toMatch(/setInterval\(|setTimeout\(/);
+    // Presets and tenants are validated server-side; argv values are fenced
+    // (single key=value elements, leading '-' refused).
+    expect(route).toContain('listTenantProfileSlugs');
+    expect(route).toContain("value.startsWith('-')");
+    // Exit code 0 alone is not success: the CLI's verdict line is parsed and
+    // the draft brief is verified on disk before anything is claimed.
+    expect(route).toContain('Config mission created:');
+    expect(route).toContain("brief.status !== 'draft'");
+
+    // The setup section is preset-picker → declared inputs → inline confirm,
+    // and the copy says the change takes effect only after approval.
+    expect(setupPage).toContain('id="setup-governance"');
+    expect(setupPage).toContain("t('setup.governance_confirm')");
+    expect(setupPage).not.toContain('window.confirm');
+    expect(messages).toContain('反映はご承認を通ってからになります');
+    expect(messages).toContain('変更依頼を起票する');
+  });
+
+  it('offers quick-request chips that go through the normal message path (CS-03 方式C)', () => {
+    const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // The chips only prefill and send text through send() → /api/message —
+    // routing stays with the orchestrator, no per-chip special case, and they
+    // appear only while the log is still empty.
+    expect(dock).toContain("'dock.quick.meeting'");
+    expect(dock).toContain("'dock.quick.email'");
+    expect(dock).toContain("'dock.quick.calendar'");
+    expect(dock).toContain('dock-quick-chip');
+    expect(dock).toContain('messages.length === 0');
+    expect(dock).toContain('void send(t(key))');
+    expect(dock).not.toMatch(/fetch\('\/api\/(meeting|email|calendar)/);
+    expect(messages).toContain('会議に参加してほしい');
+    expect(messages).toContain('メールの下書きを確認したい');
+    expect(messages).toContain('今日の予定を教えて');
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {

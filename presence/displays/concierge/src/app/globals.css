@@ -368,6 +368,22 @@ body {
   padding-top: 10px;
 }
 
+/* CS-03 プラグイン承認・ガバナンス設定 — same inline-confirm ceremony as the
+   hygiene and memory panes: the concierge asks, only the human decides. */
+
+.plugin-confirm,
+.governance-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+.pane-subheading {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
 /* CS-03 文書取込 — one-document-at-a-time ingest ceremony (no watch folder).
    The dropzone is static (no animation → no prefers-reduced-motion override). */
 
@@ -597,6 +613,41 @@ body {
   background: #fff;
   color: inherit;
   font: inherit;
+}
+
+/* Quick-request chips (CS-03 方式C) — prefilled asks that go through the
+   normal message path; shown only while the log is still empty. */
+
+.dock-quick-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+}
+
+.dock-quick-chip {
+  border: 1px solid #d8d2c4;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.dock-quick-chip:hover:not(:disabled) {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+.dock-quick-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Voice tier controls (CS-02) — mic button, output toggle, speaking state. */

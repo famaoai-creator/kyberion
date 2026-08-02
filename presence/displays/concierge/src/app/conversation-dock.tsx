@@ -30,6 +30,16 @@ const SHAPE_LABEL_KEYS: Record<Exclude<ConversationShape, 'reply'>, ConciergeMes
   delivery_summary: 'dock.shape.delivery_summary',
 };
 
+// CS-03 会話クイック起票 (方式C): prefilled asks for meetings, email drafts,
+// and today's calendar. Each chip only fills and sends the text through the
+// normal /api/message path — routing stays with the orchestrator, there is no
+// special-case handling per chip.
+const QUICK_REQUEST_KEYS: ConciergeMessageKey[] = [
+  'dock.quick.meeting',
+  'dock.quick.email',
+  'dock.quick.calendar',
+];
+
 function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -346,6 +356,21 @@ export function ConversationDock() {
               </select>
             </label>
           ) : null}
+        </div>
+      ) : null}
+      {messages.length === 0 ? (
+        <div className="dock-quick-row" role="group" aria-label={t('dock.quick.label')}>
+          {QUICK_REQUEST_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className="dock-quick-chip"
+              disabled={busy}
+              onClick={() => void send(t(key))}
+            >
+              {t(key)}
+            </button>
+          ))}
         </div>
       ) : null}
       <form className="dock-input-row" onSubmit={submitDraft}>
