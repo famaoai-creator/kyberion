@@ -71,6 +71,10 @@
       "types": "./dist/approval-store.d.ts",
       "default": "./dist/approval-store.js"
     },
+    "./approval-audit": {
+      "types": "./dist/approval-audit.d.ts",
+      "default": "./dist/approval-audit.js"
+    },
     "./approval-cowork-adapter": {
       "types": "./dist/approval-cowork-adapter.d.ts",
       "default": "./dist/approval-cowork-adapter.js"
@@ -122,6 +126,10 @@
     "./environment-capability-probes": {
       "types": "./dist/environment-capability-probes.d.ts",
       "default": "./dist/environment-capability-probes.js"
+    },
+    "./finance-controller": {
+      "types": "./dist/finance-controller.d.ts",
+      "default": "./dist/finance-controller.js"
     },
     "./ledger": {
       "types": "./dist/ledger.d.ts",
