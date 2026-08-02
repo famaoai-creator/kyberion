@@ -6,6 +6,7 @@ import {
   getBrowserOnboardingState,
   listAgentIdentities,
   listTenantProfileSlugs,
+  loadNotificationPreferences,
   readTenantProfile,
   resolveActiveProfileRoot,
   pathResolver,
@@ -101,6 +102,60 @@ export function GET(req: NextRequest) {
       configured: configuredServices.has(service.id),
     }));
 
+    const onboardingComplete =
+      (onboarding.onboarding as Record<string, unknown> | null)?.status === 'complete';
+    const avatarRegistered = secureIo.withSensitivePathMediation(() => safeExistsSync(avatarPath));
+    const voiceProfileCount = Array.isArray(onboarding.voice_profiles)
+      ? onboarding.voice_profiles.length
+      : 0;
+    const reasoningReady =
+      reasoning !== 'not-installed' && reasoning !== 'stub' && reasoning !== 'unknown';
+    const notificationPreferences = withExecutionContext('sovereign_concierge', () =>
+      secureIo.withSensitivePathMediation(() => loadNotificationPreferences())
+    );
+
+    // CS-03: every incomplete item carries a machine-actionable descriptor.
+    // `action: navigate` jumps to the in-page section that fixes it; only the
+    // reasoning backend has no in-app fix, so it degrades honestly to polite
+    // guidance with the terminal command kept visually secondary in the UI.
+    const diagnostics: Array<{
+      id: string;
+      status: 'ok' | 'incomplete' | 'error';
+      action?: { type: 'navigate'; target: string };
+      command?: string;
+    }> = [
+      {
+        id: 'profile',
+        status: onboardingComplete ? 'ok' : 'incomplete',
+        action: { type: 'navigate', target: '#setup-profile' },
+      },
+      {
+        id: 'avatar',
+        status: avatarRegistered ? 'ok' : 'incomplete',
+        action: { type: 'navigate', target: '#setup-media' },
+      },
+      {
+        id: 'voice',
+        status: voiceProfileCount > 0 ? 'ok' : 'incomplete',
+        action: { type: 'navigate', target: '#setup-media' },
+      },
+      {
+        id: 'services',
+        status: configuredServices.size > 0 ? 'ok' : 'incomplete',
+        action: { type: 'navigate', target: '#setup-services' },
+      },
+      {
+        id: 'notifications',
+        status: notificationPreferences.default_channel ? 'ok' : 'incomplete',
+        action: { type: 'navigate', target: '#setup-notifications' },
+      },
+      {
+        id: 'reasoning',
+        status: reasoningReady ? 'ok' : 'incomplete',
+        command: 'pnpm reasoning:setup',
+      },
+    ];
+
     return NextResponse.json({
       ok: true,
       setup: {
@@ -123,9 +178,8 @@ export function GET(req: NextRequest) {
             (onboarding.agent_identity as Record<string, unknown> | null)?.agent_id ||
               'sovereign-agent'
           ),
-          onboarding_complete:
-            (onboarding.onboarding as Record<string, unknown> | null)?.status === 'complete',
-          avatar_registered: secureIo.withSensitivePathMediation(() => safeExistsSync(avatarPath)),
+          onboarding_complete: onboardingComplete,
+          avatar_registered: avatarRegistered,
           avatar_source: String(identity.avatar_source || ''),
           voice_profiles: Array.isArray(onboarding.voice_profiles)
             ? onboarding.voice_profiles.map((voice) => ({
@@ -158,30 +212,17 @@ export function GET(req: NextRequest) {
         },
         service_catalog: serviceCatalog,
         providers: onboarding.providers,
+        diagnostics,
+        // ceo-ux.md: no internal execution vocabulary (pipeline IDs, shell
+        // commands) in capability copy — capabilities either link to an
+        // in-app section or are available through the conversation dock.
         capabilities: [
           { id: 'approvals', label: t('cap.approvals'), status: 'ready', href: '/' },
-          {
-            id: 'schedule',
-            label: t('cap.schedule'),
-            status: 'ready',
-            pipeline: 'schedule-summary-and-coordination',
-          },
-          {
-            id: 'email',
-            label: t('cap.email'),
-            status: 'ready',
-            pipeline: 'email-triage-and-reply-draft',
-          },
-          { id: 'voice', label: t('cap.voice'), status: 'ready', pipeline: 'clone-my-voice' },
-          { id: 'device', label: t('cap.device'), status: 'guided', command: 'pnpm onboard' },
+          { id: 'schedule', label: t('cap.schedule'), status: 'ready' },
+          { id: 'email', label: t('cap.email'), status: 'ready' },
+          { id: 'voice', label: t('cap.voice'), status: 'ready' },
+          { id: 'device', label: t('cap.device'), status: 'ready', href: '#setup-media' },
         ],
-        commands: {
-          onboarding: t('command.onboarding'),
-          surfaces: 'pnpm surfaces:status / pnpm surfaces:reconcile',
-          reasoning: t('command.reasoning'),
-          company: 'pnpm company:bootstrap --list',
-          minutes: 'pnpm minutes:record --mission <ID>',
-        },
       },
     });
   } catch (error) {
