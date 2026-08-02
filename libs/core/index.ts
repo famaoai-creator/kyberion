@@ -1021,6 +1021,11 @@ export type {
   AgentExecutionReceipt,
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
+export { CoordinatedAgentExecutionPort } from './coordinated-agent-execution-port.js';
+export type {
+  CoordinatedAgentExecutionReceipt,
+  CoordinatedAgentTaskEnvelope,
+} from './coordinated-agent-execution-port.js';
 export {
   getActuatorForwardingPort,
   registerActuatorForwardingPort,
