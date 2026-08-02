@@ -154,42 +154,43 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 
 ## tuning (34)
 
-| Variable                                   | Type   | Required | Description    |
-| ------------------------------------------ | ------ | -------- | -------------- |
-| `KYBERION_AGENT_BOOT_READY_TIMEOUT_MS`     | number | no       | _undocumented_ |
-| `KYBERION_AGENT_IDLE_TIMEOUT_MS`           | number | no       | _undocumented_ |
-| `KYBERION_AGENT_INFLIGHT_LIMIT`            | number | no       | _undocumented_ |
-| `KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT`   | number | no       | _undocumented_ |
-| `KYBERION_AGENT_TURN_TIMEOUT_MS`           | number | no       | _undocumented_ |
-| `KYBERION_AGY_CLI_TIMEOUT_MS`              | number | no       | _undocumented_ |
-| `KYBERION_AUDIT_FORWARDER_TIMEOUT_MS`      | number | no       | _undocumented_ |
-| `KYBERION_CHRONOS_IDLE_TIMEOUT_MS`         | number | no       | _undocumented_ |
-| `KYBERION_CLAUDE_CLI_TIMEOUT_MS`           | number | no       | _undocumented_ |
-| `KYBERION_CODEX_CLI_TIMEOUT_MS`            | number | no       | _undocumented_ |
-| `KYBERION_DELEGATION_KILL_GRACE_MS`        | number | no       | _undocumented_ |
-| `KYBERION_DELEGATION_WALL_CLOCK_MS`        | number | no       | _undocumented_ |
-| `KYBERION_DEPLOY_TIMEOUT_MS`               | number | no       | _undocumented_ |
-| `KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS`      | number | no       | _undocumented_ |
-| `KYBERION_GEMINI_CLI_TIMEOUT`              | number | no       | _undocumented_ |
-| `KYBERION_GENERATION_SCHEDULE_INTERVAL_MS` | number | no       | _undocumented_ |
-| `KYBERION_GLOBAL_INFLIGHT_LIMIT`           | number | no       | _undocumented_ |
-| `KYBERION_GROK_CLI_TIMEOUT_MS`             | number | no       | _undocumented_ |
-| `KYBERION_KILL_SWITCH_INTERVAL_MS`         | number | no       | _undocumented_ |
-| `KYBERION_MEDIA_BACKEND_PROBE_TTL_MS`      | number | no       | _undocumented_ |
-| `KYBERION_MFLUX_TIMEOUT_MS`                | number | no       | _undocumented_ |
-| `KYBERION_NEW_TIMEOUT_MS`                  | number | no       | _undocumented_ |
-| `KYBERION_OAUTH_CALLBACK_PORT`             | number | no       | _undocumented_ |
-| `KYBERION_PEER_PORT`                       | number | no       | _undocumented_ |
-| `KYBERION_PROVIDER_DEMOTION_TTL_MS`        | number | no       | _undocumented_ |
-| `KYBERION_PTY_IDLE_TIMEOUT_MS`             | number | no       | _undocumented_ |
-| `KYBERION_REASONING_IN_PLACE_RETRIES`      | number | no       | _undocumented_ |
-| `KYBERION_REASONING_RETRY_BASE_MS`         | number | no       | _undocumented_ |
-| `KYBERION_RUNTIME_SWEEP_INTERVAL_MS`       | number | no       | _undocumented_ |
-| `KYBERION_SMTP_PORT`                       | number | no       | _undocumented_ |
-| `KYBERION_STT_TIMEOUT_MS`                  | number | no       | _undocumented_ |
-| `KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS`  | number | no       | _undocumented_ |
-| `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
-| `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
+| Variable                                   | Type   | Required | Description                              |
+| ------------------------------------------ | ------ | -------- | ---------------------------------------- |
+| `KYBERION_AGENT_BOOT_READY_TIMEOUT_MS`     | number | no       | _undocumented_                           |
+| `KYBERION_AGENT_IDLE_TIMEOUT_MS`           | number | no       | _undocumented_                           |
+| `KYBERION_AGENT_INFLIGHT_LIMIT`            | number | no       | _undocumented_                           |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT`   | number | no       | _undocumented_                           |
+| `KYBERION_AGENT_TURN_TIMEOUT_MS`           | number | no       | _undocumented_                           |
+| `KYBERION_AGY_CLI_TIMEOUT_MS`              | number | no       | _undocumented_                           |
+| `KYBERION_AUDIT_FORWARDER_TIMEOUT_MS`      | number | no       | _undocumented_                           |
+| `KYBERION_CHRONOS_IDLE_TIMEOUT_MS`         | number | no       | _undocumented_                           |
+| `KYBERION_CLAUDE_CLI_TIMEOUT_MS`           | number | no       | _undocumented_                           |
+| `KYBERION_CODEX_CLI_TIMEOUT_MS`            | number | no       | _undocumented_                           |
+| `KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS`    | number | no       | 120000 ms per mission work-item response |
+| `KYBERION_DELEGATION_KILL_GRACE_MS`        | number | no       | _undocumented_                           |
+| `KYBERION_DELEGATION_WALL_CLOCK_MS`        | number | no       | _undocumented_                           |
+| `KYBERION_DEPLOY_TIMEOUT_MS`               | number | no       | _undocumented_                           |
+| `KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS`      | number | no       | _undocumented_                           |
+| `KYBERION_GEMINI_CLI_TIMEOUT`              | number | no       | _undocumented_                           |
+| `KYBERION_GENERATION_SCHEDULE_INTERVAL_MS` | number | no       | _undocumented_                           |
+| `KYBERION_GLOBAL_INFLIGHT_LIMIT`           | number | no       | _undocumented_                           |
+| `KYBERION_GROK_CLI_TIMEOUT_MS`             | number | no       | _undocumented_                           |
+| `KYBERION_KILL_SWITCH_INTERVAL_MS`         | number | no       | _undocumented_                           |
+| `KYBERION_MEDIA_BACKEND_PROBE_TTL_MS`      | number | no       | _undocumented_                           |
+| `KYBERION_MFLUX_TIMEOUT_MS`                | number | no       | _undocumented_                           |
+| `KYBERION_NEW_TIMEOUT_MS`                  | number | no       | _undocumented_                           |
+| `KYBERION_OAUTH_CALLBACK_PORT`             | number | no       | _undocumented_                           |
+| `KYBERION_PEER_PORT`                       | number | no       | _undocumented_                           |
+| `KYBERION_PROVIDER_DEMOTION_TTL_MS`        | number | no       | _undocumented_                           |
+| `KYBERION_PTY_IDLE_TIMEOUT_MS`             | number | no       | _undocumented_                           |
+| `KYBERION_REASONING_IN_PLACE_RETRIES`      | number | no       | _undocumented_                           |
+| `KYBERION_REASONING_RETRY_BASE_MS`         | number | no       | _undocumented_                           |
+| `KYBERION_RUNTIME_SWEEP_INTERVAL_MS`       | number | no       | _undocumented_                           |
+| `KYBERION_SMTP_PORT`                       | number | no       | _undocumented_                           |
+| `KYBERION_STT_TIMEOUT_MS`                  | number | no       | _undocumented_                           |
+| `KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS`  | number | no       | _undocumented_                           |
+| `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_                           |
+| `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_                           |
 
 ## provider (70)
 
