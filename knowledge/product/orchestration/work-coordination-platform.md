@@ -18,12 +18,15 @@ Kyberion の開発ワークフロー全体は [`kyberion-development-workflow.md
 ## What It Does
 
 - `WorkItem` を共通の作業実体として扱う
+- WorkItem と依存関係を canonical Work Graph として扱い、実行面をまたいで同じ lease/attempt/handoff を共有する
 - Board は `WorkItem` の view として扱う
 - Peer messaging は coordination command の transport として使う
 - GitHub Issue / Jira Issue を `WorkItem` に取り込む
-- Mission 由来の NEXT_TASKS は `dispatch-tickets` で WorkItem と issue payload に展開する
+- Mission 由来の `NEXT_TASKS.json` は互換projectionへの入力として一方向にimportし、将来的にはWork Graphから再生成する
 - `dispatch-workitems` は、実行前に mission-scoped context pack を組み立てて、役割ごとに必要な最小コンテキストだけを agent に渡す
 - 個人 TODO / プロジェクトボード / peer queue / review queue を同じ実体から切り出す
+
+`NEXT_TASKS.json` は表示・既存CLI互換のために残すが、正規の所有権・依存関係・handoff・attempt状態ではない。agent-runtime、CLIサブエージェント、actuatorのいずれも、実行前にWorkItemをclaimし、実行後に同じWorkItemへ結果を記録する。実行面の統合境界は [`WORK_GRAPH_EXECUTION_UNIFICATION.ja.md`](../../../docs/developer/improvement-plans-2026-07/WORK_GRAPH_EXECUTION_UNIFICATION.ja.md) を参照する。
 
 Mission 型の作業では、`record-task` / `checkpoint` / `verify` / `distill` / `finish` によって board 外の mission state と board view を同期します。
 

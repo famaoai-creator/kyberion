@@ -2,13 +2,14 @@ import { safeExecResult } from './secure-io.js';
 
 export const VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-device-inventory-bridge' as const;
 
-export type VirtualDeviceKind = 'audio-input' | 'audio-output' | 'camera' | 'virtual-audio' | 'virtual-camera';
+export type VirtualDeviceKind =
+  'audio-input' | 'audio-output' | 'camera' | 'virtual-audio' | 'virtual-camera';
 
 export interface VirtualDeviceRecord {
   kind: VirtualDeviceKind;
   name: string;
   platform: NodeJS.Platform;
-  source: 'system_profiler' | 'ffmpeg' | 'pactl' | 'imagesnap' | 'heuristic';
+  source: 'system_profiler' | 'ffmpeg' | 'pactl' | 'imagesnap' | 'powershell' | 'heuristic';
   available: boolean;
   details?: Record<string, unknown>;
 }
@@ -41,7 +42,11 @@ export interface VirtualDeviceInventoryOptions {
   ffmpeg_bin?: string;
   pactl_bin?: string;
   imagesnap_bin?: string;
-  command_runner?: (command: string, args: string[]) => {
+  powershell_bin?: string;
+  command_runner?: (
+    command: string,
+    args: string[]
+  ) => {
     stdout: string;
     stderr: string;
     status: number | null;
@@ -53,6 +58,7 @@ const DEFAULT_SYSTEM_PROFILER = 'system_profiler';
 const DEFAULT_FFMPEG = 'ffmpeg';
 const DEFAULT_PACTL = 'pactl';
 const DEFAULT_IMAGESNAP = 'imagesnap';
+const DEFAULT_POWERSHELL = 'powershell.exe';
 
 function emptyInventory(): VirtualDeviceInventory {
   return {
@@ -86,7 +92,7 @@ function tryParseJson(text: string): unknown | null {
 function runCommand(
   opts: VirtualDeviceInventoryOptions,
   command: string,
-  args: string[],
+  args: string[]
 ): { stdout: string; stderr: string; status: number | null; error?: Error } {
   if (opts.command_runner) return opts.command_runner(command, args);
   return safeExecResult(command, args, { maxOutputMB: 5 });
@@ -94,21 +100,32 @@ function runCommand(
 
 function collectMacAudioDevices(
   opts: VirtualDeviceInventoryOptions,
-  bin: string,
+  bin: string
 ): VirtualDeviceRecord[] {
   const result = runCommand(opts, bin, ['SPAudioDataType', '-json']);
   const records: VirtualDeviceRecord[] = [];
   const payload = tryParseJson(result.stdout);
-  const sections = Array.isArray((payload as any)?.SPAudioDataType) ? (payload as any).SPAudioDataType : [];
+  const sections = Array.isArray((payload as any)?.SPAudioDataType)
+    ? (payload as any).SPAudioDataType
+    : [];
   for (const section of sections) {
     for (const device of Array.isArray(section?._items) ? section._items : []) {
       const name = String(device?._name || device?.coreaudio_device_name || '').trim();
       if (!name) continue;
-      const hasInput = Boolean(device?.coreaudio_default_audio_input_device || device?.coreaudio_input_source);
-      const hasOutput = Boolean(device?.coreaudio_default_audio_output_device || device?.coreaudio_output_source);
+      const hasInput = Boolean(
+        device?.coreaudio_default_audio_input_device || device?.coreaudio_input_source
+      );
+      const hasOutput = Boolean(
+        device?.coreaudio_default_audio_output_device || device?.coreaudio_output_source
+      );
       const isVirtual = /blackhole|loopback|meeting_in|meeting_out|pulse/i.test(name);
       const base: VirtualDeviceRecord = {
-        kind: hasInput && !hasOutput ? 'audio-input' : hasOutput && !hasInput ? 'audio-output' : 'audio-input',
+        kind:
+          hasInput && !hasOutput
+            ? 'audio-input'
+            : hasOutput && !hasInput
+              ? 'audio-output'
+              : 'audio-input',
         name,
         platform: process.platform,
         source: 'system_profiler',
@@ -135,12 +152,14 @@ function collectMacAudioDevices(
 function collectMacCameraDevices(
   opts: VirtualDeviceInventoryOptions,
   systemProfilerBin: string,
-  ffmpegBin: string,
+  ffmpegBin: string
 ): VirtualDeviceRecord[] {
   const records: VirtualDeviceRecord[] = [];
   const sp = runCommand(opts, systemProfilerBin, ['SPCameraDataType', '-json']);
   const payload = tryParseJson(sp.stdout);
-  const sections = Array.isArray((payload as any)?.SPCameraDataType) ? (payload as any).SPCameraDataType : [];
+  const sections = Array.isArray((payload as any)?.SPCameraDataType)
+    ? (payload as any).SPCameraDataType
+    : [];
   for (const section of sections) {
     for (const device of Array.isArray(section?._items) ? section._items : []) {
       const name = String(device?._name || device?.coremediaio_dal_device_name || '').trim();
@@ -159,7 +178,15 @@ function collectMacCameraDevices(
   }
 
   if (records.length === 0) {
-    const result = runCommand(opts, ffmpegBin, ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""']);
+    const result = runCommand(opts, ffmpegBin, [
+      '-hide_banner',
+      '-f',
+      'avfoundation',
+      '-list_devices',
+      'true',
+      '-i',
+      '""',
+    ]);
     const text = `${result.stdout}\n${result.stderr}`;
     const lines = text.split('\n');
     let section: 'audio' | 'video' | null = null;
@@ -220,7 +247,7 @@ function collectMacCameraDevices(
 
 function collectLinuxAudioDevices(
   opts: VirtualDeviceInventoryOptions,
-  bin: string,
+  bin: string
 ): VirtualDeviceRecord[] {
   const result = runCommand(opts, bin, ['list', 'short', 'sources']);
   const sourcesText = result.stdout || result.stderr;
@@ -275,9 +302,17 @@ function collectLinuxAudioDevices(
 
 function collectLinuxCameraDevices(
   opts: VirtualDeviceInventoryOptions,
-  bin: string,
+  bin: string
 ): VirtualDeviceRecord[] {
-  const result = runCommand(opts, bin, ['-hide_banner', '-f', 'v4l2', '-list_devices', 'true', '-i', '""']);
+  const result = runCommand(opts, bin, [
+    '-hide_banner',
+    '-f',
+    'v4l2',
+    '-list_devices',
+    'true',
+    '-i',
+    '""',
+  ]);
   const text = `${result.stdout}\n${result.stderr}`;
   const records: VirtualDeviceRecord[] = [];
   for (const line of text.split('\n')) {
@@ -295,49 +330,88 @@ function collectLinuxCameraDevices(
   return uniqueByName(records);
 }
 
+function collectWindowsDevices(
+  opts: VirtualDeviceInventoryOptions,
+  powershellBin: string
+): VirtualDeviceRecord[] {
+  const script =
+    "Get-PnpDevice -PresentOnly | Where-Object { $_.Class -in @('AudioEndpoint','Camera','Image') } | Select-Object Class,FriendlyName,Status,InstanceId | ConvertTo-Json -Compress";
+  const result = runCommand(opts, powershellBin, [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ]);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(result.stdout);
+  } catch {
+    return [];
+  }
+  const rows = Array.isArray(payload) ? payload : payload ? [payload] : [];
+  const records: VirtualDeviceRecord[] = [];
+  for (const row of rows as Array<Record<string, unknown>>) {
+    const name = String(row.FriendlyName || '').trim();
+    const deviceClass = String(row.Class || '').trim();
+    if (!name) continue;
+    const details = { status: row.Status, instance_id: row.InstanceId, class: deviceClass };
+    const virtual = /virtual|loopback|cable|blackhole|vb-audio|voicemeeter/i.test(name);
+    if (deviceClass === 'AudioEndpoint') {
+      const capture = /capture|input|microphone|マイク/i.test(name);
+      const kind: VirtualDeviceKind = capture ? 'audio-input' : 'audio-output';
+      records.push({
+        kind,
+        name,
+        platform: process.platform,
+        source: 'powershell',
+        available: row.Status === 'OK',
+        details,
+      });
+      if (virtual)
+        records.push({
+          kind: 'virtual-audio',
+          name,
+          platform: process.platform,
+          source: 'powershell',
+          available: row.Status === 'OK',
+          details,
+        });
+    } else if (/camera|image/i.test(deviceClass)) {
+      records.push({
+        kind: 'camera',
+        name,
+        platform: process.platform,
+        source: 'powershell',
+        available: row.Status === 'OK',
+        details,
+      });
+      if (virtual)
+        records.push({
+          kind: 'virtual-camera',
+          name,
+          platform: process.platform,
+          source: 'powershell',
+          available: row.Status === 'OK',
+          details,
+        });
+    }
+  }
+  return uniqueByName(records);
+}
+
 export class VirtualDeviceInventoryBridgeImpl implements VirtualDeviceInventoryBridge {
   readonly bridge_id = VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID;
 
   constructor(private readonly opts: VirtualDeviceInventoryOptions = {}) {}
 
   async scan(): Promise<VirtualDeviceInventory> {
-    const inventory = emptyInventory();
+    const inventory = resolveVirtualDeviceAdapter(process.platform).scan(this.opts);
 
-    if (process.platform === 'darwin') {
-      const audioBin = this.opts.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER;
-      const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG;
-      const imagesnapBin = this.opts.imagesnap_bin ?? DEFAULT_IMAGESNAP;
-
-      const audio = collectMacAudioDevices(this.opts, audioBin);
-      inventory.audio_inputs.push(...audio.filter((record) => record.kind === 'audio-input'));
-      inventory.audio_outputs.push(...audio.filter((record) => record.kind === 'audio-output'));
-      inventory.virtual_audio_devices.push(...audio.filter((record) => record.kind === 'virtual-audio'));
-
-      const cameras = collectMacCameraDevices(this.opts, audioBin, ffmpegBin);
-      inventory.cameras.push(...cameras.filter((record) => record.kind === 'camera'));
-      inventory.virtual_cameras.push(...cameras.filter((record) => record.kind === 'virtual-camera'));
-
-      if (cameras.length === 0) {
-        const probe = runCommand(this.opts, imagesnapBin, ['-h']);
-        if (probe.status === 0 || !probe.error) {
-          inventory.notes.push('imagesnap available but no camera was listed by ffmpeg avfoundation probe');
-        } else {
-          inventory.notes.push(`imagesnap probe failed: ${probe.stderr || probe.stdout || 'unknown reason'}`);
-        }
-      }
-    } else if (process.platform === 'linux') {
-      const pactlBin = this.opts.pactl_bin ?? DEFAULT_PACTL;
-      const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG;
-      const audio = collectLinuxAudioDevices(this.opts, pactlBin);
-      inventory.audio_inputs.push(...audio.filter((record) => record.kind === 'audio-input'));
-      inventory.audio_outputs.push(...audio.filter((record) => record.kind === 'audio-output'));
-      inventory.virtual_audio_devices.push(...audio.filter((record) => record.kind === 'virtual-audio'));
-      inventory.cameras.push(...collectLinuxCameraDevices(this.opts, ffmpegBin));
-    } else {
-      inventory.notes.push(`platform ${process.platform} has no built-in inventory probe; stub only`);
-    }
-
-    if (inventory.audio_inputs.length === 0 && inventory.audio_outputs.length === 0 && inventory.cameras.length === 0) {
+    if (
+      inventory.audio_inputs.length === 0 &&
+      inventory.audio_outputs.length === 0 &&
+      inventory.cameras.length === 0
+    ) {
       inventory.notes.push('no real devices discovered; bridge should fall back to stub');
     }
 
@@ -362,8 +436,87 @@ export class VirtualDeviceInventoryBridgeImpl implements VirtualDeviceInventoryB
   }
 }
 
+interface VirtualDevicePlatformAdapter {
+  scan(options: VirtualDeviceInventoryOptions): VirtualDeviceInventory;
+}
+
+class DarwinVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
+  scan(options: VirtualDeviceInventoryOptions): VirtualDeviceInventory {
+    const inventory = emptyInventory();
+    const audio = collectMacAudioDevices(
+      options,
+      options.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER
+    );
+    inventory.audio_inputs.push(...audio.filter((record) => record.kind === 'audio-input'));
+    inventory.audio_outputs.push(...audio.filter((record) => record.kind === 'audio-output'));
+    inventory.virtual_audio_devices.push(
+      ...audio.filter((record) => record.kind === 'virtual-audio')
+    );
+    const cameras = collectMacCameraDevices(
+      options,
+      options.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER,
+      options.ffmpeg_bin ?? DEFAULT_FFMPEG
+    );
+    inventory.cameras.push(...cameras.filter((record) => record.kind === 'camera'));
+    inventory.virtual_cameras.push(...cameras.filter((record) => record.kind === 'virtual-camera'));
+    return inventory;
+  }
+}
+
+class LinuxVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
+  scan(options: VirtualDeviceInventoryOptions): VirtualDeviceInventory {
+    const inventory = emptyInventory();
+    const audio = collectLinuxAudioDevices(options, options.pactl_bin ?? DEFAULT_PACTL);
+    inventory.audio_inputs.push(...audio.filter((record) => record.kind === 'audio-input'));
+    inventory.audio_outputs.push(...audio.filter((record) => record.kind === 'audio-output'));
+    inventory.virtual_audio_devices.push(
+      ...audio.filter((record) => record.kind === 'virtual-audio')
+    );
+    inventory.cameras.push(
+      ...collectLinuxCameraDevices(options, options.ffmpeg_bin ?? DEFAULT_FFMPEG)
+    );
+    return inventory;
+  }
+}
+
+class WindowsVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
+  scan(options: VirtualDeviceInventoryOptions): VirtualDeviceInventory {
+    const inventory = emptyInventory();
+    const devices = collectWindowsDevices(options, options.powershell_bin ?? DEFAULT_POWERSHELL);
+    inventory.audio_inputs.push(...devices.filter((record) => record.kind === 'audio-input'));
+    inventory.audio_outputs.push(...devices.filter((record) => record.kind === 'audio-output'));
+    inventory.cameras.push(...devices.filter((record) => record.kind === 'camera'));
+    inventory.virtual_audio_devices.push(
+      ...devices.filter((record) => record.kind === 'virtual-audio')
+    );
+    inventory.virtual_cameras.push(...devices.filter((record) => record.kind === 'virtual-camera'));
+    return inventory;
+  }
+}
+
+class StubVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
+  scan(): VirtualDeviceInventory {
+    const inventory = emptyInventory();
+    inventory.notes.push(`platform ${process.platform} has no built-in inventory probe; stub only`);
+    return inventory;
+  }
+}
+
+function resolveVirtualDeviceAdapter(platform: NodeJS.Platform): VirtualDevicePlatformAdapter {
+  switch (platform) {
+    case 'darwin':
+      return new DarwinVirtualDeviceAdapter();
+    case 'linux':
+      return new LinuxVirtualDeviceAdapter();
+    case 'win32':
+      return new WindowsVirtualDeviceAdapter();
+    default:
+      return new StubVirtualDeviceAdapter();
+  }
+}
+
 export function createVirtualDeviceInventoryBridge(
-  opts: VirtualDeviceInventoryOptions = {},
+  opts: VirtualDeviceInventoryOptions = {}
 ): VirtualDeviceInventoryBridge {
   return new VirtualDeviceInventoryBridgeImpl(opts);
 }

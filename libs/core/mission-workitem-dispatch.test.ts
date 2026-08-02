@@ -222,7 +222,7 @@ describe('mission work item dispatch', () => {
     );
     const delegateCall = delegateTask.mock.calls[0] as unknown as [string];
     const prompt = String(delegateCall?.[0] || '');
-    expect(prompt).toContain('deliverables/reconciled.ts');
+    expect(prompt.replaceAll('\\', '/')).toContain('deliverables/reconciled.ts');
     expect(prompt).toContain('code-reviewer');
 
     const tasks = JSON.parse(
@@ -252,7 +252,10 @@ describe('mission work item dispatch', () => {
     const receipt = loadArtifactReviewReceipt(
       nodePath.join(missionPath, String(tasks[1].artifact_review_receipt))
     );
-    expect(receipt).toMatchObject({
+    expect({
+      ...receipt,
+      artifact: { ...receipt.artifact, path: receipt.artifact.path.replaceAll('\\', '/') },
+    }).toMatchObject({
       review_task_id: 'review-implementation',
       review_target_task_id: 'implementation',
       artifact: {
@@ -446,7 +449,9 @@ describe('mission work item dispatch', () => {
       }),
     });
     expect(response.prompt).toContain('Model hint: openai:gpt-5.6-luna (small/low)');
-    expect(response.context_pack_path).toContain('/coordination/context-packs/');
+    expect(response.context_pack_path.replaceAll('\\', '/')).toContain(
+      '/coordination/context-packs/'
+    );
     expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(response.prompt).toContain('Fast-tier enforcement:');
     expect(response.response_text).toContain('agent completed the outline');
@@ -1380,7 +1385,7 @@ describe('mission work item dispatch', () => {
       task_id: 'task-1',
       ticket_state: 'done',
     });
-    expect(reply.context_pack_path).toContain('/coordination/context-packs/');
+    expect(reply.context_pack_path.replaceAll('\\', '/')).toContain('/coordination/context-packs/');
 
     const ticketManifest = JSON.parse(
       safeReadFile(`${missionPath}/coordination/tickets/dispatch-manifest.json`, {

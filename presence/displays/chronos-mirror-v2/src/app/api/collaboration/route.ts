@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildAgentCollaborationProjection } from '@agent/core';
+import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';

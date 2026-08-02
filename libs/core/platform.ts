@@ -70,7 +70,8 @@ class MacOSDriver implements OSDriver {
     if (!(await commandExists('osascript'))) throw new Error('osascript not found');
     if (!(await commandExists('screencapture'))) throw new Error('screencapture not found');
 
-    const areaScript = 'tell application "System Events" to tell (first application process whose frontmost is true) to tell window 1 to return (item 1 of (get position) as text) & "," & (item 2 of (get position) as text) & "," & (item 1 of (get size) as text) & "," & (item 2 of (get size) as text)';
+    const areaScript =
+      'tell application "System Events" to tell (first application process whose frontmost is true) to tell window 1 to return (item 1 of (get position) as text) & "," & (item 2 of (get position) as text) & "," & (item 1 of (get size) as text) & "," & (item 2 of (get size) as text)';
     let area = '';
     try {
       area = safeExec('osascript', ['-e', areaScript]).trim();
@@ -79,7 +80,9 @@ class MacOSDriver implements OSDriver {
     }
 
     if (!area || area.split(',').length !== 4) {
-      logger.info('[MacOSDriver] No focused window area found, falling back to full screen capture.');
+      logger.info(
+        '[MacOSDriver] No focused window area found, falling back to full screen capture.'
+      );
       return this.captureScreen(outputPath);
     }
 
@@ -89,7 +92,8 @@ class MacOSDriver implements OSDriver {
 
   async listRunningApps(): Promise<string[]> {
     if (!(await commandExists('osascript'))) return [];
-    const script = 'tell application "System Events" to get name of every application process whose background only is false';
+    const script =
+      'tell application "System Events" to get name of every application process whose background only is false';
     try {
       const output = safeExec('osascript', ['-e', script]);
       return output.split(',').map((s) => s.trim());
@@ -140,21 +144,84 @@ class WindowsDriver implements OSDriver {
   }
 
   async captureScreen(outputPath: string): Promise<void> {
-    if (!(await commandExists('powershell'))) throw new Error('powershell not found');
-    logger.warn('[Platform] Full screen capture via PowerShell GDI+ is experimental on Windows.');
-    // Stub: complex PowerShell script for GDI+ capture could go here.
+    if (!(await commandExists('ffmpeg'))) {
+      throw new Error('ffmpeg not found; install FFmpeg to capture Windows screens');
+    }
+    await safeExec('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'gdigrab',
+      '-framerate',
+      '1',
+      '-i',
+      'desktop',
+      '-frames:v',
+      '1',
+      '-y',
+      outputPath,
+    ]);
   }
 
   async captureFocusedWindow(outputPath: string): Promise<void> {
-    logger.warn('[Platform] Focused window capture not yet implemented for Windows.');
+    if (!(await commandExists('ffmpeg'))) {
+      throw new Error('ffmpeg not found; install FFmpeg to capture Windows screens');
+    }
+    // gdigrab's `title=` selector captures the foreground window without
+    // introducing a platform-specific Win32 dependency in the Node process.
+    const title = await this.getForegroundWindowTitle();
+    if (!title) return this.captureScreen(outputPath);
+    await safeExec('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'gdigrab',
+      '-framerate',
+      '1',
+      '-i',
+      `title=${title}`,
+      '-frames:v',
+      '1',
+      '-y',
+      outputPath,
+    ]);
+  }
+
+  private async getForegroundWindowTitle(): Promise<string> {
+    if (!(await commandExists('powershell'))) return '';
+    try {
+      const script = [
+        'Add-Type @"',
+        'using System;',
+        'using System.Text;',
+        'using System.Runtime.InteropServices;',
+        'public static class Win32Foreground {',
+        ' [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+        ' [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
+        '}',
+        '"@;',
+        '$h=[Win32Foreground]::GetForegroundWindow(); $s=New-Object Text.StringBuilder 1024;',
+        '[void][Win32Foreground]::GetWindowText($h,$s,$s.Capacity); $s.ToString()',
+      ].join('\n');
+      return safeExec('powershell', ['-NoProfile', '-NonInteractive', '-Command', script]).trim();
+    } catch (error) {
+      logger.warn(`[WindowsDriver] Failed to resolve foreground window: ${error}`);
+      return '';
+    }
   }
 
   async listRunningApps(): Promise<string[]> {
     if (!(await commandExists('powershell'))) return [];
     try {
-      const script = 'Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object -ExpandProperty Name';
+      const script =
+        'Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object -ExpandProperty Name';
       const output = safeExec('powershell', ['-Command', script]);
-      return output.split('\r\n').map((s) => s.trim()).filter(Boolean);
+      return output
+        .split('\r\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
     } catch (err) {
       logger.warn(`[WindowsDriver] Failed to list running apps: ${err}`);
       return [];
@@ -169,17 +236,23 @@ class WindowsDriver implements OSDriver {
   }
 
   async playSound(path: string): Promise<void> {
-    await safeExec('powershell', ['-Command', `(New-Object Media.SoundPlayer '${path}').PlaySync()`]);
+    await safeExec('powershell', [
+      '-Command',
+      `(New-Object Media.SoundPlayer '${path}').PlaySync()`,
+    ]);
   }
 
   async open(target: string): Promise<void> {
-    await safeExec('start', [target]);
+    // `start` is a cmd.exe builtin and cannot be invoked reliably through
+    // execFile-style secure execution. explorer.exe is the native Windows
+    // shell launcher and accepts both files and URLs directly.
+    await safeExec('explorer.exe', [target]);
   }
 
   async getCapabilities(): Promise<PlatformCapabilities> {
     return {
       hasSpeech: true,
-      hasScreenCapture: false,
+      hasScreenCapture: await commandExists('ffmpeg'),
       hasAudioPlayback: true,
       hasFFmpeg: await commandExists('ffmpeg'),
       nativeTerminal: 'powershell.exe',
@@ -207,9 +280,12 @@ class LinuxDriver implements OSDriver {
   }
 
   async captureFocusedWindow(outputPath: string): Promise<void> {
-    if (await commandExists('import') && await commandExists('xprop')) {
+    if ((await commandExists('import')) && (await commandExists('xprop'))) {
       try {
-        const activeWindowId = safeExec('sh', ['-c', "xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}'"]).trim();
+        const activeWindowId = safeExec('sh', [
+          '-c',
+          "xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}'",
+        ]).trim();
         if (activeWindowId && activeWindowId !== '0x0') {
           await safeExec('import', ['-window', activeWindowId, outputPath]);
           return;
@@ -225,10 +301,13 @@ class LinuxDriver implements OSDriver {
     if (await commandExists('wmctrl')) {
       try {
         const output = safeExec('wmctrl', ['-l']);
-        return output.split('\n').map((line) => {
-          const parts = line.split(/\s+/);
-          return parts.slice(3).join(' '); // App title is usually from 4th column onwards
-        }).filter(Boolean);
+        return output
+          .split('\n')
+          .map((line) => {
+            const parts = line.split(/\s+/);
+            return parts.slice(3).join(' '); // App title is usually from 4th column onwards
+          })
+          .filter(Boolean);
       } catch (err) {
         logger.warn(`[LinuxDriver] Failed to list running apps via wmctrl: ${err}`);
       }

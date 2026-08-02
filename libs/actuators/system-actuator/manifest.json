@@ -34,9 +34,9 @@
       "schema_ref": "schemas/computer-interaction.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
-    { "op": "record_screen", "platforms": ["darwin", "linux"] },
+    { "op": "record_screen", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "macos_automation_probe", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "macos_automation_probe", "platforms": ["darwin"] },
     { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_tool_runtimes", "platforms": ["darwin", "linux", "win32"] },
