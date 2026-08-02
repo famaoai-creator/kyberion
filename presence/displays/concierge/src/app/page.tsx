@@ -404,6 +404,367 @@ export default function ConciergePage() {
 
   const briefing = summary.briefing;
 
+  // CS-04 「今日の伺い」— every item awaiting the human's decision is rendered
+  // by one card helper per type; the unified queue and the panes below share
+  // these helpers, so the two views can never drift apart.
+  const renderApprovalCard = (item: Summary['approval_queue'][number]) => (
+    <div key={item.id} className="item-card">
+      <p className="item-title">{item.title}</p>
+      {item.reason ? <p className="item-body">{item.reason}</p> : null}
+      <div className="item-meta">
+        {item.mission_id ? `${item.mission_id} · ` : ''}
+        {formatWhen(item.requested_at, locale)}
+        {item.expires_at
+          ? ` · ${locale === 'ja' ? '期限' : 'expires'} ${formatWhen(item.expires_at, locale)}`
+          : ''}
+      </div>
+      <div className="button-row">
+        <button
+          type="button"
+          className="action-button"
+          disabled={busyId === item.id}
+          onClick={() => void decideApproval(item, 'approved')}
+        >
+          {t('home.approve')}
+        </button>
+        <button
+          type="button"
+          className="action-button danger"
+          disabled={busyId === item.id}
+          onClick={() => void decideApproval(item, 'rejected')}
+        >
+          {t('home.reject')}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderHygieneCard = (item: HygieneInquiry) => (
+    <div key={item.mission_id} className="item-card">
+      <p className="item-title">{item.title}</p>
+      <p className="item-body">{t(`hygiene.reason.${item.reason}` as Parameters<typeof t>[0])}</p>
+      <div className="item-meta">
+        {item.mission_id}
+        {typeof item.age_days === 'number'
+          ? ` · ${t('hygiene.waiting_days', { count: item.age_days })}`
+          : ''}
+        {item.waiting_since
+          ? ` · ${t('hygiene.waiting_since', { value: formatWhen(item.waiting_since, locale) })}`
+          : ''}
+      </div>
+      {hygieneConfirm?.missionId === item.mission_id ? (
+        <div className="hygiene-confirm">
+          <p className="item-body">
+            {t(
+              hygieneConfirm.decision === 'start'
+                ? 'hygiene.confirm_start'
+                : 'hygiene.confirm_cancel'
+            )}
+          </p>
+          {hygieneConfirm.decision === 'cancel' ? (
+            <label className="field-label">
+              {t('hygiene.note_label')}
+              <textarea
+                value={hygieneNote}
+                rows={2}
+                onChange={(event) => setHygieneNote(event.target.value)}
+              />
+            </label>
+          ) : null}
+          <div className="button-row">
+            <button
+              type="button"
+              className="action-button"
+              disabled={hygieneBusyId === item.mission_id}
+              onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
+            >
+              {t('hygiene.confirm_yes')}
+            </button>
+            <button
+              type="button"
+              className="action-button secondary"
+              disabled={hygieneBusyId === item.mission_id}
+              onClick={() => {
+                setHygieneConfirm(null);
+                setHygieneNote('');
+              }}
+            >
+              {t('hygiene.confirm_back')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="button-row">
+          <button
+            type="button"
+            className="action-button"
+            disabled={hygieneBusyId !== null}
+            onClick={() => {
+              setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
+              setHygieneNote('');
+            }}
+          >
+            {t('hygiene.start')}
+          </button>
+          <button
+            type="button"
+            className="action-button danger"
+            disabled={hygieneBusyId !== null}
+            onClick={() => {
+              setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
+              setHygieneNote('');
+            }}
+          >
+            {t('hygiene.cancel')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMemoryCard = (item: MemoryQueueItem) => (
+    <div key={item.id} className="item-card">
+      <p className="item-title">
+        {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
+        <span className="status-chip">
+          {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
+        </span>
+      </p>
+      <p className="item-body">{item.summary}</p>
+      <div className="item-meta">
+        {item.source ? `${t('memory.source', { value: item.source })} · ` : ''}
+        {formatWhen(item.queued_at, locale)}
+        {item.occurrences > 1 ? ` · ${t('memory.seen_times', { count: item.occurrences })}` : ''}
+      </div>
+      {memoryConfirm?.id === item.id ? (
+        <div className="memory-confirm">
+          <p className="item-body">
+            {t(
+              memoryConfirm.decision === 'approve'
+                ? 'memory.confirm_approve'
+                : 'memory.confirm_reject'
+            )}
+          </p>
+          <div className="button-row">
+            <button
+              type="button"
+              className="action-button"
+              disabled={memoryBusyId === item.id}
+              onClick={() => void decideMemory(item, memoryConfirm.decision)}
+            >
+              {t('memory.confirm_yes')}
+            </button>
+            <button
+              type="button"
+              className="action-button secondary"
+              disabled={memoryBusyId === item.id}
+              onClick={() => setMemoryConfirm(null)}
+            >
+              {t('memory.confirm_back')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="button-row">
+          <button
+            type="button"
+            className="action-button"
+            disabled={memoryBusyId !== null}
+            onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
+          >
+            {t('memory.approve')}
+          </button>
+          <button
+            type="button"
+            className="action-button danger"
+            disabled={memoryBusyId !== null}
+            onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
+          >
+            {t('memory.reject')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderExceptionCard = (item: Summary['exception_feed'][number]) => (
+    <div key={item.id} className="item-card">
+      <p className="item-title">{item.title}</p>
+      {item.text ? <p className="item-body">{item.text}</p> : null}
+      <div className="item-meta">
+        {item.surface} · {formatWhen(item.created_at, locale)}
+      </div>
+    </div>
+  );
+
+  const renderOutcomeCard = (item: Summary['outcome_feed'][number]) => (
+    <div key={item.entry_id} className="item-card">
+      <p className="item-title">
+        {item.title}
+        <span className="status-chip">
+          {t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
+        </span>
+      </p>
+      {item.summary ? <p className="item-body">{item.summary}</p> : null}
+      <div className="item-meta">
+        {item.mission_id ? `${item.mission_id} · ` : ''}
+        {formatWhen(item.updated_at, locale)}
+        {item.artifact_paths.length > 0
+          ? ` · ${t('home.artifacts', { count: item.artifact_paths.length })}`
+          : ''}
+      </div>
+      <div className="button-row">
+        {item.artifact_paths.length > 0 ? (
+          <button
+            type="button"
+            className="action-button secondary"
+            disabled={previewBusyId === item.entry_id}
+            onClick={() => void togglePreview(item)}
+          >
+            {previewId === item.entry_id ? t('home.preview_hide') : t('home.preview')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="action-button"
+          disabled={busyId === item.entry_id || item.status === 'accepted'}
+          onClick={() => void recordOutcomeVerdict(item, 'accepted')}
+        >
+          {t('home.accept')}
+        </button>
+        <button
+          type="button"
+          className="action-button secondary"
+          disabled={busyId === item.entry_id}
+          onClick={() => {
+            setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
+            setChangeNote('');
+          }}
+        >
+          {t('home.request_changes')}
+        </button>
+        <button
+          type="button"
+          className="action-button danger"
+          disabled={busyId === item.entry_id}
+          onClick={() => void recordOutcomeVerdict(item, 'rejected')}
+        >
+          {t('home.reject')}
+        </button>
+      </div>
+      {previewId === item.entry_id ? (
+        <div className="outcome-preview">
+          {previewError ? (
+            <p className="item-body">{t('home.preview_error', { error: previewError })}</p>
+          ) : null}
+          {previewData && previewData.files.length === 0 ? (
+            <p className="item-meta">{t('home.preview_empty')}</p>
+          ) : null}
+          {previewData?.files.map((file, index) => (
+            <div className="preview-file" key={`${file.name}-${index}`}>
+              <p className="preview-name">{file.name}</p>
+              {file.kind === 'image' && file.data_uri ? (
+                <img className="preview-image" src={file.data_uri} alt={file.name} />
+              ) : (file.kind === 'markdown' || file.kind === 'text') &&
+                typeof file.content === 'string' ? (
+                <pre className="preview-content">{file.content}</pre>
+              ) : (
+                <p className="item-meta">
+                  {t(
+                    file.missing
+                      ? 'home.preview_missing'
+                      : file.too_large
+                        ? 'home.preview_too_large'
+                        : 'home.preview_unsupported'
+                  )}
+                </p>
+              )}
+              {file.truncated ? <p className="item-meta">{t('home.preview_truncated')}</p> : null}
+            </div>
+          ))}
+          {previewData && previewData.total > previewData.shown ? (
+            <p className="item-meta">
+              {t('home.preview_more', { count: previewData.total - previewData.shown })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {changeFormId === item.entry_id ? (
+        <form
+          className="change-request-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void recordOutcomeVerdict(item, 'changes_requested', changeNote);
+          }}
+        >
+          <label className="field-label">
+            {t('home.change_prompt')}
+            <textarea
+              value={changeNote}
+              rows={3}
+              required
+              onChange={(event) => setChangeNote(event.target.value)}
+            />
+          </label>
+          <div className="button-row">
+            <button
+              type="submit"
+              className="action-button"
+              disabled={busyId === item.entry_id || !changeNote.trim()}
+            >
+              {t('home.change_send')}
+            </button>
+            <button
+              type="button"
+              className="action-button secondary"
+              onClick={() => {
+                setChangeFormId(null);
+                setChangeNote('');
+              }}
+            >
+              {t('home.change_cancel')}
+            </button>
+          </div>
+        </form>
+      ) : null}
+    </div>
+  );
+
+  // Queue order = decision urgency: approvals block others' work, stalled
+  // missions and learnings wait on the human alone, deliverables and
+  // exceptions can breathe a little longer.
+  const queueItems: Array<{
+    id: string;
+    type: 'approval' | 'hygiene' | 'memory' | 'outcome' | 'exception';
+    card: React.ReactNode;
+  }> = [
+    ...summary.approval_queue.map((item) => ({
+      id: `approval-${item.id}`,
+      type: 'approval' as const,
+      card: renderApprovalCard(item),
+    })),
+    ...hygiene.map((item) => ({
+      id: `hygiene-${item.mission_id}`,
+      type: 'hygiene' as const,
+      card: renderHygieneCard(item),
+    })),
+    ...memoryQueue.map((item) => ({
+      id: `memory-${item.id}`,
+      type: 'memory' as const,
+      card: renderMemoryCard(item),
+    })),
+    ...summary.outcome_feed.map((item) => ({
+      id: `outcome-${item.entry_id}`,
+      type: 'outcome' as const,
+      card: renderOutcomeCard(item),
+    })),
+    ...summary.exception_feed.map((item) => ({
+      id: `exception-${item.id}`,
+      type: 'exception' as const,
+      card: renderExceptionCard(item),
+    })),
+  ];
+
   return (
     <>
       <section className="briefing-card" aria-label={t('home.briefing_label')}>
@@ -449,6 +810,23 @@ export default function ConciergePage() {
 
       {notice ? <div className={`notice${notice.error ? ' error' : ''}`}>{notice.text}</div> : null}
 
+      <section className="pane inquiry-queue" aria-label={t('queue.title')}>
+        <h2>{t('queue.title')}</h2>
+        <p className="pane-subtitle">{t('queue.description')}</p>
+        {queueItems.length === 0 ? (
+          <div className="pane-empty">{t('queue.empty')}</div>
+        ) : (
+          queueItems.map((entry) => (
+            <div key={entry.id} className="queue-item">
+              <span className={`queue-chip ${entry.type}`}>
+                {t(`queue.type.${entry.type}` as Parameters<typeof t>[0])}
+              </span>
+              {entry.card}
+            </div>
+          ))
+        )}
+      </section>
+
       {responseStatus ? (
         <section className="pane response-status" aria-label={t('home.response_title')}>
           <h2>{t('home.response_title')}</h2>
@@ -474,170 +852,6 @@ export default function ConciergePage() {
         </section>
       ) : null}
 
-      {hygiene.length > 0 ? (
-        <section className="pane hygiene-pane" aria-label={t('hygiene.title')}>
-          <h2>{t('hygiene.title')}</h2>
-          <p className="pane-subtitle">{t('hygiene.description')}</p>
-          {hygiene.map((item) => (
-            <div key={item.mission_id} className="item-card">
-              <p className="item-title">{item.title}</p>
-              <p className="item-body">
-                {t(`hygiene.reason.${item.reason}` as Parameters<typeof t>[0])}
-              </p>
-              <div className="item-meta">
-                {item.mission_id}
-                {typeof item.age_days === 'number'
-                  ? ` · ${t('hygiene.waiting_days', { count: item.age_days })}`
-                  : ''}
-                {item.waiting_since
-                  ? ` · ${t('hygiene.waiting_since', { value: formatWhen(item.waiting_since, locale) })}`
-                  : ''}
-              </div>
-              {hygieneConfirm?.missionId === item.mission_id ? (
-                <div className="hygiene-confirm">
-                  <p className="item-body">
-                    {t(
-                      hygieneConfirm.decision === 'start'
-                        ? 'hygiene.confirm_start'
-                        : 'hygiene.confirm_cancel'
-                    )}
-                  </p>
-                  {hygieneConfirm.decision === 'cancel' ? (
-                    <label className="field-label">
-                      {t('hygiene.note_label')}
-                      <textarea
-                        value={hygieneNote}
-                        rows={2}
-                        onChange={(event) => setHygieneNote(event.target.value)}
-                      />
-                    </label>
-                  ) : null}
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="action-button"
-                      disabled={hygieneBusyId === item.mission_id}
-                      onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
-                    >
-                      {t('hygiene.confirm_yes')}
-                    </button>
-                    <button
-                      type="button"
-                      className="action-button secondary"
-                      disabled={hygieneBusyId === item.mission_id}
-                      onClick={() => {
-                        setHygieneConfirm(null);
-                        setHygieneNote('');
-                      }}
-                    >
-                      {t('hygiene.confirm_back')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="button-row">
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={hygieneBusyId !== null}
-                    onClick={() => {
-                      setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
-                      setHygieneNote('');
-                    }}
-                  >
-                    {t('hygiene.start')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button danger"
-                    disabled={hygieneBusyId !== null}
-                    onClick={() => {
-                      setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
-                      setHygieneNote('');
-                    }}
-                  >
-                    {t('hygiene.cancel')}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {memoryQueue.length > 0 ? (
-        <section className="pane memory-pane" aria-label={t('memory.title')}>
-          <h2>{t('memory.title')}</h2>
-          <p className="pane-subtitle">{t('memory.description')}</p>
-          {memoryQueue.map((item) => (
-            <div key={item.id} className="item-card">
-              <p className="item-title">
-                {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
-                <span className="status-chip">
-                  {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
-                </span>
-              </p>
-              <p className="item-body">{item.summary}</p>
-              <div className="item-meta">
-                {item.source ? `${t('memory.source', { value: item.source })} · ` : ''}
-                {formatWhen(item.queued_at, locale)}
-                {item.occurrences > 1
-                  ? ` · ${t('memory.seen_times', { count: item.occurrences })}`
-                  : ''}
-              </div>
-              {memoryConfirm?.id === item.id ? (
-                <div className="memory-confirm">
-                  <p className="item-body">
-                    {t(
-                      memoryConfirm.decision === 'approve'
-                        ? 'memory.confirm_approve'
-                        : 'memory.confirm_reject'
-                    )}
-                  </p>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="action-button"
-                      disabled={memoryBusyId === item.id}
-                      onClick={() => void decideMemory(item, memoryConfirm.decision)}
-                    >
-                      {t('memory.confirm_yes')}
-                    </button>
-                    <button
-                      type="button"
-                      className="action-button secondary"
-                      disabled={memoryBusyId === item.id}
-                      onClick={() => setMemoryConfirm(null)}
-                    >
-                      {t('memory.confirm_back')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="button-row">
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={memoryBusyId !== null}
-                    onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
-                  >
-                    {t('memory.approve')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button danger"
-                    disabled={memoryBusyId !== null}
-                    onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
-                  >
-                    {t('memory.reject')}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-      ) : null}
-
       <div className="pane-grid">
         <section className="pane" aria-label={t('home.approval_title')}>
           <h2>{t('home.approval_title')}</h2>
@@ -645,37 +859,9 @@ export default function ConciergePage() {
           {summary.approval_queue.length === 0 ? (
             <div className="pane-empty">{t('home.approval_empty')}</div>
           ) : (
-            summary.approval_queue.map((item) => (
-              <div key={item.id} className="item-card">
-                <p className="item-title">{item.title}</p>
-                {item.reason ? <p className="item-body">{item.reason}</p> : null}
-                <div className="item-meta">
-                  {item.mission_id ? `${item.mission_id} · ` : ''}
-                  {formatWhen(item.requested_at, locale)}
-                  {item.expires_at
-                    ? ` · ${locale === 'ja' ? '期限' : 'expires'} ${formatWhen(item.expires_at, locale)}`
-                    : ''}
-                </div>
-                <div className="button-row">
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={busyId === item.id}
-                    onClick={() => void decideApproval(item, 'approved')}
-                  >
-                    {t('home.approve')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button danger"
-                    disabled={busyId === item.id}
-                    onClick={() => void decideApproval(item, 'rejected')}
-                  >
-                    {t('home.reject')}
-                  </button>
-                </div>
-              </div>
-            ))
+            <p className="pane-subtitle">
+              {t('home.see_queue', { count: summary.approval_queue.length })}
+            </p>
           )}
         </section>
 
@@ -717,142 +903,9 @@ export default function ConciergePage() {
           {summary.outcome_feed.length === 0 ? (
             <div className="pane-empty">{t('home.outcome_empty')}</div>
           ) : (
-            summary.outcome_feed.map((item) => (
-              <div key={item.entry_id} className="item-card">
-                <p className="item-title">
-                  {item.title}
-                  <span className="status-chip">
-                    {t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
-                  </span>
-                </p>
-                {item.summary ? <p className="item-body">{item.summary}</p> : null}
-                <div className="item-meta">
-                  {item.mission_id ? `${item.mission_id} · ` : ''}
-                  {formatWhen(item.updated_at, locale)}
-                  {item.artifact_paths.length > 0
-                    ? ` · ${t('home.artifacts', { count: item.artifact_paths.length })}`
-                    : ''}
-                </div>
-                <div className="button-row">
-                  {item.artifact_paths.length > 0 ? (
-                    <button
-                      type="button"
-                      className="action-button secondary"
-                      disabled={previewBusyId === item.entry_id}
-                      onClick={() => void togglePreview(item)}
-                    >
-                      {previewId === item.entry_id ? t('home.preview_hide') : t('home.preview')}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={busyId === item.entry_id || item.status === 'accepted'}
-                    onClick={() => void recordOutcomeVerdict(item, 'accepted')}
-                  >
-                    {t('home.accept')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button secondary"
-                    disabled={busyId === item.entry_id}
-                    onClick={() => {
-                      setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
-                      setChangeNote('');
-                    }}
-                  >
-                    {t('home.request_changes')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button danger"
-                    disabled={busyId === item.entry_id}
-                    onClick={() => void recordOutcomeVerdict(item, 'rejected')}
-                  >
-                    {t('home.reject')}
-                  </button>
-                </div>
-                {previewId === item.entry_id ? (
-                  <div className="outcome-preview">
-                    {previewError ? (
-                      <p className="item-body">
-                        {t('home.preview_error', { error: previewError })}
-                      </p>
-                    ) : null}
-                    {previewData && previewData.files.length === 0 ? (
-                      <p className="item-meta">{t('home.preview_empty')}</p>
-                    ) : null}
-                    {previewData?.files.map((file, index) => (
-                      <div className="preview-file" key={`${file.name}-${index}`}>
-                        <p className="preview-name">{file.name}</p>
-                        {file.kind === 'image' && file.data_uri ? (
-                          <img className="preview-image" src={file.data_uri} alt={file.name} />
-                        ) : (file.kind === 'markdown' || file.kind === 'text') &&
-                          typeof file.content === 'string' ? (
-                          <pre className="preview-content">{file.content}</pre>
-                        ) : (
-                          <p className="item-meta">
-                            {t(
-                              file.missing
-                                ? 'home.preview_missing'
-                                : file.too_large
-                                  ? 'home.preview_too_large'
-                                  : 'home.preview_unsupported'
-                            )}
-                          </p>
-                        )}
-                        {file.truncated ? (
-                          <p className="item-meta">{t('home.preview_truncated')}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                    {previewData && previewData.total > previewData.shown ? (
-                      <p className="item-meta">
-                        {t('home.preview_more', { count: previewData.total - previewData.shown })}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {changeFormId === item.entry_id ? (
-                  <form
-                    className="change-request-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void recordOutcomeVerdict(item, 'changes_requested', changeNote);
-                    }}
-                  >
-                    <label className="field-label">
-                      {t('home.change_prompt')}
-                      <textarea
-                        value={changeNote}
-                        rows={3}
-                        required
-                        onChange={(event) => setChangeNote(event.target.value)}
-                      />
-                    </label>
-                    <div className="button-row">
-                      <button
-                        type="submit"
-                        className="action-button"
-                        disabled={busyId === item.entry_id || !changeNote.trim()}
-                      >
-                        {t('home.change_send')}
-                      </button>
-                      <button
-                        type="button"
-                        className="action-button secondary"
-                        onClick={() => {
-                          setChangeFormId(null);
-                          setChangeNote('');
-                        }}
-                      >
-                        {t('home.change_cancel')}
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-              </div>
-            ))
+            <p className="pane-subtitle">
+              {t('home.see_queue', { count: summary.outcome_feed.length })}
+            </p>
           )}
         </section>
 
@@ -862,15 +915,9 @@ export default function ConciergePage() {
           {summary.exception_feed.length === 0 ? (
             <div className="pane-empty">{t('home.exception_empty')}</div>
           ) : (
-            summary.exception_feed.map((item) => (
-              <div key={item.id} className="item-card">
-                <p className="item-title">{item.title}</p>
-                {item.text ? <p className="item-body">{item.text}</p> : null}
-                <div className="item-meta">
-                  {item.surface} · {formatWhen(item.created_at, locale)}
-                </div>
-              </div>
-            ))
+            <p className="pane-subtitle">
+              {t('home.see_queue', { count: summary.exception_feed.length })}
+            </p>
           )}
         </section>
       </div>

@@ -2,6 +2,7 @@ import * as React from 'react';
 import './globals.css';
 import { ConciergeHeader } from './concierge-header';
 import { ConversationDock } from './conversation-dock';
+import { CommandPalette } from './command-palette';
 
 export const metadata = {
   title: 'Concierge — Kyberion',
@@ -22,6 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* CS-01: the secretary conversation is available on every page
             (home and /setup), so it is mounted in the layout. */}
         <ConversationDock />
+        {/* CS-04: ⌘K palette, also on every page. */}
+        <CommandPalette />
       </body>
     </html>
   );
