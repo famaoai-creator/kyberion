@@ -835,5 +835,45 @@
   "dock.quick.calendar": {
     "en": "What's on my schedule today?",
     "ja": "今日の予定を教えて"
+  },
+  "queue.title": { "en": "Today's inquiries", "ja": "今日の伺い" },
+  "queue.description": {
+    "en": "Everything awaiting your decision, in one place — most pressing first.",
+    "ja": "ご判断をお待ちしている事項を、急ぎのものから順にまとめてお持ちしました。"
+  },
+  "queue.empty": {
+    "en": "Nothing needs your decision right now.",
+    "ja": "ただいまご判断いただく事項はございません。"
+  },
+  "queue.type.approval": { "en": "Approval", "ja": "ご承認" },
+  "queue.type.hygiene": { "en": "Stalled request", "ja": "停滞のご判断" },
+  "queue.type.memory": { "en": "Learning", "ja": "学びの承認" },
+  "queue.type.outcome": { "en": "Deliverable", "ja": "成果物" },
+  "queue.type.exception": { "en": "Exception", "ja": "例外" },
+  "home.see_queue": {
+    "en": "{count} item(s) are ready for you in “Today’s inquiries” above.",
+    "ja": "{count} 件は上部の「今日の伺い」でご対応いただけます。"
+  },
+  "palette.title": { "en": "Command palette", "ja": "コマンドパレット" },
+  "palette.placeholder": { "en": "Where to? (type to filter)", "ja": "移動先を入力…" },
+  "palette.empty": { "en": "No matches.", "ja": "該当がありません。" },
+  "palette.hint": {
+    "en": "↑↓ move · Enter open · Esc close",
+    "ja": "↑↓ 移動 · Enter 決定 · Esc 閉じる"
+  },
+  "palette.home": { "en": "Home — today’s inquiries", "ja": "ホーム — 今日の伺い" },
+  "palette.dock": { "en": "Talk to your secretary", "ja": "秘書に相談する" },
+  "palette.ingest": { "en": "Add documents", "ja": "資料を取り込む" },
+  "palette.setup": { "en": "Setup — readiness", "ja": "セットアップ — 整備状況" },
+  "palette.setup_profile": { "en": "Setup: profile", "ja": "セットアップ: プロフィール" },
+  "palette.setup_services": {
+    "en": "Setup: service connections",
+    "ja": "セットアップ: サービス接続"
+  },
+  "palette.setup_notifications": { "en": "Setup: notifications", "ja": "セットアップ: 通知" },
+  "palette.setup_plugins": { "en": "Setup: plugins", "ja": "セットアップ: プラグイン" },
+  "palette.setup_governance": {
+    "en": "Setup: governance changes",
+    "ja": "セットアップ: ガバナンス設定"
   }
 }

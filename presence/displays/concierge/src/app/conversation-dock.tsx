@@ -63,6 +63,14 @@ export function ConversationDock() {
     if (log) log.scrollTop = log.scrollHeight;
   }, [messages, busy, open]);
 
+  // CS-04: the command palette (and anything else) can open the dock via a
+  // window event — same-page action, no navigation.
+  React.useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener('concierge:open-dock', onOpen);
+    return () => window.removeEventListener('concierge:open-dock', onOpen);
+  }, []);
+
   const send = React.useCallback(
     async (text: string) => {
       const trimmed = text.trim();
