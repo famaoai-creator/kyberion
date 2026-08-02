@@ -119,6 +119,74 @@
   "home.status.accepted": { "en": "Accepted", "ja": "受領済み" },
   "home.status.rejected": { "en": "Sent back", "ja": "差し戻し済み" },
   "home.status.changes_requested": { "en": "Changes requested", "ja": "修正依頼中" },
+  "home.preview": { "en": "Preview", "ja": "プレビュー" },
+  "home.preview_hide": { "en": "Close preview", "ja": "プレビューを閉じる" },
+  "home.preview_error": {
+    "en": "The preview could not be loaded: {error}",
+    "ja": "プレビューを取得できませんでした: {error}"
+  },
+  "home.preview_empty": {
+    "en": "There are no artifacts to display.",
+    "ja": "表示できる成果物がございません。"
+  },
+  "home.preview_truncated": {
+    "en": "Showing the beginning only — the document is long.",
+    "ja": "長い資料のため、冒頭のみ表示しております。"
+  },
+  "home.preview_unsupported": {
+    "en": "This file format cannot be displayed here.",
+    "ja": "このファイル形式はここでは表示できません。"
+  },
+  "home.preview_missing": {
+    "en": "The file could not be found.",
+    "ja": "ファイルが見つかりませんでした。"
+  },
+  "home.preview_too_large": {
+    "en": "This file is too large to display here.",
+    "ja": "サイズが大きいため、ここでは表示できません。"
+  },
+  "home.preview_more": {
+    "en": "{count} more artifact(s) are attached.",
+    "ja": "ほかに成果物が {count}点ございます。"
+  },
+  "hygiene.title": {
+    "en": "Your decision, please (stalled requests)",
+    "ja": "ご判断ください(停滞中のご依頼)"
+  },
+  "hygiene.description": {
+    "en": "These requests were accepted but have not started. Nothing proceeds until you decide.",
+    "ja": "お預かりしたまま着手できていないご依頼です。ご判断をいただくまで、こちらからは進めません。"
+  },
+  "hygiene.reason.design_missing": {
+    "en": "The work plan for this request has not been prepared yet, so it has not started.",
+    "ja": "このご依頼はまだ段取りが整っておらず、着手できておりません。"
+  },
+  "hygiene.reason.ready_not_started": {
+    "en": "Preparation is complete, but the work has not been handed to anyone yet.",
+    "ja": "準備は整っておりますが、まだ作業をお渡しできておりません。"
+  },
+  "hygiene.reason.awaiting_gate": {
+    "en": "The work was handed over, but the final go-ahead has not been given, so it is paused.",
+    "ja": "お渡しは済んでおりますが、最終のご確認が済んでいないため止まっております。"
+  },
+  "hygiene.waiting_days": { "en": "waiting {count} day(s)", "ja": "停滞 {count}日" },
+  "hygiene.waiting_since": { "en": "received {value}", "ja": "お預かり {value}" },
+  "hygiene.start": { "en": "Start", "ja": "開始する" },
+  "hygiene.cancel": { "en": "Withdraw", "ja": "取りやめる" },
+  "hygiene.confirm_start": {
+    "en": "Shall we start this request?",
+    "ja": "このご依頼を開始してよろしいですか？"
+  },
+  "hygiene.confirm_cancel": {
+    "en": "Shall we withdraw this request?",
+    "ja": "このご依頼を取りやめてよろしいですか？"
+  },
+  "hygiene.confirm_yes": { "en": "Yes, please proceed", "ja": "はい、お願いします" },
+  "hygiene.confirm_back": { "en": "Go back", "ja": "戻る" },
+  "hygiene.note_label": {
+    "en": "A note for the record (optional)",
+    "ja": "差し支えなければ理由をお聞かせください（任意）"
+  },
   "setup.loading": {
     "en": "Checking personal secretary readiness…",
     "ja": "個人秘書の準備状況を確認しております…"
@@ -443,6 +511,30 @@
   "cap.email": { "en": "Collect email / draft replies", "ja": "メール収集・返信案" },
   "cap.voice": { "en": "Voice registration", "ja": "音声登録" },
   "cap.device": { "en": "Device settings", "ja": "デバイス設定" },
+  "api.hygiene.invalid": {
+    "en": "Please choose start or withdraw for this request.",
+    "ja": "このご依頼への「開始」または「取りやめ」の指定が必要です。"
+  },
+  "api.hygiene.not_found": {
+    "en": "This request is not awaiting a decision right now.",
+    "ja": "このご依頼は現在ご判断の対象ではございません。"
+  },
+  "api.hygiene.failed": {
+    "en": "We could not complete the operation. Please try again in a moment.",
+    "ja": "お手続きを完了できませんでした。少し置いてからもう一度お試しください。"
+  },
+  "api.hygiene.started": {
+    "en": "Started “{title}”. We will report the progress here.",
+    "ja": "「{title}」を開始いたしました。進捗はこちらでご報告します。"
+  },
+  "api.hygiene.cancelled": {
+    "en": "Withdrew “{title}”.",
+    "ja": "「{title}」を取りやめました。"
+  },
+  "api.outcome_not_found": {
+    "en": "The outcome could not be found.",
+    "ja": "該当する成果物が見つかりません。"
+  },
   "api.notification_surface": {
     "en": "The notification channel is not valid.",
     "ja": "通知チャネルの指定が正しくありません。"
