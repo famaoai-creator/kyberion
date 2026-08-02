@@ -20,6 +20,7 @@ vi.mock('@agent/core', () => ({
     rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
     rootResolve: vi.fn((value: string) => value),
   },
+  resolveShellAdapter: vi.fn(() => ({ shell: '/bin/bash', args: ['-lc'] })),
   safeReadFile: vi.fn(),
   encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
   emitComputerSurfacePatch: vi.fn(),
