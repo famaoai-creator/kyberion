@@ -41,6 +41,7 @@ describe('windows local assist bridge', () => {
         })
       );
     vi.stubGlobal('fetch', fetchMock);
+    process.env.KYBERION_WINDOWS_AI_ENDPOINT = 'http://127.0.0.1:5272';
 
     await expect(classifyLocallyWithWindowsAi('help me', ['support', 'sales'])).resolves.toBe(
       'support'

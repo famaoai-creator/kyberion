@@ -255,7 +255,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7011,
+      "size": 6948,
       "type": "md"
     },
     {
@@ -3423,13 +3423,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19027,
+      "size": 18499,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 9139,
+      "size": 8877,
       "type": "json"
     },
     {
