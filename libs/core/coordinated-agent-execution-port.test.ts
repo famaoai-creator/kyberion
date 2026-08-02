@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionPort } from './agent-execution-port.js';
-import { clearWorkCoordinationStore, createWorkItem, getWorkItem } from './work-coordination.js';
+import {
+  clearWorkCoordinationStore,
+  createWorkItem,
+  getWorkItem,
+  listActiveWorkLeases,
+} from './work-coordination.js';
 import {
   CoordinatedAgentExecutionPort,
   delegateCoordinatedAgentTask,
@@ -47,6 +52,7 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(receipt.work_item_id).toBe(item.item_id);
     expect(receipt.runtime_id).toBe('runtime-1');
     expect(getWorkItem(item.item_id)?.status).toBe('done');
+    expect(listActiveWorkLeases()).toHaveLength(0);
     expect(delegatePort.delegate).toHaveBeenCalledTimes(1);
   });
 
