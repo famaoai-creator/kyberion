@@ -13,6 +13,36 @@ type Diagnostic = {
 };
 type NotificationChannelOption = { surface: string; display_name: string; status: string };
 type NotificationTarget = { surface: string; target: string };
+type PluginEntry = {
+  id: string;
+  trust: string;
+  status: string;
+  source: string;
+  requested_by?: string;
+  approval_status?: string;
+};
+type ConfigPresetInput = {
+  key: string;
+  type: 'string' | 'enum' | 'boolean' | 'secret';
+  description: string;
+  required: boolean;
+  values?: string[];
+  default?: string;
+};
+type ConfigPreset = {
+  id: string;
+  category: string;
+  description: string;
+  inputs: ConfigPresetInput[];
+  write_target_count: number;
+};
+type ConfigMissionItem = {
+  id: string;
+  preset: string;
+  tenant: string;
+  status: string;
+  created_at: string;
+};
 type Setup = {
   surface_roles: Array<{
     id: string;
@@ -100,6 +130,26 @@ const DIAG_GUIDANCE: Record<string, ConciergeMessageKey> = {
   reasoning: 'setup.reasoning_guidance',
 };
 
+const PLUGIN_STATUS_KEYS: Record<string, ConciergeMessageKey> = {
+  activatable: 'setup.plugin_status_activatable',
+  pending_approval: 'setup.plugin_status_pending',
+  blocked_broken_manifest: 'setup.plugin_status_blocked',
+  not_loadable: 'setup.plugin_status_not_loadable',
+};
+
+const PLUGIN_TRUST_KEYS: Record<string, ConciergeMessageKey> = {
+  official: 'setup.plugin_trust_official',
+  curated: 'setup.plugin_trust_curated',
+  'third-party': 'setup.plugin_trust_third_party',
+};
+
+const CONFIG_STATUS_KEYS: Record<string, ConciergeMessageKey> = {
+  draft: 'setup.governance_status_draft',
+  applying: 'setup.governance_status_in_progress',
+  applied: 'setup.governance_status_done',
+  failed: 'setup.governance_status_failed',
+};
+
 export default function SetupPage() {
   const { locale, setLocale, t } = useConciergeI18n();
   const [setup, setSetup] = React.useState<Setup | null>(null);
@@ -127,6 +177,18 @@ export default function SetupPage() {
   const [notifChannels, setNotifChannels] = React.useState<NotificationChannelOption[]>([]);
   const [notifCurrent, setNotifCurrent] = React.useState<NotificationTarget | null>(null);
   const [notif, setNotif] = React.useState({ surface: 'none', target: '' });
+  const [plugins, setPlugins] = React.useState<PluginEntry[]>([]);
+  const [pluginConfirm, setPluginConfirm] = React.useState<{
+    id: string;
+    decision: 'approve' | 'deny';
+  } | null>(null);
+  const [configPresets, setConfigPresets] = React.useState<ConfigPreset[]>([]);
+  const [configTenants, setConfigTenants] = React.useState<string[]>([]);
+  const [configRecent, setConfigRecent] = React.useState<ConfigMissionItem[]>([]);
+  const [configPresetId, setConfigPresetId] = React.useState('');
+  const [configTenant, setConfigTenant] = React.useState('');
+  const [configInputs, setConfigInputs] = React.useState<Record<string, string>>({});
+  const [configConfirm, setConfigConfirm] = React.useState(false);
   const [cameraState, setCameraState] = React.useState<'idle' | 'starting' | 'ready'>('idle');
   const [voiceRecording, setVoiceRecording] = React.useState(false);
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
@@ -205,14 +267,96 @@ export default function SetupPage() {
     }
   }, []);
 
+  const refreshPlugins = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/plugins', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugins failed');
+      setPlugins(Array.isArray(payload.plugins) ? (payload.plugins as PluginEntry[]) : []);
+    } catch {
+      // The plugin pane keeps its last known state; approval decisions always
+      // re-read the registry server-side, so stale display never grants more.
+    }
+  }, []);
+
+  const refreshConfigMissions = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/config-missions', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config missions failed');
+      const tenants = Array.isArray(payload.tenants) ? (payload.tenants as string[]) : [];
+      setConfigPresets(Array.isArray(payload.presets) ? (payload.presets as ConfigPreset[]) : []);
+      setConfigTenants(tenants);
+      setConfigTenant((current) => current || tenants[0] || '');
+      setConfigRecent(Array.isArray(payload.recent) ? (payload.recent as ConfigMissionItem[]) : []);
+    } catch {
+      // Same posture as the plugin pane: display-only degradation.
+    }
+  }, []);
+
+  // CS-03: a plugin decision only fires from the inline confirm step — no
+  // auto-approval, no default, no blocking browser dialog.
+  const decidePlugin = React.useCallback(
+    async (id: string, decision: 'approve' | 'deny') => {
+      setBusy(true);
+      try {
+        const response = await fetch(`/api/plugins/${encodeURIComponent(id)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'plugin failed');
+        setNotice({ text: payload.message });
+        setPluginConfirm(null);
+        await refreshPlugins();
+      } catch (err) {
+        setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refreshPlugins]
+  );
+
+  // CS-03 ガバナンス設定: filing only fires from the inline confirm step. The
+  // route stops at creation — the change takes effect after mission approval.
+  const submitConfigMission = React.useCallback(async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/config-missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preset: configPresetId,
+          tenant: configTenant,
+          inputs: configInputs,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'config mission failed');
+      setNotice({ text: payload.message });
+      setConfigConfirm(false);
+      setConfigPresetId('');
+      setConfigInputs({});
+      await refreshConfigMissions();
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+      setBusy(false);
+    }
+  }, [configInputs, configPresetId, configTenant, refreshConfigMissions]);
+
   React.useEffect(() => {
     void refresh();
     void refreshNotifications();
+    void refreshPlugins();
+    void refreshConfigMissions();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, [refresh, refreshNotifications]);
+  }, [refresh, refreshNotifications, refreshPlugins, refreshConfigMissions]);
 
   const jumpToSection = React.useCallback((target: string) => {
     if (!target.startsWith('#')) return;
@@ -931,6 +1075,236 @@ export default function SetupPage() {
               {t('setup.notification_save')}
             </button>
           </div>
+        </section>
+
+        <section className="pane" id="setup-plugins" aria-label={t('setup.plugins_title')}>
+          <h2>{t('setup.plugins_title')}</h2>
+          <p className="pane-subtitle">{t('setup.plugins_description')}</p>
+          <p className="item-meta">{t('setup.plugins_caveat')}</p>
+          {plugins.length === 0 ? (
+            <p className="pane-empty">{t('setup.plugins_empty')}</p>
+          ) : (
+            plugins.map((plugin) => {
+              const statusKey =
+                plugin.approval_status === 'rejected'
+                  ? 'setup.plugin_status_denied'
+                  : PLUGIN_STATUS_KEYS[plugin.status];
+              const trustKey = PLUGIN_TRUST_KEYS[plugin.trust];
+              const decidable = plugin.status === 'pending_approval';
+              return (
+                <div className="item-card" key={`${plugin.source}-${plugin.id}`}>
+                  <p className="item-title">
+                    {plugin.id}
+                    <span
+                      className={`status-chip${plugin.status === 'activatable' ? ' ok' : ' attention'}`}
+                    >
+                      {statusKey ? t(statusKey) : plugin.status}
+                    </span>
+                  </p>
+                  <p className="item-meta">
+                    {trustKey ? t(trustKey) : plugin.trust}
+                    {plugin.requested_by
+                      ? ` · ${t('setup.plugin_requested_by', { value: plugin.requested_by })}`
+                      : ''}
+                  </p>
+                  {decidable && pluginConfirm?.id === plugin.id ? (
+                    <div className="plugin-confirm">
+                      <p className="item-body">
+                        {t(
+                          pluginConfirm.decision === 'approve'
+                            ? 'setup.plugin_confirm_approve'
+                            : 'setup.plugin_confirm_deny'
+                        )}
+                      </p>
+                      <div className="button-row">
+                        <button
+                          type="button"
+                          className="action-button"
+                          disabled={busy}
+                          onClick={() => void decidePlugin(plugin.id, pluginConfirm.decision)}
+                        >
+                          {t('setup.confirm_yes')}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-button secondary"
+                          disabled={busy}
+                          onClick={() => setPluginConfirm(null)}
+                        >
+                          {t('setup.confirm_back')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : decidable ? (
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        className="action-button"
+                        disabled={busy}
+                        onClick={() => setPluginConfirm({ id: plugin.id, decision: 'approve' })}
+                      >
+                        {t('setup.plugin_approve')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action-button secondary"
+                        disabled={busy}
+                        onClick={() => setPluginConfirm({ id: plugin.id, decision: 'deny' })}
+                      >
+                        {t('setup.plugin_deny')}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
+        </section>
+
+        <section className="pane" id="setup-governance" aria-label={t('setup.governance_title')}>
+          <h2>{t('setup.governance_title')}</h2>
+          <p className="pane-subtitle">{t('setup.governance_description')}</p>
+          <label className="field-label">
+            {t('setup.governance_preset')}
+            <select
+              value={configPresetId}
+              onChange={(event) => {
+                setConfigPresetId(event.target.value);
+                setConfigInputs({});
+                setConfigConfirm(false);
+              }}
+            >
+              <option value="">{t('setup.governance_preset_placeholder')}</option>
+              {configPresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          {(() => {
+            const preset = configPresets.find((candidate) => candidate.id === configPresetId);
+            if (!preset) return null;
+            return (
+              <>
+                <p className="item-meta">{preset.description}</p>
+                <p className="item-meta">
+                  {t('setup.governance_targets', { count: preset.write_target_count })}
+                </p>
+                <label className="field-label">
+                  {t('setup.governance_tenant')}
+                  <select
+                    value={configTenant}
+                    onChange={(event) => setConfigTenant(event.target.value)}
+                  >
+                    {configTenants.map((tenant) => (
+                      <option key={tenant} value={tenant}>
+                        {tenant}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {preset.inputs.map((input) => (
+                  <label className="field-label" key={input.key}>
+                    {input.key}
+                    {input.required ? ` (${t('setup.governance_required')})` : ''}
+                    {input.type === 'enum' && input.values ? (
+                      <select
+                        value={configInputs[input.key] || input.default || ''}
+                        onChange={(event) =>
+                          setConfigInputs({ ...configInputs, [input.key]: event.target.value })
+                        }
+                      >
+                        <option value="">{t('setup.governance_preset_placeholder')}</option>
+                        {input.values.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    ) : input.type === 'boolean' ? (
+                      <select
+                        value={configInputs[input.key] || input.default || 'false'}
+                        onChange={(event) =>
+                          setConfigInputs({ ...configInputs, [input.key]: event.target.value })
+                        }
+                      >
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                      </select>
+                    ) : (
+                      <input
+                        type={input.type === 'secret' ? 'password' : 'text'}
+                        value={configInputs[input.key] || ''}
+                        onChange={(event) =>
+                          setConfigInputs({ ...configInputs, [input.key]: event.target.value })
+                        }
+                      />
+                    )}
+                    <span className="item-meta">{input.description}</span>
+                  </label>
+                ))}
+                {configConfirm ? (
+                  <div className="governance-confirm">
+                    <p className="item-body">{t('setup.governance_confirm')}</p>
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        className="action-button"
+                        disabled={busy}
+                        onClick={() => void submitConfigMission()}
+                      >
+                        {t('setup.confirm_yes')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action-button secondary"
+                        disabled={busy}
+                        onClick={() => setConfigConfirm(false)}
+                      >
+                        {t('setup.confirm_back')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="action-button"
+                      disabled={busy || !configTenant}
+                      onClick={() => setConfigConfirm(true)}
+                    >
+                      {t('setup.governance_submit')}
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          <h3 className="pane-subheading">{t('setup.governance_recent')}</h3>
+          {configRecent.length === 0 ? (
+            <p className="item-meta">{t('setup.governance_recent_empty')}</p>
+          ) : (
+            configRecent.map((mission) => {
+              const statusKey = CONFIG_STATUS_KEYS[mission.status];
+              return (
+                <div className="item-card" key={mission.id}>
+                  <p className="item-title">
+                    {mission.preset}
+                    <span
+                      className={`status-chip${mission.status === 'applied' ? ' ok' : mission.status === 'failed' ? ' attention' : ''}`}
+                    >
+                      {statusKey ? t(statusKey) : mission.status}
+                    </span>
+                  </p>
+                  <p className="item-meta">
+                    {mission.id} · {mission.tenant}
+                    {mission.created_at ? ` · ${mission.created_at.slice(0, 10)}` : ''}
+                  </p>
+                </div>
+              );
+            })
+          )}
         </section>
 
         <section className="pane" id="setup-operations" aria-label={t('setup.operations_title')}>
