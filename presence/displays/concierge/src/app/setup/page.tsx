@@ -2,8 +2,17 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
+import type { ConciergeMessageKey } from '../../lib/i18n';
 
 type Service = { id: string; label: string; auth: string; configured: boolean };
+type Diagnostic = {
+  id: string;
+  status: 'ok' | 'incomplete' | 'error';
+  action?: { type: 'navigate'; target: string };
+  command?: string;
+};
+type NotificationChannelOption = { surface: string; display_name: string; status: string };
+type NotificationTarget = { surface: string; target: string };
 type Setup = {
   surface_roles: Array<{
     id: string;
@@ -15,7 +24,6 @@ type Setup = {
   active_surfaces: Array<{ id: string; port?: number; enabled: boolean }>;
   reasoning_mode: string;
   model_tiers: Record<string, string>;
-  commands: Record<string, string>;
   providers?: { priority?: string[]; default_models?: Record<string, string> };
   profile: {
     name: string;
@@ -36,13 +44,12 @@ type Setup = {
     }>;
   };
   service_catalog: Service[];
+  diagnostics: Diagnostic[];
   capabilities: Array<{
     id: string;
     label: string;
     status: string;
     href?: string;
-    pipeline?: string;
-    command?: string;
   }>;
   tenant: {
     active_slug: string;
@@ -78,6 +85,21 @@ type Notice = { text: string; error?: boolean } | null;
 
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
+const DIAG_LABELS: Record<string, ConciergeMessageKey> = {
+  profile: 'setup.diag.profile',
+  avatar: 'setup.diag.avatar',
+  voice: 'setup.diag.voice',
+  services: 'setup.diag.services',
+  notifications: 'setup.diag.notifications',
+  reasoning: 'setup.diag.reasoning',
+};
+
+// Items with no in-app fix degrade to polite guidance (never a raw command
+// printout as the primary copy — the command stays visually secondary).
+const DIAG_GUIDANCE: Record<string, ConciergeMessageKey> = {
+  reasoning: 'setup.reasoning_guidance',
+};
+
 export default function SetupPage() {
   const { locale, setLocale, t } = useConciergeI18n();
   const [setup, setSetup] = React.useState<Setup | null>(null);
@@ -102,6 +124,9 @@ export default function SetupPage() {
     agent_provider: '',
     agent_model_id: '',
   });
+  const [notifChannels, setNotifChannels] = React.useState<NotificationChannelOption[]>([]);
+  const [notifCurrent, setNotifCurrent] = React.useState<NotificationTarget | null>(null);
+  const [notif, setNotif] = React.useState({ surface: 'none', target: '' });
   const [cameraState, setCameraState] = React.useState<'idle' | 'starting' | 'ready'>('idle');
   const [voiceRecording, setVoiceRecording] = React.useState(false);
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
@@ -158,13 +183,63 @@ export default function SetupPage() {
     }
   }, []);
 
+  const refreshNotifications = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/notification-preferences', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification failed');
+      const channels = Array.isArray(payload.channels)
+        ? (payload.channels as NotificationChannelOption[])
+        : [];
+      const current = (payload.preferences?.default_channel || null) as NotificationTarget | null;
+      setNotifChannels(channels);
+      setNotifCurrent(current);
+      setNotif(
+        current
+          ? { surface: current.surface, target: current.target }
+          : { surface: 'none', target: '' }
+      );
+    } catch {
+      // The notification pane keeps its last known state; the diagnostics
+      // checklist from /api/setup still reports the authoritative status.
+    }
+  }, []);
+
   React.useEffect(() => {
     void refresh();
+    void refreshNotifications();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, [refresh]);
+  }, [refresh, refreshNotifications]);
+
+  const jumpToSection = React.useCallback((target: string) => {
+    if (!target.startsWith('#')) return;
+    const element = document.getElementById(target.slice(1));
+    if (!element) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }, []);
+
+  const saveNotification = React.useCallback(async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/notification-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surface: notif.surface, channel: notif.target.trim() }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'notification save failed');
+      setNotice({ text: t('setup.notification_saved') });
+      await Promise.all([refreshNotifications(), refresh()]);
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+      setBusy(false);
+    }
+  }, [notif, refresh, refreshNotifications, t]);
 
   const applyOnboarding = React.useCallback(
     async (includeVoice: boolean) => {
@@ -429,6 +504,8 @@ export default function SetupPage() {
 
   const reasoningReady =
     setup.reasoning_mode !== 'not-installed' && setup.reasoning_mode !== 'stub';
+  const channelDisplayName = (surface: string) =>
+    notifChannels.find((channel) => channel.surface === surface)?.display_name || surface;
 
   return (
     <div>
@@ -474,8 +551,49 @@ export default function SetupPage() {
 
       {notice ? <div className={`notice${notice.error ? ' error' : ''}`}>{notice.text}</div> : null}
 
+      <section className="pane readiness-pane" aria-label={t('setup.readiness_title')}>
+        <h2>{t('setup.readiness_title')}</h2>
+        <p className="pane-subtitle">{t('setup.readiness_description')}</p>
+        <ul className="readiness-list">
+          {setup.diagnostics.map((item) => {
+            const labelKey = DIAG_LABELS[item.id];
+            const guidanceKey = DIAG_GUIDANCE[item.id];
+            return (
+              <li className="readiness-item" key={item.id}>
+                <span className={`status-chip${item.status === 'ok' ? ' ok' : ' attention'}`}>
+                  {item.status === 'ok'
+                    ? `✓ ${t('setup.completed')}`
+                    : item.status === 'error'
+                      ? t('setup.diag_error')
+                      : t('setup.incomplete')}
+                </span>
+                <span className="readiness-label">{labelKey ? t(labelKey) : item.id}</span>
+                {item.status !== 'ok' && item.action?.type === 'navigate' ? (
+                  <button
+                    className="action-button secondary"
+                    onClick={() => jumpToSection(item.action!.target)}
+                  >
+                    {t('setup.fix_here')}
+                  </button>
+                ) : null}
+                {item.status !== 'ok' && !item.action && guidanceKey ? (
+                  <span className="readiness-guidance">
+                    {t(guidanceKey)}
+                    {item.command ? (
+                      <span className="readiness-command">
+                        {t('setup.reasoning_command_hint', { value: item.command })}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
       <div className="pane-grid">
-        <section className="pane" aria-label={t('setup.profile_title')}>
+        <section className="pane" id="setup-profile" aria-label={t('setup.profile_title')}>
           <h2>{t('setup.profile_title')}</h2>
           <p className="pane-subtitle">{t('setup.profile_description')}</p>
           <label className="field-label">
@@ -514,7 +632,7 @@ export default function SetupPage() {
           </div>
         </section>
 
-        <section className="pane" aria-label={t('setup.management_title')}>
+        <section className="pane" id="setup-management" aria-label={t('setup.management_title')}>
           <h2>{t('setup.management_title')}</h2>
           <p className="pane-subtitle">{t('setup.management_description')}</p>
           <label className="field-label">
@@ -609,7 +727,7 @@ export default function SetupPage() {
           </div>
         </section>
 
-        <section className="pane" aria-label={t('setup.media_title')}>
+        <section className="pane" id="setup-media" aria-label={t('setup.media_title')}>
           <h2>{t('setup.media_title')}</h2>
           <p className="pane-subtitle">{t('setup.media_description')}</p>
           <div className="item-card">
@@ -731,7 +849,7 @@ export default function SetupPage() {
           </div>
         </section>
 
-        <section className="pane" aria-label={t('setup.services_title')}>
+        <section className="pane" id="setup-services" aria-label={t('setup.services_title')}>
           <h2>{t('setup.services_title')}</h2>
           <p className="pane-subtitle">{t('setup.services_description')}</p>
           {setup.service_catalog.map((service) => (
@@ -766,7 +884,56 @@ export default function SetupPage() {
           </div>
         </section>
 
-        <section className="pane" aria-label={t('setup.operations_title')}>
+        <section
+          className="pane"
+          id="setup-notifications"
+          aria-label={t('setup.notifications_title')}
+        >
+          <h2>{t('setup.notifications_title')}</h2>
+          <p className="pane-subtitle">{t('setup.notifications_description')}</p>
+          <p className="item-meta">
+            {notifCurrent
+              ? t('setup.notification_current', {
+                  value: `${channelDisplayName(notifCurrent.surface)} ${notifCurrent.target}`,
+                })
+              : t('setup.notification_none')}
+          </p>
+          <label className="field-label">
+            {t('setup.notification_surface')}
+            <select
+              value={notif.surface}
+              onChange={(event) => setNotif({ ...notif, surface: event.target.value })}
+            >
+              <option value="none">{t('setup.notification_off_option')}</option>
+              {notifChannels.map((channel) => (
+                <option key={channel.surface} value={channel.surface}>
+                  {channel.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {notif.surface !== 'none' ? (
+            <label className="field-label">
+              {t('setup.notification_target')}
+              <input
+                value={notif.target}
+                onChange={(event) => setNotif({ ...notif, target: event.target.value })}
+                placeholder={t('setup.notification_target_placeholder')}
+              />
+            </label>
+          ) : null}
+          <div className="button-row">
+            <button
+              className="action-button"
+              disabled={busy || (notif.surface !== 'none' && !notif.target.trim())}
+              onClick={() => void saveNotification()}
+            >
+              {t('setup.notification_save')}
+            </button>
+          </div>
+        </section>
+
+        <section className="pane" id="setup-operations" aria-label={t('setup.operations_title')}>
           <h2>{t('setup.operations_title')}</h2>
           <p className="pane-subtitle">{t('setup.operations_description')}</p>
           {setup.capabilities.map((capability) => (
@@ -780,12 +947,14 @@ export default function SetupPage() {
                 </span>
               </p>
               <p className="item-meta">
-                {capability.href ? (
+                {capability.href?.startsWith('#') ? (
+                  <button className="link-button" onClick={() => jumpToSection(capability.href!)}>
+                    {t('setup.open_section')}
+                  </button>
+                ) : capability.href ? (
                   <a href={capability.href}>{t('setup.open_approval_queue')}</a>
-                ) : capability.pipeline ? (
-                  t('setup.pipeline', { value: capability.pipeline })
                 ) : (
-                  t('setup.device_command', { value: capability.command || '' })
+                  t('setup.ask_via_conversation')
                 )}
               </p>
             </div>
