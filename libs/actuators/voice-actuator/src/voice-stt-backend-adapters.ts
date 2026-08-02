@@ -29,6 +29,67 @@ export function registerVoiceLoopbackSttAdapter(
   if (bridgeId === 'mlx_whisper') {
     registerStreamingSttBridge(bridgeId, () => createMlxWhisperBridge(options));
   }
+  if (bridgeId === 'faster_whisper') {
+    registerStreamingSttBridge(bridgeId, () => createFasterWhisperBridge(options));
+  }
+}
+
+function createFasterWhisperBridge(
+  options: VoiceLoopbackSttAdapterOptions
+): StreamingSpeechToTextBridge {
+  return {
+    bridge_id: 'faster_whisper',
+    async *transcribeStream(audio) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of audio) {
+        assertLoopbackFormat(chunk);
+        chunks.push(Buffer.from(chunk.payload));
+      }
+      if (chunks.length === 0) return;
+
+      const audioPath = pathResolver.sharedTmp(
+        `voice-loopback/${options.request_id}.faster-whisper.wav`
+      );
+      safeMkdir(path.dirname(audioPath), { recursive: true });
+      try {
+        safeWriteFile(audioPath, pcmToWav(Buffer.concat(chunks), 16_000));
+        const script = pathResolver.rootResolve(
+          'libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py'
+        );
+        const result = safeExecResult(resolvePythonBin('faster_whisper'), [script], {
+          input: JSON.stringify({
+            action: 'transcribe',
+            params: { audio_path: audioPath, language: options.language },
+          }),
+          env: { KYBERION_PROJECT_ROOT: pathResolver.rootResolve('.') },
+          timeoutMs: 120_000,
+          maxOutputMB: 2,
+        });
+        if (result.error || result.status !== 0) {
+          throw new Error(
+            `voice STT backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
+          );
+        }
+        const response: unknown = JSON.parse(result.stdout);
+        if (!isRecord(response) || response.status !== 'success') {
+          throw new Error(
+            `voice STT backend returned an error: ${isRecord(response) && typeof response.error === 'string' ? response.error : 'invalid response'}`
+          );
+        }
+        const text = typeof response.text === 'string' ? response.text.trim() : '';
+        if (text) {
+          yield {
+            utterance_id: `${options.request_id}-final`,
+            is_final: true,
+            text,
+            emitted_at: new Date().toISOString(),
+          };
+        }
+      } finally {
+        safeRmSync(audioPath, { force: true });
+      }
+    },
+  };
 }
 
 function createMlxWhisperBridge(

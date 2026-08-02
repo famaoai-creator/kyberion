@@ -11,6 +11,7 @@
           "enum": [
             "inspect_image",
             "ocr_image",
+            "describe_image",
             "generate_image",
             "generate_video",
             "generate_music",
@@ -37,6 +38,7 @@
                 "enum": [
                   "inspect_image",
                   "ocr_image",
+                  "describe_image",
                   "generate_image",
                   "generate_video",
                   "generate_music",

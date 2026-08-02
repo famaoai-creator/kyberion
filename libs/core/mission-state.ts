@@ -17,15 +17,20 @@ import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const missionStateAjv = new AjvCtor({ allErrors: true });
-const missionStateValidate = compileSchemaFromPath(
-  missionStateAjv,
-  pathResolver.rootResolve('schemas/mission-state.schema.json')
-);
+let missionStateValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
+
+function getMissionStateValidator() {
+  return (missionStateValidate ??= compileSchemaFromPath(
+    missionStateAjv,
+    pathResolver.rootResolve('schemas/mission-state.schema.json')
+  ));
+}
 
 function assertMissionStateSchema(state: MissionState): void {
-  if (missionStateValidate(state)) return;
-  const errors = Array.isArray(missionStateValidate.errors)
-    ? missionStateValidate.errors
+  const validate = getMissionStateValidator();
+  if (validate(state)) return;
+  const errors = Array.isArray(validate.errors)
+    ? validate.errors
         .map((entry: any) => `${entry.instancePath || '/'} ${entry.message || 'invalid'}`)
         .join('; ')
     : 'unknown schema error';

@@ -16,12 +16,12 @@ import { PulseAudioBus } from './pulse-audio-bus.js';
 
 export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio';
 
-export function resolveAudioBus(
-  preferred: AudioBusId | undefined = process.env.KYBERION_AUDIO_BUS as AudioBusId | undefined
-): AudioBus {
-  if (preferred === 'stub') return new StubAudioBus();
-  if (preferred === 'blackhole') {
-    return new BlackHoleAudioBus({
+type AudioBusFactory = () => AudioBus;
+
+const explicitFactories: Record<AudioBusId, AudioBusFactory> = {
+  stub: () => new StubAudioBus(),
+  blackhole: () =>
+    new BlackHoleAudioBus({
       ...(process.env.KYBERION_BLACKHOLE_INPUT_UID
         ? { input_device_uid: process.env.KYBERION_BLACKHOLE_INPUT_UID }
         : {}),
@@ -31,10 +31,18 @@ export function resolveAudioBus(
       ...(process.env.KYBERION_BLACKHOLE_DEVICE_LABEL
         ? { expected_device_label: process.env.KYBERION_BLACKHOLE_DEVICE_LABEL }
         : {}),
-    });
-  }
-  if (preferred === 'pulseaudio') return new PulseAudioBus();
-  if (process.platform === 'darwin') return new BlackHoleAudioBus();
-  if (process.platform === 'linux') return new PulseAudioBus();
-  return new StubAudioBus();
+    }),
+  pulseaudio: () => new PulseAudioBus(),
+};
+
+const platformFactories: Partial<Record<NodeJS.Platform, AudioBusFactory>> = {
+  darwin: explicitFactories.blackhole,
+  linux: explicitFactories.pulseaudio,
+};
+
+export function resolveAudioBus(
+  preferred: AudioBusId | undefined = process.env.KYBERION_AUDIO_BUS as AudioBusId | undefined
+): AudioBus {
+  if (preferred) return explicitFactories[preferred]();
+  return (platformFactories[process.platform] || explicitFactories.stub)();
 }

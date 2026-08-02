@@ -215,6 +215,7 @@ export async function loadAuthorizedSkillPlugins(
     }
     try {
       const mod = (await import(
+        /* webpackIgnore: true */
         pathToFileURL(authorization.resolvedPath).href
       )) as SkillPluginHookModule;
       loaded.push({

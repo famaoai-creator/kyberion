@@ -26,8 +26,9 @@ describe('Config mission contract', () => {
     const ajv = new Ajv({ strict: false });
     const validate = ajv.compile(schema);
 
-    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[])
-      .filter(f => f.endsWith('.json'));
+    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[]).filter((f) =>
+      f.endsWith('.json')
+    );
 
     expect(files.length).toBeGreaterThanOrEqual(4);
 
@@ -39,23 +40,30 @@ describe('Config mission contract', () => {
   });
 
   it('each preset references an existing pipeline', () => {
-    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[])
-      .filter(f => f.endsWith('.json'));
+    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[]).filter((f) =>
+      f.endsWith('.json')
+    );
 
     for (const file of files) {
       const preset = JSON.parse(read(path.join(PRESET_DIR, file)));
       const pipelineRaw = safeReadFile(path.join(rootDir, preset.pipeline), { encoding: 'utf8' });
-      expect(pipelineRaw, `Pipeline missing for preset ${preset.preset_id}: ${preset.pipeline}`).toBeTruthy();
+      expect(
+        pipelineRaw,
+        `Pipeline missing for preset ${preset.preset_id}: ${preset.pipeline}`
+      ).toBeTruthy();
     }
   });
 
   it('each preset declares authority_role as system_configurator', () => {
-    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[])
-      .filter(f => f.endsWith('.json'));
+    const files = (safeReaddir(path.join(rootDir, PRESET_DIR)) as string[]).filter((f) =>
+      f.endsWith('.json')
+    );
 
     for (const file of files) {
       const preset = JSON.parse(read(path.join(PRESET_DIR, file)));
-      expect(preset.authority_role, `${file} should use system_configurator`).toBe('system_configurator');
+      expect(preset.authority_role, `${file} should use system_configurator`).toBe(
+        'system_configurator'
+      );
     }
   });
 
@@ -69,7 +77,9 @@ describe('Config mission contract', () => {
   });
 
   it('system_configurator authority-role file exists and is well-formed', () => {
-    const ar = JSON.parse(read('knowledge/product/governance/authority-roles/system_configurator.json'));
+    const ar = JSON.parse(
+      read('knowledge/product/governance/authority-roles/system_configurator.json')
+    );
     expect(ar.role).toBe('system_configurator');
     expect(ar.default_persona).toBe('worker');
     expect(ar.write_scopes).toContain('knowledge/confidential/');
@@ -85,8 +95,9 @@ describe('Config mission contract', () => {
   });
 
   it('config pipeline files are valid pipeline ADF', () => {
-    const files = (safeReaddir(path.join(rootDir, PIPELINE_CONFIG_DIR)) as string[])
-      .filter(f => f.endsWith('.json'));
+    const files = (safeReaddir(path.join(rootDir, PIPELINE_CONFIG_DIR)) as string[]).filter((f) =>
+      f.endsWith('.json')
+    );
 
     expect(files.length).toBeGreaterThanOrEqual(4);
 
@@ -104,7 +115,7 @@ describe('Config mission contract', () => {
     expect(src).toContain("case 'create'");
     expect(src).toContain("case 'status'");
     expect(src).toContain("case 'apply'");
-    expect(src).toContain('SYSTEM_ROLE=system_configurator');
+    expect(src).toContain("SYSTEM_ROLE: 'system_configurator'");
     expect(src).toContain('knowledge/product/config-missions');
     expect(src).toContain('knowledge/confidential');
   });

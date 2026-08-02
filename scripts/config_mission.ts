@@ -89,8 +89,8 @@ function loadPreset(presetId: string): ConfigMissionPreset {
 function listPresets(): ConfigMissionPreset[] {
   const entries = safeReaddir(PRESET_DIR) as string[];
   return entries
-    .filter(f => f.endsWith('.json'))
-    .map(f => {
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => {
       try {
         return loadPreset(f.replace('.json', ''));
       } catch {
@@ -147,7 +147,9 @@ function cmdList(): void {
     console.log(`  ${id} ${cat} ${p.description}`);
   }
   console.log(`\nTotal: ${presets.length} preset(s)`);
-  console.log(`\nTo create a mission: pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]`);
+  console.log(
+    `\nTo create a mission: pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]`
+  );
 }
 
 function cmdCreate(argv: string[]): void {
@@ -233,11 +235,15 @@ function cmdStatus(argv: string[]): void {
     return;
   }
 
-  const entries = (safeReaddir(missionsDir) as string[]).filter(e => e.startsWith('cfg-'));
-  const targets = id ? entries.filter(e => e === id) : entries;
+  const entries = (safeReaddir(missionsDir) as string[]).filter((e) => e.startsWith('cfg-'));
+  const targets = id ? entries.filter((e) => e === id) : entries;
 
   if (targets.length === 0) {
-    logger.info(id ? `Config mission ${id} not found for tenant ${tenant}` : `No config missions for tenant ${tenant}`);
+    logger.info(
+      id
+        ? `Config mission ${id} not found for tenant ${tenant}`
+        : `No config missions for tenant ${tenant}`
+    );
     return;
   }
 
@@ -291,19 +297,21 @@ async function cmdApply(argv: string[]): Promise<void> {
   logger.info(`[CONFIG_MISSION] Applying ${brief.preset_id} for tenant ${tenant}…`);
 
   try {
-    // Delegate execution to run_pipeline with the mission's inputs as context
-    const inputEnv = Object.entries(brief.inputs)
-      .map(([k, v]) => `INPUT_${k.toUpperCase()}=${JSON.stringify(v)}`)
-      .join(' ');
-
+    // Delegate execution directly to Node.  The previous implementation used
+    // `sh -c`, which is unavailable on a stock Windows installation and also
+    // made environment values vulnerable to shell quoting differences.
     const pipelinePath = preset.pipeline;
-    safeExec(
-      'sh',
-      ['-c',
-       `KYBERION_PERSONA=worker SYSTEM_ROLE=system_configurator ${inputEnv} ` +
-       `node dist/scripts/run_pipeline.js --input ${pipelinePath}`],
-      { cwd: pathResolver.rootDir() }
+    const inputEnv = Object.fromEntries(
+      Object.entries(brief.inputs).map(([k, v]) => [`INPUT_${k.toUpperCase()}`, String(v)])
     );
+    safeExec('node', ['dist/scripts/run_pipeline.js', '--input', pipelinePath], {
+      cwd: pathResolver.rootDir(),
+      env: {
+        KYBERION_PERSONA: 'worker',
+        SYSTEM_ROLE: 'system_configurator',
+        ...inputEnv,
+      },
+    });
 
     brief.status = 'applied';
     brief.applied_at = new Date().toISOString();
@@ -343,13 +351,15 @@ async function cmdApply(argv: string[]): Promise<void> {
 function printUsage(): void {
   console.error('Usage: pnpm config-mission <list|create|status|apply> [options]');
   console.error('  pnpm config-mission help');
-  console.error('  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]');
+  console.error(
+    '  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]'
+  );
   console.error('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
   console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
 async function main(): Promise<void> {
-  const [,, command, ...rest] = process.argv;
+  const [, , command, ...rest] = process.argv;
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printUsage();
@@ -376,7 +386,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   logger.error(String(err));
   process.exit(1);
 });

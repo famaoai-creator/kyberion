@@ -1011,7 +1011,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16329,
+      "size": 16347,
       "type": "json"
     },
     {
@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 75492,
+      "size": 76786,
       "type": "json"
     },
     {
@@ -1299,7 +1299,7 @@
     {
       "path": "product/governance/environment-manifests/kyberion-toolchain.json",
       "tier": "public",
-      "size": 6249,
+      "size": 7536,
       "type": "json"
     },
     {
@@ -2493,7 +2493,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 18987,
+      "size": 20113,
       "type": "json"
     },
     {
@@ -3075,7 +3075,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 90496,
+      "size": 90579,
       "type": "json"
     },
     {
@@ -3423,7 +3423,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 18492,
+      "size": 18499,
       "type": "json"
     },
     {
@@ -4713,7 +4713,7 @@
     {
       "path": "product/orchestration/work-coordination-platform.md",
       "tier": "public",
-      "size": 4553,
+      "size": 5222,
       "type": "md"
     },
     {

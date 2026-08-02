@@ -13,6 +13,7 @@ export type VoiceTtsAdapterId = 'native_tts' | 'python_bridge' | 'unsupported';
 export type VoiceSttAdapterId =
   | 'native_speech'
   | 'fluid_audio_native'
+  | 'faster_whisper_python'
   | 'managed_python_bridge'
   | 'whisper_cpp_cli'
   | 'openai_compatible_server'
@@ -74,6 +75,13 @@ const STT_ADAPTERS: Record<VoiceSttBackend, VoiceSttAdapterDescriptor> = {
     backend: 'fluid_audio',
     adapter_id: 'fluid_audio_native',
     display_name: 'FluidAudio Parakeet native bridge',
+  },
+  faster_whisper: {
+    backend: 'faster_whisper',
+    adapter_id: 'faster_whisper_python',
+    display_name: 'faster-whisper Windows Python bridge',
+    runtime_id: 'faster_whisper',
+    bridge_script: 'libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py',
   },
   whisper_cpp: {
     backend: 'whisper_cpp',

@@ -384,7 +384,10 @@ export async function POST(req: NextRequest) {
     if (body?.action !== 'apply_onboarding' || !body?.draft) {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
     }
-    const draft = structuredClone(body.draft) as Record<string, any>;
+    const draft = structuredClone(body.draft) as {
+      [key: string]: unknown;
+      voice?: { enabled?: boolean; sample_refs?: unknown[] };
+    };
     if (draft.voice?.enabled && Array.isArray(draft.voice.sample_refs)) {
       draft.voice.sample_refs = draft.voice.sample_refs.map((sampleRef: unknown) => {
         const value = String(sampleRef || '');
