@@ -434,3 +434,111 @@ body {
   color: inherit;
   font: inherit;
 }
+
+/* Voice tier controls (CS-02) — mic button, output toggle, speaking state. */
+
+.dock-voice-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+}
+
+.dock-voice-chip {
+  border: 1px solid #d8d2c4;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.dock-voice-chip.on {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+.dock-voice-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--kb-accent, #8a6d3b);
+}
+
+.dock-voice-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.dock-voice-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dock-voice-settings select {
+  max-width: 60%;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  padding: 4px 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+}
+
+.dock-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.dock-mic:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dock-mic.listening {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+  animation: dock-mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dock-mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(138, 109, 59, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(138, 109, 59, 0.12);
+  }
+}
+
+/* Accessibility: the listening pulse is decorative only — the same state is
+   conveyed by the aria-pressed mic button and the visible listening label. */
+@media (prefers-reduced-motion: reduce) {
+  .dock-mic.listening {
+    animation: none;
+  }
+}
