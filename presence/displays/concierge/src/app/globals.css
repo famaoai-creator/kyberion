@@ -352,6 +352,53 @@ body {
   border-radius: 8px;
 }
 
+/* CS-03 記憶昇格キュー — proposed learnings awaiting the human's approval.
+   Sits above the grid like the hygiene pane: a pending memory decision is a
+   question to the human, not a routine feed. No animation is used, so no
+   prefers-reduced-motion override is needed. */
+
+.memory-pane {
+  margin-bottom: 20px;
+  border-left: 4px solid var(--kb-accent, #8a6d3b);
+}
+
+.memory-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+/* CS-03 文書取込 — one-document-at-a-time ingest ceremony (no watch folder).
+   The dropzone is static (no animation → no prefers-reduced-motion override). */
+
+.ingest-pane {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.ingest-dropzone {
+  border: 2px dashed #d8d2c4;
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  background: #fffdf9;
+  margin-bottom: 16px;
+}
+
+.ingest-dropzone.dragover {
+  border-color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+/* The dry-run toggle is an inline checkbox, not a block field. */
+.ingest-dry-run input[type='checkbox'] {
+  display: inline-block;
+  width: auto;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  accent-color: var(--kb-accent, #8a6d3b);
+}
+
 /* Readiness checklist (CS-03) — attention items jump to their in-page section. */
 
 .readiness-pane {

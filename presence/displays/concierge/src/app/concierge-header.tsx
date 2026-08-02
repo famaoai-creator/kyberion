@@ -18,6 +18,9 @@ export function ConciergeHeader() {
         <Link href="/" style={{ marginRight: 12 }}>
           {t('header.home')}
         </Link>
+        <Link href="/ingest" style={{ marginRight: 12 }}>
+          {t('header.ingest')}
+        </Link>
         <Link href="/setup" style={{ marginRight: 12 }}>
           {t('header.setup')}
         </Link>

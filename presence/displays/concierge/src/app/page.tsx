@@ -59,6 +59,17 @@ type HygieneInquiry = {
   waiting_since?: string;
 };
 
+type MemoryQueueItem = {
+  id: string;
+  kind: 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
+  summary: string;
+  source: string;
+  source_type: string;
+  sensitivity_tier: 'public' | 'confidential' | 'personal';
+  occurrences: number;
+  queued_at: string;
+};
+
 type ArtifactPreview = {
   name: string;
   kind: 'markdown' | 'text' | 'image' | 'other';
@@ -159,10 +170,32 @@ export default function ConciergePage() {
     }
   }, []);
 
+  // CS-03 記憶昇格キュー — proposed learnings awaiting the human's blessing.
+  // The pane only appears when candidates exist, and nothing is approved or
+  // rejected without an explicit confirmed click (§0: human gates stay human).
+  const [memoryQueue, setMemoryQueue] = React.useState<MemoryQueueItem[]>([]);
+  const [memoryBusyId, setMemoryBusyId] = React.useState<string | null>(null);
+  const [memoryConfirm, setMemoryConfirm] = React.useState<{
+    id: string;
+    decision: 'approve' | 'reject';
+  } | null>(null);
+
+  const refreshMemoryQueue = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/memory-queue', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory queue failed');
+      setMemoryQueue(payload.candidates as MemoryQueueItem[]);
+    } catch {
+      // Advisory pane: a failed queue fetch never blocks the concierge.
+    }
+  }, []);
+
   React.useEffect(() => {
     void refresh();
     void refreshResponseStatus();
     void refreshHygiene();
+    void refreshMemoryQueue();
     // CS-01: live summary updates over SSE; degrade to the legacy 30 s
     // polling only when the event stream is unavailable.
     let source: EventSource | null = null;
@@ -190,15 +223,18 @@ export default function ConciergePage() {
     }
     const responseTimer = setInterval(() => void refreshResponseStatus(), 10_000);
     // The hygiene report scans mission directories; a relaxed cadence is
-    // plenty for a list that changes on the order of days.
+    // plenty for a list that changes on the order of days. The memory queue
+    // moves at the same human pace.
     const hygieneTimer = setInterval(() => void refreshHygiene(), 60_000);
+    const memoryTimer = setInterval(() => void refreshMemoryQueue(), 60_000);
     return () => {
       source?.close();
       if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(responseTimer);
       clearInterval(hygieneTimer);
+      clearInterval(memoryTimer);
     };
-  }, [refresh, refreshResponseStatus, refreshHygiene]);
+  }, [refresh, refreshResponseStatus, refreshHygiene, refreshMemoryQueue]);
 
   const decideApproval = React.useCallback(
     async (item: Summary['approval_queue'][number], decision: 'approved' | 'rejected') => {
@@ -298,6 +334,31 @@ export default function ConciergePage() {
       }
     },
     [refresh, refreshHygiene]
+  );
+
+  // CS-03: a memory decision only fires from the inline confirm step — no
+  // auto-approval, no default, no blocking browser dialog.
+  const decideMemory = React.useCallback(
+    async (item: MemoryQueueItem, decision: 'approve' | 'reject') => {
+      setMemoryBusyId(item.id);
+      try {
+        const response = await fetch(`/api/memory-queue/${encodeURIComponent(item.id)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory decision failed');
+        setNotice({ text: payload.result.message });
+        setMemoryConfirm(null);
+        await refreshMemoryQueue();
+      } catch (error) {
+        setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
+      } finally {
+        setMemoryBusyId(null);
+      }
+    },
+    [refreshMemoryQueue]
   );
 
   // CS-03 受領プレビュー: one preview open at a time, fetched on demand.
@@ -496,6 +557,79 @@ export default function ConciergePage() {
                     }}
                   >
                     {t('hygiene.cancel')}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {memoryQueue.length > 0 ? (
+        <section className="pane memory-pane" aria-label={t('memory.title')}>
+          <h2>{t('memory.title')}</h2>
+          <p className="pane-subtitle">{t('memory.description')}</p>
+          {memoryQueue.map((item) => (
+            <div key={item.id} className="item-card">
+              <p className="item-title">
+                {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
+                <span className="status-chip">
+                  {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
+                </span>
+              </p>
+              <p className="item-body">{item.summary}</p>
+              <div className="item-meta">
+                {item.source ? `${t('memory.source', { value: item.source })} · ` : ''}
+                {formatWhen(item.queued_at, locale)}
+                {item.occurrences > 1
+                  ? ` · ${t('memory.seen_times', { count: item.occurrences })}`
+                  : ''}
+              </div>
+              {memoryConfirm?.id === item.id ? (
+                <div className="memory-confirm">
+                  <p className="item-body">
+                    {t(
+                      memoryConfirm.decision === 'approve'
+                        ? 'memory.confirm_approve'
+                        : 'memory.confirm_reject'
+                    )}
+                  </p>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="action-button"
+                      disabled={memoryBusyId === item.id}
+                      onClick={() => void decideMemory(item, memoryConfirm.decision)}
+                    >
+                      {t('memory.confirm_yes')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-button secondary"
+                      disabled={memoryBusyId === item.id}
+                      onClick={() => setMemoryConfirm(null)}
+                    >
+                      {t('memory.confirm_back')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="action-button"
+                    disabled={memoryBusyId !== null}
+                    onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
+                  >
+                    {t('memory.approve')}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button danger"
+                    disabled={memoryBusyId !== null}
+                    onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
+                  >
+                    {t('memory.reject')}
                   </button>
                 </div>
               )}
