@@ -4,6 +4,8 @@
 > **依頼**: presence surface の一つとして秘書(コンシェルジェ)を。アバターがいて音声/テキストの会話ベース、軽量なものは direct_reply。軽量なら 3D モデル。ダッシュボードもより視覚的に(グラフ)。**ドキュメント作成の上で実装まで実施。**
 > **位置づけ**: 設計 + 実装記録。関連: [COMPANY_OS_CONCEPT](./COMPANY_OS_CONCEPT.ja.md)、UX-01/02(体裁)、DS-01(トークン)、SU 系(UI 機能)。
 
+> **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は**旧実装**であり、surface manifest からは既に外れている。現行の登録済み concierge は **Next.js 版(port 3050、healthPath `/api/summary`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。旧実装の会話・音声・アバター機能は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で Next.js 版へ移植後、Express 版は削除予定。§1 のバックエンド二経路設計(voice-hub → orchestrator 縮退)と §4 の 3D 設計は移植後も有効な設計資産として参照される。
+
 ---
 
 ## 1. 秘書コンシェルジェ surface
@@ -46,8 +48,8 @@
 
 - `presence/displays/concierge/server.ts` — Express: `/health`、static 配信、`POST /api/message`(voice-hub プロキシ)、`GET /api/state`(状態)。presence-studio と同構造(package.json 不要、ルート tsc でコンパイル → `dist/presence/displays/concierge/server.js`)。
 - `presence/displays/concierge/static/index.html` — 2.5D アバター(インライン SVG + CSS アニメ)+ 音声/テキスト会話 UI(vanilla JS、Web Speech API、`/api/message` へ fetch)。self-contained。
-- `knowledge/product/governance/surfaces/concierge.json` — surface manifest(kind `ui`, port 3033, healthPath `/health`)。
-- 起動: `pnpm build && pnpm surfaces:reconcile`(または `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`)。
+- `knowledge/product/governance/surfaces/concierge.json` — surface manifest(**当時** kind `ui`, port 3033, healthPath `/health`。現行 manifest は Next.js 版 port 3050 / `/api/summary`)。
+- 起動(旧): `pnpm build && pnpm surfaces:reconcile`(または `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`)。
 
 ---
 
