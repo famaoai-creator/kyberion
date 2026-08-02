@@ -51,6 +51,31 @@ type Summary = {
   }>;
 };
 
+type HygieneInquiry = {
+  mission_id: string;
+  title: string;
+  reason: 'design_missing' | 'ready_not_started' | 'awaiting_gate';
+  age_days: number | null;
+  waiting_since?: string;
+};
+
+type ArtifactPreview = {
+  name: string;
+  kind: 'markdown' | 'text' | 'image' | 'other';
+  content?: string;
+  truncated?: boolean;
+  data_uri?: string;
+  missing?: boolean;
+  too_large?: boolean;
+};
+
+type OutcomePreview = {
+  entry_id: string;
+  total: number;
+  shown: number;
+  files: ArtifactPreview[];
+};
+
 type ResponseStatus = {
   state: 'ready' | 'waiting' | 'queued';
   label: string;
@@ -112,9 +137,32 @@ export default function ConciergePage() {
     }
   }, []);
 
+  // CS-03: 停滞ミッション伺いカード — stalled requests waiting for a human
+  // start/withdraw decision. The pane only appears when there is something to
+  // decide, and nothing is ever decided without an explicit confirmed click.
+  const [hygiene, setHygiene] = React.useState<HygieneInquiry[]>([]);
+  const [hygieneBusyId, setHygieneBusyId] = React.useState<string | null>(null);
+  const [hygieneConfirm, setHygieneConfirm] = React.useState<{
+    missionId: string;
+    decision: 'start' | 'cancel';
+  } | null>(null);
+  const [hygieneNote, setHygieneNote] = React.useState('');
+
+  const refreshHygiene = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/hygiene', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
+      setHygiene(payload.inquiries as HygieneInquiry[]);
+    } catch {
+      // Advisory pane: a failed hygiene fetch never blocks the concierge.
+    }
+  }, []);
+
   React.useEffect(() => {
     void refresh();
     void refreshResponseStatus();
+    void refreshHygiene();
     // CS-01: live summary updates over SSE; degrade to the legacy 30 s
     // polling only when the event stream is unavailable.
     let source: EventSource | null = null;
@@ -141,12 +189,16 @@ export default function ConciergePage() {
       startPollingFallback();
     }
     const responseTimer = setInterval(() => void refreshResponseStatus(), 10_000);
+    // The hygiene report scans mission directories; a relaxed cadence is
+    // plenty for a list that changes on the order of days.
+    const hygieneTimer = setInterval(() => void refreshHygiene(), 60_000);
     return () => {
       source?.close();
       if (fallbackTimer) clearInterval(fallbackTimer);
       clearInterval(responseTimer);
+      clearInterval(hygieneTimer);
     };
-  }, [refresh, refreshResponseStatus]);
+  }, [refresh, refreshResponseStatus, refreshHygiene]);
 
   const decideApproval = React.useCallback(
     async (item: Summary['approval_queue'][number], decision: 'approved' | 'rejected') => {
@@ -219,6 +271,67 @@ export default function ConciergePage() {
       }
     },
     [refresh, t]
+  );
+
+  // CS-03: the decision only fires from the inline confirm step — there is no
+  // auto-start, no auto-cancel, and no blocking browser dialog.
+  const decideHygiene = React.useCallback(
+    async (item: HygieneInquiry, decision: 'start' | 'cancel', note: string) => {
+      setHygieneBusyId(item.mission_id);
+      try {
+        const response = await fetch(`/api/hygiene/${encodeURIComponent(item.mission_id)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, ...(note.trim() ? { note: note.trim() } : {}) }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
+        setNotice({ text: payload.result.message });
+        setHygieneConfirm(null);
+        setHygieneNote('');
+        await refreshHygiene();
+        await refresh();
+      } catch (error) {
+        setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
+      } finally {
+        setHygieneBusyId(null);
+      }
+    },
+    [refresh, refreshHygiene]
+  );
+
+  // CS-03 受領プレビュー: one preview open at a time, fetched on demand.
+  const [previewId, setPreviewId] = React.useState<string | null>(null);
+  const [previewData, setPreviewData] = React.useState<OutcomePreview | null>(null);
+  const [previewError, setPreviewError] = React.useState<string | null>(null);
+  const [previewBusyId, setPreviewBusyId] = React.useState<string | null>(null);
+
+  const togglePreview = React.useCallback(
+    async (item: Summary['outcome_feed'][number]) => {
+      if (previewId === item.entry_id) {
+        setPreviewId(null);
+        setPreviewData(null);
+        setPreviewError(null);
+        return;
+      }
+      setPreviewBusyId(item.entry_id);
+      try {
+        const response = await fetch(`/api/outcomes/${encodeURIComponent(item.entry_id)}/preview`, {
+          cache: 'no-store',
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'preview failed');
+        setPreviewData(payload.preview as OutcomePreview);
+        setPreviewError(null);
+      } catch (error) {
+        setPreviewData(null);
+        setPreviewError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setPreviewId(item.entry_id);
+        setPreviewBusyId(null);
+      }
+    },
+    [previewId]
   );
 
   if (loadError) {
@@ -295,6 +408,97 @@ export default function ConciergePage() {
                 ? ` · ${t('home.response_backend', { value: task.backend_name })}`
                 : ''}
               {` · ${t('home.response_elapsed', { value: task.elapsed_seconds })}`}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {hygiene.length > 0 ? (
+        <section className="pane hygiene-pane" aria-label={t('hygiene.title')}>
+          <h2>{t('hygiene.title')}</h2>
+          <p className="pane-subtitle">{t('hygiene.description')}</p>
+          {hygiene.map((item) => (
+            <div key={item.mission_id} className="item-card">
+              <p className="item-title">{item.title}</p>
+              <p className="item-body">
+                {t(`hygiene.reason.${item.reason}` as Parameters<typeof t>[0])}
+              </p>
+              <div className="item-meta">
+                {item.mission_id}
+                {typeof item.age_days === 'number'
+                  ? ` · ${t('hygiene.waiting_days', { count: item.age_days })}`
+                  : ''}
+                {item.waiting_since
+                  ? ` · ${t('hygiene.waiting_since', { value: formatWhen(item.waiting_since, locale) })}`
+                  : ''}
+              </div>
+              {hygieneConfirm?.missionId === item.mission_id ? (
+                <div className="hygiene-confirm">
+                  <p className="item-body">
+                    {t(
+                      hygieneConfirm.decision === 'start'
+                        ? 'hygiene.confirm_start'
+                        : 'hygiene.confirm_cancel'
+                    )}
+                  </p>
+                  {hygieneConfirm.decision === 'cancel' ? (
+                    <label className="field-label">
+                      {t('hygiene.note_label')}
+                      <textarea
+                        value={hygieneNote}
+                        rows={2}
+                        onChange={(event) => setHygieneNote(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="action-button"
+                      disabled={hygieneBusyId === item.mission_id}
+                      onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
+                    >
+                      {t('hygiene.confirm_yes')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-button secondary"
+                      disabled={hygieneBusyId === item.mission_id}
+                      onClick={() => {
+                        setHygieneConfirm(null);
+                        setHygieneNote('');
+                      }}
+                    >
+                      {t('hygiene.confirm_back')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="action-button"
+                    disabled={hygieneBusyId !== null}
+                    onClick={() => {
+                      setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
+                      setHygieneNote('');
+                    }}
+                  >
+                    {t('hygiene.start')}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button danger"
+                    disabled={hygieneBusyId !== null}
+                    onClick={() => {
+                      setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
+                      setHygieneNote('');
+                    }}
+                  >
+                    {t('hygiene.cancel')}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </section>
@@ -396,6 +600,16 @@ export default function ConciergePage() {
                     : ''}
                 </div>
                 <div className="button-row">
+                  {item.artifact_paths.length > 0 ? (
+                    <button
+                      type="button"
+                      className="action-button secondary"
+                      disabled={previewBusyId === item.entry_id}
+                      onClick={() => void togglePreview(item)}
+                    >
+                      {previewId === item.entry_id ? t('home.preview_hide') : t('home.preview')}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="action-button"
@@ -424,6 +638,47 @@ export default function ConciergePage() {
                     {t('home.reject')}
                   </button>
                 </div>
+                {previewId === item.entry_id ? (
+                  <div className="outcome-preview">
+                    {previewError ? (
+                      <p className="item-body">
+                        {t('home.preview_error', { error: previewError })}
+                      </p>
+                    ) : null}
+                    {previewData && previewData.files.length === 0 ? (
+                      <p className="item-meta">{t('home.preview_empty')}</p>
+                    ) : null}
+                    {previewData?.files.map((file, index) => (
+                      <div className="preview-file" key={`${file.name}-${index}`}>
+                        <p className="preview-name">{file.name}</p>
+                        {file.kind === 'image' && file.data_uri ? (
+                          <img className="preview-image" src={file.data_uri} alt={file.name} />
+                        ) : (file.kind === 'markdown' || file.kind === 'text') &&
+                          typeof file.content === 'string' ? (
+                          <pre className="preview-content">{file.content}</pre>
+                        ) : (
+                          <p className="item-meta">
+                            {t(
+                              file.missing
+                                ? 'home.preview_missing'
+                                : file.too_large
+                                  ? 'home.preview_too_large'
+                                  : 'home.preview_unsupported'
+                            )}
+                          </p>
+                        )}
+                        {file.truncated ? (
+                          <p className="item-meta">{t('home.preview_truncated')}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                    {previewData && previewData.total > previewData.shown ? (
+                      <p className="item-meta">
+                        {t('home.preview_more', { count: previewData.total - previewData.shown })}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {changeFormId === item.entry_id ? (
                   <form
                     className="change-request-form"
