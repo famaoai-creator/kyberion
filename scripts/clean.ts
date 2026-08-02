@@ -10,6 +10,7 @@ import { getAllFiles } from '../libs/core/fs-utils.js';
 import { findSensitivePathMatch } from '../libs/core/sensitive-path-policy.js';
 
 function removeIfExists(targetPath: string): void {
+  if (!isProjectGeneratedFile(targetPath)) return;
   safeRmSync(targetPath, { recursive: true, force: true });
 }
 
