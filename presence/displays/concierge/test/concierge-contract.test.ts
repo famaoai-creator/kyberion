@@ -20,6 +20,7 @@ describe('concierge surface contract', () => {
       'src/app/api/approvals/[id]/route.ts',
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/setup/route.ts',
+      'src/app/api/notification-preferences/route.ts',
       'src/app/api/message/route.ts',
       'src/app/api/voice/listen-once/route.ts',
       'src/app/api/voice/stop/route.ts',
@@ -155,6 +156,64 @@ describe('concierge surface contract', () => {
     expect(dock).toContain('notifyServerSpeech');
     expect(messages).toContain('dock.voice.no_transcript');
     expect(messages).toContain('dock.voice.stop_speaking');
+  });
+
+  it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
+    const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    // Every incomplete item carries a machine-actionable navigate descriptor.
+    expect(setupRoute).toContain('diagnostics');
+    expect(setupRoute).toContain("type: 'navigate'");
+    expect(setupRoute).toContain("target: '#setup-");
+    // The page renders the checklist and attention items jump to their section.
+    expect(setupPage).toContain("t('setup.readiness_title')");
+    expect(setupPage).toContain('scrollIntoView');
+    for (const anchor of [
+      'setup-profile',
+      'setup-media',
+      'setup-services',
+      'setup-notifications',
+    ]) {
+      expect(setupPage).toContain(`id="${anchor}"`);
+    }
+    // ceo-ux.md: items with an in-app section no longer print shell commands,
+    // and pipeline IDs are not exposed as UI copy.
+    expect(setupPage).not.toContain('setup.device_command');
+    expect(setupPage).not.toContain('setup.pipeline');
+    expect(setupRoute).not.toContain('pnpm surfaces:status');
+    expect(setupRoute).not.toContain('schedule-summary-and-coordination');
+    // Honest degradation: the reasoning backend has no in-app fix, so the
+    // terminal command survives — as guidance-first, visually secondary copy.
+    expect(setupRoute).toContain('pnpm reasoning:setup');
+    expect(setupPage).toContain("'setup.reasoning_guidance'");
+    expect(setupPage).toContain("t('setup.reasoning_command_hint'");
+    expect(setupPage).toContain('readiness-command');
+    expect(messages).toContain('整備状況');
+  });
+
+  it('routes notification channel settings through the guarded preferences API (CS-03)', () => {
+    const route = fs.readFileSync(
+      path.join(appDir, 'src/app/api/notification-preferences/route.ts'),
+      'utf8'
+    );
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    // Preferences load/save reuse the @agent/core operator-notifications
+    // helpers under the sovereign_concierge execution context.
+    expect(route).toContain('loadNotificationPreferences');
+    expect(route).toContain('saveNotificationPreferences');
+    expect(route).toContain("withExecutionContext('sovereign_concierge'");
+    expect(route).toContain('withSensitivePathMediation');
+    // Channel candidates come from the shared channel directory, and the
+    // POST validates the surface against it before saving.
+    expect(route).toContain('listChannelDirectoryEntries');
+    expect(route).toContain('requireConciergeMutationAccess');
+    expect(route).not.toMatch(/export (async )?function (PUT|DELETE|PATCH)/);
+    // The setup page exposes the section and reports it in the checklist.
+    expect(setupPage).toContain("t('setup.notifications_title')");
+    expect(setupPage).toContain("fetch('/api/notification-preferences'");
+    expect(messages).toContain('通知設定を保存');
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {

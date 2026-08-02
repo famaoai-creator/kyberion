@@ -225,7 +225,35 @@
   },
   "setup.connected": { "en": "connected", "ja": "接続済み" },
   "setup.save_connections": { "en": "Save connection preparation", "ja": "接続準備を保存" },
-  "setup.operations_title": { "en": "5. Secretary operations", "ja": "5. 秘書業務の入口" },
+  "setup.notifications_title": { "en": "5. Notifications", "ja": "5. 通知" },
+  "setup.notifications_description": {
+    "en": "Choose where the secretary delivers questions, approvals, and completion notices.",
+    "ja": "質問・承認待ち・完了などのお知らせをお届けするチャネルを選びます。"
+  },
+  "setup.notification_current": {
+    "en": "Current destination: {value}",
+    "ja": "現在の通知先: {value}"
+  },
+  "setup.notification_none": {
+    "en": "No destination is set yet. Updates appear only on this screen.",
+    "ja": "通知先は未設定です。お知らせはこの画面でのみ確認できます。"
+  },
+  "setup.notification_surface": { "en": "Channel", "ja": "通知チャネル" },
+  "setup.notification_off_option": { "en": "Do not send notifications", "ja": "通知しない" },
+  "setup.notification_target": {
+    "en": "Destination (channel or recipient ID)",
+    "ja": "送り先(チャンネルまたは宛先のID)"
+  },
+  "setup.notification_target_placeholder": {
+    "en": "e.g. #ops or C0123456789",
+    "ja": "例: #ops または C0123456789"
+  },
+  "setup.notification_save": { "en": "Save notification settings", "ja": "通知設定を保存" },
+  "setup.notification_saved": {
+    "en": "Notification settings saved.",
+    "ja": "通知設定を保存しました。"
+  },
+  "setup.operations_title": { "en": "6. Secretary operations", "ja": "6. 秘書業務の入口" },
   "setup.operations_description": {
     "en": "Bring approvals, scheduling, and email into one personal entry point.",
     "ja": "承認・予定・メールを一つの個人向け入口にまとめます。"
@@ -233,8 +261,35 @@
   "setup.available": { "en": "available", "ja": "利用可能" },
   "setup.guided": { "en": "guided", "ja": "案内付き" },
   "setup.open_approval_queue": { "en": "Open approval queue", "ja": "承認キューを開く" },
-  "setup.pipeline": { "en": "pipeline: {value}", "ja": "pipeline: {value}" },
-  "setup.device_command": { "en": "command: {value}", "ja": "コマンド: {value}" },
+  "setup.open_section": {
+    "en": "Open the section on this page",
+    "ja": "この画面の該当セクションへ"
+  },
+  "setup.ask_via_conversation": {
+    "en": "Ask through the conversation dock",
+    "ja": "会話ドックからご依頼いただけます"
+  },
+  "setup.readiness_title": { "en": "Readiness", "ja": "整備状況" },
+  "setup.readiness_description": {
+    "en": "Items needing attention jump straight to the section where you can fix them.",
+    "ja": "未完了の項目は、ボタンでそのまま該当セクションへ移動して整えられます。"
+  },
+  "setup.diag.profile": { "en": "Profile", "ja": "プロフィール" },
+  "setup.diag.avatar": { "en": "Avatar", "ja": "アバター" },
+  "setup.diag.voice": { "en": "Voice profile", "ja": "音声プロフィール" },
+  "setup.diag.services": { "en": "Service connections", "ja": "サービス接続" },
+  "setup.diag.notifications": { "en": "Notification channel", "ja": "通知チャネル" },
+  "setup.diag.reasoning": { "en": "Reasoning backend", "ja": "推論バックエンド" },
+  "setup.diag_error": { "en": "needs attention", "ja": "要対応" },
+  "setup.fix_here": { "en": "Go to section", "ja": "設定に移動" },
+  "setup.reasoning_guidance": {
+    "en": "The reasoning backend is not ready yet. It needs to be prepared on the machine that runs your secretary, so it cannot be finished from this page.",
+    "ja": "推論バックエンドの準備がまだ整っていません。秘書が動作する端末側での準備が必要なため、この画面だけでは完了できません。"
+  },
+  "setup.reasoning_command_hint": {
+    "en": "For your administrator — terminal command: {value}",
+    "ja": "管理者向け・端末でのコマンド: {value}"
+  },
   "setup.avatar_flow": {
     "en": "Take a camera photo to create a square avatar. If no camera is available, upload a photo instead.",
     "ja": "カメラで撮影した写真から正方形のアバター画像を作成します。カメラがない場合は写真をアップロードできます。"
@@ -388,12 +443,12 @@
   "cap.email": { "en": "Collect email / draft replies", "ja": "メール収集・返信案" },
   "cap.voice": { "en": "Voice registration", "ja": "音声登録" },
   "cap.device": { "en": "Device settings", "ja": "デバイス設定" },
-  "command.onboarding": {
-    "en": "pnpm install && pnpm build && pnpm surfaces:reconcile && pnpm onboard",
-    "ja": "pnpm install && pnpm build && pnpm surfaces:reconcile && pnpm onboard"
+  "api.notification_surface": {
+    "en": "The notification channel is not valid.",
+    "ja": "通知チャネルの指定が正しくありません。"
   },
-  "command.reasoning": {
-    "en": "pnpm reasoning:setup (claude-cli recommended)",
-    "ja": "pnpm reasoning:setup (claude-cli 推奨)"
+  "api.notification_target": {
+    "en": "Enter a destination ID for the channel.",
+    "ja": "送り先IDを入力してください。"
   }
 }

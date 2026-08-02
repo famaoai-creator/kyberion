@@ -240,6 +240,12 @@ body {
   background: #fef3c7;
 }
 
+.status-chip.ok {
+  border-color: #9ecb9e;
+  color: #2f7d32;
+  background: #f2faf2;
+}
+
 .button-row {
   display: flex;
   gap: 8px;
@@ -289,6 +295,62 @@ body {
 
 .change-request-form {
   margin-top: 10px;
+}
+
+/* Readiness checklist (CS-03) — attention items jump to their in-page section. */
+
+.readiness-pane {
+  margin-bottom: 20px;
+}
+
+.readiness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readiness-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.readiness-item .status-chip {
+  margin-left: 0;
+  min-width: 72px;
+  text-align: center;
+}
+
+.readiness-label {
+  font-weight: 600;
+}
+
+.readiness-guidance {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+/* Honest degradation: the terminal command stays visible but secondary. */
+.readiness-command {
+  display: block;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #9ca3af);
+}
+
+.link-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--kb-accent, #8a6d3b);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* Conversation dock — the always-available secretary conversation (CS-01). */
