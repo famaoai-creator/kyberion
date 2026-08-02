@@ -146,11 +146,14 @@ def _qwen3_generate(text: str, ref_audio: str, ref_text: str, output_path: str) 
 
 
 def _macos_say_fallback(text: str, output_path: str) -> dict:
-    """macOS /usr/bin/say last-resort fallback."""
+    """macOS say last-resort fallback, resolved through PATH."""
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     aiff = out.with_suffix(".aiff")
-    subprocess.run(["/usr/bin/say", "-v", "Kyoko", "-o", str(aiff), text], check=True)
+    say = shutil.which("say")
+    if not say:
+        raise RuntimeError("macOS say is not available on PATH")
+    subprocess.run([say, "-v", "Kyoko", "-o", str(aiff), text], check=True)
     subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16", str(aiff), str(out)], check=False)
     if not out.exists() and aiff.exists():
         shutil.copy(aiff, out)  # keep aiff as last resort
@@ -240,7 +243,7 @@ def _health() -> dict:
             "cosyvoice2": _probe_cosyvoice(),
             "fish_speech_v1.5": _probe_fish_speech(),
             "qwen3_tts_icl": _probe_mlx_qwen3(),
-            "macos_say": os.path.exists("/usr/bin/say"),
+            "macos_say": shutil.which("say") is not None,
         },
         "install_hints": {
             "cosyvoice2": "pnpm voice:setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",

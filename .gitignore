@@ -106,3 +106,11 @@ tools/adf-replay-extension/native-host/.node-path
 .tmp-mulmoclaude/
 .tmp-agency-agents/
 .pnpm-store/
+
+# WinAppSDK helper build output
+tools/windows-native-image-generator/bin/
+tools/windows-native-image-generator/obj/
+tools/windows-native-image-generator/AppPackages/
+tools/windows-native-image-generator/.vs/
+tools/windows-native-image-generator/*.pfx
+tools/windows-native-image-generator/*.cer

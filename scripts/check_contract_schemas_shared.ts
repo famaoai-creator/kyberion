@@ -1,4 +1,5 @@
-import { pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { readJsonFile } from './refactor/cli-input.js';
 
 export type ContractCheck = {

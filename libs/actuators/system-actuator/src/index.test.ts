@@ -826,6 +826,14 @@ const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pendin
 const loadApprovalRequest = vi.fn(() => null);
 const classifyError = vi.fn(() => ({ category: 'timeout' }));
 const retry = vi.fn(async (fn: any) => fn());
+const resolveDesktopLaunchAdapter = vi.fn(() => ({
+  open: (target: string, cwd?: string) =>
+    safeExec(
+      process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open',
+      process.platform === 'win32' ? ['/c', 'start', '', target] : [target],
+      { cwd }
+    ),
+}));
 const pathResolver = {
   rootDir: vi.fn(() => '/tmp/kyberion'),
   rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
@@ -935,6 +943,7 @@ vi.mock('@agent/core', () => ({
     shouldRetry: vi.fn(() => true),
   })),
   retry,
+  resolveDesktopLaunchAdapter,
   emitComputerSurfacePatch,
   activateApplication,
   detectFocusedInput,

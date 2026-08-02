@@ -48,7 +48,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (80)
+## path (81)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -113,6 +113,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SERVICE_RUNTIME_POLICY_PATH`                           | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_STT_MODEL_DIR`                                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TASK_GRANTS_PATH`                                      | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                                                                |
@@ -191,7 +192,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
 | `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
 
-## provider (70)
+## provider (73)
 
 | Variable                                  | Type                                         | Required | Description                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -265,8 +266,11 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TTS_PLAY_COMMAND`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_WINDOWS_AI_ENDPOINT`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (147)
+## runtime (150)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -415,5 +419,8 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_PROFILE_ID`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_TIER`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_UPGRADE_ALIAS`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_WINDOWS_AI`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_WINDOWS_AUMID`                       | string | no       | _undocumented_                                                                                          |
+| `KYBERION_WINDOWS_IMAGE_GENERATOR`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_WISDOM_LLM_PROFILE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_WORK_COORDINATION_NAMESPACE`         | string | no       | _undocumented_                                                                                          |

@@ -9,6 +9,7 @@ import {
   buildGovernedRetryOptions,
   classifyError,
   retry,
+  resolveShellAdapter,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -115,7 +116,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
 
   switch (action) {
     case 'spawn': {
-      const shell = params.shell || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
+      const shell = params.shell || resolveShellAdapter().shell;
       const args = params.args || [];
       const cwd = params.cwd ? path.resolve(rootDir, params.cwd) : rootDir;
       const sessionId = ptyEngine.spawn(shell, args, cwd, params.env || {}, params.threadId);
@@ -317,13 +318,12 @@ async function handleComputerInteraction(
         buildRetryOptions()
       );
     case 'shell_command': {
-      const shell = action.shell || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
+      const shellAdapter = resolveShellAdapter();
+      const shell = action.shell || shellAdapter.shell;
       const args =
         action.args && action.args.length > 0
           ? action.args
-          : process.platform === 'win32'
-            ? ['-Command', action.text || '']
-            : ['-lc', action.text || ''];
+          : [...shellAdapter.args, action.text || ''];
       return await handleAction({
         action: 'spawn',
         params: {

@@ -14,6 +14,8 @@ import {
 } from './artifact-review.js';
 import { executeServicePreset } from './service-engine.js';
 import { getReasoningBackend } from './reasoning-backend.js';
+import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
+import { buildWorkGraph } from './work-graph.js';
 import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { logger } from './core.js';
@@ -779,11 +781,30 @@ async function delegateSubagentTask(input: {
     if (input.adapters.delegateTask) {
       return input.adapters.delegateTask(input.prompt, `workitem:${input.item.item_id}`);
     }
-    return getReasoningBackend().delegateTask(
-      input.prompt,
-      `workitem:${input.item.item_id}`,
-      input.routingOptions
-    );
+    const missionId = String(
+      input.item.metadata?.mission_id || input.item.project_id || input.item.item_id
+    ).trim();
+    const receipt = await delegateWorkItemWithReasoningBackend(getReasoningBackend(), {
+      work_item_id: input.item.item_id,
+      task_id: getWorkItemTaskId(input.item) || input.item.item_id,
+      ...(missionId ? { mission_id: missionId } : {}),
+      ...(input.item.assignee_peer_id ? { agent_id: input.item.assignee_peer_id } : {}),
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: missionId,
+        read_tiers: ['public', 'confidential', 'personal'],
+        write_tier: 'public',
+        purpose: 'mission work item delegation',
+      },
+      success_status: isIndependentReviewRequired(input.item) ? 'review' : 'done',
+      instruction: input.prompt,
+      context_refs: [`workitem:${input.item.item_id}`, JSON.stringify(input.routingOptions)],
+      idempotency_key: `workitem:${input.item.item_id}:${input.item.version}`,
+    });
+    if (receipt.status !== 'succeeded') {
+      throw new Error(receipt.error || `work item delegation ${receipt.status}`);
+    }
+    return receipt.output || '';
   };
   const wantsFiles = workItemExpectsFiles(input.item);
   const previousTools = process.env.KYBERION_CLAUDE_AGENT_TOOLS;
@@ -1450,15 +1471,19 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     options.sources && options.sources.length > 0
       ? options.sources
       : (['local'] as WorkItemSource[]);
-  return listWorkItems({
+  const allMissionItems = listWorkItems({
     projectId,
     source: sources,
-    status: statuses,
     labels,
-  }).filter(
-    (item) =>
-      getMissionLabel(item) === missionId && areMissionTaskDependenciesSatisfied(state, item)
-  );
+  }).filter((item) => getMissionLabel(item) === missionId);
+  const graph = buildWorkGraph(allMissionItems, projectId);
+  const readyIds = new Set(graph.ready_item_ids);
+  return allMissionItems
+    .filter((item) => statuses.includes(item.status))
+    .filter((item) => {
+      if (item.status === 'blocked') return areMissionTaskDependenciesSatisfied(state, item);
+      return readyIds.has(item.item_id) && areMissionTaskDependenciesSatisfied(state, item);
+    });
 }
 
 function resolveAssigneePeerId(input: {

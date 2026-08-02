@@ -2567,6 +2567,14 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_STT_MODEL_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_STT_OUTPUT_FORMAT",
       "category": "runtime",
       "type": "string",
@@ -3044,6 +3052,54 @@
     {
       "name": "KYBERION_VOICE_UPGRADE_ALIAS",
       "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AI",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AI_ENDPOINT",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AUMID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_IMAGE_GENERATOR",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_STT_BACKEND",
+      "category": "provider",
       "type": "string",
       "required": false,
       "description": "",
