@@ -311,6 +311,7 @@ export async function createMission(args: {
   // Initialize volatile working-memory faces (MEMORY.md + NOW.md with sidecar)
   try {
     const { initMissionMemory } = await import(
+      /* webpackIgnore: true */
       pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
     );
     initMissionMemory({ missionId: upperId, tier: finalTier });
