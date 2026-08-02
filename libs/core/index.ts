@@ -2419,6 +2419,7 @@ export {
 } from './software-quality.js';
 export * from './delegation-notifications.js';
 export * from './work-graph.js';
+export { ReasoningBackendExecutionAdapter } from './reasoning-backend-execution-adapter.js';
 
 // SO-01: governed in-process facade over the mission lifecycle verbs
 // (start/create/checkpoint/verify/finish/staff/prewarm/dispatch/pause/resume/status).
