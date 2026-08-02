@@ -1023,7 +1023,11 @@ export type {
   AgentExecutionReceipt,
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
-export { CoordinatedAgentExecutionPort } from './coordinated-agent-execution-port.js';
+export {
+  CoordinatedAgentExecutionPort,
+  delegateCoordinatedAgentTask,
+  getCoordinatedAgentExecutionPort,
+} from './coordinated-agent-execution-port.js';
 export type {
   CoordinatedAgentExecutionReceipt,
   CoordinatedAgentTaskEnvelope,
