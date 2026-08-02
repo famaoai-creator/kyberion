@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionPort } from './agent-execution-port.js';
 import { clearWorkCoordinationStore, createWorkItem, getWorkItem } from './work-coordination.js';
-import { CoordinatedAgentExecutionPort } from './coordinated-agent-execution-port.js';
+import {
+  CoordinatedAgentExecutionPort,
+  delegateCoordinatedAgentTask,
+} from './coordinated-agent-execution-port.js';
 
 describe('CoordinatedAgentExecutionPort', () => {
   it('claims and closes a work item around agent-runtime execution', async () => {
@@ -45,5 +48,44 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(receipt.runtime_id).toBe('runtime-1');
     expect(getWorkItem(item.item_id)?.status).toBe('done');
     expect(delegatePort.delegate).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a convenience entry point that keeps WorkItem coordination enabled', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-002',
+      title: 'convenience task',
+      description: 'run through the convenience boundary',
+      projectId: 'MSN-COORDINATED-002',
+      status: 'ready',
+    });
+    const receipt = await delegateCoordinatedAgentTask(
+      {
+        work_item_id: item.item_id,
+        task_id: 'task-2',
+        mission_id: 'MSN-COORDINATED-002',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-002',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'convenience execution test',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-2',
+      },
+      {
+        delegate: async (request) => ({
+          execution_kind: 'agent_delegation' as const,
+          task_id: request.task_id,
+          agent_id: 'agent-2',
+          status: 'succeeded' as const,
+          output: 'done',
+        }),
+      },
+      'test-convenience-agent'
+    );
+    expect(receipt.work_item_id).toBe(item.item_id);
+    expect(getWorkItem(item.item_id)?.status).toBe('done');
   });
 });
