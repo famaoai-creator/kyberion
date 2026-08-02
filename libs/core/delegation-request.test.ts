@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createAssistantDelegationRequest, validateAssistantDelegationRequest } from './delegation-request.js';
+import {
+  createAssistantDelegationRequest,
+  validateAssistantDelegationRequest,
+} from './delegation-request.js';
 
 describe('assistant delegation request', () => {
   it('creates a governed delegation artifact with provider preferences', () => {
@@ -85,7 +88,9 @@ describe('assistant delegation request', () => {
     expect(validation.valid).toBe(true);
     expect(request.delegation.preferred_provider).toBe('claude');
     expect(request.delegation.allowed_providers).toEqual(['claude', 'codex', 'gemini']);
-    expect(requestPath).toContain('/active/shared/tmp/delegation-requests/');
-    expect(request.expected_output.write_back_path).toContain('/active/shared/tmp/delegation-results/');
+    expect(requestPath.replaceAll('\\', '/')).toContain('/active/shared/tmp/delegation-requests/');
+    expect(request.expected_output.write_back_path.replaceAll('\\', '/')).toContain(
+      '/active/shared/tmp/delegation-results/'
+    );
   });
 });

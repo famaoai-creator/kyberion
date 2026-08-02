@@ -15,7 +15,12 @@ vi.mock('node:fs', async (importOriginal) => {
 import { execFileSync } from 'node:child_process';
 import * as nodefs from 'node:fs';
 import { PythonVoiceBridge, installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
-import { resetVoiceBridge, getVoiceBridge, stubVoiceBridge, type RoleplayTurn } from './voice-bridge.js';
+import {
+  resetVoiceBridge,
+  getVoiceBridge,
+  stubVoiceBridge,
+  type RoleplayTurn,
+} from './voice-bridge.js';
 
 const mockExec = execFileSync as ReturnType<typeof vi.fn>;
 const mockExists = nodefs.existsSync as ReturnType<typeof vi.fn>;
@@ -65,7 +70,9 @@ describe('PythonVoiceBridge', () => {
 
       expect(result.turns).toHaveLength(2);
       const sovereignTurn = result.turns[0] as RoleplayTurn & { audio_ref?: string };
-      expect(sovereignTurn.audio_ref).toContain('/tmp/voice-out/test-profile/roleplay/');
+      expect(sovereignTurn.audio_ref?.replaceAll('\\', '/')).toContain(
+        '/tmp/voice-out/test-profile/roleplay/'
+      );
       expect(sovereignTurn.audio_ref).toMatch(/\.wav$/);
 
       // Counterparty turn should not have audio_ref
@@ -83,7 +90,9 @@ describe('PythonVoiceBridge', () => {
 
     it('sets audio_ref to undefined when TTS throws', async () => {
       const textBridge = makeStubBridge();
-      mockExec.mockImplementation(() => { throw new Error('python not found'); });
+      mockExec.mockImplementation(() => {
+        throw new Error('python not found');
+      });
 
       const bridge = new PythonVoiceBridge({ ...BASE_OPTS, textBridge });
       const result = await bridge.runRoleplaySession({} as any);
@@ -99,8 +108,11 @@ describe('PythonVoiceBridge', () => {
 
       expect(mockExec).toHaveBeenCalledWith(
         'python3',
-        expect.arrayContaining([BASE_OPTS.voiceBridgePath, expect.stringContaining('"action":"generate"')]),
-        expect.objectContaining({ encoding: 'utf8' }),
+        expect.arrayContaining([
+          BASE_OPTS.voiceBridgePath,
+          expect.stringContaining('"action":"generate"'),
+        ]),
+        expect.objectContaining({ encoding: 'utf8' })
       );
     });
   });
@@ -132,8 +144,10 @@ describe('PythonVoiceBridge', () => {
       });
       await bridge.runRoleplaySession({} as any);
 
-      const allCalls = mockExec.mock.calls.map(c => c[1] as string[]);
-      const blackholeCalls = allCalls.filter(args => args[0] === '/tmp/blackhole_audio_router.py');
+      const allCalls = mockExec.mock.calls.map((c) => c[1] as string[]);
+      const blackholeCalls = allCalls.filter(
+        (args) => args[0] === '/tmp/blackhole_audio_router.py'
+      );
       expect(blackholeCalls).toHaveLength(1);
       expect(blackholeCalls[0][1]).toContain('"action":"play_to_blackhole"');
     });
@@ -150,8 +164,10 @@ describe('PythonVoiceBridge', () => {
       });
       await bridge.runRoleplaySession({} as any);
 
-      const allCalls = mockExec.mock.calls.map(c => c[1] as string[]);
-      const blackholeCalls = allCalls.filter(args => args[0] === '/tmp/blackhole_audio_router.py');
+      const allCalls = mockExec.mock.calls.map((c) => c[1] as string[]);
+      const blackholeCalls = allCalls.filter(
+        (args) => args[0] === '/tmp/blackhole_audio_router.py'
+      );
       expect(blackholeCalls).toHaveLength(0);
     });
   });
