@@ -574,4 +574,26 @@ describe('concierge surface contract', () => {
     // Keyboard focus is visible across the surface.
     expect(css).toContain(':focus-visible');
   });
+  it('CS-05: the registered surface stays bootable — manifest health route exists and build:ui builds this package', () => {
+    // The 2026-07 crash-loop happened because the manifest ran 'next start'
+    // while nothing ever built the package. Freeze both halves of the fix.
+    const manifest = JSON.parse(
+      fs.readFileSync(
+        path.join(appDir, '../../../knowledge/product/governance/surfaces/concierge.json'),
+        'utf8'
+      )
+    );
+    const surface = manifest.surfaces.find((entry: { id: string }) => entry.id === 'concierge');
+    expect(surface).toBeTruthy();
+    expect(surface.healthPath).toBe('/api/summary');
+    expect(fs.existsSync(path.join(appDir, 'src/app/api/summary/route.ts'))).toBe(true);
+    const rootPackage = JSON.parse(
+      fs.readFileSync(path.join(appDir, '../../../package.json'), 'utf8')
+    );
+    expect(rootPackage.scripts['build:ui']).toContain('presence/displays/concierge');
+    // CS-05: the legacy Express concierge (port 3033) is gone — one surface,
+    // one implementation.
+    expect(fs.existsSync(path.join(appDir, 'server.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(appDir, 'static'))).toBe(false);
+  });
 });

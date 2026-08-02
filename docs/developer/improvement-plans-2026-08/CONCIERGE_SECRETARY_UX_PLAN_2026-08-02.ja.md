@@ -168,5 +168,8 @@
   - (2) 通知チャネル設定: guarded `GET/POST /api/notification-preferences`(`loadNotificationPreferences`/`saveNotificationPreferences` + channel-directory 検証、sovereign_concierge 実行文脈+sensitive-path mediation)。
   - (3) 停滞ミッション伺いカード: `GET /api/hygiene` + guarded `POST /api/hygiene/[id]`。状態変更は `dist/scripts/mission_controller.js` 経由のみ(argv 配列、MISSION_ROLE、exit 0 を成功とみなさずディスク上の遷移を検証)。判断は人間のインライン確認クリックのみから発火。受領前インラインプレビュー(`/api/outcomes/[id]/preview`、エントリ自身の artifact_paths 限定、ルート外拒否、secureIo 経由、SU-03 残件解消)。
   - (4) 文書取込 `/ingest` ページ(dry-run 既定 ON の preview-first ceremony、`active/shared/tmp` staging、`--ingested-by sovereign_concierge:web`)+記憶昇格キュー承認ペイン(`memory-approve/reject` を controller 経由、on-disk 検証)。
-  - 契約テスト 16 件。**残(CS-03)**: プラグイン承認 1 画面化、config-mission 化(優先度 5)、会議・メール・カレンダー会話起票(優先度 6)。
-- 未着手: CS-04(情報設計刷新・i18n 方式合流)、CS-05(旧 Express 版削除・ライブ voice-hub E2E ほか)。
+  - 契約テスト 16 件。
+- 2026-08-02: **CS-03 完了(優先度 5・6 含む)** — プラグイン承認 1 画面化(`/setup` プラグイン pane: `decideApprovalRequest` + `refreshManagedPluginActivation` で 3 手順 CLI ceremony を 1 画面に;approve 後も activatable にならない場合は正直に報告)。ガバナンス設定の config-mission 化(preset 選択→`config_mission.js create` のみ;GUI に apply 経路なし=契約テストで固定)。会話クイック起票チップ(会議/メール/予定 — ルーティングは orchestrator に委譲)。
+- 2026-08-02: **CS-04 完了** — (1)「今日の伺い」統合キュー(承認→停滞判断→学び→成果物→例外の優先順;カードヘルパーをキューとペインで共有し乖離不能)。(2) ⌘K コマンドパレット(dialog/focus-trap/矢印キー;判断は実行しない=契約テストで固定)。(3) i18n 合流: messages.json 全 373 キーを共通語彙カタログ `concierge` ドメインへ移行(qps-ploc 自動生成、`check:catalogs`/`check:pseudo-locale`/`check:vocabulary-types`/`check:i18n` 緑)、messages.json 削除。(4) `:focus-visible`・コントラストゲート通過。
+- 2026-08-02: **CS-05 完了** — 旧 Express 版(`server.ts`+`static/`、port 3033)削除(二重実装 P1 クローズ)、i18n baseline 再生成(948→945)、surface 健全性契約テスト追加(manifest healthPath↔ルート実在・`build:ui` 包含・旧実装不在を固定)。契約テスト 22 件。
+- **残課題(スコープ外送り)**: 稼働 voice-hub デーモン+マイク実機でのライブ音声 E2E(この環境ではデーモン停止のため未実施;`pipelines/ui-voice-browser-smoke.json` 系は presence-studio 対象で concierge 非依存)。Tier 2 リアルタイム対話は [REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-2026-07/REALTIME_VOICE_CONVERSATION_PLAN.ja.md) に委譲。

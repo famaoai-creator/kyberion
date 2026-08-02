@@ -4,7 +4,7 @@
 > **依頼**: presence surface の一つとして秘書(コンシェルジェ)を。アバターがいて音声/テキストの会話ベース、軽量なものは direct_reply。軽量なら 3D モデル。ダッシュボードもより視覚的に(グラフ)。**ドキュメント作成の上で実装まで実施。**
 > **位置づけ**: 設計 + 実装記録。関連: [COMPANY_OS_CONCEPT](./COMPANY_OS_CONCEPT.ja.md)、UX-01/02(体裁)、DS-01(トークン)、SU 系(UI 機能)。
 
-> **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は**旧実装**であり、surface manifest からは既に外れている。現行の登録済み concierge は **Next.js 版(port 3050、healthPath `/api/summary`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。旧実装の会話・音声・アバター機能は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で Next.js 版へ移植後、Express 版は削除予定。§1 のバックエンド二経路設計(voice-hub → orchestrator 縮退)と §4 の 3D 設計は移植後も有効な設計資産として参照される。
+> **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で会話(2経路フェイルオーバー)・音声(Web Speech Tier 0 / voice-hub Tier 1)を Next.js 版へ移植のうえ、**CS-05 で削除済み**。現行の唯一の concierge は **Next.js 版(port 3050、healthPath `/api/summary`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。本文書は歴史記録+設計資産(§1 の二経路設計、§4 の 3D アバター設計)として保存されている。2.5D アバターの再導入は §4 とともに将来オプション。
 
 ---
 
