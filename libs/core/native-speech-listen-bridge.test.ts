@@ -53,7 +53,7 @@ describe('listenNativeSpeech', () => {
         locale: 'ja-JP',
         isFinal: true,
         deviceId: 'device-1',
-      }),
+      })
     );
     fakeChild.emit('close', 0);
 
@@ -62,21 +62,54 @@ describe('listenNativeSpeech', () => {
     expect(result.text).toBe('こんにちは');
     expect(result.locale).toBe('ja-JP');
     expect(result.deviceId).toBe('device-1');
+    const [command, args] = mocks.spawn.mock.calls[0];
+    if (process.platform === 'win32') {
+      expect(command).toBe('powershell.exe');
+      expect(args).toEqual(expect.arrayContaining(['-NoProfile', '-NonInteractive', '-Command']));
+    } else {
+      expect(command).toBe('swift');
+      expect(args).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('satellites/voice-hub/native-stt.swift'),
+          '--locale',
+          'ja-JP',
+          '--timeout',
+          '8',
+          '--device-id',
+          'device-1',
+        ])
+      );
+    }
     expect(mocks.spawn).toHaveBeenCalledWith(
-      'swift',
-      expect.arrayContaining([
-        expect.stringContaining('satellites/voice-hub/native-stt.swift'),
-        '--locale',
-        'ja-JP',
-        '--timeout',
-        '8',
-        '--device-id',
-        'device-1',
-      ]),
-      expect.objectContaining({
-        cwd: '/tmp/voice-hub',
-      }),
+      command,
+      args,
+      expect.objectContaining({ cwd: '/tmp/voice-hub' })
     );
+  });
+
+  it('uses Windows PowerShell SpeechRecognitionEngine on win32', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+
+    try {
+      const { listenNativeSpeech } = await import('./native-speech-listen-bridge.js');
+      const promise = listenNativeSpeech({ locale: 'ja-JP', timeoutSeconds: 6 });
+      expect(mocks.spawn).toHaveBeenCalledWith(
+        'powershell.exe',
+        expect.arrayContaining(['-NoProfile', '-NonInteractive', '-Command']),
+        expect.objectContaining({ cwd: expect.any(String) })
+      );
+      fakeChild.stdout.emit(
+        'data',
+        JSON.stringify({ ok: true, text: 'こんにちは', locale: 'ja-JP', isFinal: true })
+      );
+      fakeChild.emit('close', 0);
+      await expect(promise).resolves.toMatchObject({ ok: true, text: 'こんにちは' });
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
+    }
   });
 
   it('rejects if the swift script outputs invalid json', async () => {
@@ -150,4 +183,3 @@ describe('listenNativeSpeech', () => {
     expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
   });
 });
-

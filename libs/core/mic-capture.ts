@@ -32,12 +32,107 @@ export interface MicCaptureSession {
 
 export interface MicCaptureProbeResult {
   available: boolean;
-  backend: 'ffmpeg-avfoundation' | 'arecord' | 'custom' | 'none';
+  backend: 'ffmpeg-avfoundation' | 'ffmpeg-dshow' | 'arecord' | 'custom' | 'none';
   reason?: string;
 }
 
 const MAC_VIRTUAL_AUDIO_DEVICE_RE =
   /blackhole|soundflower|loopback|virtual|aggregate|multi-output/i;
+
+interface MicCapturePlatformAdapter {
+  backend: Exclude<MicCaptureProbeResult['backend'], 'custom' | 'none'>;
+  binary: string;
+  resolveDevice(explicit?: string): string;
+  command(device: string, sampleRateHz: number): string[];
+}
+
+class DarwinMicCaptureAdapter implements MicCapturePlatformAdapter {
+  backend = 'ffmpeg-avfoundation' as const;
+  binary = 'ffmpeg';
+  resolveDevice(explicit?: string): string {
+    if (explicit?.trim()) return explicit.trim();
+    return detectMacPhysicalAudioDevice() || ':0';
+  }
+  command(device: string, sampleRateHz: number): string[] {
+    return [
+      'ffmpeg',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'avfoundation',
+      '-i',
+      device,
+      '-ac',
+      '1',
+      '-ar',
+      String(sampleRateHz),
+      '-f',
+      's16le',
+      '-',
+    ];
+  }
+}
+
+class LinuxMicCaptureAdapter implements MicCapturePlatformAdapter {
+  backend = 'arecord' as const;
+  binary = 'arecord';
+  resolveDevice(explicit?: string): string {
+    return explicit?.trim() || ':0';
+  }
+  command(device: string, sampleRateHz: number): string[] {
+    return [
+      'arecord',
+      ...(device !== ':0' ? ['-D', device] : []),
+      '-f',
+      'S16_LE',
+      '-r',
+      String(sampleRateHz),
+      '-c',
+      '1',
+      '-t',
+      'raw',
+    ];
+  }
+}
+
+class WindowsMicCaptureAdapter implements MicCapturePlatformAdapter {
+  backend = 'ffmpeg-dshow' as const;
+  binary = 'ffmpeg';
+  resolveDevice(explicit?: string): string {
+    return explicit?.trim() || 'default';
+  }
+  command(device: string, sampleRateHz: number): string[] {
+    return [
+      'ffmpeg',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'dshow',
+      '-i',
+      `audio="${device.replace(/"/g, '\\"')}"`,
+      '-ac',
+      '1',
+      '-ar',
+      String(sampleRateHz),
+      '-f',
+      's16le',
+      '-',
+    ];
+  }
+}
+
+function resolveMicCaptureAdapter(platform: NodeJS.Platform): MicCapturePlatformAdapter {
+  switch (platform) {
+    case 'darwin':
+      return new DarwinMicCaptureAdapter();
+    case 'win32':
+      return new WindowsMicCaptureAdapter();
+    default:
+      return new LinuxMicCaptureAdapter();
+  }
+}
 
 /**
  * Select the first physical AVFoundation audio input from ffmpeg's device
@@ -72,62 +167,21 @@ function detectMacPhysicalAudioDevice(): string | undefined {
 
 /** Resolve a host-safe default while preserving explicit test/device overrides. */
 export function resolveMicDevice(explicit?: string): string {
-  const requested = explicit?.trim();
-  if (requested) return requested;
-  if (process.platform !== 'darwin') return ':0';
-  const detected = detectMacPhysicalAudioDevice();
-  if (detected) return detected;
-  throw new Error(
-    '[mic-capture] no physical macOS audio input was detected; set --mic-device to an AVFoundation audio index'
-  );
+  return resolveMicCaptureAdapter(process.platform).resolveDevice(explicit);
 }
 
 function defaultCommand(opts: Required<Pick<MicCaptureOptions, 'device' | 'sampleRateHz'>>): {
   argv: string[];
   backend: MicCaptureProbeResult['backend'];
 } {
-  if (process.platform === 'darwin') {
-    return {
-      backend: 'ffmpeg-avfoundation',
-      argv: [
-        'ffmpeg',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'avfoundation',
-        '-i',
-        opts.device,
-        '-ac',
-        '1',
-        '-ar',
-        String(opts.sampleRateHz),
-        '-f',
-        's16le',
-        '-',
-      ],
-    };
-  }
-  return {
-    backend: 'arecord',
-    argv: [
-      'arecord',
-      ...(opts.device && opts.device !== ':0' ? ['-D', opts.device] : []),
-      '-f',
-      'S16_LE',
-      '-r',
-      String(opts.sampleRateHz),
-      '-c',
-      '1',
-      '-t',
-      'raw',
-    ],
-  };
+  const adapter = resolveMicCaptureAdapter(process.platform);
+  return { backend: adapter.backend, argv: adapter.command(opts.device, opts.sampleRateHz) };
 }
 
 export function probeMicCapture(opts: MicCaptureOptions = {}): MicCaptureProbeResult {
   if (opts.command?.length) return { available: true, backend: 'custom' };
-  const binary = process.platform === 'darwin' ? 'ffmpeg' : 'arecord';
+  const adapter = resolveMicCaptureAdapter(process.platform);
+  const binary = adapter.binary;
   const probe = spawnSync(binary, ['-version'], { stdio: 'ignore' });
   if (probe.error || probe.status === null) {
     return {
@@ -138,7 +192,7 @@ export function probeMicCapture(opts: MicCaptureOptions = {}): MicCaptureProbeRe
   }
   return {
     available: true,
-    backend: process.platform === 'darwin' ? 'ffmpeg-avfoundation' : 'arecord',
+    backend: adapter.backend,
   };
 }
 

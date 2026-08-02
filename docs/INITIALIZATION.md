@@ -27,6 +27,14 @@ winget install --id pnpm.pnpm --exact --source winget --accept-source-agreements
 winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements
 ```
 
+WindowsでローカルAI支援（Foundry Local）を使う場合は、追加で次を実行します。これは任意機能です。
+
+```powershell
+winget install --id Microsoft.FoundryLocal --exact --source winget --accept-source-agreements --accept-package-agreements
+```
+
+導入後はFoundry LocalのローカルAPIを起動し、必要に応じて`KYBERION_WINDOWS_AI_ENDPOINT`と`KYBERION_WINDOWS_AI_MODEL`を設定してください。
+
 導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
 
 ```powershell

@@ -3495,6 +3495,10 @@
         {
           "op": "ocr_image",
           "kind": "capture"
+        },
+        {
+          "op": "describe_image",
+          "kind": "capture"
         }
       ]
     },

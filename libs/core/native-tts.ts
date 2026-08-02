@@ -71,8 +71,9 @@ function buildCommand(text: string, opts: SpeakOptions): { cmd: string; args: st
     case 'win32': {
       // PowerShell one-liner using System.Speech.Synthesis.SpeechSynthesizer.
       const escaped = safe.replace(/'/g, "''");
+      const voiceClause = opts.voice ? `;$s.SelectVoice('${opts.voice.replace(/'/g, "''")}')` : '';
       const rateClause = opts.rate ? `;$s.Rate=${Math.round((opts.rate - 175) / 35)}` : '';
-      const ps = `Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer${rateClause};$s.Speak('${escaped}')`;
+      const ps = `Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer${voiceClause}${rateClause};$s.Speak('${escaped}')`;
       return { cmd: 'powershell', args: ['-NoProfile', '-Command', ps] };
     }
     default:

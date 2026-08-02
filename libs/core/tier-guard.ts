@@ -30,7 +30,10 @@ const PROJECT_ROOT = pathResolver.rootDir();
 const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
 
 function normalizePath(p: string): string {
-  return p.replace(/\/+$/, '');
+  // Policy paths use POSIX separators even when Kyberion runs on Windows.
+  // `path.relative()` returns `\\` on Windows, so normalize both forms before
+  // matching policy prefixes.
+  return p.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
 function pathStartsWith(targetPath: string, patternPath: string): boolean {
@@ -41,7 +44,7 @@ function pathStartsWith(targetPath: string, patternPath: string): boolean {
 
 function isOutsideProjectRoot(relativePath: string): boolean {
   if (!relativePath) return false;
-  const firstSegment = relativePath.split(path.sep)[0];
+  const firstSegment = normalizePath(relativePath).split('/')[0];
   return firstSegment === '..';
 }
 
@@ -443,7 +446,7 @@ function recordGroupAccess(input: {
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
+  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
   const currentMission = process.env.MISSION_ID;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -541,7 +544,7 @@ export function detectTier(filePath: string): TierLevel {
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
+  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
 
   if (isOutsideProjectRoot(relativePath)) {
     return {

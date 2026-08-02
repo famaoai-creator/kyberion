@@ -21,8 +21,10 @@ describe('assistant compiler request', () => {
     expect(request.delegation.preferred_provider).toBe('gemini');
     expect(request.expected_output.contract).toBe('intent-bundle');
     expect(request.context.runtime_context?.platform_id).toBe('imessage');
-    expect(requestPath).toContain('/active/shared/tmp/assistant-compiler-requests/');
-    expect(request.expected_output.write_back_path).toContain(
+    expect(requestPath.replaceAll('\\', '/')).toContain(
+      '/active/shared/tmp/assistant-compiler-requests/'
+    );
+    expect(request.expected_output.write_back_path.replaceAll('\\', '/')).toContain(
       '/active/shared/tmp/assistant-compiler-results/'
     );
   });

@@ -5,13 +5,14 @@ import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-} from '@agent/core';
+} from '@agent/core/artifacts';
 import {
   loadArtifactRecord,
   saveArtifactRecord,
   type ArtifactRecord,
 } from '@agent/core/artifact-record';
-import type { GovernedArtifactRole, RejectionReasonCategory } from '@agent/core';
+import type { GovernedArtifactRole } from '@agent/core/artifacts';
+import type { RejectionReasonCategory } from '@agent/core/rejection-reason';
 
 const REVIEW_DIR = 'active/shared/coordination/deliverable-reviews';
 const REVIEW_LOG = `${REVIEW_DIR}/reviews.jsonl`;

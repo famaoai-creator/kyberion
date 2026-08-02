@@ -35,13 +35,6 @@ const DEFAULT_VOICE_RETRY = {
   factor: 2,
   jitter: true,
 };
-const ESPEAK_NG_CANDIDATES = [
-  '/opt/homebrew/bin/espeak-ng',
-  '/usr/local/bin/espeak-ng',
-  '/opt/homebrew/bin/espeak',
-  '/usr/local/bin/espeak',
-];
-
 export function buildRetryOptions(override?: Record<string, any>) {
   return buildGovernedRetryOptions({
     manifestPath: VOICE_MANIFEST_PATH,
@@ -51,7 +44,7 @@ export function buildRetryOptions(override?: Record<string, any>) {
   });
 }
 
-type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'kokoro_tts' | 'pocket_tts';
+type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'faster_whisper' | 'kokoro_tts' | 'pocket_tts';
 
 function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
   if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
@@ -69,7 +62,9 @@ function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string 
 }
 
 function hasEspeakNg(): boolean {
-  return ESPEAK_NG_CANDIDATES.some((candidate) => safeExistsSync(candidate));
+  const resolver = process.platform === 'win32' ? 'where' : 'which';
+  const result = safeExecResult(resolver, ['espeak-ng'], { timeoutMs: 3000 });
+  return result.status === 0 && Boolean(result.stdout.trim());
 }
 
 function resolveEspeakLanguage(language: string): string {
@@ -217,20 +212,140 @@ async function runPythonTtsBridge(
   }
 }
 
-function openPlaybackArtifact(artifactPath: string): void {
-  if (process.platform === 'linux') {
-    safeExec('xdg-open', [artifactPath]);
-    return;
+interface VoicePlaybackPlatformAdapter {
+  openArtifact(path: string): void;
+}
+
+class DarwinVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
+  openArtifact(path: string): void {
+    safeExec('open', [path]);
   }
-  if (process.platform === 'win32') {
-    safeExec('powershell', [
+}
+
+class LinuxVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
+  openArtifact(path: string): void {
+    safeExec('xdg-open', [path]);
+  }
+}
+
+class WindowsVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
+  openArtifact(path: string): void {
+    safeExec('powershell.exe', [
       '-NoProfile',
+      '-NonInteractive',
       '-Command',
-      `Start-Process -FilePath '${artifactPath.replace(/'/g, "''")}'`,
+      `Start-Process -FilePath '${path.replace(/'/g, "''")}'`,
     ]);
-    return;
   }
-  safeExec('open', [artifactPath]);
+}
+
+interface VoiceNativeArtifactAdapter {
+  render(
+    text: string,
+    options: {
+      requestId: string;
+      voice: string;
+      rate: number;
+      format: VoiceArtifactFormat;
+      outputPath?: string;
+    }
+  ): string;
+}
+
+class DarwinVoiceArtifactAdapter implements VoiceNativeArtifactAdapter {
+  render(
+    text: string,
+    options: {
+      requestId: string;
+      voice: string;
+      rate: number;
+      format: VoiceArtifactFormat;
+      outputPath?: string;
+    }
+  ): string {
+    return renderWithSay(text, options);
+  }
+}
+class LinuxVoiceArtifactAdapter implements VoiceNativeArtifactAdapter {
+  render(
+    text: string,
+    options: {
+      requestId: string;
+      voice: string;
+      rate: number;
+      format: VoiceArtifactFormat;
+      outputPath?: string;
+    }
+  ): string {
+    if (options.format !== 'wav')
+      throw new Error(
+        `linux native artifact rendering supports only wav, received ${options.format}`
+      );
+    const path = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+    safeExec('espeak', ['-s', String(options.rate), '-w', path, text]);
+    return path;
+  }
+}
+class WindowsVoiceArtifactAdapter implements VoiceNativeArtifactAdapter {
+  render(
+    text: string,
+    options: {
+      requestId: string;
+      voice: string;
+      rate: number;
+      format: VoiceArtifactFormat;
+      outputPath?: string;
+    }
+  ): string {
+    if (options.format !== 'wav')
+      throw new Error(
+        `win32 native artifact rendering supports only wav, received ${options.format}`
+      );
+    const path = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+    safeExec('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.SetOutputToWaveFile('${path.replace(/'/g, "''")}'); $s.Speak('${text.replace(/'/g, "''")}'); $s.Dispose()`,
+    ]);
+    return path;
+  }
+}
+const voiceArtifactAdapters: Record<string, VoiceNativeArtifactAdapter> = {
+  darwin: new DarwinVoiceArtifactAdapter(),
+  linux: new LinuxVoiceArtifactAdapter(),
+  win32: new WindowsVoiceArtifactAdapter(),
+};
+
+interface VoiceSpeechPlaybackAdapter {
+  speak(text: string, rate: number): void;
+}
+const voiceSpeechAdapters: Partial<Record<string, VoiceSpeechPlaybackAdapter>> = {
+  linux: { speak: (text, rate) => safeExec('espeak', ['-s', String(rate), text]) },
+  win32: {
+    speak: (text) =>
+      safeExec('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak('${text.replace(/'/g, "''")}'); $s.Dispose()`,
+      ]),
+  },
+};
+
+function resolveVoicePlaybackAdapter(platform: NodeJS.Platform): VoicePlaybackPlatformAdapter {
+  switch (platform) {
+    case 'darwin':
+      return new DarwinVoicePlaybackAdapter();
+    case 'win32':
+      return new WindowsVoicePlaybackAdapter();
+    default:
+      return new LinuxVoicePlaybackAdapter();
+  }
+}
+
+function openPlaybackArtifact(artifactPath: string): void {
+  resolveVoicePlaybackAdapter(process.platform).openArtifact(artifactPath);
 }
 
 async function renderWithEspeakNg(
@@ -391,28 +506,13 @@ async function renderVoiceArtifactWithEngine(
     return artifactPath;
   }
 
-  if (process.platform === 'darwin') {
-    const rendered = renderWithSay(text, {
-      requestId: options.requestId,
-      voice: options.voice,
-      rate: options.rate,
-      format: options.format,
-      outputPath: options.outputPath,
-    });
+  const nativeAdapter = voiceArtifactAdapters[process.platform];
+  if (nativeAdapter) {
+    const rendered = nativeAdapter.render(text, options);
     if (await isRenderableAudioArtifact(rendered)) {
       return rendered;
     }
-    throw new Error(`say produced an invalid audio artifact: ${rendered}`);
-  }
-
-  if (process.platform === 'linux') {
-    if (options.format !== 'wav') {
-      throw new Error(
-        `linux native artifact rendering supports only wav, received ${options.format}`
-      );
-    }
-    safeExec('espeak', ['-s', String(options.rate), '-w', artifactPath, text]);
-    return artifactPath;
+    throw new Error(`native voice adapter produced an invalid audio artifact: ${rendered}`);
   }
 
   throw new Error(`native artifact rendering is unsupported on ${process.platform}`);
@@ -547,22 +647,10 @@ async function performPlayback(
       outputs: outputs.outputs,
     };
   }
-  if (process.platform === 'linux') {
+  const speechAdapter = voiceSpeechAdapters[process.platform];
+  if (speechAdapter) {
     await retry(async () => {
-      safeExec('espeak', ['-s', String(options.rate), text]);
-    }, buildRetryOptions());
-    return {
-      playback_source_path: undefined,
-      outputs: [],
-    };
-  }
-  if (process.platform === 'win32') {
-    const escaped = text.replace(/'/g, "''");
-    await retry(async () => {
-      safeExec('powershell', [
-        '-Command',
-        `Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 0; $s.Speak('${escaped}')`,
-      ]);
+      speechAdapter.speak(text, options.rate);
     }, buildRetryOptions());
     return {
       playback_source_path: undefined,
