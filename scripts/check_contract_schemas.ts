@@ -8,8 +8,8 @@ import {
   createNextActionContract,
   createOutcomeContract,
   createTaskSession,
-  pathResolver,
 } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
 import {
   findUnmanagedGoldenScenarioCatalogs,
   readAgentProfilePayloads,

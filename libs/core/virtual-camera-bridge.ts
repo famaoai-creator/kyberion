@@ -1,9 +1,19 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeExec, safeWriteFile, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeExec,
+  safeWriteFile,
+  safeReadFile,
+  safeRmSync,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
-import type { VirtualDeviceInventory, VirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
+import type {
+  VirtualDeviceInventory,
+  VirtualDeviceInventoryBridge,
+} from './virtual-device-inventory-bridge.js';
 
 export const VIRTUAL_CAMERA_BRIDGE_ID = 'virtual-camera-bridge' as const;
 
@@ -76,10 +86,33 @@ export interface VirtualCameraBridge {
 const DEFAULT_IMAGESNAP_BIN = 'imagesnap';
 const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 const DEFAULT_LIBCAMERA_STILL_BIN = 'libcamera-still';
+
+interface CameraCaptureAdapter {
+  inputFormat: string;
+  deviceArg(preference?: string): string;
+}
+
+class WindowsCameraCaptureAdapter implements CameraCaptureAdapter {
+  inputFormat = 'dshow';
+  deviceArg(preference?: string): string {
+    return `video="${(preference || '').replace(/"/g, '\\"')}"`;
+  }
+}
+
+class LinuxCameraCaptureAdapter implements CameraCaptureAdapter {
+  inputFormat = 'video4linux2';
+  deviceArg(preference?: string): string {
+    return preference?.startsWith('/dev/') ? preference : '/dev/video0';
+  }
+}
+
+function resolveCameraCaptureAdapter(platform: NodeJS.Platform): CameraCaptureAdapter {
+  return platform === 'win32' ? new WindowsCameraCaptureAdapter() : new LinuxCameraCaptureAdapter();
+}
 const DEFAULT_OUTPUT_DIR = path.join('active', 'shared', 'tmp', 'camera-captures');
 const PLACEHOLDER_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7u1WQAAAAASUVORK5CYII=',
-  'base64',
+  'base64'
 );
 
 function defaultOutputPath(): string {
@@ -93,16 +126,20 @@ function normalizeDevicePreference(value: unknown): string | undefined {
 
 function pickCameraPreference(
   inventory: VirtualDeviceInventory | undefined,
-  preference?: string,
+  preference?: string
 ): string | undefined {
   const candidates = inventory?.cameras ?? [];
   if (candidates.length === 0) return normalizeDevicePreference(preference);
   const normalizedPreference = normalizeDevicePreference(preference);
   if (!normalizedPreference) return candidates[0]?.name;
   const lowerPreference = normalizedPreference.toLowerCase();
-  const exactMatch = candidates.find((candidate) => candidate.name.trim().toLowerCase() === lowerPreference);
+  const exactMatch = candidates.find(
+    (candidate) => candidate.name.trim().toLowerCase() === lowerPreference
+  );
   if (exactMatch) return exactMatch.name;
-  const containsMatch = candidates.find((candidate) => candidate.name.trim().toLowerCase().includes(lowerPreference));
+  const containsMatch = candidates.find((candidate) =>
+    candidate.name.trim().toLowerCase().includes(lowerPreference)
+  );
   if (containsMatch) return containsMatch.name;
   return candidates[0]?.name;
 }
@@ -155,22 +192,29 @@ function chooseBackend(input: {
     const bin = input.imagesnap_bin ?? DEFAULT_IMAGESNAP_BIN;
     if (isAvailableCommand(bin, ['-h'])) return { backend: 'imagesnap', available: true };
     const swiftBin = input.swift_bin ?? 'swift';
-    if (isAvailableCommand(swiftBin, ['--version'])) return { backend: 'swift-avfoundation', available: true };
+    if (isAvailableCommand(swiftBin, ['--version']))
+      return { backend: 'swift-avfoundation', available: true };
     const ffmpegBin = input.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
     if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
   }
 
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' || process.platform === 'win32') {
     const ffmpegBin = input.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
     const libcameraBin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
     if (input.device_preference || safeExistsSync('/dev/video0')) {
-      if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
+      if (isAvailableCommand(ffmpegBin, ['-version']))
+        return { backend: 'ffmpeg', available: true };
     }
-    if (isAvailableCommand(libcameraBin, ['--help'])) return { backend: 'libcamera-still', available: true };
+    if (isAvailableCommand(libcameraBin, ['--help']))
+      return { backend: 'libcamera-still', available: true };
     if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
   }
 
-  return { backend: 'stub', available: true, reason: 'no real camera backend detected; using stub' };
+  return {
+    backend: 'stub',
+    available: true,
+    reason: 'no real camera backend detected; using stub',
+  };
 }
 
 export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
@@ -179,7 +223,9 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
   constructor(private readonly opts: VirtualCameraBridgeOptions = {}) {}
 
   async probe(): Promise<VirtualCameraBridgeProbe> {
-    const inventory = this.opts.inventory_bridge ? (await this.opts.inventory_bridge.probe()).inventory : undefined;
+    const inventory = this.opts.inventory_bridge
+      ? (await this.opts.inventory_bridge.probe()).inventory
+      : undefined;
     const selectedCamera = pickCameraPreference(inventory, this.opts.device_preference);
     const choice = chooseBackend({
       preferred_backend: this.opts.preferred_backend,
@@ -203,15 +249,20 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
 
   async capturePhoto(input: VirtualCameraCaptureRequest): Promise<VirtualCameraCaptureResult> {
     const savePath = path.resolve(input.save_path ?? defaultOutputPath());
-    const devicePreference = normalizeDevicePreference(input.device_preference ?? this.opts.device_preference);
+    const devicePreference = normalizeDevicePreference(
+      input.device_preference ?? this.opts.device_preference
+    );
     const probe = await this.probe();
-    const selectedCamera = probe.selected_camera ?? pickCameraPreference(probe.inventory, devicePreference);
+    const selectedCamera =
+      probe.selected_camera ?? pickCameraPreference(probe.inventory, devicePreference);
     const chosen = {
       ...probe,
       device_preference: selectedCamera ?? devicePreference,
     };
     if (!chosen.available) {
-      throw new Error(`[virtual-camera-bridge] not available: ${chosen.reason || 'unknown reason'}`);
+      throw new Error(
+        `[virtual-camera-bridge] not available: ${chosen.reason || 'unknown reason'}`
+      );
     }
 
     safeMkdir(path.dirname(savePath), { recursive: true });
@@ -232,7 +283,11 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
 
     if (chosen.backend === 'imagesnap') {
       const bin = this.opts.imagesnap_bin ?? DEFAULT_IMAGESNAP_BIN;
-      const args = selectedCamera ? ['-d', selectedCamera, savePath] : devicePreference ? ['-d', devicePreference, savePath] : [savePath];
+      const args = selectedCamera
+        ? ['-d', selectedCamera, savePath]
+        : devicePreference
+          ? ['-d', devicePreference, savePath]
+          : [savePath];
       safeExec(bin, args, { env: process.env });
       return {
         bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
@@ -249,7 +304,10 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
     if (chosen.backend === 'swift-avfoundation') {
       const bin = this.opts.swift_bin ?? 'swift';
       const script = pathResolver.rootResolve('libs/core/virtual-camera-capture.swift');
-      const tempCapture = path.resolve(path.dirname(savePath), `${path.basename(savePath, path.extname(savePath))}-${Date.now()}.jpg`);
+      const tempCapture = path.resolve(
+        path.dirname(savePath),
+        `${path.basename(savePath, path.extname(savePath))}-${Date.now()}.jpg`
+      );
       const deviceArg = selectedCamera ?? devicePreference;
       const args = [script, '--output', tempCapture];
       if (deviceArg) {
@@ -258,7 +316,9 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
       safeExec(bin, args, { env: process.env, timeoutMs: 120000 });
       if (/\.png$/i.test(savePath)) {
         const sips = 'sips';
-        safeExec(sips, ['-s', 'format', 'png', tempCapture, '--out', savePath], { env: process.env });
+        safeExec(sips, ['-s', 'format', 'png', tempCapture, '--out', savePath], {
+          env: process.env,
+        });
         safeRmSync(tempCapture, { force: true });
       } else if (tempCapture !== savePath) {
         safeExec('cp', [tempCapture, savePath], { env: process.env });
@@ -292,9 +352,8 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
     }
 
     const bin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
-    const device = devicePreference && devicePreference.startsWith('/dev/')
-      ? devicePreference
-      : '/dev/video0';
+    const adapter = resolveCameraCaptureAdapter(process.platform);
+    const device = adapter.deviceArg(selectedCamera || devicePreference);
     safeExec(
       bin,
       [
@@ -303,14 +362,14 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
         '-loglevel',
         'error',
         '-f',
-        'video4linux2',
+        adapter.inputFormat,
         '-i',
         device,
         '-frames:v',
         '1',
         savePath,
       ],
-      { env: process.env },
+      { env: process.env }
     );
     return {
       bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
@@ -329,7 +388,7 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
     const intervalMs = Math.max(0, Number(input.frame_interval_ms || 250));
     for (let index = 0; index < frameCount; index += 1) {
       const tempPath = pathResolver.sharedTmp(
-        path.join('camera-stream', `frame-${Date.now()}-${index}.jpg`),
+        path.join('camera-stream', `frame-${Date.now()}-${index}.jpg`)
       );
       const result = await this.capturePhoto({
         save_path: tempPath,
@@ -338,7 +397,9 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
         subject_hint: input.subject_hint,
       });
       const payload = safeReadFile(result.save_path, { encoding: null });
-      const framePayload = Buffer.isBuffer(payload) ? new Uint8Array(payload) : new Uint8Array(Buffer.from(payload));
+      const framePayload = Buffer.isBuffer(payload)
+        ? new Uint8Array(payload)
+        : new Uint8Array(Buffer.from(payload));
       yield {
         format: { mime_type: /\.png$/i.test(result.save_path) ? 'image/png' : 'image/jpeg' },
         payload: framePayload,
@@ -357,7 +418,7 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
 }
 
 export function createVirtualCameraBridge(
-  opts: VirtualCameraBridgeOptions = {},
+  opts: VirtualCameraBridgeOptions = {}
 ): VirtualCameraBridge {
   return new VirtualCameraBridgeImpl(opts);
 }

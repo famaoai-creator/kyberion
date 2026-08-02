@@ -661,7 +661,7 @@ describe('mission-context-pack', () => {
     const pack = makePack();
     const filePath = saveMissionContextPack(missionPath, pack);
 
-    expect(filePath).toContain('/coordination/context-packs/');
+    expect(filePath.replaceAll('\\', '/')).toContain('/coordination/context-packs/');
     expect(safeExistsSync(filePath)).toBe(true);
 
     const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
@@ -758,7 +758,9 @@ describe('mission-context-pack', () => {
     });
     expect(pack.pruning?.pruned_sections.length).toBeGreaterThan(0);
     expect(pack.pruning?.rollup_summary).toContain('Pruned sections');
-    expect(pack.pruning?.rollup_path).toContain('/coordination/context-rollups/');
+    expect(pack.pruning?.rollup_path?.replaceAll('\\', '/')).toContain(
+      '/coordination/context-rollups/'
+    );
     expect(pack.knowledge_hints?.length).toBeLessThanOrEqual(3);
     expect(pack.artifact_hints?.length ?? 0).toBeLessThanOrEqual(2);
 

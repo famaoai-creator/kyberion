@@ -306,7 +306,7 @@ def action_generate(params: dict) -> dict:
             elif engine == "macos_say":
                 aiff = out.with_suffix(".aiff")
                 subprocess.run(
-                    ["/usr/bin/say", "-v", "Kyoko", "-o", str(aiff), text], check=True
+                    [shutil.which("say") or "say", "-v", "Kyoko", "-o", str(aiff), text], check=True
                 )
                 subprocess.run(
                     ["afconvert", "-f", "WAVE", "-d", "LEI16", str(aiff), str(out)],
@@ -335,7 +335,7 @@ def action_health() -> dict:
             "cosyvoice2": _probe_cosyvoice(),
             "fish_speech_v1.5": _probe_fish_speech(),
             "qwen3_tts_icl": _probe_mlx_qwen3(),
-            "macos_say": Path("/usr/bin/say").exists(),
+            "macos_say": shutil.which("say") is not None,
         },
     }
 

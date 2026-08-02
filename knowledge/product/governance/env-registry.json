@@ -618,14 +618,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",
-      "category": "tuning",
-      "type": "number",
-      "required": false,
-      "description": "Maximum milliseconds a mission work item waits for one provider response before recording a blocked result.",
-      "documented": true
-    },
-    {
       "name": "KYBERION_CODEX_INSTANCES",
       "category": "runtime",
       "type": "string",
@@ -2575,6 +2567,14 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_STT_MODEL_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_STT_OUTPUT_FORMAT",
       "category": "runtime",
       "type": "string",
@@ -3058,6 +3058,54 @@
       "documented": false
     },
     {
+      "name": "KYBERION_WINDOWS_AI",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AI_ENDPOINT",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_AUMID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_IMAGE_GENERATOR",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_WINDOWS_STT_BACKEND",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_WISDOM_LLM_PROFILE",
       "category": "runtime",
       "type": "string",
@@ -3072,6 +3120,14 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Maximum milliseconds a mission work item waits for one provider response before recording a blocked result.",
+      "documented": true
     }
   ]
 }

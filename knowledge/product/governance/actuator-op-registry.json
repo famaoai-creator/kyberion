@@ -525,7 +525,7 @@
       ]
     },
     "vision": {
-      "capture": ["inspect_image", "ocr_image"],
+      "capture": ["describe_image", "inspect_image", "ocr_image"],
       "transform": [],
       "apply": []
     },

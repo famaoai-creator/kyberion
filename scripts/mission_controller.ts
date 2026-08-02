@@ -54,6 +54,7 @@ import {
   missionLifecycleService,
   releaseOrchestratorSessionForMissionBestEffort,
   resumeAiDlcPhaseState,
+  recordMissionHandoff,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -1652,6 +1653,15 @@ export async function handoffMission(
     handoff_packet: handoffPacket,
   });
   await saveState(upperId, state);
+  // Keep mission-level and WorkItem-level handoff state in the same durable
+  // coordination ledger. This is metadata-only: active leases remain owned by
+  // their current worker until an explicit WorkItem handoff is requested.
+  recordMissionHandoff({
+    missionId: upperId,
+    fromPersona: previousPersona,
+    toPersona: nextPersona,
+    handoffPacket,
+  });
   await syncProjectLedgerIfLinked(upperId);
   // SO-02: the CLI orchestrator taking over means any conversation-thread
   // owner steps down — release its orchestrator session (if any).
