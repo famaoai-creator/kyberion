@@ -15,6 +15,7 @@ import {
 import { executeServicePreset } from './service-engine.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
+import { buildWorkGraph } from './work-graph.js';
 import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { logger } from './core.js';
@@ -1470,15 +1471,19 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     options.sources && options.sources.length > 0
       ? options.sources
       : (['local'] as WorkItemSource[]);
-  return listWorkItems({
+  const allMissionItems = listWorkItems({
     projectId,
     source: sources,
-    status: statuses,
     labels,
-  }).filter(
-    (item) =>
-      getMissionLabel(item) === missionId && areMissionTaskDependenciesSatisfied(state, item)
-  );
+  }).filter((item) => getMissionLabel(item) === missionId);
+  const graph = buildWorkGraph(allMissionItems, projectId);
+  const readyIds = new Set(graph.ready_item_ids);
+  return allMissionItems
+    .filter((item) => statuses.includes(item.status))
+    .filter((item) => {
+      if (item.status === 'blocked') return areMissionTaskDependenciesSatisfied(state, item);
+      return readyIds.has(item.item_id) && areMissionTaskDependenciesSatisfied(state, item);
+    });
 }
 
 function resolveAssigneePeerId(input: {
