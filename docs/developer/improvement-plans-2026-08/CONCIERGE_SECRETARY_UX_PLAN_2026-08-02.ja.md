@@ -159,4 +159,8 @@
 
 ## 5. 実装状況
 
-- 2026-08-02: 計画作成。全フェーズ未着手。
+- 2026-08-02: 計画作成。
+- 2026-08-02: **CS-00 完了**(ブランチ `feat/concierge-secretary`)— pr653 worktree の未コミット実装(+2,171/−270、26ファイル)を `recover/concierge-pr653-scratch` 経由で回収・cherry-pick。crash-loop の根因(`build:ui` に concierge 欠落)を修正し `/api/summary` 200 を実証。設計文書に現況バナー追加。
+- 2026-08-02: **CS-01 完了** — `POST /api/message`(voice-hub → orchestrator 2経路フェイルオーバー、3s タイムアウト、mutation guard)、`GET /api/events`(SSE、30s ポーリング置換)、ConversationDock(layout 常設、UX 契約 shape カード、i18n ja/en)、`window.prompt` 廃止。shape は orchestrator 結果から正直に導出(clarification/status_summary は捏造しない)。契約テスト 9 件。
+- 2026-08-02: **CS-02 完了** — Tier 0(SpeechRecognition + speechSynthesis、字幕=interim を draft にミラー)、Tier 1(`/api/voice/status` 自動検出 → `listen-once` プロキシ、STT バックエンド/入力デバイス選択、発話状態の有界ポーリング+停止ボタン)。二重発話防止。契約テスト 10 件。**残**: 稼働 voice-hub に対するライブ E2E スモーク。
+- 未着手: CS-03(業務カタログ実装。ただし回収した /setup 書き込み化・テナント CRUD・アバター/音声サンプル登録が先行実装として取り込み済み)、CS-04(情報設計刷新・i18n 方式合流)、CS-05(旧 Express 版削除ほか)。
