@@ -447,6 +447,10 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
+    "./operator-home-summary": {
+      "types": "./dist/operator-home-summary.d.ts",
+      "default": "./dist/operator-home-summary.js"
+    },
     "./kill-switch": {
       "types": "./dist/kill-switch.d.ts",
       "default": "./dist/kill-switch.js"
