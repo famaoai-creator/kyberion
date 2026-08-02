@@ -232,7 +232,7 @@
       "d": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
       "s": "implemented",
       "version": "1.3.0",
-      "capability_count": 2
+      "capability_count": 3
     },
     {
       "n": "voice-actuator",
