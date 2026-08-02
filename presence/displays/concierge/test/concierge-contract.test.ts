@@ -25,6 +25,8 @@ describe('concierge surface contract', () => {
       'src/app/api/voice/listen-once/route.ts',
       'src/app/api/voice/stop/route.ts',
       'src/app/api/hygiene/[id]/route.ts',
+      'src/app/api/ingest/route.ts',
+      'src/app/api/memory-queue/[id]/route.ts',
     ];
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
@@ -68,6 +70,7 @@ describe('concierge surface contract', () => {
       'src/app/api/voice/status/route.ts',
       'src/app/api/hygiene/route.ts',
       'src/app/api/outcomes/[id]/preview/route.ts',
+      'src/app/api/memory-queue/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).not.toMatch(/export (async )?function (POST|PUT|DELETE|PATCH)/);
@@ -294,6 +297,95 @@ describe('concierge surface contract', () => {
     expect(page).toContain('data_uri');
     expect(messages).toContain('このファイル形式はここでは表示できません');
     expect(messages).toContain('冒頭のみ表示');
+  });
+
+  it('runs document intake as an explicit one-shot ingest ceremony (CS-03)', () => {
+    const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
+    const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // The ceremony always goes through the built DA-05 ingest CLI with an
+    // explicit identity — anonymous ingests are refused by the script itself.
+    expect(route).toContain('requireConciergeMutationAccess');
+    expect(route).toContain('dist/scripts/ingest.js');
+    expect(route).toContain('--ingested-by');
+    expect(route).toContain('safeExecResult');
+    expect(route).toContain('--dry-run');
+    // Uploads stage under active/shared/tmp (repo temp-file invariant) and are
+    // cleaned up best-effort; node:fs never appears (repo invariant).
+    expect(route).toContain('active/shared/tmp');
+    expect(route).toContain('sharedTmp(');
+    expect(route).toContain('safeRmSync');
+    expect(route).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
+    // One explicit upload per ceremony — no scheduler, no auto-retry timer
+    // (the deliberate absence of a watch/auto-ingest mode mirrors the CLI).
+    expect(route).not.toMatch(/setInterval\(|setTimeout\(/);
+    // Exit code 0 alone is not success: the route reads the ceremony's own
+    // verdict lines before claiming anything.
+    expect(route).toContain('[ingest] DRY RUN');
+    expect(route).toContain('[ingest] committed ');
+    expect(route).toContain('[ingest] NOT committed');
+    // Tenant candidates are validated against the tenant registry.
+    expect(route).toContain('listTenantProfileSlugs');
+
+    // The page is a dedicated form: drop zone + picker, tenant select, and a
+    // preview-first default (dry-run ON) with an explicit second commit step.
+    expect(page).toContain('onDrop');
+    expect(page).toContain("t('ingest.drop_hint')");
+    expect(page).toContain('setDryRun] = React.useState(true)');
+    expect(page).toContain("t('ingest.commit_after_preview')");
+    expect(header).toContain("t('header.ingest')");
+    expect(messages).toContain('資料の取込');
+    expect(messages).toContain('まず内容を確認する');
+  });
+
+  it('presents the memory promotion queue for human approval only (CS-03)', () => {
+    const listRoute = fs.readFileSync(
+      path.join(appDir, 'src/app/api/memory-queue/route.ts'),
+      'utf8'
+    );
+    const decisionRoute = fs.readFileSync(
+      path.join(appDir, 'src/app/api/memory-queue/[id]/route.ts'),
+      'utf8'
+    );
+    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+
+    // The list is a pure read over the shared promotion queue, filtered to
+    // undecided candidates; it never touches the mission controller.
+    expect(listRoute).toContain('listMemoryPromotionCandidates');
+    expect(listRoute).toContain("status === 'queued'");
+    expect(listRoute).not.toContain('mission_controller');
+
+    // Decisions go exclusively through scripts/mission_controller.ts (repo
+    // invariant), with the controller role and honest exit handling.
+    expect(decisionRoute).toContain('requireConciergeMutationAccess');
+    expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
+    expect(decisionRoute).toContain('memory-approve');
+    expect(decisionRoute).toContain('memory-reject');
+    expect(decisionRoute).toContain("MISSION_ROLE: 'mission_controller'");
+    expect(decisionRoute).toContain('safeExecResult');
+    // The candidate must exist and still be pending before anything runs, and
+    // exit code 0 alone is not success — the transition is verified on disk.
+    expect(decisionRoute).toContain('loadMemoryPromotionCandidate');
+    expect(decisionRoute).toContain("candidate.status !== 'queued'");
+    expect(decisionRoute).toContain('after?.status !== expected');
+    expect(decisionRoute).not.toMatch(/setInterval\(|setTimeout\(/);
+    for (const source of [listRoute, decisionRoute]) {
+      expect(source).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
+    }
+
+    // The pane uses inline confirm and translated plain-language labels — the
+    // internal kind/tier codes never render verbatim.
+    expect(page).toContain("t('memory.title')");
+    expect(page).toContain('memory.kind.');
+    expect(page).toContain('memory.tier.');
+    expect(page).toContain("'memory.confirm_approve'");
+    expect(page).toContain("'memory.confirm_reject'");
+    expect(page).not.toContain('window.confirm');
+    expect(messages).toContain('記憶にしてよいか(学びの承認)');
+    expect(messages).toContain('コツとして残したい学び');
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {
