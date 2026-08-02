@@ -163,4 +163,10 @@
 - 2026-08-02: **CS-00 完了**(ブランチ `feat/concierge-secretary`)— pr653 worktree の未コミット実装(+2,171/−270、26ファイル)を `recover/concierge-pr653-scratch` 経由で回収・cherry-pick。crash-loop の根因(`build:ui` に concierge 欠落)を修正し `/api/summary` 200 を実証。設計文書に現況バナー追加。
 - 2026-08-02: **CS-01 完了** — `POST /api/message`(voice-hub → orchestrator 2経路フェイルオーバー、3s タイムアウト、mutation guard)、`GET /api/events`(SSE、30s ポーリング置換)、ConversationDock(layout 常設、UX 契約 shape カード、i18n ja/en)、`window.prompt` 廃止。shape は orchestrator 結果から正直に導出(clarification/status_summary は捏造しない)。契約テスト 9 件。
 - 2026-08-02: **CS-02 完了** — Tier 0(SpeechRecognition + speechSynthesis、字幕=interim を draft にミラー)、Tier 1(`/api/voice/status` 自動検出 → `listen-once` プロキシ、STT バックエンド/入力デバイス選択、発話状態の有界ポーリング+停止ボタン)。二重発話防止。契約テスト 10 件。**残**: 稼働 voice-hub に対するライブ E2E スモーク。
-- 未着手: CS-03(業務カタログ実装。ただし回収した /setup 書き込み化・テナント CRUD・アバター/音声サンプル登録が先行実装として取り込み済み)、CS-04(情報設計刷新・i18n 方式合流)、CS-05(旧 Express 版削除ほか)。
+- 2026-08-02: **CS-03 優先度 1〜4 完了** —
+  - (1) `/setup` 整備状況チェックリスト: 印字コマンドを machine-actionable 診断(`{id, status, action}` → セクションへジャンプ)に置換。in-app 修正手段のない項目(推論バックエンド導入)のみコマンドを二次的表示で残置。capabilities ペインからパイプライン ID 露出を除去。
+  - (2) 通知チャネル設定: guarded `GET/POST /api/notification-preferences`(`loadNotificationPreferences`/`saveNotificationPreferences` + channel-directory 検証、sovereign_concierge 実行文脈+sensitive-path mediation)。
+  - (3) 停滞ミッション伺いカード: `GET /api/hygiene` + guarded `POST /api/hygiene/[id]`。状態変更は `dist/scripts/mission_controller.js` 経由のみ(argv 配列、MISSION_ROLE、exit 0 を成功とみなさずディスク上の遷移を検証)。判断は人間のインライン確認クリックのみから発火。受領前インラインプレビュー(`/api/outcomes/[id]/preview`、エントリ自身の artifact_paths 限定、ルート外拒否、secureIo 経由、SU-03 残件解消)。
+  - (4) 文書取込 `/ingest` ページ(dry-run 既定 ON の preview-first ceremony、`active/shared/tmp` staging、`--ingested-by sovereign_concierge:web`)+記憶昇格キュー承認ペイン(`memory-approve/reject` を controller 経由、on-disk 検証)。
+  - 契約テスト 16 件。**残(CS-03)**: プラグイン承認 1 画面化、config-mission 化(優先度 5)、会議・メール・カレンダー会話起票(優先度 6)。
+- 未着手: CS-04(情報設計刷新・i18n 方式合流)、CS-05(旧 Express 版削除・ライブ voice-hub E2E ほか)。
