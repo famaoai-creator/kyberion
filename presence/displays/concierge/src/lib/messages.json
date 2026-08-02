@@ -1,5 +1,6 @@
 {
   "header.home": { "en": "Home", "ja": "ホーム" },
+  "header.ingest": { "en": "Add documents", "ja": "資料の取込" },
   "header.setup": { "en": "Setup", "ja": "セットアップ" },
   "header.tagline": {
     "en": "Executive secretary — requests, approvals, outcomes, exceptions",
@@ -542,5 +543,153 @@
   "api.notification_target": {
     "en": "Enter a destination ID for the channel.",
     "ja": "送り先IDを入力してください。"
+  },
+  "ingest.title": { "en": "Add a document to our records", "ja": "資料の取込" },
+  "ingest.description": {
+    "en": "Hand us one document at a time. We first show you what would be recorded, and nothing is filed until you say so.",
+    "ja": "資料を一件ずつお預かりします。まず登録内容の見込みをご確認いただき、ご指示があるまで正式な登録はいたしません。"
+  },
+  "ingest.load_error": {
+    "en": "Could not prepare the intake form: {error}",
+    "ja": "取込画面の準備に失敗しました: {error}"
+  },
+  "ingest.drop_hint": {
+    "en": "Drop a document here, or choose a file below.",
+    "ja": "ここに資料をドラッグ&ドロップするか、下のボタンでお選びください。"
+  },
+  "ingest.choose_file": { "en": "Choose a file", "ja": "ファイルを選ぶ" },
+  "ingest.tenant_label": { "en": "File under (tenant)", "ja": "登録先（テナント）" },
+  "ingest.format_label": { "en": "Document type", "ja": "資料の種類" },
+  "ingest.format_auto": {
+    "en": "Detect from the file name",
+    "ja": "ファイル名から自動判定"
+  },
+  "ingest.dry_run_label": {
+    "en": "Preview first (recommended)",
+    "ja": "まず内容を確認する（推奨）"
+  },
+  "ingest.dry_run_hint": {
+    "en": "With preview on, nothing is written — you will see what would be recorded and can then file it explicitly.",
+    "ja": "確認モードでは何も書き込みません。登録される内容をご確認のうえ、本登録をご指示ください。"
+  },
+  "ingest.submit_preview": { "en": "Check the document", "ja": "内容を確認する" },
+  "ingest.submit_commit": { "en": "File the document", "ja": "登録する" },
+  "ingest.commit_after_preview": {
+    "en": "Looks good — file it",
+    "ja": "この内容で登録する"
+  },
+  "ingest.busy": {
+    "en": "Reviewing the document…",
+    "ja": "資料を確認しております…"
+  },
+  "ingest.outcome.would_commit": { "en": "Ready to file", "ja": "登録できます" },
+  "ingest.outcome.committed": { "en": "Filed", "ja": "登録済み" },
+  "ingest.outcome.duplicate": { "en": "Already on file", "ja": "登録済みの資料" },
+  "ingest.target_path": { "en": "Filing location: {value}", "ja": "保存先: {value}" },
+  "ingest.tenant_note": { "en": "Filed under: {value}", "ja": "登録先: {value}" },
+  "api.ingest.tenant_invalid": {
+    "en": "Please choose a registered destination for this document.",
+    "ja": "登録先のテナントをお選びください。"
+  },
+  "api.ingest.file_size": {
+    "en": "Please use a file no larger than 25 MB.",
+    "ja": "ファイルは 25 MB 以下にしてください。"
+  },
+  "api.ingest.format_invalid": {
+    "en": "That document type is not supported.",
+    "ja": "この資料の種類には対応しておりません。"
+  },
+  "api.ingest.format_needed": {
+    "en": "We could not tell the document type from the file name. Please choose the type explicitly.",
+    "ja": "ファイル名から資料の種類を判定できませんでした。種類をお選びください。"
+  },
+  "api.ingest.previewed": {
+    "en": "“{name}” can be filed. Please review the details and file it explicitly.",
+    "ja": "「{name}」は登録できます。内容をご確認のうえ、本登録をご指示ください。"
+  },
+  "api.ingest.committed": {
+    "en": "“{name}” has been filed in our records.",
+    "ja": "「{name}」を登録いたしました。"
+  },
+  "api.ingest.duplicate": {
+    "en": "“{name}” is already on file, so nothing was added.",
+    "ja": "「{name}」は既に登録済みのため、新たな登録はしておりません。"
+  },
+  "api.ingest.blocked": {
+    "en": "This document contains sensitive details we are not allowed to file. Nothing was recorded — please review the document and try again.",
+    "ja": "この資料には登録できない機微な情報が含まれておりました。何も記録しておりません。内容をご確認のうえ、もう一度お試しください。"
+  },
+  "api.ingest.failed": {
+    "en": "We could not take in the document. Please try again in a moment.",
+    "ja": "資料の取込を完了できませんでした。少し置いてからもう一度お試しください。"
+  },
+  "memory.title": {
+    "en": "May we remember this? (approving learnings)",
+    "ja": "記憶にしてよいか(学びの承認)"
+  },
+  "memory.description": {
+    "en": "Lessons we would like to keep for future work. Nothing is remembered until you approve it.",
+    "ja": "今後の仕事に活かしたい学びのご提案です。ご承認いただくまで、記憶には残しません。"
+  },
+  "memory.kind.sop": {
+    "en": "A step-by-step procedure worth keeping",
+    "ja": "手順として残したい学び"
+  },
+  "memory.kind.template": {
+    "en": "A reusable template worth keeping",
+    "ja": "ひな形として残したい学び"
+  },
+  "memory.kind.heuristic": {
+    "en": "A rule of thumb worth keeping",
+    "ja": "コツとして残したい学び"
+  },
+  "memory.kind.risk_rule": {
+    "en": "A caution to remember",
+    "ja": "注意点として残したい学び"
+  },
+  "memory.kind.clarification_prompt": {
+    "en": "A question we should ask earlier next time",
+    "ja": "次回は先に伺うべき確認事項"
+  },
+  "memory.tier.public": { "en": "Shareable", "ja": "共有可" },
+  "memory.tier.confidential": { "en": "Company-internal", "ja": "社内限り" },
+  "memory.tier.personal": { "en": "Personal", "ja": "個人情報" },
+  "memory.source": { "en": "From: {value}", "ja": "由来: {value}" },
+  "memory.seen_times": { "en": "seen {count} times", "ja": "{count}回確認" },
+  "memory.approve": { "en": "Remember it", "ja": "承認する" },
+  "memory.reject": { "en": "Let it go", "ja": "見送る" },
+  "memory.confirm_approve": {
+    "en": "Shall we keep this as a lasting memory?",
+    "ja": "この学びを記憶に残してよろしいですか？"
+  },
+  "memory.confirm_reject": {
+    "en": "Shall we let this one go?",
+    "ja": "この学びは見送ってよろしいですか？"
+  },
+  "memory.confirm_yes": { "en": "Yes, please proceed", "ja": "はい、お願いします" },
+  "memory.confirm_back": { "en": "Go back", "ja": "戻る" },
+  "api.memory.invalid": {
+    "en": "Please choose remember or let go for this learning.",
+    "ja": "この学びへの「承認」または「見送り」の指定が必要です。"
+  },
+  "api.memory.not_found": {
+    "en": "This learning could not be found in the queue.",
+    "ja": "この学びは承認待ち一覧に見つかりませんでした。"
+  },
+  "api.memory.not_pending": {
+    "en": "This learning has already been decided.",
+    "ja": "この学びは既にご判断いただいております。"
+  },
+  "api.memory.failed": {
+    "en": "We could not record the decision. Please try again in a moment.",
+    "ja": "ご判断を記録できませんでした。少し置いてからもう一度お試しください。"
+  },
+  "api.memory.approved": {
+    "en": "Thank you — we will keep this learning.",
+    "ja": "承知しました。この学びを記憶に残します。"
+  },
+  "api.memory.rejected": {
+    "en": "Understood — we will let this learning go.",
+    "ja": "承知しました。この学びは見送ります。"
   }
 }
