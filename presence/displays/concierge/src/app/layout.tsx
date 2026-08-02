@@ -1,9 +1,14 @@
 import * as React from 'react';
 import './globals.css';
+import { ConciergeHeader } from './concierge-header';
+import { ConversationDock } from './conversation-dock';
+import { CommandPalette } from './command-palette';
+
+// Surface identity contract: CEO秘書 — 依頼・承認・成果・例外
 
 export const metadata = {
-  title: '秘書室 — Kyberion Concierge',
-  description: 'CEO秘書 — 依頼・承認・成果・例外',
+  title: 'Concierge — Kyberion',
+  description: 'Executive secretary surface for requests, approvals, outcomes, and exceptions.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,20 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/api/theme" />
       </head>
       <body>
-        <header className="concierge-header">
-          <div className="concierge-header-title">
-            <span className="concierge-crest">秘</span>
-            <div>
-              <strong>秘書室</strong>
-              <div className="concierge-tagline">CEO秘書 — 依頼・承認・成果・例外</div>
-            </div>
-          </div>
-          <div className="concierge-header-note">
-            <a href="/" style={{ marginRight: 12 }}>ホーム</a>
-            <a href="/setup">セットアップ</a>
-          </div>
-        </header>
+        <ConciergeHeader />
         <main className="concierge-main">{children}</main>
+        {/* CS-01: the secretary conversation is available on every page
+            (home and /setup), so it is mounted in the layout. */}
+        <ConversationDock />
+        {/* CS-04: ⌘K palette, also on every page. */}
+        <CommandPalette />
       </body>
     </html>
   );

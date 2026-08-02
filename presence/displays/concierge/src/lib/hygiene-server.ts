@@ -1,0 +1,94 @@
+import * as path from 'node:path';
+import {
+  collectMissionHygieneReport,
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  secureIo,
+  withExecutionContext,
+  type PlannedMissionFinding,
+} from '@agent/core';
+
+/**
+ * CS-03 停滞ミッション伺いカード — server-side view over the mission hygiene
+ * report. This module only READS: classification comes from
+ * `collectMissionHygieneReport` (libs/core/mission-hygiene.ts) and the mission
+ * title from mission-state.json. Starting or cancelling stays a human decision
+ * routed through scripts/mission_controller.ts (see api/hygiene/[id]/route.ts);
+ * nothing here mutates mission state.
+ */
+
+export interface HygieneInquiry {
+  mission_id: string;
+  /** Human-facing label: the agreed goal when recorded, else the mission id. */
+  title: string;
+  /** Reason code — translated to plain language client-side via i18n. */
+  reason: PlannedMissionFinding['reason'];
+  age_days: number | null;
+  waiting_since?: string;
+}
+
+interface MissionStateSnapshot {
+  status?: string;
+  history?: Array<{ ts?: string }>;
+  intent?: { goal_summary?: string; source_text?: string };
+}
+
+function readMissionStateSnapshot(missionId: string): MissionStateSnapshot | null {
+  const missionPath = pathResolver.findMissionPath(missionId);
+  if (!missionPath) return null;
+  const statePath = path.join(missionPath, 'mission-state.json');
+  try {
+    return withExecutionContext('sovereign_concierge', () =>
+      secureIo.withSensitivePathMediation(() => {
+        if (!safeExistsSync(statePath)) return null;
+        return JSON.parse(
+          safeReadFile(statePath, { encoding: 'utf8' }) as string
+        ) as MissionStateSnapshot;
+      })
+    );
+  } catch {
+    // A missing/corrupt state file degrades to id-only display; the hygiene
+    // report itself already proved the mission exists.
+    return null;
+  }
+}
+
+/** Current mission status straight from disk (used to verify a decision took effect). */
+export function readMissionStatus(missionId: string): string | null {
+  return readMissionStateSnapshot(missionId)?.status || null;
+}
+
+function toInquiry(finding: PlannedMissionFinding): HygieneInquiry {
+  const state = readMissionStateSnapshot(finding.mission_id);
+  const goal = state?.intent?.goal_summary?.trim() || state?.intent?.source_text?.trim() || '';
+  const waitingSince = state?.history?.find((entry) => entry.ts)?.ts;
+  return {
+    mission_id: finding.mission_id,
+    title: goal ? goal.slice(0, 120) : finding.mission_id,
+    reason: finding.reason,
+    age_days: finding.age_days,
+    ...(waitingSince ? { waiting_since: waitingSince } : {}),
+  };
+}
+
+/**
+ * Findings the operator should decide on, oldest first (abandoned before
+ * stale, matching the report's own ordering). The `recommendation` field is
+ * deliberately dropped: it contains CLI command strings, which ceo-ux.md bans
+ * from concierge copy.
+ */
+export function listHygieneInquiries(): HygieneInquiry[] {
+  const report = withExecutionContext('sovereign_concierge', () => collectMissionHygieneReport());
+  return [...report.abandoned, ...report.stale].map(toInquiry);
+}
+
+/** Only missions currently in the hygiene report are actionable from the UI. */
+export function findHygieneInquiry(missionId: string): HygieneInquiry | null {
+  const report = withExecutionContext('sovereign_concierge', () => collectMissionHygieneReport());
+  const wanted = missionId.toUpperCase();
+  const finding = [...report.abandoned, ...report.stale].find(
+    (entry) => entry.mission_id.toUpperCase() === wanted
+  );
+  return finding ? toInquiry(finding) : null;
+}

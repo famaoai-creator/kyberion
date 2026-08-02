@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('browser-onboarding-tests/profile');
 const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
@@ -85,6 +85,14 @@ describe('browser onboarding', () => {
     expect(loadOperatorProviderPreferences()).toEqual({
       priority: ['codex', 'claude', 'gemini'],
       default_models: { codex: 'gpt-5.5' },
+    });
+    expect(
+      JSON.parse(
+        String(safeReadFile(path.join(PROFILE_ROOT, 'my-identity.json'), { encoding: 'utf8' }))
+      )
+    ).toMatchObject({
+      name: 'Browser Operator',
+      vision: 'Configure Kyberion safely from a browser.',
     });
     expect(
       JSON.parse(
@@ -180,6 +188,7 @@ describe('browser onboarding', () => {
 
   it('stores supported voice samples only inside the active profile', async () => {
     const { saveBrowserOnboardingVoiceSample } = await import('./browser-onboarding.js');
+    vi.stubEnv('KYBERION_PERSONA', 'worker');
     const sample = saveBrowserOnboardingVoiceSample({
       profileId: 'my-voice',
       contentType: 'audio/webm;codecs=opus',
@@ -195,6 +204,35 @@ describe('browser onboarding', () => {
         data: Buffer.from('bad'),
       })
     ).toThrow(/unsupported voice sample content type/);
+  });
+
+  it('keeps personal onboarding writes inside the sovereign concierge context', async () => {
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    const result = await applyBrowserOnboarding(validDraft());
+    expect(result.ok).toBe(true);
+    expect(safeExistsSync(path.join(PROFILE_ROOT, 'my-identity.json'))).toBe(true);
+  });
+
+  it('preserves existing identity metadata while updating onboarding fields', async () => {
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    safeMkdir(PROFILE_ROOT, { recursive: true });
+    safeWriteFile(
+      path.join(PROFILE_ROOT, 'my-identity.json'),
+      JSON.stringify({ name: 'Existing', avatar_path: 'avatar.png', custom_preference: 'quiet' })
+    );
+
+    await applyBrowserOnboarding(validDraft());
+
+    expect(
+      JSON.parse(
+        String(safeReadFile(path.join(PROFILE_ROOT, 'my-identity.json'), { encoding: 'utf8' }))
+      )
+    ).toMatchObject({
+      avatar_path: 'avatar.png',
+      custom_preference: 'quiet',
+      vision: 'Configure Kyberion safely from a browser.',
+    });
   });
 
   it('rejects duplicate providers, duplicate services, and unknown services', async () => {

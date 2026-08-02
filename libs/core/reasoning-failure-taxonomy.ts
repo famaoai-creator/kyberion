@@ -1,12 +1,5 @@
 export type ReasoningFailureClass =
-  | 'transient'
-  | 'capacity'
-  | 'capability'
-  | 'auth'
-  | 'policy'
-  | 'request'
-  | 'cancelled'
-  | 'unknown';
+  'transient' | 'capacity' | 'capability' | 'auth' | 'policy' | 'request' | 'cancelled' | 'unknown';
 
 export interface ReasoningFailureClassification {
   class: ReasoningFailureClass;
@@ -21,6 +14,13 @@ function messageOf(error: unknown): string {
 
 export function classifyReasoningFailure(error: unknown): ReasoningFailureClassification {
   const message = messageOf(error);
+  // A governed CLI wall-clock deadline is already the final attempt for this
+  // call. Retrying the same prompt only recreates the user-visible "waiting"
+  // state and multiplies the delay. Fail over, when policy allows it, but do
+  // not retry in place.
+  if (/\[codex-cli\].*(?:timed out|timeout)|codex-cli.*wall.?clock/i.test(message)) {
+    return { class: 'transient', retryable: false, allowFailover: true, demoteProvider: true };
+  }
   if (/abort|cancel|user.?stop|operator.?cancel/i.test(message)) {
     return { class: 'cancelled', retryable: false, allowFailover: false, demoteProvider: false };
   }

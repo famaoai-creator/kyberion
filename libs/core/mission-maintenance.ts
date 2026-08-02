@@ -322,13 +322,11 @@ export async function approveScopeChange(args: {
     });
 
     await saveState(missionId, state, { alreadyLocked: true });
-    await emitMissionLifecycleIntentSnapshot({
-      missionId,
-      stage: 'scope_change',
-      text: goalSummary,
-      source: 'manual',
-      traceRef: state.correlation_id,
-    });
+    // recordApprovedIntentScopeChange already emitted the new `origin`
+    // snapshot. Do not append a second goal-only `current` snapshot here:
+    // dropping the approved constraints/deliverables from that same event
+    // would manufacture a minor field-churn delta immediately after a
+    // legitimate rebaseline.
   });
 
   try {
