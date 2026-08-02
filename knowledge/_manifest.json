@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 75190,
+      "size": 75492,
       "type": "json"
     },
     {
@@ -1407,7 +1407,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7034,
+      "size": 6820,
       "type": "json"
     },
     {

@@ -1326,6 +1326,9 @@ Usage: node dist/scripts/mission_controller.js <command> [args]
 Lifecycle Commands:
   create   <ID>                  Create a new mission (status: planned)
   start    <ID>                  Activate a mission (planned/paused/failed → active)
+                                 --goal <TEXT> carries the user goal into the intent baseline
+                                 --success-condition <TEXT> records the acceptance condition
+                                 --intent-goal <PATH> accepts an existing governed handoff file
   checkpoint [task_id] [note]    Record a checkpoint on the focused mission
   checkpoint <ID> <task_id> <note>
                                  Record a checkpoint on an explicit mission
