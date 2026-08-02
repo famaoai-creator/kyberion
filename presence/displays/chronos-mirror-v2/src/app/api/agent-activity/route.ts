@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildAgentActivityBoard } from '@agent/core';
+import { buildAgentActivityBoard } from '@agent/core/agent-activity-board';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';

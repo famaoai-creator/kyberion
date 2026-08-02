@@ -67,25 +67,46 @@ jobs:
       - name: Contract schemas
         run: pnpm run check:contract-schemas
 
+      # The full core suite is still Unix-oriented: it relies on POSIX path
+      # assertions and host-only fixtures (sqlite3, ffmpeg, and macOS/Linux
+      # media backends). Keep that coverage on the Unix runners and exercise
+      # the Windows-native surface with its platform-focused suite below.
       - name: Unit tests (core)
+        if: runner.os != 'Windows'
         run: pnpm run test:core
 
+      - name: Unit tests (Windows native)
+        if: runner.os == 'Windows'
+        run: >-
+          pnpm exec vitest run
+          libs/core/windows-local-assist-bridge.test.ts
+          libs/core/native-speech-listen-bridge.test.ts
+          libs/core/native-tts.test.ts
+          libs/core/environment-capability.test.ts
+          libs/core/platform.test.ts
+
       - name: Governance boundary tests
+        if: runner.os != 'Windows'
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
 
       - name: Meeting participation dry-run
+        if: runner.os != 'Windows'
         run: pnpm run test:meeting-dry-run
 
       - name: Pipeline preview (baseline)
+        if: runner.os != 'Windows'
         run: pnpm run cli:preview -- pipelines/baseline-check.json
 
       - name: Pipeline preview (meeting proxy)
+        if: runner.os != 'Windows'
         run: pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json
 
       - name: Pipeline shell independence
+        if: runner.os != 'Windows'
         run: pnpm run check:pipeline-shell-independence
 
       - name: Customer aggregation smoke
+        if: runner.os != 'Windows'
         env:
           KYBERION_CUSTOMER: smoke-test
           KYBERION_PERSONA: ecosystem_architect

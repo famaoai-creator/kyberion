@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listWorkItems, updateWorkItem, type WorkItemStatus } from '@agent/core';
+import { listWorkItems, updateWorkItem, type WorkItemStatus } from '@agent/core/work-coordination';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
     const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
     const status = KANBAN_STATUSES.includes(body?.status) ? (body.status as WorkItemStatus) : null;
     if (!itemId || !status) {
-      return NextResponse.json({ ok: false, error: 'itemId と status が必要です' }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: 'itemId と status が必要です' },
+        { status: 400 }
+      );
     }
     const updated = updateWorkItem({ itemId, status });
     return NextResponse.json({ ok: true, item: updated });

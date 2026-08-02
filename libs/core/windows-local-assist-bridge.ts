@@ -60,10 +60,11 @@ function discoverEndpoint(payload: unknown, fallback: string): string {
 
 async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
   if (disabledByEnv()) return { available: false, reason: 'disabled via KYBERION_WINDOWS_AI' };
-  if (process.platform !== 'win32') {
+  const explicitEndpoint = configuredEndpoint();
+  if (process.platform !== 'win32' && !explicitEndpoint) {
     return { available: false, reason: 'requires Windows' };
   }
-  let configured = configuredEndpoint();
+  let configured = explicitEndpoint;
   if (!configured) {
     const cli = safeExecResult('foundry', ['server', 'status', '--output', 'json'], {
       timeoutMs: 3_000,

@@ -1,7 +1,10 @@
-import { MetricsCollector, listApprovalRequests, listArtifactRecords } from '@agent/core';
+import { MetricsCollector } from '@agent/core/metrics';
+import { listApprovalRequests } from '@agent/core/approval-store';
+import { listArtifactRecords } from '@agent/core/artifact-record';
 import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
-import { pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir, safeReadFile } from '@agent/core/secure-io';
 import { type MissionState } from '../../../../../scripts/refactor/mission-types.js';
 
 export interface MissionHistoryEntry {
