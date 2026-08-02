@@ -39,7 +39,10 @@ describe('concierge surface contract', () => {
   it('exposes the personal-secretary onboarding controls', () => {
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
     expect(setupPage).toContain("t('setup.save_profile')");
     expect(setupPage).toContain("t('setup.image_label')");
     expect(setupPage).toContain("t('setup.save_voice')");
@@ -112,7 +115,10 @@ describe('concierge surface contract', () => {
   it('mounts the conversation dock through the shared i18n mechanism', () => {
     const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
     expect(layout).toContain('ConversationDock');
     expect(dock).toContain('useConciergeI18n');
     expect(dock).toContain("fetch('/api/message'");
@@ -135,7 +141,10 @@ describe('concierge surface contract', () => {
     const stop = fs.readFileSync(path.join(appDir, 'src/app/api/voice/stop/route.ts'), 'utf8');
     const hook = fs.readFileSync(path.join(appDir, 'src/lib/use-voice.ts'), 'utf8');
     const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // Tier detection: bounded /health probe that degrades to available:false
     // instead of throwing — the dock must work with voice-hub down.
@@ -170,7 +179,10 @@ describe('concierge surface contract', () => {
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
     // Every incomplete item carries a machine-actionable navigate descriptor.
     expect(setupRoute).toContain('diagnostics');
     expect(setupRoute).toContain("type: 'navigate'");
@@ -207,7 +219,10 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
     // Preferences load/save reuse the @agent/core operator-notifications
     // helpers under the sovereign_concierge execution context.
     expect(route).toContain('loadNotificationPreferences');
@@ -233,7 +248,10 @@ describe('concierge surface contract', () => {
     );
     const server = fs.readFileSync(path.join(appDir, 'src/lib/hygiene-server.ts'), 'utf8');
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // Classification comes from the shared hygiene report; the GET is pure
     // read and never touches the mission controller.
@@ -278,7 +296,10 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // Path safety: the entry is looked up server-side and only its own
     // artifact_paths are opened — no client-supplied path ever reaches a read.
@@ -308,7 +329,10 @@ describe('concierge surface contract', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
     const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
     const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // The ceremony always goes through the built DA-05 ingest CLI with an
     // explicit identity — anonymous ingests are refused by the script itself.
@@ -355,7 +379,10 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // The list is a pure read over the shared promotion queue, filtered to
     // undecided candidates; it never touches the mission controller.
@@ -402,7 +429,10 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // The list reuses the loader's own provenance gate and the managed
     // registry — it can never claim more than the loader would execute, and
@@ -447,7 +477,10 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // Creation goes exclusively through the built config-mission CLI — the
     // route never writes governance JSON directly, and it never executes the
@@ -480,7 +513,10 @@ describe('concierge surface contract', () => {
 
   it('offers quick-request chips that go through the normal message path (CS-03 方式C)', () => {
     const dock = fs.readFileSync(path.join(appDir, 'src/app/conversation-dock.tsx'), 'utf8');
-    const messages = fs.readFileSync(path.join(appDir, 'src/lib/messages.json'), 'utf8');
+    const messages = fs.readFileSync(
+      path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
+      'utf8'
+    );
 
     // The chips only prefill and send text through send() → /api/message —
     // routing stays with the orchestrator, no per-chip special case, and they
