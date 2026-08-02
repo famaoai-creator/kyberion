@@ -3120,6 +3120,14 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Maximum milliseconds a mission work item waits for one provider response before recording a blocked result.",
+      "documented": true
     }
   ]
 }

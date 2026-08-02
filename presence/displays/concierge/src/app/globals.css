@@ -76,6 +76,23 @@ body {
   margin: 0 0 12px;
 }
 
+.locale-switcher {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.locale-switcher select {
+  margin-left: 6px;
+  border: 1px solid #d8d2c4;
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: #fff;
+  color: inherit;
+}
+
 .briefing-counts {
   display: flex;
   gap: 20px;
@@ -146,10 +163,65 @@ body {
   color: var(--kb-text-secondary, #9ca3af);
 }
 
+.media-preview {
+  display: block;
+  width: min(100%, 20rem);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #efeae0;
+  border-radius: 10px;
+  background: #111827;
+  margin: 10px 0;
+}
+
 .item-body {
   font-size: 13px;
   margin: 6px 0;
   white-space: pre-wrap;
+}
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+
+.field-label input,
+.field-label textarea,
+.field-label select,
+.field-row input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.field-label textarea {
+  resize: vertical;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.service-row input {
+  accent-color: var(--kb-accent, #8a6d3b);
 }
 
 .status-chip {
@@ -166,6 +238,12 @@ body {
   border-color: #d97706;
   color: #b45309;
   background: #fef3c7;
+}
+
+.status-chip.ok {
+  border-color: #9ecb9e;
+  color: #2f7d32;
+  background: #f2faf2;
 }
 
 .button-row {
@@ -213,4 +291,566 @@ body {
 .notice.error {
   border-color: #f3caca;
   background: #fdf3f3;
+}
+
+.change-request-form {
+  margin-top: 10px;
+}
+
+/* CS-03 停滞ミッション伺いカード — the concierge asks; only the human decides.
+   The pane sits above the grid because a stalled decision outranks routine feeds. */
+
+.hygiene-pane {
+  margin-bottom: 20px;
+  border-left: 4px solid #d97706;
+}
+
+.hygiene-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+/* CS-03 受領プレビュー — inline artifact preview inside an outcome card.
+   No animation is used, so no prefers-reduced-motion override is needed. */
+
+.outcome-preview {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+.preview-file {
+  margin-bottom: 10px;
+}
+
+.preview-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.preview-content {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #efeae0;
+  border-radius: 8px;
+  background: #fffdf9;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.preview-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #efeae0;
+  border-radius: 8px;
+}
+
+/* CS-03 記憶昇格キュー — proposed learnings awaiting the human's approval.
+   Sits above the grid like the hygiene pane: a pending memory decision is a
+   question to the human, not a routine feed. No animation is used, so no
+   prefers-reduced-motion override is needed. */
+
+.memory-pane {
+  margin-bottom: 20px;
+  border-left: 4px solid var(--kb-accent, #8a6d3b);
+}
+
+.memory-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+/* CS-03 プラグイン承認・ガバナンス設定 — same inline-confirm ceremony as the
+   hygiene and memory panes: the concierge asks, only the human decides. */
+
+.plugin-confirm,
+.governance-confirm {
+  margin-top: 10px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 10px;
+}
+
+.pane-subheading {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+/* CS-03 文書取込 — one-document-at-a-time ingest ceremony (no watch folder).
+   The dropzone is static (no animation → no prefers-reduced-motion override). */
+
+.ingest-pane {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.ingest-dropzone {
+  border: 2px dashed #d8d2c4;
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  background: #fffdf9;
+  margin-bottom: 16px;
+}
+
+.ingest-dropzone.dragover {
+  border-color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+/* The dry-run toggle is an inline checkbox, not a block field. */
+.ingest-dry-run input[type='checkbox'] {
+  display: inline-block;
+  width: auto;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  accent-color: var(--kb-accent, #8a6d3b);
+}
+
+/* Readiness checklist (CS-03) — attention items jump to their in-page section. */
+
+.readiness-pane {
+  margin-bottom: 20px;
+}
+
+.readiness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readiness-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.readiness-item .status-chip {
+  margin-left: 0;
+  min-width: 72px;
+  text-align: center;
+}
+
+.readiness-label {
+  font-weight: 600;
+}
+
+.readiness-guidance {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+/* Honest degradation: the terminal command stays visible but secondary. */
+.readiness-command {
+  display: block;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #9ca3af);
+}
+
+.link-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--kb-accent, #8a6d3b);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Conversation dock — the always-available secretary conversation (CS-01). */
+
+.dock-toggle {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  border: 1px solid var(--kb-accent, #8a6d3b);
+  background: var(--kb-accent, #8a6d3b);
+  color: #fff;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(31, 41, 55, 0.18);
+}
+
+.conversation-dock {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  max-height: min(520px, calc(100vh - 96px));
+  background: #ffffff;
+  border: 1px solid #e7e2d8;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(31, 41, 55, 0.18);
+  overflow: hidden;
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--kb-accent, #8a6d3b);
+  color: #fff;
+  font-size: 13px;
+}
+
+.dock-collapse {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.dock-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 160px;
+}
+
+.dock-empty {
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0;
+}
+
+.dock-bubble {
+  border: 1px solid #efeae0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  max-width: 92%;
+}
+
+.dock-bubble.user {
+  align-self: flex-end;
+  background: #f4efe6;
+}
+
+.dock-bubble.secretary {
+  align-self: flex-start;
+  background: #fffdf9;
+}
+
+.dock-bubble.error {
+  border-color: #f3caca;
+  background: #fdf3f3;
+}
+
+.dock-speaker {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--kb-text-secondary, #9ca3af);
+  margin-right: 6px;
+}
+
+.dock-shape-chip {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+}
+
+.dock-text {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.dock-promoted {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.dock-busy {
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0;
+}
+
+.dock-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+}
+
+.dock-input-row input {
+  flex: 1;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+/* Quick-request chips (CS-03 方式C) — prefilled asks that go through the
+   normal message path; shown only while the log is still empty. */
+
+.dock-quick-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+}
+
+.dock-quick-chip {
+  border: 1px solid #d8d2c4;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.dock-quick-chip:hover:not(:disabled) {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+.dock-quick-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Voice tier controls (CS-02) — mic button, output toggle, speaking state. */
+
+.dock-voice-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+}
+
+.dock-voice-chip {
+  border: 1px solid #d8d2c4;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.dock-voice-chip.on {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+}
+
+.dock-voice-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--kb-accent, #8a6d3b);
+}
+
+.dock-voice-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid #efeae0;
+  background: #fffdf9;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.dock-voice-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dock-voice-settings select {
+  max-width: 60%;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  padding: 4px 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+}
+
+.dock-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  border: 1px solid #d8d2c4;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.dock-mic:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dock-mic.listening {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: #f4efe6;
+  animation: dock-mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dock-mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(138, 109, 59, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(138, 109, 59, 0.12);
+  }
+}
+
+/* Accessibility: the listening pulse is decorative only — the same state is
+   conveyed by the aria-pressed mic button and the visible listening label. */
+@media (prefers-reduced-motion: reduce) {
+  .dock-mic.listening {
+    animation: none;
+  }
+}
+
+/* ---------- CS-04: unified inquiry queue ---------- */
+.inquiry-queue {
+  border-left: 3px solid var(--kb-accent, #8a6d3b);
+}
+.queue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.queue-item > .item-card {
+  flex: 1;
+  margin-bottom: 0;
+}
+.queue-chip {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+  color: var(--kb-accent, #8a6d3b);
+  border: 1px solid var(--kb-accent, #8a6d3b);
+}
+.queue-chip.approval {
+  font-weight: 600;
+}
+.queue-chip.exception {
+  border-style: dashed;
+}
+
+/* ---------- CS-04: command palette (⌘K) ---------- */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 60;
+}
+.command-palette {
+  width: min(520px, 92vw);
+  background: var(--kb-panel-bg, #fffdf8);
+  border: 1px solid var(--kb-border, #d9cfbc);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 10px;
+}
+.palette-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--kb-border, #d9cfbc);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.palette-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.palette-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.palette-item.active {
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+}
+.palette-empty,
+.palette-hint {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin: 0;
+}
+
+/* ---------- CS-04: keyboard accessibility ---------- */
+:focus-visible {
+  outline: 2px solid var(--kb-accent, #8a6d3b);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
