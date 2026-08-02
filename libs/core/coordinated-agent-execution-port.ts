@@ -1,6 +1,7 @@
 import {
   claimWorkItem,
   getWorkItem,
+  releaseWorkItem,
   updateWorkItem,
   type WorkItem,
   type WorkItemStatus,
@@ -59,7 +60,7 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       receipt = await this.delegatePort.delegate(request);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      closeWorkItem(claimed.item, 'blocked', message, attemptId);
+      closeWorkItem(claimed.item, this.actorPeerId, 'blocked', message, attemptId);
       throw error;
     }
 
@@ -67,6 +68,7 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       receipt.status === 'succeeded' ? request.success_status || 'done' : 'blocked';
     closeWorkItem(
       claimed.item,
+      this.actorPeerId,
       terminalStatus,
       receipt.error || receipt.output || `agent execution ${receipt.status}`,
       attemptId,
@@ -99,11 +101,31 @@ export async function delegateCoordinatedAgentTask(
 
 function closeWorkItem(
   item: WorkItem,
+  actorPeerId: string,
   status: 'done' | 'review' | 'blocked',
   summary: string,
   attemptId?: string,
   receipt?: AgentExecutionReceipt
 ): void {
+  if (item.lease_id) {
+    releaseWorkItem({
+      itemId: item.item_id,
+      leaseId: item.lease_id,
+      actorPeerId,
+      expectedVersion: item.version,
+      nextStatus: status,
+      summary,
+      metadata: {
+        ...(item.metadata || {}),
+        ...(attemptId ? { attempt_id: attemptId } : {}),
+        ...(receipt?.runtime_id ? { runtime_id: receipt.runtime_id } : {}),
+        ...(receipt?.output_ref ? { output_ref: receipt.output_ref } : {}),
+        summary,
+        execution_status: receipt?.status || status,
+      },
+    });
+    return;
+  }
   updateWorkItem({
     itemId: item.item_id,
     expectedVersion: item.version,
