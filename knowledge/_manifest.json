@@ -7623,7 +7623,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 14068,
+      "size": 13988,
       "type": "json"
     },
     {
