@@ -308,6 +308,16 @@ describe('work coordination', () => {
       });
     });
 
+    it('replays durable completion evidence instead of discarding an orphan result', async () => {
+      const item = makeItem();
+      claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
+      await sleep(10);
+      const result = reapExpiredWorkLeases({ completedEvidence: () => true });
+      expect(result.replayed.map((entry) => entry.item_id)).toContain(item.item_id);
+      expect(listWorkItems()[0]).toMatchObject({ status: 'done', metadata: { replayed: true } });
+      expect(listWorkItemAttempts(item.item_id)[0].status).toBe('completed');
+    });
+
     it('a zombie holder cannot release after the item was re-claimed', async () => {
       const item = makeItem();
       const zombie = claimWorkItem({

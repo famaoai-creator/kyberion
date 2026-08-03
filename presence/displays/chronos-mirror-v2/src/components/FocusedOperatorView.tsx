@@ -326,7 +326,7 @@ function saveFocusedOperatorSelectedSessionId(selectedSessionId: string | null):
 }
 
 export function pickDefaultSessionId(
-  sessions: Payload['computerSessions'],
+  sessions: ReadonlyArray<Payload['computerSessions'][number]>,
   selectedSessionId: string | null
 ): string | null {
   if (selectedSessionId && sessions.some((session) => session.id === selectedSessionId)) {
@@ -350,7 +350,7 @@ export function pickDefaultSessionId(
 }
 
 export function resolveComputerSessionHotkeySelection(
-  sessions: Payload['computerSessions'],
+  sessions: ReadonlyArray<Payload['computerSessions'][number]>,
   currentSessionId: string | null,
   key: string
 ): string | null {

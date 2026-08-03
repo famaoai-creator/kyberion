@@ -1253,6 +1253,8 @@ export interface ReapWorkLeasesOptions {
    */
   maxClaimAttempts?: number;
   maxErrorAttempts?: number;
+  /** CE-12: inject the durable mission/run-journal evidence reader. */
+  completedEvidence?: (item: WorkItem) => boolean;
 }
 
 export interface ReapWorkLeasesResult {
@@ -1261,6 +1263,8 @@ export interface ReapWorkLeasesResult {
   recovered: WorkItem[];
   /** Items parked (status: blocked) after exhausting their attempt budget. */
   parked: WorkItem[];
+  /** Items completed by replaying durable evidence after a worker disappeared. */
+  replayed: WorkItem[];
 }
 
 export const DEFAULT_MAX_CLAIM_ATTEMPTS = 5;
@@ -1280,10 +1284,49 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
   const expired = expireWorkItemLeases(now);
   const recovered: WorkItem[] = [];
   const parked: WorkItem[] = [];
+  const replayed: WorkItem[] = [];
 
   for (const item of currentWorkItems()) {
     if (item.status !== 'in_progress') continue;
     if (activeLeaseForItem(item.item_id)) continue;
+
+    const completedEvidence =
+      options.completedEvidence?.(item) === true || item.metadata?.completed_evidence === true;
+    if (completedEvidence) {
+      const finalAttempt = finalizeWorkItemAttempt(item, 'completed', {
+        summary: 'completion evidence replayed after orphaned worker recovery',
+        metadata: { ...(item.metadata || {}), replayed: true },
+      });
+      const next = appendItemSnapshot({
+        ...item,
+        status: 'done',
+        version: item.version + 1,
+        updated_at: now,
+        lease_id: undefined,
+        claimed_at: undefined,
+        released_at: now,
+        claimed_by_peer_id: undefined,
+        claimed_by_user_id: undefined,
+        current_attempt_id: finalAttempt.currentAttemptId,
+        attempts: finalAttempt.attempts,
+        metadata: { ...(item.metadata || {}), replayed: true, replayed_at: now },
+      });
+      appendWorkItemAttemptEvent(
+        'item_attempt_completed',
+        item.item_id,
+        finalAttempt.attempt,
+        'completion evidence replayed after orphan recovery'
+      );
+      appendEvent({
+        eventType: 'item_attempt_completed',
+        itemId: item.item_id,
+        status: 'done',
+        note: 'orphaned completion replayed idempotently',
+        payload: { replayed: true },
+      });
+      replayed.push(next);
+      continue;
+    }
 
     const finalAttempt = finalizeWorkItemAttempt(item, 'released', {
       failureReason: 'lease_expired',
@@ -1345,7 +1388,7 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
     }
   }
 
-  return { expired, recovered, parked };
+  return { expired, recovered, parked, replayed };
 }
 
 export function handoffWorkItem(input: HandoffWorkItemInput): {

@@ -89,6 +89,8 @@ export interface AgentRuntimeSupervisorSnapshot {
   owner_id?: string;
   owner_type?: string;
   metadata?: Record<string, unknown>;
+  /** Runtime daemon may include a bounded log tail in status responses. */
+  log?: Array<Record<string, unknown>>;
 }
 
 export interface AgentRuntimeSupervisorAskPayload {

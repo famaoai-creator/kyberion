@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { NextRequest } from 'next/server';
 
 // route.ts calls guardRequest(req), which needs a NextRequest (cookies API
 // etc.) that a plain Request doesn't implement. Bypass it here (this test
@@ -13,7 +14,7 @@ vi.mock('../../../lib/api-guard', () => ({
 import { GET } from './route.js';
 
 describe('tenant-design route', () => {
-  const rootDir = path.join(process.cwd(), 'active/shared/tmp/tenant-design-route-fixture');
+  const rootDir = pathResolver.rootResolve('active/shared/tmp/tenant-design-route-fixture');
 
   beforeEach(() => {
     process.env.KYBERION_TENANT_DESIGN_ROOT = rootDir;
@@ -76,7 +77,7 @@ describe('tenant-design route', () => {
     );
 
     const response = await GET(
-      new Request(
+      new NextRequest(
         'http://localhost/api/tenant-design?customerId=tenant-a&brandName=Tenant%20A&designSystemId=tenant-a'
       )
     );
@@ -93,7 +94,7 @@ describe('tenant-design route', () => {
   });
 
   it('returns defaults when no tenant is specified', async () => {
-    const response = await GET(new Request('http://localhost/api/tenant-design'));
+    const response = await GET(new NextRequest('http://localhost/api/tenant-design'));
     const payload = (await response.json()) as {
       source: string;
       brand_name: string | null;
