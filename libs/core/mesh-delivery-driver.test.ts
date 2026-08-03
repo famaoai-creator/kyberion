@@ -67,7 +67,11 @@ describe('runMeshDeliveryPass', () => {
     const report = await runMeshDeliveryPass({
       senderPeerId: 'peer-a',
       dispatcher,
-      resolvePeer: () => PEER_B,
+      resolvePeer: (peerId, tenantId) => {
+        expect(peerId).toBe('peer-b');
+        expect(tenantId).toBe('demo');
+        return PEER_B;
+      },
     });
 
     expect(report.delivered).toBe(1);

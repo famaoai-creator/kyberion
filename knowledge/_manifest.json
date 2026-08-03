@@ -3801,13 +3801,13 @@
     {
       "path": "product/orchestration/peer-network.json",
       "tier": "public",
-      "size": 941,
+      "size": 79,
       "type": "json"
     },
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 4020,
+      "size": 4544,
       "type": "md"
     },
     {
@@ -3923,6 +3923,12 @@
       "tier": "public",
       "size": 1259,
       "type": "json"
+    },
+    {
+      "path": "product/orchestration/same-tenant-peer-quickstart.ja.md",
+      "tier": "public",
+      "size": 6252,
+      "type": "md"
     },
     {
       "path": "product/orchestration/schedule-coordination-playbook.md",
@@ -7143,7 +7149,7 @@
     {
       "path": "product/schemas/peer-network.schema.json",
       "tier": "public",
-      "size": 1215,
+      "size": 1565,
       "type": "json"
     },
     {
