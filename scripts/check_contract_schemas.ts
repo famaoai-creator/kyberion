@@ -1272,7 +1272,7 @@ function createChecks(): ContractCheck[] {
       validPayloads: [
         {
           kind: 'organization_work_resolution',
-          utterance: '今月の運用レポートを作る',
+          utterance: 'Prepare this month operation report',
           organization_id: 'org-schema-1',
           tier: 'confidential',
           tenant_slug: 'tenant-acme',
@@ -1283,7 +1283,7 @@ function createChecks(): ContractCheck[] {
           authority_class: 'normal',
           human_decision: 'pending',
           reasons: ['Recurring operation.'],
-          next_questions: ['operation_id を指定しますか？'],
+          next_questions: ['Specify operation_id?'],
           dry_run: true,
         },
       ],
