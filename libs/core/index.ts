@@ -931,6 +931,7 @@ export * from './capability-broker.js';
 export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
 export * from './organization-profile.js';
+export * from './organization-operating-model.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
 export * from './plugin-source-trust.js';

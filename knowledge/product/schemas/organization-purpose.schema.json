@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-purpose.schema.json",
+  "title": "Organization Purpose Record",
+  "type": "object",
+  "required": [
+    "version",
+    "organization_id",
+    "name",
+    "purpose",
+    "tier",
+    "owner_role",
+    "approval_state",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "purpose": { "type": "string", "minLength": 1 },
+    "principles": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["objective_id", "title"],
+        "properties": {
+          "objective_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "horizon": { "type": "string" },
+          "status": { "type": "string", "enum": ["planned", "active", "completed", "retired"] },
+          "owner_role": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "owner_role": { "type": "string", "minLength": 1 },
+    "approval_state": {
+      "type": "string",
+      "enum": ["draft", "pending_approval", "approved", "superseded"]
+    },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source_refs": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

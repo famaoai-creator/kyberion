@@ -1,4 +1,5 @@
 import * as AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 import * as path from 'node:path';
 import {
   extractPlaceholderNames,
@@ -22,6 +23,8 @@ import {
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+addFormats(ajv);
 
 type CatalogCheck = {
   id: string;
@@ -75,6 +78,16 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/specialist-catalog.json',
   },
+  {
+    id: 'organization-operating-model',
+    schemaPath: 'knowledge/product/schemas/organization-operating-model.schema.json',
+    dataPath: 'knowledge/product/orchestration/organization-operating-model.json',
+  },
+  {
+    id: 'organization-catalog',
+    schemaPath: 'knowledge/product/schemas/organization-catalog.schema.json',
+    dataPath: 'knowledge/product/orchestration/organization-catalog.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -84,6 +97,20 @@ function readJson<T>(relativePath: string): T {
 
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
   const schema = readJson<Record<string, unknown>>(check.schemaPath);
+  if (check.id === 'organization-catalog') {
+    for (const dependency of [
+      'organization-domain.schema.json',
+      'organization-capability.schema.json',
+      'organization-service.schema.json',
+    ]) {
+      const dependencySchema = readJson<Record<string, unknown>>(
+        `knowledge/product/schemas/${dependency}`
+      );
+      if (!ajv.getSchema(String(dependencySchema.$id || dependency))) {
+        ajv.addSchema(dependencySchema);
+      }
+    }
+  }
   const data = readJson<Record<string, unknown>>(check.dataPath);
   const validate = ajv.compile(schema);
   const ok = validate(data);

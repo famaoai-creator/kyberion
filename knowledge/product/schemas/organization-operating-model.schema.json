@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-operating-model.schema.json",
+  "title": "Organization Operating Model Catalog",
+  "type": "object",
+  "required": ["version", "work_shapes", "relationship_types", "resolution_examples"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "work_shapes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "management_unit", "lifecycle", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "solution_project",
+              "service_operation",
+              "routine_operation",
+              "incident_response",
+              "governance_cadence",
+              "improvement_experiment"
+            ]
+          },
+          "management_unit": { "type": "string", "minLength": 1 },
+          "lifecycle": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "accountable_role": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relationship_types": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "owns",
+              "supports",
+              "delivers",
+              "depends_on",
+              "responds_to",
+              "improves",
+              "governs"
+            ]
+          },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "resolution_examples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scenario_id", "title", "work_shape", "management_unit", "rationale"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "work_shape": {
+            "type": "string",
+            "enum": [
+              "solution_project",
+              "service_operation",
+              "routine_operation",
+              "incident_response",
+              "governance_cadence",
+              "improvement_experiment"
+            ]
+          },
+          "management_unit": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

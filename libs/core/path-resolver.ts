@@ -285,6 +285,40 @@ export function projectStateDir(
 }
 
 /**
+ * Returns the workspace directory for an organization operating model.
+ * Path: active/organizations/{tier}/{tenantOrShared}/{organizationId}/
+ */
+export function organizationWorkspaceDir(
+  organizationId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug = 'shared'
+): string {
+  const dir = path.join(
+    ACTIVE_ROOT,
+    'organizations',
+    tier,
+    normalizePathSegment(tenantSlug, 'shared'),
+    normalizePathSegment(organizationId, 'organization')
+  );
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
+ * Returns the live organization operational state directory.
+ * Path: active/organizations/{tier}/{tenantOrShared}/{organizationId}/state/
+ */
+export function organizationStateDir(
+  organizationId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug = 'shared'
+): string {
+  const dir = path.join(organizationWorkspaceDir(organizationId, tier, tenantSlug), 'state');
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
  * Returns the path to the audit directory for a given mission (tier-aware).
  */
 export function missionAuditDir(
@@ -438,6 +472,8 @@ export const pathResolver = {
   projectWorkspaceDir,
   projectOsDir,
   projectStateDir,
+  organizationWorkspaceDir,
+  organizationStateDir,
   missionAuditDir,
   missionEvidenceDir,
   findMissionPath,

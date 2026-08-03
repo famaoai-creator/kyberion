@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "organization_id": "sample-organization",
+  "tier": "public",
+  "domains": [
+    {
+      "version": "1.0.0",
+      "domain_id": "customer-operations",
+      "organization_id": "sample-organization",
+      "name": "Customer Operations",
+      "purpose": "Support reliable customer-facing work.",
+      "owner_role": "customer_success",
+      "capability_ids": ["customer-support"],
+      "service_ids": ["customer-support-service"],
+      "tier": "public",
+      "status": "active",
+      "updated_at": "2026-08-03T00:00:00.000Z"
+    }
+  ],
+  "capabilities": [
+    {
+      "version": "1.0.0",
+      "capability_id": "customer-support",
+      "organization_id": "sample-organization",
+      "domain_id": "customer-operations",
+      "name": "Customer Support",
+      "description": "Handle customer questions and follow-up.",
+      "owner_role": "customer_success",
+      "service_ids": ["customer-support-service"],
+      "tier": "public",
+      "status": "active",
+      "updated_at": "2026-08-03T00:00:00.000Z"
+    }
+  ],
+  "services": [
+    {
+      "version": "1.0.0",
+      "service_id": "customer-support-service",
+      "organization_id": "sample-organization",
+      "domain_id": "customer-operations",
+      "name": "Customer Support Desk",
+      "outcome": "Customers receive a timely and accountable response.",
+      "owner_role": "customer_success",
+      "consumers": ["customers", "account_team"],
+      "slo": {
+        "target": "First response within one business day",
+        "measurement_window": "rolling_30_days",
+        "objective": 0.95,
+        "unit": "fraction"
+      },
+      "slis": [
+        {
+          "sli_id": "first-response-time",
+          "name": "First response time",
+          "source_ref": "service://customer-support/tickets",
+          "freshness_seconds": 3600,
+          "threshold": "<= 1 business day"
+        }
+      ],
+      "runbook_refs": ["knowledge/product/orchestration/meeting-operations-playbook.md"],
+      "escalation_path": ["customer_success", "incident_commander"],
+      "dependencies": [],
+      "tier": "public",
+      "status": "active",
+      "updated_at": "2026-08-03T00:00:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "version": "1.0.0",
+  "work_shapes": [
+    {
+      "id": "solution_project",
+      "management_unit": "project",
+      "lifecycle": "initiate_define_design_build_validate_transfer_run",
+      "description": "期限・成果物・変更スコープを持つ新しいソリューションを作る活動。",
+      "accountable_role": "project_owner"
+    },
+    {
+      "id": "service_operation",
+      "management_unit": "service",
+      "lifecycle": "design_launch_run_improve_retire",
+      "description": "組織が継続的に提供するサービスまたは業務プロセスを運用する活動。",
+      "accountable_role": "service_owner"
+    },
+    {
+      "id": "routine_operation",
+      "management_unit": "operation",
+      "lifecycle": "schedule_execute_verify_record",
+      "description": "定期的で手順化されたオペレーションを実行し、結果を記録する活動。",
+      "accountable_role": "operations_owner"
+    },
+    {
+      "id": "incident_response",
+      "management_unit": "incident",
+      "lifecycle": "detect_contain_recover_review",
+      "description": "通常運用から外れた事象を収束させ、再発防止まで扱う活動。",
+      "accountable_role": "incident_commander"
+    },
+    {
+      "id": "governance_cadence",
+      "management_unit": "cadence",
+      "lifecycle": "prepare_decide_record_follow_up",
+      "description": "経営・組織運営上の定例的な判断、承認、レビューを行う活動。",
+      "accountable_role": "governance_owner"
+    },
+    {
+      "id": "improvement_experiment",
+      "management_unit": "experiment",
+      "lifecycle": "hypothesize_test_measure_decide",
+      "description": "運用やサービスの改善仮説を小さく検証し、標準化または撤回する活動。",
+      "accountable_role": "improvement_owner"
+    }
+  ],
+  "relationship_types": [
+    { "id": "owns", "description": "上位の組織・役割が対象の成果と判断を引き受ける。" },
+    { "id": "supports", "description": "対象の実行を補助する。" },
+    { "id": "delivers", "description": "サービスまたは成果を対象へ提供する。" },
+    { "id": "depends_on", "description": "対象の成立に別の対象が必要である。" },
+    { "id": "responds_to", "description": "事象・要求・変化を受けて対応する。" },
+    { "id": "improves", "description": "対象の品質・効率・安全性を改善する。" },
+    { "id": "governs", "description": "方針・判断・制約を定める。" }
+  ],
+  "resolution_examples": [
+    {
+      "scenario_id": "new-customer-portal",
+      "title": "新しい顧客ポータルを作る",
+      "work_shape": "solution_project",
+      "management_unit": "project",
+      "rationale": "期限と成果物を持つ新規ソリューションのため。"
+    },
+    {
+      "scenario_id": "monthly-billing",
+      "title": "月次請求を継続して処理する",
+      "work_shape": "routine_operation",
+      "management_unit": "operation",
+      "rationale": "反復実行と実行記録が中心で、プロジェクト成果物を作らないため。"
+    },
+    {
+      "scenario_id": "customer-support",
+      "title": "顧客サポート窓口を提供する",
+      "work_shape": "service_operation",
+      "management_unit": "service",
+      "rationale": "継続的に提供するサービスとサービス水準を管理するため。"
+    },
+    {
+      "scenario_id": "production-outage",
+      "title": "本番障害を収束させる",
+      "work_shape": "incident_response",
+      "management_unit": "incident",
+      "rationale": "通常運用から逸脱した事象の収束と復旧が目的のため。"
+    },
+    {
+      "scenario_id": "quarterly-review",
+      "title": "四半期の組織レビューを行う",
+      "work_shape": "governance_cadence",
+      "management_unit": "cadence",
+      "rationale": "定例の判断・承認・フォローアップを管理するため。"
+    },
+    {
+      "scenario_id": "support-automation-pilot",
+      "title": "サポート自動化を小さく試す",
+      "work_shape": "improvement_experiment",
+      "management_unit": "experiment",
+      "rationale": "仮説検証の結果で標準化・撤回を判断するため。"
+    }
+  ]
+}
