@@ -39,7 +39,11 @@
   },
   "tenant_scope": {
     "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
-    "protected_prefixes": ["knowledge/confidential/"],
+    "protected_prefixes": [
+      "knowledge/confidential/",
+      "active/organizations/personal/",
+      "active/organizations/confidential/"
+    ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
       "knowledge/confidential/heuristics/",

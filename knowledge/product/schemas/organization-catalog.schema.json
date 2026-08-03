@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-catalog.schema.json",
+  "title": "Organization Domain Capability Service Catalog",
+  "type": "object",
+  "required": ["version", "organization_id", "tier", "domains", "capabilities", "services"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "domains": { "type": "array", "items": { "$ref": "organization-domain.schema.json" } },
+    "capabilities": { "type": "array", "items": { "$ref": "organization-capability.schema.json" } },
+    "services": { "type": "array", "items": { "$ref": "organization-service.schema.json" } }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}
