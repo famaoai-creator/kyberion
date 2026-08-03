@@ -77,7 +77,9 @@ function loadPolicy(): PolicyLoad {
 function isProtectedTierPath(relativePath: string): boolean {
   return (
     pathStartsWith(relativePath, 'knowledge/personal') ||
-    pathStartsWith(relativePath, 'knowledge/confidential')
+    pathStartsWith(relativePath, 'knowledge/confidential') ||
+    pathStartsWith(relativePath, 'active/organizations/personal') ||
+    pathStartsWith(relativePath, 'active/organizations/confidential')
   );
 }
 
@@ -534,8 +536,16 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
  */
 export function detectTier(filePath: string): TierLevel {
   const resolved = path.resolve(filePath);
-  if (resolved.includes('/knowledge/personal/')) return 'personal';
-  if (resolved.includes('/knowledge/confidential/')) return 'confidential';
+  if (
+    resolved.includes('/knowledge/personal/') ||
+    resolved.includes('/active/organizations/personal/')
+  )
+    return 'personal';
+  if (
+    resolved.includes('/knowledge/confidential/') ||
+    resolved.includes('/active/organizations/confidential/')
+  )
+    return 'confidential';
   return 'public';
 }
 
@@ -553,12 +563,21 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     };
   }
 
-  if (!pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
+  const organizationStatePath =
+    pathStartsWith(relativePath, 'active/organizations/personal') ||
+    pathStartsWith(relativePath, 'active/organizations/confidential') ||
+    pathStartsWith(relativePath, 'active/organizations/public');
+  const organizationTier = relativePath.match(
+    /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
+  if (!pathStartsWith(relativePath, 'knowledge') && !organizationStatePath)
+    return { allowed: true };
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
   if (
     !pathStartsWith(relativePath, 'knowledge/personal') &&
-    !pathStartsWith(relativePath, 'knowledge/confidential')
+    !pathStartsWith(relativePath, 'knowledge/confidential') &&
+    !organizationStatePath
   ) {
     return { allowed: true };
   }
@@ -632,6 +651,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (pathStartsWith(relativePath, 'knowledge/confidential')) {
+    return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
+  }
+  if (organizationTier === 'personal') {
+    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+  }
+  if (organizationTier === 'confidential') {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
 

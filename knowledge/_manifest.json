@@ -2157,7 +2157,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19508,
+      "size": 19604,
       "type": "json"
     },
     {
@@ -3781,6 +3781,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/organization-catalog.json",
+      "tier": "public",
+      "size": 2189,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/organization-discovery-reports.md",
       "tier": "public",
       "size": 7948,
@@ -3791,6 +3797,12 @@
       "tier": "public",
       "size": 3318,
       "type": "md"
+    },
+    {
+      "path": "product/orchestration/organization-operating-model.json",
+      "tier": "public",
+      "size": 4326,
+      "type": "json"
     },
     {
       "path": "product/orchestration/organization-selection-guide.md",
@@ -7057,6 +7069,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/organization-cadence.schema.json",
+      "tier": "public",
+      "size": 1595,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-capability.schema.json",
+      "tier": "public",
+      "size": 1670,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/organization-catalog-report.example.json",
       "tier": "public",
       "size": 1064,
@@ -7069,6 +7093,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/organization-catalog.schema.json",
+      "tier": "public",
+      "size": 1126,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-decision.schema.json",
+      "tier": "public",
+      "size": 2121,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/organization-discovery-report.example.json",
       "tier": "public",
       "size": 3472,
@@ -7078,6 +7114,54 @@
       "path": "product/schemas/organization-discovery-report.schema.json",
       "tier": "public",
       "size": 2353,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-domain.schema.json",
+      "tier": "public",
+      "size": 1652,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-incident.schema.json",
+      "tier": "public",
+      "size": 1853,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-learning-candidate.schema.json",
+      "tier": "public",
+      "size": 1925,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-operating-model.schema.json",
+      "tier": "public",
+      "size": 2697,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-operation-run.schema.json",
+      "tier": "public",
+      "size": 1616,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-operation-state.schema.json",
+      "tier": "public",
+      "size": 1581,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-operation.schema.json",
+      "tier": "public",
+      "size": 3118,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-operational-state.schema.json",
+      "tier": "public",
+      "size": 1957,
       "type": "json"
     },
     {
@@ -7111,6 +7195,24 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/organization-purpose.schema.json",
+      "tier": "public",
+      "size": 2028,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-service-state.schema.json",
+      "tier": "public",
+      "size": 1925,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-service.schema.json",
+      "tier": "public",
+      "size": 3029,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/organization-team-template-catalog.schema.json",
       "tier": "public",
       "size": 2301,
@@ -7120,6 +7222,12 @@
       "path": "product/schemas/organization-work-loop.schema.json",
       "tier": "public",
       "size": 9084,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/organization-work-resolution.schema.json",
+      "tier": "public",
+      "size": 2877,
       "type": "json"
     },
     {
