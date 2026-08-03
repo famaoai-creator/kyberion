@@ -836,6 +836,7 @@ function classifyOrganizationWork(
       managementUnit: 'incident',
       confidence: 0.93,
       pattern: /障害|インシデント|緊急|停止|エラー|outage|incident|emergency|down/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '障害・緊急対応を示す語が含まれています。',
     },
     {
@@ -843,6 +844,7 @@ function classifyOrganizationWork(
       managementUnit: 'cadence',
       confidence: 0.9,
       pattern: /経営会議|レビュー|承認|決裁|監査|予算|方針|governance|review|approval|audit|budget/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '組織判断・承認・定例会議に関する語が含まれています。',
     },
     {
@@ -851,6 +853,7 @@ function classifyOrganizationWork(
       confidence: 0.88,
       pattern:
         /月次|週次|毎日|定期|定常|請求|レポート|監視|daily|weekly|monthly|routine|scheduled|report|monitor/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '反復・定期運用を示す語が含まれています。',
     },
     {
@@ -858,6 +861,7 @@ function classifyOrganizationWork(
       managementUnit: 'service',
       confidence: 0.84,
       pattern: /サービス|窓口|運用|顧客対応|サポート|support|service|customer/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: 'サービス提供・継続運用を示す語が含まれています。',
     },
     {
@@ -865,6 +869,7 @@ function classifyOrganizationWork(
       managementUnit: 'experiment',
       confidence: 0.82,
       pattern: /改善|試す|実験|パイロット|pilot|experiment|optimize|improve/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '改善・実験を示す語が含まれています。',
     },
     {
@@ -872,6 +877,7 @@ function classifyOrganizationWork(
       managementUnit: 'project',
       confidence: 0.8,
       pattern: /作る|開発|構築|導入|新しい|project|build|develop|implement|launch/,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '成果物の構築・導入を示す語が含まれています。',
     },
   ];
@@ -882,6 +888,7 @@ function classifyOrganizationWork(
       workShape: 'solution_project',
       managementUnit: 'project',
       confidence: 0.62,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '標準インテントがプロジェクト開始系として解決されました。',
     };
   }
@@ -890,6 +897,7 @@ function classifyOrganizationWork(
       workShape: 'service_operation',
       managementUnit: 'service',
       confidence: 0.58,
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       reason: '標準インテントがタスク実行系として解決されました。',
     };
   }
@@ -897,6 +905,7 @@ function classifyOrganizationWork(
     workShape: 'routine_operation',
     managementUnit: 'operation',
     confidence: 0.4,
+    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
     reason: '明確な分類語がないため、定常運用候補として仮置きしました。',
   };
 }
@@ -949,12 +958,15 @@ export function resolveOrganizationWork(
       cadence: 'cadence_id',
       experiment: 'experiment_id',
     }[classification.managementUnit];
+    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
     if (parentLabel) nextQuestions.push(`${parentLabel} を指定しますか？`);
   }
   if (classification.confidence < 0.7) {
+    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
     nextQuestions.push('この分類を人間が確認・修正しますか？');
   }
   if (authorityClass === 'high' || authorityClass === 'approval_required') {
+    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
     nextQuestions.push('実行前に責任者の承認を取得しますか？');
   }
   const result: OrganizationWorkResolution = {
@@ -974,7 +986,8 @@ export function resolveOrganizationWork(
       kind: classification.managementUnit,
       ...(parentId ? { id: parentId } : {}),
       reason: parentId
-        ? '入力されたコンテキストを親候補として採用しました。'
+        ? // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
+          '入力されたコンテキストを親候補として採用しました。'
         : classification.reason,
     },
     confidence: classification.confidence,
@@ -983,8 +996,11 @@ export function resolveOrganizationWork(
     reasons: [
       classification.reason,
       ...(packet.selected_intent_id
-        ? [`標準インテント ${packet.selected_intent_id} を参照しました。`]
-        : ['標準インテントの確定候補はありません。']),
+        ? // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
+          [`標準インテント ${packet.selected_intent_id} を参照しました。`]
+        : // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
+          ['標準インテントの確定候補はありません。']),
+      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
       'この結果は組織の管理単位を提案するだけで、実行や状態変更は行いません。',
     ],
     next_questions: nextQuestions,
