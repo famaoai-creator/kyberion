@@ -10,6 +10,7 @@ import {
   listSurfaceOutboxMessages,
   resolveIntentTrackGate,
   saveProjectTrackRecord,
+  writeIntentGoalHandoff,
 } from '@agent/core';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
@@ -387,6 +388,35 @@ function persistIntentTrackGate(
   saveProjectTrackRecord(intentTrackGate.track_record);
 }
 
+/**
+ * Manual CLI mission creation used to have no way to carry the user's goal
+ * unless the caller prepared an intent-handoff JSON file first. That made a
+ * bare `create` emit a company-vision origin snapshot and a subsequent
+ * `start` emit a generated "Start mission ..." snapshot; the drift gate then
+ * correctly classified two different machine placeholders as blocking user
+ * intent drift. Keep the file-based contract, but make the common CLI path
+ * create the governed handoff for the operator.
+ */
+function resolveIntentGoalHandoffPath(
+  context: MissionControllerRoutingContext,
+  missionId: string | undefined
+): string | undefined {
+  const explicit = context.getOptionValue('--intent-goal', context.argv);
+  if (explicit) return explicit;
+  const goal = context.getOptionValue('--goal', context.argv)?.trim();
+  if (!goal || !missionId) return undefined;
+  return writeIntentGoalHandoff(missionId, {
+    source_text: goal,
+    correlation_id: context.getOptionValue('--correlation-id', context.argv),
+    origin_intent_id: context.getOptionValue('--intent-id', context.argv),
+    origin_utterance_ref: context.getOptionValue('--origin-utterance-ref', context.argv),
+    goal: {
+      summary: goal,
+      success_condition: context.getOptionValue('--success-condition', context.argv),
+    },
+  });
+}
+
 function syncRoutingDecisionSummary(
   context: MissionControllerRoutingContext,
   missionId: string,
@@ -434,9 +464,7 @@ export async function runMissionControllerAction(
       await context.createMission(
         arg1!,
         (createInput?.tier || positionalTier || 'confidential') as
-          | 'personal'
-          | 'confidential'
-          | 'public',
+          'personal' | 'confidential' | 'public',
         createInput?.tenantId,
         createInput?.missionType,
         createInput?.visionRef,
@@ -446,7 +474,7 @@ export async function runMissionControllerAction(
         createInput?.organizationId,
         {
           ephemeral: context.argv.includes('--ephemeral'),
-          intentGoal: getValue('--intent-goal', context.argv),
+          intentGoal: resolveIntentGoalHandoffPath(context, arg1),
         }
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
@@ -505,7 +533,7 @@ export async function runMissionControllerAction(
         input?.organizationId,
         {
           ephemeral: context.argv.includes('--ephemeral'),
-          intentGoal: getValue('--intent-goal', context.argv),
+          intentGoal: resolveIntentGoalHandoffPath(context, arg1),
           force: context.argv.includes('--force'),
         }
       );
@@ -687,8 +715,7 @@ export async function runMissionControllerAction(
       await context.promotePendingMemoryCandidates({
         executionRole:
           (getValue('--execution-role', context.argv) as
-            | 'mission_controller'
-            | 'chronos_gateway') || 'mission_controller',
+            'mission_controller' | 'chronos_gateway') || 'mission_controller',
         note: getValue('--note', context.argv),
         supersedes: getValue('--supersedes', context.argv),
         dryRun: context.argv.includes('--dry-run'),
@@ -724,9 +751,7 @@ export async function runMissionControllerAction(
       const findingsRaw = getValue('--findings', context.argv);
       const findings = findingsRaw ? JSON.parse(findingsRaw) : [];
       const reviewerTeamRole = getValue('--reviewer-team-role', context.argv) as
-        | 'reviewer'
-        | 'qa'
-        | undefined;
+        'reviewer' | 'qa' | undefined;
       const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
       await context.recordArtifactReview(
         arg1!,

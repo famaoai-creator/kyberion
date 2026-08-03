@@ -71,7 +71,7 @@
     },
     {
       "file": "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts",
-      "count": 1,
+      "count": 2,
       "classification": "legit-tmp",
       "note": "STT intermediate wav"
     },

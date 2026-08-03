@@ -14,10 +14,9 @@ const MAX_MEMORY_SIZE = 5000;
 export class SensoryMemory {
   private static instance: SensoryMemory;
   private buffer: NerveMessage[] = [];
+  private hydrated = false;
 
-  private constructor() {
-    this.hydrate();
-  }
+  private constructor() {}
 
   public static getInstance(): SensoryMemory {
     if (!SensoryMemory.instance) {
@@ -27,6 +26,8 @@ export class SensoryMemory {
   }
 
   private hydrate() {
+    if (this.hydrated) return;
+    this.hydrated = true;
     try {
       this.buffer.push(...loadRecentStimuli(MAX_MEMORY_SIZE));
     } catch (err) {
@@ -35,12 +36,14 @@ export class SensoryMemory {
   }
 
   public remember(stimulus: NerveMessage) {
+    this.hydrate();
     this.buffer.push(stimulus);
     if (this.buffer.length > MAX_MEMORY_SIZE) this.buffer.shift();
     appendStimulus(stimulus);
   }
 
   public getLatestByIntent(intent: string): NerveMessage | undefined {
+    this.hydrate();
     return this.buffer
       .slice()
       .reverse()
@@ -48,6 +51,7 @@ export class SensoryMemory {
   }
 
   public hasActiveContext(keyword: string, timeWindowMs: number): boolean {
+    this.hydrate();
     const cutoff = Date.now() - timeWindowMs;
     return this.buffer.some((msg) => {
       const ts = new Date(msg.ts).getTime();

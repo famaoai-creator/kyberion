@@ -399,6 +399,7 @@ export {
   normalizeWorkItemLabels,
   releaseWorkItem,
   renewWorkItemLease,
+  recordMissionHandoff,
   setWorkCoordinationNamespace,
   WorkCoordinationError,
   updateWorkItem,
@@ -410,6 +411,7 @@ export type {
   CreateBoardInput,
   CreateWorkItemInput,
   HandoffWorkItemInput,
+  RecordMissionHandoffInput,
   ReleaseWorkItemInput,
   RenewWorkItemLeaseInput,
   UpdateWorkItemInput,
@@ -693,6 +695,7 @@ export {
   LlmApiOcrProvider,
   LocalVlmOcrProvider,
   TesseractOcrProvider,
+  WindowsNativeOcrProvider,
   ocrImage,
   ocrImageWithRouter,
   AdaptivePolicyRouter as OcrAdaptivePolicyRouter,
@@ -1020,6 +1023,15 @@ export type {
   AgentExecutionReceipt,
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
+export {
+  CoordinatedAgentExecutionPort,
+  delegateCoordinatedAgentTask,
+  getCoordinatedAgentExecutionPort,
+} from './coordinated-agent-execution-port.js';
+export type {
+  CoordinatedAgentExecutionReceipt,
+  CoordinatedAgentTaskEnvelope,
+} from './coordinated-agent-execution-port.js';
 export {
   getActuatorForwardingPort,
   registerActuatorForwardingPort,
@@ -2022,6 +2034,10 @@ export * from './artifact-registry.js';
 export * from './control-plane-client.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
+export * from './os-automation-platform.js';
+export * from './platform-command-adapters.js';
+export * from './desktop-launch-adapter.js';
+export * from './windows-native-image-generation-bridge.js';
 export * from './os-automation-bridge.js';
 export * from './macos-automation-bridge.js';
 export * from './os-app-adapters.js';
@@ -2388,6 +2404,11 @@ export type {
   SoftwareQualityReportSummary,
 } from './software-quality.js';
 export * from './software-quality-operations.js';
+export * from './windows-local-assist-bridge.js';
+export * from './windows-native-image-recognition-bridge.js';
+export * from './image-description-types.js';
+export * from './image-description-bridge.js';
+export * from './local-assist-bridge.js';
 export {
   evaluateQualityContract,
   evaluateDefinitionOfReady,
@@ -2398,6 +2419,11 @@ export {
   buildSoftwareQualityReport,
 } from './software-quality.js';
 export * from './delegation-notifications.js';
+export * from './work-graph.js';
+export {
+  ReasoningBackendExecutionAdapter,
+  delegateWorkItemWithReasoningBackend,
+} from './reasoning-backend-execution-adapter.js';
 
 // SO-01: governed in-process facade over the mission lifecycle verbs
 // (start/create/checkpoint/verify/finish/staff/prewarm/dispatch/pause/resume/status).

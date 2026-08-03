@@ -227,6 +227,34 @@
       "notes": "Runtime dependency for the Qwen3-STT bridge used by voice capture flows."
     },
     {
+      "tool_id": "faster_whisper",
+      "display_name": "faster-whisper STT Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["win32", "linux"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import faster_whisper; print(\"ok\")"],
+        "description": "Probe faster-whisper availability through an import check."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "faster-whisper"],
+        "description": "Install faster-whisper into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import faster_whisper; print(\"ok\")"],
+        "description": "Re-check the installed faster-whisper runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/faster-whisper",
+      "notes": "Windows/Linux Whisper STT bridge; configure KYBERION_WINDOWS_STT_BACKEND=faster_whisper."
+    },
+    {
       "tool_id": "kokoro_tts",
       "display_name": "Kokoro TTS Runtime",
       "ecosystem": "python",
