@@ -69,13 +69,13 @@ function getRateLimitKey(req: NextRequest): string {
 
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveToken(req);
-  const ip = getClientIP(req);
+  const directIp = (req as NextRequest & { ip?: string }).ip;
   // Self-hosted Next.js commonly leaves NextRequest.ip unset. In that case,
   // use the direct request hostname as a local signal; forwarded requests
   // must still provide an explicit token because the proxy owns the origin.
   const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   const isLocal =
-    (ip !== 'unknown' && isLoopback(ip)) ||
+    (directIp !== undefined && isLoopback(directIp)) ||
     (isLoopbackHostname(req.nextUrl?.hostname) && (!forwardedFor || isLoopback(forwardedFor)));
 
   if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {

@@ -8,7 +8,11 @@ import {
   createMeshHubPeerMessagingAdapter,
   type MeshHubDispatchInput,
 } from './mesh-hub-peer-messaging-adapter.js';
-import { resolvePeerRecord, type PeerNetworkPeerRecord } from './peer-messaging.js';
+import {
+  loadPeerNetworkCatalog,
+  resolvePeerRecord,
+  type PeerNetworkPeerRecord,
+} from './peer-messaging.js';
 import type { MeshDeliveryRecord, MeshRequest } from './mesh-hub-contract.js';
 import type { MeshRetryPolicy } from './mesh-message-broker.js';
 import { logger } from './core.js';
@@ -50,7 +54,7 @@ export interface MeshDeliveryPassOptions {
   batchLimit?: number;
   now?: string;
   dispatcher?: MeshDeliveryDispatcher;
-  resolvePeer?: (peerId: string) => PeerNetworkPeerRecord | null;
+  resolvePeer?: (peerId: string, tenantId?: string) => PeerNetworkPeerRecord | null;
   retryPolicy?: Partial<MeshRetryPolicy>;
   dispatchTimeoutMs?: number;
   /**
@@ -159,7 +163,10 @@ async function runMeshDeliveryPassUnfenced(
       peerId: options.senderPeerId,
       sharedSecret: options.sharedSecret || '',
     });
-  const resolvePeer = options.resolvePeer || ((peerId: string) => resolvePeerRecord(peerId));
+  const resolvePeer =
+    options.resolvePeer ||
+    ((peerId: string, tenantId?: string) =>
+      resolvePeerRecord(peerId, loadPeerNetworkCatalog(tenantId ? { tenantId } : {})));
 
   const report: MeshDeliveryPassReport = {
     expired: 0,
@@ -182,7 +189,7 @@ async function runMeshDeliveryPassUnfenced(
   for (const delivery of claimed) {
     const peerId = delivery.route.selected_peer_id;
     const routable = delivery.route.decision === 'direct' && peerId;
-    const peer = routable ? resolvePeer(peerId as string) : null;
+    const peer = routable ? resolvePeer(peerId as string, delivery.tenant_scope.tenant_id) : null;
 
     if (!peer || !peer.base_url) {
       // Unroutable deliveries go back through the broker's retry state machine
