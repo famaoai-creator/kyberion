@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
+import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -124,6 +125,8 @@ export interface ResolvedCreativeDesign {
   typography: CreativeDesignTypography;
   spacing: CreativeDesignSpacing;
   constraints: CreativeDesignConstraints;
+  /** CE-09: one derived palette shared by web, media, and operator surfaces. */
+  accent_palette: CeAccentPalette;
   logo_url?: string;
   projection: CreativeProjection;
 }
@@ -133,6 +136,9 @@ export interface ResolveCreativeDesignInput {
   tenantSlug?: string;
   /** light/dark override. Defaults: video/prompt → dark, others → light. */
   mode?: CreativeDesignMode;
+  /** Optional tenant accent override; tone is deliberately a single bounded value. */
+  accent?: string;
+  tone?: number;
 }
 
 interface BrandTokensFile {
@@ -719,6 +725,10 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
     typography,
     spacing,
     constraints,
+    accent_palette: deriveAccentPalette(
+      input.accent || colors.accent,
+      input.tone ?? (mode === 'dark' ? 0.65 : 0.4)
+    ),
     ...(logoUrl ? { logo_url: logoUrl } : {}),
     projection,
   };

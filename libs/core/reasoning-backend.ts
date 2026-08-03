@@ -45,6 +45,7 @@ import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-f
 import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import { AdvisoryPolicyViolation } from './ce-adoption.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -447,6 +448,8 @@ export interface ReasoningCallOptions {
   model_tier?: 'fast' | 'standard' | 'deep';
   /** Cancellation propagated by delegateTaskHandle to killable providers. */
   signal?: AbortSignal;
+  /** CE-11: this call is advice-only and must never produce a tool call. */
+  advisory?: boolean;
 }
 
 /**
@@ -1189,6 +1192,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         continue;
       }
       recordCandidateServed('generateWithTools', primaryCandidate, candidate, errors);
+      if (options?.advisory && (attempt.result.toolCalls?.length ?? 0) > 0) {
+        throw new AdvisoryPolicyViolation();
+      }
       return attempt.result;
     }
 

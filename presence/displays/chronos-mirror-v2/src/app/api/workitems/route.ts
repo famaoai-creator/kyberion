@@ -4,7 +4,15 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';
 
-const KANBAN_STATUSES: WorkItemStatus[] = ['backlog', 'ready', 'in_progress', 'review', 'done'];
+const KANBAN_STATUSES: WorkItemStatus[] = [
+  'backlog',
+  'ready',
+  'in_progress',
+  'blocked',
+  'review',
+  'done',
+  'archived',
+];
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);

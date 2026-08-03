@@ -1,0 +1,52 @@
+{
+  "pipeline_id": "ce-adoption-validation",
+  "version": "1.0.0",
+  "action": "pipeline",
+  "description": "Deterministic validation envelope for the claw-empire adoption slice (CE-01..12).",
+  "context": {
+    "mission_id": "MSN-CE-ADOPTION-20260802"
+  },
+  "steps": [
+    {
+      "id": "build",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "build", "type": "ShellResult" },
+      "params": { "cmd": "pnpm run build" }
+    },
+    {
+      "id": "core-contract-tests",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "core_contract_tests", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm exec vitest run libs/core/ce-adoption.test.ts libs/core/worker-event-stream.test.ts libs/core/work-coordination.test.ts"
+      }
+    },
+    {
+      "id": "chronos-contract-tests",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "chronos_contract_tests", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm --dir presence/displays/chronos-mirror-v2 exec vitest run src/lib/collaboration-stream.test.ts src/lib/live-sync.test.ts"
+      }
+    },
+    {
+      "id": "contrast",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "contrast", "type": "ShellResult" },
+      "params": { "cmd": "pnpm run check:chronos-dom-contrast" }
+    },
+    {
+      "id": "report",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["build", "core_contract_tests", "chronos_contract_tests", "contrast"],
+      "params": {
+        "message": "CE adoption validation completed for mission MSN-CE-ADOPTION-20260802."
+      }
+    }
+  ]
+}

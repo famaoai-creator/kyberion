@@ -593,29 +593,6 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
   }, [data, selectedTraceId]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isEditableHotkeyTarget(event.target)) return;
-      if (!visibleTraces.length) return;
-
-      const normalized = event.key.toLowerCase();
-      if (normalized === 'r') {
-        event.preventDefault();
-        setRawTraceVisible((current) => !current);
-        return;
-      }
-
-      const nextTraceId = resolveTraceHotkeySelection(visibleTraces, selectedTraceId, event.key);
-      if (!nextTraceId) return;
-      event.preventDefault();
-      setSelectedTraceId(nextTraceId);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTraceId, visibleTraces]);
-
-  useEffect(() => {
     if (!selectedTraceId) {
       setSelectedTrace(null);
       return;
@@ -710,6 +687,28 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       }),
     [sort, traces]
   );
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableHotkeyTarget(event.target)) return;
+      if (!visibleTraces.length) return;
+
+      const normalized = event.key.toLowerCase();
+      if (normalized === 'r') {
+        event.preventDefault();
+        setRawTraceVisible((current) => !current);
+        return;
+      }
+
+      const nextTraceId = resolveTraceHotkeySelection(visibleTraces, selectedTraceId, event.key);
+      if (!nextTraceId) return;
+      event.preventDefault();
+      setSelectedTraceId(nextTraceId);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTraceId, visibleTraces]);
   const selectedSummary = useMemo(
     () =>
       visibleTraces.find((trace) => trace.traceId === selectedTraceId) || visibleTraces[0] || null,

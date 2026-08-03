@@ -27,6 +27,8 @@ import {
   listInboxEntries,
   listProcessImprovementProposals,
   listAgentRuntimeSnapshots,
+  composeOfficeSnapshot as composeChronosOfficeSnapshot,
+  type OfficeSnapshot as ChronosOfficeSnapshot,
   loadOrganizationProfile,
   listTaskSessions,
   loadAgentProfileIndex,
@@ -117,6 +119,8 @@ interface OfficeSnapshot {
   proposals: Array<{ id: string; status: string; kind: string }>;
   task_status_counts: Record<string, number>;
   role_counts: Record<string, number>;
+  /** CE-03: shared projection consumed by Chronos and the offline renderer. */
+  chronos_projection: ChronosOfficeSnapshot;
 }
 
 function readJson<T>(filePath: string): T | null {
@@ -539,6 +543,19 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     proposals,
     task_status_counts: taskStatusCounts,
     role_counts: roleCounts,
+    chronos_projection: composeChronosOfficeSnapshot({
+      agents: rooms.flatMap((room) =>
+        room.tasks
+          .filter((task) => Boolean(task.agent))
+          .map((task) => ({
+            agent_id: task.agent as string,
+            status: task.status,
+            title: task.description,
+            team_role: task.role,
+            mission_id: room.mission_id,
+          }))
+      ),
+    }),
   };
 }
 
