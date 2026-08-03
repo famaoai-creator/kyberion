@@ -1,4 +1,4 @@
-export type MissionAssetCategory = "deliverables" | "artifacts" | "outputs" | "evidence";
+export type MissionAssetCategory = 'deliverables' | 'artifacts' | 'outputs' | 'evidence';
 
 export interface MissionAssetSummary {
   path: string;
@@ -34,7 +34,12 @@ export interface MissionProgressSnapshot {
   generatedAssets: MissionAssetSummary[];
 }
 
-export function parseTaskBoard(taskBoard: string): Omit<MissionProgressSnapshot, "missionId" | "nextTasksTotal" | "nextTasksPending" | "nextTasksCompleted"> {
+export function parseTaskBoard(
+  taskBoard: string
+): Omit<
+  MissionProgressSnapshot,
+  'missionId' | 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted'
+> {
   const statusMatch = taskBoard.match(/^## Status:\s+(.+)$/m);
   const stepLines = taskBoard.match(/^- \[(?: |x|~)\] Step .+$/gm) || [];
   let boardStepsDone = 0;
@@ -42,9 +47,9 @@ export function parseTaskBoard(taskBoard: string): Omit<MissionProgressSnapshot,
   let boardStepsPending = 0;
 
   for (const line of stepLines) {
-    if (line.includes("[x]")) {
+    if (line.includes('[x]')) {
       boardStepsDone += 1;
-    } else if (line.includes("[~]")) {
+    } else if (line.includes('[~]')) {
       boardStepsActive += 1;
     } else {
       boardStepsPending += 1;
@@ -52,21 +57,25 @@ export function parseTaskBoard(taskBoard: string): Omit<MissionProgressSnapshot,
   }
 
   return {
-    boardStatus: statusMatch?.[1]?.trim() || "Unknown",
+    boardStatus: statusMatch?.[1]?.trim() || 'Unknown',
     boardStepsTotal: stepLines.length,
     boardStepsDone,
     boardStepsActive,
     boardStepsPending,
+    dependencies: [],
+    generatedAssets: [],
   };
 }
 
-export function summarizeNextTasks(tasks: Array<{ status?: string }>): Pick<MissionProgressSnapshot, "nextTasksTotal" | "nextTasksPending" | "nextTasksCompleted"> {
+export function summarizeNextTasks(
+  tasks: Array<{ status?: string }>
+): Pick<MissionProgressSnapshot, 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted'> {
   let nextTasksPending = 0;
   let nextTasksCompleted = 0;
 
   for (const task of tasks) {
-    const status = task.status || "planned";
-    if (status === "completed" || status === "done" || status === "accepted") {
+    const status = task.status || 'planned';
+    if (status === 'completed' || status === 'done' || status === 'accepted') {
       nextTasksCompleted += 1;
     } else {
       nextTasksPending += 1;
@@ -80,13 +89,19 @@ export function summarizeNextTasks(tasks: Array<{ status?: string }>): Pick<Miss
   };
 }
 
-export function extractMissionDependencies(relationships: Record<string, unknown> | undefined | null): string[] {
-  if (!relationships || typeof relationships !== "object") return [];
+export function extractMissionDependencies(
+  relationships: Record<string, unknown> | undefined | null
+): string[] {
+  if (!relationships || typeof relationships !== 'object') return [];
   const prerequisites = Array.isArray(relationships.prerequisites)
-    ? relationships.prerequisites.filter((value): value is string => typeof value === "string" && value.length > 0)
+    ? relationships.prerequisites.filter(
+        (value): value is string => typeof value === 'string' && value.length > 0
+      )
     : [];
   const dependsOn = Array.isArray((relationships as Record<string, unknown>).depends_on)
-    ? ((relationships as Record<string, unknown>).depends_on as unknown[]).filter((value): value is string => typeof value === "string" && value.length > 0)
+    ? ((relationships as Record<string, unknown>).depends_on as unknown[]).filter(
+        (value): value is string => typeof value === 'string' && value.length > 0
+      )
     : [];
   return Array.from(new Set([...prerequisites, ...dependsOn]));
 }
@@ -94,7 +109,7 @@ export function extractMissionDependencies(relationships: Record<string, unknown
 export function normalizeMissionAssets(assets: MissionAssetSummary[]): MissionAssetSummary[] {
   const seen = new Set<string>();
   return assets
-    .filter((asset) => asset.path && !asset.path.endsWith("/"))
+    .filter((asset) => asset.path && !asset.path.endsWith('/'))
     .filter((asset) => {
       if (seen.has(asset.path)) return false;
       seen.add(asset.path);
@@ -105,9 +120,11 @@ export function normalizeMissionAssets(assets: MissionAssetSummary[]): MissionAs
 
 export function findLatestMissionHandoff(
   missionId: string,
-  handoffs: MissionHandoffSummary[],
+  handoffs: MissionHandoffSummary[]
 ): MissionHandoffSummary | null {
-  return handoffs
-    .filter((handoff) => handoff.missionId === missionId)
-    .sort((a, b) => b.ts.localeCompare(a.ts))[0] || null;
+  return (
+    handoffs
+      .filter((handoff) => handoff.missionId === missionId)
+      .sort((a, b) => b.ts.localeCompare(a.ts))[0] || null
+  );
 }

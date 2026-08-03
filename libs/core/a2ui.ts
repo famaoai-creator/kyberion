@@ -6,10 +6,10 @@ import { redactSensitiveObject } from './network.js';
  * Inspired by OpenClaw A2UI.
  */
 
-export type A2UIComponentType = 
-  | 'text' 
-  | 'button' 
-  | 'card' 
+export type A2UIComponentType =
+  | 'text'
+  | 'button'
+  | 'card'
   | 'container'
   // Chronos Specific Components
   | 'kb-layout-grid'
@@ -30,12 +30,12 @@ export interface A2UIComponent {
   children?: string[];
 }
 
-
 export interface A2UIMessage {
   createSurface?: {
     surfaceId: string;
     catalogId: string;
     title?: string;
+    titleKey?: string;
   };
   updateComponents?: {
     surfaceId: string;
@@ -59,7 +59,8 @@ export class A2UISurface {
   constructor(
     public readonly surfaceId: string,
     public readonly catalogId: string,
-    public title?: string
+    public title?: string,
+    public titleKey?: string
   ) {}
 
   public setComponent(component: A2UIComponent): this {
@@ -90,8 +91,9 @@ export class A2UISurface {
       createSurface: {
         surfaceId: this.surfaceId,
         catalogId: this.catalogId,
-        title: this.title
-      }
+        title: this.title,
+        titleKey: this.titleKey,
+      },
     };
   }
 
@@ -99,8 +101,8 @@ export class A2UISurface {
     return {
       updateComponents: {
         surfaceId: this.surfaceId,
-        components: Array.from(this.components.values())
-      }
+        components: Array.from(this.components.values()),
+      },
     };
   }
 
@@ -108,16 +110,16 @@ export class A2UISurface {
     return {
       updateDataModel: {
         surfaceId: this.surfaceId,
-        data: { ...this.data }
-      }
+        data: { ...this.data },
+      },
     };
   }
 
   public buildDeleteMessage(): A2UIMessage {
     return {
       deleteSurface: {
-        surfaceId: this.surfaceId
-      }
+        surfaceId: this.surfaceId,
+      },
     };
   }
 }
@@ -135,7 +137,7 @@ class A2UIDispatcher {
   }
 
   public removeTransport(transport: A2UITransport): void {
-    this.transports = this.transports.filter(t => t !== transport);
+    this.transports = this.transports.filter((t) => t !== transport);
   }
 
   public trackSurface(surface: A2UISurface): void {
@@ -163,7 +165,9 @@ export const a2uiDispatcher = new A2UIDispatcher();
 /**
  * Bridge HTTP transport: forwards A2UI messages to the Bridge SSE relay.
  */
-function createBridgeTransport(bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031,http://127.0.0.1:3040'): A2UITransport {
+function createBridgeTransport(
+  bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031,http://127.0.0.1:3040'
+): A2UITransport {
   const targets = bridgeUrl
     .split(',')
     .map((value) => value.trim())

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useChronosLocale } from '../lib/hooks';
+import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 
 type Attention = {
@@ -201,15 +202,50 @@ export function AgentCollaborationBoard({
     }
   }, [locale, missionId, tenant]);
 
+  const loadProjection = React.useCallback(async () => {
+    const query = buildCollaborationQuery(tenant, missionId);
+    const response = await fetch(`/api/collaboration${query}`, { cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok)
+      throw new Error(payload.error || uxText('chronos_ac_load_error', locale));
+    return payload.projection as CollaborationProjection;
+  }, [locale, missionId, tenant]);
+
   React.useEffect(() => {
     setMissionId('');
   }, [tenant]);
 
   React.useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(timer);
   }, [refresh]);
+
+  React.useEffect(() => {
+    const scheduler = new LiveSyncScheduler<CollaborationProjection>({
+      fetchSnapshot: loadProjection,
+      onSnapshot: setProjection,
+      isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+      debounceMs: 120,
+    });
+    const unbindVisibility = bindVisibilityToLiveSync(scheduler);
+    const eventSource =
+      typeof window !== 'undefined' && 'EventSource' in window
+        ? new EventSource('/api/collaboration/stream')
+        : null;
+    const invalidate = () => scheduler.invalidate();
+    eventSource?.addEventListener('batch', invalidate);
+    eventSource?.addEventListener('mission_event', invalidate);
+    eventSource?.addEventListener('status_update', invalidate);
+    eventSource?.addEventListener('notification', invalidate);
+    eventSource?.addEventListener('step_begin', invalidate);
+    eventSource?.addEventListener('step_end', invalidate);
+    eventSource?.addEventListener('error', invalidate);
+    scheduler.start();
+    return () => {
+      eventSource?.close();
+      unbindVisibility();
+      scheduler.stop();
+    };
+  }, [loadProjection, tenant]);
 
   const overview = projection?.overview;
   const eventById = React.useMemo(

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
+import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';
@@ -32,6 +33,9 @@ export interface DeliverableInboxItem {
   reviewComment?: string;
   reviewVersion?: number;
   reviewCurrentArtifactId?: string;
+  /** CE-07: role-separated claims carried from the governed inbox record. */
+  roleSections?: DeliverableInboxEntry['role_sections'];
+  integratedSummary?: string;
 }
 
 export interface DeliverableInboxQuery {
@@ -100,6 +104,12 @@ function collectSearchText(item: DeliverableInboxItem): string {
     item.externalRef,
     item.previewText,
     item.missionStatus,
+    item.integratedSummary,
+    ...(item.roleSections || []).flatMap((section) => [
+      section.role,
+      section.summary,
+      ...section.evidence_refs,
+    ]),
   ]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .join(' ')
@@ -111,6 +121,7 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
   const missionId = input.missionId?.trim().toUpperCase() || '';
   const kind = input.kind?.trim().toLowerCase() || '';
   const tier = input.tier || '';
+  const governedInbox = listInboxEntries({ limit: 200 });
 
   const filtered = listArtifactRecords()
     .map((record) => {
@@ -129,6 +140,17 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       const targetMissing = normalizedPath
         ? !safeExistsSync(path.join(root, normalizedPath))
         : false;
+      const linkedInbox = governedInbox.find((entry) => {
+        if (
+          record.mission_id &&
+          entry.mission_id?.toUpperCase() !== record.mission_id.toUpperCase()
+        )
+          return false;
+        if (!normalizedPath) return Boolean(record.mission_id && entry.mission_id);
+        return entry.artifact_paths.some((artifactPath) =>
+          artifactPath.replace(/\\/g, '/').endsWith(normalizedPath)
+        );
+      });
       return {
         artifactId: record.artifact_id,
         missing: targetMissing,
@@ -153,6 +175,8 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           loadDeliverableReviewState(record.artifact_id)?.latest_version,
         reviewCurrentArtifactId: loadDeliverableReviewState(record.artifact_id)
           ?.current_artifact_id,
+        roleSections: linkedInbox?.role_sections,
+        integratedSummary: linkedInbox?.integrated_summary,
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
