@@ -24,6 +24,7 @@ import {
   withLock,
 } from '@agent/core';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
@@ -279,8 +280,10 @@ async function writeJsonArtifact(
 ): Promise<void> {
   await withLock(lockName, async () => {
     withExecutionContext('sovereign_concierge', () => {
-      ensureArtifactDir(filePath);
-      safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+      withSensitivePathMediation(() => {
+        ensureArtifactDir(filePath);
+        safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+      });
     });
   });
 }
@@ -292,8 +295,10 @@ async function writeTextArtifact(
 ): Promise<void> {
   await withLock(lockName, async () => {
     withExecutionContext('sovereign_concierge', () => {
-      ensureArtifactDir(filePath);
-      safeWriteFile(filePath, content);
+      withSensitivePathMediation(() => {
+        ensureArtifactDir(filePath);
+        safeWriteFile(filePath, content);
+      });
     });
   });
 }
@@ -608,7 +613,9 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
   );
   const candidates: ServiceCandidateDraft[] = [];
   const connDir = connectionDir();
-  if (!safeExistsSync(connDir)) safeMkdir(connDir, { recursive: true });
+  withSensitivePathMediation(() => {
+    if (!safeExistsSync(connDir)) safeMkdir(connDir, { recursive: true });
+  });
   const onboardingServices = listServiceOnboardingCatalogEntries();
 
   if (wantsServiceSetup) {

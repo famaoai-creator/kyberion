@@ -1,5 +1,6 @@
 import type { Ajv, ValidateFunction } from 'ajv';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { safeReadFile } from './secure-io.js';
 
 function collectExternalRefs(value: unknown, refs: Set<string>) {
@@ -32,7 +33,11 @@ function registerSchema(ajv: Ajv, schemaPath: string, visited: Set<string>): any
     if (/^[a-z]+:/i.test(ref)) continue;
     registerSchema(ajv, path.resolve(path.dirname(normalized), ref), visited);
   }
-  const schemaIds = new Set<string>([normalized]);
+  // Ajv treats schema identifiers as URI bases. A Windows drive path such as
+  // `D:\\repo\\schemas\\voice-action.schema.json` is parsed as the URI
+  // `D:repo...`, which breaks relative `$ref` resolution. File URLs preserve
+  // the drive and remain valid URI bases on every platform.
+  const schemaIds = new Set<string>([pathToFileURL(normalized).href]);
   if (typeof schema.$id === 'string' && schema.$id) {
     schemaIds.add(schema.$id);
   }
