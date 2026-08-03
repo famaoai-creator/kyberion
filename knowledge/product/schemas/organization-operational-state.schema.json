@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-operational-state.schema.json",
+  "title": "Organization Operational State",
+  "type": "object",
+  "required": ["organization_id", "name", "tier", "status", "updated_at"],
+  "properties": {
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "status": { "type": "string", "enum": ["draft", "active", "paused", "archived"] },
+    "purpose_ref": { "type": "string" },
+    "active_project_ids": { "type": "array", "items": { "type": "string" } },
+    "active_operation_ids": { "type": "array", "items": { "type": "string" } },
+    "open_incident_ids": { "type": "array", "items": { "type": "string" } },
+    "pending_decision_ids": { "type": "array", "items": { "type": "string" } },
+    "service_health_summary": {
+      "type": "object",
+      "required": ["healthy", "degraded", "critical", "unknown"],
+      "properties": {
+        "healthy": { "type": "integer", "minimum": 0 },
+        "degraded": { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "recent_outcome_refs": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "last_reconciled_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

@@ -33,6 +33,9 @@ Project を長期的な意味・運用のコンテナとして管理でき、Pro
 - `task` は Mission の作業単位、`task_session` は会話作業コンテナとして表示上も分離する。
 - Pipeline は状態の親ではなく、再現可能な実行手順として lineage に表示する。
 - Project の tier / tenant / path 境界は fail-closed で検証する。
+- 組織全体の Purpose、Service、定常 Operation、Incident、Governance との関係は
+  [Organization Operating Model Plan](./ORGANIZATION_OPERATING_MODEL_PLAN_2026-08-03.ja.md)
+  で扱い、Project は `solution_project` の管理単位として接続する。
 
 ## 実装フェーズ
 

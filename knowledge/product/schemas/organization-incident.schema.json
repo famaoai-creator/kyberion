@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-incident.schema.json",
+  "title": "Organization Incident Record",
+  "type": "object",
+  "required": [
+    "version",
+    "incident_id",
+    "organization_id",
+    "title",
+    "severity",
+    "status",
+    "owner_role",
+    "impact_summary",
+    "tier",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "incident_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "service_id": { "type": "string" },
+    "operation_id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "status": {
+      "type": "string",
+      "enum": ["detected", "triaging", "mitigating", "resolved", "closed"]
+    },
+    "owner_role": { "type": "string", "minLength": 1 },
+    "impact_summary": { "type": "string", "minLength": 1 },
+    "trigger_refs": { "type": "array", "items": { "type": "string" } },
+    "mitigation_mission_id": { "type": "string" },
+    "post_incident_review_ref": { "type": "string" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

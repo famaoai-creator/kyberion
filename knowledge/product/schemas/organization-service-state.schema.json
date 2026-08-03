@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-service-state.schema.json",
+  "title": "Organization Service Operational State",
+  "type": "object",
+  "required": [
+    "service_id",
+    "organization_id",
+    "tier",
+    "health",
+    "observed_at",
+    "source_timestamp",
+    "freshness_seconds",
+    "confidence",
+    "reconcile_status",
+    "updated_at"
+  ],
+  "properties": {
+    "service_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "health": { "type": "string", "enum": ["healthy", "degraded", "critical", "unknown"] },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "source_timestamp": { "type": "string", "format": "date-time" },
+    "freshness_seconds": { "type": "integer", "minimum": 0 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "active_project_ids": { "type": "array", "items": { "type": "string" } },
+    "active_operation_ids": { "type": "array", "items": { "type": "string" } },
+    "open_incident_ids": { "type": "array", "items": { "type": "string" } },
+    "last_outcome_refs": { "type": "array", "items": { "type": "string" } },
+    "reconcile_status": {
+      "type": "string",
+      "enum": ["current", "stale", "missing_source", "conflict", "unknown"]
+    },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

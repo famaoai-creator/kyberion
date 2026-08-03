@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-operation-state.schema.json",
+  "title": "Organization Operation State",
+  "type": "object",
+  "required": ["operation_id", "organization_id", "tier", "status", "due_status", "updated_at"],
+  "properties": {
+    "operation_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "running", "succeeded", "failed", "blocked", "paused"]
+    },
+    "due_status": {
+      "type": "string",
+      "enum": ["current", "due", "overdue", "not_scheduled", "unknown"]
+    },
+    "last_run_at": { "type": "string", "format": "date-time" },
+    "next_due_at": { "type": "string", "format": "date-time" },
+    "last_result_summary": { "type": "string" },
+    "last_evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "exception_refs": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}
