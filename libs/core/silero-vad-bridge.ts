@@ -141,6 +141,7 @@ export class SileroVad implements VoiceActivityDetector {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: buildSafeExecEnv(),
       });
+      child.stdin.on('error', (error) => this.fail(error));
       let stdoutBuffer = '';
       child.stdout.on('data', (data: Buffer) => {
         stdoutBuffer += data.toString('utf8');
@@ -176,8 +177,14 @@ export class SileroVad implements VoiceActivityDetector {
     }
   }
 
-  private fail(reason: string): void {
-    if (!this.failedReason) this.failedReason = reason;
+  private fail(reason: unknown): void {
+    const normalizedReason =
+      reason instanceof Error
+        ? reason.message
+        : typeof reason === 'string'
+          ? reason
+          : JSON.stringify(reason) || String(reason);
+    if (!this.failedReason) this.failedReason = normalizedReason;
     if (this.child) {
       try {
         this.child.kill('SIGTERM');

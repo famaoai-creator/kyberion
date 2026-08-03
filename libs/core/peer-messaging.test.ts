@@ -8,6 +8,7 @@ import {
   loadPeerNetworkCatalog,
   listPeerInboxRecords,
   listPeerOutboxRecords,
+  registerPeerNetworkPeer,
   resolvePeerRecord,
   resolvePeerDispatchTarget,
   sendPeerMessage,
@@ -18,6 +19,8 @@ import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const SHARED_SECRET = 'peer-message-test-secret';
+const REGISTRY_TENANT = 'peer-registry-test';
+const REGISTRY_TEST_CATALOG = pathResolver.sharedTmp('peer-network-registration.test.json');
 
 async function listenOnEphemeralPort(
   server: ReturnType<typeof createPeerMessagingServer>
@@ -34,6 +37,11 @@ afterEach(() => {
   const catalogPath = pathResolver.sharedTmp('peer-network-catalog.test.json');
   try {
     safeRmSync(catalogPath, { force: true });
+  } catch (_) {
+    /* best-effort cleanup */
+  }
+  try {
+    safeRmSync(REGISTRY_TEST_CATALOG, { force: true });
   } catch (_) {
     /* best-effort cleanup */
   }
@@ -155,6 +163,42 @@ describe('peer messaging', () => {
     expect(target.destinationUrl).toBe('http://192.168.1.20:4555');
     expect(target.allowLocalNetwork).toBe(true);
     expect(target.sharedSecret).toBe(SHARED_SECRET);
+  });
+
+  it('registers a peer in the tenant confidential catalog and records exposure', () => {
+    const result = registerPeerNetworkPeer({
+      tenantId: REGISTRY_TENANT,
+      peerId: 'peer-b-test',
+      baseUrl: 'http://127.0.0.1:4555',
+      sharedSecret: SHARED_SECRET,
+      exposure: 'same_host',
+      catalogPath: REGISTRY_TEST_CATALOG,
+      capabilities: ['handoff'],
+    });
+
+    expect(result.catalogPath).toBe(REGISTRY_TEST_CATALOG);
+    expect(result.catalog.catalog_visibility).toBe('tenant_confidential');
+    expect(result.peer.exposure).toBe('same_host');
+
+    const catalog = loadPeerNetworkCatalog({
+      tenantId: REGISTRY_TENANT,
+      catalogPath: REGISTRY_TEST_CATALOG,
+    });
+    const target = resolvePeerDispatchTarget('peer-b-test', catalog);
+    expect(target.allowLocalNetwork).toBe(true);
+    expect(target.sharedSecret).toBe(SHARED_SECRET);
+  });
+
+  it('rejects a private endpoint when the registered exposure is public_network', () => {
+    expect(() =>
+      registerPeerNetworkPeer({
+        tenantId: REGISTRY_TENANT,
+        peerId: 'peer-b-test',
+        baseUrl: 'http://192.168.1.20:4555',
+        sharedSecret: SHARED_SECRET,
+        exposure: 'public_network',
+      })
+    ).toThrow(/Blocked URL|private/i);
   });
 
   it('requires a valid HMAC request signature for inbox and outbox reads', async () => {
