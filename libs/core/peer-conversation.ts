@@ -25,7 +25,8 @@ import {
 } from './secure-io.js';
 
 export type PeerConversationStatus = 'open' | 'active' | 'closed' | 'blocked' | 'failed';
-export type PeerConversationMessageKind = 'open' | 'message' | 'reply' | 'handoff' | 'close' | 'status';
+export type PeerConversationMessageKind =
+  'open' | 'message' | 'reply' | 'handoff' | 'close' | 'status';
 export type PeerConversationDirection = 'inbound' | 'outbound';
 
 export interface PeerConversationTranscriptEntry {
@@ -115,6 +116,7 @@ export interface SendPeerConversationMessageInput {
   replyToMessageId?: string;
   ttlMs?: number;
   catalogPath?: string;
+  tenantId?: string;
   timeoutMs?: number;
 }
 
@@ -124,14 +126,21 @@ export interface CreatePeerConversationResponderOptions {
     session: PeerConversationSession;
     message: PeerConversationTranscriptEntry;
     envelope: PeerMessageEnvelope<unknown>;
-  }) => Promise<Partial<PeerConversationResponderResult> | void> | Partial<PeerConversationResponderResult> | void;
+  }) =>
+    | Promise<Partial<PeerConversationResponderResult> | void>
+    | Partial<PeerConversationResponderResult>
+    | void;
 }
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
 
-const SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/peer-conversation-session.schema.json');
-const MESSAGE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/peer-conversation-message.schema.json');
+const SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/peer-conversation-session.schema.json'
+);
+const MESSAGE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/peer-conversation-message.schema.json'
+);
 const RUNTIME_ROOT = 'active/shared/runtime/peer-conversations';
 const OBSERVABILITY_ROOT = 'active/shared/observability/peer-conversations';
 const GOVERNED_ROLE = 'infrastructure_sentinel' as const;
@@ -164,7 +173,7 @@ function ensureMessageValidator(): ValidateFunction {
 
 function errorsFrom(validate: ValidateFunction): string[] {
   return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim(),
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
   );
 }
 
@@ -200,7 +209,10 @@ function recordEvent(peerId: string, event: Record<string, unknown>): string {
   ensurePeerDir(peerId);
   const logicalPath = eventsPath(peerId);
   return withExecutionContext(GOVERNED_ROLE, () => {
-    safeAppendFileSync(pathResolver.resolve(logicalPath), `${JSON.stringify({ ts: nowIso(), peer_id: peerId, ...event })}\n`);
+    safeAppendFileSync(
+      pathResolver.resolve(logicalPath),
+      `${JSON.stringify({ ts: nowIso(), peer_id: peerId, ...event })}\n`
+    );
     return pathResolver.resolve(logicalPath);
   });
 }
@@ -209,7 +221,11 @@ function sessionSortKey(session: PeerConversationSession): string {
   return session.updated_at || session.created_at;
 }
 
-function validatePeerConversationSession(session: unknown): { valid: boolean; errors: string[]; value?: PeerConversationSession } {
+function validatePeerConversationSession(session: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: PeerConversationSession;
+} {
   const validate = ensureSessionValidator();
   const valid = validate(session);
   return {
@@ -219,7 +235,11 @@ function validatePeerConversationSession(session: unknown): { valid: boolean; er
   };
 }
 
-function validatePeerConversationMessage(message: unknown): { valid: boolean; errors: string[]; value?: PeerConversationMessagePayload } {
+function validatePeerConversationMessage(message: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: PeerConversationMessagePayload;
+} {
   const validate = ensureMessageValidator();
   const valid = validate(message);
   return {
@@ -233,10 +253,14 @@ function defaultSessionTitle(topic: string, remotePeerId: string): string {
   return `${topic} with ${remotePeerId}`;
 }
 
-export function createPeerConversationSession(input: CreatePeerConversationSessionInput): PeerConversationSession {
+export function createPeerConversationSession(
+  input: CreatePeerConversationSessionInput
+): PeerConversationSession {
   const now = nowIso();
   const session: PeerConversationSession = {
-    session_id: input.sessionId || `PCS-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+    session_id:
+      input.sessionId ||
+      `PCS-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
     local_peer_id: input.localPeerId,
     remote_peer_id: input.remotePeerId,
     topic: input.topic,
@@ -265,14 +289,19 @@ export function savePeerConversationSession(session: PeerConversationSession): s
   });
 }
 
-export function loadPeerConversationSession(peerId: string, sessionId: string): PeerConversationSession | null {
+export function loadPeerConversationSession(
+  peerId: string,
+  sessionId: string
+): PeerConversationSession | null {
   const filePath = pathResolver.resolve(sessionPath(peerId, sessionId));
   if (!safeExistsSync(filePath)) return null;
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw) as PeerConversationSession;
   const result = validatePeerConversationSession(parsed);
   if (!result.valid) {
-    logger.warn(`[peer-conversation] invalid session ${peerId}/${sessionId}: ${result.errors.join('; ')}`);
+    logger.warn(
+      `[peer-conversation] invalid session ${peerId}/${sessionId}: ${result.errors.join('; ')}`
+    );
     return null;
   }
   return parsed;
@@ -289,9 +318,10 @@ export function listPeerConversationSessions(peerId: string): PeerConversationSe
 }
 
 export function appendPeerConversationTranscript(
-  input: AppendPeerConversationMessageInput,
+  input: AppendPeerConversationMessageInput
 ): PeerConversationSession {
-  const session = loadPeerConversationSession(input.localPeerId, input.sessionId) ||
+  const session =
+    loadPeerConversationSession(input.localPeerId, input.sessionId) ||
     createPeerConversationSession({
       sessionId: input.sessionId,
       localPeerId: input.localPeerId,
@@ -320,13 +350,16 @@ export function appendPeerConversationTranscript(
 
   session.transcript = [...session.transcript, entry].slice(-200);
   session.related_work_item_ids = [
-    ...new Set([
-      ...session.related_work_item_ids,
-      ...(input.relatedWorkItemIds || []),
-      ...((input.payload?.related_work_item_ids as string[] | undefined) || []),
-    ].filter(Boolean)),
+    ...new Set(
+      [
+        ...session.related_work_item_ids,
+        ...(input.relatedWorkItemIds || []),
+        ...((input.payload?.related_work_item_ids as string[] | undefined) || []),
+      ].filter(Boolean)
+    ),
   ];
-  session.status = input.kind === 'close' ? 'closed' : input.kind === 'handoff' ? 'active' : 'active';
+  session.status =
+    input.kind === 'close' ? 'closed' : input.kind === 'handoff' ? 'active' : 'active';
   session.last_message_at = entry.created_at;
   session.updated_at = entry.created_at;
   savePeerConversationSession(session);
@@ -382,12 +415,15 @@ export function buildPeerConversationEnvelope(input: {
 }
 
 export async function sendPeerConversationMessageToPeer(
-  input: SendPeerConversationMessageInput,
+  input: SendPeerConversationMessageInput
 ): Promise<{
   session: PeerConversationSession;
   receipt: PeerMessageDispatchReceipt;
 }> {
-  const catalog = loadPeerNetworkCatalog(input.catalogPath ? { catalogPath: input.catalogPath } : {});
+  const catalog = loadPeerNetworkCatalog({
+    ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  });
   const target = resolvePeerDispatchTarget(input.recipientPeerId, catalog);
   const sessionId = input.sessionId || randomId('PCS');
   const localSession = appendPeerConversationTranscript({
@@ -458,12 +494,13 @@ export function clearPeerConversationRuntime(peerId: string): void {
     const runtimeDir = pathResolver.resolve(peerRoot(peerId));
     const observabilityDir = pathResolver.resolve(`${OBSERVABILITY_ROOT}/${peerId}`);
     if (safeExistsSync(runtimeDir)) safeRmSync(runtimeDir, { recursive: true, force: true });
-    if (safeExistsSync(observabilityDir)) safeRmSync(observabilityDir, { recursive: true, force: true });
+    if (safeExistsSync(observabilityDir))
+      safeRmSync(observabilityDir, { recursive: true, force: true });
   });
 }
 
 export function createPeerConversationResponder(
-  options: CreatePeerConversationResponderOptions,
+  options: CreatePeerConversationResponderOptions
 ): PeerMessageResponder {
   return async (context: PeerMessageResponderContext): Promise<unknown> => {
     const payload = validatePeerConversationMessage(context.envelope.payload);

@@ -331,6 +331,7 @@
 - [Real-time Coaching Surface Protocol](./product/orchestration/real-time-coaching-protocol.md) (public | Ecosystem Architect)
 - [Rehearsal Mode Protocol](./product/orchestration/rehearsal-protocol.md) (public | Ecosystem Architect)
 - [Relationship Graph Protocol](./product/orchestration/relationship-graph-protocol.md) (public | Ecosystem Architect)
+- [Same-Tenant Peer Quickstart](./product/orchestration/same-tenant-peer-quickstart.ja.md) (public | Unknown)
 - [Schedule Coordination Playbook](./product/orchestration/schedule-coordination-playbook.md) (public | Unknown)
 - [Schedule Delivery Protocol](./product/orchestration/schedule-delivery-protocol.md) (public | Ecosystem Architect)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./product/orchestration/self-refinement-protocol.md) (public | Ecosystem Architect)
