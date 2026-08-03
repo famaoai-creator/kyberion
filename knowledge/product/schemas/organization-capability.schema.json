@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-capability.schema.json",
+  "title": "Organization Capability",
+  "type": "object",
+  "required": [
+    "version",
+    "capability_id",
+    "organization_id",
+    "domain_id",
+    "name",
+    "owner_role",
+    "service_ids",
+    "tier",
+    "status",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "capability_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "domain_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "owner_role": { "type": "string", "minLength": 1 },
+    "service_ids": { "type": "array", "items": { "type": "string" } },
+    "policy_refs": { "type": "array", "items": { "type": "string" } },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "status": { "type": "string", "enum": ["draft", "active", "paused", "retired"] },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source_refs": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

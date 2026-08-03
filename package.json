@@ -72,6 +72,7 @@
     "sync:authority-roles": "node --import ./scripts/ts-loader.mjs scripts/sync_authority_roles.ts",
     "sync:team-roles": "node --import ./scripts/ts-loader.mjs scripts/sync_team_roles.ts",
     "org": "node --import ./scripts/ts-loader.mjs scripts/org.ts",
+    "organization": "node --import ./scripts/ts-loader.mjs scripts/organization_operating_model.ts",
     "knowledge:rank": "node dist/scripts/context_ranker.js",
     "knowledge:sync": "node dist/scripts/run_pipeline.js --input pipelines/knowledge-sync.json",
     "storage:janitor": "node dist/scripts/run_pipeline.js --input pipelines/storage-janitor.json",
