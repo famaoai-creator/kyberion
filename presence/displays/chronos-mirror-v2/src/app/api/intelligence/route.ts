@@ -94,6 +94,7 @@ import {
   updateDistillCandidateRecord,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
+import { listManagedProjects } from '@agent/core';
 
 interface RuntimeTopologySurfaceInput {
   id: string;
@@ -1721,6 +1722,9 @@ export async function GET(req: NextRequest) {
       collectWorkCoordinationSummary
     );
     const projects = listProjectRecords();
+    const projectManagement = safeCollect('collectProjectManagement', [], () =>
+      listManagedProjects().map((view) => ({ project: view.project, lineage: view.lineage }))
+    );
     const projectTracks = listProjectTrackRecords();
     const missionSeeds = listMissionSeedRecords();
     const missionSeedAssessment = summarizeMissionSeedAssessment(missionSeeds);
@@ -1744,6 +1748,7 @@ export async function GET(req: NextRequest) {
       activeMissions,
       missionProgress,
       projects,
+      projectManagement,
       projectTracks,
       gateReadiness,
       missionSeeds,

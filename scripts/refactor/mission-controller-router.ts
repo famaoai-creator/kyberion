@@ -181,6 +181,20 @@ export interface MissionControllerRoutingContext {
   showMissionStatus: (id: string, follow?: boolean) => void;
   showReasoningBackendStatus: () => void;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
+  reassignMissionProject: (
+    missionId: string,
+    options: {
+      projectId?: string;
+      projectPath?: string;
+      tier?: 'personal' | 'confidential' | 'public';
+      trackId?: string;
+      trackName?: string;
+      relationshipType?: 'belongs_to' | 'supports' | 'governs' | 'independent';
+      note?: string;
+      force?: boolean;
+      dryRun?: boolean;
+    }
+  ) => Awaitable<unknown>;
   showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<unknown>;
   staffMissionTeam: (id: string, organizationId?: string) => Awaitable<unknown>;
   prewarmMissionTeam: (
@@ -785,6 +799,21 @@ export async function runMissionControllerAction(
       break;
     case 'sync-project-ledger':
       await context.syncProjectLedger(arg1!);
+      break;
+    case 'reassign-project':
+      await context.reassignMissionProject(arg1!, {
+        projectId: getValue('--project-id', context.argv),
+        projectPath: getValue('--project-path', context.argv),
+        tier: getValue('--tier', context.argv) as
+          'personal' | 'confidential' | 'public' | undefined,
+        trackId: getValue('--track-id', context.argv),
+        trackName: getValue('--track-name', context.argv),
+        relationshipType: getValue('--project-relationship', context.argv) as
+          'belongs_to' | 'supports' | 'governs' | 'independent' | undefined,
+        note: getValue('--project-note', context.argv) || getValue('--note', context.argv),
+        force: context.argv.includes('--force'),
+        dryRun: context.hasDryRun,
+      });
       break;
     case 'team': {
       const teamPlan = await context.showMissionTeam(

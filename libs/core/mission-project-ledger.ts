@@ -62,6 +62,27 @@ export function upsertMissionLedgerRow(content: string, row: string, missionId: 
     .trimEnd()}\n`;
 }
 
+export function removeMissionFromProjectLedger(projectPath: string, missionId: string): void {
+  const upperId = missionId.toUpperCase();
+  const ledgerPath = resolveProjectLedgerPath(projectPath);
+  const ledgerJsonPath = resolveProjectLedgerJsonPath(projectPath);
+  if (safeExistsSync(ledgerPath)) {
+    const current = readTextFile(ledgerPath);
+    const updated = current
+      .split('\n')
+      .filter((line) => !line.startsWith(`| ${upperId} |`))
+      .join('\n');
+    safeWriteFile(ledgerPath, `${updated.trimEnd()}\n`);
+  }
+  if (safeExistsSync(ledgerJsonPath)) {
+    const jsonLedger = readJsonFileSafe(ledgerJsonPath);
+    if (jsonLedger && Array.isArray(jsonLedger.entries)) {
+      jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
+      safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+    }
+  }
+}
+
 export async function syncProjectLedger(id: string, rootDir: string): Promise<void> {
   if (!id) {
     logger.error('Usage: mission_controller sync-project-ledger <MISSION_ID>');

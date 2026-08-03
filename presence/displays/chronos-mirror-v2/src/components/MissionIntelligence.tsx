@@ -391,6 +391,25 @@ interface ProjectTrackRecordSummary {
   };
 }
 
+interface ProjectManagementSummary {
+  project: { project_id: string; name: string };
+  lineage: {
+    tracks: Array<{ track_id: string; name: string; status: string }>;
+    tasks: Array<{ work_id: string; title: string; status: string }>;
+    missions: Array<{ mission_id: string; status: string; track_id?: string }>;
+    task_sessions: Array<{ session_id: string; status: string }>;
+    pipelines: Array<{ pipeline_id: string }>;
+    role_explanations: {
+      project: string;
+      track: string;
+      mission: string;
+      task: string;
+      task_session: string;
+      pipeline: string;
+    };
+  };
+}
+
 interface ServiceBindingRecordSummary {
   binding_id: string;
   service_type: string;
@@ -1005,6 +1024,7 @@ interface IntelligencePayload {
   company?: CompanySnapshot;
   activeMissions: MissionSummary[];
   projects: ProjectRecordSummary[];
+  projectManagement?: ProjectManagementSummary[];
   projectTracks: ProjectTrackRecordSummary[];
   gateReadiness?: Array<{
     track_id: string;
@@ -2040,6 +2060,11 @@ export function MissionIntelligence({
   const selectedProject = selectedProjectId
     ? data.projects.find((project) => project.project_id === selectedProjectId) || null
     : null;
+  const selectedProjectManagement = selectedProject
+    ? (data.projectManagement || []).find(
+        (item) => item.project.project_id === selectedProject.project_id
+      ) || null
+    : null;
   const selectedMission = selectedMissionId
     ? data.activeMissions.find((mission) => mission.missionId === selectedMissionId) || null
     : null;
@@ -2629,6 +2654,15 @@ export function MissionIntelligence({
               <span className="font-semibold kb-text-primary">{selectedProject.name}</span>
               <span className="mx-2 kb-text-muted">·</span>
               <span className="font-mono kb-text-secondary">{selectedProject.project_id}</span>
+              {selectedProjectManagement ? (
+                <>
+                  <span className="mx-2 kb-text-muted">·</span>
+                  <span className="kb-text-primary">
+                    {selectedProjectManagement.lineage.tasks.length} tasks /{' '}
+                    {selectedProjectManagement.lineage.task_sessions.length} task sessions
+                  </span>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setSelectedProjectId(null)}
@@ -3573,6 +3607,9 @@ export function MissionIntelligence({
                   {(() => {
                     const learnedRefs = learnedProjectRefs(project.project_id);
                     const workLoop = buildProjectWorkLoopPreview(project);
+                    const management = (data.projectManagement || []).find(
+                      (item) => item.project.project_id === project.project_id
+                    );
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
@@ -3626,6 +3663,36 @@ export function MissionIntelligence({
                             <span className="font-mono kb-text-secondary">
                               {project.kickoff_task_session_id}
                             </span>
+                          </div>
+                        ) : null}
+                        {management ? (
+                          <div className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-3 text-[10px] kb-text-muted">
+                            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                              {mt('chronos_project_lineage', 'project lineage')}
+                            </div>
+                            <div className="mt-2 kb-text-primary">
+                              {mt(
+                                'chronos_project_hierarchy',
+                                'Project → Track → Mission → Task / Task Session'
+                              )}
+                            </div>
+                            <div className="mt-1">
+                              {mt('chronos_lineage_counts', 'counts')}:{' '}
+                              {management.lineage.tracks.length} {mt('chronos_tracks', 'tracks')} ·{' '}
+                              {management.lineage.tasks.length} {mt('chronos_tasks', 'tasks')} ·{' '}
+                              {management.lineage.missions.length}{' '}
+                              {mt('chronos_missions', 'missions')} ·{' '}
+                              {management.lineage.task_sessions.length}{' '}
+                              {mt('chronos_task_sessions', 'task sessions')} ·{' '}
+                              {management.lineage.pipelines.length}{' '}
+                              {mt('chronos_pipelines', 'pipelines')}
+                            </div>
+                            <div className="mt-1">
+                              {mt(
+                                'chronos_pipeline_role',
+                                'Pipeline is a replayable execution procedure, not a parent container.'
+                              )}
+                            </div>
                           </div>
                         ) : null}
                         <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
