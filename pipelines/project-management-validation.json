@@ -1,0 +1,57 @@
+{
+  "pipeline_id": "project-management-validation",
+  "version": "1.0.0",
+  "action": "pipeline",
+  "description": "Deterministic validation envelope for Project control, Mission reassignment, bootstrap, and reconciliation.",
+  "context": {
+    "mission_id": "MSN-PROJECT-CONTROL-20260803"
+  },
+  "steps": [
+    {
+      "id": "project-management-tests",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "project_management_tests", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm exec vitest run libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts"
+      }
+    },
+    {
+      "id": "project-management-typecheck",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "project_management_typecheck", "type": "ShellResult" },
+      "params": { "cmd": "pnpm run typecheck" }
+    },
+    {
+      "id": "project-management-build",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "project_management_build", "type": "ShellResult" },
+      "params": { "cmd": "pnpm run build:packages" }
+    },
+    {
+      "id": "control-plane-typecheck",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "control_plane_typecheck", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm --dir presence/displays/chronos-mirror-v2 exec tsc --noEmit"
+      }
+    },
+    {
+      "id": "report",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": [
+        "project_management_tests",
+        "project_management_typecheck",
+        "project_management_build",
+        "control_plane_typecheck"
+      ],
+      "params": {
+        "message": "Project management validation completed for mission MSN-PROJECT-CONTROL-20260803."
+      }
+    }
+  ]
+}
