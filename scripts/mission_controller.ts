@@ -54,6 +54,7 @@ import {
   missionLifecycleService,
   releaseOrchestratorSessionForMissionBestEffort,
   resumeAiDlcPhaseState,
+  reassignMissionToProject,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -136,6 +137,37 @@ async function syncProjectLedger(id: string): Promise<unknown> {
 
 async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
   return missionSystem.syncProjectLedgerIfLinked(id);
+}
+
+async function reassignMissionProject(
+  missionId: string,
+  options: {
+    projectId?: string;
+    projectPath?: string;
+    tier?: 'personal' | 'confidential' | 'public';
+    trackId?: string;
+    trackName?: string;
+    relationshipType?: 'belongs_to' | 'supports' | 'governs' | 'independent';
+    note?: string;
+    force?: boolean;
+    dryRun?: boolean;
+  }
+): Promise<unknown> {
+  if (!options.projectId) throw new Error('reassign-project requires --project-id');
+  const result = await reassignMissionToProject({
+    mission_id: missionId,
+    project_id: options.projectId,
+    ...(options.projectPath ? { project_path: options.projectPath } : {}),
+    ...(options.tier ? { tier: options.tier } : {}),
+    ...(options.trackId ? { track_id: options.trackId } : {}),
+    ...(options.trackName ? { track_name: options.trackName } : {}),
+    ...(options.relationshipType ? { relationship_type: options.relationshipType } : {}),
+    ...(options.note ? { note: options.note } : {}),
+    ...(options.force ? { force: true } : {}),
+    ...(options.dryRun ? { dry_run: true } : {}),
+  });
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
@@ -1376,6 +1408,8 @@ Visibility Commands:
                                  Show detailed status of a specific mission and backend availability
   outbox   [ID] [--ack]          Show mission results delivered to the terminal surface (--ack to clear)
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
+  reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
+                                 Safely move a paused/planned mission to another project and reconcile both sides
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
@@ -1923,6 +1957,7 @@ export async function main() {
     showMissionStatus,
     showReasoningBackendStatus,
     syncProjectLedger,
+    reassignMissionProject,
     showMissionTeam,
     staffMissionTeam,
     prewarmMissionTeam,

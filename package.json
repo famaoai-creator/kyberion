@@ -178,6 +178,7 @@
     "email:workflow": "node --import ./scripts/ts-loader.mjs scripts/email-workflow.ts",
     "calendar:workflow": "node --import ./scripts/ts-loader.mjs scripts/calendar-workflow.ts",
     "mission": "node dist/scripts/mission_controller.js",
+    "project": "node dist/scripts/project_controller.js",
     "mission:prewarm": "node dist/scripts/mission_controller.js prewarm",
     "create:actuator": "node --import ./scripts/ts-loader.mjs scripts/create_actuator.ts",
     "mission:team": "node dist/scripts/compose_mission_team.js",
