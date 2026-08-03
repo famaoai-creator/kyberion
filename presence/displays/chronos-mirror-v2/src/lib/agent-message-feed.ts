@@ -110,8 +110,10 @@ function readObservedA2AHandoffs(): A2AHandoffSummary[] {
   }
 
   const bounded = new BoundedRingBuffer<A2AHandoffSummary>(CE_STREAM_LIMITS.maxLiveMessages);
-  for (const handoff of handoffs.sort((a, b) => b.ts.localeCompare(a.ts))) bounded.push(handoff);
-  return bounded.toArray().slice(0, 24);
+  // The ring buffer is FIFO: feed oldest-first so overflow sheds old history,
+  // then restore the operator-facing newest-first order.
+  for (const handoff of handoffs.sort((a, b) => a.ts.localeCompare(b.ts))) bounded.push(handoff);
+  return bounded.toArray().reverse().slice(0, 24);
 }
 
 function appendObservedA2AHandoffs(
@@ -148,8 +150,10 @@ export function collectAgentMessages(): AgentMessageSummary[] {
   appendObservedA2AHandoffs(messages, handoffs);
 
   const bounded = new BoundedRingBuffer<AgentMessageSummary>(CE_STREAM_LIMITS.maxLiveMessages);
-  for (const message of messages.sort((a, b) => b.ts.localeCompare(a.ts))) bounded.push(message);
-  return bounded.toArray().slice(0, 40);
+  // Feed oldest-first so a bounded buffer retains the newest messages rather
+  // than the oldest tail of an already descending list.
+  for (const message of messages.sort((a, b) => a.ts.localeCompare(b.ts))) bounded.push(message);
+  return bounded.toArray().reverse().slice(0, 40);
 }
 
 export function collectA2AHandoffs(): A2AHandoffSummary[] {
