@@ -31,7 +31,14 @@ async function main(): Promise<void> {
     .option('type', {
       type: 'string',
       default: 'request',
-      choices: ['request', 'reply', 'notification', 'handoff', 'capability_query', 'capability_response'],
+      choices: [
+        'request',
+        'reply',
+        'notification',
+        'handoff',
+        'capability_query',
+        'capability_response',
+      ],
       description: 'Message type',
     })
     .option('payload', {
@@ -60,9 +67,18 @@ async function main(): Promise<void> {
       type: 'string',
       description: 'Optional peer catalog path',
     })
+    .option('tenant-id', {
+      type: 'string',
+      default: process.env.KYBERION_TENANT_ID || '',
+      description:
+        'Tenant used to resolve knowledge/confidential/<tenant>/connections/peer-network.json',
+    })
     .parseSync();
 
-  const catalog = loadPeerNetworkCatalog(argv.catalog ? { catalogPath: String(argv.catalog) } : {});
+  const catalog = loadPeerNetworkCatalog({
+    ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
+    ...(argv['tenant-id'] ? { tenantId: String(argv['tenant-id']) } : {}),
+  });
   const target = resolvePeerDispatchTarget(String(argv['to-peer-id']), catalog);
   const payload = parseJsonPayload(String(argv.payload || '{}'));
   const envelope = buildPeerMessageEnvelope({
@@ -73,7 +89,9 @@ async function main(): Promise<void> {
     payload,
     sharedSecret: target.sharedSecret,
     ...(argv['conversation-id'] ? { conversationId: String(argv['conversation-id']) } : {}),
-    ...(argv['reply-to-message-id'] ? { replyToMessageId: String(argv['reply-to-message-id']) } : {}),
+    ...(argv['reply-to-message-id']
+      ? { replyToMessageId: String(argv['reply-to-message-id']) }
+      : {}),
     ...(argv['correlation-id'] ? { correlationId: String(argv['correlation-id']) } : {}),
   });
 

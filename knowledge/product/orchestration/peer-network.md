@@ -11,6 +11,8 @@ tags: [peer, messaging, transport, same-host, lan, catalog]
 
 Use this catalog to exchange messages between Kyberion instances.
 
+同一 tenant の peer を初めて接続する場合は、先に [同一 tenant peer の最短手順](./same-tenant-peer-quickstart.ja.md) を実行してください。この文書は catalog、transport、collaboration の詳細を説明します。
+
 ## Files
 
 - Schema: `knowledge/product/schemas/peer-network.schema.json`
@@ -20,7 +22,8 @@ Use this catalog to exchange messages between Kyberion instances.
 
 - `peer:server` starts a Kyberion peer listener on an HTTP port.
 - `peer:conversation-server` starts a conversation-capable Kyberion peer listener.
-- `peer:send` resolves a peer from the catalog and sends a signed envelope.
+- `peer:register` stores a peer endpoint and shared secret in the tenant confidential catalog.
+- `peer:send` resolves a peer from the tenant catalog and sends a signed envelope.
 - `peer:conversation` opens, sends, lists, and closes peer conversation sessions.
 - `peer:collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/` and `active/shared/observability/peer-messaging/`.
@@ -33,8 +36,8 @@ Use this catalog to exchange messages between Kyberion instances.
 
 1. Start one peer on `127.0.0.1:4100`.
 2. Start another peer on `127.0.0.1:4101`.
-3. Register both peers in `knowledge/product/orchestration/peer-network.json`.
-4. Send a message with `pnpm peer:send --from-peer-id kyberion-local-a --to-peer-id kyberion-local-b --subject status --payload '{}'`.
+3. On the sender host, register the remote peer with `pnpm peer:register --tenant-id demo --peer-id kyberion-local-b --base-url http://127.0.0.1:4101 --shared-secret-env KYBERION_PEER_SHARED_SECRET_B --exposure same_host`.
+4. Send a message with `KYBERION_TENANT_ID=demo pnpm peer:send --from-peer-id kyberion-local-a --to-peer-id kyberion-local-b --subject status --payload '{}'`.
 
 ## Same-host governed collaboration
 
