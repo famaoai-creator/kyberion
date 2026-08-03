@@ -72,6 +72,10 @@ function readEvents(
       }
     }
   }
+  // A browser can reconnect with a cursor from a rotated log file. In that
+  // case replay the bounded tail instead of silently waiting forever for a
+  // cursor that can no longer be found.
+  if (afterId && !foundCursor) return readEvents(null, missionId);
   return { events: events.slice(-60), lastSeenId };
 }
 

@@ -1290,8 +1290,9 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
     if (item.status !== 'in_progress') continue;
     if (activeLeaseForItem(item.item_id)) continue;
 
-    const completedEvidence =
-      options.completedEvidence?.(item) === true || item.metadata?.completed_evidence === true;
+    // Completion must come from the caller's durable evidence reader. A
+    // work-item metadata flag is worker-controlled input and is not evidence.
+    const completedEvidence = options.completedEvidence?.(item) === true;
     if (completedEvidence) {
       const finalAttempt = finalizeWorkItemAttempt(item, 'completed', {
         summary: 'completion evidence replayed after orphaned worker recovery',
