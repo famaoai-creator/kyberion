@@ -10,6 +10,14 @@
       "type": "string",
       "enum": ["1"]
     },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$"
+    },
+    "catalog_visibility": {
+      "type": "string",
+      "enum": ["operator_only", "tenant_confidential", "public_metadata"]
+    },
     "peers": {
       "type": "array",
       "items": {
@@ -21,7 +29,7 @@
     "peer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["peer_id", "base_url", "shared_secret"],
+      "required": ["peer_id", "base_url"],
       "properties": {
         "peer_id": {
           "type": "string",
@@ -34,6 +42,10 @@
         "shared_secret": {
           "type": "string",
           "minLength": 8
+        },
+        "exposure": {
+          "type": "string",
+          "enum": ["same_host", "same_lan", "private_network", "public_network"]
         },
         "allow_local_network": {
           "type": "boolean",

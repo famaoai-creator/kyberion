@@ -16,12 +16,7 @@ import {
 } from './secure-io.js';
 
 export type PeerMessageType =
-  | 'request'
-  | 'reply'
-  | 'notification'
-  | 'handoff'
-  | 'capability_query'
-  | 'capability_response';
+  'request' | 'reply' | 'notification' | 'handoff' | 'capability_query' | 'capability_response';
 
 export interface PeerMessageEnvelope<TPayload = unknown> {
   version: '1';
@@ -45,13 +40,21 @@ export interface PeerNetworkPeerRecord {
   peer_id: string;
   base_url: string;
   shared_secret?: string;
+  exposure?: PeerNetworkExposure;
   allow_local_network?: boolean;
   capabilities?: string[];
   description?: string;
 }
 
+export type PeerNetworkExposure = 'same_host' | 'same_lan' | 'private_network' | 'public_network';
+
+export type PeerNetworkCatalogVisibility =
+  'operator_only' | 'tenant_confidential' | 'public_metadata';
+
 export interface PeerNetworkCatalog {
   version: '1';
+  tenant_id?: string;
+  catalog_visibility?: PeerNetworkCatalogVisibility;
   peers: PeerNetworkPeerRecord[];
 }
 
@@ -111,6 +114,7 @@ export interface PeerMessagingServerOptions {
 
 export interface PeerMessagingCatalogOptions {
   catalogPath?: string;
+  tenantId?: string;
 }
 
 const DEFAULT_CATALOG_PATH = pathResolver.knowledge('product/orchestration/peer-network.json');
@@ -120,6 +124,9 @@ const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';
 const DEFAULT_EVENT_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
+const TENANT_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
+const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '::1']);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -222,13 +229,21 @@ export function buildPeerMessageEnvelope<TPayload>(
 export function loadPeerNetworkCatalog(
   options: PeerMessagingCatalogOptions = {}
 ): PeerNetworkCatalog | null {
-  const catalogPath =
-    options.catalogPath || process.env.KYBERION_PEER_NETWORK_CATALOG || DEFAULT_CATALOG_PATH;
+  const catalogPath = resolvePeerNetworkCatalogPath(options);
   try {
     if (!safeExistsSync(catalogPath)) return null;
     const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
     const parsed = JSON.parse(raw) as PeerNetworkCatalog;
     if (parsed && parsed.version === '1' && Array.isArray(parsed.peers)) {
+      if (options.tenantId && parsed.tenant_id && parsed.tenant_id !== options.tenantId) {
+        throw new Error(`peer_catalog_tenant_mismatch:${options.tenantId}`);
+      }
+      if (
+        parsed.catalog_visibility === 'public_metadata' &&
+        parsed.peers.some((peer) => Boolean(peer.shared_secret))
+      ) {
+        throw new Error('public_peer_catalog_contains_shared_secret');
+      }
       return parsed;
     }
   } catch (error: any) {
@@ -237,6 +252,134 @@ export function loadPeerNetworkCatalog(
     );
   }
   return null;
+}
+
+function normalizeTenantId(tenantId: string): string {
+  const normalized = String(tenantId || '').trim();
+  if (!TENANT_ID_PATTERN.test(normalized)) {
+    throw new Error(`invalid_peer_network_tenant_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+export function peerNetworkCatalogPath(tenantId: string): string {
+  return pathResolver.knowledge(
+    `confidential/${normalizeTenantId(tenantId)}/connections/peer-network.json`
+  );
+}
+
+export function resolvePeerNetworkCatalogPath(options: PeerMessagingCatalogOptions = {}): string {
+  if (options.catalogPath) return options.catalogPath;
+  if (process.env.KYBERION_PEER_NETWORK_CATALOG?.trim()) {
+    return process.env.KYBERION_PEER_NETWORK_CATALOG.trim();
+  }
+  const tenantId = options.tenantId?.trim() || process.env.KYBERION_TENANT_ID?.trim();
+  return tenantId ? peerNetworkCatalogPath(tenantId) : DEFAULT_CATALOG_PATH;
+}
+
+export interface RegisterPeerNetworkPeerInput {
+  tenantId: string;
+  peerId: string;
+  baseUrl: string;
+  sharedSecret: string;
+  exposure: PeerNetworkExposure;
+  /** Test-only fixture seam; production registration always uses the tenant confidential path. */
+  catalogPath?: string;
+  capabilities?: string[];
+  description?: string;
+}
+
+export interface RegisterPeerNetworkPeerResult {
+  catalogPath: string;
+  catalog: PeerNetworkCatalog;
+  peer: PeerNetworkPeerRecord;
+}
+
+function allowLocalNetworkForExposure(exposure: PeerNetworkExposure): boolean {
+  return exposure !== 'public_network';
+}
+
+function validatePeerExposure(baseUrl: string, exposure: PeerNetworkExposure): void {
+  const parsed = new URL(baseUrl);
+  if (exposure === 'same_host' && !LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
+    throw new Error('same_host_requires_loopback_endpoint');
+  }
+  validateUrl(baseUrl, { allowLocalNetwork: allowLocalNetworkForExposure(exposure) });
+}
+
+function isPathWithin(candidate: string, root: string): boolean {
+  const relative = path.relative(root, candidate);
+  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+export function registerPeerNetworkPeer(
+  input: RegisterPeerNetworkPeerInput
+): RegisterPeerNetworkPeerResult {
+  const tenantId = normalizeTenantId(input.tenantId);
+  const peerId = String(input.peerId || '').trim();
+  if (!PEER_ID_PATTERN.test(peerId)) {
+    throw new Error(`invalid_peer_network_peer_id:${peerId || 'missing'}`);
+  }
+  const sharedSecret = String(input.sharedSecret || '');
+  if (sharedSecret.length < 8) {
+    throw new Error(`peer_network_shared_secret_too_short:${peerId}`);
+  }
+  validatePeerExposure(input.baseUrl, input.exposure);
+
+  const catalogPath = input.catalogPath || peerNetworkCatalogPath(tenantId);
+  if (input.catalogPath) {
+    const resolvedCatalogPath = pathResolver.resolve(input.catalogPath);
+    const confidentialRoot = pathResolver.resolve(`knowledge/confidential/${tenantId}`);
+    const sharedTmpRoot = pathResolver.resolve('active/shared/tmp');
+    if (
+      !isPathWithin(resolvedCatalogPath, confidentialRoot) &&
+      !isPathWithin(resolvedCatalogPath, sharedTmpRoot)
+    ) {
+      throw new Error('peer_catalog_path_must_be_confidential_or_test_tmp');
+    }
+  }
+  let catalog: PeerNetworkCatalog = {
+    version: '1',
+    tenant_id: tenantId,
+    catalog_visibility: 'tenant_confidential',
+    peers: [],
+  };
+  if (safeExistsSync(catalogPath)) {
+    const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
+    const existing = JSON.parse(raw) as PeerNetworkCatalog;
+    if (existing.version !== '1' || !Array.isArray(existing.peers)) {
+      throw new Error(`invalid_peer_network_catalog:${catalogPath}`);
+    }
+    if (existing.tenant_id && existing.tenant_id !== tenantId) {
+      throw new Error(`peer_catalog_tenant_mismatch:${tenantId}`);
+    }
+    if (existing.catalog_visibility === 'public_metadata') {
+      throw new Error('cannot_register_secret_in_public_peer_catalog');
+    }
+    catalog = {
+      ...existing,
+      tenant_id: tenantId,
+      catalog_visibility: 'tenant_confidential',
+    };
+  }
+
+  const peer: PeerNetworkPeerRecord = {
+    peer_id: peerId,
+    base_url: input.baseUrl,
+    shared_secret: sharedSecret,
+    exposure: input.exposure,
+    allow_local_network: allowLocalNetworkForExposure(input.exposure),
+    ...(input.capabilities?.length ? { capabilities: [...new Set(input.capabilities)] } : {}),
+    ...(input.description ? { description: input.description } : {}),
+  };
+  const peers = catalog.peers.filter((entry) => entry.peer_id !== peerId);
+  catalog = {
+    ...catalog,
+    peers: [...peers, peer].sort((left, right) => left.peer_id.localeCompare(right.peer_id)),
+  };
+  safeMkdir(path.dirname(catalogPath), { recursive: true });
+  safeWriteFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+  return { catalogPath, catalog, peer };
 }
 
 export function resolvePeerRecord(
@@ -266,7 +409,9 @@ export function resolvePeerDispatchTarget(
   return {
     peer,
     destinationUrl: peer.base_url,
-    allowLocalNetwork: peer.allow_local_network !== false,
+    allowLocalNetwork:
+      peer.allow_local_network ??
+      (peer.exposure ? allowLocalNetworkForExposure(peer.exposure) : true),
     sharedSecret: peer.shared_secret,
   };
 }

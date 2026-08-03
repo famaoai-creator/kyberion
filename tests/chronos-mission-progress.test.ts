@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
 import {
   extractMissionDependencies,
@@ -6,10 +6,10 @@ import {
   normalizeMissionAssets,
   parseTaskBoard,
   summarizeNextTasks,
-} from "../presence/displays/chronos-mirror-v2/src/lib/mission-progress";
+} from '../presence/displays/chronos-mirror-v2/src/lib/mission-progress';
 
-describe("Chronos mission progress helpers", () => {
-  it("parses task board step counts and status", () => {
+describe('Chronos mission progress helpers', () => {
+  it('parses task board step counts and status', () => {
     const snapshot = parseTaskBoard(`
 # TASK_BOARD: TEST
 
@@ -25,20 +25,22 @@ describe("Chronos mission progress helpers", () => {
 `);
 
     expect(snapshot).toEqual({
-      boardStatus: "Execution Ready",
+      boardStatus: 'Execution Ready',
       boardStepsTotal: 4,
       boardStepsDone: 1,
       boardStepsActive: 1,
       boardStepsPending: 2,
+      dependencies: [],
+      generatedAssets: [],
     });
   });
 
-  it("summarizes next task queue state", () => {
+  it('summarizes next task queue state', () => {
     const summary = summarizeNextTasks([
-      { status: "planned" },
-      { status: "completed" },
-      { status: "accepted" },
-      { status: "in_progress" },
+      { status: 'planned' },
+      { status: 'completed' },
+      { status: 'accepted' },
+      { status: 'in_progress' },
     ]);
 
     expect(summary).toEqual({
@@ -48,83 +50,88 @@ describe("Chronos mission progress helpers", () => {
     });
   });
 
-  it("extracts dependency ids and normalizes asset paths", () => {
-    expect(extractMissionDependencies({
-      prerequisites: ["MSN-A", "MSN-B"],
-      depends_on: ["MSN-B", "MSN-C"],
-    })).toEqual(["MSN-A", "MSN-B", "MSN-C"]);
+  it('extracts dependency ids and normalizes asset paths', () => {
+    expect(
+      extractMissionDependencies({
+        prerequisites: ['MSN-A', 'MSN-B'],
+        depends_on: ['MSN-B', 'MSN-C'],
+      })
+    ).toEqual(['MSN-A', 'MSN-B', 'MSN-C']);
 
-    expect(normalizeMissionAssets([
+    expect(
+      normalizeMissionAssets([
+        {
+          path: 'evidence/result.json',
+          category: 'evidence',
+          sizeBytes: 12,
+          updatedAt: '2026-03-24T00:00:00.000Z',
+        },
+        {
+          path: 'deliverables/slide.html',
+          category: 'deliverables',
+          sizeBytes: 24,
+          updatedAt: '2026-03-24T00:00:01.000Z',
+        },
+        {
+          path: 'deliverables/slide.html',
+          category: 'deliverables',
+          sizeBytes: 24,
+          updatedAt: '2026-03-24T00:00:01.000Z',
+        },
+        {
+          path: '',
+          category: 'outputs',
+          sizeBytes: 0,
+          updatedAt: '2026-03-24T00:00:02.000Z',
+        },
+      ])
+    ).toEqual([
       {
-        path: "evidence/result.json",
-        category: "evidence",
+        path: 'deliverables/slide.html',
+        category: 'deliverables',
+        sizeBytes: 24,
+        updatedAt: '2026-03-24T00:00:01.000Z',
+      },
+      {
+        path: 'evidence/result.json',
+        category: 'evidence',
         sizeBytes: 12,
-        updatedAt: "2026-03-24T00:00:00.000Z",
-      },
-      {
-        path: "deliverables/slide.html",
-        category: "deliverables",
-        sizeBytes: 24,
-        updatedAt: "2026-03-24T00:00:01.000Z",
-      },
-      {
-        path: "deliverables/slide.html",
-        category: "deliverables",
-        sizeBytes: 24,
-        updatedAt: "2026-03-24T00:00:01.000Z",
-      },
-      {
-        path: "",
-        category: "outputs",
-        sizeBytes: 0,
-        updatedAt: "2026-03-24T00:00:02.000Z",
-      },
-    ])).toEqual([
-      {
-        path: "deliverables/slide.html",
-        category: "deliverables",
-        sizeBytes: 24,
-        updatedAt: "2026-03-24T00:00:01.000Z",
-      },
-      {
-        path: "evidence/result.json",
-        category: "evidence",
-        sizeBytes: 12,
-        updatedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: '2026-03-24T00:00:00.000Z',
       },
     ]);
   });
 
-  it("picks the latest handoff for a mission", () => {
-    expect(findLatestMissionHandoff("MSN-ALPHA", [
-      {
-        ts: "2026-03-24T01:00:00.000Z",
-        missionId: "MSN-ALPHA",
-        sender: "planner",
-        receiver: "worker-a",
-        promptExcerpt: "draft the plan",
-      },
-      {
-        ts: "2026-03-24T02:00:00.000Z",
-        missionId: "MSN-BETA",
-        sender: "planner",
-        receiver: "worker-b",
-      },
-      {
-        ts: "2026-03-24T03:00:00.000Z",
-        missionId: "MSN-ALPHA",
-        sender: "reviewer",
-        receiver: "worker-c",
-        promptExcerpt: "tighten the evidence",
-      },
-    ]))
-      .toMatchObject({
-        missionId: "MSN-ALPHA",
-        sender: "reviewer",
-        receiver: "worker-c",
-        promptExcerpt: "tighten the evidence",
-      });
+  it('picks the latest handoff for a mission', () => {
+    expect(
+      findLatestMissionHandoff('MSN-ALPHA', [
+        {
+          ts: '2026-03-24T01:00:00.000Z',
+          missionId: 'MSN-ALPHA',
+          sender: 'planner',
+          receiver: 'worker-a',
+          promptExcerpt: 'draft the plan',
+        },
+        {
+          ts: '2026-03-24T02:00:00.000Z',
+          missionId: 'MSN-BETA',
+          sender: 'planner',
+          receiver: 'worker-b',
+        },
+        {
+          ts: '2026-03-24T03:00:00.000Z',
+          missionId: 'MSN-ALPHA',
+          sender: 'reviewer',
+          receiver: 'worker-c',
+          promptExcerpt: 'tighten the evidence',
+        },
+      ])
+    ).toMatchObject({
+      missionId: 'MSN-ALPHA',
+      sender: 'reviewer',
+      receiver: 'worker-c',
+      promptExcerpt: 'tighten the evidence',
+    });
 
-    expect(findLatestMissionHandoff("MSN-GAMMA", [])).toBeNull();
+    expect(findLatestMissionHandoff('MSN-GAMMA', [])).toBeNull();
   });
 });

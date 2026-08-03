@@ -10,7 +10,10 @@ import {
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
   if (typeof value !== 'string' || !value.trim()) return [];
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 async function main(): Promise<void> {
@@ -35,6 +38,11 @@ async function main(): Promise<void> {
     .option('related-work-item-id', { type: 'array' })
     .option('metadata', { type: 'string' })
     .option('catalog', { type: 'string' })
+    .option('tenant-id', {
+      type: 'string',
+      default: process.env.KYBERION_TENANT_ID || '',
+      description: 'Tenant used to resolve the confidential peer catalog',
+    })
     .option('timeout-ms', { type: 'number', default: 5000 })
     .demandCommand(1)
     .parseSync();
@@ -69,9 +77,10 @@ async function main(): Promise<void> {
         metadata: argv.metadata ? JSON.parse(String(argv.metadata)) : undefined,
         timeoutMs: Number(argv['timeout-ms']),
         catalogPath: argv.catalog ? String(argv.catalog) : undefined,
+        tenantId: argv['tenant-id'] ? String(argv['tenant-id']) : undefined,
       });
       logger.success(
-        `[peer-conversation] ${outcome.receipt.ok ? 'delivered' : 'failed'} ${outcome.session.session_id}`,
+        `[peer-conversation] ${outcome.receipt.ok ? 'delivered' : 'failed'} ${outcome.session.session_id}`
       );
       console.log(JSON.stringify(outcome, null, 2));
       break;
@@ -83,7 +92,13 @@ async function main(): Promise<void> {
     }
     case 'show-session': {
       const peerId = String(argv['peer-id'] || argv['local-peer-id'] || '');
-      console.log(JSON.stringify({ session: loadPeerConversationSession(peerId, String(argv['session-id'] || '')) }, null, 2));
+      console.log(
+        JSON.stringify(
+          { session: loadPeerConversationSession(peerId, String(argv['session-id'] || '')) },
+          null,
+          2
+        )
+      );
       break;
     }
     case 'close-session': {
