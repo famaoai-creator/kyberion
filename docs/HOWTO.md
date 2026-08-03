@@ -115,6 +115,21 @@ Mental model:
 Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
 ```
 
+For direct Project administration and reconciliation:
+
+```bash
+pnpm project list [--json]
+pnpm project show <projectId> [--json]
+pnpm project create --project-id <id> --name <name> --summary <text> --tier <personal|confidential|public>
+pnpm project update-status <projectId> --status <draft|active|paused|archived>
+pnpm project reconcile [projectId] --dry-run --json
+pnpm project bootstrap --project-id <id> --name <name> --summary <text> --tier <tier>
+pnpm mission reassign-project <missionId> --project-id <projectId> --dry-run
+```
+
+The management read model keeps `Project -> Track -> Mission -> Task / Task Session` visible. A
+`Pipeline` is shown as a replayable execution procedure, not as a parent container.
+
 ---
 
 ## 🛠 4. Actuator Reference

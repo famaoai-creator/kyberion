@@ -7269,7 +7269,7 @@
     {
       "path": "product/schemas/project-record.schema.json",
       "tier": "public",
-      "size": 2584,
+      "size": 2814,
       "type": "json"
     },
     {
@@ -7623,7 +7623,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 13966,
+      "size": 13988,
       "type": "json"
     },
     {

@@ -2023,6 +2023,7 @@ export * from './productivity-task-plan.js';
 export * from './booking-preference-profile.js';
 export * from './presentation-preference-profile.js';
 export * from './project-registry.js';
+export * from './project-management.js';
 export * from './project-operational-state-registry.js';
 export * from './project-track-registry.js';
 export * from './sdlc-gate-readiness.js';
