@@ -647,6 +647,8 @@ export * from './output-artifacts.js';
 export * from './worker-context-compaction.js';
 export * from './completion-token-budget.js';
 export * from './worker-event-stream.js';
+export * from './ce-adoption.js';
+export * from './office-snapshot.js';
 export * from './lifecycle-hook-engine.js';
 export * from './dynamic-injection.js';
 export * from './prompt-cache-discipline.js';

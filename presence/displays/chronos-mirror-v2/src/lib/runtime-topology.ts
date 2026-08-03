@@ -1,4 +1,4 @@
-import type { AgentMessageSummary, A2AHandoffSummary } from "./agent-message-feed";
+import type { AgentMessageSummary, A2AHandoffSummary } from './agent-message-feed';
 
 export interface RuntimeTopologyRuntime {
   agentId: string;
@@ -36,7 +36,7 @@ export interface RuntimeTopologyFlow {
   latestAt: string;
   channel?: string;
   thread?: string;
-  kind: "a2a" | "agent_message" | "surface_link";
+  kind: 'a2a' | 'agent_message' | 'surface_link';
 }
 
 export interface RuntimeTopologySnapshot {
@@ -49,7 +49,7 @@ export interface RuntimeTopologySnapshot {
 export interface RuntimeTopologyGraphNode {
   id: string;
   label: string;
-  kind: "surface" | "runtime" | "peer";
+  kind: 'surface' | 'runtime' | 'peer';
   column: 0 | 1 | 2;
   x: number;
   y: number;
@@ -60,7 +60,7 @@ export interface RuntimeTopologyGraphEdge {
   id: string;
   from: string;
   to: string;
-  kind: "a2a" | "agent_message" | "surface_link";
+  kind: 'a2a' | 'agent_message' | 'surface_link';
   count: number;
   latestAt: string;
 }
@@ -73,7 +73,10 @@ export interface RuntimeTopologyGraph {
 }
 
 function normalizeTopologyKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function firstTopologyToken(value: string): string {
@@ -84,7 +87,7 @@ function firstTopologyToken(value: string): string {
 function inferRuntimeSurfaceId(
   runtime: RuntimeTopologyRuntime,
   surfaces: RuntimeTopologySurface[],
-  runtimeChannelHints: Map<string, Set<string>>,
+  runtimeChannelHints: Map<string, Set<string>>
 ): string | null {
   const normalizedSurfaceIds = surfaces.map((surface) => ({
     id: surface.id,
@@ -93,31 +96,32 @@ function inferRuntimeSurfaceId(
   }));
 
   const directCandidates = [runtime.ownerId, runtime.requestedBy, runtime.agentId]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
     .map((value) => ({
       normalized: normalizeTopologyKey(value),
       token: firstTopologyToken(value),
     }));
 
   for (const candidate of directCandidates) {
-    const direct = normalizedSurfaceIds.find((surface) =>
-      surface.normalized === candidate.normalized ||
-      surface.normalized.includes(candidate.normalized) ||
-      candidate.normalized.includes(surface.normalized) ||
-      (surface.token && candidate.token && surface.token === candidate.token)
+    const direct = normalizedSurfaceIds.find(
+      (surface) =>
+        surface.normalized === candidate.normalized ||
+        surface.normalized.includes(candidate.normalized) ||
+        candidate.normalized.includes(surface.normalized) ||
+        (surface.token && candidate.token && surface.token === candidate.token)
     );
     if (direct) return direct.id;
   }
 
   const channels = runtimeChannelHints.get(runtime.agentId);
-  if (channels?.has("slack") && surfaces.some((surface) => surface.id === "slack-bridge")) {
-    return "slack-bridge";
+  if (channels?.has('slack') && surfaces.some((surface) => surface.id === 'slack-bridge')) {
+    return 'slack-bridge';
   }
-  if (channels?.has("chronos") && surfaces.some((surface) => surface.id === "chronos-mirror-v2")) {
-    return "chronos-mirror-v2";
+  if (channels?.has('chronos') && surfaces.some((surface) => surface.id === 'chronos-mirror-v2')) {
+    return 'chronos-mirror-v2';
   }
-  if (channels?.has("voice") && surfaces.some((surface) => surface.id === "voice-hub")) {
-    return "voice-hub";
+  if (channels?.has('voice') && surfaces.some((surface) => surface.id === 'voice-hub')) {
+    return 'voice-hub';
   }
 
   return null;
@@ -166,10 +170,11 @@ export function buildRuntimeTopology(input: {
       from: ownerNode,
       to: message.agentId,
       count: (existing?.count || 0) + 1,
-      latestAt: existing?.latestAt && existing.latestAt > message.ts ? existing.latestAt : message.ts,
+      latestAt:
+        existing?.latestAt && existing.latestAt > message.ts ? existing.latestAt : message.ts,
       channel: message.channel,
       thread: message.thread,
-      kind: "agent_message",
+      kind: 'agent_message',
     });
   }
 
@@ -181,10 +186,11 @@ export function buildRuntimeTopology(input: {
       from: handoff.sender,
       to: handoff.receiver,
       count: (existing?.count || 0) + 1,
-      latestAt: existing?.latestAt && existing.latestAt > handoff.ts ? existing.latestAt : handoff.ts,
+      latestAt:
+        existing?.latestAt && existing.latestAt > handoff.ts ? existing.latestAt : handoff.ts,
       channel: handoff.channel,
       thread: handoff.thread,
-      kind: "a2a",
+      kind: 'a2a',
     });
     if (runtimeIds.has(handoff.sender)) {
       runtimeActivity.set(handoff.sender, (runtimeActivity.get(handoff.sender) || 0) + 1);
@@ -214,8 +220,8 @@ export function buildRuntimeTopology(input: {
       from: `surface-runtime:${surfaceId}`,
       to: runtime.agentId,
       count: existing?.count || 1,
-      latestAt: existing?.latestAt || "",
-      kind: "surface_link",
+      latestAt: existing?.latestAt || '',
+      kind: 'surface_link',
     });
   }
 
@@ -238,21 +244,23 @@ export function buildRuntimeTopologyGraph(snapshot: RuntimeTopologySnapshot): Ru
   const surfaceColumn = snapshot.surfaces.map((surface) => ({
     id: `surface-runtime:${surface.id}`,
     label: surface.id,
-    kind: "surface" as const,
-    detail: `${surface.kind} · ${surface.running ? "running" : "offline"}`,
+    kind: 'surface' as const,
+    detail: `${surface.kind} · ${surface.running ? 'running' : 'offline'}`,
   }));
-  const ownerLookup = new Map(snapshot.owners.map((owner) => [`${owner.type}:${owner.id}`, owner] as const));
+  const ownerLookup = new Map<string, RuntimeTopologyOwner>(
+    snapshot.owners.map((owner) => [`${owner.type}:${owner.id}`, owner])
+  );
   const runtimeColumn = snapshot.runtimes.map((runtime) => ({
     id: runtime.agentId,
     label: runtime.agentId,
-    kind: "runtime" as const,
+    kind: 'runtime' as const,
     detail: `${runtime.status} · ${runtime.ownerType}:${runtime.ownerId} · activity ${runtime.recentActivityCount}`,
   }));
 
   const graphFlows = snapshot.flows.filter((flow) => {
-    if (flow.kind === "surface_link") return true;
-    if (flow.kind === "a2a") return true;
-    if (flow.kind === "agent_message") {
+    if (flow.kind === 'surface_link') return true;
+    if (flow.kind === 'a2a') return true;
+    if (flow.kind === 'agent_message') {
       return !ownerLookup.has(flow.from);
     }
     return true;
@@ -262,14 +270,16 @@ export function buildRuntimeTopologyGraph(snapshot: RuntimeTopologySnapshot): Ru
     ...surfaceColumn.map((node) => node.id),
     ...runtimeColumn.map((node) => node.id),
   ]);
-  const peerIds = Array.from(new Set(
-    graphFlows.flatMap((flow) => [flow.from, flow.to]).filter((id) => !knownNodeIds.has(id)),
-  )).sort((a, b) => a.localeCompare(b));
+  const peerIds = Array.from(
+    new Set(
+      graphFlows.flatMap((flow) => [flow.from, flow.to]).filter((id) => !knownNodeIds.has(id))
+    )
+  ).sort((a, b) => a.localeCompare(b));
   const peerColumn = peerIds.map((peerId) => ({
     id: peerId,
-    label: peerId.includes(":") ? peerId.split(":").slice(-1)[0] : peerId,
-    kind: "peer" as const,
-    detail: "flow endpoint",
+    label: peerId.includes(':') ? peerId.split(':').slice(-1)[0] : peerId,
+    kind: 'peer' as const,
+    detail: 'flow endpoint',
   }));
 
   const columns = [surfaceColumn, runtimeColumn, peerColumn] as const;
@@ -285,7 +295,7 @@ export function buildRuntimeTopologyGraph(snapshot: RuntimeTopologySnapshot): Ru
       column: columnIndex as 0 | 1 | 2,
       x: columnX[columnIndex],
       y: topPadding + rowIndex * rowHeight,
-    })),
+    }))
   );
 
   return {

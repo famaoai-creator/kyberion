@@ -1,8 +1,9 @@
-import path from "node:path";
+import path from 'node:path';
 
-import { customerIsConfigured, customerRoot } from "@agent/core/customer-resolver";
-import { pathResolver } from "@agent/core/path-resolver";
-import { safeExistsSync, safeReadFile, safeReaddir } from "@agent/core/secure-io";
+import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
 
 export interface TraceFeedSummary {
   traceId: string;
@@ -13,7 +14,7 @@ export interface TraceFeedSummary {
   missionId?: string;
   pipelineId?: string;
   actuator?: string;
-  status: "ok" | "error" | "in_progress";
+  status: 'ok' | 'error' | 'in_progress';
   rootSpanName: string;
   spanCount: number;
   eventCount: number;
@@ -25,7 +26,7 @@ export interface TraceFeedRecord extends TraceFeedSummary {
   rootSpan: {
     spanId?: string;
     name: string;
-    status: "ok" | "error" | "in_progress";
+    status: 'ok' | 'error' | 'in_progress';
     startTime: string;
     endTime?: string;
     attributes?: Record<string, string | number | boolean>;
@@ -42,7 +43,7 @@ export interface TraceEventDetail {
 }
 
 export interface TraceArtifactDetail {
-  type: "screenshot" | "file" | "document" | "log";
+  type: 'screenshot' | 'file' | 'document' | 'log';
   path: string;
   description?: string;
   timestamp: string;
@@ -51,7 +52,7 @@ export interface TraceArtifactDetail {
 export interface TraceSpanDetail {
   spanId?: string;
   name: string;
-  status: "ok" | "error" | "in_progress";
+  status: 'ok' | 'error' | 'in_progress';
   startTime: string;
   endTime?: string;
   attributes?: Record<string, string | number | boolean>;
@@ -62,14 +63,14 @@ export interface TraceSpanDetail {
   children: TraceSpanDetail[];
 }
 
-export interface TraceFeedDetail extends TraceFeedRecord {
+export interface TraceFeedDetail extends Omit<TraceFeedRecord, 'rootSpan'> {
   rootSpan: TraceSpanDetail;
 }
 
 export interface TraceFeedOptions {
   dir?: string;
   limit?: number;
-  status?: "ok" | "error" | "in_progress";
+  status?: 'ok' | 'error' | 'in_progress';
   missionId?: string;
   pipelineId?: string;
   actuator?: string;
@@ -92,7 +93,7 @@ interface PersistedTraceShape {
 interface TraceNode {
   spanId?: string;
   name?: string;
-  status?: "ok" | "error" | "in_progress";
+  status?: 'ok' | 'error' | 'in_progress';
   startTime?: string;
   endTime?: string;
   attributes?: Record<string, string | number | boolean>;
@@ -104,14 +105,14 @@ interface TraceNode {
 }
 
 function asTraceNode(value: unknown): TraceNode | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== 'object') return null;
   return value as TraceNode;
 }
 
 export function resolveTraceFeedDirs(): string[] {
   const dirs: string[] = [];
   if (customerIsConfigured()) {
-    const customerTraceDir = customerRoot("logs/traces");
+    const customerTraceDir = customerRoot('logs/traces');
     if (customerTraceDir) dirs.push(customerTraceDir);
   }
 
@@ -120,14 +121,23 @@ export function resolveTraceFeedDirs(): string[] {
 }
 
 function isTraceEventDetail(value: unknown): value is TraceEventDetail {
-  return Boolean(value && typeof value === "object" && typeof (value as TraceEventDetail).name === "string");
+  return Boolean(
+    value && typeof value === 'object' && typeof (value as TraceEventDetail).name === 'string'
+  );
 }
 
 function isTraceArtifactDetail(value: unknown): value is TraceArtifactDetail {
-  return Boolean(value && typeof value === "object" && typeof (value as TraceArtifactDetail).type === "string");
+  return Boolean(
+    value && typeof value === 'object' && typeof (value as TraceArtifactDetail).type === 'string'
+  );
 }
 
-function countTraceNode(node: TraceNode | null): { spans: number; events: number; artifacts: number; errors: number } {
+function countTraceNode(node: TraceNode | null): {
+  spans: number;
+  events: number;
+  artifacts: number;
+  errors: number;
+} {
   if (!node) {
     return { spans: 0, events: 0, artifacts: 0, errors: 0 };
   }
@@ -135,7 +145,7 @@ function countTraceNode(node: TraceNode | null): { spans: number; events: number
   let spans = 1;
   let events = Array.isArray(node.events) ? node.events.length : 0;
   let artifacts = Array.isArray(node.artifacts) ? node.artifacts.length : 0;
-  let errors = node.status === "error" ? 1 : 0;
+  let errors = node.status === 'error' ? 1 : 0;
 
   for (const child of node.children || []) {
     const childCounts = countTraceNode(asTraceNode(child));
@@ -153,20 +163,20 @@ function normalizeTraceNode(node: TraceNode | null): TraceSpanDetail | null {
 
   return {
     spanId: node.spanId,
-    name: node.name || "trace",
-    status: node.status || "in_progress",
+    name: node.name || 'trace',
+    status: node.status || 'in_progress',
     startTime: node.startTime || new Date().toISOString(),
     endTime: node.endTime,
     attributes: node.attributes,
     events: Array.isArray(node.events) ? node.events.filter(isTraceEventDetail) : [],
     artifacts: Array.isArray(node.artifacts) ? node.artifacts.filter(isTraceArtifactDetail) : [],
     knowledgeRefs: Array.isArray(node.knowledgeRefs)
-      ? node.knowledgeRefs.filter((ref): ref is string => typeof ref === "string")
+      ? node.knowledgeRefs.filter((ref): ref is string => typeof ref === 'string')
       : [],
     error: node.error,
-    children: (node.children || []).map((child) => normalizeTraceNode(asTraceNode(child))).filter(
-      (child): child is TraceSpanDetail => Boolean(child),
-    ),
+    children: (node.children || [])
+      .map((child) => normalizeTraceNode(asTraceNode(child)))
+      .filter((child): child is TraceSpanDetail => Boolean(child)),
   };
 }
 
@@ -182,8 +192,8 @@ function matchesTraceQuery(summary: TraceFeedSummary, query?: string): boolean {
     summary.rootSpanName,
     summary.status,
   ]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
-    .join(" ")
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
     .toLowerCase();
   return haystack.includes(normalized);
 }
@@ -196,12 +206,19 @@ function matchesTraceFilters(summary: TraceFeedSummary, options: TraceFeedOption
   return matchesTraceQuery(summary, options.query);
 }
 
-export function summarizePersistedTrace(record: PersistedTraceShape, tracePath: string): TraceFeedSummary | null {
+export function summarizePersistedTrace(
+  record: PersistedTraceShape,
+  tracePath: string
+): TraceFeedSummary | null {
   const rootSpan = asTraceNode(record.rootSpan);
   if (!rootSpan || !record.traceId) return null;
 
   const counts = countTraceNode(rootSpan);
-  const startedAt = record.metadata?.startedAt || rootSpan.startTime || record._persistedAt || new Date().toISOString();
+  const startedAt =
+    record.metadata?.startedAt ||
+    rootSpan.startTime ||
+    record._persistedAt ||
+    new Date().toISOString();
   const completedAt = record.metadata?.completedAt || rootSpan.endTime;
 
   return {
@@ -213,8 +230,8 @@ export function summarizePersistedTrace(record: PersistedTraceShape, tracePath: 
     missionId: record.metadata?.missionId,
     pipelineId: record.metadata?.pipelineId,
     actuator: record.metadata?.actuator,
-    status: rootSpan.status || "in_progress",
-    rootSpanName: rootSpan.name || "trace",
+    status: rootSpan.status || 'in_progress',
+    rootSpanName: rootSpan.name || 'trace',
     spanCount: counts.spans,
     eventCount: counts.events,
     artifactCount: counts.artifacts,
@@ -222,7 +239,10 @@ export function summarizePersistedTrace(record: PersistedTraceShape, tracePath: 
   };
 }
 
-export function detailPersistedTrace(record: PersistedTraceShape, tracePath: string): TraceFeedDetail | null {
+export function detailPersistedTrace(
+  record: PersistedTraceShape,
+  tracePath: string
+): TraceFeedDetail | null {
   const summary = summarizePersistedTrace(record, tracePath);
   const rootSpan = normalizeTraceNode(asTraceNode(record.rootSpan));
   if (!summary || !rootSpan) return null;
@@ -242,7 +262,7 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
   const records: TraceFeedRecord[] = [];
   const seen = new Set<string>();
 
-  for (const dir of (options.dir ? [options.dir] : resolveTraceFeedDirs())) {
+  for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
     if (!safeExistsSync(dir)) continue;
 
     const files = safeReaddir(dir)
@@ -252,8 +272,8 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
 
     for (const fileName of files) {
       const filePath = path.join(dir, fileName);
-      const raw = safeReadFile(filePath, { encoding: "utf8" }) as string;
-      for (const line of raw.split("\n")) {
+      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
@@ -285,15 +305,19 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
     }
   }
 
-  return records
-    .sort((a, b) => b.persistedAt.localeCompare(a.persistedAt))
-    .slice(0, Math.max(1, options.limit || 24));
+  const bounded = new BoundedRingBuffer<TraceFeedRecord>(CE_STREAM_LIMITS.maxLiveMessages);
+  for (const record of records.sort((a, b) => b.persistedAt.localeCompare(a.persistedAt)))
+    bounded.push(record);
+  return bounded.toArray().slice(0, Math.max(1, options.limit || 24));
 }
 
-export function collectTraceDetail(traceId: string, options: TraceFeedOptions = {}): TraceFeedDetail | null {
+export function collectTraceDetail(
+  traceId: string,
+  options: TraceFeedOptions = {}
+): TraceFeedDetail | null {
   if (!traceId) return null;
 
-  for (const dir of (options.dir ? [options.dir] : resolveTraceFeedDirs())) {
+  for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
     if (!safeExistsSync(dir)) continue;
 
     const files = safeReaddir(dir)
@@ -303,8 +327,8 @@ export function collectTraceDetail(traceId: string, options: TraceFeedOptions = 
 
     for (const fileName of files) {
       const filePath = path.join(dir, fileName);
-      const raw = safeReadFile(filePath, { encoding: "utf8" }) as string;
-      for (const line of raw.split("\n")) {
+      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {

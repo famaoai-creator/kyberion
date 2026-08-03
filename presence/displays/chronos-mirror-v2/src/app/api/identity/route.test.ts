@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { NextRequest } from 'next/server';
 
 // route.ts calls guardRequest(req), which needs a NextRequest (cookies API
 // etc.) that a plain Request doesn't implement. Bypass it here (this test
@@ -33,7 +34,7 @@ function fixtureDir(): string {
 }
 
 function request() {
-  return new Request('http://localhost/api/identity');
+  return new NextRequest('http://localhost/api/identity');
 }
 
 function writeFixture(fileName: string, content: string) {
