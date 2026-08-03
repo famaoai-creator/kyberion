@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-operation.schema.json",
+  "title": "Organization Operation Record",
+  "type": "object",
+  "required": [
+    "version",
+    "operation_id",
+    "organization_id",
+    "name",
+    "operation_type",
+    "owner_role",
+    "trigger",
+    "automation_boundary",
+    "escalation_path",
+    "evidence_outputs",
+    "execution_target",
+    "tier",
+    "status",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "operation_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "service_id": { "type": "string" },
+    "capability_id": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
+    "purpose": { "type": "string" },
+    "operation_type": {
+      "type": "string",
+      "enum": ["continuous", "scheduled", "event_driven", "governance"]
+    },
+    "owner_role": { "type": "string", "minLength": 1 },
+    "trigger": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["schedule", "event", "manual", "cadence"] },
+        "expression": { "type": "string" },
+        "event_ref": { "type": "string" },
+        "timezone": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "automation_boundary": {
+      "type": "object",
+      "required": ["allowed_actions", "approval_required_actions", "forbidden_actions"],
+      "properties": {
+        "allowed_actions": { "type": "array", "items": { "type": "string" } },
+        "approval_required_actions": { "type": "array", "items": { "type": "string" } },
+        "forbidden_actions": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "escalation_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "evidence_outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "execution_target": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["mission", "task_session", "pipeline", "actuator"] },
+        "ref": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "status": { "type": "string", "enum": ["draft", "active", "paused", "retired"] },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source_refs": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}

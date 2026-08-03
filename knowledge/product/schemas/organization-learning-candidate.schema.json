@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-learning-candidate.schema.json",
+  "title": "Organization Learning Candidate",
+  "type": "object",
+  "required": [
+    "version",
+    "learning_id",
+    "organization_id",
+    "source_type",
+    "source_ref",
+    "title",
+    "summary",
+    "evidence_refs",
+    "target_kind",
+    "status",
+    "tier",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "learning_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "organization_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["incident_review", "routine_exception", "project_closure", "governance_decision"]
+    },
+    "source_ref": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "target_kind": {
+      "type": "string",
+      "enum": ["pattern", "sop_candidate", "knowledge_hint", "report_template"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "approved", "rejected", "promoted"]
+    },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
+}
