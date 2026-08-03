@@ -16,14 +16,22 @@ const TENANT_GROUP_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve('schemas/tenant-group.schema.json');
-const tenantGroupValidate = compileSchemaFromPath(ajv, TENANT_GROUP_SCHEMA_PATH);
+let tenantGroupValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
 // Resolved at module load against the real repo root on purpose: the schema is
 // tracked source, not fixture data — hermetic tests that pass a fixture
 // rootDir still validate against the canonical schema.
 const TENANT_PROFILE_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/tenant-profile.schema.json'
 );
-const tenantProfileValidate = compileSchemaFromPath(ajv, TENANT_PROFILE_SCHEMA_PATH);
+let tenantProfileValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
+
+function getTenantGroupValidator() {
+  return (tenantGroupValidate ??= compileSchemaFromPath(ajv, TENANT_GROUP_SCHEMA_PATH));
+}
+
+function getTenantProfileValidator() {
+  return (tenantProfileValidate ??= compileSchemaFromPath(ajv, TENANT_PROFILE_SCHEMA_PATH));
+}
 
 /** Declared ingest source system for a tenant (DA-01). */
 export interface TenantIngestSource {
@@ -93,9 +101,10 @@ function assertTenantGroupId(groupId: string): void {
 
 function assertTenantGroupProfile(profile: TenantGroupProfile): void {
   const groupId = profile.tenant_group_id;
-  const ok = tenantGroupValidate(profile);
+  const validate = getTenantGroupValidator();
+  const ok = validate(profile);
   if (ok) return;
-  const details = (tenantGroupValidate.errors || [])
+  const details = (validate.errors || [])
     .map((err) => `${err.instancePath || '/'} ${err.message || 'schema violation'}`)
     .join('; ');
   throw new Error(`[tenant-registry] invalid tenant group profile '${groupId}': ${details}`);
@@ -128,9 +137,10 @@ export function listTenantProfileSlugs(options: TenantRegistryPathOptions = {}):
 
 function assertTenantProfile(profile: TenantProfile): void {
   const slug = profile?.tenant_slug ?? 'unknown';
-  const ok = tenantProfileValidate(profile);
+  const validate = getTenantProfileValidator();
+  const ok = validate(profile);
   if (ok) return;
-  const details = (tenantProfileValidate.errors || [])
+  const details = (validate.errors || [])
     .map((err) => `${err.instancePath || '/'} ${err.message || 'schema violation'}`)
     .join('; ');
   throw new Error(`[tenant-registry] invalid tenant profile '${slug}': ${details}`);
@@ -167,6 +177,28 @@ export function readTenantProfile(
     );
   }
   return profile;
+}
+
+/**
+ * Create or update a tenant profile through the same schema and path boundary
+ * used by the registry reader. Callers that write personal-tier profiles must
+ * establish a sovereign_concierge/sovereign execution context first.
+ */
+export function writeTenantProfile(
+  profile: TenantProfile,
+  options: TenantRegistryPathOptions = {}
+): TenantProfile {
+  assertTenantSlug(profile.tenant_slug);
+  const normalized: TenantProfile = {
+    ...profile,
+    tenant_id: profile.tenant_id || profile.tenant_slug,
+    knowledge_root: profile.knowledge_root || defaultTenantKnowledgeRoot(profile.tenant_slug),
+  };
+  assertTenantProfile(normalized);
+  const file = tenantProfilePath(normalized.tenant_slug, options);
+  safeMkdir(path.dirname(file), { recursive: true });
+  safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
+  return normalized;
 }
 
 /**

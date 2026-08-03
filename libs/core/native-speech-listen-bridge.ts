@@ -22,25 +22,51 @@ export interface NativeSpeechListenResult {
   deviceId?: string;
 }
 
+function buildWindowsSpeechCommand(request: NativeSpeechListenRequest): {
+  command: string;
+  args: string[];
+} {
+  const locale = request.locale.replace(/'/g, "''");
+  const timeout = Math.max(1, Math.round(request.timeoutSeconds));
+  // System.Speech is included with Windows PowerShell/.NET Framework.  The
+  // recognizer uses the user's default recording device and the installed
+  // DictationGrammar for the requested locale.
+  const script = [
+    "$ErrorActionPreference='Stop'",
+    'Add-Type -AssemblyName System.Speech',
+    `$culture=New-Object System.Globalization.CultureInfo('${locale}')`,
+    '$engine=New-Object System.Speech.Recognition.SpeechRecognitionEngine($culture)',
+    '$engine.SetInputToDefaultAudioDevice()',
+    '$engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))',
+    `$result=$engine.Recognize([TimeSpan]::FromSeconds(${timeout}))`,
+    `if ($null -eq $result) { @{ok=$false;locale='${locale}';error='no_speech_result'} | ConvertTo-Json -Compress } else { @{ok=$true;locale='${locale}';isFinal=$true;text=$result.Text} | ConvertTo-Json -Compress }`,
+  ].join(';');
+  return {
+    command: 'powershell.exe',
+    args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+  };
+}
+
 export async function listenNativeSpeech(
   request: NativeSpeechListenRequest
 ): Promise<NativeSpeechListenResult> {
+  const isWindows = process.platform === 'win32';
   const scriptPath =
     request.scriptPath?.trim() || pathResolver.resolve('satellites/voice-hub/native-stt.swift');
 
   return new Promise((resolve, reject) => {
-    const args = [
+    const windowsCommand = isWindows ? buildWindowsSpeechCommand(request) : null;
+    const command = windowsCommand?.command || 'swift';
+    const args = windowsCommand?.args || [
       scriptPath,
       '--locale',
       request.locale,
       '--timeout',
       String(request.timeoutSeconds),
+      ...(request.deviceId ? ['--device-id', request.deviceId] : []),
     ];
-    if (request.deviceId) {
-      args.push('--device-id', request.deviceId);
-    }
 
-    const child = spawn('swift', args, {
+    const child = spawn(command, args, {
       cwd: request.cwd || pathResolver.rootDir(),
       env: request.env ?? process.env,
       stdio: ['ignore', 'pipe', 'pipe'],

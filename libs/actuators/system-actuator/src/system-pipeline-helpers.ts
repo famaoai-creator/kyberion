@@ -13,6 +13,7 @@ import {
   executeAdfSteps,
   pathResolver,
   resolveVars,
+  resolveDesktopLaunchAdapter,
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
@@ -1575,24 +1576,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       if (!/^(https?|file):\/\//.test(url)) {
         throw new Error(`open_url refused unsupported URL scheme: ${url.slice(0, 64)}`);
       }
-      const platform = process.platform;
       try {
-        if (platform === 'darwin') {
-          await retry(
-            async () => safeExec('open', [url], { cwd: rootDir }),
-            buildRetryOptions(params.retry)
-          );
-        } else if (platform === 'win32') {
-          await retry(
-            async () => safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir }),
-            buildRetryOptions(params.retry)
-          );
-        } else {
-          await retry(
-            async () => safeExec('xdg-open', [url], { cwd: rootDir }),
-            buildRetryOptions(params.retry)
-          );
-        }
+        const launcher = resolveDesktopLaunchAdapter();
+        await retry(async () => launcher.open(url, rootDir), buildRetryOptions(params.retry));
         ctx = { ...ctx, [params.export_as || 'opened_url']: url };
       } catch (err: any) {
         logger.warn(`[OPEN_URL] Failed to open ${url}: ${err.message}`);
@@ -1650,10 +1636,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     case 'scroll': {
       const direction = String(resolve(params.direction || 'down')) as
-        | 'up'
-        | 'down'
-        | 'left'
-        | 'right';
+        'up' | 'down' | 'left' | 'right';
       scrollAt(
         Number(resolve(params.x || 0)),
         Number(resolve(params.y || 0)),
@@ -1697,23 +1680,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error(`open_file: path must be within repo root: ${filePath}`);
       }
-      const platform = process.platform;
-      if (platform === 'darwin') {
-        await retry(
-          async () => safeExec('open', [absPath], { cwd: rootDir }),
-          buildRetryOptions(params.retry)
-        );
-      } else if (platform === 'win32') {
-        await retry(
-          async () => safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir }),
-          buildRetryOptions(params.retry)
-        );
-      } else {
-        await retry(
-          async () => safeExec('xdg-open', [absPath], { cwd: rootDir }),
-          buildRetryOptions(params.retry)
-        );
-      }
+      const launcher = resolveDesktopLaunchAdapter();
+      await retry(async () => launcher.open(absPath, rootDir), buildRetryOptions(params.retry));
       break;
     }
     case 'process_kill': {

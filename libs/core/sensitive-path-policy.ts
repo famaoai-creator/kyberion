@@ -85,7 +85,13 @@ function isPathWithin(candidate: string, root: string): boolean {
   const normalizedCandidate = normalizeCandidate(candidate);
   const normalizedRoot = normalizeCandidate(root);
   const relative = path.relative(normalizedRoot, normalizedCandidate);
-  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`));
+  // On Windows, path.relative() returns an absolute path when the two paths
+  // are on different drives. That absolute result is not a descendant of the
+  // sensitive root and must not be accepted by the prefix checks below.
+  return (
+    relative === '' ||
+    (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))
+  );
 }
 
 export function findSensitivePathMatch(candidate: string): SensitivePathMatch | null {

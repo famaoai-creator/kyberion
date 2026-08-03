@@ -5,7 +5,11 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
-export const VISION_ACTUATOR_CAPTURE_OPS = ['inspect_image', 'ocr_image'] as const;
+export const VISION_ACTUATOR_CAPTURE_OPS = [
+  'inspect_image',
+  'ocr_image',
+  'describe_image',
+] as const;
 
 export const VISION_ACTUATOR_TRANSFORM_OPS = [] as const;
 

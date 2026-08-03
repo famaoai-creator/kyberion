@@ -14,6 +14,8 @@ import {
 } from './artifact-review.js';
 import { executeServicePreset } from './service-engine.js';
 import { getReasoningBackend } from './reasoning-backend.js';
+import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
+import { buildWorkGraph } from './work-graph.js';
 import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { logger } from './core.js';
@@ -66,6 +68,7 @@ import {
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
 import { recordTask } from './mission-maintenance.js';
+import type { ReasoningCallOptions } from './reasoning-backend.js';
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
 export type MissionWorkItemDispatchFinalStatus = 'review' | 'done' | 'blocked';
@@ -137,7 +140,31 @@ export interface MissionWorkItemDispatchManifest {
 
 interface WorkItemDispatchAdapters {
   routeA2A?: (envelope: A2AMessage) => Promise<A2AMessage>;
-  delegateTask?: (instruction: string, context?: string) => Promise<string>;
+  delegateTask?: (
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ) => Promise<string>;
+}
+
+const DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS = 2 * 60 * 1000;
+
+function resolveWorkItemResponseTimeoutMs(): number {
+  const raw = process.env.KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS?.trim();
+  const value = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS;
+}
+
+class WorkItemResponseTimeoutError extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(
+      `[WORKITEM_RESPONSE_TIMEOUT] no response within ${timeoutMs}ms; the work item was blocked without retrying the same request`
+    );
+    this.name = 'WorkItemResponseTimeoutError';
+    this.timeoutMs = timeoutMs;
+  }
 }
 
 type WorkItemDispatchReviewerVerdict = {
@@ -774,16 +801,43 @@ async function delegateSubagentTask(input: {
   routingOptions: Record<string, unknown>;
   adapters: WorkItemDispatchAdapters;
   notes: string[];
+  signal: AbortSignal;
 }): Promise<string> {
   const run = async (): Promise<string> => {
     if (input.adapters.delegateTask) {
-      return input.adapters.delegateTask(input.prompt, `workitem:${input.item.item_id}`);
+      return input.adapters.delegateTask(input.prompt, `workitem:${input.item.item_id}`, {
+        signal: input.signal,
+      });
     }
-    return getReasoningBackend().delegateTask(
-      input.prompt,
-      `workitem:${input.item.item_id}`,
-      input.routingOptions
+    const missionId = String(
+      input.item.metadata?.mission_id || input.item.project_id || input.item.item_id
+    ).trim();
+    const receipt = await delegateWorkItemWithReasoningBackend(
+      getReasoningBackend(),
+      {
+        work_item_id: input.item.item_id,
+        task_id: getWorkItemTaskId(input.item) || input.item.item_id,
+        ...(missionId ? { mission_id: missionId } : {}),
+        ...(input.item.assignee_peer_id ? { agent_id: input.item.assignee_peer_id } : {}),
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: missionId,
+          read_tiers: ['public', 'confidential', 'personal'],
+          write_tier: 'public',
+          purpose: 'mission work item delegation',
+        },
+        success_status: isIndependentReviewRequired(input.item) ? 'review' : 'done',
+        instruction: input.prompt,
+        context_refs: [`workitem:${input.item.item_id}`, JSON.stringify(input.routingOptions)],
+        idempotency_key: `workitem:${input.item.item_id}:${input.item.version}`,
+      },
+      undefined,
+      input.signal
     );
+    if (receipt.status !== 'succeeded') {
+      throw new Error(receipt.error || `work item delegation ${receipt.status}`);
+    }
+    return receipt.output || '';
   };
   const wantsFiles = workItemExpectsFiles(input.item);
   const previousTools = process.env.KYBERION_CLAUDE_AGENT_TOOLS;
@@ -795,6 +849,8 @@ async function delegateSubagentTask(input: {
     let responseText = await run();
     if (!responseText || !responseText.trim()) {
       input.notes.push('empty subagent response; retrying once');
+      // Empty output is the only retryable response condition. A timeout is
+      // never retried in this layer; the mission record must become actionable.
       responseText = await run();
     }
     return responseText;
@@ -802,6 +858,29 @@ async function delegateSubagentTask(input: {
     if (wantsFiles && previousTools === undefined) {
       delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;
     }
+  }
+}
+
+async function runWithWorkItemResponseDeadline<T>(
+  run: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const timeoutMs = resolveWorkItemResponseTimeoutMs();
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new WorkItemResponseTimeoutError(timeoutMs));
+  }, timeoutMs);
+  timer.unref?.();
+  try {
+    try {
+      return await run(controller.signal);
+    } catch (error) {
+      if (timedOut) throw new WorkItemResponseTimeoutError(timeoutMs);
+      throw error;
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -1450,15 +1529,19 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     options.sources && options.sources.length > 0
       ? options.sources
       : (['local'] as WorkItemSource[]);
-  return listWorkItems({
+  const allMissionItems = listWorkItems({
     projectId,
     source: sources,
-    status: statuses,
     labels,
-  }).filter(
-    (item) =>
-      getMissionLabel(item) === missionId && areMissionTaskDependenciesSatisfied(state, item)
-  );
+  }).filter((item) => getMissionLabel(item) === missionId);
+  const graph = buildWorkGraph(allMissionItems, projectId);
+  const readyIds = new Set(graph.ready_item_ids);
+  return allMissionItems
+    .filter((item) => statuses.includes(item.status))
+    .filter((item) => {
+      if (item.status === 'blocked') return areMissionTaskDependenciesSatisfied(state, item);
+      return readyIds.has(item.item_id) && areMissionTaskDependenciesSatisfied(state, item);
+    });
 }
 
 function resolveAssigneePeerId(input: {
@@ -1821,6 +1904,7 @@ async function routeToAgentOrSubagent(input: {
   taskModelHint: TaskModelHint;
   mode: MissionWorkItemDispatchMode;
   adapters: WorkItemDispatchAdapters;
+  signal: AbortSignal;
 }): Promise<{ executionMode: 'agent' | 'subagent'; responseText: string; notes: string[] }> {
   const prompt = input.prompt;
   const itemDetails = input.item as WorkItem & Record<string, unknown>;
@@ -1862,6 +1946,7 @@ async function routeToAgentOrSubagent(input: {
       routingOptions,
       adapters: input.adapters,
       notes,
+      signal: input.signal,
     });
     return { executionMode: 'subagent', responseText, notes };
   }
@@ -1874,6 +1959,7 @@ async function routeToAgentOrSubagent(input: {
       routingOptions,
       adapters: input.adapters,
       notes,
+      signal: input.signal,
     });
     return { executionMode: 'subagent', responseText, notes };
   }
@@ -1951,8 +2037,12 @@ async function routeToAgentOrSubagent(input: {
     notes.push(`agent dispatch failed: ${error?.message || error}; falling back to subagent`);
     const backend = getReasoningBackend();
     const responseText = input.adapters.delegateTask
-      ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`)
-      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`);
+      ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`, {
+          signal: input.signal,
+        })
+      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`, {
+          signal: input.signal,
+        });
     return { executionMode: 'subagent', responseText, notes };
   }
 }
@@ -1978,16 +2068,21 @@ async function obtainTaskResultResponse(input: {
   let attemptPrompt = input.prompt;
   const notes: string[] = [];
   let retried = false;
-  let response = await routeToAgentOrSubagent({
-    missionId: input.missionId,
-    item: input.item,
-    teamRole: input.teamRole,
-    assigneePeerId: input.assigneePeerId,
-    prompt: attemptPrompt,
-    taskModelHint: input.taskModelHint,
-    mode: input.mode,
-    adapters: input.adapters,
-  });
+  const route = (prompt: string) =>
+    runWithWorkItemResponseDeadline((signal) =>
+      routeToAgentOrSubagent({
+        missionId: input.missionId,
+        item: input.item,
+        teamRole: input.teamRole,
+        assigneePeerId: input.assigneePeerId,
+        prompt,
+        taskModelHint: input.taskModelHint,
+        mode: input.mode,
+        adapters: input.adapters,
+        signal,
+      })
+    );
+  let response = await route(attemptPrompt);
   let parsed = parseTaskResultResponse(response.responseText);
   let taskResult = parsed.taskResult;
   let parseErrors = parsed.parseErrors;
@@ -2014,16 +2109,7 @@ async function obtainTaskResultResponse(input: {
         ...parseErrors,
       ],
     });
-    response = await routeToAgentOrSubagent({
-      missionId: input.missionId,
-      item: input.item,
-      teamRole: input.teamRole,
-      assigneePeerId: input.assigneePeerId,
-      prompt: attemptPrompt,
-      taskModelHint: input.taskModelHint,
-      mode: input.mode,
-      adapters: input.adapters,
-    });
+    response = await route(attemptPrompt);
     parsed = parseTaskResultResponse(response.responseText);
     taskResult = parsed.taskResult;
     parseErrors = parsed.parseErrors;
@@ -2243,16 +2329,58 @@ async function dispatchMissionWorkItemsRound(
       }
     }
 
-    const response = await obtainTaskResultResponse({
-      missionId,
-      item,
-      teamRole,
-      assigneePeerId,
-      prompt: dispatchPrompt,
-      taskModelHint,
-      mode,
-      adapters,
-    });
+    let response: Awaited<ReturnType<typeof obtainTaskResultResponse>>;
+    try {
+      response = await obtainTaskResultResponse({
+        missionId,
+        item,
+        teamRole,
+        assigneePeerId,
+        prompt: dispatchPrompt,
+        taskModelHint,
+        mode,
+        adapters,
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      record.status = 'failed';
+      record.work_item_status_after = 'blocked';
+      record.notes.push(`response wait failed: ${reason}`);
+      record.notes.push(
+        reason.includes('[WORKITEM_RESPONSE_TIMEOUT]')
+          ? 'next action: inspect the provider/session and re-dispatch after recovery'
+          : 'next action: inspect the provider error before re-dispatching'
+      );
+      updateWorkItem({
+        itemId: item.item_id,
+        status: 'blocked',
+        assigneePeerId: assigneePeerId || item.assignee_peer_id,
+        metadata: {
+          ...(item.metadata || {}),
+          last_dispatch_at: new Date().toISOString(),
+          last_dispatch_mission_id: missionId,
+          last_dispatch_error: reason,
+          response_wait_status: reason.includes('[WORKITEM_RESPONSE_TIMEOUT]')
+            ? 'timed_out'
+            : 'failed',
+          response_wait_next_action: 'inspect provider/session and re-dispatch after recovery',
+        },
+      });
+      appendDispatchEvent(dispatchEventPath(missionPath), {
+        event_type: 'workitem_dispatch_failed',
+        mission_id: missionId,
+        item_id: item.item_id,
+        team_role: teamRole,
+        assignee_peer_id: assigneePeerId,
+        reason,
+        response_wait_status: reason.includes('[WORKITEM_RESPONSE_TIMEOUT]')
+          ? 'timed_out'
+          : 'failed',
+        next_action: 'inspect provider/session and re-dispatch after recovery',
+      });
+      records.push(record);
+      continue;
+    }
     const cognitiveRouteSummary = formatCognitiveRouteDecision(dispatchContext.cognitiveRoute);
     let reviewerResult: {
       verdict: WorkItemDispatchReviewerVerdict;

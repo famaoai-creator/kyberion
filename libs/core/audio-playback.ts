@@ -35,21 +35,54 @@ export interface PlayAudioOptions {
 
 export interface AudioPlaybackProbeResult {
   available: boolean;
-  backend: 'afplay' | 'aplay' | 'custom' | 'none';
+  backend: 'afplay' | 'aplay' | 'powershell-soundplayer' | 'custom' | 'none';
   reason?: string;
 }
 
-function defaultPlayerArgv(audioPath: string): { argv: string[]; backend: 'afplay' | 'aplay' } {
-  if (process.platform === 'darwin') {
-    return { backend: 'afplay', argv: ['afplay', audioPath] };
-  }
-  return { backend: 'aplay', argv: ['aplay', '-q', audioPath] };
+interface AudioPlaybackAdapter {
+  backend: 'afplay' | 'aplay' | 'powershell-soundplayer';
+  command(audioPath: string): string[];
+  probe(): boolean;
+}
+const audioAdapters: Partial<Record<NodeJS.Platform, AudioPlaybackAdapter>> = {
+  darwin: {
+    backend: 'afplay',
+    command: (file) => ['afplay', file],
+    probe: () => spawnSync('which', ['afplay'], { stdio: 'ignore' }).status === 0,
+  },
+  linux: {
+    backend: 'aplay',
+    command: (file) => ['aplay', '-q', file],
+    probe: () => spawnSync('which', ['aplay'], { stdio: 'ignore' }).status === 0,
+  },
+  win32: {
+    backend: 'powershell-soundplayer',
+    command: (file) => [
+      'powershell.exe',
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `(New-Object System.Media.SoundPlayer '${file.replace(/'/g, "''")}').PlaySync()`,
+    ],
+    probe: () => spawnSync('where', ['powershell.exe'], { stdio: 'ignore' }).status === 0,
+  },
+};
+function resolveAudioPlaybackAdapter(): AudioPlaybackAdapter | undefined {
+  return audioAdapters[process.platform];
 }
 
 export function probeAudioPlayback(opts: PlayAudioOptions = {}): AudioPlaybackProbeResult {
   if (opts.command?.length) return { available: true, backend: 'custom' };
-  const binary = process.platform === 'darwin' ? 'afplay' : 'aplay';
-  const probe = spawnSync('which', [binary], { stdio: 'ignore' });
+  const adapter = resolveAudioPlaybackAdapter();
+  const binary =
+    adapter?.backend === 'afplay'
+      ? 'afplay'
+      : adapter?.backend === 'aplay'
+        ? 'aplay'
+        : 'powershell.exe';
+  const probe = adapter
+    ? { error: undefined, status: adapter.probe() ? 0 : 1 }
+    : { error: new Error('unsupported'), status: 1 };
   if (probe.error || probe.status !== 0) {
     return {
       available: false,
@@ -57,7 +90,7 @@ export function probeAudioPlayback(opts: PlayAudioOptions = {}): AudioPlaybackPr
       reason: `${binary} is not available on PATH — local playback is disabled`,
     };
   }
-  return { available: true, backend: binary as 'afplay' | 'aplay' };
+  return { available: true, backend: adapter!.backend };
 }
 
 function buildArgv(audioPath: string, opts: PlayAudioOptions): string[] {
@@ -65,7 +98,15 @@ function buildArgv(audioPath: string, opts: PlayAudioOptions): string[] {
     const argv = opts.command.map((part) => (part === '{file}' ? audioPath : part));
     return argv.includes(audioPath) ? argv : [...argv, audioPath];
   }
-  return defaultPlayerArgv(audioPath).argv;
+  const adapter = resolveAudioPlaybackAdapter();
+  if (!adapter) throw new Error(`audio playback is unsupported on ${process.platform}`);
+  return adapter.command(audioPath);
+}
+
+/** Resolve the native playback command for callers that stream their own audio. */
+export function resolveAudioPlaybackCommand(audioPath = '{file}'): string[] | null {
+  const adapter = resolveAudioPlaybackAdapter();
+  return adapter ? adapter.command(audioPath) : null;
 }
 
 export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): PlaybackHandle {

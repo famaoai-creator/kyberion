@@ -4,6 +4,7 @@ export type VoiceSttBackend =
   | 'auto'
   | 'server'
   | 'fluid_audio'
+  | 'faster_whisper'
   | 'mlx_whisper'
   | 'whisper_cpp'
   | 'native_speech';
@@ -11,6 +12,7 @@ export type VoiceSttBackend =
 export interface VoiceSttAvailability {
   server: boolean;
   fluidAudio?: boolean;
+  fasterWhisper?: boolean;
   mlxWhisper?: boolean;
   whisperCpp: boolean;
   nativeSpeech: boolean;
@@ -41,6 +43,7 @@ export function parseVoiceSttBackend(value: unknown): VoiceSttBackend {
   if (normalized === 'server') return 'server';
   if (normalized === 'fluid_audio' || normalized === 'fluid-audio' || normalized === 'parakeet')
     return 'fluid_audio';
+  if (normalized === 'faster_whisper' || normalized === 'faster-whisper') return 'faster_whisper';
   if (normalized === 'mlx_whisper' || normalized === 'mlx-whisper') return 'mlx_whisper';
   if (normalized === 'whisper_cpp' || normalized === 'whisper.cpp') return 'whisper_cpp';
   if (normalized === 'native_speech' || normalized === 'native' || normalized === 'apple_speech')
@@ -91,7 +94,10 @@ export function resolveVoiceSttBackendOrder(
   if (requested !== 'auto') return [requested];
 
   const preference = (
-    env.VOICE_HUB_STT_PREFERENCE || 'server,fluid_audio,mlx_whisper,whisper_cpp,native_speech'
+    env.VOICE_HUB_STT_PREFERENCE ||
+    (process.platform === 'win32'
+      ? 'server,faster_whisper,whisper_cpp,native_speech'
+      : 'server,fluid_audio,mlx_whisper,whisper_cpp,native_speech')
   )
     .split(',')
     .map((item) => parseVoiceSttBackend(item))
@@ -102,6 +108,7 @@ export function resolveVoiceSttBackendOrder(
     const adapter = resolveVoiceSttAdapter(backend);
     if (adapter.adapter_id === 'openai_compatible_server') return availability.server;
     if (adapter.adapter_id === 'fluid_audio_native') return availability.fluidAudio === true;
+    if (adapter.adapter_id === 'faster_whisper_python') return availability.fasterWhisper === true;
     if (adapter.adapter_id === 'managed_python_bridge') return availability.mlxWhisper === true;
     if (adapter.adapter_id === 'whisper_cpp_cli') return availability.whisperCpp;
     if (adapter.adapter_id === 'native_speech') return availability.nativeSpeech;
@@ -121,13 +128,15 @@ export function resolveVoiceSttBackendOrder(
         ? availability.server
         : adapter.adapter_id === 'fluid_audio_native'
           ? availability.fluidAudio === true
-          : adapter.adapter_id === 'managed_python_bridge'
-            ? availability.mlxWhisper === true
-            : adapter.adapter_id === 'whisper_cpp_cli'
-              ? availability.whisperCpp
-              : adapter.adapter_id === 'native_speech'
-                ? availability.nativeSpeech
-                : false;
+          : adapter.adapter_id === 'faster_whisper_python'
+            ? availability.fasterWhisper === true
+            : adapter.adapter_id === 'managed_python_bridge'
+              ? availability.mlxWhisper === true
+              : adapter.adapter_id === 'whisper_cpp_cli'
+                ? availability.whisperCpp
+                : adapter.adapter_id === 'native_speech'
+                  ? availability.nativeSpeech
+                  : false;
     if (isAvailable && !fallback.includes(backend)) fallback.push(backend);
   }
   return fallback;

@@ -14,6 +14,7 @@ export const VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID =
 export interface VirtualAudioOutputPlaybackBridgeOptions {
   inventory_bridge?: VirtualDeviceInventoryBridge;
   swift_bin?: string;
+  powershell_bin?: string;
   tone_frequency_hz?: number;
   tone_duration_ms?: number;
   tone_volume?: number;
@@ -28,7 +29,7 @@ export interface VirtualAudioOutputPlaybackTargetResult {
   status: 'played' | 'failed' | 'skipped';
   source_path: string;
   tone_path: string;
-  selected_backend: 'swift-output-switch';
+  selected_backend: 'swift-output-switch' | 'powershell-default-output';
   output?: string;
   error?: string;
   warning?: string;
@@ -65,10 +66,72 @@ export interface VirtualAudioOutputPlaybackBridge {
 }
 
 const DEFAULT_SWIFT_BIN = 'swift';
+const DEFAULT_POWERSHELL_BIN = 'powershell.exe';
 const DEFAULT_TONE_FREQUENCY_HZ = 880;
 const DEFAULT_TONE_DURATION_MS = 300;
 const DEFAULT_TONE_VOLUME = 0.18;
 const DEFAULT_TONE_DIR = path.join('audio-output-tests');
+
+interface AudioPlaybackAdapter {
+  backend: VirtualAudioOutputPlaybackTargetResult['selected_backend'];
+  play(
+    powershellBin: string,
+    swiftBin: string,
+    script: string,
+    path: string,
+    device: string
+  ): string;
+  warning: string;
+}
+
+class WindowsAudioPlaybackAdapter implements AudioPlaybackAdapter {
+  backend = 'powershell-default-output' as const;
+  warning =
+    'Windows playback uses the current default output; per-device endpoint switching requires an external audio router.';
+  play(
+    powershellBin: string,
+    _swiftBin: string,
+    _script: string,
+    filePath: string,
+    _device: string
+  ): string {
+    const escapedPath = filePath.replace(/'/g, "''");
+    return safeExec(
+      powershellBin,
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$p=New-Object System.Media.SoundPlayer('${escapedPath}');$p.PlaySync();$p.Dispose()`,
+      ],
+      { env: buildSafeExecEnv(), timeoutMs: 120000 }
+    );
+  }
+}
+
+class DarwinAudioPlaybackAdapter implements AudioPlaybackAdapter {
+  backend = 'swift-output-switch' as const;
+  warning =
+    'compatibility fallback changed the macOS default output temporarily; CoreAudio UID output is the canonical loopback path';
+  play(
+    _powershellBin: string,
+    swiftBin: string,
+    script: string,
+    filePath: string,
+    device: string
+  ): string {
+    return safeExec(swiftBin, [script, '--device', device, '--tone-path', filePath], {
+      env: buildSafeExecEnv(),
+      timeoutMs: 120000,
+    });
+  }
+}
+
+function resolveAudioPlaybackAdapter(platform: NodeJS.Platform): AudioPlaybackAdapter {
+  return platform === 'win32'
+    ? new WindowsAudioPlaybackAdapter()
+    : new DarwinAudioPlaybackAdapter();
+}
 
 function tonePathFor(deviceName: string): string {
   const safeName = deviceName.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'output';
@@ -174,9 +237,10 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     return {
       bridge_id: VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID,
       platform: process.platform,
-      available: process.platform === 'darwin' && outputs.length > 0,
+      available:
+        (process.platform === 'darwin' || process.platform === 'win32') && outputs.length > 0,
       reason:
-        process.platform !== 'darwin'
+        process.platform !== 'darwin' && process.platform !== 'win32'
           ? `unsupported platform ${process.platform}`
           : outputs.length === 0
             ? 'no audio outputs found'
@@ -226,6 +290,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     const results: VirtualAudioOutputPlaybackTargetResult[] = [];
     const leaseManager = new AudioDeviceLeaseManager();
     const swiftBin = this.opts.swift_bin ?? DEFAULT_SWIFT_BIN;
+    const powershellBin = this.opts.powershell_bin ?? DEFAULT_POWERSHELL_BIN;
     const script = pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift');
 
     for (const outputName of selectedOutputs) {
@@ -249,19 +314,15 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           `legacy-default-output:${candidate.name}`,
           `legacy-playback-${process.pid}-${Date.now()}`
         );
-        const output = safeExec(
-          swiftBin,
-          [script, '--device', candidate.name, '--tone-path', playbackPath],
-          { env: buildSafeExecEnv(), timeoutMs: 120000 }
-        );
+        const adapter = resolveAudioPlaybackAdapter(process.platform);
+        const output = adapter.play(powershellBin, swiftBin, script, playbackPath, candidate.name);
         results.push({
           device_name: candidate.name,
           status: 'played',
           source_path: playbackPath,
           tone_path: playbackPath,
-          selected_backend: 'swift-output-switch',
-          warning:
-            'compatibility fallback changed the macOS default output temporarily; CoreAudio UID output is the canonical loopback path',
+          selected_backend: adapter.backend,
+          warning: adapter.warning,
           output: output.trim() || undefined,
         });
       } catch (error: any) {
@@ -270,7 +331,8 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           status: 'failed',
           source_path: playbackPath,
           tone_path: playbackPath,
-          selected_backend: 'swift-output-switch',
+          selected_backend:
+            process.platform === 'win32' ? 'powershell-default-output' : 'swift-output-switch',
           error: error?.message || String(error),
         });
       } finally {

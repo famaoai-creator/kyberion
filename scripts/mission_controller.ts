@@ -55,6 +55,7 @@ import {
   releaseOrchestratorSessionForMissionBestEffort,
   resumeAiDlcPhaseState,
   reassignMissionToProject,
+  recordMissionHandoff,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -1358,6 +1359,9 @@ Usage: node dist/scripts/mission_controller.js <command> [args]
 Lifecycle Commands:
   create   <ID>                  Create a new mission (status: planned)
   start    <ID>                  Activate a mission (planned/paused/failed → active)
+                                 --goal <TEXT> carries the user goal into the intent baseline
+                                 --success-condition <TEXT> records the acceptance condition
+                                 --intent-goal <PATH> accepts an existing governed handoff file
   checkpoint [task_id] [note]    Record a checkpoint on the focused mission
   checkpoint <ID> <task_id> <note>
                                  Record a checkpoint on an explicit mission
@@ -1683,6 +1687,15 @@ export async function handoffMission(
     handoff_packet: handoffPacket,
   });
   await saveState(upperId, state);
+  // Keep mission-level and WorkItem-level handoff state in the same durable
+  // coordination ledger. This is metadata-only: active leases remain owned by
+  // their current worker until an explicit WorkItem handoff is requested.
+  recordMissionHandoff({
+    missionId: upperId,
+    fromPersona: previousPersona,
+    toPersona: nextPersona,
+    handoffPacket,
+  });
   await syncProjectLedgerIfLinked(upperId);
   // SO-02: the CLI orchestrator taking over means any conversation-thread
   // owner steps down — release its orchestrator session (if any).
