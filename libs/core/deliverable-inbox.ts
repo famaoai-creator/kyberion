@@ -12,11 +12,15 @@ import {
 } from './secure-io.js';
 
 export type DeliverableInboxStatus =
-  | 'unread'
-  | 'read'
-  | 'accepted'
-  | 'rejected'
-  | 'changes_requested';
+  'unread' | 'read' | 'accepted' | 'rejected' | 'changes_requested';
+
+export type DeliverableRole = 'implementer' | 'reviewer' | 'orchestrator';
+
+export interface DeliverableRoleSection {
+  role: DeliverableRole;
+  summary: string;
+  evidence_refs: string[];
+}
 
 export interface DeliverableInboxEntry {
   entry_id: string;
@@ -37,6 +41,9 @@ export interface DeliverableInboxEntry {
   reviewed_by?: string;
   acceptance_receipt?: HumanAcceptanceReceipt;
   delivery_receipt?: HumanDeliveryReceipt;
+  /** CE-07: claims are separated by role and bound to evidence references. */
+  role_sections?: DeliverableRoleSection[];
+  integrated_summary?: string;
 }
 
 export interface HumanAcceptanceReceipt {
@@ -211,6 +218,8 @@ export function addInboxEntry(input: {
   status?: DeliverableInboxStatus;
   entryId?: string;
   createdAt?: string;
+  roleSections?: DeliverableRoleSection[];
+  integratedSummary?: string;
 }): DeliverableInboxEntry {
   const now = new Date().toISOString();
   const entry: DeliverableInboxEntry = {
@@ -228,7 +237,19 @@ export function addInboxEntry(input: {
     status: input.status || 'unread',
     tenant_slug: input.tenantSlug?.trim() || undefined,
     kind: input.kind?.trim() || undefined,
+    ...(input.roleSections?.length
+      ? {
+          role_sections: input.roleSections.map((section) => ({
+            ...section,
+            evidence_refs: [...section.evidence_refs],
+          })),
+        }
+      : {}),
+    ...(input.integratedSummary?.trim()
+      ? { integrated_summary: input.integratedSummary.trim() }
+      : {}),
   };
+  validateDeliverableRoleSections(entry);
 
   return withInboxLock(() => {
     const entries = readInboxEntries();
@@ -236,6 +257,28 @@ export function addInboxEntry(input: {
     writeInboxEntries(entries);
     return entry;
   });
+}
+
+/** Fail closed when a role section points to evidence outside this deliverable. */
+export function validateDeliverableRoleSections(
+  entry: Pick<DeliverableInboxEntry, 'artifact_paths' | 'role_sections'>
+): void {
+  const artifacts = new Set(entry.artifact_paths);
+  for (const section of entry.role_sections || []) {
+    if (!section.summary.trim() || section.evidence_refs.length === 0) {
+      throw new Error(`[CE-07] ${section.role} section must contain summary and evidence_refs`);
+    }
+    for (const ref of section.evidence_refs) {
+      if (
+        !artifacts.has(ref) &&
+        !ref.startsWith('trace:') &&
+        !ref.startsWith('run-graph:') &&
+        !ref.startsWith('receipt:')
+      ) {
+        throw new Error(`[CE-07] role section evidence is not bound to the deliverable: ${ref}`);
+      }
+    }
+  }
 }
 
 export function listInboxEntries(query: DeliverableInboxQuery = {}): DeliverableInboxEntry[] {

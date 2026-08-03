@@ -394,12 +394,15 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
        * byte-identical to callers that predate this option.
        */
       profile?: ProviderPermissionProfileName;
+      advisory?: boolean;
       signal?: AbortSignal;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = resolveClaudeModelForTier(options?.model_tier, this.model);
-    const permissionArgs = this.resolvePermissionArgs(options?.profile);
+    const permissionArgs = this.resolvePermissionArgs(
+      options?.advisory ? 'planner' : options?.profile
+    );
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,

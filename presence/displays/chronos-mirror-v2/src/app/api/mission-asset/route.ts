@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     }
 
     const content = safeReadFile(assetPath, { encoding: null }) as Buffer;
-    return new NextResponse(content, {
+    return new NextResponse(new Uint8Array(content), {
       status: 200,
       headers: {
         'Content-Type': contentTypeFor(assetPath),

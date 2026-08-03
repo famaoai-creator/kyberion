@@ -22,10 +22,55 @@ import {
  * A2UI Component Library for Chronos Mirror v2
  */
 
+const A2UI_FALLBACK_KEYS: Record<string, string> = {
+  Intent: 'chronos_a2ui_intent',
+  Plan: 'chronos_a2ui_plan',
+  State: 'chronos_a2ui_state',
+  Result: 'chronos_a2ui_result',
+  Status: 'chronos_a2ui_status',
+  Progress: 'chronos_a2ui_progress',
+  Preview: 'chronos_a2ui_preview',
+  'file missing': 'chronos_a2ui_file_missing',
+  'Intervention Required': 'chronos_a2ui_intervention_required',
+  'Pipeline Execution': 'chronos_a2ui_pipeline_execution',
+  'Execution Output': 'chronos_a2ui_execution_output',
+  Readiness: 'chronos_a2ui_readiness',
+  Schedule: 'chronos_a2ui_schedule',
+  'Operator Snapshot': 'chronos_a2ui_operator_snapshot',
+  'Chronos Dashboard': 'chronos_a2ui_dashboard',
+  'Active Missions': 'chronos_a2ui_active_missions',
+  'Mission Control': 'chronos_a2ui_mission_control',
+  'Visible Missions': 'chronos_a2ui_visible_missions',
+  'Mission Registry View': 'chronos_a2ui_mission_registry',
+  'Agent Catalog': 'chronos_a2ui_agent_catalog',
+  'Available Agents': 'chronos_a2ui_available_agents',
+  'Vital Check': 'chronos_a2ui_vital_check',
+  'System Vital Signs': 'chronos_a2ui_system_vital_signs',
+  'Runtime Diagnostics': 'chronos_a2ui_runtime_diagnostics',
+  'Recent Events': 'chronos_a2ui_recent_events',
+  Governance: 'chronos_a2ui_governance',
+  'Build & Test': 'chronos_a2ui_build_test',
+  missions: 'chronos_a2ui_missions',
+  runtime: 'chronos_a2ui_runtime',
+  runtimes: 'chronos_a2ui_runtimes',
+  outbox: 'chronos_a2ui_outbox',
+  exit: 'chronos_a2ui_exit_code',
+  Tier: 'chronos_a2ui_tier',
+  Type: 'chronos_a2ui_type',
+  Next: 'chronos_a2ui_next',
+  Provider: 'chronos_a2ui_provider',
+  Model: 'chronos_a2ui_model',
+  Capabilities: 'chronos_a2ui_capabilities',
+  Checkpoints: 'chronos_a2ui_checkpoints',
+  'Next Tasks': 'chronos_a2ui_next_tasks',
+};
+
 function useA2UIText() {
   const locale = useChronosLocale();
-  return (key: string | undefined, fallbackEn: string) =>
-    key ? uxTextOr(key, fallbackEn, locale) : fallbackEn;
+  return (key: string | undefined, fallbackEn: string) => {
+    const resolvedKey = key || A2UI_FALLBACK_KEYS[fallbackEn];
+    return resolvedKey ? uxTextOr(resolvedKey, fallbackEn, locale) : fallbackEn;
+  };
 }
 
 // --- display:gauge ---
@@ -99,11 +144,13 @@ export const KyberionTable = ({
   title,
   titleKey,
   headers,
+  headerKeys,
   rows,
 }: {
   title?: string;
   titleKey?: string;
   headers: string[];
+  headerKeys?: string[];
   rows: string[][];
 }) => {
   const tx = useA2UIText();
@@ -123,7 +170,7 @@ export const KyberionTable = ({
                   key={i}
                   className="px-4 py-3 text-left uppercase tracking-widest kb-text-secondary font-bold whitespace-nowrap"
                 >
-                  {h}
+                  {tx(headerKeys?.[i], h)}
                 </th>
               ))}
             </tr>
@@ -151,11 +198,13 @@ export const KyberionStatus = ({
   labelKey,
   status,
   detail,
+  detailKey,
 }: {
   label: string;
   labelKey?: string;
   status: string;
   detail?: string;
+  detailKey?: string;
 }) => {
   const tx = useA2UIText();
   const config: Record<string, { icon: React.ReactNode; border: string }> = {
@@ -186,7 +235,9 @@ export const KyberionStatus = ({
         <div className="text-[10px] uppercase tracking-widest kb-text-secondary font-bold">
           {tx(labelKey, label)}
         </div>
-        {detail && <div className="text-[9px] kb-text-secondary mt-0.5">{detail}</div>}
+        {detail && (
+          <div className="text-[9px] kb-text-secondary mt-0.5">{tx(detailKey, detail)}</div>
+        )}
       </div>
       <div className="text-[9px] uppercase tracking-widest kb-text-secondary">{status}</div>
     </div>
@@ -196,38 +247,54 @@ export const KyberionStatus = ({
 // --- display:kv ---
 export const KyberionKeyValue = ({
   title,
+  titleKey,
   entries,
 }: {
   title?: string;
-  entries: { key: string; value: string }[];
-}) => (
-  <div className="flex flex-col gap-3 w-full">
-    {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
-    <div className="kb-surface-well rounded-xl p-4 border kb-border-subtle space-y-2">
-      {(entries || []).map((entry, i) => (
-        <div key={i} className="flex justify-between text-[10px]">
-          <span className="opacity-40 uppercase tracking-widest">{entry.key}</span>
-          <span className="opacity-70 font-mono">{entry.value}</span>
+  titleKey?: string;
+  entries: { key: string; keyKey?: string; value: string }[];
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && (
+        <div className="text-[10px] uppercase tracking-widest opacity-60">
+          {tx(titleKey, title)}
         </div>
-      ))}
+      )}
+      <div className="kb-surface-well rounded-xl p-4 border kb-border-subtle space-y-2">
+        {(entries || []).map((entry, i) => (
+          <div key={i} className="flex justify-between text-[10px]">
+            <span className="opacity-40 uppercase tracking-widest">
+              {tx(entry.keyKey, entry.key)}
+            </span>
+            <span className="opacity-70 font-mono">{entry.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:metric (big number with trend) ---
 export const KyberionMetric = ({
   label,
+  labelKey,
   value,
   unit,
   trend,
   description,
+  descriptionKey,
 }: {
   label: string;
+  labelKey?: string;
   value: string | number;
   unit?: string;
   trend?: 'up' | 'down' | 'flat';
   description?: string;
+  descriptionKey?: string;
 }) => {
+  const tx = useA2UIText();
   const trendIcon =
     trend === 'up' ? (
       <ArrowUp size={12} className="kb-status-positive" />
@@ -238,13 +305,17 @@ export const KyberionMetric = ({
     );
   return (
     <div className="kb-surface-well rounded-2xl p-4 border kb-border-subtle flex flex-col gap-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="text-[9px] uppercase tracking-widest kb-text-secondary">{label}</div>
+      <div className="text-[9px] uppercase tracking-widest kb-text-secondary">
+        {tx(labelKey, label)}
+      </div>
       <div className="flex items-end gap-2">
         <span className="text-2xl font-bold font-mono kb-text-primary">{value}</span>
         {unit && <span className="text-[10px] kb-text-secondary mb-1">{unit}</span>}
         {trend && <span className="mb-1">{trendIcon}</span>}
       </div>
-      {description && <div className="text-[9px] kb-text-secondary mt-1">{description}</div>}
+      {description && (
+        <div className="text-[9px] kb-text-secondary mt-1">{tx(descriptionKey, description)}</div>
+      )}
     </div>
   );
 };
@@ -255,9 +326,12 @@ export const KyberionMetricsRow = ({
 }: {
   metrics: {
     label: string;
+    labelKey?: string;
     value: string | number;
     unit?: string;
     trend?: 'up' | 'down' | 'flat';
+    description?: string;
+    descriptionKey?: string;
   }[];
 }) => (
   <div
@@ -273,88 +347,120 @@ export const KyberionMetricsRow = ({
 // --- display:timeline ---
 export const KyberionTimeline = ({
   title,
+  titleKey,
   events,
 }: {
   title?: string;
-  events: { time: string; label: string; status?: string; detail?: string }[];
-}) => (
-  <div className="flex flex-col gap-3 w-full">
-    {title && (
-      <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2">
-        <Clock size={12} /> {title}
+  titleKey?: string;
+  events: {
+    time: string;
+    label: string;
+    labelKey?: string;
+    status?: string;
+    detail?: string;
+    detailKey?: string;
+  }[];
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && (
+        <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2">
+          <Clock size={12} /> {tx(titleKey, title)}
+        </div>
+      )}
+      <div className="relative pl-6 space-y-4">
+        <div className="absolute left-2 top-1 bottom-1 w-px kb-status-warning-surface" />
+        {events.map((event, i) => {
+          const dotColor =
+            event.status === 'error'
+              ? 'kb-status-negative-surface'
+              : event.status === 'warning'
+                ? 'kb-status-warning-surface'
+                : event.status === 'ok'
+                  ? 'kb-status-positive-surface'
+                  : 'kb-status-warning-surface';
+          return (
+            <div key={i} className="relative">
+              <div
+                className={`absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full ${dotColor} border-2 kb-border-subtle`}
+              />
+              <div className="text-[9px] font-mono opacity-40">{event.time}</div>
+              <div className="text-[10px] opacity-70 font-bold">
+                {tx(event.labelKey, event.label)}
+              </div>
+              {event.detail && (
+                <div className="text-[9px] opacity-30 mt-0.5">
+                  {tx(event.detailKey, event.detail)}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-    )}
-    <div className="relative pl-6 space-y-4">
-      <div className="absolute left-2 top-1 bottom-1 w-px kb-status-warning-surface" />
-      {events.map((event, i) => {
-        const dotColor =
-          event.status === 'error'
-            ? 'kb-status-negative-surface'
-            : event.status === 'warning'
-              ? 'kb-status-warning-surface'
-              : event.status === 'ok'
-                ? 'kb-status-positive-surface'
-                : 'kb-status-warning-surface';
-        return (
-          <div key={i} className="relative">
-            <div
-              className={`absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full ${dotColor} border-2 kb-border-subtle`}
-            />
-            <div className="text-[9px] font-mono opacity-40">{event.time}</div>
-            <div className="text-[10px] opacity-70 font-bold">{event.label}</div>
-            {event.detail && <div className="text-[9px] opacity-30 mt-0.5">{event.detail}</div>}
-          </div>
-        );
-      })}
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:progress (multi-step pipeline) ---
 export const KyberionProgress = ({
   title,
+  titleKey,
   steps,
 }: {
   title?: string;
-  steps: { label: string; status: 'done' | 'active' | 'pending' }[];
-}) => (
-  <div className="flex flex-col gap-3 w-full">
-    {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
-    <div className="flex items-center gap-1">
-      {steps.map((step, i) => {
-        const bg =
-          step.status === 'done'
-            ? 'kb-status-positive-surface'
-            : step.status === 'active'
-              ? 'kb-status-warning-surface animate-pulse'
-              : 'kb-surface-raised';
-        const textColor = step.status === 'pending' ? 'opacity-30' : 'opacity-80';
-        return (
-          <React.Fragment key={i}>
-            <div className="flex flex-col items-center gap-1 flex-1">
-              <div className={`w-full h-2 rounded-full ${bg} transition-all duration-500`} />
-              <span className={`text-[8px] uppercase tracking-widest ${textColor} text-center`}>
-                {step.label}
-              </span>
-            </div>
-            {i < steps.length - 1 && <div className="w-1" />}
-          </React.Fragment>
-        );
-      })}
+  titleKey?: string;
+  steps: { label: string; labelKey?: string; status: 'done' | 'active' | 'pending' }[];
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && (
+        <div className="text-[10px] uppercase tracking-widest opacity-60">
+          {tx(titleKey, title)}
+        </div>
+      )}
+      <div className="flex items-center gap-1">
+        {steps.map((step, i) => {
+          const bg =
+            step.status === 'done'
+              ? 'kb-status-positive-surface'
+              : step.status === 'active'
+                ? 'kb-status-warning-surface animate-pulse'
+                : 'kb-surface-raised';
+          const textColor = step.status === 'pending' ? 'opacity-30' : 'opacity-80';
+          return (
+            <React.Fragment key={i}>
+              <div className="flex flex-col items-center gap-1 flex-1">
+                <div className={`w-full h-2 rounded-full ${bg} transition-all duration-500`} />
+                <span className={`text-[8px] uppercase tracking-widest ${textColor} text-center`}>
+                  {tx(step.labelKey, step.label)}
+                </span>
+              </div>
+              {i < steps.length - 1 && <div className="w-1" />}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:alert ---
 export const KyberionAlert = ({
   severity,
   title,
+  titleKey,
   message,
+  messageKey,
 }: {
   severity: 'info' | 'warning' | 'error' | 'success';
   title: string;
+  titleKey?: string;
   message?: string;
+  messageKey?: string;
 }) => {
+  const tx = useA2UIText();
   const config: Record<
     string,
     { border: string; bg: string; text: string; icon: React.ReactNode }
@@ -389,8 +495,10 @@ export const KyberionAlert = ({
     <div className={`flex gap-3 p-4 rounded-xl border ${c.border} ${c.bg}`}>
       <div className={c.text}>{c.icon}</div>
       <div className="flex-1">
-        <div className={`text-[10px] font-bold uppercase tracking-widest ${c.text}`}>{title}</div>
-        {message && <div className="text-[9px] opacity-50 mt-1">{message}</div>}
+        <div className={`text-[10px] font-bold uppercase tracking-widest ${c.text}`}>
+          {tx(titleKey, title)}
+        </div>
+        {message && <div className="text-[9px] opacity-50 mt-1">{tx(messageKey, message)}</div>}
       </div>
     </div>
   );
@@ -399,43 +507,67 @@ export const KyberionAlert = ({
 // --- display:hero ---
 export const KyberionHero = ({
   title,
+  titleKey,
   description,
+  descriptionKey,
   eyebrow,
+  eyebrowKey,
   status,
+  statusKey,
 }: {
   title: string;
+  titleKey?: string;
   description?: string;
+  descriptionKey?: string;
   eyebrow?: string;
+  eyebrowKey?: string;
   status?: string;
-}) => (
-  <div className="rounded-[24px] border kb-border-subtle bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-    {eyebrow && (
-      <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">{eyebrow}</div>
-    )}
-    <div className="mt-2 flex items-start justify-between gap-4">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight kb-text-primary">{title}</h2>
-        {description && (
-          <p className="mt-2 text-[12px] leading-6 kb-text-secondary">{description}</p>
-        )}
-      </div>
-      {status && (
-        <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-3 py-1 text-[10px] uppercase tracking-[0.2em] kb-status-warning">
-          {status}
+  statusKey?: string;
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="rounded-[24px] border kb-border-subtle bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      {eyebrow && (
+        <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+          {tx(eyebrowKey, eyebrow)}
         </div>
       )}
+      <div className="mt-2 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight kb-text-primary">
+            {tx(titleKey, title)}
+          </h2>
+          {description && (
+            <p className="mt-2 text-[12px] leading-6 kb-text-secondary">
+              {tx(descriptionKey, description)}
+            </p>
+          )}
+        </div>
+        {status && (
+          <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-3 py-1 text-[10px] uppercase tracking-[0.2em] kb-status-warning">
+            {tx(statusKey, status)}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:badges ---
 export const KyberionBadges = ({
   title,
+  titleKey,
   items,
 }: {
   title?: string;
-  items: { label: string; tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' }[];
+  titleKey?: string;
+  items: {
+    label: string;
+    labelKey?: string;
+    tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+  }[];
 }) => {
+  const tx = useA2UIText();
   const toneClass: Record<string, string> = {
     neutral: 'kb-border-subtle kb-surface-raised/5 kb-text-secondary',
     info: 'kb-border-accent kb-surface-accent kb-text-accent',
@@ -448,7 +580,7 @@ export const KyberionBadges = ({
     <div className="flex flex-col gap-3 w-full">
       {title && (
         <div className="text-[10px] uppercase tracking-widest opacity-60 kb-text-secondary">
-          {title}
+          {tx(titleKey, title)}
         </div>
       )}
       <div className="flex flex-wrap gap-2">
@@ -457,7 +589,7 @@ export const KyberionBadges = ({
             key={`${item.label}-${index}`}
             className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${toneClass[item.tone || 'neutral']}`}
           >
-            {item.label}
+            {tx(item.labelKey, item.label)}
           </div>
         ))}
       </div>
@@ -468,104 +600,148 @@ export const KyberionBadges = ({
 // --- display:section ---
 export const KyberionSection = ({
   title,
+  titleKey,
   description,
+  descriptionKey,
   items,
 }: {
   title: string;
+  titleKey?: string;
   description?: string;
+  descriptionKey?: string;
   items: { type: string; props: Record<string, any> }[];
-}) => (
-  <div className="flex flex-col gap-4 rounded-[24px] border kb-border-subtle kb-surface-well p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-    <div>
-      <div className="text-[10px] uppercase tracking-[0.24em] kb-text-muted">{title}</div>
-      {description && (
-        <div className="mt-1 text-[11px] leading-5 kb-text-secondary">{description}</div>
-      )}
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-4 rounded-[24px] border kb-border-subtle kb-surface-well p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.24em] kb-text-muted">
+          {tx(titleKey, title)}
+        </div>
+        {description && (
+          <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
+            {tx(descriptionKey, description)}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-4">
+        {items.map((item, index) => {
+          const Component = A2UI_COMPONENT_REGISTRY[item.type];
+          return Component ? <Component key={`${item.type}-${index}`} {...item.props} /> : null;
+        })}
+      </div>
     </div>
-    <div className="flex flex-col gap-4">
-      {items.map((item, index) => {
-        const Component = A2UI_COMPONENT_REGISTRY[item.type];
-        return Component ? <Component key={`${item.type}-${index}`} {...item.props} /> : null;
-      })}
-    </div>
-  </div>
-);
+  );
+};
 
 // --- display:code ---
 export const KyberionCode = ({
   title,
+  titleKey,
   language,
   code,
 }: {
   title?: string;
+  titleKey?: string;
   language?: string;
   code: string;
-}) => (
-  <div className="flex flex-col gap-2 w-full">
-    {(title || language) && (
-      <div className="flex justify-between text-[9px] uppercase tracking-widest opacity-40">
-        <span>{title || ''}</span>
-        {language && <span className="font-mono">{language}</span>}
-      </div>
-    )}
-    <pre className="kb-surface-well rounded-xl p-4 font-mono text-[10px] overflow-x-auto border kb-border-subtle kb-status-positive whitespace-pre-wrap">
-      {code}
-    </pre>
-  </div>
-);
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      {(title || language) && (
+        <div className="flex justify-between text-[9px] uppercase tracking-widest opacity-40">
+          <span>{title ? tx(titleKey, title) : ''}</span>
+          {language && <span className="font-mono">{language}</span>}
+        </div>
+      )}
+      <pre className="kb-surface-well rounded-xl p-4 font-mono text-[10px] overflow-x-auto border kb-border-subtle kb-status-positive whitespace-pre-wrap">
+        {code}
+      </pre>
+    </div>
+  );
+};
 
 // --- display:list ---
 export const KyberionList = ({
   title,
+  titleKey,
   items,
 }: {
   title?: string;
-  items: { label: string; detail?: string; icon?: string }[];
-}) => (
-  <div className="flex flex-col gap-3 w-full">
-    {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
-    <div className="space-y-1">
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className="flex items-start gap-2 p-2 rounded-lg hover:kb-surface-raised transition"
-        >
-          <span className="text-[11px] mt-0.5">{item.icon || '▸'}</span>
-          <div className="flex-1">
-            <div className="text-[10px] opacity-70">{item.label}</div>
-            {item.detail && <div className="text-[9px] opacity-30 mt-0.5">{item.detail}</div>}
-          </div>
+  titleKey?: string;
+  items: { label: string; labelKey?: string; detail?: string; detailKey?: string; icon?: string }[];
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && (
+        <div className="text-[10px] uppercase tracking-widest opacity-60">
+          {tx(titleKey, title)}
         </div>
-      ))}
+      )}
+      <div className="space-y-1">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className="flex items-start gap-2 p-2 rounded-lg hover:kb-surface-raised transition"
+          >
+            <span className="text-[11px] mt-0.5">{item.icon || '▸'}</span>
+            <div className="flex-1">
+              <div className="text-[10px] opacity-70">{tx(item.labelKey, item.label)}</div>
+              {item.detail && (
+                <div className="text-[9px] opacity-30 mt-0.5">
+                  {tx(item.detailKey, item.detail)}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:card ---
 export const KyberionCard = ({
   title,
+  titleKey,
   description,
+  descriptionKey,
   icon,
   footer,
+  footerKey,
 }: {
   title: string;
+  titleKey?: string;
   description?: string;
+  descriptionKey?: string;
   icon?: string;
   footer?: string;
-}) => (
-  <div className="kb-surface-well rounded-xl p-5 border kb-border-subtle flex flex-col gap-2">
-    <div className="flex items-center gap-2">
-      {icon && <span className="text-lg">{icon}</span>}
-      <div className="text-[11px] font-bold uppercase tracking-widest opacity-70">{title}</div>
-    </div>
-    {description && <div className="text-[10px] opacity-50 leading-relaxed">{description}</div>}
-    {footer && (
-      <div className="text-[8px] opacity-30 mt-2 pt-2 border-t kb-border-subtle font-mono">
-        {footer}
+  footerKey?: string;
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div className="kb-surface-well rounded-xl p-5 border kb-border-subtle flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {icon && <span className="text-lg">{icon}</span>}
+        <div className="text-[11px] font-bold uppercase tracking-widest opacity-70">
+          {tx(titleKey, title)}
+        </div>
       </div>
-    )}
-  </div>
-);
+      {description && (
+        <div className="text-[10px] opacity-50 leading-relaxed">
+          {tx(descriptionKey, description)}
+        </div>
+      )}
+      {footer && (
+        <div className="text-[8px] opacity-30 mt-2 pt-2 border-t kb-border-subtle font-mono">
+          {tx(footerKey, footer)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- display:grid (layout container) ---
 export const KyberionGrid = ({
@@ -610,11 +786,16 @@ export const KbStatusOrbit = ({
   currentPhase,
   status,
   label,
+  labelKey,
+  phaseKeys,
 }: {
   currentPhase: 'intent' | 'plan' | 'state' | 'result';
   status: string;
   label: string;
+  labelKey?: string;
+  phaseKeys?: Partial<Record<'intent' | 'plan' | 'state' | 'result', string>>;
 }) => {
+  const tx = useA2UIText();
   const phases = ['intent', 'plan', 'state', 'result'];
   const currentIndex = phases.indexOf(currentPhase);
 
@@ -655,7 +836,7 @@ export const KbStatusOrbit = ({
               <div
                 className={`absolute top-5 left-1/2 -translate-x-1/2 text-[8px] uppercase tracking-tighter ${isActive ? 'kb-text-accent' : 'kb-text-secondary'}`}
               >
-                {phase}
+                {tx(phaseKeys?.[phase as keyof typeof phaseKeys], phase)}
               </div>
             </div>
           );
@@ -663,11 +844,13 @@ export const KbStatusOrbit = ({
 
         {/* Center Text */}
         <div className="text-center px-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-1">Status</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-1">
+            {tx('chronos_a2ui_status', 'Status')}
+          </div>
           <div
             className={`text-sm font-bold uppercase tracking-widest ${status === 'running' ? 'pulse-animation kb-text-accent' : 'kb-text-primary'}`}
           >
-            {label}
+            {tx(labelKey, label)}
           </div>
         </div>
       </div>
@@ -679,16 +862,23 @@ export const KbStatusOrbit = ({
 export const KbMissionCard = ({
   missionId,
   title,
+  titleKey,
   owner,
+  ownerKey,
   progress,
   priority,
+  priorityKey,
 }: {
   missionId: string;
   title: string;
+  titleKey?: string;
   owner: string;
+  ownerKey?: string;
   progress: number;
   priority: string;
+  priorityKey?: string;
 }) => {
+  const tx = useA2UIText();
   const priorityColors = {
     low: 'kb-text-secondary',
     medium: 'kb-text-accent',
@@ -703,14 +893,14 @@ export const KbMissionCard = ({
         <div
           className={`text-[9px] uppercase font-bold tracking-widest ${(priorityColors as any)[priority] || priorityColors.medium}`}
         >
-          {priority}
+          {tx(priorityKey, priority)}
         </div>
       </div>
       <div className="text-sm font-bold kb-text-primary group-hover:kb-text-accent transition-colors">
-        {title}
+        {tx(titleKey, title)}
       </div>
       <div className="flex items-center gap-2 opacity-40 text-[10px]">
-        <Activity size={10} /> {owner}
+        <Activity size={10} /> {tx(ownerKey, owner)}
       </div>
       <div className="mt-2">
         <div className="h-1 w-full kb-surface-raised/5 rounded-full overflow-hidden">
@@ -720,7 +910,7 @@ export const KbMissionCard = ({
           />
         </div>
         <div className="flex justify-between mt-1 text-[8px] uppercase tracking-widest opacity-30">
-          <span>Progress</span>
+          <span>{tx('chronos_a2ui_progress', 'Progress')}</span>
           <span>{progress}%</span>
         </div>
       </div>
@@ -769,6 +959,7 @@ export const KbArtifactTile = ({
   onOpen?: () => void;
   onPreview?: () => void;
 }) => {
+  const tx = useA2UIText();
   const fileName = path.split('/').filter(Boolean).pop() || path;
   const icon = ARTIFACT_KIND_ICON[type.toLowerCase()] || '📦';
   return (
@@ -788,7 +979,7 @@ export const KbArtifactTile = ({
           </div>
           {missing ? (
             <span className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] kb-status-warning">
-              file missing
+              {tx('chronos_a2ui_file_missing', 'file missing')}
             </span>
           ) : null}
         </div>
@@ -805,7 +996,7 @@ export const KbArtifactTile = ({
               onClick={onPreview}
               className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
             >
-              preview
+              {tx('chronos_a2ui_preview', 'Preview')}
             </button>
           )}
           {onOpen && (
@@ -814,14 +1005,17 @@ export const KbArtifactTile = ({
               onClick={onOpen}
               className="rounded border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
             >
-              open
+              {tx('chronos_cb_open', 'Open')}
             </button>
           )}
         </div>
       )}
       {missing ? (
         <div className="mt-2 text-[9px] kb-status-warning">
-          元ファイルは掃除済みです(記録のみ残っています)
+          {tx(
+            'chronos_a2ui_original_file_cleaned',
+            'The original file was cleaned up; only the record remains.'
+          )}
         </div>
       ) : null}
     </div>
@@ -831,11 +1025,17 @@ export const KbArtifactTile = ({
 // --- kb:intervention-panel ---
 export const KbInterventionPanel = ({
   reason,
+  reasonKey,
+  title,
+  titleKey,
   options,
   isBlocking,
   onSelectOption,
 }: {
   reason: string;
+  reasonKey?: string;
+  title?: string;
+  titleKey?: string;
   options: Array<{ label: string; variant?: 'primary' | 'danger' | 'neutral'; value?: string }>;
   isBlocking: boolean;
   onSelectOption?: (option: {
@@ -843,35 +1043,40 @@ export const KbInterventionPanel = ({
     variant?: 'primary' | 'danger' | 'neutral';
     value?: string;
   }) => void;
-}) => (
-  <div
-    className={`p-6 rounded-2xl border-2 ${isBlocking ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-accent kb-surface-accent'} shadow-2xl`}
-  >
-    <div className="flex items-center gap-3 mb-4">
-      <AlertTriangle className={isBlocking ? 'kb-status-warning' : 'kb-text-accent'} />
-      <div className="text-xs font-bold uppercase tracking-[0.2em]">Intervention Required</div>
+}) => {
+  const tx = useA2UIText();
+  return (
+    <div
+      className={`p-6 rounded-2xl border-2 ${isBlocking ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-accent kb-surface-accent'} shadow-2xl`}
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <AlertTriangle className={isBlocking ? 'kb-status-warning' : 'kb-text-accent'} />
+        <div className="text-xs font-bold uppercase tracking-[0.2em]">
+          {tx(titleKey, title || 'Intervention Required')}
+        </div>
+      </div>
+      <p className="text-sm kb-text-primary mb-6 leading-relaxed">{tx(reasonKey, reason)}</p>
+      <div className="flex gap-3">
+        {(options || []).map((opt, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelectOption?.(opt)}
+            className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-all ${
+              opt.variant === 'primary'
+                ? 'kb-surface-accent kb-text-inverse hover:kb-surface-accent'
+                : opt.variant === 'danger'
+                  ? 'kb-status-negative-surface kb-text-primary hover:kb-status-negative-surface'
+                  : 'kb-surface-raised kb-text-primary hover:kb-surface-raised'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
     </div>
-    <p className="text-sm kb-text-primary mb-6 leading-relaxed">{reason}</p>
-    <div className="flex gap-3">
-      {(options || []).map((opt, i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onSelectOption?.(opt)}
-          className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-all ${
-            opt.variant === 'primary'
-              ? 'kb-surface-accent kb-text-inverse hover:kb-surface-accent'
-              : opt.variant === 'danger'
-                ? 'kb-status-negative-surface kb-text-primary hover:kb-status-negative-surface'
-                : 'kb-surface-raised kb-text-primary hover:kb-surface-raised'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 /**
  * Registry mapping A2UI component types to React components.

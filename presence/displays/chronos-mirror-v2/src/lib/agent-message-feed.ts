@@ -4,7 +4,8 @@ import {
   pathResolver,
   safeExistsSync,
   safeReadFile,
-} from "./intelligence-primitives";
+} from './intelligence-primitives';
+import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
 
 export interface AgentMessageSummary {
   ts: string;
@@ -15,8 +16,8 @@ export interface AgentMessageSummary {
   ownerType: string;
   channel?: string;
   thread?: string;
-  type: "handoff" | "prompt" | "agent" | "stderr";
-  tone: "request" | "response" | "runtime";
+  type: 'handoff' | 'prompt' | 'agent' | 'stderr';
+  tone: 'request' | 'response' | 'runtime';
   content: string;
 }
 
@@ -39,36 +40,37 @@ type RuntimeSnapshot = ReturnType<typeof listAgentRuntimeSnapshots>[number];
 function appendRuntimeMessages(
   messages: AgentMessageSummary[],
   leaseByAgent: Map<string, RuntimeLeaseSummary>,
-  runtimeSnapshots: RuntimeSnapshot[],
+  runtimeSnapshots: RuntimeSnapshot[]
 ): void {
   for (const snapshot of runtimeSnapshots) {
     const lease = leaseByAgent.get(snapshot.agent.agentId);
     if (!lease) continue;
 
     const missionId =
-      lease.owner_type === "mission"
+      lease.owner_type === 'mission'
         ? lease.owner_id
-        : typeof lease.metadata?.mission_id === "string"
+        : typeof lease.metadata?.mission_id === 'string'
           ? lease.metadata.mission_id
           : undefined;
     if (!missionId) continue;
 
     for (const entry of snapshot.logs || []) {
-      if (entry.type !== "prompt" && entry.type !== "agent" && entry.type !== "stderr") continue;
-      const normalized = entry.content.replace(/\s+/g, " ").trim();
+      if (entry.type !== 'prompt' && entry.type !== 'agent' && entry.type !== 'stderr') continue;
+      const normalized = entry.content.replace(/\s+/g, ' ').trim();
       if (!normalized) continue;
 
       messages.push({
         ts: new Date(entry.ts).toISOString(),
         missionId,
         agentId: snapshot.agent.agentId,
-        teamRole: typeof lease.metadata?.team_role === "string" ? lease.metadata.team_role : undefined,
+        teamRole:
+          typeof lease.metadata?.team_role === 'string' ? lease.metadata.team_role : undefined,
         ownerId: lease.owner_id,
         ownerType: lease.owner_type,
-        channel: typeof lease.metadata?.channel === "string" ? lease.metadata.channel : undefined,
-        thread: typeof lease.metadata?.thread === "string" ? lease.metadata.thread : undefined,
+        channel: typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined,
+        thread: typeof lease.metadata?.thread === 'string' ? lease.metadata.thread : undefined,
         type: entry.type,
-        tone: entry.type === "prompt" ? "request" : entry.type === "agent" ? "response" : "runtime",
+        tone: entry.type === 'prompt' ? 'request' : entry.type === 'agent' ? 'response' : 'runtime',
         content: normalized.length > 240 ? `${normalized.slice(0, 240)}...` : normalized,
       });
     }
@@ -76,41 +78,46 @@ function appendRuntimeMessages(
 }
 
 function readObservedA2AHandoffs(): A2AHandoffSummary[] {
-  const observationPath = pathResolver.shared("observability/mission-control/orchestration-events.jsonl");
+  const observationPath = pathResolver.shared(
+    'observability/mission-control/orchestration-events.jsonl'
+  );
   if (!safeExistsSync(observationPath)) return [];
 
   const handoffs: A2AHandoffSummary[] = [];
-  const raw = safeReadFile(observationPath, { encoding: "utf8" }) as string;
-  for (const line of raw.trim().split("\n")) {
+  const raw = safeReadFile(observationPath, { encoding: 'utf8' }) as string;
+  for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
       const event = JSON.parse(line) as any;
-      if ((event.decision || event.event_type) !== "a2a_message_routed") continue;
-      if (typeof event.mission_id !== "string" || !event.mission_id) continue;
+      if ((event.decision || event.event_type) !== 'a2a_message_routed') continue;
+      if (typeof event.mission_id !== 'string' || !event.mission_id) continue;
 
       handoffs.push({
         ts: event.ts || new Date().toISOString(),
         missionId: event.mission_id,
-        sender: typeof event.sender === "string" ? event.sender : "unknown",
-        receiver: typeof event.receiver === "string" ? event.receiver : "unknown",
-        teamRole: typeof event.team_role === "string" ? event.team_role : undefined,
-        channel: typeof event.channel === "string" ? event.channel : undefined,
-        thread: typeof event.thread === "string" ? event.thread : undefined,
-        performative: typeof event.performative === "string" ? event.performative : undefined,
-        intent: typeof event.intent === "string" ? event.intent : undefined,
-        promptExcerpt: typeof event.prompt_excerpt === "string" ? event.prompt_excerpt : undefined,
+        sender: typeof event.sender === 'string' ? event.sender : 'unknown',
+        receiver: typeof event.receiver === 'string' ? event.receiver : 'unknown',
+        teamRole: typeof event.team_role === 'string' ? event.team_role : undefined,
+        channel: typeof event.channel === 'string' ? event.channel : undefined,
+        thread: typeof event.thread === 'string' ? event.thread : undefined,
+        performative: typeof event.performative === 'string' ? event.performative : undefined,
+        intent: typeof event.intent === 'string' ? event.intent : undefined,
+        promptExcerpt: typeof event.prompt_excerpt === 'string' ? event.prompt_excerpt : undefined,
       });
     } catch {
       // Ignore malformed lines.
     }
   }
 
-  return handoffs
-    .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 24);
+  const bounded = new BoundedRingBuffer<A2AHandoffSummary>(CE_STREAM_LIMITS.maxLiveMessages);
+  for (const handoff of handoffs.sort((a, b) => b.ts.localeCompare(a.ts))) bounded.push(handoff);
+  return bounded.toArray().slice(0, 24);
 }
 
-function appendObservedA2AHandoffs(messages: AgentMessageSummary[], handoffs: A2AHandoffSummary[]): void {
+function appendObservedA2AHandoffs(
+  messages: AgentMessageSummary[],
+  handoffs: A2AHandoffSummary[]
+): void {
   for (const handoff of handoffs) {
     messages.push({
       ts: handoff.ts,
@@ -118,11 +125,11 @@ function appendObservedA2AHandoffs(messages: AgentMessageSummary[], handoffs: A2
       agentId: handoff.receiver,
       teamRole: handoff.teamRole,
       ownerId: handoff.missionId,
-      ownerType: "mission",
+      ownerType: 'mission',
       channel: handoff.channel,
       thread: handoff.thread,
-      type: "handoff",
-      tone: "request",
+      type: 'handoff',
+      tone: 'request',
       content: handoff.promptExcerpt
         ? `handoff from ${handoff.sender} -> ${handoff.receiver}: ${handoff.promptExcerpt}`
         : `handoff from ${handoff.sender} -> ${handoff.receiver}`,
@@ -140,9 +147,9 @@ export function collectAgentMessages(): AgentMessageSummary[] {
   appendRuntimeMessages(messages, leaseByAgent, runtimeSnapshots);
   appendObservedA2AHandoffs(messages, handoffs);
 
-  return messages
-    .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 40);
+  const bounded = new BoundedRingBuffer<AgentMessageSummary>(CE_STREAM_LIMITS.maxLiveMessages);
+  for (const message of messages.sort((a, b) => b.ts.localeCompare(a.ts))) bounded.push(message);
+  return bounded.toArray().slice(0, 40);
 }
 
 export function collectA2AHandoffs(): A2AHandoffSummary[] {

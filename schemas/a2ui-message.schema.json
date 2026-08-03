@@ -19,7 +19,8 @@
           "properties": {
             "surfaceId": { "type": "string" },
             "catalogId": { "type": "string" },
-            "title": { "type": "string" }
+            "title": { "type": "string" },
+            "titleKey": { "type": "string" }
           },
           "required": ["surfaceId", "catalogId"]
         }
