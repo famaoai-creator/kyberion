@@ -47,6 +47,7 @@ import {
   listDistillCandidateRecords,
   listMissionSeedRecords,
   listProjectRecords,
+  listManagedProjects,
   listProjectTrackRecords,
   listServiceBindingRecords,
   listTaskSessions,
@@ -1144,6 +1145,30 @@ app.get('/api/projects', (_req, res) => {
     ok: true,
     items: listProjectRecords(),
   });
+});
+
+app.get('/api/project-management', (_req, res) => {
+  try {
+    res.json({
+      ok: true,
+      items: listManagedProjects().map((view) => ({
+        project: view.project,
+        lineage: view.lineage,
+        operational_states: view.operational_states.map((state) => ({
+          project_id: state.project_id,
+          tier: state.tier,
+          tenant_slug: state.tenant_slug,
+          status: state.status,
+          active_track_ids: state.active_track_ids || [],
+          active_mission_ids: state.active_mission_ids || [],
+          active_task_session_ids: state.active_task_session_ids || [],
+          updated_at: state.updated_at,
+        })),
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
 });
 
 app.get('/api/project-tracks', (_req, res) => {
