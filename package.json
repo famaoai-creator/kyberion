@@ -61,6 +61,7 @@
     "check:subagent-definitions": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",
     "check:chronos-dom-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_chronos_dom_contrast.ts --start",
+    "check:chronos-perf": "node --import ./scripts/ts-loader.mjs scripts/check_chronos_perf_baseline.ts",
     "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "check:i18n": "node --import ./scripts/ts-loader.mjs scripts/check_i18n_hardcoding.ts",
     "report:i18n-coverage": "node --import ./scripts/ts-loader.mjs scripts/report_i18n_translation_coverage.ts",

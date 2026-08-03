@@ -308,6 +308,31 @@ describe('work coordination', () => {
       });
     });
 
+    it('replays durable completion evidence instead of discarding an orphan result', async () => {
+      const item = makeItem();
+      claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
+      await sleep(10);
+      const result = reapExpiredWorkLeases({ completedEvidence: () => true });
+      expect(result.replayed.map((entry) => entry.item_id)).toContain(item.item_id);
+      expect(listWorkItems()[0]).toMatchObject({ status: 'done', metadata: { replayed: true } });
+      expect(listWorkItemAttempts(item.item_id)[0].status).toBe('completed');
+    });
+
+    it('does not treat worker-controlled metadata as completion evidence', async () => {
+      const item = createWorkItem({
+        title: 'Untrusted evidence target',
+        description: 'metadata must not complete an orphaned item',
+        projectId: 'PRJ-REAP',
+        metadata: { completed_evidence: true },
+      });
+      claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
+      await sleep(10);
+      const result = reapExpiredWorkLeases();
+      expect(result.replayed).toHaveLength(0);
+      expect(result.recovered.map((entry) => entry.item_id)).toContain(item.item_id);
+      expect(listWorkItems().find((entry) => entry.item_id === item.item_id)?.status).toBe('ready');
+    });
+
     it('a zombie holder cannot release after the item was re-claimed', async () => {
       const item = makeItem();
       const zombie = claimWorkItem({

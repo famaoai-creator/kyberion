@@ -9,7 +9,7 @@ import {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from 'lucide-react';
-import { chronosSpeechLocale, uxText } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { useChronosLocale } from '../lib/hooks';
 
@@ -30,7 +30,7 @@ interface ChatMessage {
 
 const PANEL_VIEWPORT_MARGIN = 16;
 
-function buildGuidedPrompts(locale: Parameters<typeof uxText>[2]) {
+function buildGuidedPrompts(locale: SupportedLocale) {
   return [
     {
       label: uxText('chronos_chat_prompt_health_label', locale),

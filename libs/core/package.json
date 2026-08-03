@@ -815,6 +815,18 @@
       "types": "./dist/work-coordination.d.ts",
       "default": "./dist/work-coordination.js"
     },
+    "./work-design": {
+      "types": "./dist/work-design.d.ts",
+      "default": "./dist/work-design.js"
+    },
+    "./ce-adoption": {
+      "types": "./dist/ce-adoption.d.ts",
+      "default": "./dist/ce-adoption.js"
+    },
+    "./office-snapshot": {
+      "types": "./dist/office-snapshot.d.ts",
+      "default": "./dist/office-snapshot.js"
+    },
     "./company": {
       "types": "./dist/company.d.ts",
       "default": "./dist/company.js"

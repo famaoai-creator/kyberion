@@ -181,15 +181,18 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     options?: {
       model_tier?: 'fast' | 'standard' | 'deep';
       profile?: ProviderPermissionProfileName;
+      advisory?: boolean;
       signal?: AbortSignal;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = resolveGrokModelForTier(options?.model_tier, this.model);
-    const permissionArgs = this.resolvePermissionArgs(options?.profile);
+    const permissionArgs = this.resolvePermissionArgs(
+      options?.advisory ? 'planner' : options?.profile
+    );
     // Historical default for unprofiled headless calls: auto-approve tools.
     // When a KD-05 profile is set, its permission projection owns the mode.
-    const defaultPermissionArgs = options?.profile ? [] : ['--always-approve'];
+    const defaultPermissionArgs = options?.advisory || options?.profile ? [] : ['--always-approve'];
     const prompt = [instruction.trim(), context ? `Context: ${context}` : '']
       .filter(Boolean)
       .join('\n\n');

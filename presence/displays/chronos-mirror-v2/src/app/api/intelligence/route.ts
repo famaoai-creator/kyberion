@@ -18,6 +18,7 @@ import {
   resolveFinanceControllerDecision,
   type FinanceControllerDecision,
 } from '@agent/core/finance-controller';
+import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {
   collectA2AHandoffs,
@@ -232,7 +233,7 @@ interface CompanySnapshot {
 
 interface SurfaceOutboxMessage {
   message_id: string;
-  surface: 'slack' | 'chronos';
+  surface: string;
   correlation_id: string;
   channel: string;
   thread_ts: string;
@@ -284,7 +285,7 @@ interface PendingApprovalSummary {
   pendingRoles: string[];
   missionId?: string;
   serviceId?: string;
-  work_loop?: Record<string, unknown>;
+  work_loop?: OrganizationWorkLoopSummary;
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
@@ -1608,7 +1609,7 @@ function recordRuntimeRemediationArtifacts(input: {
 
   const channel = typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined;
   if (channel) {
-    emitChannelSurfaceEvent('chronos_localadmin', channel, 'runtime-remediation', {
+    emitChannelSurfaceEvent('chronos_gateway', channel, 'runtime-remediation', {
       correlation_id:
         typeof lease.metadata?.thread === 'string' ? lease.metadata.thread : input.agentId,
       decision: 'runtime_lease_remediation_applied',
@@ -1863,7 +1864,7 @@ export async function POST(req: NextRequest) {
       if (!approvalRecord) {
         return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
       }
-      const updated = decideApprovalRequest('chronos_localadmin', {
+      const updated = decideApprovalRequest('chronos_gateway', {
         channel,
         storageChannel,
         requestId,
@@ -1882,17 +1883,16 @@ export async function POST(req: NextRequest) {
         surface: 'presence',
         requestId: updated.correlationId || updated.id,
         title: `Approval ${decision}`,
+        channel: 'chronos',
+        threadTs: updated.correlationId || updated.id,
+        sourceAgentId: 'chronos_gateway',
         text: buildApprovalDecisionText({
           title: updated.title,
           decision,
           missionId: updated.requestedByContext?.missionId,
           serviceId: updated.target?.serviceId,
         }),
-        status: decision === 'approved' ? 'completed' : 'attention',
-        metadata: {
-          approval_id: updated.id,
-          channel: updated.channel,
-        },
+        status: decision === 'approved' ? 'success' : 'error',
       });
       return NextResponse.json({ ok: true, approval: updated });
     }
@@ -1926,15 +1926,14 @@ export async function POST(req: NextRequest) {
         surface: 'presence',
         requestId: updated.candidate_id,
         title: decision === 'promote' ? 'Memory promoted' : 'Memory archived',
+        channel: 'chronos',
+        threadTs: updated.candidate_id,
+        sourceAgentId: 'chronos_gateway',
         text:
           decision === 'promote'
             ? `${updated.title} was promoted for reuse.${buildLearnedNotificationText({ projectId: updated.project_id, language: 'en' })}`
             : `${updated.title} was archived from the memory queue.`,
-        status: 'completed',
-        metadata: {
-          candidate_id: updated.candidate_id,
-          promoted_ref: updated.promoted_ref,
-        },
+        status: 'success',
       });
       return NextResponse.json({ ok: true, candidate: updated });
     }
@@ -2194,11 +2193,6 @@ export async function POST(req: NextRequest) {
         sourceAgentId: 'chronos_localadmin',
         title: `Mission promoted: ${seed.title}`,
         text: `${project.name} の mission seed 「${seed.title}」を durable mission ${missionId} として開始しました。${buildLearnedNotificationText({ projectId: project.project_id, language: 'ja' })}`,
-        metadata: {
-          project_id: project.project_id,
-          seed_id: seed.seed_id,
-          mission_id: missionId,
-        },
       });
       return NextResponse.json({
         status: 'ok',
@@ -2276,13 +2270,11 @@ export async function POST(req: NextRequest) {
         surface: 'presence',
         requestId: seed.seed_id,
         title: 'Track seed proposed',
+        channel: 'chronos',
+        threadTs: seed.seed_id,
+        sourceAgentId: 'chronos_gateway',
         text: `${track.name} needs ${proposal.artifact_id}. Mission seed ${seed.seed_id} is ready for review.`,
-        status: 'completed',
-        metadata: {
-          seed_id: seed.seed_id,
-          project_id: project.project_id,
-          track_id: track.track_id,
-        },
+        status: 'success',
       });
       return NextResponse.json({
         status: 'ok',
@@ -2414,7 +2406,7 @@ export async function POST(req: NextRequest) {
         surface,
         why: 'Chronos operator cleared a surface outbox message.',
       });
-      emitChannelSurfaceEvent('chronos_localadmin', surface, 'outbox', {
+      emitChannelSurfaceEvent('chronos_gateway', surface, 'outbox', {
         correlation_id: message?.correlation_id || messageId,
         decision: 'surface_outbox_cleared',
         why: 'Chronos operator cleared a surface outbox message from the shared outbox contract.',
