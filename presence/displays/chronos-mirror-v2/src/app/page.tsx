@@ -1287,6 +1287,14 @@ export default function ChronosMirrorV2() {
                 >
                   {uxText('chronos_nav_operations', locale)}
                 </button>
+                <div
+                  className={`ml-2 rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-accent'}`}
+                  title={locale === 'ja' ? 'このサーフェスの役割' : 'What this surface is for'}
+                >
+                  {locale === 'ja'
+                    ? '管制塔 — 実行状態の監視と介入'
+                    : 'Control tower — monitor execution, intervene when needed'}
+                </div>
                 <button
                   type="button"
                   onClick={() => openConsoleSection('organization')}
