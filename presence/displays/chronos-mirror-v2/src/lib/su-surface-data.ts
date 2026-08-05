@@ -34,6 +34,7 @@ export interface MissionHistoryQuery {
   status?: string;
   tier?: string;
   tenant?: string;
+  tenantSlugs?: string[] | 'all';
   kind?: string;
   missionId?: string;
   limit?: number;
@@ -84,6 +85,7 @@ export interface ApprovalQueueQuery {
   kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][] | string | string[];
   missionId?: string;
   tenant?: string;
+  tenantSlugs?: string[] | 'all';
   channel?: string;
   limit?: number;
 }
@@ -246,6 +248,10 @@ export function projectMissionHistoryItems(
         const tenantValue = `${item.tenantSlug || ''} ${item.tenantId || ''}`.toLowerCase();
         if (!tenantValue.includes(tenantFilter)) return false;
       }
+      if (query.tenantSlugs && query.tenantSlugs !== 'all') {
+        const tenantValue = item.tenantSlug || item.tenantId;
+        if (!tenantValue || !query.tenantSlugs.includes(tenantValue)) return false;
+      }
       if (
         kindFilter &&
         !item.artifactKinds.some((value) => value.toLowerCase().includes(kindFilter))
@@ -385,6 +391,13 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
         const tenantValue =
           `${record.requestedByContext?.actorId || ''} ${record.requestedByContext?.surface || ''} ${record.track_id || ''} ${record.track_name || ''}`.toLowerCase();
         if (!tenantValue.includes(tenantFilter)) return false;
+      }
+      if (query.tenantSlugs && query.tenantSlugs !== 'all') {
+        const tenantValue =
+          record.requestedByContext?.surface ||
+          record.requestedByContext?.actorId ||
+          record.track_id;
+        if (!tenantValue || !query.tenantSlugs.includes(tenantValue)) return false;
       }
       if (
         channelFilter &&
