@@ -6,6 +6,7 @@ import { safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 import { guardRequest } from '../../../lib/api-guard';
+import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
 import {
   normalizeChronosLocale,
@@ -1196,6 +1197,8 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     process.env.MISSION_ROLE = 'chronos_localadmin';
     const core = await loadChronosCore();

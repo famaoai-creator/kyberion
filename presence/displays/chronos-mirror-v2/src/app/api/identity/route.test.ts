@@ -12,6 +12,13 @@ vi.mock('../../../lib/api-guard', () => ({
   guardRequest: vi.fn(() => null),
 }));
 
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveViewerContextForRequest: vi.fn(() => ({
+    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+  })),
+  withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
+}));
+
 // knowledge/personal/my-identity.json is a real, shared, non-namespaced
 // fixture path that many other test files across the repo also touch
 // concurrently (scripts/onboarding_reset.test.ts, tests/a2a-lifecycle.test.ts,

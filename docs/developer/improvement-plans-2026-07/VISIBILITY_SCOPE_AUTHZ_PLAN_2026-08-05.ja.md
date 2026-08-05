@@ -99,6 +99,8 @@ last_updated: 2026-08-05
 - concierge の GET 系未ガード(mutations only 方針の再評価)。
 - peer HTTP GET 署名(`METHOD\nURL` のみ)のリプレイ耐性(timestamp/nonce)— AA-03 残作業。
 
-## 実装状況（2026-08-05）
+## 実装状況（2026-08-06）
 
-実装中: Chronos の viewer principal / server-side tenant scope / work item projection / middleware 境界、既存 Organization Operating Model view との接続、loopback 固定、Computer Surface と runtime supervisor の transport guard、段階導入 env、運用文書を追加した。`warn` 既定で互換動作を維持し、対象 route・core テストと build の結果を確認後に完了とする。IdP、terminal bridge、Telegram、voice hub、peer 署名リプレイ対策は本計画の対象外である。
+Chronos の viewer principal / server-side tenant scope / work item projection / middleware 境界、既存 Organization Operating Model view との接続、loopback 固定、Computer Surface と runtime supervisor の transport guard、段階導入 env、運用文書を実装した。今回、`healthz` を除く全 Chronos API route に `ViewerContext` 解決契約を適用し、ファイル・成果物・runtime の読み取り境界へ execution context を伝播、`route-contract.test.ts` で新規 route の未適用を検出できるようにした。対象 route テスト 13 件、Chronos lint、production build は成功している。
+
+残りは warn 期間の audit 観測と、enforce モードでの全 route/core 回帰確認後に、既定値を `enforce` へ切り替える単独コミットである。IdP、terminal bridge、Telegram、voice hub、peer 署名リプレイ対策は本計画の対象外である。

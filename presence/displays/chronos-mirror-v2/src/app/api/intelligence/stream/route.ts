@@ -13,6 +13,7 @@ import {
   guardRequest,
   roleToMissionRole,
 } from '../../../../lib/api-guard';
+import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
@@ -172,6 +173,8 @@ async function collectManagedRuntimeTopology() {
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
 
   const accessRole = getChronosAccessRoleOrThrow(req);
   process.env.MISSION_ROLE = roleToMissionRole(accessRole);

@@ -5,6 +5,7 @@ import {
   requireChronosAccess,
   roleToMissionRole,
 } from '../../../lib/api-guard';
+import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 
 /**
  * /api/agents - Thin wrapper over Agent-Actuator
@@ -17,6 +18,8 @@ import {
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const accessRole = getChronosAccessRoleOrThrow(req);
     process.env.MISSION_ROLE = roleToMissionRole(accessRole);
@@ -137,6 +140,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const accessRole = getChronosAccessRoleOrThrow(req);
     process.env.MISSION_ROLE = roleToMissionRole(accessRole);
@@ -300,6 +305,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const forbidden = requireChronosAccess(req, 'localadmin');
     if (forbidden) return forbidden;
