@@ -28,6 +28,14 @@ type WorkItem = {
   dependencies: string[];
   created_at: string;
   updated_at: string;
+  context?: {
+    mission_id?: string;
+    project_id?: string;
+    tenant_slug?: string;
+    work_shape?: string;
+    source?: string;
+    warnings?: string[];
+  };
   claimed_by_peer_id?: string;
   claimed_by_user_id?: string;
   metadata?: Record<string, unknown>;
@@ -68,7 +76,9 @@ function metadataText(
 
 function missionIdFromItem(item: WorkItem): string | null {
   const label = item.labels.find((entry) => entry.startsWith('mission:'));
-  return label ? label.slice('mission:'.length) : item.project_id || null;
+  return (
+    item.context?.mission_id || (label ? label.slice('mission:'.length) : item.project_id || null)
+  );
 }
 
 function compactDate(value: string): string {
@@ -86,6 +96,15 @@ export function WorkItemsWorkspace({
   const [items, setItems] = React.useState<WorkItem[]>([]);
   const [statuses, setStatuses] = React.useState<string[]>([]);
   const [coordination, setCoordination] = React.useState<WorkCoordinationSummary | null>(null);
+  const [projection, setProjection] = React.useState<{
+    scope: string;
+    view: string;
+    quality?: {
+      explicit_context: number;
+      migrated_context: number;
+      missing_context: number;
+    };
+  } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -99,6 +118,11 @@ export function WorkItemsWorkspace({
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'work items failed');
       setItems(Array.isArray(payload.items) ? payload.items : []);
       setStatuses(Array.isArray(payload.statuses) ? payload.statuses : []);
+      setProjection({
+        scope: String(payload.scope || 'work_items'),
+        view: String(payload.view || 'all'),
+        quality: payload.quality,
+      });
       if (intelligenceResponse.ok) {
         const intelligencePayload = await intelligenceResponse.json();
         setCoordination(intelligencePayload.workCoordination || null);
@@ -156,6 +180,24 @@ export function WorkItemsWorkspace({
         <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
           {items.length}
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] kb-text-muted">
+        <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 kb-text-accent">
+          scope: {projection?.scope || 'work_items'}
+        </span>
+        <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1">
+          view: {projection?.view || 'all'}
+        </span>
+        {projection?.quality ? (
+          <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1">
+            context: {projection.quality.explicit_context} explicit ·{' '}
+            {projection.quality.migrated_context} migrated
+            {projection.quality.missing_context > 0
+              ? ` · ${projection.quality.missing_context} missing`
+              : ''}
+          </span>
+        ) : null}
       </div>
 
       {error ? (

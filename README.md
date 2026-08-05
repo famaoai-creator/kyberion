@@ -123,7 +123,7 @@ To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QU
 
 If you do not know which surface to use next, `pnpm setup:report --persona first-time-user` now acts as the entry guide. It tells you whether to start with Chronos, the voice path, or a messaging surface, and whether auth/setup is still blocking that route.
 
-Chronos API routes still accept `KYBERION_API_TOKEN` or `KYBERION_LOCALADMIN_TOKEN` for local access. Replacing that token gate with a proper IdP-backed user session is a follow-up item, so treat the current token requirement as a known limitation.
+Chronos API routes use a viewer principal and server-side tenant scope. `KYBERION_API_TOKEN` / `KYBERION_LOCALADMIN_TOKEN` remain compatible all-tenant tokens for the single-operator local workflow; scoped token registrations can restrict a viewer to selected tenants. A proper IdP-backed user session, SSO, and human user management remain follow-up items and are not implied by this boundary.
 
 For a concise map of entry points and their intended use, read [`docs/SURFACES.md`](./docs/SURFACES.md).
 For the full canonical setup, see [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md) (structure map: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).

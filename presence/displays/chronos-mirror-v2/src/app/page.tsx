@@ -2,6 +2,7 @@
 
 import {
   Shield,
+  Building2,
   Cpu,
   Radar,
   Bot,
@@ -44,6 +45,7 @@ import { MissionJourneySummary } from '../components/MissionJourneySummary';
 import { ChronosOffice } from '../components/ChronosOffice';
 import { WorkItemsWorkspace } from '../components/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../components/SurfaceControlWorkspace';
+import { OrganizationOperatingModel } from '../components/OrganizationOperatingModel';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -92,6 +94,7 @@ type StatusCard = {
 
 type ConsoleSectionId =
   | 'home'
+  | 'organization'
   | 'missions'
   | 'work-items'
   | 'surface-control'
@@ -108,6 +111,11 @@ const CONSOLE_SECTIONS: Array<{
   detailKey: string;
 }> = [
   { id: 'home', labelKey: 'chronos_nav_home', detailKey: 'chronos_nav_home_hint' },
+  {
+    id: 'organization',
+    labelKey: 'chronos_nav_organization',
+    detailKey: 'chronos_nav_organization_hint',
+  },
   { id: 'missions', labelKey: 'chronos_nav_missions', detailKey: 'chronos_nav_missions_hint' },
   {
     id: 'work-items',
@@ -1081,7 +1089,7 @@ export default function ChronosMirrorV2() {
     () =>
       surface?.titleKey
         ? uxText(surface.titleKey, locale)
-        : surface?.title || uxText('chronos_mission_intelligence', locale),
+        : surface?.title || uxText('chronos_nav_active_surface', locale),
     [surface?.title, surface?.titleKey, locale]
   );
   const activeScenario = useMemo(
@@ -1269,16 +1277,8 @@ export default function ChronosMirrorV2() {
                     Chronos Mirror
                   </div>
                   <h1 className={`text-lg font-bold tracking-tight ${shellTitleClass}`}>
-                    Control Plane
+                    {uxText('chronos_home_title', locale)}
                   </h1>
-                </div>
-                <div
-                  className={`ml-2 rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-accent'}`}
-                  title={locale === 'ja' ? 'このサーフェスの役割' : 'What this surface is for'}
-                >
-                  {locale === 'ja'
-                    ? '管制塔 — 実行状態の監視と介入'
-                    : 'Control tower — monitor execution, intervene when needed'}
                 </div>
                 <button
                   type="button"
@@ -1286,6 +1286,14 @@ export default function ChronosMirrorV2() {
                   className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${consoleSection === 'operations' ? 'kb-border-accent kb-surface-accent kb-text-accent' : isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised'}`}
                 >
                   {uxText('chronos_nav_operations', locale)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openConsoleSection('organization')}
+                  className={`ml-2 flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] transition ${consoleSection === 'organization' ? 'kb-border-accent kb-surface-accent kb-text-accent' : isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised'}`}
+                >
+                  <Building2 size={12} />
+                  {uxText('chronos_nav_organization', locale)}
                 </button>
               </div>
               {tenantLabel ? (
@@ -1356,119 +1364,125 @@ export default function ChronosMirrorV2() {
             ))}
           </nav>
 
-          {/* The command band: role, current state, the one action to take,
-              and counters that double as navigation. This is deliberately the
-              first thing on the page — the design-system panel that used to own
-              this slot moved into the sidebar's reference drawer. */}
-          <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="max-w-3xl">
-                <div
-                  className={`flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] ${shellMutedClass}`}
-                >
-                  <span>{uxText('chronos_cb_role', locale)}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{uxText('chronos_mission_intelligence', locale)}</span>
-                </div>
-                <h2
-                  className={`mt-3 text-xl font-semibold leading-snug tracking-tight ${shellTitleClass} md:text-2xl`}
-                >
-                  {operatorHomeSummary
-                    ? operatorHomeSummary.statusDetail
-                    : uxText('chronos_cb_reading_state', locale)}
-                </h2>
-                <p className={`mt-2 text-sm leading-6 ${shellSubtleClass}`}>
-                  {uxText('chronos_cb_purpose', locale)}
-                </p>
-              </div>
-              <div
-                className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${toneChipClass(
-                  operatorHomeSummary?.status === 'blocked'
-                    ? 'reject'
-                    : operatorHomeSummary?.status === 'attention'
-                      ? 'alert'
-                      : operatorHomeSummary
-                        ? 'approve'
-                        : 'neutral'
-                )}`}
-              >
-                {operatorHomeSummary?.statusLabel || uxText('chronos_working', locale)}
-              </div>
-            </div>
-
-            {operatorHomeError ? (
-              <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-                {operatorHomeError}
-              </div>
-            ) : null}
-
-            {homePrimaryAction ? (
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border kb-border-accent kb-surface-accent px-4 py-4">
-                <div className="min-w-0">
-                  <div
-                    className={`text-[10px] font-bold uppercase tracking-[0.22em] ${shellMutedClass}`}
-                  >
-                    {uxText('chronos_cb_do_this_next', locale)}
-                  </div>
-                  <div className={`mt-1 text-base font-semibold ${shellTitleClass}`}>
-                    {homePrimaryAction.title || uxText('chronos_cb_all_clear', locale)}
-                  </div>
-                  <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                    {homePrimaryAction.reason || uxText('chronos_cb_all_clear_detail', locale)}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleScenarioOpen(homePrimaryAction.targetId, homePrimaryAction.surface)
-                  }
-                  className={`rounded-xl border px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] transition ${toneChipClass('info')}`}
-                >
-                  {uxText('chronos_cb_open', locale)} →
-                </button>
-              </div>
-            ) : null}
-
-            {homeCounters.length > 0 ? (
-              <>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {homeCounters.map((counter) => (
-                    <button
-                      key={counter.key}
-                      type="button"
-                      onClick={() => handleScenarioOpen(counter.targetId, 'mission-intelligence')}
-                      className={`rounded-2xl border px-4 py-3 text-left transition ${toneChipClass(
-                        counter.value > 0 ? counter.tone : 'neutral'
-                      )}`}
+          {consoleSection === 'home' ? (
+            <>
+              {/* The command band: role, current state, the one action to take,
+                  and counters that double as navigation. This is deliberately the
+                  first thing on the home page — detail views should start with
+                  their own content. */}
+              <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="max-w-3xl">
+                    <div
+                      className={`flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] ${shellMutedClass}`}
                     >
-                      <div className="text-2xl font-semibold leading-none">{counter.value}</div>
-                      <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em]">
-                        {counter.label}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <div className={`mt-3 text-[10px] uppercase tracking-[0.16em] ${shellMutedClass}`}>
-                  {uxText('chronos_cb_counts_hint', locale)}
-                </div>
-              </>
-            ) : null}
-
-            {operatorHomeSummary?.activeMissions?.length ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {operatorHomeSummary.activeMissions.slice(0, 4).map((mission: any) => (
-                  <button
-                    key={mission.missionId}
-                    type="button"
-                    onClick={() => setSelectedMissionId(mission.missionId)}
-                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                      <span>{uxText('chronos_cb_do_this_next', locale)}</span>
+                    </div>
+                    <h2
+                      className={`mt-3 text-xl font-semibold leading-snug tracking-tight ${shellTitleClass} md:text-2xl`}
+                    >
+                      {operatorHomeSummary
+                        ? operatorHomeSummary.statusDetail
+                        : uxText('chronos_cb_reading_state', locale)}
+                    </h2>
+                    <p className={`mt-2 text-sm leading-6 ${shellSubtleClass}`}>
+                      {uxText('chronos_cb_instruction', locale)}
+                    </p>
+                  </div>
+                  <div
+                    className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${toneChipClass(
+                      operatorHomeSummary?.status === 'blocked'
+                        ? 'reject'
+                        : operatorHomeSummary?.status === 'attention'
+                          ? 'alert'
+                          : operatorHomeSummary
+                            ? 'approve'
+                            : 'neutral'
+                    )}`}
                   >
-                    {mission.missionId}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
+                    {operatorHomeSummary?.statusLabel || uxText('chronos_working', locale)}
+                  </div>
+                </div>
+
+                {operatorHomeError ? (
+                  <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
+                    {operatorHomeError}
+                  </div>
+                ) : null}
+
+                {homePrimaryAction ? (
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border kb-border-accent kb-surface-accent px-4 py-4">
+                    <div className="min-w-0">
+                      <div
+                        className={`text-[10px] font-bold uppercase tracking-[0.22em] ${shellMutedClass}`}
+                      >
+                        {uxText('chronos_cb_do_this_next', locale)}
+                      </div>
+                      <div className={`mt-1 text-base font-semibold ${shellTitleClass}`}>
+                        {homePrimaryAction.title || uxText('chronos_cb_all_clear', locale)}
+                      </div>
+                      <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
+                        {homePrimaryAction.reason || uxText('chronos_cb_all_clear_detail', locale)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleScenarioOpen(homePrimaryAction.targetId, homePrimaryAction.surface)
+                      }
+                      className={`rounded-xl border px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] transition ${toneChipClass('info')}`}
+                    >
+                      {uxText('chronos_cb_open', locale)} →
+                    </button>
+                  </div>
+                ) : null}
+
+                {homeCounters.length > 0 ? (
+                  <>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {homeCounters.map((counter) => (
+                        <button
+                          key={counter.key}
+                          type="button"
+                          onClick={() =>
+                            handleScenarioOpen(counter.targetId, 'mission-intelligence')
+                          }
+                          className={`rounded-2xl border px-4 py-3 text-left transition ${toneChipClass(
+                            counter.value > 0 ? counter.tone : 'neutral'
+                          )}`}
+                        >
+                          <div className="text-2xl font-semibold leading-none">{counter.value}</div>
+                          <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em]">
+                            {counter.label}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      className={`mt-3 text-[10px] uppercase tracking-[0.16em] ${shellMutedClass}`}
+                    >
+                      {uxText('chronos_cb_counts_hint', locale)}
+                    </div>
+                  </>
+                ) : null}
+
+                {operatorHomeSummary?.activeMissions?.length ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {operatorHomeSummary.activeMissions.slice(0, 4).map((mission) => (
+                      <button
+                        key={mission.missionId}
+                        type="button"
+                        onClick={() => setSelectedMissionId(mission.missionId)}
+                        className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition ${toneChipClass('neutral')}`}
+                      >
+                        {mission.missionId}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            </>
+          ) : null}
 
           {consoleSection === 'home' ? (
             <>
@@ -2296,6 +2310,7 @@ export default function ChronosMirrorV2() {
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <MissionIntelligence
                 workspace="missions"
+                showMissionIntelligenceLabel
                 onOpenWorkspace={(target) => openConsoleSection(target)}
               />
             </section>
@@ -2313,7 +2328,8 @@ export default function ChronosMirrorV2() {
           {legacyWorkspaceEnabled &&
           consoleSection !== 'deliverables' &&
           consoleSection !== 'work-items' &&
-          consoleSection !== 'surface-control' ? (
+          consoleSection !== 'surface-control' &&
+          consoleSection !== 'organization' ? (
             <div
               className={`grid flex-1 gap-6 min-h-0 ${
                 consoleSection === 'diagnostics' ? 'xl:grid-cols-[280px,1fr]' : 'xl:grid-cols-1'
@@ -2874,6 +2890,13 @@ export default function ChronosMirrorV2() {
                 </div>
               </section>
             </div>
+          ) : null}
+
+          {consoleSection === 'organization' ? (
+            <OrganizationOperatingModel
+              onOpenOperations={() => openConsoleSection('operations')}
+              onOpenGovernance={() => openConsoleSection('governance')}
+            />
           ) : null}
 
           {consoleSection === 'operations' ? (

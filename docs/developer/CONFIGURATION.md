@@ -10,43 +10,44 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (33)
+## secret (34)
 
-| Variable                              | Type   | Required | Description                                                                                                                                                            |
-| ------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KYBERION_A2A_SECRET`                 | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_AGY_SDK_API_KEY`            | string | no       | Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.                                          |
-| `KYBERION_API_TOKEN`                  | string | no       | Bearer token for authenticated surface/API requests.                                                                                                                   |
-| `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_BLUEBUBBLES_PASSWORD`       | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_BLUEBUBBLES_WEBHOOK_SECRET` | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_CONTEXT_BUFFER_TOKENS`      | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_CONTEXT_RESERVE_TOKENS`     | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_CONTEXT_WINDOW_TOKENS`      | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_GEMINI_VIDEO_API_KEY`       | string | no       | API key used by the explicit Google Veo video-generation backend.                                                                                                      |
-| `KYBERION_LLAMACPP_KEY`               | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_LMSTUDIO_KEY`               | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_LOCAL_LLM_KEY`              | string | no       | API key for the local LLM endpoint.                                                                                                                                    |
-| `KYBERION_LOCALADMIN_TOKEN`           | string | no       | Bearer token for the chronos localadmin control surface.                                                                                                               |
-| `KYBERION_LOCALAI_KEY`                | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_MANIFEST_SIGNING_KEY`       | string | no       | HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign. |
-| `KYBERION_MESH_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_MINIMAX_VIDEO_API_KEY`      | string | no       | API key used by the explicit MiniMax Hailuo video-generation backend.                                                                                                  |
-| `KYBERION_MLX_KEY`                    | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_NEMOTRON_KEY`               | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_OLLAMA_KEY`                 | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_OPENAI_VIDEO_API_KEY`       | string | no       | API key used by the explicit OpenAI Sora video-generation backend.                                                                                                     |
-| `KYBERION_OPENROUTER_KEY`             | string | no       | OpenRouter API key. `OPENROUTER_API_KEY` is also accepted for compatibility.                                                                                           |
-| `KYBERION_PEER_KEY_REF`               | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_PEER_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_REQUIRED_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_RUNWAY_API_KEY`             | string | no       | API key used by the explicit Runway video-generation backends.                                                                                                         |
-| `KYBERION_SECRET_RESOLVER_COMMAND`    | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_SECRET_RESOLVER_TIMEOUT_MS` | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_SOVEREIGN_SECRET`           | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
-| `KYBERION_VLLM_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
+| Variable                                  | Type   | Required | Description                                                                                                                                                            |
+| ----------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_A2A_SECRET`                     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN` | string | no       | Shared token for newline-JSON agent runtime supervisor RPC.                                                                                                            |
+| `KYBERION_AGY_SDK_API_KEY`                | string | no       | Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.                                          |
+| `KYBERION_API_TOKEN`                      | string | no       | Bearer token for authenticated surface/API requests.                                                                                                                   |
+| `KYBERION_AUDIT_CHAIN_KEY`                | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_BLUEBUBBLES_PASSWORD`           | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_BLUEBUBBLES_WEBHOOK_SECRET`     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_BUFFER_TOKENS`          | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_RESERVE_TOKENS`         | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_WINDOW_TOKENS`          | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_GEMINI_VIDEO_API_KEY`           | string | no       | API key used by the explicit Google Veo video-generation backend.                                                                                                      |
+| `KYBERION_LLAMACPP_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_LMSTUDIO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_LOCAL_LLM_KEY`                  | string | no       | API key for the local LLM endpoint.                                                                                                                                    |
+| `KYBERION_LOCALADMIN_TOKEN`               | string | no       | Bearer token for the chronos localadmin control surface.                                                                                                               |
+| `KYBERION_LOCALAI_KEY`                    | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_MANIFEST_SIGNING_KEY`           | string | no       | HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign. |
+| `KYBERION_MESH_SHARED_SECRET`             | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_MINIMAX_VIDEO_API_KEY`          | string | no       | API key used by the explicit MiniMax Hailuo video-generation backend.                                                                                                  |
+| `KYBERION_MLX_KEY`                        | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_NEMOTRON_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_OLLAMA_KEY`                     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_OPENAI_VIDEO_API_KEY`           | string | no       | API key used by the explicit OpenAI Sora video-generation backend.                                                                                                     |
+| `KYBERION_OPENROUTER_KEY`                 | string | no       | OpenRouter API key. `OPENROUTER_API_KEY` is also accepted for compatibility.                                                                                           |
+| `KYBERION_PEER_KEY_REF`                   | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_PEER_SHARED_SECRET`             | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_REQUIRED_TOKEN`                 | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_RUNWAY_API_KEY`                 | string | no       | API key used by the explicit Runway video-generation backends.                                                                                                         |
+| `KYBERION_SECRET_RESOLVER_COMMAND`        | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SECRET_RESOLVER_TIMEOUT_MS`     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SOVEREIGN_SECRET`               | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SUDO_KEY`                       | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_TERMINAL_TOKEN`                 | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_VLLM_KEY`                       | string | no       | _undocumented_                                                                                                                                                         |
 
 ## path (81)
 
@@ -271,7 +272,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (150)
+## runtime (151)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -342,7 +343,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_LIVE_BLACKHOLE_TEST`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALE`                              | string | no       | _undocumented_                                                                                          |
-| `KYBERION_LOCALHOST_AUTOADMIN`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_LOCALHOST_AUTOADMIN`                 | string | no       | Allow loopback Chronos requests to use the compatibility localadmin principal when true or unset.       |
 | `KYBERION_MANAGED_PYTHON_VERSION`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MEMORY_AUTOPROMOTE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_NAMESPACE`                      | string | no       | _undocumented_                                                                                          |
@@ -415,6 +416,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_UNDOCUMENTED`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VAD`                                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIDEO_RENDER_RUN_MODE`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VIEWER_SCOPE`                        | string | no       | Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.                        |
 | `KYBERION_VOICE_LANGUAGE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_PLAY_BLACKHOLE`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_PROFILE_ID`                    | string | no       | _undocumented_                                                                                          |

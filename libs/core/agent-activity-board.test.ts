@@ -87,4 +87,23 @@ describe('agent-activity-board', () => {
     });
     expect(board.entries.map((entry) => entry.item_id)).toEqual(['w1']);
   });
+
+  it('keeps an active work item visible when mission identity is explicit', () => {
+    const board = composeAgentActivityBoard({
+      items: [
+        item({
+          item_id: 'explicit-context',
+          labels: [],
+          context: { mission_id: 'MSN-EXPLICIT', tenant_slug: 'aurora' },
+          assignee_peer_id: 'operator-agent',
+        }),
+      ],
+      tenantFilter: 'aurora',
+    });
+    expect(board.entries[0]).toMatchObject({
+      item_id: 'explicit-context',
+      mission_id: 'MSN-EXPLICIT',
+      tenant_slug: 'aurora',
+    });
+  });
 });

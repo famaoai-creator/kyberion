@@ -439,6 +439,7 @@
         "active/shared/coordination/channels/",
         "active/shared/coordination/chronos/",
         "active/shared/coordination/orchestration/",
+        "active/organizations/confidential/",
         "active/shared/observability/",
         "active/shared/runtime/",
         "active/audit/"

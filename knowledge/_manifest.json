@@ -573,7 +573,7 @@
     {
       "path": "product/architecture/multi-tenant-operations.md",
       "tier": "public",
-      "size": 14492,
+      "size": 16199,
       "type": "md"
     },
     {
@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 76786,
+      "size": 77490,
       "type": "json"
     },
     {
@@ -2157,7 +2157,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19604,
+      "size": 19650,
       "type": "json"
     },
     {
@@ -4683,7 +4683,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 264420,
+      "size": 272524,
       "type": "json"
     },
     {
