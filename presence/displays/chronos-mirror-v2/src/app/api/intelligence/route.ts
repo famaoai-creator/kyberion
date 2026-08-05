@@ -7,6 +7,7 @@ import {
   requireChronosAccess,
   roleToMissionRole,
 } from '../../../lib/api-guard';
+import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
 import {
   summarizeApprovalAuditDrilldown,
@@ -1632,6 +1633,8 @@ export async function GET(req: NextRequest) {
     if (denied) return denied;
     const accessDenied = requireChronosAccess(req, 'readonly');
     if (accessDenied) return accessDenied;
+    const resolvedViewer = resolveViewerContextForRequest(req);
+    if (resolvedViewer.response) return resolvedViewer.response;
     const accessRole = getChronosAccessRoleOrThrow(req);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
@@ -1825,6 +1828,8 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
     const requiresAdmin = requireChronosAccess(req, 'localadmin');
     if (requiresAdmin) return requiresAdmin;
+    const resolvedViewer = resolveViewerContextForRequest(req);
+    if (resolvedViewer.response) return resolvedViewer.response;
     const body = await req.json();
     const action = body?.action;
 
