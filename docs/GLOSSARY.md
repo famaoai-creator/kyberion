@@ -10,11 +10,11 @@ The human owner/operator whose intent the ecosystem serves.
 
 ### Sovereign Entity
 
-The autonomous agent persona defined by `AGENTS.md`. It is the acting identity of the system, not just a collection of scripts.
+The acting identity of the system as a whole — the agent organization operating under the rules of `AGENTS.md` (the Kyberion Operating Guide), not just a collection of scripts.
 
 ### Charter
 
-The governance rules in `AGENTS.md`. These rules define safety, lifecycle, tier isolation, and execution constraints.
+The binding rules in `AGENTS.md` (the Kyberion Operating Guide). These rules define safety invariants, lifecycle, tier/tenant isolation, and execution constraints.
 
 ### Actuator
 
@@ -300,15 +300,19 @@ A narrow actuator for creating, loading, deciding, and listing human approval re
 
 ### Chronos Gateway
 
-The authenticated interactive control surface behind Chronos Mirror v2. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
+The authenticated interactive control surface behind Chronos Mirror v2. Every API route except `/api/healthz` resolves a ViewerContext fail-closed before serving data. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
 
 ### Chronos Operator
 
-The read-only Chronos access level mapped to `chronos_operator`. It can inspect mission state, recent control-plane activity, runtime leases, and delivery backlogs without mutating system state.
+The read-only Chronos access level mapped to `chronos_operator`. It can inspect mission state, recent control-plane activity, runtime leases, and delivery backlogs without mutating system state. At the HTTP layer this corresponds to the `readonly` viewer role.
 
 ### Chronos Local Admin
 
-The bounded local control-plane access level mapped to `chronos_localadmin`. It can invoke deterministic backend actions such as mission control, runtime remediation, and surface control, but it still does not become the mission authority itself.
+The bounded local control-plane access level mapped to `chronos_localadmin`. It can invoke deterministic backend actions such as mission control, runtime remediation, and surface control, but it still does not become the mission authority itself. At the HTTP layer this corresponds to the `localadmin` viewer role.
+
+### ViewerContext / Viewer Scope
+
+The request-scoped principal resolved server-side by Chronos API routes: a viewer role (`readonly` | `localadmin`) plus an allowed tenant set (`tenant_slugs`). Tenant query parameters may only narrow the viewer's allowed set, never widen it. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel
 
@@ -334,11 +338,61 @@ The diagnostic view that inspects runtime lease metadata, finds stale/orphaned/e
 
 The actuator class for local short-lived shell, OS, and file-control operations. It is distinct from channel gateways and from authenticated service binding.
 
+## Organization and tenancy terms
+
+### Organization Operating Model
+
+The control plane for running an organization beyond individual missions: purpose, operational state, domains, capabilities, services, routine operations, incidents, cadences, decisions, and learning candidates, stored under `active/organizations/{tier}/{tenant}/{organization}/state/` and mutated only via the `pnpm organization` facade (`libs/core/organization-operating-model.ts`).
+
+### Work Shape
+
+The `work_shape` field classifying a work item's operating mode: `solution_project`, `service_operation`, `routine_operation`, `incident_response`, `governance_cadence`, or `improvement_experiment`. It distinguishes running the organization from building solutions.
+
+### WorkItem
+
+The canonical unit of executable work shared by all views and surfaces (`libs/core/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
+
+### WorkItem Context
+
+The typed identity chain on a work item: `organization_id → tenant_slug → mission_id → project_id → task_id`, plus `work_shape`. Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+
+### Work Visibility Scope
+
+One of six projections over the same work items, each answering a different operator question: `organization`, `home`, `work_items`, `operations`, `missions`, `governance` (`libs/core/work-visibility.ts`). Combined with a view filter (`all` / `actionable` / `active` / `history`) and the viewer's allowed tenant set.
+
+### Managed Project
+
+A governed project record with lifecycle controls (create / update-status / archive / reconcile) behind the `pnpm project` facade, sitting between missions and the organization operating model.
+
+### Tenant
+
+An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,30}$`). Each tenant has an isolated knowledge root (default `knowledge/confidential/{tenant-slug}/`); cross-tenant access is deny-unless-brokered and audited.
+
+### Tenant Registry
+
+The single source of tenant definitions (`libs/core/tenant-registry.ts`; profiles under `knowledge/personal/tenants/`). Unregistered tenants cannot be silently operated on; CI guards drift via `check:tenant-registry`.
+
+### Tenant Group
+
+A named set of tenants sharing a `knowledge/confidential/tenant-groups/{group}/` prefix for deliberately shared knowledge, without weakening per-tenant isolation.
+
+### Tenant Peer Mesh
+
+HMAC-signed peer-to-peer messaging between tenant instances. Peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata.
+
+### Customer Overlay
+
+The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER`, layering customer-specific identity and configuration over `knowledge/personal/` for FDE / implementation-support engagements without forking.
+
+### History Search
+
+Zero-LLM full-text search over conversation, mission, and trace history on SQLite FTS5 (unicode61 + CJK trigram), tier-isolated with an explicit provenance gate before anything is indexed publicly (`libs/core/history-search-index.ts`, `pnpm history:search`).
+
 ## Governance and storage terms
 
 ### Knowledge Slice
 
-A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
+A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `knowledge/product/schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
 
 ### Trace / Span / Event
 
