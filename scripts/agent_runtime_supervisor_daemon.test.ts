@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -84,7 +85,7 @@ describe('agent_runtime_supervisor_daemon', () => {
   beforeEach(() => {
     // Keep the socket under the governed project temp root so secure-io can
     // enforce the 0600 chmod in the same way production does.
-    rootDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/kyb-'));
+    rootDir = fs.mkdtempSync(pathResolver.sharedTmp('kyb-'));
     socketPath = path.join(rootDir, 's.sock');
     lockPath = path.join(rootDir, 'lock');
     mocks.ensureAgentRuntime.mockResolvedValue({
