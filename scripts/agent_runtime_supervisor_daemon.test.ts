@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -83,11 +83,9 @@ describe('agent_runtime_supervisor_daemon', () => {
   let instance: Awaited<ReturnType<typeof startAgentRuntimeSupervisorDaemon>> | null = null;
 
   beforeEach(() => {
-    // os.tmpdir() on purpose: Unix domain socket paths are capped (~104
-    // macOS / 108 Linux). active/shared/tmp under a CI checkout
-    // (/home/runner/work/...) pushes the socket path past the limit and the
-    // daemon can never listen.
-    rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-daemon-'));
+    // Keep the socket under the governed project temp root so secure-io can
+    // enforce the 0600 chmod in the same way production does.
+    rootDir = fs.mkdtempSync(pathResolver.sharedTmp('kyb-'));
     socketPath = path.join(rootDir, 's.sock');
     lockPath = path.join(rootDir, 'lock');
     mocks.ensureAgentRuntime.mockResolvedValue({
@@ -187,6 +185,18 @@ describe('agent_runtime_supervisor_daemon', () => {
       result: { text: 'daemon-ask' },
     });
   }, 90000);
+
+  it('creates a private Unix socket', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    expect(fs.statSync(socketPath).mode & 0o777).toBe(0o600);
+  });
 
   it('rejects ask requests over the per-agent inflight limit and admits again once slots free up', async () => {
     // AGENT_LIMIT defaults to 2 (KYBERION_AGENT_INFLIGHT_LIMIT unset in test env).

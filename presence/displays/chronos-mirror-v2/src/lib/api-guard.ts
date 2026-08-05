@@ -1,4 +1,7 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { secretGuard } from '@agent/core/secret-guard';
+import { pathResolver, safeExistsSync } from '@agent/core';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -13,6 +16,50 @@ const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
 const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false';
 
 export type ChronosAccessRole = 'readonly' | 'localadmin';
+
+export interface ChronosTokenRegistration {
+  token_hash: string;
+  role: ChronosAccessRole;
+  tenant_slugs: string[];
+  label?: string;
+}
+
+export function matchesChronosToken(candidate: string, configured: string | undefined): boolean {
+  if (!candidate || !configured) return false;
+  const left = Buffer.from(candidate);
+  const right = Buffer.from(configured);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
+  const path = pathResolver.knowledge('personal/connections/chronos-access.json');
+  if (!safeExistsSync(path)) return [];
+  try {
+    const document = secretGuard.loadConnectionDocument('chronos-access');
+    if (!document || !Array.isArray(document.tokens)) return [];
+    return document.tokens.filter((entry: unknown): entry is ChronosTokenRegistration => {
+      if (!entry || typeof entry !== 'object') return false;
+      const value = entry as Record<string, unknown>;
+      return (
+        typeof value.token_hash === 'string' &&
+        (value.role === 'readonly' || value.role === 'localadmin') &&
+        Array.isArray(value.tenant_slugs) &&
+        value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.length > 0)
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function resolveChronosTokenRegistration(token: string): ChronosTokenRegistration | null {
+  const digest = createHash('sha256').update(token).digest('hex');
+  return (
+    loadChronosTokenRegistrations().find((entry) =>
+      matchesChronosToken(digest, entry.token_hash)
+    ) || null
+  );
+}
 
 // In-memory rate limit store
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
@@ -38,6 +85,15 @@ function isLoopbackHostname(hostname: string | undefined): boolean {
   return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
 }
 
+export function isChronosLoopbackRequest(req: NextRequest): boolean {
+  const directIp = (req as NextRequest & { ip?: string }).ip;
+  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  if (directIp !== undefined) {
+    return isLoopback(directIp) && (!forwardedFor || isLoopback(forwardedFor));
+  }
+  return isLoopbackHostname(req.nextUrl?.hostname) && (!forwardedFor || isLoopback(forwardedFor));
+}
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   let entry = rateLimitStore.get(ip);
@@ -53,14 +109,14 @@ function checkRateLimit(ip: string): boolean {
  * Validate an incoming API request.
  * Returns null if OK, or a NextResponse error if rejected.
  */
-function resolveToken(req: NextRequest): string | null {
+export function resolveChronosToken(req: NextRequest): string | null {
   const authHeader = req.headers.get('authorization');
   const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   return bearer || req.cookies.get('kyberion_token')?.value || null;
 }
 
 function getRateLimitKey(req: NextRequest): string {
-  const token = resolveToken(req);
+  const token = resolveChronosToken(req);
   if (token) {
     return `token:${token}`;
   }
@@ -68,22 +124,22 @@ function getRateLimitKey(req: NextRequest): string {
 }
 
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
-  const token = resolveToken(req);
-  const directIp = (req as NextRequest & { ip?: string }).ip;
-  // Self-hosted Next.js commonly leaves NextRequest.ip unset. In that case,
-  // use the direct request hostname as a local signal; forwarded requests
-  // must still provide an explicit token because the proxy owns the origin.
-  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const isLocal =
-    (directIp !== undefined && isLoopback(directIp)) ||
-    (isLoopbackHostname(req.nextUrl?.hostname) && (!forwardedFor || isLoopback(forwardedFor)));
+  const token = resolveChronosToken(req);
+  const isLocal = isChronosLoopbackRequest(req);
 
-  if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
+  if (matchesChronosToken(token || '', LOCALADMIN_TOKEN)) {
     return 'localadmin';
   }
-  if (API_TOKEN && token === API_TOKEN) {
+  if (matchesChronosToken(token || '', API_TOKEN)) {
     return 'readonly';
   }
+  if (token) {
+    const registration = resolveChronosTokenRegistration(token);
+    if (registration) return registration.role;
+  }
+  // A supplied but invalid credential must not fall through to the
+  // loopback auto-admin compatibility path.
+  if (token) return null;
   if (isLocal && ALLOW_LOCALHOST_AUTOADMIN) {
     return 'localadmin';
   }

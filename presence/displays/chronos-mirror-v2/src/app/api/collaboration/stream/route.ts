@@ -14,6 +14,11 @@ import {
   normalizeWorkerEvent,
   type CollaborationStreamEvent,
 } from '../../../../lib/collaboration-stream';
+import {
+  resolveViewerContextForRequest,
+  viewerErrorResponse,
+  viewerScopeTenantSlugs,
+} from '../../../../lib/viewer-context';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,7 +50,8 @@ function eventFiles(): string[] {
 
 function readEvents(
   afterId: string | null,
-  missionId?: string
+  missionId?: string,
+  tenantSlugs: string[] | 'all' = 'all'
 ): { events: CollaborationStreamEvent[]; lastSeenId?: string } {
   const events: CollaborationStreamEvent[] = [];
   let lastSeenId: string | undefined;
@@ -65,7 +71,32 @@ function readEvents(
       try {
         const event = workerEventEnvelopeSchema.parse(JSON.parse(line)) as WorkerEventEnvelope;
         if (missionId && event.source?.mission_id !== missionId) continue;
-        events.push(normalizeWorkerEvent(event, id));
+        const normalized = normalizeWorkerEvent(event, id);
+        if (tenantSlugs !== 'all') {
+          const eventTenant =
+            typeof normalized.payload.tenant_slug === 'string'
+              ? normalized.payload.tenant_slug
+              : normalized.mission_id
+                ? (() => {
+                    const missionPath = pathResolver.findMissionPath(normalized.mission_id);
+                    if (!missionPath) return undefined;
+                    try {
+                      const state = JSON.parse(
+                        String(
+                          safeReadFile(path.join(missionPath, 'mission-state.json'), {
+                            encoding: 'utf8',
+                          })
+                        )
+                      ) as { tenant_slug?: string };
+                      return state.tenant_slug;
+                    } catch {
+                      return undefined;
+                    }
+                  })()
+                : undefined;
+          if (!eventTenant || !tenantSlugs.includes(eventTenant)) continue;
+        }
+        events.push(normalized);
       } catch {
         // Torn JSONL records are skipped; the next poll/reconnect can replay a
         // valid subsequent record without poisoning the stream.
@@ -75,7 +106,7 @@ function readEvents(
   // A browser can reconnect with a cursor from a rotated log file. In that
   // case replay the bounded tail instead of silently waiting forever for a
   // cursor that can no longer be found.
-  if (afterId && !foundCursor) return readEvents(null, missionId);
+  if (afterId && !foundCursor) return readEvents(null, missionId, tenantSlugs);
   return { events: events.slice(-60), lastSeenId };
 }
 
@@ -84,9 +115,20 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
   const requiresAccess = requireChronosAccess(req, 'readonly');
   if (requiresAccess) return requiresAccess;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
 
   const encoder = new TextEncoder();
   const missionId = req.nextUrl.searchParams.get('mission') || undefined;
+  let tenantSlugs: string[] | 'all';
+  try {
+    tenantSlugs = viewerScopeTenantSlugs(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('tenant') || undefined
+    );
+  } catch (error) {
+    return viewerErrorResponse(error);
+  }
   const requestedCursor = req.headers.get('last-event-id');
   let cursor = requestedCursor;
   let closed = false;
@@ -118,7 +160,7 @@ export async function GET(req: NextRequest) {
       });
       const poll = () => {
         if (closed) return;
-        const result = readEvents(scanCursor, missionId);
+        const result = readEvents(scanCursor, missionId, tenantSlugs);
         if (result.lastSeenId) scanCursor = result.lastSeenId;
         for (const event of result.events) batcher.push(event);
       };

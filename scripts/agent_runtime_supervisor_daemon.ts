@@ -1,4 +1,5 @@
 import * as net from 'node:net';
+import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -22,6 +23,7 @@ import {
   safeStat,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
+  safeChmodSync,
   sendOpsAlert,
   shutdownAllAgentRuntimes,
   stopAgentRuntime,
@@ -60,6 +62,7 @@ type SupervisorMethod =
 interface SupervisorRequest {
   id: string;
   method: SupervisorMethod;
+  auth_token?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -208,6 +211,19 @@ function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp'): void {
 
 function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
   socket.end(`${JSON.stringify(response)}\n`);
+}
+
+function supervisorTokenValid(candidate: string | undefined): boolean {
+  const configured = process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN;
+  if (!configured) return true;
+  if (!candidate) return false;
+  const left = Buffer.from(candidate);
+  const right = Buffer.from(configured);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function socketIsLoopback(socket: net.Socket): boolean {
+  return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(socket.remoteAddress || '');
 }
 
 async function handleRequest(
@@ -453,7 +469,15 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
     };
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => {
-      socket.write(`${JSON.stringify({ id: 'health-probe', method: 'health' })}\n`);
+      socket.write(
+        `${JSON.stringify({
+          id: 'health-probe',
+          method: 'health',
+          ...(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN
+            ? { auth_token: process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN }
+            : {}),
+        })}\n`
+      );
     });
     socket.on('data', (chunk) => {
       const line = String(chunk).trim();
@@ -571,6 +595,16 @@ export async function startAgentRuntimeSupervisorDaemon(
       }
       try {
         const request = JSON.parse(line) as SupervisorRequest;
+        if (
+          (transport === 'tcp' && !socketIsLoopback(socket)) ||
+          !supervisorTokenValid(request.auth_token)
+        ) {
+          return writeResponse(socket, {
+            id: request.id || 'unknown',
+            ok: false,
+            error: 'unauthorized',
+          });
+        }
         const response = await handleRequest(request, socketLabel || socketPath);
         writeResponse(socket, response);
       } catch (error: any) {
@@ -652,6 +686,7 @@ export async function startAgentRuntimeSupervisorDaemon(
           pid: process.pid,
           socket_path: socketLabel || socketPath,
         });
+        if (transport === 'unix') safeChmodSync(socketPath, 0o600);
         recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
           status: 'running',
           details: { socket_path: socketLabel || socketPath, transport },

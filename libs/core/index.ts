@@ -38,6 +38,7 @@ export {
   safeOpenAppendFile,
   safeFsyncFile,
   safeCreateExclusiveFileSync,
+  safeChmodSync,
 } from './secure-io.js';
 
 // Backward compatibility aliases
