@@ -8,6 +8,10 @@ import {
 } from '../../../lib/api-guard';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import {
+  resolveViewerContextForRequest,
+  withViewerExecutionContext,
+} from '../../../lib/viewer-context';
 
 const ALLOWED_PREFIXES = ['deliverables/', 'artifacts/', 'outputs/', 'evidence/'] as const;
 // Repo-relative mode (no missionId): where governed artifacts actually live.
@@ -94,6 +98,8 @@ export async function GET(req: NextRequest) {
   try {
     const denied = guardRequest(req);
     if (denied) return denied;
+    const resolvedViewer = resolveViewerContextForRequest(req);
+    if (resolvedViewer.response) return resolvedViewer.response;
 
     const accessRole = getChronosAccessRoleOrThrow(req);
     process.env.MISSION_ROLE = roleToMissionRole(accessRole);
@@ -120,24 +126,26 @@ export async function GET(req: NextRequest) {
       }
       assetPath = path.join(pathResolver.rootDir(), repoRelative);
     }
-    if (!safeExistsSync(assetPath)) {
-      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
-    }
+    return withViewerExecutionContext(resolvedViewer.context, () => {
+      if (!safeExistsSync(assetPath)) {
+        return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+      }
 
-    const stats = safeStat(assetPath);
-    if (!stats.isFile()) {
-      return NextResponse.json({ error: 'Asset is not a file' }, { status: 400 });
-    }
+      const stats = safeStat(assetPath);
+      if (!stats.isFile()) {
+        return NextResponse.json({ error: 'Asset is not a file' }, { status: 400 });
+      }
 
-    const content = safeReadFile(assetPath, { encoding: null }) as Buffer;
-    return new NextResponse(new Uint8Array(content), {
-      status: 200,
-      headers: {
-        'Content-Type': contentTypeFor(assetPath),
-        'Content-Length': String(stats.size),
-        'Content-Disposition': `inline; filename="${path.basename(assetPath)}"`,
-        'Cache-Control': 'no-store',
-      },
+      const content = safeReadFile(assetPath, { encoding: null }) as Buffer;
+      return new NextResponse(new Uint8Array(content), {
+        status: 200,
+        headers: {
+          'Content-Type': contentTypeFor(assetPath),
+          'Content-Length': String(stats.size),
+          'Content-Disposition': `inline; filename="${path.basename(assetPath)}"`,
+          'Cache-Control': 'no-store',
+        },
+      });
     });
   } catch (err: any) {
     return NextResponse.json(
