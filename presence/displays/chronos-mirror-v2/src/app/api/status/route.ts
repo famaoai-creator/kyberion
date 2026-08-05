@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { collectSystemStatus } from '../../../lib/system-status';
+import {
+  resolveViewerContextForRequest,
+  withViewerExecutionContext,
+} from '../../../lib/viewer-context';
 
 /**
  * Aggregated system health (OP-04 Task 2): uptime, persisted provider
@@ -16,5 +20,10 @@ export async function GET(req: NextRequest) {
   const requiresAccess = requireChronosAccess(req, 'readonly');
   if (requiresAccess) return requiresAccess;
 
-  return NextResponse.json(collectSystemStatus());
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
+
+  return NextResponse.json(
+    withViewerExecutionContext(resolvedViewer.context, () => collectSystemStatus())
+  );
 }

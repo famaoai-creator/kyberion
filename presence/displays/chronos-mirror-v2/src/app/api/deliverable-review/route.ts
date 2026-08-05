@@ -10,6 +10,7 @@ import {
   type RejectionReasonCategory,
 } from '@agent/core/rejection-reason';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
+import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
 const VERDICT_TO_INBOX_STATUS = {
@@ -67,6 +68,8 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
     const requiresAccess = requireChronosAccess(req, 'localadmin');
     if (requiresAccess) return requiresAccess;
+    const resolvedViewer = resolveViewerContextForRequest(req);
+    if (resolvedViewer.response) return resolvedViewer.response;
 
     const body = await req.json();
     const artifactId = typeof body?.artifactId === 'string' ? body.artifactId : '';
