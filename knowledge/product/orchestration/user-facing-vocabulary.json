@@ -139,6 +139,16 @@
         "ja": "管制塔",
         "qps-ploc": "⟦Ƈőñŧřőŀ ŧőẇėř ŀőřė⟧"
       },
+      "chronos_surface_role_title": {
+        "en": "What this surface is for",
+        "ja": "このサーフェスの役割",
+        "qps-ploc": "⟦Ẇħȧŧ ŧħïş şůřƒȧƈė ïş ƒőř ŀőřė⟧"
+      },
+      "chronos_surface_role_tagline": {
+        "en": "Control tower — monitor execution, intervene when needed",
+        "ja": "管制塔 — 実行状態の監視と介入",
+        "qps-ploc": "⟦Ƈőñŧřőŀ ŧőẇėř — ɱőñïŧőř ėẋėƈůŧïőñ, ïñŧėřṽėñė ẇħėñ ñėėḓėḓ ŀőřė⟧"
+      },
       "chronos_ac_title": {
         "en": "Agent flow",
         "ja": "エージェントフロー",
