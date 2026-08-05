@@ -10,9 +10,20 @@ vi.mock('@agent/core', () => ({
   collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
 }));
 
+vi.mock('@agent/core/operator-home-summary', () => ({
+  collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
+}));
+
 vi.mock('../../../lib/api-guard', () => ({
   guardRequest: mocks.guardRequest,
   requireChronosAccess: mocks.requireChronosAccess,
+}));
+
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveViewerContextForRequest: vi.fn(() => ({
+    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+  })),
+  withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
 }));
 
 import { GET } from './route.js';

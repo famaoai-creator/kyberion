@@ -1,4 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../lib/api-guard', () => ({
+  guardRequest: vi.fn(() => null),
+}));
+
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveViewerContextForRequest: vi.fn(() => ({
+    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+  })),
+}));
+
 import { POST } from './route.js';
 
 describe('chronos agent route', () => {

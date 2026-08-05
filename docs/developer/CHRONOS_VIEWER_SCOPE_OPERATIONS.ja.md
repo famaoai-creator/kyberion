@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-08-05
+last_updated: 2026-08-06
 ---
 
 # Chronos viewer scope 運用手順
@@ -17,6 +17,14 @@ last_updated: 2026-08-05
 - `enforce`: viewer の許可集合外の tenant 指定を HTTP 403 にします。
 
 監査 chain で `action=viewer_scope` の warn 記録が一定期間 0 件であることを確認してから、運用環境ごとに `enforce` へ切り替えます。切り替えは単独コミットで行い、表示の欠落があれば直ちに `warn` へ戻せます。
+
+## API ルート契約
+
+`/api/healthz` を除くすべての Chronos API ルートは、通常の role guard 通過後に `resolveViewerContextForRequest` を実行します。これにより、登録外 token や principal のない remote request は個別ルートでも fail-closed になります。`healthz` だけが明示的な公開 probe です。
+
+ファイル・成果物・runtime の読み取りは、可能な範囲で `withViewerExecutionContext` の内側で行い、単一 tenant viewer の境界を tier guard へ伝播します。tenant を選択できる可視化ルートは、viewer の許可集合を先に解決した後で query を交差させます。回帰防止として `src/app/api/route-contract.test.ts` が route module の viewer 契約を走査します。
+
+middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
 
 ## scoped token の登録
 
