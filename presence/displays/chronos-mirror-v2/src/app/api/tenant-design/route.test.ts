@@ -11,6 +11,25 @@ vi.mock('../../../lib/api-guard', () => ({
   guardRequest: vi.fn(() => null),
 }));
 
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveViewerContextForRequest: vi.fn(() => ({
+    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+  })),
+  viewerScopeTenantSlugs: vi.fn((_viewer: unknown, requested?: string) =>
+    requested ? [requested] : 'all'
+  ),
+  viewerErrorResponse: vi.fn(
+    (error: unknown) =>
+      new Response(
+        JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+        {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
+  ),
+}));
+
 import { GET } from './route.js';
 
 describe('tenant-design route', () => {
