@@ -64,6 +64,11 @@
         "ja": "build と test が完了しました。",
         "qps-ploc": "⟦Ƀůïŀḓ ȧñḓ ŧėşŧ ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗ⟧"
       },
+      "chronos_home_title": {
+        "en": "Today's work",
+        "ja": "今日の対応",
+        "qps-ploc": "⟦Ŧőḓȧẏ'ş ẇőřķ ŀőř⟧"
+      },
       "chronos_capability_audit_complete": {
         "en": "Capability audit complete. {manifests} agent manifests were scanned.",
         "ja": "capability audit が完了しました。{manifests} 件の agent manifest を確認しました。",
@@ -103,6 +108,11 @@
         "en": "Select a count to jump straight to it.",
         "ja": "数字を選ぶと、その場所へ直接移動します。",
         "qps-ploc": "⟦Şėŀėƈŧ ȧ ƈőůñŧ ŧő ĵůɱṗ şŧřȧïɠħŧ ŧő ïŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_cb_instruction": {
+        "en": "Start with the highlighted action. Use the counts below only when you need to inspect a queue.",
+        "ja": "まず強調された対応を実行してください。詳しく確認するときだけ、下の件数を選びます。",
+        "qps-ploc": "⟦Şŧȧřŧ ẇïŧħ ŧħė ħïɠħŀïɠħŧėḓ ȧƈŧïőñ. Ůşė ŧħė ƈőůñŧş ƀėŀőẇ őñŀẏ ẇħėñ ẏőů ñėėḓ ŧő ïñşṗėƈŧ ȧ ɋůėůė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "chronos_cb_do_this_next": {
         "en": "Do this next",
@@ -4139,6 +4149,16 @@
         "ja": "現在地と次の一手",
         "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧė ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗş⟧"
       },
+      "chronos_nav_organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "chronos_nav_organization_hint": {
+        "en": "Purpose, services, operations, and decisions",
+        "ja": "目的・サービス・運用・意思決定",
+        "qps-ploc": "⟦Ṗůřṗőşė, şėřṽïƈėş, őṗėřȧŧïőñş, ȧñḓ ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "chronos_nav_missions": {
         "en": "Missions",
         "ja": "ミッション",
@@ -4208,6 +4228,166 @@
         "en": "Start, stop, and inspect managed surfaces",
         "ja": "管理対象Surfaceの起動・停止・状態確認",
         "qps-ploc": "⟦Şŧȧřŧ, şŧőṗ, ȧñḓ ïñşṗėƈŧ ɱȧñȧɠėḓ şůřƒȧƈėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_org_title": {
+        "en": "Organization operating model",
+        "ja": "組織の運用モデル",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ őṗėřȧŧïñɠ ɱőḓėŀ ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_org_description": {
+        "en": "See how purpose becomes services, routine operations, solution projects, decisions, and governed learning for the active tenant.",
+        "ja": "アクティブなテナントについて、目的がサービス・定常運用・ソリューションプロジェクト・意思決定・統制された学習へどうつながるかを確認します。",
+        "qps-ploc": "⟦Şėė ħőẇ ṗůřṗőşė ƀėƈőɱėş şėřṽïƈėş, řőůŧïñė őṗėřȧŧïőñş, şőŀůŧïőñ ṗřőĵėƈŧş, ḓėƈïşïőñş, ȧñḓ ɠőṽėřñėḓ ŀėȧřñïñɠ ƒőř ŧħė ȧƈŧïṽė ŧėñȧñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "chronos_org_refresh": {
+        "en": "Refresh",
+        "ja": "更新",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "chronos_org_load_failed": {
+        "en": "Organization model could not be loaded",
+        "ja": "組織モデルを読み込めませんでした",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ɱőḓėŀ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_org_loading": {
+        "en": "Loading the active tenant organization model...",
+        "ja": "アクティブテナントの組織モデルを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ŧħė ȧƈŧïṽė ŧėñȧñŧ őřɠȧñïẑȧŧïőñ ɱőḓėŀ... ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_org_readiness": {
+        "en": "Readiness",
+        "ja": "準備状態",
+        "qps-ploc": "⟦Řėȧḓïñėşş ŀőř⟧"
+      },
+      "chronos_org_readiness_ready": {
+        "en": "ready",
+        "ja": "運用可能",
+        "qps-ploc": "⟦řėȧḓẏ ŀőř⟧"
+      },
+      "chronos_org_readiness_draft": {
+        "en": "purpose draft",
+        "ja": "目的を確認中",
+        "qps-ploc": "⟦ṗůřṗőşė ḓřȧƒŧ ŀőřė⟧"
+      },
+      "chronos_org_readiness_setup": {
+        "en": "setup needed",
+        "ja": "初期設定が必要",
+        "qps-ploc": "⟦şėŧůṗ ñėėḓėḓ ŀőř⟧"
+      },
+      "chronos_org_reconciliation": {
+        "en": "Reconciliation",
+        "ja": "整合性確認",
+        "qps-ploc": "⟦Řėƈőñƈïŀïȧŧïőñ ŀőřė⟧"
+      },
+      "chronos_org_purpose": {
+        "en": "Purpose",
+        "ja": "目的",
+        "qps-ploc": "⟦Ṗůřṗőşė ŀőř⟧"
+      },
+      "chronos_org_not_configured": {
+        "en": "Not configured",
+        "ja": "未設定",
+        "qps-ploc": "⟦Ñőŧ ƈőñƒïɠůřėḓ ŀőřė⟧"
+      },
+      "chronos_org_services": {
+        "en": "Services",
+        "ja": "サービス",
+        "qps-ploc": "⟦Şėřṽïƈėş ŀőř⟧"
+      },
+      "chronos_org_services_detail": {
+        "en": "{degraded} need attention",
+        "ja": "要対応 {degraded} 件",
+        "qps-ploc": "⟦{degraded} ñėėḓ ȧŧŧėñŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_org_operations": {
+        "en": "Operations",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
+      },
+      "chronos_org_operations_detail": {
+        "en": "{overdue} overdue",
+        "ja": "期限超過 {overdue} 件",
+        "qps-ploc": "⟦{overdue} őṽėřḓůė ŀőřėɱ⟧"
+      },
+      "chronos_org_attention": {
+        "en": "Attention",
+        "ja": "要対応",
+        "qps-ploc": "⟦Ȧŧŧėñŧïőñ ŀőř⟧"
+      },
+      "chronos_org_attention_detail": {
+        "en": "{incidents} incidents · {decisions} decisions",
+        "ja": "インシデント {incidents} 件 · 判断待ち {decisions} 件",
+        "qps-ploc": "⟦{incidents} ïñƈïḓėñŧş · {decisions} ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_org_interventions": {
+        "en": "Intervention points",
+        "ja": "介入ポイント",
+        "qps-ploc": "⟦Ïñŧėřṽėñŧïőñ ṗőïñŧş ŀőřėɱ ⟧"
+      },
+      "chronos_org_no_interventions": {
+        "en": "No operator intervention is currently required.",
+        "ja": "現在、オペレーターの介入は必要ありません。",
+        "qps-ploc": "⟦Ñő őṗėřȧŧőř ïñŧėřṽėñŧïőñ ïş ƈůřřėñŧŀẏ řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_org_structure": {
+        "en": "Operating structure",
+        "ja": "運用構造",
+        "qps-ploc": "⟦Őṗėřȧŧïñɠ şŧřůƈŧůřė ŀőřėɱ ⟧"
+      },
+      "chronos_org_domains": {
+        "en": "Domains",
+        "ja": "ドメイン",
+        "qps-ploc": "⟦Ḓőɱȧïñş ŀőř⟧"
+      },
+      "chronos_org_capabilities": {
+        "en": "Capabilities",
+        "ja": "ケイパビリティ",
+        "qps-ploc": "⟦Ƈȧṗȧƀïŀïŧïėş ŀőř⟧"
+      },
+      "chronos_org_projects": {
+        "en": "Solution projects",
+        "ja": "ソリューションプロジェクト",
+        "qps-ploc": "⟦Şőŀůŧïőñ ṗřőĵėƈŧş ŀőřėɱ⟧"
+      },
+      "chronos_org_learning": {
+        "en": "Learning queue",
+        "ja": "学習候補",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ɋůėůė ŀőřė⟧"
+      },
+      "chronos_org_learning_detail": {
+        "en": "{count} learning candidates awaiting governed promotion",
+        "ja": "統制された昇格を待つ学習候補 {count} 件",
+        "qps-ploc": "⟦{count} ŀėȧřñïñɠ ƈȧñḓïḓȧŧėş ȧẇȧïŧïñɠ ɠőṽėřñėḓ ṗřőɱőŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_org_health_healthy": {
+        "en": "healthy",
+        "ja": "健全",
+        "qps-ploc": "⟦ħėȧŀŧħẏ ŀőř⟧"
+      },
+      "chronos_org_health_degraded": {
+        "en": "degraded",
+        "ja": "劣化",
+        "qps-ploc": "⟦ḓėɠřȧḓėḓ ŀőř⟧"
+      },
+      "chronos_org_health_critical": {
+        "en": "critical",
+        "ja": "重大",
+        "qps-ploc": "⟦ƈřïŧïƈȧŀ ŀőř⟧"
+      },
+      "chronos_org_health_unknown": {
+        "en": "unknown",
+        "ja": "不明",
+        "qps-ploc": "⟦ůñķñőẇñ ŀőř⟧"
+      },
+      "chronos_org_open_operations": {
+        "en": "Open operations",
+        "ja": "運用を開く",
+        "qps-ploc": "⟦Őṗėñ őṗėřȧŧïőñş ŀőřė⟧"
+      },
+      "chronos_org_open_governance": {
+        "en": "Open governance",
+        "ja": "ガバナンスを開く",
+        "qps-ploc": "⟦Őṗėñ ɠőṽėřñȧñƈė ŀőřė⟧"
       },
       "chronos_surface_control": {
         "en": "Surface Control",

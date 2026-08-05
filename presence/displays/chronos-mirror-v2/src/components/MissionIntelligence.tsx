@@ -1187,6 +1187,7 @@ export function MissionIntelligence({
   onOpenWorkspace,
   focusedMissionId = null,
   hideSurfaceControl = false,
+  showMissionIntelligenceLabel = false,
 }: {
   workspace?: MissionIntelligenceWorkspace;
   focusedView?: string | null;
@@ -1197,9 +1198,13 @@ export function MissionIntelligence({
   ) => void;
   focusedMissionId?: string | null;
   hideSurfaceControl?: boolean;
+  showMissionIntelligenceLabel?: boolean;
 }) {
   const locale = resolveChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
+  const missionIntelligenceEyebrow = showMissionIntelligenceLabel
+    ? uxText('chronos_mission_intelligence', locale)
+    : undefined;
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<IntelligencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2020,7 +2025,7 @@ export function MissionIntelligence({
       <div className="flex h-full w-full items-center justify-center">
         <div className="w-full max-w-xl">
           <SurfaceStatusPanel
-            eyebrow="Mission Intelligence"
+            eyebrow={missionIntelligenceEyebrow}
             title={safeError.title}
             detail={`${safeError.body} ${safeError.nextAction}`}
             tone="error"
@@ -2038,7 +2043,7 @@ export function MissionIntelligence({
   if (!mounted) {
     return (
       <SurfaceStatusPanel
-        eyebrow="Mission Intelligence"
+        eyebrow={missionIntelligenceEyebrow}
         title="Loading mission intelligence"
         detail="Chronos is fetching missions, runtime state, and the latest governance signals."
         tone="neutral"
@@ -2049,7 +2054,7 @@ export function MissionIntelligence({
   if (!data) {
     return (
       <SurfaceStatusPanel
-        eyebrow="Mission Intelligence"
+        eyebrow={missionIntelligenceEyebrow}
         title="Waiting for mission data"
         detail={mt('chronos_mission_loading', 'Loading mission intelligence...')}
         tone="neutral"

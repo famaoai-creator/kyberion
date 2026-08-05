@@ -99,6 +99,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Shared token for newline-JSON agent runtime supervisor RPC.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT",
       "category": "runtime",
       "type": "string",
@@ -1509,8 +1518,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow loopback Chronos requests to use the compatibility localadmin principal when true or unset.",
+      "documented": true,
+      "subsystem": "surfaces"
     },
     {
       "name": "KYBERION_MANAGED_PYTHON_VERSION",
@@ -2920,6 +2930,15 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_VIEWER_SCOPE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.",
+      "documented": true,
+      "subsystem": "surfaces"
     },
     {
       "name": "KYBERION_VLLM_KEY",
