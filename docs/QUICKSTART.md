@@ -112,14 +112,19 @@ export KYBERION_LOCALHOST_AUTOADMIN=true
 pnpm chronos:dev
 ```
 
-Useful local surfaces:
+Useful local surfaces (full role map: [`docs/SURFACES.md`](./SURFACES.md)):
 
-- `Chronos`: `http://127.0.0.1:3000`
+- `Chronos`: `http://127.0.0.1:3000` (control tower)
+- `Concierge`: `http://127.0.0.1:3050` (CEO secretary — requests, approvals, deliverables)
 - `Presence Studio`: usually `http://127.0.0.1:3031`
+- `Terminal HUD`: `pnpm tui` (Ink TUI for missions / work items / runtimes)
+
+Chronos API routes resolve a viewer principal server-side; `KYBERION_LOCALHOST_AUTOADMIN=true` grants loopback callers `localadmin` (see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`).
 
 If you are unsure which one matters for your goal, `pnpm setup:report --persona first-time-user` is the canonical entry guide:
 
 - `Chronos` for runtime visibility and operator control
+- `Concierge` for the "what should I decide now" secretary view
 - `Presence Studio + voice-hub` for conversational voice/browser demos
 - `Slack` when you want threaded remote interaction and auth is ready
 
@@ -186,6 +191,8 @@ Rule of thumb:
 - `quick conversational work` -> answer or task session
 - `larger durable work` -> mission
 
+Above all of this sits the organization layer: every work item carries a typed context chain (`organization_id → tenant_slug → mission_id → project_id → task_id` plus a `work_shape`), so the same work shows up consistently in the Organization, Home, Work Items, Operations, Missions, and Governance views. Routine operations, incidents, and cadences — work that is not a solution project — are tracked by the organization operating model (`pnpm organization`).
+
 ## 6. The Smallest Mental Model
 
 If you only remember a few things, remember these:
@@ -209,6 +216,15 @@ Practical rule:
 Kyberion will decide whether to answer directly, ask for a brief clarification, or start a task session or mission.
 
 ## 7. When To Use Each Surface
+
+The canonical role map (with ports and write scopes) is [`docs/SURFACES.md`](./SURFACES.md). Summary:
+
+### Concierge
+
+Use when:
+
+- you want the secretary view: pending requests, approvals, deliverables, exceptions
+- you are deciding, not operating
 
 ### Terminal
 
@@ -246,7 +262,7 @@ Use when:
 
 If you need to understand or change which reasoning backend is used for distillation or other structured LLM work, start here:
 
-- [`knowledge/product/governance/wisdom-policy-guide.md`](knowledge/product/governance/wisdom-policy-guide.md)
+- [`knowledge/product/governance/wisdom-policy-guide.md`](../knowledge/product/governance/wisdom-policy-guide.md)
 
 The policy guide explains:
 
@@ -293,8 +309,10 @@ Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next R
 
 ## 10. Where To Read Next
 
-- [README.md](README.md)
+- [README.md](../README.md)
+- [docs/SURFACES.md](SURFACES.md)
+- [docs/COMPONENT_MAP.md](COMPONENT_MAP.md)
 - [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)
 - [docs/GLOSSARY.md](GLOSSARY.md)
-- [CAPABILITIES_GUIDE.md](CAPABILITIES_GUIDE.md)
-- [knowledge/product/governance/wisdom-policy-guide.md](knowledge/product/governance/wisdom-policy-guide.md)
+- [CAPABILITIES_GUIDE.md](../CAPABILITIES_GUIDE.md)
+- [knowledge/product/governance/wisdom-policy-guide.md](../knowledge/product/governance/wisdom-policy-guide.md)

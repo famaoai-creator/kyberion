@@ -65,21 +65,23 @@ The concept map explains how those ideas fit together logically.
 
 ## Top-level directories
 
-| Path              | Role                                                    | Start here when you want to...                                            |
-| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `AGENTS.md`       | Sovereign charter and operating rules                   | Understand the philosophy, constraints, and lifecycle                     |
-| `docs/`           | Human-facing guides                                     | Learn setup, terminology, and architecture                                |
-| `libs/core/`      | Shared kernel utilities                                 | Inspect secure I/O, path resolution, locks, CLI helpers                   |
-| `libs/actuators/` | Execution "spinal cord"                                 | See what the system can physically do                                     |
-| `knowledge/`      | Tiered memory and procedures                            | Add guidance, playbooks, governance, and private context                  |
-| `scripts/`        | Entry-point commands                                    | Run onboarding, missions, dashboards, and discovery tools                 |
-| `pipelines/`      | Declarative workflows                                   | Review system diagnostics and repeatable flows                            |
-| `plugins/`        | Runtime guardrails and telemetry                        | Inspect policy enforcement and instrumentation                            |
-| `satellites/`     | External bridges                                        | Connect Kyberion to platforms like Slack                                  |
-| `presence/`       | Background sensing, dashboards, and control surfaces    | Inspect pulse, display, sensory integrations, and Chronos Mirror v2       |
-| `active/`         | Mission/runtime workspace and project operational state | Review live mission state, project state, and generated operational files |
-| `schemas/`        | Structured data contracts                               | Validate JSON-based ADF and ecosystem data                                |
-| `tests/`          | Cross-cutting tests                                     | Run smoke and integration coverage                                        |
+| Path              | Role                                                 | Start here when you want to...                                                                            |
+| ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md`       | Sovereign charter and operating rules                | Understand the philosophy, constraints, and lifecycle                                                     |
+| `docs/`           | Human-facing guides                                  | Learn setup, terminology, and architecture                                                                |
+| `libs/core/`      | Shared kernel utilities                              | Inspect secure I/O, path resolution, locks, CLI helpers                                                   |
+| `libs/actuators/` | Execution "spinal cord"                              | See what the system can physically do                                                                     |
+| `knowledge/`      | Tiered memory and procedures                         | Add guidance, playbooks, governance, and private context                                                  |
+| `scripts/`        | Entry-point commands                                 | Run onboarding, missions, dashboards, and discovery tools                                                 |
+| `pipelines/`      | Declarative workflows                                | Review system diagnostics and repeatable flows                                                            |
+| `plugins/`        | Runtime guardrails and telemetry                     | Inspect policy enforcement and instrumentation                                                            |
+| `satellites/`     | External bridges                                     | Connect Kyberion to Slack, Telegram, Discord, iMessage, or voice                                          |
+| `presence/`       | Background sensing, dashboards, and control surfaces | Inspect pulse, sensors, bridges, and the UI surfaces under `presence/displays/` (map: `docs/SURFACES.md`) |
+| `active/`         | Mission/runtime workspace and operational state      | Review live mission state, organization state (`active/organizations/`), and generated operational files  |
+| `customer/`       | Customer overlay for FDE engagements                 | Layer customer-specific identity/config over `knowledge/personal/`                                        |
+| `templates/`      | Reusable scaffolds and document templates            | Start a new pipeline, onboarding profile, or document from a template                                     |
+| `schemas/`        | Structured data contracts                            | Validate JSON-based ADF and ecosystem data                                                                |
+| `tests/`          | Cross-cutting tests                                  | Run smoke and integration coverage                                                                        |
 
 ## Core execution paths
 
@@ -166,9 +168,18 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
 - `satellites/slack-bridge/`
 - `satellites/imessage-bridge/`
 - `satellites/telegram-bridge/`
+- `satellites/discord-bridge/`
+- `satellites/voice-hub/`
 - `presence/bridge/nexus-daemon.ts`
-- `presence/displays/chronos-mirror-v2/`
+- `presence/bridge/terminal/` (terminal bridge)
+- `presence/displays/chronos-mirror-v2/` (control tower, port 3000)
+- `presence/displays/concierge/` (CEO secretary, port 3050)
+- `presence/displays/presence-studio/` (companion workbench, port 3031)
+- `presence/displays/computer-surface/` (local mirror, port 3040)
+- `presence/displays/operator-surface/` (read-only audit monitor, port 3331)
+- `presence/displays/terminal-hud/` (Ink TUI, `pnpm tui`)
 - `knowledge/product/architecture/slack-chronos-control-model.md`
+- `docs/SURFACES.md` (role map for all of the above)
 
 This path covers how external channels are normalized, routed, observed, and answered.
 It also defines channel ports and Surface Agents that sit between human-facing surfaces and the durable mission/execution layer.
@@ -182,14 +193,16 @@ Current delivery model:
 Chronos access modes:
 
 - `readonly`
-  - route-local observer mode for health, missions, runtimes, outbox, and diagnostics
+  - observer mode for health, missions, runtimes, outbox, and diagnostics
 - `localadmin`
-  - route-local operator mode for deterministic mission/runtime/surface control actions
+  - operator mode for deterministic mission/runtime/surface control actions
+
+Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Client-supplied `tenant` parameters can only narrow the viewer's allowed set. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`; see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback.
 
 Local Chronos boot:
 
 ```bash
-export KYBERION_LOCALHOST_AUTOADMIN=true
+export KYBERION_LOCALHOST_AUTOADMIN=true   # loopback auto-admin; set false to require tokens
 pnpm chronos:dev
 ```
 
@@ -246,6 +259,9 @@ The kernel of the ecosystem. Important responsibilities:
 - control-plane helpers for channel routing, feedback, and session-scoped artifacts
 - mission orchestration worker and event contracts
 - generic surface outbox and delivery helpers
+- organization and tenancy: `organization-operating-model.ts`, `project-management.ts`, `work-coordination.ts` + `work-visibility.ts` (work-item context chain and visibility projections), `tenant-registry.ts`, `tenant-knowledge-retrieval.ts`, `peer-messaging.ts` (tenant peer mesh)
+- identity and authorization: `agent-identity.ts` (NHI), `authority.ts`, `tier-guard.ts`, `delegation-chain.ts`
+- history search: `history-search-index.ts` (SQLite FTS5, tier-isolated)
 
 If you are changing shared behavior or trying to follow AGENTS.md's secure-I/O rule, start here.
 
@@ -257,7 +273,6 @@ Actuators are the execution layer. Current major groups include:
 - `code-actuator`: code analysis/refactoring helpers
 - `network-actuator`: secure API and A2A transport
 - `wisdom-actuator`: knowledge distillation and evolution
-- `knowledge/product/orchestration/specialists/` (compatibility snapshot: `specialist-catalog.json`)
 - `media-actuator`: document and diagram generation
 - `browser-actuator`: browser automation
 - `system-actuator`: OS-level operations
@@ -269,7 +284,12 @@ Actuators are the execution layer. Current major groups include:
 - `orchestrator-actuator`: mission/control-plane execution
 - `process-actuator`: managed long-lived process ownership
 - `presence-actuator`: channel delivery and in-session message dispatch
-- `scripts/surface_runtime.ts`: operational lifecycle controller for long-running gateways and control surfaces
+
+This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (kept drift-free by `pnpm check:op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface_runtime.ts`.
+
+### `libs/shared-*`
+
+Workspace packages shared across actuators and surfaces: `libs/shared-media` (media primitives), `libs/shared-nerve` (reflex engine and nerve-system helpers), `libs/shared-network` (network primitives), `libs/shared-vision` (vision helpers).
 
 ### Channel and service boundary
 
@@ -295,7 +315,7 @@ Background surfaces and bridges are not started ad hoc. Their canonical startup 
 
 ## Mission control model
 
-Kyberion uses a `single-owner, multi-worker` mission model.
+Kyberion uses a `single-owner, multi-worker` mission model. Missions themselves sit inside the organization layer: every work item carries the canonical context chain `organization_id → tenant_slug → mission_id → project_id → task_id` (+ `work_shape`), and non-mission operating work (services, routine operations, incidents, cadences) is tracked by the organization operating model (`pnpm organization`).
 
 - The mission is the durable control contract.
 - One owner agent holds mission write authority.
@@ -312,13 +332,13 @@ The authoritative architecture reference is:
 
 ## Knowledge tiers
 
-| Tier         | Path                                | Purpose                                               |
-| ------------ | ----------------------------------- | ----------------------------------------------------- |
-| Personal     | `knowledge/personal/`               | Identity, private preferences, private missions       |
-| Confidential | `knowledge/confidential/`           | Sensitive organizational knowledge                    |
-| Public       | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge |
+| Tier         | Path                                | Purpose                                                                                                                    |
+| ------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Personal     | `knowledge/personal/`               | Identity, private preferences, private missions, tenant profiles (`tenants/`)                                              |
+| Confidential | `knowledge/confidential/`           | Sensitive organizational knowledge, scoped per tenant: `{tenant-slug}/` roots, `tenant-groups/` shared prefixes, `common/` |
+| Public       | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge                                                                      |
 
-The charter assumes strict isolation between these tiers.
+The charter assumes strict isolation between these tiers. Within the confidential tier, tenant scope is a second isolation axis: cross-tenant access is deny-unless-brokered and audited (`knowledge/product/architecture/multi-tenant-operations.md`). Organization operating-model state follows the same tiers under `active/organizations/{tier}/{tenant}/{organization}/state/`.
 
 ## Supporting architecture docs
 
@@ -327,11 +347,13 @@ The charter assumes strict isolation between these tiers.
 - `docs/PACKAGING_CONTRACT.md`: workspace/package import rules and boundary expectations
   - runtime code uses package imports only
   - white-box source imports in tests must stay explicitly whitelisted
-- `README.md`: current operator-oriented summary of mission controller, orchestration worker, runtime supervisor, Slack, and Chronos
+- `README.md`: product overview and quick start
 - `knowledge/product/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
-- `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
+- `knowledge/product/architecture/multi-tenant-operations.md`: tenant isolation layers, brokered cross-tenant access, and tenant scope enforcement
+- `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`: viewer principal, scoped tokens, and `KYBERION_VIEWER_SCOPE` staging
+- `docs/developer/improvement-plans-2026-07/STATUS.ja.md`: the canonical implementation-status ledger for all improvement plans
+- `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries; also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `knowledge/product/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
-- `knowledge/product/architecture/slack-chronos-control-model.md`: also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `knowledge/product/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
 - `dependency-graph.mmd`: repo-level dependency visualization
 
@@ -342,7 +364,8 @@ The charter assumes strict isolation between these tiers.
 3. `docs/INITIALIZATION.md`
 4. `docs/QUICKSTART.md`
 5. This file
-6. `docs/GLOSSARY.md`
-7. `CAPABILITIES_GUIDE.md`
+6. `docs/SURFACES.md`
+7. `docs/GLOSSARY.md`
+8. `CAPABILITIES_GUIDE.md`
 
 That sequence gives you the concept first, then the operating model, then the concrete places to work.
