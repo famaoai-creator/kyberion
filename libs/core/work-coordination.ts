@@ -20,6 +20,21 @@ export type WorkItemSource = 'local' | 'github' | 'jira' | 'peer';
 export type WorkBoardType = 'project' | 'personal' | 'peer' | 'review' | 'external';
 export type WorkLeaseStatus = 'active' | 'released' | 'expired';
 
+export interface WorkItemContext {
+  organization_id?: string;
+  tenant_slug?: string;
+  mission_id?: string;
+  project_id?: string;
+  task_id?: string;
+  work_shape?:
+    | 'solution_project'
+    | 'service_operation'
+    | 'routine_operation'
+    | 'incident_response'
+    | 'governance_cadence'
+    | 'improvement_experiment';
+}
+
 export interface WorkItem {
   item_id: string;
   title: string;
@@ -43,6 +58,7 @@ export interface WorkItem {
   claimed_by_user_id?: string;
   current_attempt_id?: string;
   attempts?: WorkItemAttempt[];
+  context?: WorkItemContext;
   metadata?: Record<string, unknown>;
 }
 
@@ -159,6 +175,7 @@ export interface CreateWorkItemInput {
   metadata?: Record<string, unknown>;
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
+  context?: WorkItemContext;
 }
 
 export interface UpdateWorkItemInput {
@@ -176,6 +193,7 @@ export interface UpdateWorkItemInput {
   metadata?: Record<string, unknown>;
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
+  context?: WorkItemContext;
 }
 
 export interface CreateBoardInput {
@@ -265,6 +283,9 @@ export interface RecordMissionHandoffInput {
 export interface WorkItemFilter {
   boardId?: string;
   projectId?: string;
+  tenantSlugs?: string[];
+  /** JSON/API spelling retained for cross-process work-item filters. */
+  tenant_slugs?: string[];
   source?: WorkItemSource | WorkItemSource[];
   status?: WorkItemStatus | WorkItemStatus[];
   assigneePeerId?: string;
@@ -649,6 +670,16 @@ function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkIt
   const query = filter.text ? filter.text.trim().toLowerCase() : '';
 
   return items.filter((item) => {
+    const tenantSlugs = filter.tenantSlugs || filter.tenant_slugs;
+    if (tenantSlugs) {
+      const tenantSlug =
+        typeof item.context?.tenant_slug === 'string'
+          ? item.context.tenant_slug
+          : typeof item.metadata?.tenant_slug === 'string'
+            ? item.metadata.tenant_slug
+            : undefined;
+      if (!tenantSlug || !tenantSlugs.includes(tenantSlug)) return false;
+    }
     if (
       (filter.projectId || (filter as any).project_id) &&
       item.project_id !== (filter.projectId || (filter as any).project_id)
@@ -733,6 +764,36 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
     throw new WorkCoordinationError('validation_error', 'description is required');
   }
   const now = nowIso();
+  const metadata = input.metadata || {};
+  const missionLabel = (input.labels || []).find((label) => label.startsWith('mission:'));
+  const context: WorkItemContext = {
+    ...(input.context || {}),
+    ...(input.context?.project_id || input.projectId
+      ? { project_id: input.context?.project_id || input.projectId }
+      : { project_id: 'default' }),
+    ...(input.context?.mission_id || metadata.mission_id || missionLabel
+      ? {
+          mission_id:
+            input.context?.mission_id ||
+            String(metadata.mission_id || missionLabel?.slice('mission:'.length)),
+        }
+      : {}),
+    ...(input.context?.tenant_slug || metadata.tenant_slug
+      ? { tenant_slug: input.context?.tenant_slug || String(metadata.tenant_slug) }
+      : {}),
+    ...(input.context?.organization_id || metadata.organization_id
+      ? { organization_id: input.context?.organization_id || String(metadata.organization_id) }
+      : {}),
+    ...(input.context?.task_id || metadata.task_id
+      ? { task_id: input.context?.task_id || String(metadata.task_id) }
+      : {}),
+    ...(input.context?.work_shape || metadata.work_shape
+      ? {
+          work_shape:
+            input.context?.work_shape || (metadata.work_shape as WorkItemContext['work_shape']),
+        }
+      : {}),
+  };
   const item: WorkItem = {
     item_id: input.itemId || randomId('witem'),
     title,
@@ -751,6 +812,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
     updated_at: now,
     ...(input.currentAttemptId ? { current_attempt_id: input.currentAttemptId } : {}),
     ...(input.attempts ? { attempts: input.attempts.map((attempt) => ({ ...attempt })) } : {}),
+    context,
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
   appendItemSnapshot(item);
@@ -853,6 +915,7 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
       ...(input.assigneeUserId !== undefined ? { assignee_user_id: input.assigneeUserId } : {}),
       ...(input.labels ? { labels: [...input.labels] } : {}),
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
+      ...(input.context ? { context: { ...input.context } } : {}),
       ...(input.metadata ? { metadata: input.metadata } : {}),
       ...(finalizedAttempt
         ? {

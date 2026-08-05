@@ -815,6 +815,10 @@
       "types": "./dist/work-coordination.d.ts",
       "default": "./dist/work-coordination.js"
     },
+    "./work-visibility": {
+      "types": "./dist/work-visibility.d.ts",
+      "default": "./dist/work-visibility.js"
+    },
     "./work-design": {
       "types": "./dist/work-design.d.ts",
       "default": "./dist/work-design.js"

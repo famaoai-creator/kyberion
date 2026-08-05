@@ -85,6 +85,14 @@ describe('api guard', () => {
     expect(resolveChronosAccessRole(request)).toBeNull();
   });
 
+  it('does not trust a localhost host header from a non-loopback peer', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+    expect(
+      resolveChronosAccessRole(makeReq({ ip: '203.0.113.10', hostname: 'localhost' }))
+    ).toBeNull();
+  });
+
   it('accepts the loopback forwarding address added by the self-hosted Next.js server', async () => {
     vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
     const { resolveChronosAccessRole } = await import('./api-guard.js');

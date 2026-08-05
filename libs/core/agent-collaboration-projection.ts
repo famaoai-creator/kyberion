@@ -76,6 +76,7 @@ export interface AgentCollaborationProjection {
 export interface ComposeCollaborationProjectionOptions {
   missionId?: string;
   tenant?: string;
+  tenantSlugs?: string[] | 'all';
   limit?: number;
   now?: string;
   staleAfterMs?: number;
@@ -293,12 +294,18 @@ function eventMatches(
   options: ComposeCollaborationProjectionOptions
 ): boolean {
   if (options.missionId && event.mission_id !== options.missionId.toUpperCase()) return false;
-  if (options.tenant) {
+  if (options.tenant || (options.tenantSlugs && options.tenantSlugs !== 'all')) {
     const eventTenant =
       event.tenant_slug || (event.mission_id ? readMissionTenant(event.mission_id) : undefined);
     // Tenant-scoped views must fail closed: an event without an explicit or
     // mission-derived tenant cannot be safely shown in a tenant projection.
-    if (eventTenant !== options.tenant) return false;
+    const allowed =
+      options.tenantSlugs && options.tenantSlugs !== 'all'
+        ? options.tenantSlugs
+        : options.tenant
+          ? [options.tenant]
+          : [];
+    if (!eventTenant || !allowed.includes(eventTenant)) return false;
   }
   return true;
 }

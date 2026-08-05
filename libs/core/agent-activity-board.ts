@@ -9,6 +9,11 @@
 
 import * as path from 'node:path';
 import { listWorkItems, type WorkItem } from './work-coordination.js';
+import {
+  buildWorkVisibilityProjection,
+  resolveWorkItemContext,
+  type WorkVisibilityViewer,
+} from './work-visibility.js';
 import { findMissionPath } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 
@@ -42,11 +47,6 @@ export interface AgentActivityBoard {
   tenant?: string;
   entries: AgentActivityEntry[];
   agents: AgentActivitySummaryRow[];
-}
-
-function missionIdFromLabels(item: WorkItem): string | undefined {
-  const label = item.labels.find((entry) => entry.startsWith('mission:'));
-  return label ? label.slice('mission:'.length) : undefined;
 }
 
 function deriveBlockers(
@@ -89,11 +89,16 @@ function deriveBlockers(
 /** Pure mapping — testable without stores. */
 export function composeAgentActivityBoard(input: {
   items: WorkItem[];
+  viewer?: WorkVisibilityViewer;
   tenantByMission?: Record<string, string | undefined>;
   tenantFilter?: string;
   now?: string;
 }): AgentActivityBoard {
-  const missionItems = input.items.filter((item) => missionIdFromLabels(item));
+  const missionItems = buildWorkVisibilityProjection({
+    items: input.items,
+    viewer: input.viewer || { tenantSlugs: 'all' },
+    scope: 'operations',
+  }).items;
   const statusByTaskId = new Map<string, string>();
   for (const item of missionItems) {
     const taskId = String((item.metadata as Record<string, unknown> | undefined)?.task_id || '');
@@ -102,8 +107,10 @@ export function composeAgentActivityBoard(input: {
 
   const entries: AgentActivityEntry[] = [];
   for (const item of missionItems) {
-    const missionId = missionIdFromLabels(item);
-    const tenant = missionId ? input.tenantByMission?.[missionId] : undefined;
+    const context = resolveWorkItemContext(item);
+    const missionId = context.mission_id;
+    const tenant =
+      context.tenant_slug || (missionId ? input.tenantByMission?.[missionId] : undefined);
     if (input.tenantFilter && tenant !== input.tenantFilter) continue;
     if (['done', 'archived'].includes(item.status)) continue;
     const metadata = (item.metadata || {}) as Record<string, unknown>;
@@ -160,16 +167,23 @@ function readTenantSlug(missionId: string): string | undefined {
   }
 }
 
-export function buildAgentActivityBoard(options: { tenant?: string } = {}): AgentActivityBoard {
-  const items = listWorkItems({}).filter((item) =>
-    item.labels.some((label) => label.startsWith('mission:'))
-  );
+export function buildAgentActivityBoard(
+  options: { tenant?: string; tenantSlugs?: string[] | 'all' } = {}
+): AgentActivityBoard {
+  const items = listWorkItems({
+    tenantSlugs: options.tenantSlugs === 'all' ? undefined : options.tenantSlugs,
+  });
   const tenantByMission: Record<string, string | undefined> = {};
   for (const item of items) {
-    const missionId = missionIdFromLabels(item);
+    const missionId = resolveWorkItemContext(item).mission_id;
     if (missionId && !(missionId in tenantByMission)) {
       tenantByMission[missionId] = readTenantSlug(missionId);
     }
   }
-  return composeAgentActivityBoard({ items, tenantByMission, tenantFilter: options.tenant });
+  return composeAgentActivityBoard({
+    items,
+    tenantByMission,
+    tenantFilter: options.tenant,
+    viewer: { tenantSlugs: options.tenantSlugs || (options.tenant ? [options.tenant] : 'all') },
+  });
 }
