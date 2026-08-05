@@ -31,14 +31,15 @@ serves all tenants, only the data and authority layers differ.
 
 ## 2. Isolation Layers
 
-| Layer | What enforces it | What it stops |
-|---|---|---|
-| Filesystem tier | `secure-io` + `tier-guard` | Reads / writes outside the caller's allowed prefixes |
-| Path scope | `path-scope-policy.json` | A persona reaching across `mission_state`, `knowledge_core`, etc. |
-| Tenant scope (this doc) | `tenant-scope-policy.json` (see §4) | A tenant's persona reading/writing another tenant's confidential prefix |
-| Tier hygiene | `tier-hygiene-policy.json` | Tenant identifiers leaking into public-tier files |
-| Mission ownership | `mission_controller` | Workers mutating mission state outside their assigned role |
-| Audit chain | `audit-chain` | Backdating, tampering, replay |
+| Layer                   | What enforces it                                  | What it stops                                                           |
+| ----------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
+| Filesystem tier         | `secure-io` + `tier-guard`                        | Reads / writes outside the caller's allowed prefixes                    |
+| Path scope              | `path-scope-policy.json`                          | A persona reaching across `mission_state`, `knowledge_core`, etc.       |
+| Tenant scope (this doc) | `tenant-scope-policy.json` (see §4)               | A tenant's persona reading/writing another tenant's confidential prefix |
+| Tier hygiene            | `tier-hygiene-policy.json`                        | Tenant identifiers leaking into public-tier files                       |
+| Mission ownership       | `mission_controller`                              | Workers mutating mission state outside their assigned role              |
+| Audit chain             | `audit-chain`                                     | Backdating, tampering, replay                                           |
+| HTTP viewer scope       | Chronos `ViewerContext` + `KYBERION_VIEWER_SCOPE` | A caller selecting an unauthorized tenant through a visualization API   |
 
 These compose: a malicious or buggy persona must beat **all** layers to
 exfiltrate or corrupt cross-tenant data. Each layer is independently
@@ -101,7 +102,7 @@ declares per-tenant:
 
 - Personas tagged with one tenant cannot read / write paths under another
   tenant's `confidential_prefixes`.
-- The only legal cross-tenant communication is via a *brokered mission* —
+- The only legal cross-tenant communication is via a _brokered mission_ —
   a `public`-tier mission whose explicit purpose is to mediate between two
   tenants, with all artifacts redacted to the broker's tier.
 
@@ -253,13 +254,13 @@ above.
 
 Each tenant typically configures its own:
 
-| Adapter | Mechanism |
-|---|---|
-| Reasoning backend | `KYBERION_REASONING_BACKEND` per worker, plus tenant-specific model preferences in tenant config |
-| Audit forwarder | `KYBERION_AUDIT_FORWARDER_*` set per tenant runtime |
-| Secret resolver | `SecretResolver` chain with tenant-specific provider |
-| Deployment adapter | `KYBERION_DEPLOY_COMMAND` per tenant CI |
-| STT / voice | `voice-engines/*.json` canonical engine manifests, with `voice-engine-registry.json` as compatibility snapshot |
+| Adapter            | Mechanism                                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Reasoning backend  | `KYBERION_REASONING_BACKEND` per worker, plus tenant-specific model preferences in tenant config               |
+| Audit forwarder    | `KYBERION_AUDIT_FORWARDER_*` set per tenant runtime                                                            |
+| Secret resolver    | `SecretResolver` chain with tenant-specific provider                                                           |
+| Deployment adapter | `KYBERION_DEPLOY_COMMAND` per tenant CI                                                                        |
+| STT / voice        | `voice-engines/*.json` canonical engine manifests, with `voice-engine-registry.json` as compatibility snapshot |
 
 A practical pattern is one runtime process per tenant, each with its own
 env, sharing the same code base. This keeps the runtime layer simple and
@@ -302,12 +303,12 @@ Compliance checks (e.g. weekly):
 
 ## 9. Operational Failure Modes
 
-| Failure | Detection | Response |
-|---|---|---|
-| Persona writes to wrong tenant prefix | `tier-guard` rejects write | Audit event `tenant.scope_violation`; persona is automatically downgraded; on-call paged |
-| Cross-tenant promotion missing redaction | `tier-hygiene` lint fails in CI | Block release; require redaction |
-| Tenant SIEM unavailable | audit-forwarder logs warning, local chain continues | Backfill on recovery from local chain |
-| Tenant secret unavailable | `SecretResolver` returns null | Mission halts with explicit error; no degraded fallback |
+| Failure                                  | Detection                                           | Response                                                                                 |
+| ---------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Persona writes to wrong tenant prefix    | `tier-guard` rejects write                          | Audit event `tenant.scope_violation`; persona is automatically downgraded; on-call paged |
+| Cross-tenant promotion missing redaction | `tier-hygiene` lint fails in CI                     | Block release; require redaction                                                         |
+| Tenant SIEM unavailable                  | audit-forwarder logs warning, local chain continues | Backfill on recovery from local chain                                                    |
+| Tenant secret unavailable                | `SecretResolver` returns null                       | Mission halts with explicit error; no degraded fallback                                  |
 
 ## 10. Migration Pattern (single-tenant → multi-tenant)
 
@@ -324,11 +325,10 @@ When introducing the second tenant:
 
 ## 11. Known Limits
 
-- The current `tier-guard` does not yet enforce tenant scoping (only path
-  scope). Implementing §4 needs an extension to read `tenant_slug` from
-  identity context.
-- `audit-chain` does not yet carry `tenant_slug` as a first-class field;
-  add via the next chain version with a migration path.
+- HTTP viewer scope is same-host logical isolation. It does not replace OS
+  user separation, host hardening, or an IdP-backed session.
+- `KYBERION_VIEWER_SCOPE=warn` is the migration default; switch to `enforce`
+  only after the audit-chain observation window is clean.
 - Per-tenant rate limiting (e.g. one tenant exhausting reasoning quota)
   is not implemented; treat as future work.
 

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
 // here created a cycle (secure-io → tier-guard/policy-engine → authority →
@@ -80,6 +81,10 @@ type RoleAuthorityMap = {
 };
 
 let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
+const executionScopeStorage = new AsyncLocalStorage<{
+  tenantBound: boolean;
+  tenantSlug?: string;
+}>();
 
 function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
@@ -214,7 +219,12 @@ export function buildExecutionEnv(
   return nextEnv;
 }
 
-export function withExecutionContext<T>(role: string, fn: () => T, persona?: Persona): T {
+export function withExecutionContext<T>(
+  role: string,
+  fn: () => T,
+  persona?: Persona,
+  tenantSlug?: string
+): T {
   const previousRole = process.env.MISSION_ROLE;
   const previousPersona = process.env.KYBERION_PERSONA;
   process.env.MISSION_ROLE = role;
@@ -225,7 +235,10 @@ export function withExecutionContext<T>(role: string, fn: () => T, persona?: Per
     delete process.env.KYBERION_PERSONA;
   }
   try {
-    return fn();
+    return executionScopeStorage.run(
+      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
+      fn
+    );
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
@@ -242,7 +255,8 @@ export function withExecutionContext<T>(role: string, fn: () => T, persona?: Per
 export async function withExecutionContextAsync<T>(
   role: string,
   fn: () => Promise<T> | T,
-  persona?: Persona
+  persona?: Persona,
+  tenantSlug?: string
 ): Promise<T> {
   const previousRole = process.env.MISSION_ROLE;
   const previousPersona = process.env.KYBERION_PERSONA;
@@ -254,7 +268,10 @@ export async function withExecutionContextAsync<T>(
     delete process.env.KYBERION_PERSONA;
   }
   try {
-    return await fn();
+    return await executionScopeStorage.run(
+      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
+      fn
+    );
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
@@ -345,14 +362,18 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
   return `kyberion://agent/${organizationId}/${role}`;
 }
 
-export function resolveIdentityContext(): IdentityContext {
+export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
   const missionId = process.env.MISSION_ID;
   const envPersona = process.env.KYBERION_PERSONA;
   const envRole = resolveRole();
 
   let persona: Persona = normalizePersona(envPersona);
   const authorities: Authority[] = [];
-  let tenantSlug: string | undefined = normalizeTenantSlug(process.env.KYBERION_TENANT);
+  const executionScope = executionScopeStorage.getStore();
+  let tenantSlug: string | undefined = normalizeTenantSlug(
+    tenantOverride ??
+      (executionScope?.tenantBound ? executionScope.tenantSlug : process.env.KYBERION_TENANT)
+  );
   let brokeredTenants: string[] | undefined;
   let brokerApproval:
     | {

@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import {
   pathResolver,
@@ -25,6 +26,36 @@ const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/computer-
 const PORT = Number(process.env.COMPUTER_SURFACE_PORT || 3040);
 const HOST = process.env.COMPUTER_SURFACE_HOST || '127.0.0.1';
 const sseClients = new Set<Client>();
+
+function tokenMatches(candidate: string, configured: string | undefined): boolean {
+  if (!candidate || !configured) return false;
+  const left = Buffer.from(candidate);
+  const right = Buffer.from(configured);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function isLoopback(req: express.Request): boolean {
+  const remote = req.socket.remoteAddress || '';
+  const forwarded = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim();
+  const loopbackAddresses = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+  return (
+    loopbackAddresses.includes(remote) && (!forwarded || loopbackAddresses.includes(forwarded))
+  );
+}
+
+function authorizeSurface(req: express.Request, res: express.Response): boolean {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const configured = process.env.KYBERION_LOCALADMIN_TOKEN || process.env.KYBERION_API_TOKEN;
+  if (
+    tokenMatches(token, configured) ||
+    (isLoopback(req) && process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false')
+  ) {
+    return true;
+  }
+  res.status(401).json({ ok: false, error: 'Unauthorized.' });
+  return false;
+}
 
 const state: {
   surfaces: Record<string, SurfaceSnapshot>;
@@ -64,7 +95,10 @@ function applyA2UIMessage(message: A2UIMessage): void {
   }
 
   if (message.updateComponents) {
-    const current = state.surfaces[message.updateComponents.surfaceId] || { components: [], data: {} };
+    const current = state.surfaces[message.updateComponents.surfaceId] || {
+      components: [],
+      data: {},
+    };
     state.surfaces[message.updateComponents.surfaceId] = {
       ...current,
       components: message.updateComponents.components || [],
@@ -72,7 +106,10 @@ function applyA2UIMessage(message: A2UIMessage): void {
   }
 
   if (message.updateDataModel) {
-    const current = state.surfaces[message.updateDataModel.surfaceId] || { components: [], data: {} };
+    const current = state.surfaces[message.updateDataModel.surfaceId] || {
+      components: [],
+      data: {},
+    };
     state.surfaces[message.updateDataModel.surfaceId] = {
       ...current,
       data: {
@@ -105,7 +142,8 @@ app.get('/favicon.ico', (_req, res) => {
   res.status(204).end();
 });
 
-app.get('/api/identity', (_req, res) => {
+app.get('/api/identity', (req, res) => {
+  if (!authorizeSurface(req, res)) return;
   try {
     const personalDir = pathResolver.knowledge('personal');
     const result = withExecutionContext('ecosystem_architect', () => {
@@ -122,7 +160,10 @@ app.get('/api/identity', (_req, res) => {
         ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
         : null;
       const vision = visionRaw
-        ? visionRaw.replace(/^#[^\n]*\n+/, '').trim().slice(0, 600)
+        ? visionRaw
+            .replace(/^#[^\n]*\n+/, '')
+            .trim()
+            .slice(0, 600)
         : null;
       return { sovereign, agent, vision };
     });
@@ -146,11 +187,13 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.get('/api/state', (_req, res) => {
+app.get('/api/state', (req, res) => {
+  if (!authorizeSurface(req, res)) return;
   res.json(state);
 });
 
 app.get('/api/stream', (req, res) => {
+  if (!authorizeSurface(req, res)) return;
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -161,6 +204,7 @@ app.get('/api/stream', (req, res) => {
 });
 
 app.post('/a2ui/dispatch', (req, res) => {
+  if (!authorizeSurface(req, res)) return;
   const body = req.body;
   const messages = Array.isArray(body) ? body : [body];
   for (const message of messages) applyA2UIMessage(message as A2UIMessage);

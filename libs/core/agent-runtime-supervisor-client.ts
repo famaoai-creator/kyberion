@@ -30,6 +30,7 @@ type SupervisorMethod =
 interface SupervisorRequest<T = Record<string, unknown>> {
   id: string;
   method: SupervisorMethod;
+  auth_token?: string;
   payload?: T;
 }
 
@@ -146,6 +147,9 @@ function makeRequest<T>(method: SupervisorMethod, payload?: T): SupervisorReques
   return {
     id: `${method}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     method,
+    ...(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN
+      ? { auth_token: process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN }
+      : {}),
     payload,
   };
 }
