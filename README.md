@@ -68,7 +68,7 @@ Kyberion's first visible result comes in three short paths:
 | Readiness check   | Node 24+, pnpm (`pnpm install`)                         | ~30s         | `pnpm doctor`                                         | No build needed                                                                                                                       |
 | Browser first-win | + `pnpm build`, `pnpm exec playwright install chromium` | ~5min        | `pnpm pipeline --input pipelines/verify-session.json` | Writes `active/shared/tmp/first-win-session.png`                                                                                      |
 | Voice first-win   | macOS only (native TTS; not available in Docker)        | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json`    | Run after the browser smoke                                                                                                           |
-| Docker path       | Docker Desktop                                          | ~10min build | `docker compose --profile deploy up`                  | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is still an open item (OP-03). |
+| Docker path       | Docker Desktop                                          | ~10min build | `docker compose --profile deploy up`                  | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is tracked in the ops backlog. |
 
 If you want the shortest startup path first, run this:
 
@@ -121,9 +121,9 @@ pnpm pipeline --input pipelines/voice-hello.json
 
 To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md).
 
-If you do not know which surface to use next, `pnpm setup:report --persona first-time-user` now acts as the entry guide. It tells you whether to start with Chronos, the voice path, or a messaging surface, and whether auth/setup is still blocking that route.
+If you do not know which surface to use next, `pnpm setup:report --persona first-time-user` now acts as the entry guide. It tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route.
 
-Chronos API routes use a viewer principal and server-side tenant scope. `KYBERION_API_TOKEN` / `KYBERION_LOCALADMIN_TOKEN` remain compatible all-tenant tokens for the single-operator local workflow; scoped token registrations can restrict a viewer to selected tenants. A proper IdP-backed user session, SSO, and human user management remain follow-up items and are not implied by this boundary.
+Chronos API routes use a viewer principal and server-side tenant scope: every route except `/api/healthz` resolves a `ViewerContext` fail-closed, and enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce` (default `warn`; see [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)). `KYBERION_API_TOKEN` / `KYBERION_LOCALADMIN_TOKEN` remain compatible all-tenant tokens for the single-operator local workflow; scoped token registrations can restrict a viewer to selected tenants. A proper IdP-backed user session, SSO, and human user management remain follow-up items and are not implied by this boundary.
 
 For a concise map of entry points and their intended use, read [`docs/SURFACES.md`](./docs/SURFACES.md).
 For the full canonical setup, see [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md) (structure map: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
@@ -140,18 +140,21 @@ Kyberion currently covers:
 - **Code assistance**: refactor, scaffold, and analyze codebases.
 - **Network and service actions**: governed fetch plus Slack / Google / Notion / Microsoft 365 integration.
 - **System operations**: shell, screenshots, and OS-level introspection.
-- **Knowledge and memory**: search, distill, and reuse organizational hints.
+- **Knowledge and memory**: search, distill, and reuse organizational hints — including zero-LLM history search (SQLite FTS5 + CJK trigram, tier-isolated).
+- **Organization operations**: an organization operating model control plane (purpose, services, routine operations, incidents, cadences, decisions — six `work_shape` kinds beyond solution projects), governed project management, and a canonical work-item context chain (`organization_id → tenant_slug → mission_id → project_id → task_id`) projected into per-view visibility scopes.
+- **Multi-tenant foundations**: a tenant registry with isolated knowledge roots (`knowledge/confidential/{tenant-slug}/`), deny-unless-brokered cross-tenant access, and an HMAC-signed tenant peer mesh (`pnpm peer:register`).
 
 Plus:
 
 - **ADF pipeline format** — declarative, schema-validated, sub-pipeline composable. With `on_error` recovery semantics.
 - **Mission lifecycle** — each piece of work is a mission with its own git repo, state, evidence. Survives 24h+ runs.
-- **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary.
+- **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary, with per-tenant scoping under `confidential/` and viewer-scoped surface APIs on top (staged warn→enforce).
 - **Customer aggregation** — `customer/{slug}/` overlay for FDE / implementation-support engagements without forks.
 - **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
 - **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
 - **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.
 - **Design-system-governed media** — PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
+- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD, plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
 
 For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
 
@@ -168,6 +171,8 @@ For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md)
 
 The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists. See `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list.
 
+Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. Implementation status per improvement plan is tracked in the canonical ledger: [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md).
+
 ---
 
 ## Documentation Map
@@ -183,6 +188,10 @@ The strategic positioning is **OSS-first, with paid implementation support / FDE
 | Customize for a customer           | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
 | Contribute                         | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                                         |
 | Understand the data flow / privacy | [`docs/PRIVACY.md`](./docs/PRIVACY.md) / [`.ja.md`](./docs/PRIVACY.ja.md)                                                                      |
+| Pick a surface / entry point       | [`docs/SURFACES.md`](./docs/SURFACES.md)                                                                                                       |
+| Run multi-tenant isolation         | [`knowledge/product/architecture/multi-tenant-operations.md`](./knowledge/product/architecture/multi-tenant-operations.md)                     |
+| Operate viewer-scoped API access   | [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)                               |
+| Check what is actually implemented | [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md)                             |
 | Report a security issue            | [`SECURITY.md`](./SECURITY.md)                                                                                                                 |
 
 Three audiences, three folders:
@@ -209,7 +218,7 @@ Three audiences, three folders:
 
 MIT — see [`LICENSE`](./LICENSE).
 
-Third-party dependencies and their licenses are inventoried by `pnpm license:audit` (output at [`docs/legal/third-party-licenses.json`](./docs/legal/third-party-licenses.json)).
+Third-party dependencies and their licenses are inventoried by `pnpm license:audit` (writes `docs/legal/third-party-licenses.json`; generated, not committed).
 
 ## Code of Conduct
 
