@@ -202,5 +202,52 @@ describe('plugin packs (QM-07)', () => {
         safeRmSync(nested, { recursive: true, force: true });
       }
     });
+
+    it('discovers a portable Agent Plugins v1 root plugin.json', () => {
+      const portable = pathResolver.sharedTmp(`qm07-portable-${randomUUID()}`);
+      safeMkdir(portable, { recursive: true });
+      safeWriteFile(
+        path.join(portable, 'plugin.json'),
+        JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          name: 'portable-root-plugin',
+        })
+      );
+      try {
+        expect(discoverPackPluginDirs(portable)).toEqual([
+          { pluginId: 'portable-root-plugin', dir: portable },
+        ]);
+      } finally {
+        safeRmSync(portable, { recursive: true, force: true });
+      }
+    });
+
+    it('imports a local portable root package using its manifest name', () => {
+      const portable = pathResolver.sharedTmp(`qm07-portable-import-${randomUUID()}`);
+      const localRegistry = pathResolver.sharedTmp(`qm07-portable-registry-${randomUUID()}`);
+      const localManagedRoot = pathResolver.sharedTmp(`qm07-portable-managed-${randomUUID()}`);
+      safeMkdir(portable, { recursive: true });
+      safeWriteFile(
+        path.join(portable, 'plugin.json'),
+        JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          name: 'portable-import-plugin',
+        })
+      );
+      try {
+        const result = importPluginPack({
+          url: portable,
+          allowLocalPath: true,
+          registryDir: localRegistry,
+          managedRoot: localManagedRoot,
+          requestedBy: 'qm07-test',
+        });
+        expect(result.importRecord.installed).toEqual(['portable-import-plugin']);
+      } finally {
+        safeRmSync(portable, { recursive: true, force: true });
+        safeRmSync(localRegistry, { recursive: true, force: true });
+        safeRmSync(localManagedRoot, { recursive: true, force: true });
+      }
+    });
   });
 });
