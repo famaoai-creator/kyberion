@@ -50,6 +50,11 @@ function writeManifest(dir: string, manifest: Record<string, unknown>): void {
   safeWriteFile(path.join(dir, 'plugin-manifest.json'), JSON.stringify(manifest));
 }
 
+function writePortableManifest(dir: string, manifest: Record<string, unknown>): void {
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(path.join(dir, 'plugin.json'), JSON.stringify(manifest));
+}
+
 describe('installPluginManaged', () => {
   it('labels a real plugins/ source as official and activatable without approval', () => {
     const managedRoot = managedRootDir('official');
@@ -69,6 +74,22 @@ describe('installPluginManaged', () => {
     const listed = listManagedPlugins(managedRoot);
     expect(listed).toHaveLength(1);
     expect(listed[0]?.trust).toBe('official');
+  });
+
+  it('loads the portable root manifest from an official repo package', () => {
+    const managedRoot = managedRootDir('official-portable');
+    const officialSample = pathResolver.rootResolve('plugins/kyberion-agent-plugin');
+
+    const record = installPluginManaged({
+      pluginId: `official-portable-${process.pid}`,
+      sourcePath: officialSample,
+      managedRoot,
+    });
+
+    expect(record.manifest?.pluginId).toBe('kyberion-agent-plugin');
+    expect(record.trust).toBe('official');
+    expect(record.activationStatus).toBe('activatable');
+    expect(record.diagnostics).toEqual([]);
   });
 
   it('labels identical manifest content sourced outside plugins/ as third-party, blocked until approved', () => {
@@ -114,6 +135,28 @@ describe('installPluginManaged', () => {
     const refreshed = refreshManagedPluginActivation(pluginId, managedRoot);
     expect(refreshed?.activationStatus).toBe('activatable');
     expect(isManagedPluginActivationAllowed(refreshed!)).toBe(true);
+  });
+
+  it('discovers an Agent Plugins v1 root manifest without weakening provenance gating', () => {
+    const managedRoot = managedRootDir('portable-manifest');
+    const src = sourceDir('portable-manifest');
+    writePortableManifest(src, {
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'portable-sample',
+      version: '1.0.0',
+    });
+
+    const record = installPluginManaged({
+      pluginId: `portable-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+      requestedBy: 'test-suite',
+    });
+
+    expect(record.manifest?.pluginId).toBe('portable-sample');
+    expect(record.diagnostics).toEqual([]);
+    expect(record.trust).toBe('third-party');
+    expect(record.activationStatus).toBe('pending_approval');
   });
 
   it('rejects an install whose asset symlinks outside the plugin root', () => {
