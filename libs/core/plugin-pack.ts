@@ -239,10 +239,36 @@ function defaultFetcher(
   return { ...(commit ? { commit } : {}) };
 }
 
-const MANIFEST_NAMES = ['plugin-manifest.json', '.claude-plugin/plugin.json'];
+// Existing Kyberion and Claude Code packs remain supported alongside the
+// Agent Plugins v1 portable root manifest.
+const MANIFEST_NAMES = ['plugin-manifest.json', '.claude-plugin/plugin.json', 'plugin.json'];
 
 function hasManifest(dir: string): boolean {
   return MANIFEST_NAMES.some((name) => safeExistsSync(path.join(dir, name)));
+}
+
+function manifestPluginId(dir: string): string | undefined {
+  for (const name of MANIFEST_NAMES) {
+    const manifestPath = path.join(dir, name);
+    if (!safeExistsSync(manifestPath)) continue;
+    try {
+      const parsed = JSON.parse(String(safeReadFile(manifestPath, { encoding: 'utf8' }))) as Record<
+        string,
+        unknown
+      >;
+      const candidate =
+        typeof parsed.plugin_id === 'string'
+          ? parsed.plugin_id.trim()
+          : typeof parsed.name === 'string'
+            ? parsed.name.trim()
+            : '';
+      if (candidate) return candidate;
+    } catch {
+      // The managed-install path records malformed manifests as diagnostics.
+      // Discovery should continue looking for another valid root candidate.
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -257,7 +283,10 @@ export function discoverPackPluginDirs(
 ): Array<{ pluginId: string; dir: string }> {
   const found: Array<{ pluginId: string; dir: string }> = [];
   if (hasManifest(root)) {
-    found.push({ pluginId: rootPluginId || path.basename(root), dir: root });
+    found.push({
+      pluginId: rootPluginId || manifestPluginId(root) || path.basename(root),
+      dir: root,
+    });
     return found;
   }
   const roots = [root, path.join(root, 'plugins')].filter((candidate) => safeExistsSync(candidate));
@@ -328,7 +357,10 @@ export function importPluginPack(params: ImportPluginPackParams): ImportPluginPa
     }
     if (commit) importRecord.commit = commit;
 
-    const discovered = discoverPackPluginDirs(fetchDir, packId);
+    // A fetched remote root needs the stable pack id because its temp
+    // directory name is nondeterministic. A local root package can use the
+    // portable manifest name directly.
+    const discovered = discoverPackPluginDirs(fetchDir, cleanup ? packId : undefined);
     if (discovered.length === 0) {
       throw new Error('[plugin-pack] no plugin directories with a manifest found in the pack');
     }

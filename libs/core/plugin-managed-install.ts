@@ -88,7 +88,13 @@ export interface InstallPluginManagedParams {
 }
 
 const MANAGED_RECORD_FILENAME = '.kyberion-managed-plugin.json';
-const MANIFEST_CANDIDATE_RELATIVE_PATHS = ['plugin-manifest.json', '.claude-plugin/plugin.json'];
+// Keep the Kyberion/Cowork and Claude Code locations first for compatibility,
+// then accept the Agent Plugins v1 portable root manifest.
+const MANIFEST_CANDIDATE_RELATIVE_PATHS = [
+  'plugin-manifest.json',
+  '.claude-plugin/plugin.json',
+  'plugin.json',
+];
 const DEFAULT_APPROVAL_CHANNEL = 'plugin-install';
 
 function defaultManagedRoot(): string {
