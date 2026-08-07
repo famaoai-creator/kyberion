@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "kyberion-agent-plugin",
+  "version": "1.0.0",
+  "description": "Portable Agent Plugins package for Kyberion governed operations, knowledge access, mission control, approvals, and audit workflows.",
+  "author": {
+    "name": "Kyberion (famao)"
+  },
+  "repository": "https://github.com/famaoai-creator/kyberion",
+  "keywords": ["kyberion", "governance", "mission-control", "knowledge", "audit", "mcp"],
+  "extensions": {
+    "org.kyberion": {
+      "governance": {
+        "tier_visibility": ["public"],
+        "risky_operations_require_approval": true
+      },
+      "compatibility": {
+        "claude_code": "../kyberion-claude-code",
+        "cowork_manifest": "../kyberion/plugin-manifest.json",
+        "cowork_connector": "../kyberion/connector.json"
+      }
+    }
+  }
+}
