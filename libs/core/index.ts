@@ -179,6 +179,7 @@ export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
 export * from './managed-process.js';
+export * from './trigger-runner.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';

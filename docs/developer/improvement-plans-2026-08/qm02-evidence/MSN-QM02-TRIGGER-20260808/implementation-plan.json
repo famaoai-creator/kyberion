@@ -1,0 +1,19 @@
+{
+  "mission_id": "MSN-QM02-TRIGGER-20260808",
+  "changes": [
+    "TriggerRunner に lock-backed atomic claim、pending lease、failed retry、store compaction、authority binding を追加する",
+    "managed process の quiet one-shot、UTF-8 tail、listener cleanup、callback rejection handling を追加する",
+    "Chronos に leader lease と execution context/runId を追加する",
+    "pipeline registry の空 path を fail-closed にする",
+    "各境界を対象テストと QM-02 validation pipeline で検証する"
+  ],
+  "verification": [
+    "targeted vitest",
+    "core build",
+    "typecheck",
+    "script-integrity",
+    "QM-02 pipeline",
+    "full build",
+    "git diff --check"
+  ]
+}

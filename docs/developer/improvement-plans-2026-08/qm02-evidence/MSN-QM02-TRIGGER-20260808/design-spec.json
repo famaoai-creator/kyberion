@@ -1,0 +1,15 @@
+{
+  "mission_id": "MSN-QM02-TRIGGER-20260808",
+  "decisions": [
+    "exact-once claim は deterministic store lock の下で duplicate 判定と claim append を同一クリティカルセクションに置く",
+    "audit scope は trigger execution power を昇格させない orthogonal scope とする",
+    "failed delivery は terminal duplicate ではなく同一 delivery id で retry 可能にする",
+    "leader lease は scheduler tick 全体を保護し、Chronos 実行には fresh thread/context を付与する"
+  ],
+  "open_decisions": [],
+  "security_constraints": [
+    "canonical role と MISSION_ROLE を照合する",
+    "tenant escalation は拒否する",
+    "audit failure は delivered side effect を failed に書き換えない"
+  ]
+}

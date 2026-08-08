@@ -6,6 +6,7 @@ import {
   resolveScheduledPipelinePath,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
+import { safeWriteFile } from '../secure-io.js';
 import {
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
@@ -237,6 +238,50 @@ describe('pipeline scheduler', () => {
       expect(normalizeScheduledPipelinePath('pipelines/x.json', '/any/root')).toBe(
         'pipelines/x.json'
       );
+    });
+
+    it('rejects an absolute path persisted in the registry during load', () => {
+      const rootDir = makeRootDir();
+      const registryPath = path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json');
+      safeWriteFile(
+        registryPath,
+        JSON.stringify({
+          version: '1.0',
+          schedules: [
+            {
+              id: 'unsafe',
+              name: 'unsafe',
+              pipelinePath: '/etc/passwd',
+              actuator: 'run_pipeline',
+              trigger: { type: 'cron', cron: '0 6 * * *' },
+              enabled: true,
+            },
+          ],
+        })
+      );
+      expect(() => loadScheduleRegistry({ rootDir })).toThrowError(/repo-relative/);
+    });
+
+    it('rejects an empty path persisted in the registry during load', () => {
+      const rootDir = makeRootDir();
+      const registryPath = path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json');
+      safeWriteFile(
+        registryPath,
+        JSON.stringify({
+          version: '1.0',
+          schedules: [
+            {
+              id: 'empty-path',
+              name: 'empty-path',
+              pipelinePath: '',
+              actuator: 'run_pipeline',
+              trigger: { type: 'cron', cron: '0 6 * * *' },
+              enabled: true,
+            },
+          ],
+        })
+      );
+      expect(() => loadScheduleRegistry({ rootDir })).toThrowError(/non-empty/);
     });
   });
 });

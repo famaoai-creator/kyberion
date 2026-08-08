@@ -132,8 +132,16 @@ export function loadScheduleRegistry(
   }
   try {
     const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(raw) as PipelineScheduleRegistry;
+    const parsed = JSON.parse(raw) as PipelineScheduleRegistry;
+    const schedules = (parsed.schedules || []).map((schedule) => ({
+      ...schedule,
+      pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
+    }));
+    return { ...parsed, schedules };
   } catch (err) {
+    if (err instanceof Error && /pipelinePath must be/u.test(err.message)) {
+      throw err;
+    }
     logger.warn(`[PIPELINE-SCHEDULER] Failed to load registry, returning empty: ${err}`);
     return { version: '1.0', schedules: [] };
   }
