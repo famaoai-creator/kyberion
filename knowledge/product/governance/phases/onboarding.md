@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-08-01
+last_updated: 2026-08-08
 runtime_stages: [intake, classification]
 ---
 
@@ -25,11 +25,12 @@ Establish the neurological link between modules.
 
 Construct the physical structure and activate services based on governance.
 
-- **Action**: `pnpm onboard` (interactive) or `pnpm onboard:apply --identity path/to/identity.json` (non-interactive).
+- **Action**: `pnpm build`, then `pnpm onboard` (interactive) or `pnpm onboard:apply --identity path/to/identity.json` (non-interactive).
+- **Precondition**: `pnpm onboard` does NOT generate build artifacts — it refuses to run until `dist/` exists (`Run \`pnpm build\` first before onboarding.`). Always run `pnpm build` first.
 - **Effect**:
-  - Build artifacts (`dist/`) are generated.
   - `presence` (external interface) services are initialized.
   - Personal Tier (`knowledge/personal/`) is physically secured.
+- **Redo**: `pnpm onboard:reset` removes onboarding state and generated identity/vision/agent artifacts so the flow can be restarted cleanly.
 
 ### Stage 3: Soul Infusion (アイデンティティとビジョンの注入)
 
@@ -51,7 +52,7 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
    - Agent writes output files directly, conforming to `knowledge/public/templates/my-identity.schema.json` and `knowledge/product/schemas/onboarding-state.schema.json`.
 3. **Defaults bypass** (evaluation only): `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — accepts every default. Use only when defaults are knowingly acceptable.
 
-- **Output**:
+- **Output** (出力ルート: `KYBERION_CUSTOMER` が設定されている場合は `customer/{slug}/` overlay 配下、未設定時は `knowledge/personal/` 配下 — 詳細は `docs/INITIALIZATION.md` Stage 9-11):
   - `knowledge/personal/my-identity.json`: Defines values, domain, and role.
   - `knowledge/personal/my-vision.md`: Defines the "North Star" (Vision).
   - `knowledge/personal/agent-identity.json`: Defines the Agent ID and trust tier.

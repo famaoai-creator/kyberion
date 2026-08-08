@@ -19,6 +19,11 @@ const {
   PROVIDER_CAPABILITY_PROBE_ENV,
   isJanitorMarkerFresh,
   JANITOR_FRESHNESS_MAX_AGE_MS,
+  evaluateSchedulerHealth,
+  schedulerHealthEvaluationFailure,
+  cronFiredWithinWindow,
+  shouldEmitDailyOpsAlert,
+  SCHEDULES_FIRING_WINDOW_MS,
 } = await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
@@ -265,6 +270,170 @@ describe('run_baseline_check', () => {
         age_ms: null,
         probing_enabled: false,
       });
+    });
+  });
+
+  // LC-01a: L10 Scheduler Layer — chronos liveness + schedules firing.
+  describe('scheduler health (LC-01)', () => {
+    const NOW = new Date('2026-08-08T12:00:00.000Z');
+
+    function cronSchedule(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'daily',
+        name: 'daily',
+        pipelinePath: 'pipelines/daily-routine.json',
+        actuator: 'run_pipeline',
+        trigger: { type: 'cron', cron: '0 6 * * *', timezone: 'Asia/Tokyo' },
+        enabled: true,
+        ...overrides,
+      };
+    }
+
+    const healthyHeartbeat = {
+      daemon_id: 'chronos-daemon',
+      status: 'healthy',
+      age_ms: 30_000,
+      heartbeat: {
+        daemon_id: 'chronos-daemon',
+        pid: 4242,
+        status: 'running',
+        timestamp: '2026-08-08T11:59:30.000Z',
+      },
+    };
+    const missingHeartbeat = {
+      daemon_id: 'chronos-daemon',
+      status: 'missing',
+      reason: 'heartbeat file is missing',
+    };
+
+    it('cronFiredWithinWindow: a daily cron fired within a 24h window; a weekly one off-day did not', () => {
+      // 0 6 * * * UTC fired at 06:00 today, inside the window ending at noon.
+      expect(cronFiredWithinWindow('0 6 * * *', undefined, NOW, SCHEDULES_FIRING_WINDOW_MS)).toBe(
+        true
+      );
+      // 2026-08-08 is a Saturday; a Monday-only cron did not fire in 24h.
+      expect(cronFiredWithinWindow('0 7 * * 1', undefined, NOW, SCHEDULES_FIRING_WINDOW_MS)).toBe(
+        false
+      );
+    });
+
+    it('a fresh environment (no enabled schedules) is healthy even with a missing heartbeat', () => {
+      const report = evaluateSchedulerHealth({
+        schedules: [cronSchedule({ enabled: false })],
+        heartbeat: missingHeartbeat,
+        pidAlive: () => false,
+        now: NOW,
+      });
+      expect(report.healthy).toBe(true);
+      expect(report.enabled_schedule_count).toBe(0);
+      expect(report.scheduler_alive.ok).toBe(true);
+      expect(report.schedules_firing.ok).toBe(true);
+    });
+
+    it('enabled schedules + missing/stale heartbeat fails scheduler_alive', () => {
+      const report = evaluateSchedulerHealth({
+        schedules: [cronSchedule()],
+        heartbeat: missingHeartbeat,
+        pidAlive: () => true,
+        now: NOW,
+        cronFired: () => true,
+      });
+      expect(report.scheduler_alive.ok).toBe(false);
+      expect(report.scheduler_alive.reason).toContain('missing');
+      expect(report.healthy).toBe(false);
+    });
+
+    it('a fresh heartbeat whose pid is dead fails scheduler_alive', () => {
+      const report = evaluateSchedulerHealth({
+        schedules: [cronSchedule()],
+        heartbeat: healthyHeartbeat,
+        pidAlive: () => false,
+        now: NOW,
+        cronFired: () => true,
+      });
+      expect(report.scheduler_alive.ok).toBe(false);
+      expect(report.scheduler_alive.reason).toContain('4242');
+    });
+
+    it('due schedules with no lastRun in 24h fail schedules_firing; a recent lastRun passes', () => {
+      const base = {
+        heartbeat: healthyHeartbeat,
+        pidAlive: () => true,
+        now: NOW,
+        cronFired: () => true,
+      };
+      const stale = evaluateSchedulerHealth({
+        ...base,
+        schedules: [cronSchedule({ lastRun: '2026-08-01T21:00:00.000Z' })],
+      });
+      expect(stale.schedules_firing.ok).toBe(false);
+      expect(stale.schedules_firing.due_in_window).toBe(1);
+      expect(stale.healthy).toBe(false);
+
+      const fresh = evaluateSchedulerHealth({
+        ...base,
+        schedules: [
+          cronSchedule({ lastRun: '2026-08-01T21:00:00.000Z' }),
+          cronSchedule({ id: 'other', lastRun: '2026-08-08T06:00:00.000Z' }),
+        ],
+      });
+      expect(fresh.schedules_firing.ok).toBe(true);
+      expect(fresh.healthy).toBe(true);
+    });
+
+    it('schedules that were never due in the window do not fail schedules_firing', () => {
+      const report = evaluateSchedulerHealth({
+        schedules: [cronSchedule({ trigger: { type: 'cron', cron: '0 7 * * 1' } })],
+        heartbeat: healthyHeartbeat,
+        pidAlive: () => true,
+        now: NOW,
+        cronFired: () => false,
+      });
+      expect(report.schedules_firing.ok).toBe(true);
+      expect(report.schedules_firing.due_in_window).toBe(0);
+    });
+
+    it('a failed L10 (dead scheduler) degrades the baseline to needs_attention, never fatal', () => {
+      const status = deriveBaselineStatus(
+        { success: false, failedLayer: 'L10' },
+        { submitted: false, pending: false, reason: null }
+      );
+      expect(status).toBe('needs_attention');
+    });
+
+    it('fails closed when scheduler health cannot be evaluated', () => {
+      const report = schedulerHealthEvaluationFailure('schedule registry unreadable');
+      expect(report.healthy).toBe(false);
+      expect(report.scheduler_alive.ok).toBe(false);
+      expect(report.scheduler_alive.reason).toContain('schedule registry unreadable');
+      expect(report.schedules_firing.ok).toBe(false);
+    });
+
+    // LC-01b: day-level dedup so hourly baseline runs emit one alert per day.
+    it('shouldEmitDailyOpsAlert gates per key per UTC day and fails open on bad markers', () => {
+      expect(shouldEmitDailyOpsAlert(null, 'scheduler_alive', NOW)).toBe(true);
+      expect(
+        shouldEmitDailyOpsAlert(
+          JSON.stringify({ scheduler_alive: '2026-08-08' }),
+          'scheduler_alive',
+          NOW
+        )
+      ).toBe(false);
+      expect(
+        shouldEmitDailyOpsAlert(
+          JSON.stringify({ scheduler_alive: '2026-08-07' }),
+          'scheduler_alive',
+          NOW
+        )
+      ).toBe(true);
+      expect(
+        shouldEmitDailyOpsAlert(
+          JSON.stringify({ failed_schedules: '2026-08-08' }),
+          'scheduler_alive',
+          NOW
+        )
+      ).toBe(true);
+      expect(shouldEmitDailyOpsAlert('{broken', 'scheduler_alive', NOW)).toBe(true);
     });
   });
 });

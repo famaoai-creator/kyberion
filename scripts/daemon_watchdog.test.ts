@@ -59,7 +59,9 @@ describe('daemon_watchdog', () => {
     expect(report.statuses.map((status) => status.status)).toEqual(['stale', 'missing']);
     expect(report.alert?.recorded_path).toBe(ALERT_LOG);
     expect(safeExistsSync(ALERT_LOG)).toBe(true);
-    const line = String(safeReadFile(ALERT_LOG, { encoding: 'utf8' })).trim();
+    const line = String(safeReadFile(ALERT_LOG, { encoding: 'utf8' }))
+      .trim()
+      .split('\n')[0]!;
     expect(JSON.parse(line)).toMatchObject({
       severity: 'critical',
       title: 'Daemon heartbeat watchdog detected unhealthy daemon(s)',

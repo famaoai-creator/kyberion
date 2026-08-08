@@ -1,7 +1,14 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import {
-  buildOrganizationManagementView,
+  buildOrganizationDomainRecord,
   buildOrganizationLearningCandidate,
+  buildOrganizationManagementView,
+  buildOrganizationObjectiveAddition,
+  buildOrganizationOperationRecord,
+  buildOrganizationProjectLink,
+  buildOrganizationScaffold,
+  buildOrganizationServiceAddition,
+  saveProjectRecord,
   loadOrganizationCatalog,
   loadOrganizationOperatingModelCatalog,
   loadOrganizationOperationalState,
@@ -528,5 +535,183 @@ describe('organization operating model', () => {
       target_kind: 'sop_candidate',
       tenant_slug: tenantSlug,
     });
+  });
+
+  it('authors an organization end-to-end via the builder functions', () => {
+    const now = '2026-08-08T00:00:00.000Z';
+    const scaffold = buildOrganizationScaffold(
+      {
+        organizationId,
+        name: 'Authored Organization',
+        tier: 'confidential',
+        tenantSlug,
+        purpose: 'Prove the authoring path works without hand-editing JSON.',
+        principles: ['Facade-only mutation.'],
+        ownerRole: 'organization_owner',
+      },
+      now
+    );
+    expect(scaffold.state.active_project_ids).toEqual([]);
+    expect(scaffold.purpose?.approval_state).toBe('draft');
+    saveOrganizationOperationalState(scaffold.state);
+    saveOrganizationPurpose(scaffold.purpose!);
+
+    expect(() =>
+      buildOrganizationScaffold(
+        { organizationId, name: 'Duplicate', tier: 'confidential', tenantSlug },
+        now
+      )
+    ).toThrow(/already exists/);
+
+    const withObjective = buildOrganizationObjectiveAddition(
+      {
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+        objective: { objective_id: 'obj-authoring-1', title: 'First objective', status: 'active' },
+      },
+      now
+    );
+    expect(withObjective.objectives?.map((entry) => entry.objective_id)).toEqual([
+      'obj-authoring-1',
+    ]);
+    saveOrganizationPurpose(withObjective);
+    expect(() =>
+      buildOrganizationObjectiveAddition(
+        {
+          organizationId,
+          tier: 'confidential',
+          tenantSlug,
+          objective: { objective_id: 'obj-authoring-1', title: 'Duplicate objective' },
+        },
+        now
+      )
+    ).toThrow(/already exists/);
+
+    expect(() =>
+      buildOrganizationServiceAddition(
+        {
+          organizationId,
+          serviceId: 'svc-authoring',
+          domainId: 'dom-authoring',
+          name: 'Authoring Service',
+          outcome: 'Organizations are authored via the facade.',
+          ownerRole: 'organization_owner',
+          consumers: ['operator'],
+          tier: 'confidential',
+          tenantSlug,
+        },
+        now
+      )
+    ).toThrow(/domain add/);
+
+    const domain = buildOrganizationDomainRecord(
+      {
+        organizationId,
+        domainId: 'dom-authoring',
+        name: 'Authoring Domain',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+      },
+      now
+    );
+    saveOrganizationDomain(domain);
+    const addition = buildOrganizationServiceAddition(
+      {
+        organizationId,
+        serviceId: 'svc-authoring',
+        domainId: 'dom-authoring',
+        name: 'Authoring Service',
+        outcome: 'Organizations are authored via the facade.',
+        ownerRole: 'organization_owner',
+        consumers: ['operator'],
+        tier: 'confidential',
+        tenantSlug,
+      },
+      now
+    );
+    expect(addition.service.slis).toHaveLength(1);
+    expect(addition.domain.service_ids).toEqual(['svc-authoring']);
+    saveOrganizationService(addition.service);
+    saveOrganizationDomain(addition.domain);
+
+    const operation = buildOrganizationOperationRecord(
+      {
+        organizationId,
+        operationId: 'op-authoring-review',
+        name: 'Weekly authoring review',
+        operationType: 'scheduled',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+        serviceId: 'svc-authoring',
+        triggerKind: 'schedule',
+        triggerExpression: '0 9 * * 1',
+      },
+      now
+    );
+    expect(operation.trigger).toEqual({ kind: 'schedule', expression: '0 9 * * 1' });
+    saveOrganizationOperation(operation);
+
+    expect(() =>
+      buildOrganizationProjectLink(
+        { organizationId, projectId: 'prj-lc08-missing', tier: 'confidential', tenantSlug },
+        now
+      )
+    ).toThrow(/project registry/);
+
+    const projectPath = saveProjectRecord({
+      project_id: 'prj-lc08-authoring-test',
+      name: 'LC08 Authoring Test Project',
+      summary: 'Temporary project registry record for the authoring test.',
+      status: 'active',
+      tier: 'confidential',
+      tenant_slug: tenantSlug,
+    });
+    try {
+      const attached = buildOrganizationProjectLink(
+        { organizationId, projectId: 'prj-lc08-authoring-test', tier: 'confidential', tenantSlug },
+        now
+      );
+      expect(attached.active_project_ids).toEqual(['prj-lc08-authoring-test']);
+      saveOrganizationOperationalState(attached);
+      expect(() =>
+        buildOrganizationProjectLink(
+          {
+            organizationId,
+            projectId: 'prj-lc08-authoring-test',
+            tier: 'confidential',
+            tenantSlug,
+          },
+          now
+        )
+      ).toThrow(/already attached/);
+      const detached = buildOrganizationProjectLink(
+        {
+          organizationId,
+          projectId: 'prj-lc08-authoring-test',
+          tier: 'confidential',
+          tenantSlug,
+          detach: true,
+        },
+        now
+      );
+      expect(detached.active_project_ids).toEqual([]);
+    } finally {
+      safeRmSync(projectPath);
+    }
+
+    const view = buildOrganizationManagementView({
+      organizationId,
+      tier: 'confidential',
+      tenantSlug,
+    });
+    expect(view.purpose?.objectives?.map((entry) => entry.objective_id)).toEqual([
+      'obj-authoring-1',
+    ]);
+    expect(view.domains.map((entry) => entry.domain_id)).toEqual(['dom-authoring']);
+    expect(view.services.map((entry) => entry.service_id)).toEqual(['svc-authoring']);
+    expect(view.operations.map((entry) => entry.operation_id)).toEqual(['op-authoring-review']);
   });
 });

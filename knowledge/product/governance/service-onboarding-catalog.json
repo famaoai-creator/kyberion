@@ -12,7 +12,7 @@
       "label": "Whisper"
     },
     {
-      "service_id": "tts",
+      "service_id": "voice",
       "prompt_kind": "generic",
       "label": "TTS"
     },

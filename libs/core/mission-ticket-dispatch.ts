@@ -23,6 +23,7 @@ import {
 } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { recordTask } from './mission-maintenance.js';
+import { loadProjectRecord } from './project-registry.js';
 
 export type MissionTicketDispatchTarget = 'workitem' | 'github' | 'jira';
 
@@ -250,6 +251,7 @@ export async function dispatchMissionTickets(
   ensureTicketDirs(missionPath);
 
   const projectLink = resolveProjectLink(state);
+  const projectRecord = projectLink.project_id ? loadProjectRecord(projectLink.project_id) : null;
   const existingManifest = loadExistingManifest(missionPath);
   const existingRecords = new Map<string, MissionTicketDispatchRecord>(
     (existingManifest?.records || []).map((record) => [record.task_id, record])
@@ -328,6 +330,18 @@ export async function dispatchMissionTickets(
         status: 'ready',
         projectId: projectLink.project_id || missionId,
         assigneePeerId: resolvedAgentId,
+        context: {
+          ...(projectRecord?.organization_id
+            ? { organization_id: projectRecord.organization_id }
+            : {}),
+          ...(state.tenant_slug || projectRecord?.tenant_slug
+            ? { tenant_slug: state.tenant_slug || projectRecord?.tenant_slug }
+            : {}),
+          mission_id: missionId,
+          project_id: projectLink.project_id || missionId,
+          task_id: task.task_id,
+          work_shape: 'solution_project',
+        },
         labels: [
           `mission:${missionId}`,
           ...(state.mission_type ? [`mission_type:${state.mission_type}`] : []),

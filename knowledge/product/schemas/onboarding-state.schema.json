@@ -42,7 +42,15 @@
     },
     "identity": {
       "type": "object",
-      "required": ["name", "language", "interaction_style", "primary_domain", "vision", "agent_id"],
+      "required": [
+        "name",
+        "language",
+        "interaction_style",
+        "primary_domain",
+        "vision",
+        "agent_id",
+        "persona"
+      ],
       "properties": {
         "name": { "type": "string" },
         "language": { "type": "string" },
@@ -52,7 +60,11 @@
         },
         "primary_domain": { "type": "string" },
         "vision": { "type": "string" },
-        "agent_id": { "type": "string" }
+        "agent_id": { "type": "string" },
+        "persona": {
+          "type": "string",
+          "enum": ["sovereign", "ecosystem_architect", "mission_owner", "worker", "analyst"]
+        }
       },
       "additionalProperties": false
     },
@@ -67,7 +79,10 @@
             "required": ["service_id", "status", "captured_at"],
             "properties": {
               "service_id": { "type": "string" },
-              "status": { "type": "string", "enum": ["pending", "saved", "skipped"] },
+              "status": {
+                "type": "string",
+                "enum": ["pending", "saved", "ready", "blocked", "skipped"]
+              },
               "connection_kind": {
                 "type": "string",
                 "enum": ["base_url", "output_dir", "cli_path", "custom", "none"]

@@ -271,6 +271,7 @@ export interface MissionState {
 export type MissionRelationships = NonNullable<MissionState['relationships']>;
 
 export const BOOLEAN_FLAGS = new Set([
+  '--generate',
   '--ephemeral',
   '--refresh',
   '--seal',
@@ -338,6 +339,7 @@ export const VALUE_FLAGS = new Set([
   '--reason',
   '--severity',
   '--manifest',
+  '--output',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

@@ -1,6 +1,6 @@
 import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 
-export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8' | 'L9';
+export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8' | 'L9' | 'L10';
 
 export interface LayerState {
   status: 'pending' | 'passed' | 'failed';
@@ -39,6 +39,7 @@ export class PfcController {
         L7: { status: 'pending', attempt_count: 0 },
         L8: { status: 'pending', attempt_count: 0 },
         L9: { status: 'pending', attempt_count: 0 },
+        L10: { status: 'pending', attempt_count: 0 },
       },
     };
   }
@@ -70,8 +71,24 @@ export class PfcController {
   public async runLayer(layer: Layer, logic: () => Promise<boolean>): Promise<LayerResult> {
     const layerState = this.state.layers[layer];
 
+    // Open circuit: probe once per run instead of returning immediately. A
+    // layer that has genuinely recovered (e.g. the scheduler daemon was
+    // reinstalled) closes its own circuit on the next pass; a still-broken
+    // layer stays open without inflating attempt_count further.
     if (layerState.status === 'failed' && layerState.attempt_count >= this.MAX_ATTEMPTS) {
-      return { passed: false, circuit_broken: true };
+      let recovered = false;
+      try {
+        recovered = await logic();
+      } catch {
+        recovered = false;
+      }
+      if (!recovered) {
+        return { passed: false, circuit_broken: true };
+      }
+      layerState.status = 'passed';
+      layerState.attempt_count = 0;
+      this.saveState();
+      return { passed: true, circuit_broken: false };
     }
 
     try {

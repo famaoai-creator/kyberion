@@ -9,7 +9,7 @@ describe('reasoning-backend-policy', () => {
   it('loads the policy catalog', () => {
     const policy = loadReasoningBackendPolicy();
 
-    expect(policy.default_mode).toBe('codex-cli');
+    expect(policy.default_mode).toBe('claude-cli');
     expect(policy.allowed_modes).toContain('gemini-cli');
     expect(policy.allowed_modes).toContain('gemini-api');
     expect(policy.allowed_modes).toContain('openrouter');
@@ -76,7 +76,7 @@ describe('reasoning-backend-policy', () => {
           { provider: 'gemini', installed: true, healthy: true },
         ],
       })
-    ).toBe('codex-cli');
+    ).toBe('claude-cli');
 
     expect(
       resolveReasoningBackendModeFromContext({
@@ -132,7 +132,7 @@ describe('reasoning-backend-policy', () => {
         env: {},
         providers: [],
       })
-    ).toBe('codex-cli');
+    ).toBe('claude-cli');
 
     expect(
       resolveReasoningBackendModeFromContext({
@@ -212,9 +212,9 @@ describe('reasoning-backend-policy', () => {
       })
     ).toBe('codex-cli');
 
-    // No CLAUDECODE → behavior unchanged (default).
+    // No CLAUDECODE → the governed default remains the local Claude CLI.
     expect(resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] })).toBe(
-      'codex-cli'
+      'claude-cli'
     );
   });
 });

@@ -18,6 +18,11 @@ const opsAlert = vi.hoisted(() => vi.fn());
 vi.mock('./ops-alert.js', () => ({ sendOpsAlert: opsAlert }));
 const notify = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 vi.mock('./operator-notifications.js', () => ({ notifyOperator: notify }));
+const enqueueLearning = vi.hoisted(() => vi.fn());
+vi.mock('./organization-operating-model.js', () => ({
+  enqueueOrganizationLearningCandidate: enqueueLearning,
+}));
+vi.mock('./organization-profile.js', () => ({ loadOrganizationProfile: () => null }));
 
 let tmpRoot: string;
 let mod: typeof import('./mission-hygiene.js');
@@ -97,15 +102,24 @@ describe('mission hygiene', () => {
     expect(byId['MSN-GATED']?.reason).toBe('awaiting_gate');
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-GATED');
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-NO-HISTORY');
+    expect(report.active_stale?.map((finding) => finding.mission_id)).toContain('MSN-RUNNING');
   });
 
   it('notifies the operator once with concrete commands, never mutating state', async () => {
+    enqueueLearning.mockClear();
     const report = mod.collectMissionHygieneReport();
     const sent = await mod.notifyMissionHygiene(report);
     expect(sent).toBe(true);
     expect(opsAlert).toHaveBeenCalledTimes(1);
     expect(opsAlert.mock.calls[0][0].severity).toBe('warning'); // abandoned present
     expect(notify).toHaveBeenCalledTimes(1);
+    expect(enqueueLearning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'routine_exception',
+        targetKind: 'sop_candidate',
+        tier: 'personal',
+      })
+    );
     const body = String(notify.mock.calls[0][1].body);
     expect(body).toContain('MSN-READY');
     expect(body).toContain('dispatch-workitems MSN-READY'); // <ID> substituted
