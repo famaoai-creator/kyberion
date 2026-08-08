@@ -13,6 +13,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/apple-intelligence-bridge.ts',
   'libs/core/blackhole-audio-bus.ts',
   'libs/core/coreaudio-output-bridge.ts',
+  'libs/core/managed-process.watch.test.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',
