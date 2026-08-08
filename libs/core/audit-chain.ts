@@ -10,6 +10,7 @@ import {
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rootDir } from './path-resolver.js';
+import { withLockSync } from './src/lock-utils.js';
 import {
   computeAuditEntryHash,
   GENESIS_HASH,
@@ -83,42 +84,47 @@ class AuditChainImpl {
    * the caller has already supplied one.
    */
   record(entry: Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>): AuditEntry {
-    this.entryCount++;
-    const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
-    const timestamp = new Date().toISOString();
+    const fullEntry = withLockSync('audit-chain-global', () => {
+      // Refresh the in-memory cursor while holding the inter-process lock;
+      // another process may have appended since this module was loaded.
+      this.seedFromDisk();
+      this.entryCount++;
+      const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
+      const timestamp = new Date().toISOString();
 
-    const tenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
-    const chainKey = resolveAuditChainKey({ createIfMissing: true });
-    if (!chainKey) throw new Error('missing_audit_chain_key');
+      const tenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+      const chainKey = resolveAuditChainKey({ createIfMissing: true });
+      if (!chainKey) throw new Error('missing_audit_chain_key');
 
-    const fullEntry: AuditEntry = {
-      id,
-      timestamp,
-      ...entry,
-      correlationId:
-        entry.correlationId ??
-        (typeof entry.metadata?.correlationId === 'string'
-          ? entry.metadata.correlationId
-          : undefined),
-      ...(tenantSlug ? { tenantSlug } : {}),
-      chain_alg: 'hmac-sha256',
-      chain_key_id: getAuditChainKeyId(chainKey),
-      previousHash: this.lastHash,
-      currentHash: '', // computed below
-    };
+      const nextEntry: AuditEntry = {
+        id,
+        timestamp,
+        ...entry,
+        correlationId:
+          entry.correlationId ??
+          (typeof entry.metadata?.correlationId === 'string'
+            ? entry.metadata.correlationId
+            : undefined),
+        ...(tenantSlug ? { tenantSlug } : {}),
+        chain_alg: 'hmac-sha256',
+        chain_key_id: getAuditChainKeyId(chainKey),
+        previousHash: this.lastHash,
+        currentHash: '', // computed below
+      };
 
-    fullEntry.currentHash = computeAuditEntryHash(
-      fullEntry as unknown as Record<string, unknown>,
-      this.lastHash,
-      {
-        alg: 'hmac-sha256',
-        key: chainKey,
-      }
-    );
-    this.lastHash = fullEntry.currentHash;
+      nextEntry.currentHash = computeAuditEntryHash(
+        nextEntry as unknown as Record<string, unknown>,
+        this.lastHash,
+        {
+          alg: 'hmac-sha256',
+          key: chainKey,
+        }
+      );
+      this.lastHash = nextEntry.currentHash;
 
-    // Persist
-    this.appendToFile(fullEntry);
+      this.appendToFile(nextEntry);
+      return nextEntry;
+    });
 
     // Fan-out to the registered audit forwarder (SIEM / log sink). Dynamic
     // import to keep the forwarder optional and break the circular type

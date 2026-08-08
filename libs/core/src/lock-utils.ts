@@ -14,7 +14,7 @@ import {
  * Provides file-based mutex/locking with retry support.
  */
 
-const LOCK_ROOT = pathResolver.rootResolve('active/shared/runtime/locks');
+const LOCK_ROOT = path.join(pathResolver.rootDir(), 'active/shared/runtime/locks');
 
 /**
  * Tries to acquire a lock for a specific resource.
