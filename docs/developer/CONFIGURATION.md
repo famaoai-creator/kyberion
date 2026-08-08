@@ -272,7 +272,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (151)
+## runtime (152)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -366,6 +366,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PREFIX`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROJECT_NAME`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_CAPABILITY_PROBE`           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROVIDER_CAPABILITY_REFRESH`         | string | no       | Force a provider capability re-probe and reasoning backend re-selection                                 |
 | `KYBERION_PROVIDER_CAPABILITY_ROUTING`         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_DISCOVERY_REFRESH`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_ENV_ALLOWLIST`              | string | no       | _undocumented_                                                                                          |

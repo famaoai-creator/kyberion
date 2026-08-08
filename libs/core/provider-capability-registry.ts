@@ -12,9 +12,9 @@
  * `{computed_at, ttl_ms, value}` envelope used by
  * `scripts/run_baseline_check.ts`'s `runtime/baseline-check-cache/*.json`.
  *
- * Fail-closed-for-routing, fail-open-for-the-probe-itself: a probe that
- * cannot determine a provider's state marks that provider unavailable
- * (`binary_found: false`) rather than throwing — callers (e.g.
+ * Binary discovery is fail-closed for routing, while auth probe errors remain
+ * explicitly uncertain (`probe_error`) so a transient keyring/network failure
+ * cannot strand a provider until the snapshot TTL expires. Callers (e.g.
  * `reasoning-bootstrap.ts`) must never crash because a CLI probe hiccuped.
  *
  * See docs/developer/improvement-plans-2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md
@@ -31,6 +31,7 @@ import {
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
+import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import * as path from 'node:path';
 
 export interface ProviderCapability {
@@ -81,14 +82,17 @@ interface ProviderProbeSpec {
  * `knowledge/product/governance/provider-capability-scan-policy.json`
  * (`--help` across providers, `gh copilot -- --help` for copilot). Auth
  * probes are declared only where a cheap, non-interactive subcommand exists;
- * `claude`/`codex`/`agy`/`grok`/`gemini` have none known that don't make a live
- * call, so their `authenticated` field stays `'unknown'` unless the binary
- * itself is missing (then it is `false`).
+ * `codex`/`agy`/`grok`/`gemini` have none known that don't make a live call,
+ * so their `authenticated` field stays `'unknown'` unless the binary itself
+ * is missing (then it is `false`). Claude Code exposes the cheap
+ * `claude auth status` probe, so Claude can report its actual login state.
  */
 export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> = {
   claude: {
     binaryCommand: 'claude',
     binaryArgs: ['--version'],
+    authCommand: 'claude',
+    authArgs: ['auth', 'status'],
     headless: true,
     structuredOutput: true,
   },
@@ -200,8 +204,8 @@ function probeSingleProvider(
     probeError = versionResult.stderr.trim() || `${spec.binaryCommand} probe failed (non-fatal)`;
   } else if (spec.authCommand && spec.authArgs) {
     const authResult = runProbe(exec, spec.authCommand, spec.authArgs, timeoutMs);
-    authenticated = authResult.ok;
-    if (!authResult.ok) {
+    authenticated = providerId === 'claude' ? isClaudeCliAuthenticated(authResult) : authResult.ok;
+    if (!authenticated) {
       probeError = authResult.stderr.trim() || `${spec.authCommand} auth probe reported failure`;
     }
   }
