@@ -1,0 +1,307 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-08-08T08:05:23.205Z",
+  "probe": "live-cli-version-help",
+  "results": [
+    {
+      "mode": "claude-cli",
+      "binary": "claude",
+      "profile": {
+        "mode": "claude-cli",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": false,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "verified",
+        "output": "2.1.224 (Claude Code)"
+      },
+      "help": {
+        "status": "verified",
+        "output": "Usage: claude [options] [command] [prompt]\n\nClaude Code - starts an interactive session by default, use -p/--print for\nnon-interactive output\n\nArguments:\n  prompt                                Your prompt\n\nOptions:\n  --add-dir <directories...>            Additional directories to allow tool\n                                        access to\n  --agent <agent>                       Agent for the current session. Overrides\n                                        the 'agent' setting.\n  --agents <json>                       JSON object defining custom agents (e.g.\n                                        '{\"reviewer\": {\"description\": \"Reviews\n                                        code\", \"prompt\": \"You are a code\n                                        reviewer\"}}')\n  --allow-dangerously-skip-permissions  Enable bypassing all permission checks\n                                        as an option, without it being enabled\n                                        by default. Recommended only for\n                                        sandboxes with no internet access.\n  --allowedTools, --allowed-tools <tools...>\n      Comma or space-separated list of tool names to allow (e.g. \"Bash(git *)\n      Edit\")\n  --append-system-prompt <prompt>       Append a system prompt to the default\n                                        system prompt\n  --autocompact <auto|tokens>           Auto-compact window size (auto, or\n                                        100k–1M tokens)\n  --ax-screen-reader                    Render screen-reader friendly output\n                                        (flat text, no decorative borders or\n                                        animations).\n  --bg, --background                    Start the session as a background agent\n                                        and return immediately (manage with\n                                        `claude agents`)\n  --bare                                Minimal mode: skip hooks, LSP, plugin\n                         "
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "verified",
+          "evidence": "CLI help exposes a structured-output marker."
+        },
+        "session_continuity": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "abort": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "images": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        }
+      }
+    },
+    {
+      "mode": "codex-cli",
+      "binary": "codex",
+      "profile": {
+        "mode": "codex-cli",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": true,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "verified",
+        "output": "codex-cli 0.146.0"
+      },
+      "help": {
+        "status": "verified",
+        "output": "Codex CLI\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.\n\nUsage: codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]\n\nCommands:\n  exec            Run Codex non-interactively [aliases: e]\n  review          Run a code review non-interactively\n  login           Manage login\n  logout          Remove stored authentication credentials\n  mcp             Manage external MCP servers for Codex\n  plugin          Manage Codex plugins\n  mcp-server      Start Codex as an MCP server (stdio)\n  app-server      [experimental] Run the app server or related tooling\n  remote-control  [experimental] Manage the app-server daemon with remote control enabled\n  app             Launch the Desktop app (opens the app installer if missing)\n  completion      Generate shell completion scripts\n  update          Update Codex to the latest version\n  doctor          Diagnose local Codex installation, config, auth, and runtime health\n  sandbox         Run commands within a Codex-provided sandbox\n  debug           Debugging tools\n  apply           Apply the latest diff produced by Codex agent as a `git apply` to your local\n                  working tree [aliases: a]\n  resume          Resume a previous interactive session (picker by default; use --last to continue\n                  the most recent)\n  archive         Archive a saved session by id or session name\n  delete          Permanently delete a saved session by id or session name\n  unarchive       Unarchive a saved session by id or session name\n  fork            Fork a previous interactive session (picker by default; use --last to fork the\n                  most recent)\n  cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n  exec-server     [EXPERIMENTAL] Run the standalone exec-server service\n  features        Inspect feature flags\n  help            Print this message or the help of the given subcommand(s)\n\nArguments:\n  [PROMPT]\n          Optional user prompt to star"
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "session_continuity": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "abort": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "images": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        }
+      }
+    },
+    {
+      "mode": "gemini-cli",
+      "binary": "gemini",
+      "profile": {
+        "mode": "gemini-cli",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": true,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "verified",
+        "output": "0.46.0"
+      },
+      "help": {
+        "status": "verified",
+        "output": "Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.\n\nCommands:\n  gemini mcp                   Manage MCP servers\n  gemini extensions <command>  Manage Gemini CLI extensions.  [aliases: extension]\n  gemini skills <command>      Manage agent skills.  [aliases: skill]\n  gemini hooks <command>       Manage Gemini CLI hooks.  [aliases: hook]\n  gemini gemma                 Manage local Gemma model routing\n  gemini [query..]             Launch Gemini CLI  [default]\n\nPositionals:\n  query  Initial prompt. Runs in interactive mode by default; use -p/--prompt for non-interactive.\n\nOptions:\n  -d, --debug                     Run in debug mode (open debug console with F12)  [boolean] [default: false]\n  -m, --model                     Model  [string]\n  -p, --prompt                    Run in non-interactive (headless) mode with the given prompt. Appended to input on stdin (if any).  [string]\n  -i, --prompt-interactive        Execute the provided prompt and continue in interactive mode  [string]\n      --skip-trust                Trust the current workspace for this session.  [boolean] [default: false]\n  -w, --worktree                  Start Gemini in a new git worktree. If no name is provided, one is generated automatically.  [string]\n  -s, --sandbox                   Run in sandbox?  [boolean]\n  -y, --yolo                      Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?  [boolean] [default: false]\n      --approval-mode             Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)  [string] [choices: \"default\", \"auto_edit\", \"yolo\", \"plan\"]\n      --policy                    Additional policy files or directories to load (comma-separated or multiple --policy)  [array]\n      --admin-policy              Additional admin policy files or directorie"
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "session_continuity": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "abort": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "images": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        }
+      }
+    },
+    {
+      "mode": "agy-cli",
+      "binary": "agy",
+      "profile": {
+        "mode": "agy-cli",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": true,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "verified",
+        "output": "1.1.9"
+      },
+      "help": {
+        "status": "verified",
+        "output": ""
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "session_continuity": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "abort": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "images": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        }
+      }
+    },
+    {
+      "mode": "grok-cli",
+      "binary": "grok",
+      "profile": {
+        "mode": "grok-cli",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": true,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "verified",
+        "output": "grok 0.2.118 (1e1687c1cf6a)"
+      },
+      "help": {
+        "status": "verified",
+        "output": "Grok Build TUI\n\nUsage: grok [OPTIONS] [PROMPT] [COMMAND]\n\nArguments:\n  [PROMPT]\n          Initial prompt for the interactive session, e.g. `grok \"fix the bug\"` or `grok --worktree=feat \"create this feature\"`\n\nOptions:\n      --agent <NAME>\n          Agent name or definition file path\n\n      --agents <JSON>\n          Inline subagent definitions as JSON\n\n      --allow <RULE>\n          Permission allow rule (compat alias: --allowedTools)\n\n      --always-approve\n          Auto-approve all tool executions\n\n  -c, --continue\n          Continue the most recent session for the current working directory\n\n      --cwd <CWD>\n          Working directory\n\n      --debug\n          Enable debug logging\n\n      --debug-file <FILE>\n          Write debug logs to FILE\n\n      --deny <RULE>\n          Permission deny rule (compat alias: --disallowedTools)\n\n      --disable-web-search\n          Disable web search and web fetch tools\n\n      --disallowed-tools <TOOLS>\n          Built-in tools to remove (comma-separated)\n\n      --experimental-memory\n          Enable cross-session memory\n\n      --fork-session\n          When resuming (`--resume` / `--continue`), create a new session ID instead of reusing the original (optionally set via `--session-id`)\n\n      --fullscreen\n          Open in the standard fullscreen TUI for this session, overriding a config `[ui] screen_mode = \"minimal\"` preference. Session-scoped only — does not write config. Fullscreen-vs-inline still follows the alt-screen policy (--no-alt-screen, [terminal] alt_screen, terminal auto-detection)\n\n  -h, --help\n          Print help (see a summary with '-h')\n\n      --include-partial-messages\n          Emit incremental `stream_event` lines (text/thinking deltas) alongside whole messages. Only affects `--output-format streaming-messages-json`\n\n      --json-schema <SCHEMA>\n          JSON Schema for structured output. When set, the model is constrained to produce JSON matching this schema. Implies --output-format json. Example: --json-schem"
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "verified",
+          "evidence": "CLI help exposes a structured-output marker."
+        },
+        "session_continuity": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "abort": {
+          "declared": true,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        },
+        "images": {
+          "declared": false,
+          "status": "declared",
+          "evidence": "Profile declaration retained; this capability needs a model-turn probe."
+        }
+      }
+    },
+    {
+      "mode": "copilot",
+      "binary": "copilot",
+      "profile": {
+        "mode": "copilot",
+        "transport": "cli",
+        "capabilities": {
+          "structured_output": true,
+          "session_continuity": true,
+          "abort": true,
+          "images": false
+        },
+        "utility_fit": [
+          "judge",
+          "classify",
+          "summarize",
+          "divergent"
+        ]
+      },
+      "version": {
+        "status": "unavailable",
+        "error": "spawnSync copilot ENOENT"
+      },
+      "help": {
+        "status": "unavailable",
+        "error": "spawnSync copilot ENOENT"
+      },
+      "capabilities": {
+        "structured_output": {
+          "declared": true,
+          "status": "unavailable",
+          "evidence": "CLI help was unavailable, so the profile declaration is not live evidence."
+        },
+        "session_continuity": {
+          "declared": true,
+          "status": "unavailable",
+          "evidence": "CLI help was unavailable, so the profile declaration is not live evidence."
+        },
+        "abort": {
+          "declared": true,
+          "status": "unavailable",
+          "evidence": "CLI help was unavailable, so the profile declaration is not live evidence."
+        },
+        "images": {
+          "declared": false,
+          "status": "unavailable",
+          "evidence": "CLI help was unavailable, so the profile declaration is not live evidence."
+        }
+      }
+    }
+  ]
+}

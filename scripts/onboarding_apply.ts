@@ -24,6 +24,7 @@ import {
   formatReasoningSummary,
   type OnboardingReasoningState,
 } from './onboarding_reasoning.js';
+import { generateOnboardingRunbookSkill } from './onboarding_runbook_skill.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -297,6 +298,9 @@ export function buildSummary(
     '- Run `pnpm vital --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',
+    '## Runbook Skill',
+    `- Generated: ${path.join(onboardingRoot(), 'skills', 'kyberion-onboarding-runbook', 'SKILL.md')}`,
+    '',
   ];
   return lines.join('\n');
 }
@@ -363,6 +367,12 @@ export async function main() {
   const tenantEntries = await applyTenants(input, now);
   const tutorial = await applyTutorial(input, now);
   const reasoning = await evaluateReasoningBackend(new Date(now));
+  const runbookSkill = generateOnboardingRunbookSkill({
+    profileRoot: profileRoot(),
+    identityName: input.identity.name,
+    agentId: input.identity.agent_id,
+    generatedAt: now,
+  });
   const state = buildState(input, now, tenantEntries, tutorial, reasoning);
   if (!validateState(state)) {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
@@ -382,6 +392,7 @@ export async function main() {
     reasoning,
     state_path: statePath(),
     summary_path: summaryPath(),
+    runbook_skill_path: runbookSkill.skillPath,
   };
   if (argv.json) {
     console.log(JSON.stringify(result, null, 2));

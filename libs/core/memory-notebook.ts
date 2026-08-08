@@ -85,6 +85,21 @@ export interface FoldCaptureResult {
   added: number;
 }
 
+/**
+ * Normalize one candidate before it crosses into a durable promotion queue.
+ *
+ * The queue stores a summary rather than a whole notebook, so callers must
+ * not reimplement the fold just to obtain the canonical fact text.  The
+ * returned value deliberately omits the capture date; the queue owns its
+ * timestamp while this helper owns whitespace, dedupe grammar, and provenance
+ * neutralization.
+ */
+export function normalizeMemoryFact(fact: string, at: number, trustedProvenance = false): string {
+  const folded = foldCapture('', [fact], at, trustedProvenance);
+  const first = bullets(folded.body)[0] || '';
+  return first.replace(/^\(\d{4}-\d\d-\d\d\)\s*/u, '').trim();
+}
+
 export function foldCapture(
   existing: string,
   facts: string[],

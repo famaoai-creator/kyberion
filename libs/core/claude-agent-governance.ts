@@ -3,7 +3,10 @@ import type { CanUseTool, McpServerConfig, PermissionResult } from '@anthropic-a
 import { pathResolver } from './path-resolver.js';
 import { auditChain } from './audit-chain.js';
 import { evaluatePreToolUse } from './claude-code-hook.js';
-import { evaluateShellCommandPolicy } from './shell-command-policy.js';
+import {
+  evaluateShellCommandPolicy,
+  shellCommandApprovalDescriptor,
+} from './shell-command-policy.js';
 
 /**
  * Direction B: make the claude-agent SDK sub-agent a *governed Kyberion citizen*
@@ -111,6 +114,7 @@ export function createKyberionCanUseTool(): CanUseTool {
           opId: 'subagent:bash',
           agentId: process.env.KYBERION_PERSONA || 'sub-agent',
           payload: { command },
+          actionDescriptor: shellCommandApprovalDescriptor(decision),
           draft: {
             title: 'Sub-agent Bash approval required',
             summary: `${decision.reason} Command: ${command}`,

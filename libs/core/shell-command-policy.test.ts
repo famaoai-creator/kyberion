@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { evaluateShellCommandPolicy } from './shell-command-policy.js';
+import {
+  evaluateShellCommandPolicy,
+  shellCommandApprovalDescriptor,
+} from './shell-command-policy.js';
 
 const savedSuspected = process.env.KYBERION_INJECTION_SUSPECTED;
 const savedMissionId = process.env.MISSION_ID;
@@ -35,7 +38,12 @@ describe('shell-command-policy', () => {
   });
 
   it('requires approval for non-allowlisted commands', () => {
-    expect(evaluateShellCommandPolicy('pnpm install').verdict).toBe('require_approval');
+    const decision = evaluateShellCommandPolicy('pnpm install');
+    expect(decision.verdict).toBe('require_approval');
+    expect(shellCommandApprovalDescriptor(decision)).toEqual({
+      action: 'shell:execute',
+      targetClass: 'rule:unmatched',
+    });
     expect(evaluateShellCommandPolicy('git commit -m "x"').verdict).toBe('require_approval');
   });
 

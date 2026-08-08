@@ -119,6 +119,25 @@ function spanTone(status: TraceSpanDetail['status']): string {
   }
 }
 
+function gapPhaseBreakdown(span: TraceSpanDetail): Array<{ phase: string; ms: number }> {
+  const event = span.events.find((entry) => entry.name === 'gap_phases');
+  const raw = event?.attributes?.gap_phases;
+  if (typeof raw !== 'string') return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is { phase: string; ms: number } =>
+        Boolean(entry) &&
+        typeof entry === 'object' &&
+        typeof (entry as { phase?: unknown }).phase === 'string' &&
+        typeof (entry as { ms?: unknown }).ms === 'number'
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function buildTraceFeedUrl(
   limit: number,
   filters: TraceFilters,
@@ -300,6 +319,7 @@ function TraceSpanTree({
   const [showKnowledge, setShowKnowledge] = useState(depth === 0);
   const previewEvents = span.events.slice(0, 3);
   const previewArtifacts = span.artifacts.slice(0, 3);
+  const gapPhases = gapPhaseBreakdown(span);
 
   return (
     <div
@@ -345,6 +365,25 @@ function TraceSpanTree({
               {key}={String(value)}
             </span>
           ))}
+        </div>
+      ) : null}
+
+      {gapPhases.length > 0 ? (
+        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
+          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+            dispatch gap breakdown
+          </div>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2">
+            {gapPhases.map((entry) => (
+              <div
+                key={entry.phase}
+                className="flex justify-between gap-3 text-[11px] kb-text-secondary"
+              >
+                <span>{entry.phase}</span>
+                <span className="font-mono">{entry.ms} ms</span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
