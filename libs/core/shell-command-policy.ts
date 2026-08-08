@@ -12,6 +12,7 @@ import {
   type SimpleCommand,
 } from './shell-command-normalize.js';
 import { logger } from './core.js';
+import type { ApprovalActionDescriptor } from './approval-store.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
 
@@ -42,6 +43,20 @@ export interface ShellCommandPolicyDecision {
   args: string[];
   matchedRuleId?: string;
   reason: string;
+}
+
+/**
+ * QM-05: standing shell approvals are scoped to the matched policy rule, not
+ * to a literal command. The approval gate still binds the exact payload hash,
+ * so this descriptor cannot turn a rule-level label into a blanket permit.
+ */
+export function shellCommandApprovalDescriptor(
+  decision: Pick<ShellCommandPolicyDecision, 'matchedRuleId'>
+): ApprovalActionDescriptor {
+  return {
+    action: 'shell:execute',
+    targetClass: `rule:${decision.matchedRuleId || 'unmatched'}`,
+  };
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/shell-command-policy.json');

@@ -20,6 +20,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
+import { applyConsolidationActions, type ConsolidationAction } from './memory-notebook.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   computeApprovalPayloadHash,
@@ -32,6 +33,8 @@ import {
 const PIPELINE_REF_PATTERN = /^pipelines\/[A-Za-z0-9._/-]+\.json$/u;
 const MANAGED_SKILL_REF_PATTERN =
   /^active\/shared\/runtime\/background-review\/skills\/[a-z0-9][a-z0-9._-]{0,63}\/SKILL\.md$/u;
+const MEMORY_NOTEBOOK_REF_PATTERN =
+  /^(?:knowledge\/(?:personal|confidential|public)\/missions\/[A-Za-z0-9._-]+|active\/missions\/(?:personal|confidential|public)\/[A-Za-z0-9._-]+|active\/shared\/runtime\/session\/[A-Za-z0-9._-]+|active\/personal)\/MEMORY\.md$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const CANDIDATE_ID_PATTERN = /^[A-Za-z0-9._-]+$/u;
 
@@ -45,9 +48,15 @@ export interface BackgroundSkillAppendSectionPatch {
   section: string;
 }
 
+export interface BackgroundMemoryConsolidationPatch {
+  operation: 'apply_consolidation';
+  actions: ConsolidationAction[];
+}
+
 export type BackgroundReviewPatch =
   | BackgroundPipelineAppendStepPatch
-  | BackgroundSkillAppendSectionPatch;
+  | BackgroundSkillAppendSectionPatch
+  | BackgroundMemoryConsolidationPatch;
 
 export interface ApplyBackgroundReviewPipelinePatchInput {
   candidateId: string;
@@ -84,7 +93,7 @@ export interface BackgroundReviewApprovalRequestInput {
 
 export interface BackgroundReviewApprovalPreview {
   candidateId: string;
-  action: 'pipeline_proposal' | 'skill_patch';
+  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
   targetRef: string;
   expectedSha256: string;
   patch: BackgroundReviewPatch;
@@ -98,7 +107,7 @@ function metadataOf(record: DistillCandidateRecord): BackgroundReviewMetadata {
 
 function assertBackgroundProposal(
   record: DistillCandidateRecord,
-  action: 'pipeline_proposal' | 'skill_patch'
+  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation'
 ): BackgroundReviewMetadata {
   const metadata = metadataOf(record);
   const provenance = metadata.provenance;
@@ -169,6 +178,56 @@ function parseSkillPatch(value: unknown): BackgroundSkillAppendSectionPatch {
   return { operation: 'append_section', section };
 }
 
+function parseMemoryPatch(value: unknown): BackgroundMemoryConsolidationPatch {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('[POLICY_VIOLATION] Background-review memory patch is missing.');
+  }
+  const patch = value as Record<string, unknown>;
+  if (patch.operation !== 'apply_consolidation' || !Array.isArray(patch.actions)) {
+    throw new Error('[POLICY_VIOLATION] Memory patches require apply_consolidation actions.');
+  }
+  const actions: ConsolidationAction[] = [];
+  for (const raw of patch.actions) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('[POLICY_VIOLATION] Memory consolidation action must be an object.');
+    }
+    const action = raw as Record<string, unknown>;
+    if (action.kind === 'delete') {
+      const index = Number(action.index);
+      if (!Number.isSafeInteger(index) || index < 1) {
+        throw new Error(
+          '[POLICY_VIOLATION] Memory consolidation indexes must be positive integers.'
+        );
+      }
+      actions.push({ kind: 'delete', index });
+      continue;
+    }
+    if (action.kind === 'update' || action.kind === 'add') {
+      const text = String(action.text || '').trim();
+      if (!text || text.length > 2_000 || text.includes('\u0000')) {
+        throw new Error('[POLICY_VIOLATION] Memory consolidation text is empty or unbounded.');
+      }
+      if (action.kind === 'update') {
+        const index = Number(action.index);
+        if (!Number.isSafeInteger(index) || index < 1) {
+          throw new Error(
+            '[POLICY_VIOLATION] Memory consolidation indexes must be positive integers.'
+          );
+        }
+        actions.push({ kind: 'update', index, text });
+      } else actions.push({ kind: 'add', text });
+      continue;
+    }
+    throw new Error(
+      `[POLICY_VIOLATION] Unknown memory consolidation action: ${String(action.kind)}`
+    );
+  }
+  if (actions.length === 0) {
+    throw new Error('[POLICY_VIOLATION] Memory consolidation patch must contain an action.');
+  }
+  return { operation: 'apply_consolidation', actions };
+}
+
 function sha256(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
@@ -182,7 +241,7 @@ function backupRef(candidateId: string): string {
 
 function approvalPayload(input: {
   candidateId: string;
-  action: 'pipeline_proposal' | 'skill_patch';
+  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
   targetRef: string;
   expectedSha256: string;
   patch: BackgroundReviewPatch;
@@ -207,7 +266,7 @@ function assertApprovedBackgroundReviewEffect(input: {
   expectedSha256: string;
   approvalRef: string;
   approvedBy: string;
-  action: 'pipeline_proposal' | 'skill_patch';
+  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
   targetRef: string;
   patch: BackgroundReviewPatch;
 }): ApprovalRequestRecord {
@@ -261,19 +320,27 @@ export function inspectBackgroundReviewProposal(
   if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
   const metadata = metadataOf(record);
   const action = metadata.action;
-  if (action !== 'pipeline_proposal' && action !== 'skill_patch') {
+  if (
+    action !== 'pipeline_proposal' &&
+    action !== 'skill_patch' &&
+    action !== 'memory_consolidation'
+  ) {
     throw new Error(`[POLICY_VIOLATION] Candidate ${candidateId} is not an approval-bound patch.`);
   }
   const proposal = assertBackgroundProposal(record, action);
   const target =
     action === 'pipeline_proposal'
       ? resolvePipelineTarget(proposal.target_ref)
-      : resolveManagedSkillTarget(proposal.target_ref);
+      : action === 'skill_patch'
+        ? resolveManagedSkillTarget(proposal.target_ref)
+        : resolveMemoryTarget(proposal.target_ref);
   const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
   const patch =
     action === 'pipeline_proposal'
       ? parsePipelinePatch(proposal.patch)
-      : parseSkillPatch(proposal.patch);
+      : action === 'skill_patch'
+        ? parseSkillPatch(proposal.patch)
+        : parseMemoryPatch(proposal.patch);
   return {
     candidateId,
     action,
@@ -532,6 +599,20 @@ function resolveManagedSkillTarget(targetRef: unknown): {
   return { ref, absolute, provenance };
 }
 
+function resolveMemoryTarget(targetRef: unknown): { ref: string; absolute: string } {
+  const ref = String(targetRef || '').trim();
+  if (!MEMORY_NOTEBOOK_REF_PATTERN.test(ref) || ref.includes('..')) {
+    throw new Error(`[POLICY_VIOLATION] Invalid background-review memory target: ${ref}`);
+  }
+  const absolute = pathResolver.rootResolve(ref);
+  const root = pathResolver.rootDir();
+  if (!(absolute === root || absolute.startsWith(`${root}${path.sep}`))) {
+    throw new Error(`[POLICY_VIOLATION] Memory target escapes repository root: ${ref}`);
+  }
+  if (!safeExistsSync(absolute)) throw new Error(`Memory target not found: ${ref}`);
+  return { ref, absolute };
+}
+
 function applySkillSection(content: string, section: string): string {
   const heading = section.match(/^## ([^\n\r]+)(?:\r?\n|$)/u)?.[1]?.trim();
   if (!heading) throw new Error('[POLICY_VIOLATION] Skill patch section heading is missing.');
@@ -543,6 +624,98 @@ function applySkillSection(content: string, section: string): string {
     throw new Error(`[POLICY_VIOLATION] Skill already contains the requested section: ${heading}`);
   }
   return `${content.trimEnd()}\n\n${section}\n`;
+}
+
+/** Apply one explicitly approved, hash-bound consolidation to a notebook. */
+export function applyBackgroundReviewMemoryConsolidationPatch(
+  input: ApplyBackgroundReviewPipelinePatchInput
+): ApplyBackgroundReviewPipelinePatchResult {
+  assertBackgroundReviewOperationAllowed('memory:consolidate');
+  const candidateId = String(input.candidateId || '').trim();
+  const expectedSha256 = String(input.expectedSha256 || '')
+    .trim()
+    .toLowerCase();
+  const approvedBy = String(input.approvedBy || '').trim();
+  const approvalRef = String(input.approvalRef || '').trim();
+  if (!candidateId || !approvedBy || !approvalRef) {
+    throw new Error('candidateId, approvedBy, and approvalRef are required for patch application.');
+  }
+  if (!SHA256_PATTERN.test(expectedSha256)) {
+    throw new Error('[POLICY_VIOLATION] expectedSha256 must be a lowercase SHA-256 digest.');
+  }
+
+  const record = loadDistillCandidateRecord(candidateId);
+  if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
+  const metadata = assertBackgroundProposal(record, 'memory_consolidation');
+  const target = resolveMemoryTarget(metadata.target_ref);
+  const patch = parseMemoryPatch(metadata.patch);
+  const before = String(safeReadFile(target.absolute, { encoding: 'utf8' }));
+  const beforeSha256 = sha256(before);
+  if (beforeSha256 !== expectedSha256) {
+    throw new Error(
+      `[POLICY_VIOLATION] Memory pre-image hash mismatch for ${target.ref}: expected ${expectedSha256}, got ${beforeSha256}`
+    );
+  }
+  const nextContent = applyConsolidationActions(before, patch.actions, Date.now());
+  if (nextContent === before) {
+    throw new Error('[POLICY_VIOLATION] Memory consolidation proposal produces no change.');
+  }
+  assertApprovedBackgroundReviewEffect({
+    candidateId,
+    expectedSha256,
+    approvalRef,
+    approvedBy,
+    action: 'memory_consolidation',
+    targetRef: target.ref,
+    patch,
+  });
+  const afterSha256 = sha256(nextContent);
+  const backup = backupRef(candidateId);
+  const backupPayload = {
+    version: 1,
+    candidate_id: candidateId,
+    target_ref: target.ref,
+    before_sha256: beforeSha256,
+    after_sha256: afterSha256,
+    approved_by: approvedBy,
+    approval_ref: approvalRef,
+    backed_up_at: new Date().toISOString(),
+    original_content: before,
+  };
+
+  withExecutionContext('ecosystem_architect', () => {
+    const backupDir = path.dirname(pathResolver.rootResolve(backup));
+    if (!safeExistsSync(backupDir)) safeMkdir(backupDir, { recursive: true });
+    safeWriteFile(pathResolver.rootResolve(backup), `${JSON.stringify(backupPayload, null, 2)}\n`);
+    safeWriteFile(target.absolute, nextContent);
+  });
+
+  updateDistillCandidateRecord(candidateId, {
+    status: 'promoted',
+    promoted_ref: target.ref,
+    metadata: {
+      ...metadata,
+      patch_application: {
+        operation: patch.operation,
+        target_ref: target.ref,
+        before_sha256: beforeSha256,
+        after_sha256: afterSha256,
+        backup_ref: backup,
+        approved_by: approvedBy,
+        approval_ref: approvalRef,
+        applied_at: new Date().toISOString(),
+      },
+    },
+  });
+
+  return {
+    candidate_id: candidateId,
+    target_ref: target.ref,
+    backup_ref: backup,
+    before_sha256: beforeSha256,
+    after_sha256: afterSha256,
+    approved_by: approvedBy,
+  };
 }
 
 /** Apply one explicitly approved, provenance-bound append-only skill patch. */

@@ -38,6 +38,10 @@ vi.mock('./shell-command-policy.js', () => ({
           args: [],
           reason: 'Allowed by shell command policy.',
         },
+  shellCommandApprovalDescriptor: (decision: { matchedRuleId?: string }) => ({
+    action: 'shell:execute',
+    targetClass: `rule:${decision.matchedRuleId || 'unmatched'}`,
+  }),
 }));
 
 import {

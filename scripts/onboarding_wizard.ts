@@ -35,6 +35,10 @@ import {
   markReasoningStubAcknowledged,
   type OnboardingReasoningState,
 } from './onboarding_reasoning.js';
+import {
+  generateOnboardingRunbookSkill,
+  onboardingRunbookSkillPath,
+} from './onboarding_runbook_skill.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -389,6 +393,9 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     '- Review candidate service connections before using them in missions.',
     '- Register additional tenants one at a time.',
     '- Convert the tutorial into an explicit mission only after confirming the setup.',
+    '',
+    '## Runbook Skill',
+    `- Generated: ${onboardingRunbookSkillPath(profileRoot())}`,
     '',
   ].join('\n');
 }
@@ -822,6 +829,12 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
   console.log(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const summary = buildSummaryMarkdown(state);
+  const runbookSkill = generateOnboardingRunbookSkill({
+    profileRoot: profileRoot(),
+    identityName: state.identity?.name,
+    agentId: state.identity?.agent_id,
+    generatedAt: new Date().toISOString(),
+  });
   await writeTextArtifact(summaryPath(), summary, 'onboarding-summary');
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
   state.status = 'complete';
@@ -835,6 +848,7 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
     `Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`
   );
   console.log(`Summary written to: ${summaryPath()}`);
+  console.log(`Runbook skill written to: ${runbookSkill.skillPath}`);
   console.log(`State written to: ${statePath()}`);
   console.log(t('\nNext steps:', '\n次のステップ:'));
   if (state.reasoning && !state.reasoning.available) {

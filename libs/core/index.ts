@@ -2332,6 +2332,7 @@ export {
   scannableUnits,
   simpleCommands,
 } from './shell-command-normalize.js';
+export { shellCommandApprovalDescriptor } from './shell-command-policy.js';
 export type { SimpleCommand } from './shell-command-normalize.js';
 
 // QM-07: git-imported plugin packs (provenance-gated, archive-not-delete).
@@ -2364,6 +2365,13 @@ export {
   backendCapabilityProfile,
   modesWithUtilityFit,
 } from './backend-capability-profile.js';
+export {
+  runBackendConformance,
+  type BackendConformanceExec,
+  type BackendConformanceReport,
+  type BackendConformanceResult,
+  type ConformanceEvidenceStatus,
+} from './backend-conformance.js';
 
 // QM-09: gap-phase latency attribution for LLM delegations.
 export type { BaseGapPhase, GapPhaseSample, GapRecorder } from './gap-phase.js';
@@ -2389,6 +2397,7 @@ export {
   capTail,
   recallBody,
   neutralizeUntrustedProvenance,
+  normalizeMemoryFact,
   foldCapture,
   queryBullets,
   DEFAULT_CONSOLIDATE_AFTER,
@@ -2399,6 +2408,11 @@ export {
   applyConsolidationActions,
   planConsolidation,
 } from './memory-notebook.js';
+export {
+  exerciseJsonRecordStoreContract,
+  type JsonRecordStoreContractAdapter,
+  type JsonRecordStoreContractResult,
+} from './store-contract.js';
 
 // Software QA lifecycle (QA-01)
 export type {
