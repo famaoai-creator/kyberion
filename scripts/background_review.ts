@@ -9,6 +9,7 @@
 import {
   applyBackgroundReviewPipelinePatch,
   applyBackgroundReviewSkillPatch,
+  applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
 } from '@agent/core';
 
@@ -19,13 +20,17 @@ function flag(argv: string[], name: string): string {
 
 function usage(): never {
   throw new Error(
-    'Usage: pnpm background-review <request|apply|apply-skill> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>]'
+    'Usage: pnpm background-review <request|apply|apply-skill|apply-memory> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>]'
   );
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  if (!['request', 'apply', 'apply-skill'].includes(argv[0]) || !flag(argv, '--candidate')) usage();
+  if (
+    !['request', 'apply', 'apply-skill', 'apply-memory'].includes(argv[0]) ||
+    !flag(argv, '--candidate')
+  )
+    usage();
   if (argv[0] === 'request') {
     const request = createBackgroundReviewApprovalRequest({
       candidateId: flag(argv, '--candidate'),
@@ -52,7 +57,9 @@ async function main(): Promise<void> {
   const apply =
     argv[0] === 'apply-skill'
       ? applyBackgroundReviewSkillPatch
-      : applyBackgroundReviewPipelinePatch;
+      : argv[0] === 'apply-memory'
+        ? applyBackgroundReviewMemoryConsolidationPatch
+        : applyBackgroundReviewPipelinePatch;
   const result = apply({
     candidateId: flag(argv, '--candidate'),
     expectedSha256: flag(argv, '--expected-sha256'),

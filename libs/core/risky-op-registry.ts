@@ -12,6 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
+import type { ApprovalActionDescriptor, ApprovalRequestSource } from './approval-store.js';
 import type { TraceContext } from './src/trace.js';
 
 /** Canonical op IDs for risky operations enforced by the approval gate. */
@@ -44,6 +45,9 @@ export interface RequireApprovalParams {
   };
   /** Pipeline trace context — threaded into the approval gate for event emission. */
   trace?: TraceContext;
+  /** Optional session-cache descriptor; the concrete payload remains hash-bound. */
+  actionDescriptor?: ApprovalActionDescriptor;
+  source?: ApprovalRequestSource;
 }
 
 /**
@@ -74,6 +78,8 @@ export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGat
     payload: params.payload,
     draft: params.draft,
     trace: params.trace,
+    actionDescriptor: params.actionDescriptor,
+    source: params.source,
   });
 }
 

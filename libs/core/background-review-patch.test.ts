@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
@@ -11,6 +12,7 @@ import {
 import {
   applyBackgroundReviewPipelinePatch,
   applyBackgroundReviewSkillPatch,
+  applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
 } from './background-review-patch.js';
 import { approvalRequestLogicalPath, decideApprovalRequest } from './approval-store.js';
@@ -18,6 +20,7 @@ import { approvalRequestLogicalPath, decideApprovalRequest } from './approval-st
 const createdCandidateIds: string[] = [];
 const createdPipelineRefs: string[] = [];
 const createdSkillDirs: string[] = [];
+const createdMemoryRefs: string[] = [];
 const createdBackupRefs: string[] = [];
 const createdApprovalRefs: string[] = [];
 
@@ -64,12 +67,23 @@ function writeManagedSkill(suffix: string, registeredBy = 'operator-test'): stri
   return ref;
 }
 
+function writeMemoryNotebook(suffix: string): string {
+  const ref = `active/shared/runtime/session/background-review-memory-${process.pid}-${suffix}/MEMORY.md`;
+  const absolute = pathResolver.rootResolve(ref);
+  createdMemoryRefs.push(ref);
+  withExecutionContext('ecosystem_architect', () => {
+    safeMkdir(path.dirname(absolute), { recursive: true });
+    safeWriteFile(absolute, '# Memory\n\n- (2026-08-01) Old fact\n- (2026-08-02) Keep fact\n');
+  });
+  return ref;
+}
+
 function saveProposal(input: {
   candidateId: string;
   targetRef: string;
   patch: Record<string, unknown>;
   origin?: string;
-  action?: 'pipeline_proposal' | 'skill_patch';
+  action?: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
 }) {
   const action = input.action || 'pipeline_proposal';
   const record = createDistillCandidateRecord({
@@ -129,6 +143,10 @@ afterEach(() => {
     }
     for (const dir of createdSkillDirs.splice(0)) {
       safeRmSync(dir, { recursive: true, force: true });
+    }
+    for (const ref of createdMemoryRefs.splice(0)) {
+      safeRmSync(pathResolver.rootResolve(ref), { force: true });
+      safeRmSync(path.dirname(pathResolver.rootResolve(ref)), { recursive: true, force: true });
     }
     for (const ref of createdBackupRefs.splice(0)) {
       safeRmSync(pathResolver.rootResolve(ref), { force: true });
@@ -326,6 +344,37 @@ describe('background-review-patch', () => {
       })
     ).toThrow(/provenance sidecar/);
     expect(safeReadFile(pathResolver.rootResolve(ref), { encoding: 'utf8' })).toBe(before);
+  });
+
+  it('applies an approved memory consolidation patch with a hash-bound backup', () => {
+    const ref = writeMemoryNotebook('success');
+    const absolute = pathResolver.rootResolve(ref);
+    const before = String(safeReadFile(absolute, { encoding: 'utf8' }));
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-MEMORY-SUCCESS`,
+      targetRef: ref,
+      action: 'memory_consolidation',
+      patch: {
+        operation: 'apply_consolidation',
+        actions: [{ kind: 'delete', index: 1 }],
+      },
+    });
+
+    const result = applyBackgroundReviewMemoryConsolidationPatch({
+      candidateId: candidate.candidate_id,
+      expectedSha256: createHash('sha256').update(before).digest('hex'),
+      approvedBy: 'operator-test',
+      approvalRef: approvePatch(candidate.candidate_id, before),
+    });
+    createdBackupRefs.push(result.backup_ref);
+
+    expect(String(safeReadFile(absolute, { encoding: 'utf8' }))).not.toContain('Old fact');
+    expect(String(safeReadFile(absolute, { encoding: 'utf8' }))).toContain('Keep fact');
+    expect(loadDistillCandidateRecord(candidate.candidate_id)).toMatchObject({
+      status: 'promoted',
+      promoted_ref: ref,
+      metadata: { patch_application: { operation: 'apply_consolidation' } },
+    });
   });
 
   it('rejects duplicate sections and bundled skill paths', () => {

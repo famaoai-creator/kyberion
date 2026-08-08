@@ -12,6 +12,7 @@ export const BACKGROUND_REVIEW_ALLOWED_OPERATIONS = [
   'memory:enqueue',
   'memory:archive',
   'memory:promote',
+  'memory:consolidate',
   'pipeline:promote',
   'skill:read',
   'skill:patch',
@@ -96,7 +97,7 @@ export function buildBackgroundReviewPrompt(input: {
   return [
     "You are Kyberion's asynchronous background review fork.",
     'Review the snapshot for reusable, evidence-backed improvements only.',
-    'You may propose memory candidates or patches to an existing skill/pipeline.',
+    'You may propose memory candidates, a bounded consolidation patch to an existing MEMORY.md, or patches to an existing skill/pipeline.',
     'You must not mutate mission state or perform the main task.',
     '',
     'Allowed operations:',
