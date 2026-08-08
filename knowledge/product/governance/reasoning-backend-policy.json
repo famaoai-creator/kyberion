@@ -123,6 +123,10 @@
       "mode": "grok-cli"
     },
     {
+      "provider": "claude",
+      "mode": "claude-cli"
+    },
+    {
       "provider": "copilot",
       "mode": "copilot"
     }

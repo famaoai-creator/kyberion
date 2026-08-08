@@ -153,6 +153,37 @@ describe('reasoning-backend', () => {
     expect(calls).toEqual(['primary', 'primary', 'primary', 'fallback']);
   });
 
+  it('fails over after a provider-local authentication failure', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'unauthenticated-primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('primary');
+            throw new Error('authentication failed: invalid api key');
+          },
+        },
+      },
+      {
+        label: 'healthy-fallback',
+        provider: 'agy',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('fallback');
+            return 'served by fallback';
+          },
+        },
+      },
+    ]);
+
+    await expect(backend.prompt('hello')).resolves.toBe('served by fallback');
+    expect(calls).toEqual(['primary', 'fallback']);
+  });
+
   it('retries transient generateWithTools failures in place before demoting', async () => {
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
     clearProviderHealth();

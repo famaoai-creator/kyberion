@@ -9,7 +9,7 @@ describe('reasoning failure taxonomy', () => {
       allowFailover: true,
     });
   });
-  it('stops policy and credential failures instead of silently resending data', () => {
+  it('stops policy failures but fails over provider-local credential failures', () => {
     expect(classifyReasoningFailure(new Error('egress policy denied'))).toMatchObject({
       class: 'policy',
       retryable: false,
@@ -17,7 +17,7 @@ describe('reasoning failure taxonomy', () => {
     });
     expect(
       classifyReasoningFailure(new Error('authentication failed: invalid api key'))
-    ).toMatchObject({ class: 'auth', retryable: false, allowFailover: false });
+    ).toMatchObject({ class: 'auth', retryable: false, allowFailover: true, demoteProvider: true });
   });
   it('allows capability and capacity failures to select a compatible candidate', () => {
     expect(
@@ -34,5 +34,16 @@ describe('reasoning failure taxonomy', () => {
         new Error('[codex-cli] structured query failed: [codex-cli] timed out after 120000ms')
       )
     ).toMatchObject({ class: 'transient', retryable: false, allowFailover: true });
+  });
+
+  it('fails over immediately when the Claude agent session is unavailable', () => {
+    expect(
+      classifyReasoningFailure(new Error('claude-agent unavailable: no active session'))
+    ).toMatchObject({
+      class: 'transient',
+      retryable: false,
+      allowFailover: true,
+      demoteProvider: true,
+    });
   });
 });

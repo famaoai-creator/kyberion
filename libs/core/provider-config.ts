@@ -37,32 +37,32 @@ const ajv = new Ajv({ allErrors: true });
 const FALLBACK: ProviderConfigFile = {
   default_priority: ['gemini', 'claude', 'codex', 'grok', 'copilot'],
   default_models: {
-    gemini: 'gemini-3.5-flash',
-    claude: 'claude-fable-5',
-    agy: 'Gemini 3.5 Flash (Medium)',
+    gemini: 'gemini-3.6-flash',
+    claude: 'claude-opus-4-8',
+    agy: 'Gemini 3.6 Flash (Medium)',
     codex: 'gpt-5.6-sol',
     grok: 'grok-4.5',
-    copilot: 'claude-sonnet-4-6',
+    copilot: 'auto',
   },
   runtime_defaults: {
-    'anthropic-default': 'claude-fable-5',
+    'anthropic-default': 'claude-opus-4-8',
     'anthropic-fast': 'claude-haiku-4-5-20251001',
-    'gemini-default': 'gemini-3.5-flash',
+    'gemini-default': 'gemini-3.6-flash',
     'gemini-fast': 'gemini-3.1-flash-lite',
     'openai-vision': 'gpt-5.5',
     'codex-default': 'gpt-5.6-sol',
-    'copilot-default': 'claude-sonnet-4-6',
+    'copilot-default': 'auto',
   },
   lifecycle: {
     gemini: {
       boot_command: 'gemini',
       boot_args: ['--acp', '-y'],
-      default_model: 'gemini-3.5-flash',
+      default_model: 'gemini-3.6-flash',
     },
     copilot: {
       boot_command: 'gh',
       boot_args: ['copilot', '--', '--acp', '--allow-all'],
-      default_model: 'claude-sonnet-4-6',
+      default_model: 'auto',
     },
   },
 };
