@@ -21,6 +21,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.mode_aliases.grok).toBe('grok-cli');
     expect(policy.mode_aliases['grok-build']).toBe('grok-cli');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('grok-cli');
+    expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('claude-cli');
     expect(policy.openrouter).toEqual({
       default_profile: 'free-router',
       default_cost_policy: 'free-only',

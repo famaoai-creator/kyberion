@@ -2102,6 +2102,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PROVIDER_CAPABILITY_REFRESH",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Force a provider capability re-probe and reasoning backend re-selection",
+      "documented": true
+    },
+    {
       "name": "KYBERION_PROVIDER_CAPABILITY_ROUTING",
       "category": "runtime",
       "type": "string",

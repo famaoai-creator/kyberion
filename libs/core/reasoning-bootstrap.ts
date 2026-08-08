@@ -27,8 +27,10 @@
  *     OpenRouter model policy; paid inference requires an explicit
  *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
- *     then `agy-cli`. The legacy `gemini-cli` adapter remains available for
- *     explicit / Enterprise configurations but is not auto-selected.
+ *     then the governed provider fallback chain, which includes authenticated
+ *     Claude CLI, AGY, Grok, and Copilot when each is available. The legacy
+ *     `gemini-cli` adapter remains available for explicit / Enterprise
+ *     configurations but is not auto-selected.
  *
  * Override explicitly via env var to pin behavior:
  *   KYBERION_REASONING_BACKEND=codex-cli       (recommended in the Codex
@@ -115,8 +117,12 @@ import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
 import { discoverReasoningEndpoints } from './reasoning-endpoint-discovery.js';
-import { peekProviderCapabilityRegistry } from './provider-capability-registry.js';
+import {
+  loadProviderCapabilityRegistry,
+  peekProviderCapabilityRegistry,
+} from './provider-capability-registry.js';
 import { resolveProviderDecision } from './capability-broker.js';
+import { auditChain } from './audit-chain.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModeFromPolicy,
@@ -134,6 +140,11 @@ export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
+let lastBrokerSelection: {
+  resolvedMode: ReasoningBackendMode;
+  provider: string;
+  pinned: boolean;
+} | null = null;
 
 export function normalizeReasoningBackendMode(mode: ReasoningBackendMode): ReasoningBackendMode {
   return normalizeReasoningBackendModeFromPolicy(mode, loadReasoningBackendPolicy());
@@ -291,7 +302,11 @@ function buildReasoningRuntimeBundle(
       };
     }
     case 'gemini-api': {
-      const geminiBackend = buildGeminiApiBackendFromEnv(process.env, options.model);
+      const geminiBackend = buildGeminiApiBackendFromEnv(
+        process.env,
+        options.model,
+        options.samplingParams
+      );
       if (!geminiBackend && !options.force) return null;
       if (!geminiBackend) return null;
       return {
@@ -631,14 +646,45 @@ function filterChainByProviderCapability(
       );
       return false;
     }
-    if (capability.authenticated === false) {
+    // An auth probe failure is not a durable negative fact. For example,
+    // `gh auth status` can briefly fail while the keyring refreshes, and the
+    // persisted snapshot may remain inside its TTL after authentication has
+    // recovered. Keep the candidate in that case and let the runtime
+    // provider-local auth classification fail over to the next candidate.
+    if (capability.authenticated === false && !capability.probe_error) {
       logger.info(
         `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports authenticated=false (probed_at=${capability.probed_at})`
       );
       return false;
     }
+    if (capability.authenticated === false && capability.probe_error) {
+      logger.warn(
+        `[reasoning-bootstrap] retaining candidate mode=${candidate.mode} provider=${provider}: authentication probe errored; treating snapshot as uncertain (probed_at=${capability.probed_at})`
+      );
+    }
     return true;
   });
+}
+
+function shouldRefreshCapabilityRegistry(options: InstallReasoningOptions): boolean {
+  return (
+    options.refreshProviders === true || process.env.KYBERION_PROVIDER_CAPABILITY_REFRESH === '1'
+  );
+}
+
+function refreshCapabilityRegistryIfRequested(options: InstallReasoningOptions): void {
+  if (!shouldRefreshCapabilityRegistry(options)) return;
+  if (process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING === '0') return;
+  try {
+    const snapshot = loadProviderCapabilityRegistry({ forceRefresh: true });
+    logger.info(
+      `[reasoning-bootstrap] refreshed provider-capability-registry for selection (${snapshot.length} provider(s))`
+    );
+  } catch (error) {
+    logger.warn(
+      `[reasoning-bootstrap] provider-capability-registry refresh skipped (non-fatal): ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function buildReasoningRuntimeChain(
@@ -733,6 +779,7 @@ export function consultCapabilityBrokerForMode(
   resolvedMode: ReasoningBackendMode
 ): ReasoningBackendMode {
   if (resolvedMode === 'stub') return resolvedMode;
+  lastBrokerSelection = null;
   try {
     const decision = resolveProviderDecision({
       decisionKey: 'reasoning-backend',
@@ -745,8 +792,18 @@ export function consultCapabilityBrokerForMode(
           `[reasoning-bootstrap] capability-broker pin overrides mode ${resolvedMode} → ${decision.provider}`
         );
       }
+      lastBrokerSelection = {
+        resolvedMode,
+        provider: decision.provider,
+        pinned: true,
+      };
       return decision.provider as ReasoningBackendMode;
     }
+    lastBrokerSelection = {
+      resolvedMode,
+      provider: decision.provider,
+      pinned: false,
+    };
   } catch (err) {
     logger.warn(
       `[reasoning-bootstrap] capability-broker consult skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`
@@ -757,14 +814,28 @@ export function consultCapabilityBrokerForMode(
 
 /**
  * Install a real reasoning + intent + voice backend. Returns true when a
- * non-stub mode installed; false when the stubs remain. Idempotent.
+ * non-stub mode installed; false when the stubs remain. Idempotent unless an
+ * explicit provider refresh requests a re-selection.
  */
 export function installReasoningBackends(options: InstallReasoningOptions = {}): boolean {
-  if (installed) return installedMode !== 'stub';
+  const shouldReselect =
+    options.refreshProviders === true || process.env.KYBERION_PROVIDER_CAPABILITY_REFRESH === '1';
+  if (installed && !shouldReselect) return installedMode !== 'stub';
+  if (shouldReselect) {
+    installed = false;
+    installedMode = null;
+  }
   const result = _installReasoningBackendsCore(options);
   // Python voice bridge must wrap the mode-specific bridge registered above.
   installPythonVoiceBridgeIfAvailable();
   return result;
+}
+
+/** Re-resolve provider availability and rebuild the reasoning chain in a long-lived process. */
+export function reselectReasoningBackends(
+  options: Omit<InstallReasoningOptions, 'refreshProviders'> = {}
+): boolean {
+  return installReasoningBackends({ ...options, refreshProviders: true });
 }
 
 /**
@@ -792,6 +863,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   initializeAdapterDefaultPreferences();
   const effectiveOptions = applyOperatorLlmSelection(options);
   const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
+  refreshCapabilityRegistryIfRequested(effectiveOptions);
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
   const shellSttInstalled =
@@ -841,6 +913,32 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   }
 
   const primaryMode = chain[0]!.mode;
+  const brokerSelection = lastBrokerSelection;
+  try {
+    auditChain.record({
+      agentId: process.env.MISSION_ROLE || 'reasoning-bootstrap',
+      action: 'reasoning_runtime_selection',
+      operation: `${primaryMode}/${chain[0]!.backend.label || primaryMode}`,
+      result: 'completed',
+      reason: brokerSelection
+        ? brokerSelection.pinned
+          ? 'pinned broker decision applied to runtime chain'
+          : 'policy/env mode retained; unpinned broker decision recorded but not applied'
+        : 'policy/env mode selected without a broker decision',
+      metadata: {
+        runtime_primary: primaryMode,
+        runtime_candidates: chain.map((candidate) => candidate.mode),
+        broker_provider: brokerSelection?.provider,
+        broker_resolved_mode: brokerSelection?.resolvedMode,
+        broker_pinned: brokerSelection?.pinned ?? false,
+        broker_decision_used: Boolean(
+          brokerSelection?.pinned && brokerSelection.provider === primaryMode
+        ),
+      },
+    });
+  } catch {
+    // Selection telemetry must never prevent backend installation.
+  }
   const governedFailoverPolicy = loadReasoningRoutePolicy().fallback;
   const defaultBackend = buildFailoverReasoningBackend(
     chain.map((candidate) => candidate.backend),
@@ -949,6 +1047,7 @@ export function installAnthropicBackendsIfAvailable(
 export function resetReasoningBootstrap(): void {
   installed = false;
   installedMode = null;
+  lastBrokerSelection = null;
 }
 
 /** Which mode was selected on the last successful install, or null. */

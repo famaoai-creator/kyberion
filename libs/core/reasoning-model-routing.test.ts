@@ -114,11 +114,11 @@ describe('reasoning-model-routing', () => {
   });
 
   it('centralizes runtime model defaults and respects env overrides', () => {
-    expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-fable-5');
-    expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.5-flash');
+    expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-opus-4-8');
+    expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.6-flash');
     expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
     expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.6-sol');
-    expect(resolveRuntimeModelId('copilot-default', {})).toBe('claude-sonnet-4-6');
+    expect(resolveRuntimeModelId('copilot-default', {})).toBe('auto');
 
     expect(
       resolveRuntimeModelId('anthropic-default', {
