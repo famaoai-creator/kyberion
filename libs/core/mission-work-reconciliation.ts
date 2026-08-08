@@ -93,6 +93,28 @@ export interface MissionWorkReconciliationResult {
   receipt_path?: string;
 }
 
+export interface MissionWorkReconciliationScaffold {
+  kind: 'mission-work-reconciliation-scaffold';
+  version: '1.0.0';
+  mission_id: string;
+  generated_at: string;
+  source: {
+    repository: string;
+    branch: string;
+    commit: string;
+  };
+  adopted_by: string;
+  reason: string;
+  tasks: Array<{
+    task_id: string;
+    description?: string;
+    acceptance_criteria: string[];
+    evidence: string[];
+    verification_command: string;
+  }>;
+  next_steps: string[];
+}
+
 interface PlannedTask extends Record<string, unknown> {
   task_id?: string;
   status?: string;
@@ -521,6 +543,84 @@ function readPlannedTasks(missionPath: string): PlannedTask[] {
   const tasks = readJson<unknown>(nodePath.join(missionPath, 'NEXT_TASKS.json'), 'NEXT_TASKS.json');
   if (!Array.isArray(tasks)) throw new Error('NEXT_TASKS.json must contain an array');
   return tasks.filter((entry): entry is PlannedTask => Boolean(entry && typeof entry === 'object'));
+}
+
+/**
+ * Create an operator-editable reconciliation scaffold from the current
+ * mission tasks and repository git state. The result is intentionally not a
+ * valid apply manifest until evidence hashes and verification results are
+ * filled in by the operator.
+ */
+export function generateMissionWorkReconciliationScaffold(input: {
+  missionId: string;
+  outputPath?: string;
+  reason?: string;
+}): MissionWorkReconciliationScaffold & { manifest_path: string } {
+  assertMissionControllerAuthority();
+  const missionId = input.missionId.trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9._-]+$/u.test(missionId)) {
+    throw new Error(`Invalid mission ID: ${input.missionId}`);
+  }
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) throw new Error(`Mission ${missionId} not found`);
+  const manifestPath = resolveInsideRoot(
+    input.outputPath || `active/shared/tmp/reconciliation-${missionId}.scaffold.json`,
+    'output'
+  );
+  const sharedTmpRoot = nodePath.resolve(pathResolver.rootResolve('active/shared/tmp'));
+  if (!isInside(sharedTmpRoot, manifestPath) && !isInside(missionPath, manifestPath)) {
+    throw new Error('output must remain under active/shared/tmp or the mission-local directory.');
+  }
+  const repository = pathResolver.rootDir();
+  const branch =
+    process.env.GITHUB_HEAD_REF?.trim() ||
+    process.env.GITHUB_REF_NAME?.trim() ||
+    (() => {
+      try {
+        return safeExec('git', ['branch', '--show-current'], { cwd: repository }).trim();
+      } catch {
+        return '';
+      }
+    })();
+  const commit =
+    (() => {
+      try {
+        return safeExec('git', ['rev-parse', 'HEAD'], { cwd: repository }).trim();
+      } catch {
+        return '';
+      }
+    })() ||
+    process.env.GITHUB_SHA?.trim() ||
+    '';
+  if (!branch || !commit) throw new Error('Unable to resolve repository branch and commit');
+  const tasks = readPlannedTasks(missionPath);
+  const scaffold: MissionWorkReconciliationScaffold = {
+    kind: 'mission-work-reconciliation-scaffold',
+    version: '1.0.0',
+    mission_id: missionId,
+    generated_at: new Date().toISOString(),
+    source: { repository: '.', branch, commit },
+    adopted_by: process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller',
+    reason: input.reason || `Adopt verified existing work for ${missionId}.`,
+    tasks: tasks.map((task) => ({
+      task_id: String(task.task_id || ''),
+      ...(task.description ? { description: task.description } : {}),
+      acceptance_criteria: Array.isArray(task.acceptance_criteria)
+        ? task.acceptance_criteria.map(String)
+        : [],
+      evidence: [],
+      verification_command: '',
+    })),
+    next_steps: [
+      'Fill each task evidence path and SHA-256 hash.',
+      'Map every acceptance criterion to evidence_refs.',
+      'Record a passed verification command and evidence_refs.',
+      'Change kind to mission-work-reconciliation and run --dry-run before apply.',
+    ],
+  };
+  safeMkdir(nodePath.dirname(manifestPath), { recursive: true });
+  safeWriteFile(manifestPath, JSON.stringify(scaffold, null, 2));
+  return { ...scaffold, manifest_path: pathResolver.toRepoRelative(manifestPath) };
 }
 
 export async function reconcileMissionExistingWork(input: {

@@ -54,6 +54,12 @@ vi.mock('./provider-capability-registry.js', () => ({
 }));
 
 describe('reasoning-bootstrap', () => {
+  function expectCodexExcludedFallback(): void {
+    const selectedMode = getInstalledReasoningMode();
+    expect(selectedMode).not.toBe('codex-cli');
+    expect(['claude-cli', 'grok-cli', 'agy-cli', 'copilot']).toContain(selectedMode);
+  }
+
   // Isolate resolution from the harness host env: when this suite runs *inside* a
   // Claude Code session, the ambient CLAUDECODE would otherwise trigger the
   // claude-agent host-detection rule and pollute provider-fallback assertions.
@@ -293,15 +299,13 @@ describe('reasoning-bootstrap', () => {
         },
       ]);
 
-      // Fallback order is [codex-cli, agy-cli]; both always build a candidate
-      // (buildAgyCliBackendFromEnv never returns null), so codex-cli would be
-      // primary today. With codex excluded for authenticated=false, agy-cli
-      // must become primary.
+      // The governed fallback order is host-dependent: Claude is preferred,
+      // but CI may not have the local Claude binary and can legitimately use
+      // the next installed CLI candidate.
       const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
 
       expect(installed).toBe(true);
-      expect(getInstalledReasoningMode()).toBe('agy-cli');
-      expect(getReasoningBackend().name).toBe('agy-cli');
+      expectCodexExcludedFallback();
       expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('excluding candidate mode=codex-cli provider=codex')
       );
@@ -385,7 +389,7 @@ describe('reasoning-bootstrap', () => {
       const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
 
       expect(installed).toBe(true);
-      expect(getInstalledReasoningMode()).toBe('agy-cli');
+      expectCodexExcludedFallback();
     });
 
     it('the KYBERION_PROVIDER_CAPABILITY_ROUTING=0 kill-switch restores fail-open behavior', () => {

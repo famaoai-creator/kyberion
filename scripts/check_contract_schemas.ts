@@ -725,6 +725,7 @@ function createChecks(): ContractCheck[] {
             primary_domain: 'Software Engineering',
             vision: 'Build a high-fidelity Kyberion environment.',
             agent_id: 'KYBERION-PRIME',
+            persona: 'sovereign',
           },
           services: {
             candidates: [
@@ -990,6 +991,7 @@ function createChecks(): ContractCheck[] {
           summary: 'Project schema validation fixture.',
           status: 'active',
           tier: 'confidential',
+          tenant_slug: 'schema-tenant',
           primary_locale: 'ja-JP',
           service_bindings: ['BIND-schema-1'],
           default_track_id: 'TRK-schema-1',

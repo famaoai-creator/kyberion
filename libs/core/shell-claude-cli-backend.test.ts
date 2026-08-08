@@ -3,7 +3,9 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import {
   buildShellClaudeCliBackendFromEnv,
+  isClaudeCliPlaceholderFailure,
   probeShellClaudeCliAvailability,
+  resolveClaudeCliFallbackCandidates,
   ShellClaudeCliBackend,
 } from './shell-claude-cli-backend.js';
 
@@ -71,6 +73,87 @@ describe('shell-claude-cli-backend', () => {
 
     expect(probe.available).toBe(false);
     expect(probe.reason).toBeTruthy();
+  });
+
+  describe('LC-03 placeholder shadowing fallback', () => {
+    afterEach(() => {
+      spawnMock.mockClear();
+    });
+
+    it('recognizes the pnpm placeholder failure signature', () => {
+      expect(isClaudeCliPlaceholderFailure('Error: claude native binary not installed.')).toBe(
+        true
+      );
+      expect(isClaudeCliPlaceholderFailure('Claude Native Binary NOT Installed')).toBe(true);
+      expect(isClaudeCliPlaceholderFailure('command not found')).toBe(false);
+      expect(isClaudeCliPlaceholderFailure(undefined)).toBe(false);
+    });
+
+    it('resolves fallback candidates deterministically, excluding node_modules/.bin PATH entries', () => {
+      const existing = new Set([
+        '/home/op/.local/bin/claude',
+        '/usr/local/bin/claude',
+        '/extra/tools/claude',
+      ]);
+      const candidates = resolveClaudeCliFallbackCandidates({
+        env: {
+          PATH: [
+            '/repo/node_modules/.bin',
+            '/extra/tools',
+            '/home/op/.local/bin', // duplicate of the well-known entry
+            '',
+          ].join(':'),
+        } as NodeJS.ProcessEnv,
+        home: '/home/op',
+        exists: (candidate) => existing.has(candidate),
+      });
+
+      expect(candidates).toEqual([
+        '/home/op/.local/bin/claude',
+        '/usr/local/bin/claude',
+        '/extra/tools/claude',
+      ]);
+      expect(candidates).not.toContain('/repo/node_modules/.bin/claude');
+    });
+
+    it('returns no candidates when nothing exists on disk', () => {
+      expect(
+        resolveClaudeCliFallbackCandidates({
+          env: { PATH: '/a:/b' } as NodeJS.ProcessEnv,
+          home: '/home/op',
+          exists: () => false,
+        })
+      ).toEqual([]);
+    });
+
+    it('buildShellClaudeCliBackendFromEnv uses the probe-selected fallback binary', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = buildShellClaudeCliBackendFromEnv({} as NodeJS.ProcessEnv, () => ({
+        available: true,
+        bin: '/home/op/.local/bin/claude',
+      }));
+
+      expect(backend).not.toBeNull();
+      await backend!.delegateTask('do the thing');
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [spawnedBin] = spawnMock.mock.calls[0];
+      expect(spawnedBin).toBe('/home/op/.local/bin/claude');
+    });
+
+    it('an explicit KYBERION_CLAUDE_CLI_BIN wins over the probe-selected binary', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = buildShellClaudeCliBackendFromEnv(
+        { KYBERION_CLAUDE_CLI_BIN: '/pinned/claude' } as NodeJS.ProcessEnv,
+        () => ({ available: true, bin: '/home/op/.local/bin/claude' })
+      );
+
+      expect(backend).not.toBeNull();
+      await backend!.delegateTask('do the thing');
+      const [spawnedBin] = spawnMock.mock.calls[0];
+      expect(spawnedBin).toBe('/pinned/claude');
+    });
   });
 
   describe('spawnCli env allowlisting (XP-02)', () => {
