@@ -328,6 +328,12 @@
       "note": "project-os fallback output; project-scoped artifact"
     },
     {
+      "file": "scripts/install_chronos_launchd.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "launchd plist staging before governed copy into ~/Library/LaunchAgents"
+    },
+    {
       "file": "scripts/refactor/ephemeral-actuator-call.ts",
       "count": 1,
       "classification": "legit-tmp",

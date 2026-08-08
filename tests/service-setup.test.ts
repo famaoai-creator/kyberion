@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual as any,
+    ...(actual as any),
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
     inspectServiceAuth: mocks.inspectServiceAuth,
     logger: mocks.logger,
@@ -78,16 +78,26 @@ describe('services_setup', () => {
     });
     mocks.overlayCandidates.mockImplementation((subPath: string) => {
       if (subPath.includes('slack.json')) {
-        return { overlay: '/tmp/kyberion/customer/acme/connections/slack.json', base: '/tmp/kyberion/knowledge/personal/connections/slack.json' };
+        return {
+          overlay: '/tmp/kyberion/customer/acme/connections/slack.json',
+          base: '/tmp/kyberion/knowledge/personal/connections/slack.json',
+        };
       }
-      return { overlay: '/tmp/kyberion/customer/acme/connections/github.json', base: '/tmp/kyberion/knowledge/personal/connections/github.json' };
+      return {
+        overlay: '/tmp/kyberion/customer/acme/connections/github.json',
+        base: '/tmp/kyberion/knowledge/personal/connections/github.json',
+      };
     });
     mocks.resolveOverlay.mockImplementation((subPath: string) => {
-      if (subPath.includes('slack.json')) return '/tmp/kyberion/customer/acme/connections/slack.json';
-      if (subPath.includes('github.json')) return '/tmp/kyberion/customer/acme/connections/github.json';
+      if (subPath.includes('slack.json'))
+        return '/tmp/kyberion/customer/acme/connections/slack.json';
+      if (subPath.includes('github.json'))
+        return '/tmp/kyberion/customer/acme/connections/github.json';
       return null;
     });
-    mocks.safeExistsSync.mockImplementation((p: string) => p === '/tmp/kyberion/customer/acme/connections/slack.json');
+    mocks.safeExistsSync.mockImplementation(
+      (p: string) => p === '/tmp/kyberion/customer/acme/connections/slack.json'
+    );
 
     const result = await setupServices();
 
@@ -103,12 +113,15 @@ describe('services_setup', () => {
       auth: 'missing',
       connection: 'customer',
     });
-    expect(result.rows[0].nextAction?.suggested_command).toBe('pnpm services:setup');
+    expect(result.rows[0].nextAction?.suggested_command).toBeUndefined();
+    expect(result.rows[0].nextAction?.suggested_followup_request).toContain('SLACK_ACCESS_TOKEN');
     expect(result.rows[1]).toMatchObject({
       service: 'github',
       auth: 'ready',
       connection: 'missing',
     });
-    expect(result.rows[1].nextAction?.suggested_command).toBe('pnpm services:setup');
+    expect(result.rows[1].nextAction?.suggested_command).toBe(
+      'pnpm onboard -- --services-only --service github'
+    );
   });
 });
