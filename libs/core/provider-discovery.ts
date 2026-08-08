@@ -10,6 +10,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
 
 /**
  * Provider Discovery v1.0
@@ -301,7 +302,21 @@ function checkGemini(): ProviderInfo {
 
 function checkClaude(): ProviderInfo {
   const which = run('which', ['claude']);
-  if (!which.ok)
+  // Use --version only — honor the same placeholder fallback as the runtime
+  // shell backend so provider health and backend selection agree.
+  let command: string | undefined = which.ok ? 'claude' : undefined;
+  let ver = command ? run(command, ['--version']) : { ok: false, stdout: '' };
+  if (!ver.ok) {
+    for (const candidate of resolveClaudeCliFallbackCandidates()) {
+      const fallback = run(candidate, ['--version']);
+      if (fallback.ok) {
+        command = candidate;
+        ver = fallback;
+        break;
+      }
+    }
+  }
+  if (!ver.ok) {
     return {
       provider: 'claude',
       installed: false,
@@ -310,10 +325,7 @@ function checkClaude(): ProviderInfo {
       models: [],
       healthy: false,
     };
-
-  // Use --version only — probeShellClaudeCliAvailability() makes a live LLM call
-  // which is too expensive for discovery. Credential validity is checked at use-time.
-  const ver = run('claude', ['--version']);
+  }
   const entry = capabilityEntryFor('claude');
   return {
     provider: 'claude',

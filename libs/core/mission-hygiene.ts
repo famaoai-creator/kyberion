@@ -4,6 +4,11 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
+import { loadOrganizationProfile } from './organization-profile.js';
+import {
+  enqueueOrganizationLearningCandidate,
+  type OrganizationTier,
+} from './organization-operating-model.js';
 
 /**
  * Mission hygiene — handling for missions that never actually started.
@@ -14,23 +19,28 @@ import { notifyOperator } from './operator-notifications.js';
  * that population VISIBLE and ACTIONABLE without auto-mutating anything:
  * deterministic classification of why each planned mission is stuck, a
  * per-mission recommended command, and an operator notification for the
- * stale tail. Cancelling/starting stays a human decision via
- * mission_controller (bounded-loop philosophy: detect → recommend →
- * escalate, never silently repair).
+ * stale tail and queues a governed organization-learning candidate. Cancelling
+ * or starting stays a human decision via mission_controller (bounded-loop
+ * philosophy: detect → recommend → escalate, never silently repair).
  */
 
 export type PlannedMissionReason =
   | 'design_missing' // no NEXT_TASKS.json (or empty) — nothing to execute yet
   | 'ready_not_started' // tasks exist but nothing was ever dispatched
-  | 'awaiting_gate'; // gates defined but none passed (activation never ran)
+  | 'awaiting_gate' // gates defined but none passed (activation never ran)
+  | 'active_stale'
+  | 'distilling_stale';
 
 export interface PlannedMissionFinding {
   mission_id: string;
   tier: string;
+  organization_id?: string;
+  tenant_slug?: string;
   age_days: number | null;
   reason: PlannedMissionReason;
   task_count: number;
   recommendation: string;
+  lifecycle_status?: string;
 }
 
 export interface MissionHygieneReport {
@@ -38,6 +48,8 @@ export interface MissionHygieneReport {
   planned_total: number;
   stale: PlannedMissionFinding[];
   abandoned: PlannedMissionFinding[];
+  active_stale?: PlannedMissionFinding[];
+  distilling_stale?: PlannedMissionFinding[];
   thresholds: { stale_days: number; abandoned_days: number };
 }
 
@@ -85,6 +97,33 @@ function missionAgeDays(history: Array<{ ts?: string }> | undefined): number | n
   return Math.floor((Date.now() - created) / (24 * 60 * 60 * 1000));
 }
 
+function scopedMissionFields(state: {
+  organization_id?: unknown;
+  tenant_slug?: unknown;
+  context?: unknown;
+}): Pick<PlannedMissionFinding, 'organization_id' | 'tenant_slug'> {
+  const context =
+    state.context && typeof state.context === 'object'
+      ? (state.context as Record<string, unknown>)
+      : {};
+  const organizationId =
+    typeof state.organization_id === 'string' && state.organization_id.trim()
+      ? state.organization_id.trim()
+      : typeof context.organization_id === 'string' && context.organization_id.trim()
+        ? context.organization_id.trim()
+        : undefined;
+  const tenantSlug =
+    typeof state.tenant_slug === 'string' && state.tenant_slug.trim()
+      ? state.tenant_slug.trim()
+      : typeof context.tenant_slug === 'string' && context.tenant_slug.trim()
+        ? context.tenant_slug.trim()
+        : undefined;
+  return {
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+  };
+}
+
 function classifyPlanned(missionPath: string): {
   reason: PlannedMissionReason;
   task_count: number;
@@ -126,21 +165,51 @@ export function collectMissionHygieneReport(
   const abandonedDays = options.abandonedDays ?? 14;
   const stale: PlannedMissionFinding[] = [];
   const abandoned: PlannedMissionFinding[] = [];
+  const activeStale: PlannedMissionFinding[] = [];
+  const distillingStale: PlannedMissionFinding[] = [];
   let plannedTotal = 0;
 
   for (const { missionPath, tier } of listMissionDirs()) {
     const state = readJson<{
       mission_id?: string;
       status?: string;
+      organization_id?: string;
+      tenant_slug?: string;
+      context?: Record<string, unknown>;
       history?: Array<{ ts?: string }>;
     }>(path.join(missionPath, 'mission-state.json'));
-    if (!state?.mission_id || state.status !== 'planned') continue;
+    if (!state?.mission_id) continue;
+    const status = String(state.status || '');
+    if (status === 'active' || status === 'distilling') {
+      const ageDays = missionAgeDays(state.history);
+      if (ageDays !== null && ageDays >= staleDays) {
+        const tasks =
+          readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+        const distilling = status === 'distilling';
+        const finding: PlannedMissionFinding = {
+          mission_id: state.mission_id,
+          tier,
+          ...scopedMissionFields(state),
+          age_days: ageDays,
+          reason: distilling ? 'distilling_stale' : 'active_stale',
+          task_count: tasks.length,
+          lifecycle_status: status,
+          recommendation: distilling
+            ? `distilling が ${staleDays}日以上継続。レビュー/finish を確認: pnpm mission-controller finish ${state.mission_id}`
+            : `active が ${staleDays}日以上継続。checkpoint と残タスクを確認: pnpm mission-controller status ${state.mission_id}`,
+        };
+        (distilling ? distillingStale : activeStale).push(finding);
+      }
+      continue;
+    }
+    if (status !== 'planned') continue;
     plannedTotal += 1;
     const ageDays = missionAgeDays(state.history);
     const classified = classifyPlanned(missionPath);
     const finding: PlannedMissionFinding = {
       mission_id: state.mission_id,
       tier,
+      ...scopedMissionFields(state),
       age_days: ageDays,
       ...classified,
     };
@@ -155,8 +224,88 @@ export function collectMissionHygieneReport(
     planned_total: plannedTotal,
     stale: stale.sort(byAge),
     abandoned: abandoned.sort(byAge),
+    active_stale: activeStale.sort(byAge),
+    distilling_stale: distillingStale.sort(byAge),
     thresholds: { stale_days: staleDays, abandoned_days: abandonedDays },
   };
+}
+
+function learningTier(tier: string): OrganizationTier {
+  return tier === 'confidential' || tier === 'public' || tier === 'personal' ? tier : 'personal';
+}
+
+function enqueueMissionHygieneLearning(actionable: PlannedMissionFinding[]): void {
+  const profileOrganizationId = loadOrganizationProfile()?.organization_id;
+  const defaultOrganizationId = profileOrganizationId || 'default';
+  const groups = new Map<
+    string,
+    {
+      organizationId: string;
+      tier: OrganizationTier;
+      tenantSlug?: string;
+      findings: PlannedMissionFinding[];
+    }
+  >();
+
+  for (const finding of actionable) {
+    const tier = learningTier(finding.tier);
+    const tenantSlug = finding.tenant_slug?.trim() || undefined;
+    // A confidential candidate without a tenant scope cannot be safely
+    // placed. Keep the detection visible in the operator alert, but do not
+    // downgrade it into a lower-tier organization record.
+    if (tier === 'confidential' && !tenantSlug) {
+      logger.warn(
+        `[mission-hygiene] skipped learning enqueue for ${finding.mission_id}: confidential tenant scope is missing`
+      );
+      continue;
+    }
+    const organizationId = finding.organization_id || defaultOrganizationId;
+    const key = `${organizationId}:${tier}:${tenantSlug || 'shared'}`;
+    const group = groups.get(key);
+    if (group) group.findings.push(finding);
+    else
+      groups.set(key, {
+        organizationId,
+        tier,
+        ...(tenantSlug ? { tenantSlug } : {}),
+        findings: [finding],
+      });
+  }
+
+  const generatedAt = new Date().toISOString();
+  const day = generatedAt.slice(0, 10);
+  for (const group of groups.values()) {
+    const scope = group.tenantSlug || 'shared';
+    const learningId = `mission-hygiene-${day}-${group.tier}-${scope}`.replace(
+      /[^A-Za-z0-9._-]/g,
+      '-'
+    );
+    try {
+      enqueueOrganizationLearningCandidate({
+        learningId,
+        organizationId: group.organizationId,
+        sourceType: 'routine_exception',
+        sourceRef: `mission-hygiene:${day}:${group.organizationId}:${group.tier}:${scope}`,
+        title: `Mission hygiene requires review (${group.findings.length})`,
+        summary: `${group.findings.length} stale or abandoned mission(s) exceeded the hygiene threshold. Decide whether to resume, cancel, or archive them.`,
+        evidenceRefs: group.findings
+          .slice(0, 100)
+          .map((finding) => `mission:${finding.mission_id}`),
+        targetKind: 'sop_candidate',
+        tier: group.tier,
+        ...(group.tenantSlug ? { tenantSlug: group.tenantSlug } : {}),
+        metadata: {
+          generated_at: generatedAt,
+          findings: group.findings.length,
+          reasons: [...new Set(group.findings.map((finding) => finding.reason))],
+        },
+      });
+    } catch (error) {
+      logger.warn(
+        `[mission-hygiene] learning enqueue failed for ${group.organizationId}/${group.tier}/${scope}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 /**
@@ -165,20 +314,31 @@ export function collectMissionHygieneReport(
  * remediation command. Never mutates mission state.
  */
 export async function notifyMissionHygiene(report: MissionHygieneReport): Promise<boolean> {
-  const actionable = [...report.abandoned, ...report.stale];
+  const actionable = [
+    ...report.abandoned,
+    ...report.stale,
+    ...(report.active_stale || []),
+    ...(report.distilling_stale || []),
+  ];
   if (actionable.length === 0) return false;
+  enqueueMissionHygieneLearning(actionable);
   const top = actionable.slice(0, 10);
   const lines = top.map(
     (finding) =>
       `- ${finding.mission_id} (${finding.age_days ?? '?'}日, ${finding.reason}): ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
   );
   sendOpsAlert({
-    severity: report.abandoned.length > 0 ? 'warning' : 'info',
-    title: `未開始ミッションが滞留しています (planned ${report.planned_total} 件中、要対応 ${actionable.length} 件)`,
+    severity:
+      report.abandoned.length > 0 || (report.distilling_stale || []).length > 0
+        ? 'warning'
+        : 'info',
+    title: `ミッション衛生の要対応が ${actionable.length} 件あります (planned ${report.planned_total} 件)`,
     context: {
       planned_total: report.planned_total,
       stale: report.stale.length,
       abandoned: report.abandoned.length,
+      active_stale: report.active_stale?.length || 0,
+      distilling_stale: report.distilling_stale?.length || 0,
       top: top.map((finding) => finding.mission_id),
     },
     recommendation: lines.join('\n'),
@@ -204,6 +364,11 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
 
 /** One-line summary for doctor/baseline surfaces. */
 export function formatMissionHygieneLine(report: MissionHygieneReport): string {
-  if (report.planned_total === 0) return 'Mission hygiene: no planned missions waiting';
-  return `Mission hygiene: ${report.planned_total} planned (stale>${report.thresholds.stale_days}d: ${report.stale.length}, abandoned>${report.thresholds.abandoned_days}d: ${report.abandoned.length}) — pnpm mission-controller hygiene`;
+  if (
+    report.planned_total === 0 &&
+    (report.active_stale?.length || 0) === 0 &&
+    (report.distilling_stale?.length || 0) === 0
+  )
+    return 'Mission hygiene: no stale missions waiting';
+  return `Mission hygiene: ${report.planned_total} planned (stale>${report.thresholds.stale_days}d: ${report.stale.length}, active: ${report.active_stale?.length || 0}, distilling: ${report.distilling_stale?.length || 0}, abandoned>${report.thresholds.abandoned_days}d: ${report.abandoned.length}) — pnpm mission-controller hygiene`;
 }

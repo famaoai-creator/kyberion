@@ -5,7 +5,8 @@
     "interaction_style": "Minimalist",
     "primary_domain": "Kyberion operations",
     "vision": "Start small, validate quickly, and expand only after the baseline is healthy.",
-    "agent_id": "KYBERION-PRIME"
+    "agent_id": "KYBERION-PRIME",
+    "persona": "sovereign"
   },
   "tenants": [
     {

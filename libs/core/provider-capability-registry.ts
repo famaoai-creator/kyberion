@@ -32,6 +32,10 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
+import {
+  isClaudeCliPlaceholderFailure,
+  resolveClaudeCliFallbackCandidates,
+} from './claude-cli-resolution.js';
 import * as path from 'node:path';
 
 export interface ProviderCapability {
@@ -177,7 +181,8 @@ function probeSingleProvider(
   providerId: string,
   exec: ProbeExecFn,
   timeoutMs: number,
-  probedAt: string
+  probedAt: string,
+  claudeFallbackCandidates: () => string[]
 ): ProviderCapability {
   const spec = PROVIDER_PROBE_TABLE[providerId];
   if (!spec) {
@@ -193,7 +198,22 @@ function probeSingleProvider(
     };
   }
 
-  const versionResult = runProbe(exec, spec.binaryCommand, spec.binaryArgs, timeoutMs);
+  let binaryCommand = spec.binaryCommand;
+  let versionResult = runProbe(exec, binaryCommand, spec.binaryArgs, timeoutMs);
+  if (
+    providerId === 'claude' &&
+    !versionResult.ok &&
+    isClaudeCliPlaceholderFailure(versionResult.stderr)
+  ) {
+    for (const candidate of claudeFallbackCandidates()) {
+      const fallbackResult = runProbe(exec, candidate, spec.binaryArgs, timeoutMs);
+      if (fallbackResult.ok) {
+        binaryCommand = candidate;
+        versionResult = fallbackResult;
+        break;
+      }
+    }
+  }
   const binaryFound = versionResult.ok;
 
   let authenticated: boolean | 'unknown' = 'unknown';
@@ -203,7 +223,7 @@ function probeSingleProvider(
     authenticated = false;
     probeError = versionResult.stderr.trim() || `${spec.binaryCommand} probe failed (non-fatal)`;
   } else if (spec.authCommand && spec.authArgs) {
-    const authResult = runProbe(exec, spec.authCommand, spec.authArgs, timeoutMs);
+    const authResult = runProbe(exec, binaryCommand, spec.authArgs, timeoutMs);
     authenticated = providerId === 'claude' ? isClaudeCliAuthenticated(authResult) : authResult.ok;
     if (!authenticated) {
       probeError = authResult.stderr.trim() || `${spec.authCommand} auth probe reported failure`;
@@ -230,6 +250,8 @@ export interface ProbeProviderCapabilitiesOptions {
   timeoutMs?: number;
   /** Injectable clock for deterministic `probed_at` in tests. */
   now?: () => Date;
+  /** Injectable Claude fallback resolver for hermetic tests. */
+  resolveClaudeCliFallbackCandidates?: () => string[];
 }
 
 /**
@@ -246,10 +268,12 @@ export function probeProviderCapabilities(
   const providerIds = opts.providerIds ?? Object.keys(PROVIDER_PROBE_TABLE);
   const now = opts.now ?? (() => new Date());
   const probedAt = now().toISOString();
+  const claudeFallbackCandidates =
+    opts.resolveClaudeCliFallbackCandidates ?? (() => resolveClaudeCliFallbackCandidates());
 
   return providerIds.map((providerId) => {
     try {
-      return probeSingleProvider(providerId, exec, timeoutMs, probedAt);
+      return probeSingleProvider(providerId, exec, timeoutMs, probedAt, claudeFallbackCandidates);
     } catch (err) {
       // Belt-and-braces: probeSingleProvider already catches exec errors,
       // but nothing about the probe path may ever throw out to the caller.

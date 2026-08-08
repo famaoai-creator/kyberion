@@ -4,12 +4,19 @@ import {
   buildNextAction,
   formatNextAction,
   inspectServiceAuth,
+  loadNotificationPreferences,
   loadServiceEndpointsCatalog,
   logger,
+  resolveOperatorNotificationRoute,
+  resolveOpsAlertChannelStatus,
+  isServiceConnectionReady,
+  requiredServiceConnectionKeys,
   safeExistsSync,
+  safeReadFile,
 } from '@agent/core';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
+import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report.js';
 
 type ServiceSetupRow = {
@@ -19,6 +26,8 @@ type ServiceSetupRow = {
   preset: string;
   connection: 'customer' | 'personal' | 'missing';
   connectionPath: string;
+  connectionReady: boolean;
+  connectionRequiredKeys: string[];
   secrets: string;
   cli: string;
   hint: string;
@@ -36,88 +45,186 @@ function setupRowPriority(row: Pick<ServiceSetupRow, 'auth' | 'connection' | 'se
 
 function sortServiceSetupRows(rows: ServiceSetupRow[]): ServiceSetupRow[] {
   return rows
-    .map((row) => ({ ...row, priority: setupRowPriority(row) } as RankedServiceSetupRow))
+    .map((row) => ({ ...row, priority: setupRowPriority(row) }) as RankedServiceSetupRow)
     .sort((a, b) => a.priority - b.priority || a.service.localeCompare(b.service))
     .map(({ priority: _priority, ...row }) => row);
 }
 
-function inspectConnection(serviceId: string): { connection: 'customer' | 'personal' | 'missing'; connectionPath: string } {
-  const overlayPath = customerResolver.resolveOverlay(path.join('connections', `${serviceId}.json`));
-  const candidates = customerResolver.overlayCandidates(path.join('connections', `${serviceId}.json`));
-  if (overlayPath && safeExistsSync(overlayPath) && candidates.overlay && overlayPath === candidates.overlay) {
-    return { connection: 'customer', connectionPath: overlayPath };
+function inspectConnection(serviceId: string): {
+  connection: 'customer' | 'personal' | 'missing';
+  connectionPath: string;
+  connectionReady: boolean;
+  connectionRequiredKeys: string[];
+} {
+  const overlayPath = customerResolver.resolveOverlay(
+    path.join('connections', `${serviceId}.json`)
+  );
+  const candidates = customerResolver.overlayCandidates(
+    path.join('connections', `${serviceId}.json`)
+  );
+  const requiredKeys = requiredServiceConnectionKeys(serviceId);
+  const inspectFile = (filePath: string): boolean => {
+    if (!safeExistsSync(filePath)) return false;
+    if (requiredKeys.length === 0) return true;
+    try {
+      const record = JSON.parse(
+        String(safeReadFile(filePath, { encoding: 'utf8' }) ?? '')
+      ) as Record<string, unknown>;
+      return isServiceConnectionReady(serviceId, record);
+    } catch {
+      return false;
+    }
+  };
+  if (
+    overlayPath &&
+    safeExistsSync(overlayPath) &&
+    candidates.overlay &&
+    overlayPath === candidates.overlay
+  ) {
+    return {
+      connection: 'customer',
+      connectionPath: overlayPath,
+      connectionReady: inspectFile(overlayPath),
+      connectionRequiredKeys: requiredKeys,
+    };
   }
   if (safeExistsSync(candidates.base)) {
-    return { connection: 'personal', connectionPath: candidates.base };
+    return {
+      connection: 'personal',
+      connectionPath: candidates.base,
+      connectionReady: inspectFile(candidates.base),
+      connectionRequiredKeys: requiredKeys,
+    };
   }
-  return { connection: 'missing', connectionPath: candidates.overlay ?? candidates.base };
+  return {
+    connection: 'missing',
+    connectionPath: candidates.overlay ?? candidates.base,
+    connectionReady: false,
+    connectionRequiredKeys: requiredKeys,
+  };
+}
+
+// LC-02b: ops alerts are recorded to a JSONL nobody reads unless a delivery
+// channel exists — surface that gap in the same inspection table operators
+// already look at, with the exact env var to set.
+function inspectOpsAlertChannel(): ReturnType<typeof resolveOpsAlertChannelStatus> {
+  const prefs = loadNotificationPreferences();
+  const opsAlertRoute = resolveOperatorNotificationRoute('ops_alert', prefs);
+  return resolveOpsAlertChannelStatus({
+    operatorRouteConfigured: Boolean(opsAlertRoute && opsAlertRoute !== 'mute'),
+  });
+}
+
+export function buildServiceConnectionSetupCommand(serviceId: string): string {
+  return `pnpm onboard -- --services-only --service ${serviceId}`;
+}
+
+export function buildServiceAuthNextAction(
+  serviceId: string,
+  auth: { setupHint: string; oauthAvailable?: boolean; requiredSecrets: string[] }
+): ReturnType<typeof buildNextAction> {
+  return buildNextAction({
+    title: `Fix service auth for ${serviceId}`,
+    reason: auth.setupHint,
+    next_action_type: 'bootstrap_environment',
+    ...(auth.oauthAvailable
+      ? {
+          suggested_command: `KYBERION_OAUTH_SERVICE_ID=${serviceId} node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts`,
+        }
+      : {
+          suggested_followup_request: `Store one of ${auth.requiredSecrets.join(', ') || 'the required service credentials'} through Secret Guard, then rerun pnpm services:setup.`,
+        }),
+  });
 }
 
 export async function setupServices(options: { quiet?: boolean } = {}) {
   const catalog = loadServiceEndpointsCatalog();
-  const rows = sortServiceSetupRows(Object.entries(catalog.services).map(([serviceId, record]) => {
-    const auth = record.preset_path ? inspectServiceAuth(serviceId, record.preset_path) : null;
-    const connection = inspectConnection(serviceId);
-    return {
-      service: serviceId,
-      auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
-      strategy: auth?.authStrategy || record.auth_strategy || 'host-managed',
-      preset: record.preset_path || '',
-      connection: connection.connection,
-      connectionPath: connection.connectionPath,
-      secrets: auth?.requiredSecrets.join(', ') || '',
-      cli: auth?.cliFallbacks.join(', ') || '',
-      hint: auth?.setupHint || 'Host-managed service or no preset path.',
-      nextAction:
-        auth && !auth.valid
-          ? buildNextAction({
-              title: `Fix service auth for ${serviceId}`,
-              reason: auth.setupHint,
-              next_action_type: 'bootstrap_environment',
-              suggested_command: 'pnpm services:setup',
-            })
-          : connection.connection === 'missing'
-            ? buildNextAction({
-                title: `Add connection file for ${serviceId}`,
-                reason: `Missing connection file at ${connection.connectionPath}.`,
-                next_action_type: 'inspect_artifact',
-                suggested_command: 'pnpm services:setup',
-              })
-            : undefined,
-    };
-  }));
+  const rows = withSensitivePathMediation(() =>
+    sortServiceSetupRows(
+      Object.entries(catalog.services).map(([serviceId, record]) => {
+        const auth = record.preset_path ? inspectServiceAuth(serviceId, record.preset_path) : null;
+        const connection = inspectConnection(serviceId);
+        return {
+          service: serviceId,
+          auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+          strategy: auth?.authStrategy || record.auth_strategy || 'host-managed',
+          preset: record.preset_path || '',
+          connection: connection.connection,
+          connectionPath: connection.connectionPath,
+          connectionReady: connection.connectionReady,
+          connectionRequiredKeys: connection.connectionRequiredKeys,
+          secrets: auth?.requiredSecrets.join(', ') || '',
+          cli: auth?.cliFallbacks.join(', ') || '',
+          hint: auth?.setupHint || 'Host-managed service or no preset path.',
+          nextAction:
+            auth && !auth.valid
+              ? buildServiceAuthNextAction(serviceId, auth)
+              : connection.connection === 'missing' || !connection.connectionReady
+                ? buildNextAction({
+                    title: `Complete connection for ${serviceId}`,
+                    reason:
+                      connection.connection === 'missing'
+                        ? `Missing connection file at ${connection.connectionPath}.`
+                        : `Connection is missing one of: ${connection.connectionRequiredKeys.join(', ')}.`,
+                    next_action_type: 'inspect_artifact',
+                    suggested_command: buildServiceConnectionSetupCommand(serviceId),
+                  })
+                : undefined,
+        };
+      })
+    )
+  );
 
-  const summary = rows.reduce((acc, row) => {
-    acc.total += 1;
-    if (row.auth === 'ready') acc.ready += 1;
-    if (row.auth === 'missing') acc.authMissing += 1;
-    if (row.connection === 'missing') acc.connectionMissing += 1;
-    if (row.connection === 'customer') acc.customerConnections += 1;
-    if (row.connection === 'personal') acc.personalConnections += 1;
-    return acc;
-  }, { total: 0, ready: 0, authMissing: 0, connectionMissing: 0, customerConnections: 0, personalConnections: 0 });
+  const summary = rows.reduce(
+    (acc, row) => {
+      acc.total += 1;
+      if (row.auth === 'ready') acc.ready += 1;
+      if (row.auth === 'missing') acc.authMissing += 1;
+      if (row.connection === 'missing') acc.connectionMissing += 1;
+      if (row.connection === 'customer') acc.customerConnections += 1;
+      if (row.connection === 'personal') acc.personalConnections += 1;
+      return acc;
+    },
+    {
+      total: 0,
+      ready: 0,
+      authMissing: 0,
+      connectionMissing: 0,
+      customerConnections: 0,
+      personalConnections: 0,
+    }
+  );
+
+  const opsAlertChannel = inspectOpsAlertChannel();
 
   if (!options.quiet) {
     console.log('');
-    console.log(formatSetupSummaryLine([
-      ['auth missing', summary.authMissing],
-      ['connections missing', summary.connectionMissing],
-      ['auth ready', summary.ready],
-      ['total', summary.total],
-    ]));
+    console.log(
+      formatSetupSummaryLine([
+        ['auth missing', summary.authMissing],
+        ['connections missing', summary.connectionMissing],
+        ['auth ready', summary.ready],
+        ['total', summary.total],
+      ])
+    );
     const header = `${'SERVICE'.padEnd(20)} ${'AUTH'.padEnd(10)} ${'CONNECTION'.padEnd(12)} ${'STRATEGY'.padEnd(12)} ${'SECRETS'.padEnd(36)} CLI`;
     console.log(header);
     console.log('-'.repeat(header.length + 8));
     for (const row of rows) {
       const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
-      const connectionSymbol = row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
+      const connectionSymbol =
+        row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
       console.log(
-        `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
+        `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
       );
-      if (row.auth === 'missing' || row.connection === 'missing') {
+      if (row.auth === 'missing' || row.connection === 'missing' || !row.connectionReady) {
         console.log(formatSetupHintLine(row.hint));
-        if (row.connection === 'missing') {
-          console.log(formatSetupHintLine(`Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`));
+        if (row.connection === 'missing' || !row.connectionReady) {
+          console.log(
+            formatSetupHintLine(
+              `Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`
+            )
+          );
         }
         if (row.nextAction) {
           for (const line of formatNextAction(row.nextAction)) {
@@ -127,6 +234,15 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
       }
     }
     console.log('');
+    if (!opsAlertChannel.configured) {
+      console.log('⚠️  OPS ALERTS: no delivery channel configured — alerts and operator');
+      console.log('   notifications are recorded to active/shared/observability/ops-alerts.jsonl');
+      console.log('   but NEVER delivered to you.');
+      console.log(`   Fix: export ${opsAlertChannel.env_var}=<webhook url>`);
+      console.log('   (or configure knowledge/personal/notification-preferences.json), then');
+      console.log('   run `pnpm ops:alerts -- --redeliver` to flush the backlog.');
+      console.log('');
+    }
   }
 
   return {
@@ -134,6 +250,7 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
     catalogPath: 'knowledge/product/orchestration/service-endpoints.json',
     rows,
     summary,
+    opsAlertChannel,
   };
 }
 

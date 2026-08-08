@@ -40,6 +40,7 @@ export interface ServiceAuthInspection {
   foundSecrets: string[];
   missingSecrets: string[];
   cliFallbacks: string[];
+  oauthAvailable?: boolean;
   setupHint: string;
 }
 
@@ -126,6 +127,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       foundSecrets: [],
       missingSecrets: [],
       cliFallbacks: [],
+      oauthAvailable: false,
       setupHint: 'No preset found; this surface is host-managed or uses a non-service auth path.',
     };
   }
@@ -134,6 +136,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
     const presetRaw = safeReadFile(resolvedPresetPath, { encoding: 'utf8' }) as string;
     const preset = JSON.parse(presetRaw);
     const presetPolicy = getServicePresetPolicy(preset);
+    const oauthAvailable = Boolean(preset.oauth && typeof preset.oauth === 'object');
     const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();
     const presetSetupHint =
       typeof presetPolicy.setup_hint === 'string' && presetPolicy.setup_hint.trim().length > 0
@@ -175,6 +178,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         foundSecrets: [],
         missingSecrets: [],
         cliFallbacks,
+        oauthAvailable,
         setupHint:
           presetSetupHint ||
           (cliFallbacks.length > 0
@@ -194,6 +198,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         foundSecrets,
         missingSecrets,
         cliFallbacks,
+        oauthAvailable,
         setupHint: `Ready. Detected secrets: ${foundSecrets.join(', ')}`,
       };
     }
@@ -217,6 +222,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
           foundSecrets,
           missingSecrets,
           cliFallbacks,
+          oauthAvailable,
           setupHint: `CLI fallback available via ${bin}.`,
         };
       } catch (err) {
@@ -234,6 +240,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       foundSecrets,
       missingSecrets,
       cliFallbacks,
+      oauthAvailable,
       setupHint:
         presetSetupHint ||
         (requiredSecretNames.length > 0
@@ -251,6 +258,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       foundSecrets: [],
       missingSecrets: [],
       cliFallbacks: [],
+      oauthAvailable: false,
       setupHint: 'Check the preset path and service endpoint catalog.',
     };
   }

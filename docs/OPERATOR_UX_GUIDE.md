@@ -479,6 +479,22 @@ pnpm capabilities
 pnpm dashboard:onboarding
 ```
 
+### Organization operating model(組織・目標・サービスの登録)
+
+```bash
+KYBERION_PERSONA=sovereign pnpm organization init --organization-id <id> --name <名前> --tier confidential --tenant-slug <slug> --purpose "<目的>" --dry-run   # まず dry-run
+KYBERION_PERSONA=sovereign pnpm organization objective add --organization-id <id> --tier confidential --tenant-slug <slug> --objective-id obj-1 --title "<目標>" --apply
+KYBERION_PERSONA=sovereign pnpm organization domain add / service add / operation add ...   # 詳細は pnpm organization --help
+KYBERION_PERSONA=sovereign pnpm organization project attach --organization-id <id> --project-id PRJ-XXXX --apply
+KYBERION_PERSONA=sovereign pnpm organization status --organization-id <id> --tier confidential --tenant-slug <slug>
+```
+
+組織 state(`active/organizations/`)は必ずこの facade 経由で作成・変更する
+(JSON 手編集は不変条件違反)。各 authoring コマンドは `--dry-run` で保存前の
+レコードを確認でき、`--apply` で保存する。confidential tier は `--tenant-slug`
+必須。読み書きとも authority ゲートがあるため `KYBERION_PERSONA=sovereign` で
+実行する。`pnpm org` は別物(role/authority ツール)なので注意。
+
 ### Mission hygiene(未開始ミッションの整理)
 
 ```bash
@@ -554,12 +570,21 @@ $MC status MY-TASK
 $MC checkpoint MY-TASK step-1 "Progress note"
 $MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json --dry-run
 $MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json
+$MC reconcile-work MY-TASK --generate --output active/shared/tmp/reconciliation-MY-TASK.scaffold.json
 $MC verify MY-TASK verified "Verification summary"
 $MC finish MY-TASK
 ```
 
 Direct mission commands are for operators.
 They are not the primary UX you should teach first.
+
+`--generate` は現在のgit branch/commitと `NEXT_TASKS.json` から雛形を作る。雛形は
+意図的にapply不可なので、証跡のパス・SHA-256・検証結果を埋めてから次を実行する。
+
+```bash
+$MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json --dry-run
+$MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json
+```
 
 Normally, execute generated tasks with `dispatch-tickets` followed by
 `dispatch-workitems`. Use `reconcile-work` only when work was already completed
@@ -568,6 +593,11 @@ Mission tasks were dispatched. Start from
 `knowledge/product/schemas/mission-work-reconciliation.example.json` and map
 every task acceptance criterion to hash-bound Evidence plus a passed
 verification record.
+
+キュー投入やdispatchの役割を明示する必要がある場合は、実行主体に合わせて
+`MISSION_ROLE=mission_controller`（通常のmission制御）または
+`MISSION_ROLE=slack_bridge`（Slack bridgeが所有するenqueue）を設定する。
+役割を偽装して権限エラーを回避せず、失敗した場合は要求されたroleで再実行する。
 
 Reviewer/QA tasks additionally require one `kind: review` Evidence entry that
 is a JSON `artifact-review-receipt`. A Markdown review summary alone cannot

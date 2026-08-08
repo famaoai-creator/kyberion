@@ -5,6 +5,7 @@ import {
   nodeVersionSatisfiesFloor,
   parseEnginesNodeFloor,
   playwrightBrowsersDir,
+  probeExplicitReasoningBackend,
 } from './environment-capability-probes.js';
 import { probeManifest, type EnvironmentManifest } from './environment-capability.js';
 import * as pathResolver from './path-resolver.js';
@@ -86,6 +87,106 @@ describe('playwrightBrowsersDir', () => {
     const dir = playwrightBrowsersDir({});
     expect(path.basename(dir)).toBe('ms-playwright');
     expect(path.isAbsolute(dir)).toBe(true);
+  });
+});
+
+describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed specifically)', () => {
+  const binaryYes = () => true;
+  const binaryNo = () => false;
+
+  it('treats explicit stub as not-real with an actionable reason', async () => {
+    const result = await probeExplicitReasoningBackend('stub', {});
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('stub');
+    expect(result.reason).toContain('reasoning:setup');
+  });
+
+  it('anthropic requires ANTHROPIC_API_KEY', async () => {
+    await expect(
+      probeExplicitReasoningBackend('anthropic', { ANTHROPIC_API_KEY: 'k' })
+    ).resolves.toEqual({ available: true });
+    const missing = await probeExplicitReasoningBackend('anthropic', {});
+    expect(missing.available).toBe(false);
+    expect(missing.reason).toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('probes the shell runtime for explicit claude-cli even when an API key is present', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-cli',
+      { CLAUDE_API_KEY: 'not-a-shell-health-signal' },
+      { claudeProbe: () => ({ available: false, reason: 'placeholder CLI' }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('placeholder CLI');
+  });
+
+  it('does not treat an empty Claude API key as an available agent backend', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-agent',
+      { CLAUDE_API_KEY: '   ' },
+      { claudeProbe: () => ({ available: false, reason: 'not authenticated' }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('not authenticated');
+  });
+
+  it('probes the grok CLI for grok-cli and normalizes the grok alias', async () => {
+    const calls: Array<[string, readonly string[]]> = [];
+    const recordingProbe = (command: string, args: readonly string[]) => {
+      calls.push([command, args]);
+      return true;
+    };
+    await expect(
+      probeExplicitReasoningBackend('grok-cli', {}, { binaryProbe: recordingProbe })
+    ).resolves.toEqual({ available: true });
+    await expect(
+      probeExplicitReasoningBackend('grok', {}, { binaryProbe: recordingProbe })
+    ).resolves.toEqual({ available: true });
+    expect(calls).toEqual([
+      ['grok', ['--version']],
+      ['grok', ['--version']],
+    ]);
+
+    const down = await probeExplicitReasoningBackend('grok-cli', {}, { binaryProbe: binaryNo });
+    expect(down.available).toBe(false);
+    expect(down.reason).toContain('grok');
+  });
+
+  it('does not fall back to a different working backend when the selected one is down', async () => {
+    // codex selected but broken; the injected claude probe would succeed —
+    // the result must still be unavailable for the *selected* backend.
+    const result = await probeExplicitReasoningBackend(
+      'codex-cli',
+      {},
+      { binaryProbe: binaryNo, claudeProbe: () => ({ available: true }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('codex');
+  });
+
+  it('probes copilot through gh', async () => {
+    const calls: Array<[string, readonly string[]]> = [];
+    await probeExplicitReasoningBackend(
+      'copilot',
+      {},
+      {
+        binaryProbe: (command, args) => {
+          calls.push([command, args]);
+          return true;
+        },
+      }
+    );
+    expect(calls).toEqual([['gh', ['copilot', '--', '--help']]]);
+  });
+
+  it('rejects unknown backend modes with a catalog pointer', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'bogus-backend',
+      {},
+      { binaryProbe: binaryYes }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('reasoning-backend-policy.json');
   });
 });
 

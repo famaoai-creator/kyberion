@@ -11,6 +11,10 @@ import { pathResolver } from '../path-resolver.js';
 // Import types
 import type { Trace, TraceSpan } from './trace.js';
 import type { KnowledgeHint } from './knowledge-index.js';
+import { loadScheduleRegistry } from './pipeline-scheduler.js';
+import type { PipelineScheduleRegistry, PipelineSchedulerOptions } from './pipeline-scheduler.js';
+import { sendOpsAlert } from '../ops-alert.js';
+import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../ops-alert.js';
 
 const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
 const PIPELINE_SCHEDULE_REGISTRY_PATH = pathResolver.shared('runtime/pipeline-schedules.json');
@@ -55,18 +59,10 @@ export function extractHintsFromTrace(trace: Trace): KnowledgeHint[] {
       });
     }
 
-    // Extract successful patterns with artifacts (useful for future reference)
-    if (span.status === 'ok' && span.artifacts.length > 0) {
-      for (const artifact of span.artifacts) {
-        hints.push({
-          topic: `artifact ${sanitizeSpanName(span.name)}`,
-          hint: `Step "${sanitizeSpanName(span.name)}" produced a ${artifact.type} artifact. Review trace ${trace.traceId} for the governed artifact reference.`,
-          source: `trace/${trace.traceId}`,
-          confidence: 0.5,
-          tags: ['auto-generated', 'artifact', artifact.type],
-        });
-      }
-    }
+    // LC-15: a successful artifact fact is not a reusable lesson by itself.
+    // Do not persist the old low-signal "Step X produced a file artifact"
+    // template; meaningful success hints must come from an explicit category
+    // or a later quality signal rather than artifact existence alone.
 
     for (const child of span.children) {
       walkSpan(child, span.name);
@@ -178,6 +174,88 @@ export function checkScheduleHealth(
   } catch {
     return { healthy: true };
   }
+}
+
+/**
+ * LC-01c: one schedule entry currently in a failed state (failed last run,
+ * accumulating consecutive failures, or auto-disabled by checkScheduleHealth).
+ */
+export interface FailedScheduleFinding {
+  id: string;
+  name?: string;
+  enabled: boolean;
+  lastStatus?: string;
+  lastRun?: string;
+  consecutiveFailures: number;
+  disabledReason?: string;
+}
+
+/**
+ * LC-01c (pure): scan a schedule registry for schedules whose last result is
+ * `failed`, whose consecutiveFailures counter is non-zero, or which were
+ * auto-disabled. Read-only — never mutates the registry.
+ */
+export function collectFailedSchedules(
+  registry: PipelineScheduleRegistry
+): FailedScheduleFinding[] {
+  const findings: FailedScheduleFinding[] = [];
+  for (const schedule of registry.schedules ?? []) {
+    const raw = schedule as unknown as Record<string, unknown>;
+    const consecutiveFailures = Number(raw.consecutiveFailures ?? 0) || 0;
+    const disabledReason = typeof raw.disabledReason === 'string' ? raw.disabledReason : undefined;
+    const failedLastRun = schedule.lastStatus === 'failed';
+    const autoDisabled = !schedule.enabled && disabledReason !== undefined;
+    if (!failedLastRun && consecutiveFailures === 0 && !autoDisabled) continue;
+    findings.push({
+      id: schedule.id,
+      ...(schedule.name ? { name: schedule.name } : {}),
+      enabled: schedule.enabled,
+      ...(schedule.lastStatus ? { lastStatus: schedule.lastStatus } : {}),
+      ...(schedule.lastRun ? { lastRun: schedule.lastRun } : {}),
+      consecutiveFailures,
+      ...(disabledReason !== undefined ? { disabledReason } : {}),
+    });
+  }
+  return findings;
+}
+
+/**
+ * LC-01c: escalation sweep. checkScheduleHealth only runs from
+ * recordPipelineResult — i.e. only when a schedule actually fires — so a
+ * schedule stuck in `failed` (or a whole dead daemon) never escalates on its
+ * own. This sweep is called from the session-start baseline check: it is a
+ * read-only scan that emits ONE warn-level ops alert listing every failed
+ * schedule. It never disables anything beyond what checkScheduleHealth
+ * already did.
+ */
+export function sweepFailedSchedules(
+  options: {
+    registryOptions?: PipelineSchedulerOptions;
+    emitAlert?: (input: OpsAlertInput, alertOptions?: OpsAlertOptions) => OpsAlertReceipt;
+    alertOptions?: OpsAlertOptions;
+  } = {}
+): { failed: FailedScheduleFinding[]; alert: OpsAlertReceipt | null } {
+  const registry = loadScheduleRegistry(options.registryOptions);
+  const failed = collectFailedSchedules(registry);
+  if (failed.length === 0) return { failed, alert: null };
+  const emit = options.emitAlert ?? sendOpsAlert;
+  const alert = emit(
+    {
+      severity: 'warning',
+      category: 'scheduler',
+      title: `${failed.length} scheduled pipeline(s) in failed state`,
+      context: { failed_schedules: failed },
+      recommendation:
+        'Inspect the failing pipelines (lastStatus/consecutiveFailures above), fix the root cause, and re-enable any auto-disabled schedule in active/shared/runtime/pipeline-schedules.json.',
+      options: [
+        'pnpm ops:alerts  # triage the alert backlog',
+        'node dist/scripts/run_pipeline.js --input <pipelinePath>  # reproduce one failing run',
+      ],
+      dedupe_key: 'scheduler:failed-schedule-sweep',
+    },
+    options.alertOptions
+  );
+  return { failed, alert };
 }
 
 /**

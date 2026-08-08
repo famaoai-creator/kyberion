@@ -302,6 +302,35 @@ function parseIntentConfidence(value?: string): number {
   return confidence;
 }
 
+function assertMissionIdArgument(command: string | undefined, missionId: string | undefined): void {
+  const missionCommands = new Set([
+    'create',
+    'start',
+    'status',
+    'pause',
+    'cancel',
+    'finish',
+    'resume',
+    'verify',
+    'distill',
+    'dispatch-tickets',
+    'dispatch-workitems',
+    'reconcile-work',
+    'review-reenter',
+    'review-worker-output',
+  ]);
+  if (
+    command &&
+    missionCommands.has(command) &&
+    missionId &&
+    !/^[A-Za-z0-9][A-Za-z0-9._-]+$/u.test(missionId)
+  ) {
+    throw new Error(
+      `Invalid mission ID '${missionId}'. Use an ID containing only letters, numbers, '.', '_' or '-'.`
+    );
+  }
+}
+
 function summarizeIntentTrackGate(
   gate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null
 ): Record<string, unknown> | null {
@@ -430,6 +459,8 @@ export async function runMissionControllerAction(
   context: MissionControllerRoutingContext
 ): Promise<void> {
   const { action, arg1, arg2, arg3, arg4, hasDryRun, getOptionValue: getValue } = context;
+
+  assertMissionIdArgument(action, arg1);
 
   switch (action) {
     case 'create': {
@@ -612,7 +643,12 @@ export async function runMissionControllerAction(
         ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
       });
       console.log(formatMissionHygieneLine(report));
-      for (const finding of [...report.abandoned, ...report.stale]) {
+      for (const finding of [
+        ...report.abandoned,
+        ...report.stale,
+        ...(report.active_stale || []),
+        ...(report.distilling_stale || []),
+      ]) {
         console.log(
           `  [${finding.age_days ?? '?'}d] ${finding.mission_id} (${finding.reason}, tasks=${finding.task_count})`
         );
@@ -764,6 +800,16 @@ export async function runMissionControllerAction(
       break;
     }
     case 'reconcile-work': {
+      if (context.argv.includes('--generate')) {
+        const { generateMissionWorkReconciliationScaffold } = await import('@agent/core');
+        const scaffold = generateMissionWorkReconciliationScaffold({
+          missionId: arg1!,
+          outputPath: getValue('--output', context.argv),
+          reason: getValue('--reason', context.argv),
+        });
+        console.log(JSON.stringify(scaffold, null, 2));
+        break;
+      }
       const manifestPath = getValue('--manifest', context.argv);
       if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
       await context.reconcileExistingWork(arg1!, manifestPath, context.hasDryRun);

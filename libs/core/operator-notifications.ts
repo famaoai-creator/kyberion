@@ -144,7 +144,7 @@ function recordUndeliveredNotification(
   }
 }
 
-function resolveRoute(
+export function resolveOperatorNotificationRoute(
   event: OperatorEvent,
   prefs: NotificationPreferences
 ): NotificationChannelTarget | 'mute' | null {
@@ -153,7 +153,7 @@ function resolveRoute(
   return prefs.default_channel || null;
 }
 
-async function deliver(
+function deliver(
   route: NotificationChannelTarget,
   text: string,
   correlationId: string
@@ -186,6 +186,14 @@ export async function notifyOperator(
   event: OperatorEvent,
   payload: OperatorNotificationPayload
 ): Promise<boolean> {
+  return notifyOperatorSync(event, payload);
+}
+
+/** Synchronous delivery path used when a caller must return an honest receipt. */
+export function notifyOperatorSync(
+  event: OperatorEvent,
+  payload: OperatorNotificationPayload
+): boolean {
   // Tests exercising real mission flows must not pollute the operator's
   // real inbox/channels (81 phantom entries taught us this). Suites that
   // genuinely test delivery mock this module or set the override.
@@ -194,7 +202,7 @@ export async function notifyOperator(
   }
   try {
     const prefs = loadNotificationPreferences();
-    const route = resolveRoute(event, prefs);
+    const route = resolveOperatorNotificationRoute(event, prefs);
     if (route === 'mute') return false;
     if (!route) {
       recordUndeliveredNotification(event, payload, 'no_channel_configured');
@@ -202,7 +210,7 @@ export async function notifyOperator(
     }
     const dedupeKey = `${event}:${payload.correlation_id || payload.title}`;
     if (!shouldNotifyOperator(dedupeKey)) return false;
-    await deliver(
+    deliver(
       route,
       formatNotificationText(event, payload),
       payload.correlation_id || `notify:${event}:${Date.now().toString(36)}`

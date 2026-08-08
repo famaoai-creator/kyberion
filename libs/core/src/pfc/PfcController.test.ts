@@ -25,7 +25,7 @@ describe('PfcController - State Management', () => {
   it('should initialize with default state if no state file exists', () => {
     const controller = new PfcController(STATE_FILE);
     const state = controller.getState();
-    
+
     expect(state).toBeDefined();
     expect(state.layers).toBeDefined();
     expect(state.layers['L0']).toEqual({ status: 'pending', attempt_count: 0 });
@@ -33,7 +33,7 @@ describe('PfcController - State Management', () => {
 
   it('should track attempts and trigger circuit breaker after 3 failures', async () => {
     const controller = new PfcController(STATE_FILE);
-    
+
     // Simulate failing L0
     const failLogic = async () => false;
 
@@ -53,7 +53,7 @@ describe('PfcController - State Management', () => {
     expect(result3.passed).toBe(false);
     expect(result3.circuit_broken).toBe(true);
     expect(controller.getState().layers['L0'].status).toBe('failed');
-    
+
     // State should be persisted to file
     expect(fs.existsSync(STATE_FILE)).toBe(true);
     const savedState = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
@@ -62,17 +62,39 @@ describe('PfcController - State Management', () => {
 
   it('should reset attempt count and mark as passed if successful', async () => {
     const controller = new PfcController(STATE_FILE);
-    
+
     // Simulate failing first
     await controller.runLayer('L1', async () => false);
     expect(controller.getState().layers['L1'].attempt_count).toBe(1);
 
     // Simulate success
     const result = await controller.runLayer('L1', async () => true);
-    
+
     expect(result.passed).toBe(true);
     expect(result.circuit_broken).toBe(false);
     expect(controller.getState().layers['L1'].attempt_count).toBe(0);
     expect(controller.getState().layers['L1'].status).toBe('passed');
+  });
+
+  it('closes an open circuit when the layer recovers (probe on open circuit)', async () => {
+    const controller = new PfcController(STATE_FILE);
+    const failLogic = async () => false;
+    await controller.runLayer('L10', failLogic);
+    await controller.runLayer('L10', failLogic);
+    const broken = await controller.runLayer('L10', failLogic);
+    expect(broken.circuit_broken).toBe(true);
+
+    // Still broken: the probe runs but the circuit stays open without
+    // inflating attempt_count.
+    const stillBroken = await controller.runLayer('L10', failLogic);
+    expect(stillBroken.circuit_broken).toBe(true);
+    expect(controller.getState().layers['L10'].attempt_count).toBe(3);
+
+    // Recovered: the probe passes and the circuit closes.
+    const recovered = await controller.runLayer('L10', async () => true);
+    expect(recovered.passed).toBe(true);
+    expect(recovered.circuit_broken).toBe(false);
+    expect(controller.getState().layers['L10'].status).toBe('passed');
+    expect(controller.getState().layers['L10'].attempt_count).toBe(0);
   });
 });

@@ -22,19 +22,25 @@ import {
   loadProviderCapabilityRegistry,
   DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
   type ProviderCapability,
+  readDaemonHeartbeat,
+  loadScheduleRegistry,
+  matchesCron,
+  sendOpsAlert,
+  collectFailedSchedules,
+  sweepFailedSchedules,
+  enqueueOperationalLearningSignal,
+  loadNotificationPreferences,
+  resolveOperatorNotificationRoute,
+  resolveOpsAlertChannelStatus,
+  type DaemonHeartbeatStatus,
+  type ScheduledPipeline,
+  type FailedScheduleFinding,
+  type OpsAlertReceipt,
+  hasRequiredServiceConnectionValue,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
-
-function hasAnyKey(obj: Record<string, unknown>, keys: string[]): boolean {
-  return keys.some((key) => {
-    const value = obj[key];
-    return typeof value === 'string'
-      ? value.trim().length > 0
-      : value !== undefined && value !== null;
-  });
-}
 
 type ReadinessRule = {
   required_keys_any?: string[];
@@ -61,6 +67,207 @@ export const JANITOR_FRESHNESS_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 export function isJanitorMarkerFresh(lastRunMs: number | null, nowMs = Date.now()): boolean {
   return lastRunMs !== null && nowMs - lastRunMs <= JANITOR_FRESHNESS_MAX_AGE_MS;
 }
+
+// ---------------------------------------------------------------------------
+// LC-01a: scheduler liveness (L10). The chronos daemon is the only scheduler;
+// when it dies, 25 declared schedules silently stop firing and nothing else
+// in the system notices (checkScheduleHealth only runs from
+// recordPipelineResult, i.e. only when a schedule actually fires). The
+// baseline check is the one thing that reliably runs at session start, so
+// scheduler liveness degrades it to needs_attention — never fatal.
+// ---------------------------------------------------------------------------
+
+export const CHRONOS_DAEMON_ID = 'chronos-daemon';
+// The daemon ticks every 60s; 10 minutes is deliberately generous (10x tick)
+// so a slow tick or a single missed write never flaps the baseline.
+export const SCHEDULER_HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
+export const SCHEDULES_FIRING_WINDOW_MS = 24 * 60 * 60 * 1000;
+const SCHEDULER_ALERT_MARKER = 'runtime/state/scheduler-ops-alert-days.json';
+
+export interface SchedulerHealthCheck {
+  ok: boolean;
+  reason: string | null;
+}
+
+export interface SchedulerHealthReport {
+  enabled_schedule_count: number;
+  scheduler_alive: SchedulerHealthCheck;
+  schedules_firing: SchedulerHealthCheck & { due_in_window: number; last_run_in_window: number };
+  healthy: boolean;
+}
+
+export function schedulerHealthEvaluationFailure(reason: string): SchedulerHealthReport {
+  const detail = `scheduler health evaluation failed: ${reason}`;
+  return {
+    enabled_schedule_count: 0,
+    scheduler_alive: { ok: false, reason: detail },
+    schedules_firing: {
+      ok: false,
+      reason: detail,
+      due_in_window: 0,
+      last_run_in_window: 0,
+    },
+    healthy: false,
+  };
+}
+
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM means the pid exists but belongs to another user — still alive.
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Pure: would this cron expression have matched at least one minute within
+ * the trailing window ending at `now`? Minute-resolution scan (a 24h window
+ * is 1440 matchesCron calls — negligible for a health check).
+ */
+export function cronFiredWithinWindow(
+  cron: string,
+  timezone: string | undefined,
+  now: Date,
+  windowMs: number,
+  matcher: (cron: string, date: Date, timezone?: string) => boolean = matchesCron
+): boolean {
+  const cursor = new Date(now.getTime());
+  cursor.setSeconds(0, 0);
+  const floorMs = now.getTime() - windowMs;
+  while (cursor.getTime() >= floorMs) {
+    if (matcher(cron, cursor, timezone)) return true;
+    cursor.setMinutes(cursor.getMinutes() - 1);
+  }
+  return false;
+}
+
+/**
+ * Pure evaluation of the two L10 checks. Semantics:
+ * - A fresh environment with zero enabled schedules is HEALTHY regardless of
+ *   daemon state (nothing was promised, nothing is broken).
+ * - With >=1 enabled schedule, `scheduler_alive` requires a fresh heartbeat
+ *   whose pid is actually alive.
+ * - `schedules_firing` requires, when at least one enabled schedule was due
+ *   within the trailing 24h window, that at least one lastRun landed in that
+ *   window.
+ */
+export function evaluateSchedulerHealth(input: {
+  schedules: ScheduledPipeline[];
+  heartbeat: DaemonHeartbeatStatus;
+  pidAlive?: (pid: number) => boolean;
+  now: Date;
+  windowMs?: number;
+  cronFired?: (cron: string, timezone: string | undefined, now: Date, windowMs: number) => boolean;
+}): SchedulerHealthReport {
+  const windowMs = input.windowMs ?? SCHEDULES_FIRING_WINDOW_MS;
+  const pidAlive = input.pidAlive ?? isPidAlive;
+  const cronFired = input.cronFired ?? cronFiredWithinWindow;
+  const enabled = input.schedules.filter((schedule) => schedule.enabled);
+
+  if (enabled.length === 0) {
+    const reason = 'no enabled schedules registered';
+    return {
+      enabled_schedule_count: 0,
+      scheduler_alive: { ok: true, reason },
+      schedules_firing: { ok: true, reason, due_in_window: 0, last_run_in_window: 0 },
+      healthy: true,
+    };
+  }
+
+  let schedulerAlive: SchedulerHealthCheck = { ok: true, reason: null };
+  const heartbeat = input.heartbeat;
+  if (heartbeat.status !== 'healthy') {
+    schedulerAlive = {
+      ok: false,
+      reason: `heartbeat ${heartbeat.status}${heartbeat.reason ? `: ${heartbeat.reason}` : ''}`,
+    };
+  } else if (!heartbeat.heartbeat || !pidAlive(heartbeat.heartbeat.pid)) {
+    schedulerAlive = {
+      ok: false,
+      reason: `heartbeat pid ${heartbeat.heartbeat?.pid ?? 'unknown'} is not alive`,
+    };
+  }
+
+  const dueInWindow = enabled.filter((schedule) => {
+    if (schedule.trigger.type === 'cron') {
+      return schedule.trigger.cron
+        ? cronFired(schedule.trigger.cron, schedule.trigger.timezone, input.now, windowMs)
+        : false;
+    }
+    if (schedule.trigger.type === 'interval') {
+      const intervalMs = Number(schedule.trigger.intervalMs || 0);
+      return intervalMs > 0 && intervalMs <= windowMs;
+    }
+    return false;
+  }).length;
+  const lastRunInWindow = enabled.filter((schedule) => {
+    if (!schedule.lastRun) return false;
+    const lastRunMs = Date.parse(schedule.lastRun);
+    return Number.isFinite(lastRunMs) && input.now.getTime() - lastRunMs <= windowMs;
+  }).length;
+  const schedulesFiring =
+    dueInWindow === 0 || lastRunInWindow > 0
+      ? { ok: true, reason: null }
+      : {
+          ok: false,
+          reason: `${dueInWindow} enabled schedule(s) were due within the last 24h but none recorded a lastRun in that window`,
+        };
+
+  return {
+    enabled_schedule_count: enabled.length,
+    scheduler_alive: schedulerAlive,
+    schedules_firing: {
+      ...schedulesFiring,
+      due_in_window: dueInWindow,
+      last_run_in_window: lastRunInWindow,
+    },
+    healthy: schedulerAlive.ok && schedulesFiring.ok,
+  };
+}
+
+/**
+ * LC-01b (pure): day-level dedup gate for scheduler ops alerts. The baseline
+ * check runs hourly; without this gate a dead daemon would append 24 critical
+ * alerts a day. Marker maps alert key -> last emitted UTC day (YYYY-MM-DD).
+ */
+export function shouldEmitDailyOpsAlert(markerRaw: string | null, key: string, now: Date): boolean {
+  const today = now.toISOString().slice(0, 10);
+  if (!markerRaw) return true;
+  try {
+    const parsed = JSON.parse(markerRaw) as Record<string, unknown>;
+    return parsed?.[key] !== today;
+  } catch {
+    return true;
+  }
+}
+
+function readSchedulerAlertMarker(): string | null {
+  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    return safeReadFile(markerPath, { encoding: 'utf8' }) as string;
+  } catch {
+    return null;
+  }
+}
+
+function markSchedulerAlertDay(key: string, now: Date): void {
+  const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
+  let existing: Record<string, unknown> = {};
+  const raw = readSchedulerAlertMarker();
+  if (raw) {
+    try {
+      existing = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      existing = {};
+    }
+  }
+  existing[key] = now.toISOString().slice(0, 10);
+  safeWriteFile(markerPath, JSON.stringify(existing, null, 2));
+}
+
 let baselineConfigDegraded = false;
 
 type CachedEnvelope<T> = {
@@ -214,7 +421,9 @@ function checkServiceConnectionReadiness(
         if (Object.keys(connection).length === 0) return false;
 
         const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
-        if (requiredAny.length > 0 && !hasAnyKey(connection, requiredAny)) return false;
+        if (requiredAny.length > 0 && !hasRequiredServiceConnectionValue(connection, requiredAny)) {
+          return false;
+        }
       }
 
       if (readinessConfig.tenantGuard.requireZeroDrift) {
@@ -514,6 +723,129 @@ async function main() {
     );
   }
 
+  // LC-01a: scheduler liveness snapshot (feeds L10 below). Evaluation failure
+  // fails open with a warning — the read helpers themselves never throw, so
+  // this catch is belt-and-braces only, but it must fail closed: a scheduler
+  // state that cannot be evaluated is not evidence that the scheduler is
+  // healthy.
+  const schedulerNow = new Date();
+  let schedulerHeartbeat: DaemonHeartbeatStatus = {
+    daemon_id: CHRONOS_DAEMON_ID,
+    status: 'missing',
+    reason: 'not evaluated',
+  };
+  let schedulerHealth: SchedulerHealthReport = {
+    enabled_schedule_count: 0,
+    scheduler_alive: { ok: true, reason: 'not evaluated' },
+    schedules_firing: {
+      ok: true,
+      reason: 'not evaluated',
+      due_in_window: 0,
+      last_run_in_window: 0,
+    },
+    healthy: true,
+  };
+  let failedSchedules: FailedScheduleFinding[] = [];
+  try {
+    const scheduleRegistry = loadScheduleRegistry();
+    schedulerHeartbeat = readDaemonHeartbeat(CHRONOS_DAEMON_ID, {
+      staleAfterMs: SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+      now: schedulerNow,
+    });
+    schedulerHealth = evaluateSchedulerHealth({
+      schedules: scheduleRegistry.schedules,
+      heartbeat: schedulerHeartbeat,
+      now: schedulerNow,
+    });
+    failedSchedules = collectFailedSchedules(scheduleRegistry);
+  } catch (err: unknown) {
+    const reason = err instanceof Error ? err.message : String(err);
+    schedulerHeartbeat = {
+      daemon_id: CHRONOS_DAEMON_ID,
+      status: 'malformed',
+      reason: `scheduler health evaluation failed: ${reason}`,
+    };
+    schedulerHealth = schedulerHealthEvaluationFailure(reason);
+    logger.warn(`[BASELINE] scheduler health evaluation failed (non-fatal): ${reason}`);
+  }
+
+  // LC-01b/LC-01c: escalate via ops alerts with day-level dedup (the baseline
+  // runs hourly; one alert per class per UTC day). Hard-gated under vitest so
+  // test imports of this module never touch the real observability log.
+  const schedulerAlerts: {
+    scheduler_alive: OpsAlertReceipt | null;
+    failed_schedules: OpsAlertReceipt | null;
+  } = { scheduler_alive: null, failed_schedules: null };
+  if (!process.env.VITEST) {
+    try {
+      const markerRaw = readSchedulerAlertMarker();
+      if (
+        !schedulerHealth.scheduler_alive.ok &&
+        shouldEmitDailyOpsAlert(markerRaw, 'scheduler_alive', schedulerNow)
+      ) {
+        schedulerAlerts.scheduler_alive = sendOpsAlert({
+          severity: 'critical',
+          category: 'scheduler',
+          title: 'chronos scheduler daemon is not running — no schedules are firing',
+          context: {
+            reason: schedulerHealth.scheduler_alive.reason,
+            heartbeat: schedulerHeartbeat,
+            enabled_schedule_count: schedulerHealth.enabled_schedule_count,
+          },
+          recommendation:
+            'Restart the scheduler (`pnpm chronos`) or install the LaunchAgent so it survives reboots (`pnpm chronos:install`, then apply the printed launchctl steps).',
+          options: [
+            'pnpm chronos  # foreground restart',
+            'pnpm chronos:install  # print LaunchAgent install steps',
+            'pnpm daemon:watchdog -- --json  # confirm recovery',
+          ],
+          dedupe_key: 'scheduler:chronos-daemon-dead',
+        });
+        enqueueOperationalLearningSignal({
+          signalId: 'scheduler-daemon-dead',
+          sourceType: 'routine_exception',
+          sourceRef: `baseline:scheduler:${schedulerNow.toISOString().slice(0, 10)}`,
+          title: 'Chronos scheduler availability requires operational review',
+          summary:
+            'Baseline detected a stale or malformed Chronos heartbeat. Review the LaunchAgent/runtime path and confirm schedules resume before promoting a permanent runbook change.',
+          evidenceRefs: ['baseline-check:scheduler_alive'],
+          metadata: { heartbeat: schedulerHeartbeat },
+        });
+        markSchedulerAlertDay('scheduler_alive', schedulerNow);
+      }
+      if (
+        failedSchedules.length > 0 &&
+        shouldEmitDailyOpsAlert(markerRaw, 'failed_schedules', schedulerNow)
+      ) {
+        schedulerAlerts.failed_schedules = sweepFailedSchedules().alert;
+        enqueueOperationalLearningSignal({
+          signalId: 'scheduler-failed-schedules',
+          sourceType: 'routine_exception',
+          sourceRef: `baseline:failed-schedules:${schedulerNow.toISOString().slice(0, 10)}`,
+          title: 'Scheduled pipelines require failure review',
+          summary:
+            'Baseline found scheduled pipelines with failed or accumulating failure state. Inspect root causes and decide whether a governed runbook or schedule policy change is needed.',
+          evidenceRefs: failedSchedules.map((schedule) => `schedule:${schedule.id}`),
+          metadata: { failed_schedules: failedSchedules },
+        });
+        markSchedulerAlertDay('failed_schedules', schedulerNow);
+      }
+    } catch (err: any) {
+      logger.warn(
+        `[BASELINE] scheduler ops-alert escalation failed (non-fatal): ${err?.message ?? String(err)}`
+      );
+    }
+  }
+
+  // LC-01a (iii): warn-level (never blocks): is any ops-alert delivery
+  // channel configured? Without one, alerts land in the JSONL and nobody sees
+  // them (553 undelivered records taught us this).
+  const notificationPrefs = loadNotificationPreferences();
+  const opsAlertRoute = resolveOperatorNotificationRoute('ops_alert', notificationPrefs);
+  const opsAlertChannel = resolveOpsAlertChannelStatus({
+    operatorRouteConfigured: Boolean(opsAlertRoute && opsAlertRoute !== 'mute'),
+  });
+
   // L0: Physical Layer (CLI Tools)
   sentinel.registerLayer('L0', async () => {
     const res = await validateService({
@@ -586,6 +918,13 @@ async function main() {
   const nhiOrphans = listOrphanNhiIdentities();
   sentinel.registerLayer('L9', async () => nhiOrphans.length === 0);
 
+  // L10: Scheduler Layer (LC-01a) — chronos daemon liveness + schedules
+  // actually firing. Fails (→ needs_attention via deriveBaselineStatus) when
+  // enabled schedules exist but the daemon heartbeat is dead/stale or due
+  // schedules recorded no lastRun in 24h. A fresh environment with zero
+  // enabled schedules passes.
+  sentinel.registerLayer('L10', async () => schedulerHealth.healthy);
+
   const result = await sentinel.run();
   const state = sentinel.getState();
 
@@ -609,6 +948,25 @@ async function main() {
     reasoning_degraded: reasoningDegraded,
     warnings: {
       reasoning_failover: reasoningFailoverWarning(reasoningFailover),
+      // LC-01a (iii): warn-only, never a status input.
+      ops_alert_channel_configured: opsAlertChannel.configured
+        ? null
+        : `no ops-alert delivery channel configured — alerts are recorded to active/shared/observability/ops-alerts.jsonl but never delivered; set ${opsAlertChannel.env_var}=<webhook url> or configure knowledge/personal/notification-preferences.json (then run \`pnpm ops:alerts -- --redeliver\`)`,
+    },
+    // LC-01: scheduler liveness observation surface (L10).
+    scheduler: {
+      ...schedulerHealth,
+      heartbeat: {
+        status: schedulerHeartbeat.status,
+        age_ms: schedulerHeartbeat.age_ms ?? null,
+        pid: schedulerHeartbeat.heartbeat?.pid ?? null,
+        max_age_ms: SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+      },
+      failed_schedules: failedSchedules,
+      alerts: {
+        scheduler_alive: schedulerAlerts.scheduler_alive?.id ?? null,
+        failed_schedules: schedulerAlerts.failed_schedules?.id ?? null,
+      },
     },
     // XP-01: population job output — never consulted by deriveBaselineStatus,
     // purely observational (acceptance criterion 3: probe results surfaced

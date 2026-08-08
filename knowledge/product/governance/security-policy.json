@@ -236,6 +236,12 @@
       "allow_read": ["customer/"],
       "allow_write": ["customer/"]
     },
+    "run_baseline_check": {
+      "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+    },
+    "ops_alerts": {
+      "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+    },
     "run_pipeline": {
       "allow_read": ["knowledge/personal/voice/profile-registry.json"],
       "allow_write": [

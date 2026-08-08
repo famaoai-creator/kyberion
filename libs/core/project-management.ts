@@ -109,6 +109,8 @@ export interface ManagedProjectCreateInput {
   name: string;
   summary: string;
   tier: ProjectRecord['tier'];
+  organization_id?: string;
+  tenant_slug?: string;
   status?: ProjectRecord['status'];
   primary_locale?: string;
   project_path?: string;
@@ -257,15 +259,19 @@ export function ensureProjectOsScaffold(
   return targetDir;
 }
 
-export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
+export function buildManagedProjectRecord(input: ManagedProjectCreateInput): ProjectRecord {
   const projectId = normalizeId(input.project_id, 'project_id');
-  if (loadProjectRecord(projectId)) throw new Error(`Project already exists: ${projectId}`);
-  const record: ProjectRecord = {
+  if (input.tier === 'confidential' && !input.tenant_slug?.trim()) {
+    throw new Error(`tenant_slug is required for confidential project records (${projectId}).`);
+  }
+  return {
     project_id: projectId,
     name: normalizeId(input.name, 'name'),
     summary: normalizeId(input.summary, 'summary'),
     status: input.status || 'draft',
     tier: input.tier,
+    ...(input.organization_id ? { organization_id: input.organization_id } : {}),
+    ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
     ...(input.primary_locale ? { primary_locale: input.primary_locale } : {}),
     ...(input.project_path
       ? {
@@ -281,6 +287,12 @@ export function createManagedProject(input: ManagedProjectCreateInput): ProjectR
     ...(input.metadata ? { metadata: input.metadata } : {}),
     ...(input.pipeline_refs ? { pipeline_refs: sortedUnique(input.pipeline_refs) } : {}),
   };
+}
+
+export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
+  const projectId = normalizeId(input.project_id, 'project_id');
+  if (loadProjectRecord(projectId)) throw new Error(`Project already exists: ${projectId}`);
+  const record = buildManagedProjectRecord(input);
   saveProjectRecord(record);
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'project_controller',

@@ -56,6 +56,32 @@ describe('onboarding_apply', () => {
     ).toThrow('Invalid tenant_slug');
   });
 
+  it('accepts a catalog reasoning_backend and rejects unknown ones (LC-05)', () => {
+    expect(() =>
+      validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'claude-cli' })
+    ).not.toThrow();
+    // Aliases normalize through the policy catalog.
+    expect(() => validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'grok' })).not.toThrow();
+    expect(() => validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'bogus-backend' })).toThrow(
+      'Invalid reasoning_backend'
+    );
+  });
+
+  it('validates and persists a supported default persona (LC-07)', () => {
+    expect(() =>
+      validateInput({
+        ...FIXTURE_INPUT,
+        identity: { ...FIXTURE_INPUT.identity, persona: 'ecosystem_architect' },
+      })
+    ).not.toThrow();
+    expect(() =>
+      validateInput({
+        ...FIXTURE_INPUT,
+        identity: { ...FIXTURE_INPUT.identity, persona: 'not-a-persona' as never },
+      })
+    ).toThrow('persona must be one of');
+  });
+
   it('points missing identity files to the onboarding template', async () => {
     await expect(readInput('knowledge/public/templates/onboarding/missing.json')).rejects.toThrow(
       TEMPLATE_PATH
@@ -113,6 +139,7 @@ describe('onboarding_apply', () => {
     expect(state.reasoning.mode).toBe('real_backend_detected');
     expect(state.tenants.entries).toHaveLength(1);
     expect(state.identity.agent_id).toBe('agent-001');
+    expect(state.identity.persona).toBe('sovereign');
   });
 
   it('builds a human-friendly apply summary', () => {
