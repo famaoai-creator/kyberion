@@ -545,6 +545,28 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 
 async function finishMission(id: string, seal: boolean = false) {
   const result = await missionLifecycleService.finish(id, seal);
+  const finalState = loadState(id.toUpperCase());
+  const archivedPath = path.join(pathResolver.active('archive/missions'), id.toUpperCase());
+  const finishReason = String(
+    (finalState?.context as Record<string, unknown> | undefined)?.mission_finish_gate_last_reason ||
+      ''
+  );
+  if (
+    (finalState && finalState.status !== 'archived') ||
+    (!finalState && !safeExistsSync(archivedPath))
+  ) {
+    console.error(
+      JSON.stringify({
+        status: 'blocked',
+        mission_id: id.toUpperCase(),
+        gate_id: finishReason ? 'finish-gate' : 'lifecycle',
+        reason: finishReason || `Mission archive was not confirmed at ${archivedPath}`,
+      })
+    );
+    throw new Error(
+      `Mission ${id.toUpperCase()} finish gate did not pass (status: ${finalState?.status || 'unknown'}).`
+    );
+  }
   syncIntentContractMemorySnapshot(id, 'finish');
   return result;
 }
@@ -1442,6 +1464,7 @@ Maintenance Commands:
                                  can complete — bare record-evidence is not enough for review tasks). Independence
                                  from the implementer is computed from the execution ledger, not self-declared.
   reconcile-work <ID> --manifest <PATH> [--dry-run]
+                                 --generate [--output <PATH>] scaffolds a manifest from current git state
                                  Validate and adopt verified work completed outside dispatch-workitems
   review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
   scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]

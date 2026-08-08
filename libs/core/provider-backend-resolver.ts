@@ -77,6 +77,7 @@ import {
   type ProviderCapability,
 } from './provider-capability-registry.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
+import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
 
 /**
  * Minimal structural shape returned by this resolver — declared
@@ -117,7 +118,15 @@ function readCodexOptionsWithoutSpawn(env: NodeJS.ProcessEnv): CodexCliQueryOpti
 type ProviderConstructor = (env: NodeJS.ProcessEnv) => ProviderBackendHandle | null;
 
 const DEFAULT_CONSTRUCTORS: Readonly<Record<KnownProvider, ProviderConstructor>> = {
-  claude: (env) => new ShellClaudeCliBackend(buildClaudeCliOptionsFromEnv(env)),
+  claude: (env) => {
+    const options = buildClaudeCliOptionsFromEnv(env);
+    if (options.bin) return new ShellClaudeCliBackend(options);
+    const fallbackBin = resolveClaudeCliFallbackCandidates({ env })[0];
+    return new ShellClaudeCliBackend({
+      ...options,
+      ...(fallbackBin ? { bin: fallbackBin } : {}),
+    });
+  },
   codex: (env) => new CodexCliReasoningBackend(readCodexOptionsWithoutSpawn(env)),
   agy: (env) => buildAgyCliBackendFromEnv(env) as AgyCliBackend | null,
   grok: (env) => new ShellGrokCliBackend(buildGrokCliOptionsFromEnv(env)),

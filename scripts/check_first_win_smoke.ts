@@ -30,10 +30,7 @@ const RULES: SmokeRule[] = [
   },
   {
     file: 'docs/user/README.md',
-    required: [
-      'QUICKSTART.md',
-      'first working smoke',
-    ],
+    required: ['QUICKSTART.md', 'first working smoke'],
   },
   {
     file: 'docs/user/TROUBLESHOOTING.md',
@@ -45,18 +42,11 @@ const RULES: SmokeRule[] = [
   },
   {
     file: 'docs/developer/VOICE_FIRST_WIN.md',
-    required: [
-      'pipelines/voice-hello.json',
-      'system:native_tts_speak',
-    ],
+    required: ['pipelines/voice-hello.json', 'system:native_tts_speak'],
   },
   {
     file: 'pipelines/voice-hello.json',
-    required: [
-      '"pipeline_id": "voice-hello"',
-      '"first-win"',
-      '"tier-0"',
-    ],
+    required: ['"pipeline_id": "voice-hello"', '"first-win"', '"tier-0"'],
   },
   {
     file: 'pipelines/verify-session.json',
@@ -75,6 +65,15 @@ const RULES: SmokeRule[] = [
       'non-browser artifact',
     ],
   },
+  {
+    file: 'pipelines/first-win-lifecycle-weekly.json',
+    required: [
+      'first-win-lifecycle-weekly',
+      'No state is applied',
+      'first_win_lifecycle_smoke.js',
+      'lifecycle-dry-run',
+    ],
+  },
 ];
 
 function readJson(file: string): any | null {
@@ -91,11 +90,15 @@ export function validateVerifySessionPipeline(pipeline: any): string[] {
   const steps = Array.isArray(pipeline?.steps) ? pipeline.steps : [];
   const stepOps = new Set(steps.map((step: any) => String(step?.op || '')));
   if (pipeline?.options?.headless !== true) {
-    violations.push('pipelines/verify-session.json: options.headless must be true for clean first-win smoke');
+    violations.push(
+      'pipelines/verify-session.json: options.headless must be true for clean first-win smoke'
+    );
   }
   const userDataDir = String(pipeline?.options?.user_data_dir || '');
   if (!userDataDir.startsWith('active/shared/tmp/')) {
-    violations.push('pipelines/verify-session.json: user_data_dir must stay under active/shared/tmp/');
+    violations.push(
+      'pipelines/verify-session.json: user_data_dir must stay under active/shared/tmp/'
+    );
   }
   if (!stepOps.has('browser:goto')) {
     violations.push('pipelines/verify-session.json: missing browser:goto first-win navigation');
@@ -111,22 +114,71 @@ export function validateVerifySessionPipeline(pipeline: any): string[] {
   }
   const gotoStep = steps.find((step: any) => step?.op === 'browser:goto');
   const rawGotoUrl = String(gotoStep?.params?.url || '');
-  const defaultTargetUrl = String(pipeline?.context?.TARGET_URL || pipeline?.inputs?.TARGET_URL?.default || '');
+  const defaultTargetUrl = String(
+    pipeline?.context?.TARGET_URL || pipeline?.inputs?.TARGET_URL?.default || ''
+  );
   const gotoUrl = rawGotoUrl.includes('{{TARGET_URL}}')
     ? defaultTargetUrl
     : rawGotoUrl || defaultTargetUrl;
   if (!gotoUrl.includes('data:text/html')) {
-    violations.push('pipelines/verify-session.json: first-win navigation must use a local data URL');
+    violations.push(
+      'pipelines/verify-session.json: first-win navigation must use a local data URL'
+    );
   }
   if (!String(pipeline?.context?.TARGET_URL || '').includes('data:text/html')) {
-    violations.push('pipelines/verify-session.json: context.TARGET_URL must provide the local data URL default');
+    violations.push(
+      'pipelines/verify-session.json: context.TARGET_URL must provide the local data URL default'
+    );
   }
   const screenshotStep = steps.find((step: any) => step?.op === 'browser:screenshot');
   if (screenshotStep?.params?.path !== 'active/shared/tmp/first-win-session.png') {
-    violations.push('pipelines/verify-session.json: screenshot path must be active/shared/tmp/first-win-session.png');
+    violations.push(
+      'pipelines/verify-session.json: screenshot path must be active/shared/tmp/first-win-session.png'
+    );
   }
   if (pipeline?.fallback_pipeline !== 'pipelines/verify-session-fallback.json') {
-    violations.push('pipelines/verify-session.json: fallback_pipeline must point to pipelines/verify-session-fallback.json');
+    violations.push(
+      'pipelines/verify-session.json: fallback_pipeline must point to pipelines/verify-session-fallback.json'
+    );
+  }
+  return violations;
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
+  const violations: string[] = [];
+  const record = jsonRecord(pipeline);
+  const schedule = jsonRecord(record.schedule);
+  const steps = Array.isArray(record.steps) ? record.steps.map(jsonRecord) : [];
+  if (record.pipeline_id !== 'first-win-lifecycle-weekly') {
+    violations.push(
+      'pipelines/first-win-lifecycle-weekly.json: pipeline_id must be first-win-lifecycle-weekly'
+    );
+  }
+  if (
+    schedule.enabled !== true ||
+    schedule.cron !== '0 9 * * 1' ||
+    schedule.timezone !== 'Asia/Tokyo'
+  ) {
+    violations.push(
+      'pipelines/first-win-lifecycle-weekly.json: schedule must be enabled weekly at 09:00 Monday Asia/Tokyo'
+    );
+  }
+  const dryRunStep = steps.find((step) => step.id === 'lifecycle-dry-run');
+  const params = jsonRecord(dryRunStep?.params);
+  const args = Array.isArray(params.args) ? params.args : [];
+  if (
+    dryRunStep?.op !== 'system:exec' ||
+    !args.includes('dist/scripts/first_win_lifecycle_smoke.js') ||
+    !args.includes('--dry-run') ||
+    !args.includes('--json')
+  ) {
+    violations.push(
+      'pipelines/first-win-lifecycle-weekly.json: lifecycle-dry-run must execute the explicit dry-run JSON smoke command'
+    );
   }
   return violations;
 }
@@ -151,6 +203,12 @@ export function checkFirstWinSmoke(): string[] {
     violations.push('pipelines/verify-session.json: invalid JSON');
   } else {
     violations.push(...validateVerifySessionPipeline(verifySession));
+  }
+  const lifecycle = readJson('pipelines/first-win-lifecycle-weekly.json');
+  if (!lifecycle) {
+    violations.push('pipelines/first-win-lifecycle-weekly.json: invalid JSON');
+  } else {
+    violations.push(...validateFirstWinLifecyclePipeline(lifecycle));
   }
   return violations;
 }

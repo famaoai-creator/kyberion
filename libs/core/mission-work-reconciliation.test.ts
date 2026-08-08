@@ -19,6 +19,7 @@ import {
 } from './secure-io.js';
 import { sha256 } from './marketing-workload.js';
 import {
+  generateMissionWorkReconciliationScaffold,
   reconcileMissionExistingWork,
   type MissionWorkReconciliationManifest,
 } from './mission-work-reconciliation.js';
@@ -29,12 +30,12 @@ const fixtureRoot = pathResolver.sharedTmp('mission-work-reconciliation-test');
 const manifestPath = nodePath.join(fixtureRoot, 'manifest.json');
 const namespace = 'mission-work-reconciliation-test';
 const actorId = 'reconciliation-test-actor';
-const artifactPath = 'package.json';
+const artifactPath = 'libs/core/src/trace.ts';
 // Arbitrary small git-tracked file used as evidence-hash fixture material —
 // not a reference to its actual content. Must be a file with no uncommitted
 // changes in the working tree (the commit-binding check below runs `git
 // cat-file`/`git diff --quiet` against HEAD), so this deliberately avoids
-// anything touched by the in-flight SO-01 mission-lifecycle-service move.
+// anything touched by the in-flight implementation.
 const verificationPath = 'libs/core/mission-status.ts';
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
@@ -282,6 +283,44 @@ afterEach(() => {
 });
 
 describe('mission existing work reconciliation', () => {
+  it('requires mission-controller authority and a governed output location', () => {
+    prepareMission();
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'software_developer';
+    process.env.KYBERION_PERSONA = 'worker';
+    expect(() =>
+      generateMissionWorkReconciliationScaffold({
+        missionId,
+        outputPath: manifestPath,
+      })
+    ).toThrow(/Mission controller authority/);
+    process.env.MISSION_ROLE = previousRole;
+    process.env.KYBERION_PERSONA = previousPersona;
+
+    expect(() =>
+      generateMissionWorkReconciliationScaffold({
+        missionId,
+        outputPath: 'active/shared/runtime/unsafe-scaffold.json',
+      })
+    ).toThrow(/active\/shared\/tmp or the mission-local/);
+  });
+
+  it('generates a git-bound editable scaffold from planned tasks', () => {
+    prepareMission();
+    const scaffold = generateMissionWorkReconciliationScaffold({
+      missionId,
+      outputPath: manifestPath,
+      reason: 'Prepare the operator reconciliation packet.',
+    });
+
+    expect(scaffold.kind).toBe('mission-work-reconciliation-scaffold');
+    expect(scaffold.source.commit).toBe(currentCommit());
+    expect(scaffold.tasks.map((task) => task.task_id)).toContain('implementation');
+    expect(scaffold.next_steps.join(' ')).toContain('SHA-256');
+    expect(safeExistsSync(manifestPath)).toBe(true);
+    safeRmSync(manifestPath);
+  });
   it('validates the canonical manifest example against the schema', () => {
     const ajv = new Ajv({ allErrors: true, strict: false });
     const validate = compileSchemaFromPath(

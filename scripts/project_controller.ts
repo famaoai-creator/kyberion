@@ -1,6 +1,7 @@
 import {
   archiveManagedProject,
   bootstrapManagedProject,
+  buildManagedProjectRecord,
   createManagedProject,
   getProjectManagementView,
   listManagedProjects,
@@ -52,7 +53,7 @@ function printProjectList(): void {
 
 function printHelp(): void {
   console.log(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
+    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
   );
 }
 
@@ -103,11 +104,17 @@ async function main(): Promise<void> {
       return;
     }
     case 'create': {
-      const record = createManagedProject({
+      const input = {
         project_id: requiredOption(argv, '--project-id'),
         name: requiredOption(argv, '--name'),
         summary: requiredOption(argv, '--summary'),
         tier: parseTier(optionValue(argv, '--tier')),
+        ...(optionValue(argv, '--organization-id')
+          ? { organization_id: optionValue(argv, '--organization-id') }
+          : {}),
+        ...(optionValue(argv, '--tenant-slug')
+          ? { tenant_slug: optionValue(argv, '--tenant-slug') }
+          : {}),
         ...(optionValue(argv, '--status')
           ? { status: parseStatus(optionValue(argv, '--status')) }
           : {}),
@@ -120,7 +127,10 @@ async function main(): Promise<void> {
         ...(csvOption(argv, '--pipeline-refs')
           ? { pipeline_refs: csvOption(argv, '--pipeline-refs') }
           : {}),
-      });
+      };
+      const record = hasFlag(argv, '--dry-run')
+        ? buildManagedProjectRecord(input)
+        : createManagedProject(input);
       if (json) jsonOutput(record);
       else console.log(`Created project ${record.project_id}`);
       return;
@@ -175,6 +185,12 @@ async function main(): Promise<void> {
         name: requiredOption(argv, '--name'),
         summary: requiredOption(argv, '--summary'),
         tier: parseTier(optionValue(argv, '--tier')),
+        ...(optionValue(argv, '--organization-id')
+          ? { organization_id: optionValue(argv, '--organization-id') }
+          : {}),
+        ...(optionValue(argv, '--tenant-slug')
+          ? { tenant_slug: optionValue(argv, '--tenant-slug') }
+          : {}),
         ...(optionValue(argv, '--status')
           ? { status: parseStatus(optionValue(argv, '--status')) }
           : {}),

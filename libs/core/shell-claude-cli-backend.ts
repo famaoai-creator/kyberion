@@ -34,6 +34,17 @@ import {
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
+import {
+  CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
+  isClaudeCliPlaceholderFailure,
+  resolveClaudeCliFallbackCandidates,
+} from './claude-cli-resolution.js';
+export {
+  CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
+  type ClaudeCliFallbackCandidateOptions,
+  isClaudeCliPlaceholderFailure,
+  resolveClaudeCliFallbackCandidates,
+} from './claude-cli-resolution.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -84,6 +95,12 @@ export interface ShellClaudeCliBackendOptions {
 export interface ShellClaudeCliAvailability {
   available: boolean;
   reason?: string;
+  /**
+   * The binary that actually passed the probe. Differs from the default
+   * `claude` when the LC-03 placeholder fallback selected a real CLI outside
+   * `node_modules/.bin` (see `resolveClaudeCliFallbackCandidates`).
+   */
+  bin?: string;
 }
 
 export interface BrowserAgentTaskInput {
@@ -116,6 +133,11 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     this.model = options.model ?? 'opus';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+  }
+
+  /** The validated executable path used by this backend and its adapters. */
+  getBinaryPath(): string {
+    return this.bin;
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -596,13 +618,51 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
 // version and auth-status checks are sufficient to admit Claude to the
 // failover chain. `spawnSync` blocks this thread until each bounded probe
 // returns (or its own timeout fires).
+/**
+ * LC-03: the repo dependency `@anthropic-ai/claude-code` ships a postinstall
+ * placeholder — until `pnpm approve-builds` runs, `node_modules/.bin/claude`
+ * is a shim that prints this message to stderr and exits non-zero. Under
+ * pnpm, `node_modules/.bin` shadows the operator's real `claude` on PATH,
+ * so a matching failure means "shadowed", not "not installed".
+ */
 export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellClaudeCliAvailability {
-  const bin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude';
+  const explicitBin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim();
+  const bin = explicitBin || 'claude';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
+  const primary = probeClaudeBinOnce(bin, env, timeoutMs);
+  if (primary.available) {
+    return { ...primary, bin };
+  }
+
+  // LC-03 fallback: only when no binary was explicitly requested and the
+  // failure carries the pnpm placeholder signature — never second-guess an
+  // operator-pinned KYBERION_CLAUDE_CLI_BIN.
+  if (!explicitBin && isClaudeCliPlaceholderFailure(primary.reason)) {
+    for (const candidate of resolveClaudeCliFallbackCandidates({
+      env: { ...process.env, ...env },
+    })) {
+      const fallback = probeClaudeBinOnce(candidate, env, timeoutMs);
+      if (fallback.available) {
+        logger.info(
+          `[shell-claude-cli] '${bin}' is the pnpm placeholder shim (run \`pnpm approve-builds\` to fix) — selected fallback binary ${candidate}`
+        );
+        return { available: true, bin: candidate };
+      }
+    }
+  }
+
+  return primary;
+}
+
+function probeClaudeBinOnce(
+  bin: string,
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number
+): ShellClaudeCliAvailability {
   try {
     const childEnv = buildProviderChildEnv({
       provider: 'claude',
@@ -702,12 +762,14 @@ export function buildShellClaudeCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}`
+      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
     );
     return null;
   }
 
-  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
+  // Prefer an explicit pin; otherwise honor the binary the probe actually
+  // validated (LC-03: may be a fallback outside node_modules/.bin).
+  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim() || availability.bin?.trim();
   const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
   const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;

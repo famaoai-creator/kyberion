@@ -293,15 +293,13 @@ describe('reasoning-bootstrap', () => {
         },
       ]);
 
-      // Fallback order is [codex-cli, agy-cli]; both always build a candidate
-      // (buildAgyCliBackendFromEnv never returns null), so codex-cli would be
-      // primary today. With codex excluded for authenticated=false, agy-cli
-      // must become primary.
+      // Claude is the governed local default and remains the first available
+      // candidate after codex is excluded by the capability snapshot.
       const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
 
       expect(installed).toBe(true);
-      expect(getInstalledReasoningMode()).toBe('agy-cli');
-      expect(getReasoningBackend().name).toBe('agy-cli');
+      expect(getInstalledReasoningMode()).toBe('claude-cli');
+      expect(getReasoningBackend().name).toBe('shell-claude-cli');
       expect(infoSpy).toHaveBeenCalledWith(
         expect.stringContaining('excluding candidate mode=codex-cli provider=codex')
       );
@@ -385,7 +383,7 @@ describe('reasoning-bootstrap', () => {
       const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
 
       expect(installed).toBe(true);
-      expect(getInstalledReasoningMode()).toBe('agy-cli');
+      expect(getInstalledReasoningMode()).toBe('claude-cli');
     });
 
     it('the KYBERION_PROVIDER_CAPABILITY_ROUTING=0 kill-switch restores fail-open behavior', () => {

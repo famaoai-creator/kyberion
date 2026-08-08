@@ -1407,7 +1407,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6645,
+      "size": 6646,
       "type": "json"
     },
     {
@@ -1905,7 +1905,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 4678,
+      "size": 5190,
       "type": "md"
     },
     {
@@ -2085,7 +2085,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2658,
+      "size": 2659,
       "type": "json"
     },
     {
@@ -2157,7 +2157,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19650,
+      "size": 19852,
       "type": "json"
     },
     {
@@ -2181,7 +2181,7 @@
     {
       "path": "product/governance/service-onboarding-catalog.json",
       "tier": "public",
-      "size": 441,
+      "size": 443,
       "type": "json"
     },
     {
@@ -7023,7 +7023,7 @@
     {
       "path": "product/schemas/onboarding-state.schema.json",
       "tier": "public",
-      "size": 4375,
+      "size": 4669,
       "type": "json"
     },
     {
@@ -7383,7 +7383,7 @@
     {
       "path": "product/schemas/project-record.schema.json",
       "tier": "public",
-      "size": 2814,
+      "size": 3123,
       "type": "json"
     },
     {
@@ -10431,7 +10431,7 @@
     {
       "path": "public/templates/onboarding/identity.example.json",
       "tier": "public",
-      "size": 588,
+      "size": 616,
       "type": "json"
     },
     {
