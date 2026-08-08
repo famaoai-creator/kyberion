@@ -206,6 +206,10 @@ describe('mission-distill end-to-end promotion flow', () => {
     const distill = loadDistillCandidateRecord(queued.candidate_id);
     expect(distill?.status).toBe('promoted');
     expect(loadState(missionId)?.status).toBe('completed');
+    expect(loadState(missionId)?.distillation).toMatchObject({
+      mode: 'structural',
+      llm_used: false,
+    });
 
     const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
     expect(hints).toContain('Distilled wisdom from mission');
