@@ -2397,6 +2397,7 @@ export {
   capTail,
   recallBody,
   neutralizeUntrustedProvenance,
+  normalizeMemoryFact,
   foldCapture,
   queryBullets,
   DEFAULT_CONSOLIDATE_AFTER,

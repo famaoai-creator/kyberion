@@ -11,7 +11,7 @@ import {
   foldCapture,
   normalizeMemoryFact,
   planConsolidation,
-} from '../libs/core/memory-notebook.js';
+} from '@agent/core';
 
 const at = Date.parse('2026-08-08T00:00:00.000Z');
 const checks: Array<{ name: string; pass: boolean; detail: string }> = [];
