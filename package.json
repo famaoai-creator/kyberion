@@ -139,6 +139,7 @@
     "plugin:install": "node --import ./scripts/ts-loader.mjs scripts/plugin_install.ts",
     "background-review": "node --import ./scripts/ts-loader.mjs scripts/background_review.ts",
     "bench:memory": "node --import ./scripts/ts-loader.mjs scripts/benchmark_memory.ts",
+    "check:backend-conformance": "node --import ./scripts/ts-loader.mjs scripts/check_backend_conformance.ts",
     "background-review:mission-e2e": "node --import ./scripts/ts-loader.mjs scripts/background_review_mission_e2e.ts",
     "automation:blueprint": "node --import ./scripts/ts-loader.mjs scripts/automation_blueprint.ts",
     "mesh-hub:inspect": "node --import ./scripts/ts-loader.mjs scripts/mesh_hub_inspect.ts",

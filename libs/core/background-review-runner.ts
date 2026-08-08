@@ -62,7 +62,13 @@ const ProposalActionSchema = z.preprocess(
     String(value || '')
       .trim()
       .toLowerCase(),
-  z.enum(['memory_candidate', 'pipeline_proposal', 'skill_patch', 'no_action'])
+  z.enum([
+    'memory_candidate',
+    'pipeline_proposal',
+    'skill_patch',
+    'memory_consolidation',
+    'no_action',
+  ])
 );
 
 const BackgroundReviewProposalSchema = z
@@ -77,9 +83,10 @@ const BackgroundReviewProposalSchema = z
     sensitivity_tier: z.enum(['public', 'confidential', 'personal']).optional(),
     patch: z
       .object({
-        operation: z.enum(['append_step', 'append_section']),
+        operation: z.enum(['append_step', 'append_section', 'apply_consolidation']),
         step: z.record(z.string(), z.unknown()).optional(),
         section: z.string().trim().max(8_000).optional(),
+        actions: z.array(z.record(z.string(), z.unknown())).max(64).optional(),
       })
       .optional(),
   })
@@ -106,6 +113,16 @@ const BackgroundReviewProposalSchema = z
         message: 'skill patches require an append_section patch',
       });
     }
+    if (
+      proposal.action === 'memory_consolidation' &&
+      proposal.patch?.operation !== 'apply_consolidation'
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['patch'],
+        message: 'memory consolidations require an apply_consolidation patch',
+      });
+    }
     if (proposal.patch?.operation === 'append_step' && !proposal.patch.step) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -118,6 +135,13 @@ const BackgroundReviewProposalSchema = z
         code: z.ZodIssueCode.custom,
         path: ['patch', 'section'],
         message: 'append_section requires section',
+      });
+    }
+    if (proposal.patch?.operation === 'apply_consolidation' && !proposal.patch.actions?.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['patch', 'actions'],
+        message: 'apply_consolidation requires actions',
       });
     }
   });
@@ -309,7 +333,7 @@ function buildForkPrompt(input: BackgroundReviewForkInput): string {
 
 Output JSON contract:
 {
-  "action": "memory_candidate | pipeline_proposal | skill_patch | no_action",
+  "action": "memory_candidate | pipeline_proposal | skill_patch | memory_consolidation | no_action",
   "title": "short title when action is not no_action",
   "summary": "reusable, evidence-backed proposal; omit only for no_action",
   "target_ref": "existing skill or pipeline reference when relevant",
@@ -318,6 +342,7 @@ Output JSON contract:
   "sensitivity_tier": "personal | confidential"
 }
 For skill_patch, use { "operation": "append_section", "section": "## Heading\\n\\nGuidance" } instead.
+For memory_consolidation, use { "operation": "apply_consolidation", "actions": [{ "kind": "update|delete", "index": 1, "text": "..." }] } and target only an existing MEMORY.md.
 Use no_action when the snapshot contains no durable, reusable learning.`;
 }
 
@@ -373,7 +398,12 @@ function persistProposal(
   proposal: BackgroundReviewProposal,
   sourceRef: string
 ): string {
-  const operation = proposal.action === 'pipeline_proposal' ? 'pipeline:promote' : 'skill:patch';
+  const operation =
+    proposal.action === 'pipeline_proposal'
+      ? 'pipeline:promote'
+      : proposal.action === 'skill_patch'
+        ? 'skill:patch'
+        : 'memory:consolidate';
   assertBackgroundReviewOperationAllowed(operation);
   const record = createDistillCandidateRecord({
     source_type: input.missionId ? 'mission' : 'task_session',
@@ -446,7 +476,11 @@ export async function runBackgroundReviewFork(
     let approvalRequestError: string | undefined;
     let approvalNotificationId: string | undefined;
     let approvalNotificationError: string | undefined;
-    if (proposal.action === 'pipeline_proposal' || proposal.action === 'skill_patch') {
+    if (
+      proposal.action === 'pipeline_proposal' ||
+      proposal.action === 'skill_patch' ||
+      proposal.action === 'memory_consolidation'
+    ) {
       // Generate the request from the persisted candidate so the exact target,
       // patch, and current pre-image are bound before a human sees it.
       try {
