@@ -7,6 +7,11 @@ import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
+import {
+  BACKEND_CAPABILITY_PROFILES,
+  backendCapabilityProfile,
+  type BackendCapabilityProfile,
+} from './backend-capability-profile.js';
 
 const ajv = new Ajv({ allErrors: true });
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-route-policy.json');
@@ -98,6 +103,7 @@ export interface ResolvedReasoningRoute {
   candidates: string[];
   governance: { dataTier: string; egress: 'enforced'; spend: 'enforced' };
   provenance: Array<{ source: string; field: string }>;
+  backendProfile?: Pick<BackendCapabilityProfile, 'transport' | 'capabilities' | 'utility_fit'>;
   rejectedCandidates: Array<{ profile: string; reason: string }>;
   failover: ReasoningRoutePolicy['fallback'];
 }
@@ -418,6 +424,18 @@ export function resolveReasoningRoute(
       ...(base.capabilities || []),
       ...(overlay?.capabilities || []),
     ]);
+    // The route policy describes what a profile requests; the backend profile
+    // is the authoritative declaration of what the selected transport can
+    // actually provide. Keep custom test/local policy modes valid while
+    // applying the registry to every built-in mode.
+    const backendProfile = Object.prototype.hasOwnProperty.call(BACKEND_CAPABILITY_PROFILES, mode)
+      ? backendCapabilityProfile(mode as ReasoningBackendMode)
+      : undefined;
+    if (backendProfile) {
+      if (!backendProfile.capabilities.structured_output) capabilitySet.delete('structured_output');
+      if (!backendProfile.capabilities.images) capabilitySet.delete('vision');
+      provenance.push({ source: 'backend-profile', field: `${mode}.capabilities` });
+    }
     if (!toolsEnabled || allowedTools.length === 0) capabilitySet.delete('tools');
     const capabilities = Array.from(capabilitySet);
     const missing = required.filter((capability) => !capabilities.includes(capability));
@@ -470,6 +488,15 @@ export function resolveReasoningRoute(
         spend: 'enforced',
       },
       provenance,
+      ...(backendProfile
+        ? {
+            backendProfile: {
+              transport: backendProfile.transport,
+              capabilities: backendProfile.capabilities,
+              utility_fit: backendProfile.utility_fit,
+            },
+          }
+        : {}),
       rejectedCandidates,
       failover: policy.fallback,
     };

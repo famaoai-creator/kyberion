@@ -11,14 +11,11 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
+import { normalizeMemoryFact } from './memory-notebook.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
 export type MemoryCandidateKind =
-  | 'sop'
-  | 'template'
-  | 'heuristic'
-  | 'risk_rule'
-  | 'clarification_prompt';
+  'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
 export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
 
@@ -124,6 +121,7 @@ export function createMemoryPromotionCandidate(input: {
   queuedAt?: string;
 }): MemoryCandidate {
   const now = input.queuedAt || new Date().toISOString();
+  const summary = normalizeMemoryFact(String(input.summary || ''), Date.parse(now) || Date.now());
   return {
     candidate_id:
       input.candidateId ||
@@ -131,7 +129,7 @@ export function createMemoryPromotionCandidate(input: {
     source_type: input.sourceType,
     source_ref: String(input.sourceRef || '').trim(),
     proposed_memory_kind: input.proposedMemoryKind,
-    summary: String(input.summary || '').trim(),
+    summary,
     evidence_refs: normalizeEvidenceRefs(input.evidenceRefs),
     sensitivity_tier: input.sensitivityTier,
     ratification_required:
@@ -140,7 +138,7 @@ export function createMemoryPromotionCandidate(input: {
         : input.sensitivityTier !== 'personal',
     status: input.status || 'queued',
     queued_at: now,
-    content_hash: computeContentHash({ summary: String(input.summary || '').trim() }),
+    content_hash: computeContentHash({ summary }),
     occurrences: 1,
     last_seen: now,
   };
@@ -162,16 +160,21 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if ((candidate.evidence_refs || []).length === 0) {
     throw new Error('Memory promotion candidate requires at least one evidence_ref.');
   }
-  assertPublicTierReferencesSafe(candidate);
-  const validation = validateMemoryPromotionCandidate(candidate);
+  const normalizedCandidate: MemoryCandidate = {
+    ...candidate,
+    summary: normalizeMemoryFact(candidate.summary, Date.parse(candidate.queued_at) || Date.now()),
+  };
+  assertPublicTierReferencesSafe(normalizedCandidate);
+  const validation = validateMemoryPromotionCandidate(normalizedCandidate);
   if (!validation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${validation.errors.join('; ')}`);
   }
   ensureQueueDir();
   const rows = listMemoryPromotionCandidates();
-  const contentHash = resolveContentHash(candidate);
-  const normalizedSourceRef = String(candidate.source_ref || '').trim();
-  const now = candidate.last_seen || candidate.queued_at || new Date().toISOString();
+  const contentHash = resolveContentHash(normalizedCandidate);
+  const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
+  const now =
+    normalizedCandidate.last_seen || normalizedCandidate.queued_at || new Date().toISOString();
   const existingIndex = rows.findIndex(
     (row) =>
       String(row.source_ref || '').trim() === normalizedSourceRef &&
@@ -182,7 +185,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
     const nextOccurrences = normalizeOccurrenceCount(current.occurrences) + 1;
     const mergedEvidenceRefs = Array.from(
       new Set(
-        [...current.evidence_refs, ...candidate.evidence_refs]
+        [...current.evidence_refs, ...normalizedCandidate.evidence_refs]
           .map((item) => String(item || '').trim())
           .filter(Boolean)
       )
@@ -197,7 +200,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       sensitivity_tier: current.sensitivity_tier,
       ratification_required: current.ratification_required,
       status: current.status,
-      queued_at: current.queued_at || candidate.queued_at,
+      queued_at: current.queued_at || normalizedCandidate.queued_at,
       content_hash: contentHash,
       occurrences: nextOccurrences,
       last_seen: now,
@@ -213,7 +216,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
     return resolveQueuePath();
   }
   const nextCandidate: MemoryCandidate = {
-    ...candidate,
+    ...normalizedCandidate,
     content_hash: contentHash,
     occurrences: normalizeOccurrenceCount(candidate.occurrences),
     last_seen: now,
