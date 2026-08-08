@@ -260,6 +260,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   }
 
   let wisdom: any = null;
+  let llmUsed = false;
   try {
     const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy.llm;
     wisdom = await runAdaptiveStructuredLlmProfile('distill', fullPrompt, WISDOM_SCHEMA, {
@@ -267,6 +268,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
       systemPrompt:
         "You are Kyberion's Wisdom Distiller. Return exactly one JSON object matching the schema.",
     });
+    llmUsed = true;
   } catch (err: any) {
     logger.warn(`⚠️ LLM distillation failed: ${err.message}`);
     logger.info('Falling back to structural distillation (no LLM)...');
@@ -301,6 +303,8 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   state.distillation = {
     status: 'completed',
     completed_at: completedAt,
+    mode: llmUsed ? 'llm' : 'structural',
+    llm_used: llmUsed,
     output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),
   };
   state.context = {
@@ -350,7 +354,8 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     mission_id: upperId,
     wisdom_file: wisdomFileName,
     output_dir: outputDir,
-    llm_used: wisdom !== null,
+    llm_used: llmUsed,
+    distillation_mode: llmUsed ? 'llm' : 'structural',
   });
 
   logger.success(`✅ Wisdom distilled for ${upperId}. Mission ready for finishing.`);

@@ -1,0 +1,17 @@
+{
+  "mission_id": "MSN-QM02-TRIGGER-20260808",
+  "goal": "QM-02 trigger execution lifecycle を実装し、レビュー指摘を解消する",
+  "acceptance_criteria": [
+    "trigger の重複実行を原子 claim と lease で抑止する",
+    "delivery failure は retry 可能で delivery id を安定化する",
+    "authority は canonical role scope と active execution role に束縛する",
+    "watch、Chronos、registry portability の回帰を検証する"
+  ],
+  "blocking_gaps": [],
+  "scope": [
+    "libs/core/trigger-runner.ts",
+    "libs/core/managed-process.ts",
+    "scripts/chronos_daemon.ts",
+    "libs/core/src/pipeline-scheduler.ts"
+  ]
+}
