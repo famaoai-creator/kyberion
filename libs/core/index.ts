@@ -2399,6 +2399,11 @@ export {
   applyConsolidationActions,
   planConsolidation,
 } from './memory-notebook.js';
+export {
+  exerciseJsonRecordStoreContract,
+  type JsonRecordStoreContractAdapter,
+  type JsonRecordStoreContractResult,
+} from './store-contract.js';
 
 // Software QA lifecycle (QA-01)
 export type {

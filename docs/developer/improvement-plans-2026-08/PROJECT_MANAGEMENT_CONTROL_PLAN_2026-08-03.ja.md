@@ -2,7 +2,7 @@
 title: Project Management Control Plan 2026-08-03
 tags: [project, mission, track, task-session, control-plane, reconciliation, cli]
 last_updated: 2026-08-03
-status: implemented-review-pending
+status: implemented-reviewed
 ---
 
 # Project 管理統制計画
@@ -62,3 +62,4 @@ pnpm run build
 - 2026-08-03: 計画作成。Mission `MSN-PROJECT-CONTROL-20260803` で実装を開始。
 - 2026-08-03: Core facade、Project CLI、Project OS scaffold、Mission 再所属、ledger/state reconciliation、Task/Task Session/Pipeline lineage、Presence/Chronos read model、validation pipeline を実装。
 - 2026-08-03: 対象テスト・build・typecheck・contract checks は通過。全体 `validate` は既存 Chronos contrast 違反6件で停止したため、修正対象外としてレビューへ引き渡し。
+- 2026-08-08: [PM / OM 実装レビュー受領記録](./reviews/PM-OM-REVIEW-20260808.ja.md) により受入レビュー完了。blocking finding はなし。

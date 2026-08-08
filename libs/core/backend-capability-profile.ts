@@ -68,7 +68,10 @@ const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
   mode,
   transport: 'local-server',
   capabilities: {
-    structured_output: false,
+    // The local OpenAI-compatible adapters can enforce the repository's
+    // structured response envelope even though the model server itself does
+    // not expose a native schema API.
+    structured_output: true,
     session_continuity: false,
     abort: true,
     images: false,

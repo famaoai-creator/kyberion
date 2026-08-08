@@ -108,4 +108,46 @@ describe('reasoning-route-resolver', () => {
     expect(route.profileRef).toBe('default-codex');
     expect(route.rejectedCandidates).toEqual([]);
   });
+
+  it('uses the backend capability profile as the transport authority', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'ollama-default',
+      env: {},
+    });
+    expect(route.capabilities).toContain('structured_output');
+    expect(route.backendProfile?.transport).toBe('local-server');
+    expect(route.provenance).toContainEqual({
+      source: 'backend-profile',
+      field: 'ollama.capabilities',
+    });
+  });
+
+  it('rejects a built-in backend when a route requires a capability it declares absent', () => {
+    expect(() =>
+      resolveReasoningRoute({
+        role: 'reviewer',
+        requiredCapabilities: ['vision'],
+        env: {},
+        policy: {
+          version: 'test',
+          runtime_adapters: {
+            ollama: {
+              adapter: 'test',
+              model_policy: 'local-unregistered',
+              capabilities: ['text', 'vision'],
+              supported_parameters: [],
+            },
+          },
+          profiles: { local: { mode: 'ollama', capabilities: ['text', 'vision'] } },
+          roles: { reviewer: { candidates: ['local'] } },
+          fallback: {
+            max_attempts: 1,
+            max_in_place_retries: 0,
+            on_unsupported_parameter: 'reject',
+          },
+        },
+      })
+    ).toThrow(/missing capabilities: vision/);
+  });
 });

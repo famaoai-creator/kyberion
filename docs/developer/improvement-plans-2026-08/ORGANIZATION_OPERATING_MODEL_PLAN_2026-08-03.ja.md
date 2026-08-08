@@ -2,7 +2,7 @@
 title: Organization Operating Model Improvement Plan 2026-08-03
 tags: [organization, purpose, operating-model, service, operation, project, governance]
 last_updated: 2026-08-04
-status: implementation-in-progress
+status: implemented-reviewed
 ---
 
 # 組織オペレーティングモデル改善計画
@@ -389,3 +389,4 @@ operation / actuator 側に置く。
   人間承認境界に残した。
 - 受入検証済み: 組織モデル focused test 10件、`typecheck`、`build:repo`、`@agent/core build`、
   `check:contract-schemas`、`check:catalogs`、tier / ESM / script integrity、CLI dry-run / apply。
+- 2026-08-08: [PM / OM 実装レビュー受領記録](./reviews/PM-OM-REVIEW-20260808.ja.md) により受入レビュー完了。blocking finding はなし。

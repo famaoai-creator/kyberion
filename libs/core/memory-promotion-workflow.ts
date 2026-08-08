@@ -20,6 +20,7 @@ import {
   type MemoryCandidate,
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
+import { normalizeMemoryFact } from './memory-notebook.js';
 import {
   savePromotedMemoryRecord,
   NotMeaningfulPromotionCandidateError,
@@ -269,6 +270,10 @@ function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unkn
 function buildDistillCandidateFromMemoryCandidate(
   candidate: MemoryCandidate
 ): DistillCandidateRecord {
+  const summary = normalizeMemoryFact(
+    candidate.summary,
+    Date.parse(candidate.queued_at) || Date.now()
+  );
   const sourceRefParts = parseSourceRef(candidate.source_ref);
   return createDistillCandidateRecord({
     candidate_id: candidate.candidate_id,
@@ -277,8 +282,8 @@ function buildDistillCandidateFromMemoryCandidate(
     mission_id: sourceRefParts.missionId,
     task_session_id: sourceRefParts.taskSessionId,
     artifact_ids: sourceRefParts.artifactIds,
-    title: candidate.summary.slice(0, 80) || `Memory candidate ${candidate.candidate_id}`,
-    summary: candidate.summary,
+    title: summary.slice(0, 80) || `Memory candidate ${candidate.candidate_id}`,
+    summary,
     status: 'proposed',
     target_kind: mapMemoryKindToDistillTarget(candidate.proposed_memory_kind),
     evidence_refs: candidate.evidence_refs,
