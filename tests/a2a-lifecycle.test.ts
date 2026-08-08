@@ -113,7 +113,7 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     expect(ledger[AGENT_ID].current_score).toBe(515);
 
     // Cleanup for next test
-    runMissionController('finish', missionId);
+    runMissionController('cancel', missionId, 'cleanup after verification flow');
   }, 60000);
 
   it('Scenario 2: Failure Flow (Rejected & Score Decrease)', async () => {
@@ -130,7 +130,7 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     const ledger = readLedger();
     expect(ledger[AGENT_ID].current_score).toBe(480);
 
-    runMissionController('finish', FAIL_MISSION_ID);
+    runMissionController('cancel', FAIL_MISSION_ID, 'cleanup after rejection flow');
   }, 60000);
 
   it('Scenario 3: Trust Guardrail (Insufficient Score)', async () => {
@@ -163,6 +163,6 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
       expect(err.message).toContain('insufficient trust score');
     }
 
-    runMissionController('finish', GUARD_MISSION_ID);
+    runMissionController('cancel', GUARD_MISSION_ID, 'cleanup after trust guardrail flow');
   }, 60000);
 });

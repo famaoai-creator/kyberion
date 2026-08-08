@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "first-win-lifecycle-weekly",
+  "name": "First-Win Lifecycle Weekly Smoke",
+  "version": "1.0.0",
+  "description": "LC-17: weekly dry-run acceptance of onboarding, organization authoring, project attachment, mission creation, schedule tick, and meaningful hint generation. No state is applied.",
+  "schedule": {
+    "id": "first-win-lifecycle-weekly",
+    "cron": "0 9 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🧪 [FIRST-WIN] Starting weekly lifecycle dry-run..." }
+    },
+    {
+      "id": "lifecycle-dry-run",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "lifecycle_report", "type": "CommandResult" },
+      "params": {
+        "command": "node",
+        "args": ["dist/scripts/first_win_lifecycle_smoke.js", "--dry-run", "--json"],
+        "timeout_ms": 120000
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "lifecycle_report",
+      "params": { "message": "{{lifecycle_report.stdout}}" }
+    }
+  ]
+}

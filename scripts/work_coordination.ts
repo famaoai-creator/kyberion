@@ -21,6 +21,7 @@ import {
   type WorkItemPriority,
   type WorkItemSource,
   type WorkItemStatus,
+  type WorkItemContext,
   buildIntegratedHandoffHistory,
   formatIntegratedHandoffHistory,
   loadAiDlcPhaseState,
@@ -43,6 +44,48 @@ function csv(value: unknown): string[] {
 function json(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
   return JSON.parse(value) as Record<string, unknown>;
+}
+
+const WORK_SHAPES = new Set<NonNullable<WorkItemContext['work_shape']>>([
+  'solution_project',
+  'service_operation',
+  'routine_operation',
+  'incident_response',
+  'governance_cadence',
+  'improvement_experiment',
+]);
+
+function context(argv: Record<string, unknown>): WorkItemContext | undefined {
+  const parsed = json(argv.context);
+  const value = { ...(parsed || {}) } as Record<string, unknown>;
+  const mappings: Array<[string, keyof WorkItemContext & string]> = [
+    ['organization-id', 'organization_id'],
+    ['tenant-slug', 'tenant_slug'],
+    ['mission-id', 'mission_id'],
+    ['project-id', 'project_id'],
+    ['task-id', 'task_id'],
+  ];
+  for (const [option, key] of mappings) {
+    if (argv[option] !== undefined) value[key] = String(argv[option]);
+  }
+  if (argv['work-shape'] !== undefined) value.work_shape = String(argv['work-shape']);
+  const result: WorkItemContext = {};
+  for (const key of [
+    'organization_id',
+    'tenant_slug',
+    'mission_id',
+    'project_id',
+    'task_id',
+  ] as const) {
+    if (value[key] !== undefined && String(value[key]).trim())
+      result[key] = String(value[key]).trim();
+  }
+  if (value.work_shape !== undefined) {
+    const workShape = String(value.work_shape).trim() as NonNullable<WorkItemContext['work_shape']>;
+    if (!WORK_SHAPES.has(workShape)) throw new Error(`Invalid --work-shape: ${workShape}`);
+    result.work_shape = workShape;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function print(value: unknown): void {
@@ -104,6 +147,12 @@ async function main(): Promise<void> {
     .option('source', { type: 'string' })
     .option('source-ref', { type: 'string' })
     .option('project-id', { type: 'string' })
+    .option('organization-id', { type: 'string' })
+    .option('tenant-slug', { type: 'string' })
+    .option('mission-id', { type: 'string' })
+    .option('task-id', { type: 'string' })
+    .option('work-shape', { type: 'string' })
+    .option('context', { type: 'string' })
     .option('assignee-peer-id', { type: 'string' })
     .option('assignee-user-id', { type: 'string' })
     .option('labels', { type: 'string' })
@@ -153,6 +202,7 @@ async function main(): Promise<void> {
         source: argv.source ? (String(argv.source) as WorkItemSource) : undefined,
         sourceRef: argv['source-ref'] ? String(argv['source-ref']) : undefined,
         projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+        context: context(argv as Record<string, unknown>),
         assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: csv(argv.labels),
@@ -249,6 +299,7 @@ async function main(): Promise<void> {
         description: argv.description ? String(argv.description) : undefined,
         priority: argv.priority ? (String(argv.priority) as WorkItemPriority) : undefined,
         projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+        context: context(argv as Record<string, unknown>),
         assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: csv(argv.labels),

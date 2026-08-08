@@ -26,15 +26,13 @@
  *     router. Pinned free models or paid models must be declared through the
  *     OpenRouter model policy; paid inference requires an explicit
  *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
- *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
- *     then the governed provider fallback chain, which includes authenticated
- *     Claude CLI, AGY, Grok, and Copilot when each is available. The legacy
+ *   - Otherwise → prefer the authenticated Claude CLI, then Grok, Codex, AGY,
+ *     and Copilot through the governed provider fallback chain. The legacy
  *     `gemini-cli` adapter remains available for explicit / Enterprise
  *     configurations but is not auto-selected.
  *
  * Override explicitly via env var to pin behavior:
- *   KYBERION_REASONING_BACKEND=codex-cli       (recommended in the Codex
- *                                                execution environment)
+ *   KYBERION_REASONING_BACKEND=claude-cli      (recommended local CLI)
  *   KYBERION_REASONING_BACKEND=anthropic       (standalone with API key)
  *   KYBERION_REASONING_BACKEND=stub            (offline / testing)
  */
@@ -321,7 +319,14 @@ function buildReasoningRuntimeBundle(
     case 'claude-cli': {
       const cliBackend = buildShellClaudeCliBackendFromEnv();
       if (!cliBackend) return null;
-      const claudeOptions = buildClaudeCliOptionsFromEnv();
+      // The availability probe may have selected a real CLI outside
+      // node_modules/.bin when the PATH entry is a pnpm placeholder. Reuse
+      // that exact validated path for intent and voice so all Claude adapters
+      // execute the same binary.
+      const claudeOptions = {
+        ...buildClaudeCliOptionsFromEnv(),
+        bin: cliBackend.getBinaryPath(),
+      };
       return {
         mode,
         backend: { backend: cliBackend, provider, label: mode },
@@ -641,6 +646,15 @@ function filterChainByProviderCapability(
     const capability = byProvider.get(provider);
     if (!capability) return true;
     if (!capability.binary_found) {
+      // A cached negative snapshot can describe the pnpm placeholder even
+      // after the runtime shell probe selected a real fallback binary. Keep
+      // the runtime-verified Claude candidate instead of waiting for TTL.
+      if (provider === 'claude' && candidate.mode === 'claude-cli') {
+        logger.warn(
+          `[reasoning-bootstrap] retaining candidate mode=${candidate.mode} provider=${provider}: runtime shell probe selected a fallback binary while the capability snapshot reports binary_found=false (probed_at=${capability.probed_at})`
+        );
+        return true;
+      }
       logger.info(
         `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports binary_found=false (probed_at=${capability.probed_at})`
       );
@@ -1003,6 +1017,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
     if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;
+    if (provider === 'claude' && candidate.mode === 'claude-cli') return true;
     return healthyProviders.has(provider);
   });
   if (!chainUsable && process.env.KYBERION_ALLOW_STUB_FALLBACK !== '1') {

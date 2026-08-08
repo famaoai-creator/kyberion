@@ -55,6 +55,7 @@ describe('analysis-intent-support', () => {
       summary: 'For review target inference tests',
       status: 'active',
       tier: 'confidential',
+      tenant_slug: 'shared',
       repositories: [
         {
           repo_id: 'REPO-REVIEW',
@@ -114,6 +115,7 @@ describe('analysis-intent-support', () => {
       summary: 'For execution target binding',
       status: 'active',
       tier: 'confidential',
+      tenant_slug: 'shared',
       repositories: [
         {
           repo_id: 'REPO-BIND',
@@ -174,6 +176,8 @@ describe('analysis-intent-support', () => {
 
     expect(support.suggested_refs.length).toBeGreaterThan(0);
     const firstRef = support.suggested_refs[0] || '';
-    expect(firstRef.includes('TRK-42') || firstRef.startsWith('knowledge/product/incidents/')).toBe(true);
+    expect(firstRef.includes('TRK-42') || firstRef.startsWith('knowledge/product/incidents/')).toBe(
+      true
+    );
   });
 });

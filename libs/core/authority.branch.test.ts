@@ -23,10 +23,12 @@ vi.mock('./secure-io.js', () => ({
 vi.mock('./path-resolver.js', () => ({
   active: mocks.active,
   knowledge: mocks.knowledge,
+  shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
   findMissionPath: mocks.findMissionPath,
   pathResolver: {
     active: mocks.active,
     knowledge: mocks.knowledge,
+    shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
     findMissionPath: mocks.findMissionPath,
   },
 }));
@@ -88,6 +90,23 @@ describe('authority branch coverage', () => {
     const ctx = resolveIdentityContext();
     expect(ctx.persona).toBe('ecosystem_architect');
     expect(ctx.role).toBe('chronos_gateway');
+  });
+
+  it('does not derive execution persona or intrinsic authority from persisted onboarding identity', async () => {
+    delete process.env.MISSION_ROLE;
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/my-identity.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/my-identity.json')
+        ? JSON.stringify({ persona: 'ecosystem_architect' })
+        : '{}'
+    );
+
+    const { resolveIdentityContext } = await import('./authority.js');
+    const ctx = resolveIdentityContext();
+    expect(ctx.persona).toBe('unknown');
+    expect(ctx.authorities).not.toContain('SYSTEM_EXEC');
   });
 
   it('falls back to process name heuristic when role/persona are unknown', async () => {

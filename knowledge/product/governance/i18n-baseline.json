@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-03T16:44:51.515Z",
+  "generated_at": "2026-08-08T14:33:31.817Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -79,7 +79,7 @@
     "libs/core/intent-resolution.ts": 6,
     "libs/core/lead-score.ts": 11,
     "libs/core/mission-gate-engine.ts": 3,
-    "libs/core/mission-hygiene.ts": 8,
+    "libs/core/mission-hygiene.ts": 13,
     "libs/core/mission-lifecycle.ts": 1,
     "libs/core/mission-maintenance.ts": 5,
     "libs/core/mission-orchestration-worker.ts": 2,
@@ -119,7 +119,7 @@
     "scripts/generate_all_objects_layout_sample.ts": 36,
     "scripts/kyberion_home.ts": 36,
     "scripts/minutes_record.ts": 6,
-    "scripts/onboarding_wizard.ts": 39,
+    "scripts/onboarding_wizard.ts": 49,
     "scripts/process_portal_inbox.ts": 5,
     "scripts/refactor/mission-controller-router.ts": 3,
     "scripts/register_workflow.ts": 4,

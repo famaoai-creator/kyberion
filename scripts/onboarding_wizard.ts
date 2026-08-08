@@ -14,6 +14,7 @@ import {
   resolveOnboardingSummaryPolicy,
   resolveVocabularyLocale,
   resolveOnboardingText,
+  isServiceConnectionReady,
   type LocalizedOnboardingText,
   type SupportedLocale,
   safeExistsSync,
@@ -39,6 +40,15 @@ import {
   generateOnboardingRunbookSkill,
   onboardingRunbookSkillPath,
 } from './onboarding_runbook_skill.js';
+import {
+  formatReasoningBackendMenu,
+  listReasoningBackendChoices,
+  persistReasoningBackend,
+  readPersistedReasoningBackend,
+  persistPersona,
+  readPersistedPersona,
+  resolveReasoningBackendMenuSelection,
+} from './reasoning_backend_selection.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -132,7 +142,7 @@ function formatMenuTaskError(error: unknown): string {
 
 type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
 type OnboardingStatus = 'draft' | 'complete';
-type ServiceStatus = 'pending' | 'saved' | 'skipped';
+type ServiceStatus = 'pending' | 'saved' | 'ready' | 'blocked' | 'skipped';
 
 interface IdentityDraft {
   name: string;
@@ -141,6 +151,7 @@ interface IdentityDraft {
   primary_domain: string;
   vision: string;
   agent_id: string;
+  persona: 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst';
 }
 
 interface ServiceCandidateDraft {
@@ -311,7 +322,13 @@ function loadState(): OnboardingState | null {
   const filePath = statePath();
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as OnboardingState;
+    const parsed = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as OnboardingState;
+    if (parsed.identity && !parsed.identity.persona) {
+      parsed.identity.persona = 'sovereign';
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -324,7 +341,7 @@ async function saveState(state: OnboardingState): Promise<void> {
 
 function createInitialState(): OnboardingState {
   const now = new Date().toISOString();
-  return {
+  const state: OnboardingState = {
     version: '1.0.0',
     status: 'draft',
     current_phase: 'identity',
@@ -335,10 +352,23 @@ function createInitialState(): OnboardingState {
     tenants: { entries: [] },
     tutorial: { mode: 'skipped' },
   };
+  // A services-only run still persists onboarding-state.json. Seed the
+  // schema-required identity so that connection setup works before the
+  // interactive identity phase has been completed.
+  state.identity = buildIdentityFromState(state);
+  return state;
 }
 
 function buildIdentityFromState(state: OnboardingState): IdentityDraft {
   const existing = state.identity;
+  const persistedPersona = readPersistedPersona();
+  const validPersistedPersona =
+    persistedPersona &&
+    ['sovereign', 'ecosystem_architect', 'mission_owner', 'worker', 'analyst'].includes(
+      persistedPersona
+    )
+      ? (persistedPersona as IdentityDraft['persona'])
+      : undefined;
   return {
     name: existing?.name || 'Sovereign',
     language: existing?.language || 'Japanese',
@@ -346,7 +376,12 @@ function buildIdentityFromState(state: OnboardingState): IdentityDraft {
     primary_domain: existing?.primary_domain || 'General',
     vision: existing?.vision || 'Build a high-fidelity Kyberion environment.',
     agent_id: existing?.agent_id || 'KYBERION-PRIME',
+    persona: existing?.persona || validPersistedPersona || 'sovereign',
   };
+}
+
+function connectionIsReady(serviceId: string, payload: Record<string, unknown>): boolean {
+  return isServiceConnectionReady(serviceId, payload);
 }
 
 function buildSummaryMarkdown(state: OnboardingState): string {
@@ -366,6 +401,7 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     `- Domain: ${identity?.primary_domain || 'n/a'}`,
     `- Vision: ${identity?.vision || 'n/a'}`,
     `- Agent ID: ${identity?.agent_id || 'n/a'}`,
+    `- Persona: ${identity?.persona || 'n/a'}`,
     '',
     '## Reasoning Backend',
     ...formatReasoningSummary(state.reasoning),
@@ -447,6 +483,33 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
       .trim()
       .toUpperCase() || 'KYBERION-PRIME';
 
+  const personaInput = (
+    await ask(
+      t(
+        `Default persona for later operations? [${identity.persona}]: `,
+        `後続操作で使う既定 persona は? [${identity.persona}]: `
+      ),
+      identity.persona
+    )
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (
+    ['sovereign', 'ecosystem_architect', 'mission_owner', 'worker', 'analyst'].includes(
+      personaInput
+    )
+  ) {
+    identity.persona = personaInput as IdentityDraft['persona'];
+  }
+  const personaEnvPath = persistPersona(identity.persona);
+  console.log(
+    t(
+      `Persisted default persona ${identity.persona} to ${personaEnvPath}`,
+      `既定 persona ${identity.persona} を ${personaEnvPath} に永続化しました`
+    )
+  );
+
   await writeJsonArtifact(
     identityPath(),
     {
@@ -454,6 +517,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
       language: identity.language,
       interaction_style: identity.interaction_style,
       primary_domain: identity.primary_domain,
+      persona: identity.persona,
       created_at: state.created_at,
       status: 'active',
       version: '1.0.0',
@@ -475,6 +539,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
       role: 'Ecosystem Architect / Senior Partner',
       owner: identity.name,
       trust_tier: 'sovereign',
+      persona: identity.persona,
       created_at: state.created_at,
       description: `The primary autonomous entity of the Kyberion Ecosystem for ${identity.name}.`,
     },
@@ -483,7 +548,9 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
 
   state.identity = identity;
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'identity']));
-  state.current_phase = 'services';
+  // LC-05c: the next phase is 'reasoning' — jumping straight to 'services'
+  // made a resumed wizard skip backend selection entirely.
+  state.current_phase = 'reasoning';
   state.updated_at = new Date().toISOString();
   await saveState(state);
 }
@@ -558,6 +625,61 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
     reasoning = markReasoningStubAcknowledged(reasoning);
   }
 
+  // LC-05a: detection alone is not a decision — offer an explicit backend
+  // choice (catalog = reasoning-backend policy) and persist it to .env.local
+  // so later runs use the recorded selection instead of auto-discovery.
+  if (interactive && !expressMode) {
+    const choices = listReasoningBackendChoices();
+    const persisted =
+      process.env.KYBERION_REASONING_BACKEND?.trim() || readPersistedReasoningBackend();
+    console.log('');
+    console.log(
+      t(
+        'Select the reasoning backend to persist as KYBERION_REASONING_BACKEND:',
+        '永続化する推論バックエンド(KYBERION_REASONING_BACKEND)を選択してください:'
+      )
+    );
+    for (const line of formatReasoningBackendMenu(choices)) {
+      console.log(`  ${line}`);
+    }
+    if (persisted) {
+      console.log(t(`Currently set: ${persisted}`, `現在の設定: ${persisted}`));
+    }
+    const answer = await ask(
+      t(
+        `Backend [1-${choices.length}, name, or enter to skip]: `,
+        `バックエンド [1-${choices.length}・名前・Enter でスキップ]: `
+      ),
+      ''
+    );
+    const selection = resolveReasoningBackendMenuSelection(answer, choices);
+    if (selection) {
+      let proceed = true;
+      if (persisted && persisted !== selection) {
+        proceed = isAffirmative(
+          await ask(
+            t(
+              `Overwrite KYBERION_REASONING_BACKEND (${persisted} -> ${selection})? (y/N): `,
+              `KYBERION_REASONING_BACKEND を上書きしますか (${persisted} -> ${selection})? (y/N): `
+            ),
+            'n'
+          )
+        );
+      }
+      if (proceed) {
+        const envLocal = persistReasoningBackend(selection);
+        process.env.KYBERION_REASONING_BACKEND = selection;
+        reasoning = { ...reasoning, backend_hint: selection };
+        console.log(
+          t(
+            `Persisted KYBERION_REASONING_BACKEND=${selection} to ${envLocal}`,
+            `KYBERION_REASONING_BACKEND=${selection} を ${envLocal} に永続化しました`
+          )
+        );
+      }
+    }
+  }
+
   state.reasoning = reasoning;
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'reasoning']));
   state.current_phase = 'services';
@@ -591,6 +713,30 @@ async function promptWhisperConnection(): Promise<Record<string, unknown> | null
   };
 }
 
+async function promptVoiceConnection(): Promise<Record<string, unknown> | null> {
+  const voicePythonBin = await ask('Voice Python binary [optional]: ');
+  const voiceName = await ask('Voice name [optional]: ');
+  const notes = await ask('Voice notes [optional]: ');
+  if (!voicePythonBin && !voiceName && !notes) return null;
+  return {
+    voice_python_bin: voicePythonBin || undefined,
+    voice_name: voiceName || undefined,
+    notes: notes || undefined,
+    source: 'onboarding',
+  };
+}
+
+async function promptMeetingConnection(): Promise<Record<string, unknown> | null> {
+  const meetingPythonBin = await ask('Meeting Python binary [optional]: ');
+  const notes = await ask('Meeting notes [optional]: ');
+  if (!meetingPythonBin && !notes) return null;
+  return {
+    meeting_python_bin: meetingPythonBin || undefined,
+    notes: notes || undefined,
+    source: 'onboarding',
+  };
+}
+
 async function promptGenericConnection(serviceId: string): Promise<Record<string, unknown> | null> {
   const baseUrl = await ask(`${serviceId} base URL [optional]: `);
   const outputDir = await ask(`${serviceId} output dir [optional]: `);
@@ -606,24 +752,36 @@ async function promptGenericConnection(serviceId: string): Promise<Record<string
   };
 }
 
-async function runServicesPhase(state: OnboardingState): Promise<void> {
+async function runServicesPhase(
+  state: OnboardingState,
+  selectedServiceIds?: string[]
+): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
   console.log(`\n🔌 Phase 2 — ${pt(flowPolicy.phase_titles.services)}\n`);
-  const wantsServiceSetup = isAffirmative(
-    await ask(
-      t(
-        'Capture service connection candidates now? (y/N): ',
-        'サービス接続候補を今すぐ登録しますか? (y/N): '
-      ),
-      'n'
-    )
-  );
+  const wantsServiceSetup = selectedServiceIds?.length
+    ? true
+    : isAffirmative(
+        await ask(
+          t(
+            'Capture service connection candidates now? (y/N): ',
+            'サービス接続候補を今すぐ登録しますか? (y/N): '
+          ),
+          'n'
+        )
+      );
   const candidates: ServiceCandidateDraft[] = [];
   const connDir = connectionDir();
   withSensitivePathMediation(() => {
     if (!safeExistsSync(connDir)) safeMkdir(connDir, { recursive: true });
   });
-  const onboardingServices = listServiceOnboardingCatalogEntries();
+  const onboardingServices = listServiceOnboardingCatalogEntries().filter(
+    (service) => !selectedServiceIds || selectedServiceIds.includes(service.service_id)
+  );
+  if (selectedServiceIds?.length && onboardingServices.length !== selectedServiceIds.length) {
+    const known = new Set(onboardingServices.map((service) => service.service_id));
+    const unknown = selectedServiceIds.filter((serviceId) => !known.has(serviceId));
+    throw new Error(`Unknown onboarding service: ${unknown.join(', ')}`);
+  }
 
   if (wantsServiceSetup) {
     for (const service of onboardingServices) {
@@ -646,14 +804,19 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
         payload = await promptComfyuiConnection();
       } else if (service.prompt_kind === 'whisper') {
         payload = await promptWhisperConnection();
+      } else if (serviceId === 'voice') {
+        payload = await promptVoiceConnection();
+      } else if (serviceId === 'meeting') {
+        payload = await promptMeetingConnection();
       } else {
         payload = await promptGenericConnection(serviceId);
       }
 
       const capturedAt = new Date().toISOString();
+      const ready = payload ? connectionIsReady(serviceId, payload) : false;
       const candidate: ServiceCandidateDraft = {
         service_id: serviceId,
-        status: payload ? 'saved' : 'pending',
+        status: payload ? (ready ? 'ready' : 'blocked') : 'pending',
         connection_kind: payload?.base_url
           ? 'base_url'
           : payload?.output_dir
@@ -677,7 +840,7 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
           path.join(connDir, `${serviceId}.json`),
           {
             service_id: serviceId,
-            status: 'draft',
+            status: ready ? 'ready' : 'blocked',
             captured_at: capturedAt,
             ...payload,
           },
@@ -687,7 +850,10 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
     }
   }
 
-  state.services = { candidates };
+  const previous = (state.services?.candidates || []).filter(
+    (candidate) => !candidates.some((next) => next.service_id === candidate.service_id)
+  );
+  state.services = { candidates: [...previous, ...candidates] };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'services']));
   state.current_phase = 'tenants';
   state.updated_at = new Date().toISOString();
@@ -1013,6 +1179,22 @@ async function runOnboarding() {
   let state = loadState();
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
+  }
+
+  const servicesOnly = process.argv.includes('--services-only');
+  const serviceArgIndex = process.argv.indexOf('--service');
+  const selectedService =
+    serviceArgIndex >= 0 ? process.argv[serviceArgIndex + 1]?.trim() || undefined : undefined;
+  if (servicesOnly) {
+    state ??= createInitialState();
+    await runServicesPhase(state, selectedService ? [selectedService] : undefined);
+    console.log(
+      selectedService
+        ? `Service connection draft updated: ${selectedService}`
+        : 'Service connection drafts updated.'
+    );
+    rl.close();
+    return;
   }
 
   if (isMenuMode || (state && state.status === 'complete' && interactive && !expressMode)) {

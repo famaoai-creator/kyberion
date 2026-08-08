@@ -111,6 +111,14 @@
   ],
   "provider_fallback_order": [
     {
+      "provider": "claude",
+      "mode": "claude-cli"
+    },
+    {
+      "provider": "grok",
+      "mode": "grok-cli"
+    },
+    {
       "provider": "codex",
       "mode": "codex-cli"
     },
@@ -119,19 +127,11 @@
       "mode": "agy-cli"
     },
     {
-      "provider": "grok",
-      "mode": "grok-cli"
-    },
-    {
-      "provider": "claude",
-      "mode": "claude-cli"
-    },
-    {
       "provider": "copilot",
       "mode": "copilot"
     }
   ],
-  "default_mode": "codex-cli",
+  "default_mode": "claude-cli",
   "openrouter": {
     "default_profile": "free-router",
     "default_cost_policy": "free-only",

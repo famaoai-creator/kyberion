@@ -25,6 +25,12 @@ import {
   type OnboardingReasoningState,
 } from './onboarding_reasoning.js';
 import { generateOnboardingRunbookSkill } from './onboarding_runbook_skill.js';
+import {
+  normalizeReasoningBackendChoice,
+  persistReasoningBackend,
+  persistPersona,
+  readPersistedPersona,
+} from './reasoning_backend_selection.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -38,6 +44,7 @@ interface ApplyInput {
     primary_domain: string;
     vision: string;
     agent_id: string;
+    persona?: 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst';
   };
   tenants?: Array<{
     tenant_slug: string;
@@ -49,10 +56,44 @@ interface ApplyInput {
     mode: 'simulate' | 'apply' | 'skipped';
     summary?: string;
   };
+  /**
+   * Optional backend id (or alias) from the canonical catalog
+   * (`knowledge/product/governance/reasoning-backend-policy.json`
+   * `allowed_modes`). When set, it is persisted to `.env.local` as
+   * `KYBERION_REASONING_BACKEND` — the non-interactive counterpart of the
+   * wizard's reasoning-phase selection (LC-05).
+   */
+  reasoning_backend?: string;
 }
 
 function profileRoot(): string {
   return resolveActiveProfileRoot();
+}
+
+const ONBOARDING_PERSONAS = [
+  'sovereign',
+  'ecosystem_architect',
+  'mission_owner',
+  'worker',
+  'analyst',
+] as const;
+
+function resolveInputPersona(input: ApplyInput): ApplyInput['identity']['persona'] {
+  const requested = input.identity.persona?.trim().toLowerCase().replace(/\s+/g, '_');
+  if (
+    requested &&
+    ONBOARDING_PERSONAS.includes(requested as (typeof ONBOARDING_PERSONAS)[number])
+  ) {
+    return requested as ApplyInput['identity']['persona'];
+  }
+  const persisted = readPersistedPersona();
+  if (
+    persisted &&
+    ONBOARDING_PERSONAS.includes(persisted as (typeof ONBOARDING_PERSONAS)[number])
+  ) {
+    return persisted as ApplyInput['identity']['persona'];
+  }
+  return 'sovereign';
 }
 
 function onboardingRoot(): string {
@@ -106,9 +147,29 @@ export function validateInput(input: ApplyInput) {
       `interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`
     );
   }
+  if (
+    input.identity.persona !== undefined &&
+    !ONBOARDING_PERSONAS.includes(
+      input.identity.persona
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_') as (typeof ONBOARDING_PERSONAS)[number]
+    )
+  ) {
+    throw new Error(
+      `persona must be one of ${ONBOARDING_PERSONAS.join(' | ')}, got: ${input.identity.persona}`
+    );
+  }
   for (const tenant of input.tenants || []) {
     if (!/^[a-z][a-z0-9-]{1,30}$/.test(tenant.tenant_slug)) {
       throw new Error(`Invalid tenant_slug: ${tenant.tenant_slug}`);
+    }
+  }
+  if (input.reasoning_backend !== undefined) {
+    if (normalizeReasoningBackendChoice(input.reasoning_backend) === null) {
+      throw new Error(
+        `Invalid reasoning_backend: ${input.reasoning_backend}. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes).`
+      );
     }
   }
 }
@@ -137,6 +198,7 @@ export async function applyIdentity(input: ApplyInput, now: string) {
   ensureDir(onboardingRoot());
 
   const id = input.identity;
+  const persona = resolveInputPersona(input);
 
   await writeJson(
     path.join(profileDir, 'my-identity.json'),
@@ -145,6 +207,7 @@ export async function applyIdentity(input: ApplyInput, now: string) {
       language: id.language,
       interaction_style: id.interaction_style,
       primary_domain: id.primary_domain,
+      persona,
       created_at: now,
       status: 'active',
       version: '1.0.0',
@@ -166,6 +229,7 @@ export async function applyIdentity(input: ApplyInput, now: string) {
       role: 'Ecosystem Architect / Senior Partner',
       owner: id.name,
       trust_tier: 'sovereign',
+      persona,
       created_at: now,
       description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
     },
@@ -245,6 +309,7 @@ export function buildState(
   tutorial: { mode: string; summary: string; plan_path: string },
   reasoning: OnboardingReasoningState
 ) {
+  const persona = resolveInputPersona(input);
   return {
     version: '1.0.0' as const,
     status: 'complete' as const,
@@ -252,7 +317,7 @@ export function buildState(
     completed_phases: ['identity', 'reasoning', 'services', 'tenants', 'tutorial', 'summary'],
     created_at: now,
     updated_at: now,
-    identity: input.identity,
+    identity: { ...input.identity, persona },
     reasoning,
     services: { candidates: [] },
     tenants: { entries: tenantEntries },
@@ -267,6 +332,7 @@ export function buildSummary(
   reasoning?: OnboardingReasoningState
 ) {
   const id = input.identity;
+  const persona = resolveInputPersona(input);
   const summaryPolicy = resolveOnboardingSummaryPolicy();
   const lines = [
     `# ${summaryPolicy.title}`,
@@ -278,6 +344,7 @@ export function buildSummary(
     `- Domain: ${id.primary_domain}`,
     `- Vision: ${id.vision}`,
     `- Agent ID: ${id.agent_id}`,
+    `- Persona: ${persona}`,
     '',
     '## Reasoning Backend',
     ...formatReasoningSummary(reasoning),
@@ -315,6 +382,7 @@ export function buildApplySummary(
   const lines = [
     'Onboarding applied successfully.',
     `Identity: ${input.identity.name} (${input.identity.agent_id})`,
+    `Persona: ${resolveInputPersona(input)}`,
     `Tenants: ${tenantEntries.length}`,
     `Tutorial: ${tutorial.mode}`,
     `Reasoning: ${reasoning.mode}`,
@@ -363,9 +431,24 @@ export async function main() {
   );
 
   const now = new Date().toISOString();
+  const persona = resolveInputPersona(input);
+  const personaEnvPath = persistPersona(persona);
+  process.env.KYBERION_PERSONA = persona;
+  console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
   await applyIdentity(input, now);
   const tenantEntries = await applyTenants(input, now);
   const tutorial = await applyTutorial(input, now);
+  // LC-05: an explicitly supplied backend is persisted before evaluation so
+  // the recorded choice (not auto-discovery) drives the reasoning check and
+  // every later run. Non-interactive input is explicit consent to overwrite.
+  if (input.reasoning_backend !== undefined) {
+    const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
+    if (backend) {
+      const envLocal = persistReasoningBackend(backend);
+      process.env.KYBERION_REASONING_BACKEND = backend;
+      console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
+    }
+  }
   const reasoning = await evaluateReasoningBackend(new Date(now));
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),

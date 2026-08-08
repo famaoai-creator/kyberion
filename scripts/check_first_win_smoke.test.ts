@@ -1,7 +1,11 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
-import { checkFirstWinSmoke, validateVerifySessionPipeline } from './check_first_win_smoke.js';
+import {
+  checkFirstWinSmoke,
+  validateFirstWinLifecyclePipeline,
+  validateVerifySessionPipeline,
+} from './check_first_win_smoke.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -42,17 +46,43 @@ describe('check_first_win_smoke', () => {
       fallback_pipeline: 'pipelines/verify-session-fallback.json',
       steps: [
         { op: 'browser:goto', params: { url: 'https://example.com' } },
-        { op: 'browser:evaluate', params: { script: 'document.title', export_as: 'session_state' } },
-        { op: 'browser:screenshot', params: { path: 'active/shared/tmp/enterprise-login-success.png' } },
+        {
+          op: 'browser:evaluate',
+          params: { script: 'document.title', export_as: 'session_state' },
+        },
+        {
+          op: 'browser:screenshot',
+          params: { path: 'active/shared/tmp/enterprise-login-success.png' },
+        },
         { op: 'browser:close_session', params: {} },
       ],
     });
 
-    expect(violations).toEqual(expect.arrayContaining([
-      expect.stringContaining('headless must be true'),
-      expect.stringContaining('user_data_dir must stay under active/shared/tmp/'),
-      expect.stringContaining('local data URL'),
-      expect.stringContaining('first-win-session.png'),
-    ]));
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('headless must be true'),
+        expect.stringContaining('user_data_dir must stay under active/shared/tmp/'),
+        expect.stringContaining('local data URL'),
+        expect.stringContaining('first-win-session.png'),
+      ])
+    );
+  });
+
+  it('requires the weekly lifecycle smoke to remain dry-run only', () => {
+    expect(
+      validateFirstWinLifecyclePipeline({
+        pipeline_id: 'first-win-lifecycle-weekly',
+        schedule: { enabled: true, cron: '0 9 * * 1', timezone: 'Asia/Tokyo' },
+        steps: [
+          {
+            id: 'lifecycle-dry-run',
+            op: 'system:exec',
+            params: {
+              args: ['dist/scripts/first_win_lifecycle_smoke.js', '--dry-run', '--json'],
+            },
+          },
+        ],
+      })
+    ).toEqual([]);
   });
 });

@@ -16,6 +16,7 @@ import {
   renewWorkItemLease,
   reapExpiredWorkLeases,
   handoffWorkItem,
+  importExternalWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
   recordMissionHandoff,
@@ -33,6 +34,37 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('keeps the canonical context chain when an external item is updated', () => {
+    const first = importExternalWorkItem({
+      source: 'github',
+      sourceRef: 'issue-ctx-1',
+      title: 'Context-bearing issue',
+      description: 'Imported once',
+      status: 'backlog',
+      projectId: 'PRJ-CTX',
+      context: {
+        organization_id: 'ORG-CTX',
+        tenant_slug: 'tenant-ctx',
+        mission_id: 'MSN-CTX',
+        project_id: 'PRJ-CTX',
+        task_id: 'TASK-CTX',
+        work_shape: 'improvement_experiment',
+      },
+    });
+
+    const updated = importExternalWorkItem({
+      source: 'github',
+      sourceRef: 'issue-ctx-1',
+      title: 'Context-bearing issue updated',
+      description: 'Imported twice',
+      status: 'ready',
+      projectId: 'PRJ-CTX',
+    });
+
+    expect(updated.item_id).toBe(first.item_id);
+    expect(updated.context).toEqual(first.context);
+  });
+
   it('records mission handoff metadata and coordination event', () => {
     createWorkItem({
       itemId: 'mission-item-1',

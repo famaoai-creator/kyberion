@@ -16,6 +16,8 @@ export interface ProjectRecord {
   summary: string;
   status: 'draft' | 'active' | 'paused' | 'archived';
   tier: 'personal' | 'confidential' | 'public';
+  organization_id?: string;
+  tenant_slug?: string;
   primary_locale?: string;
   repositories?: Array<{
     repo_id: string;

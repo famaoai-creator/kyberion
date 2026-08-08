@@ -17,6 +17,8 @@
       "type": "string",
       "enum": ["personal", "confidential", "public"]
     },
+    "organization_id": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "minLength": 1 },
     "repositories": {
       "type": "array",
       "items": {
@@ -86,5 +88,14 @@
       "additionalProperties": true
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": ["tier"],
+        "properties": { "tier": { "const": "confidential" } }
+      },
+      "then": { "required": ["tenant_slug"] }
+    }
+  ]
 }

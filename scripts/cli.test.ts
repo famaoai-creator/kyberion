@@ -10,6 +10,7 @@ import {
   normalizeActuators,
   formatOperatorPacketLines,
   searchActuators,
+  shouldBootstrapRuntime,
   stripNpmSeparatorArg,
 } from './cli.js';
 
@@ -76,6 +77,13 @@ describe('Kyberion CLI helpers', () => {
       'preview',
       'pipelines/baseline-check.json',
     ]);
+  });
+
+  it('skips runtime bootstrap for read-only CLI commands (LC-13)', () => {
+    expect(shouldBootstrapRuntime(['--help'])).toBe(false);
+    expect(shouldBootstrapRuntime(['list'])).toBe(false);
+    expect(shouldBootstrapRuntime(['list', '--check'])).toBe(true);
+    expect(shouldBootstrapRuntime(['task', 'plan', 'hello'])).toBe(true);
   });
 
   afterEach(() => {

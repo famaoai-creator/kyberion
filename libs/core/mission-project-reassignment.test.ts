@@ -80,6 +80,7 @@ describe('mission Project reassignment', () => {
       summary: 'Source fixture.',
       status: 'active',
       tier: 'confidential',
+      tenant_slug: 'shared',
       repositories: [{ repo_id: 'REPO-SOURCE', kind: 'project-root', root_path: SOURCE_PATH }],
     });
     saveProjectRecord({
@@ -88,6 +89,7 @@ describe('mission Project reassignment', () => {
       summary: 'Target fixture.',
       status: 'active',
       tier: 'confidential',
+      tenant_slug: 'shared',
       repositories: [{ repo_id: 'REPO-TARGET', kind: 'project-root', root_path: TARGET_PATH }],
     });
   });

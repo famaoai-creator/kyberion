@@ -421,11 +421,17 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     }
   }
 
-  // 2. Default Persona from process name if still unknown
+  // 2. A functional mission/system role outranks the operator's default
+  // persona. This prevents a persisted sovereign profile from escalating a
+  // worker/controller process that intentionally omitted KYBERION_PERSONA.
   if (persona === 'unknown' && envRole) {
     persona = inferPersonaFromRole(envRole);
   }
 
+  // 3. Default Persona from process name if still unknown. The persisted
+  // onboarding profile is intentionally not an execution authority source:
+  // it is operator-editable data and must never grant SECRET_READ,
+  // SYSTEM_EXEC, or other intrinsic authorities.
   if (persona === 'unknown') {
     const argv1 = process.argv[1] || '';
     const procName = path.basename(argv1, path.extname(argv1)).toLowerCase().replace(/[-]/g, '_');
@@ -433,7 +439,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
       persona = 'ecosystem_architect';
   }
 
-  // 3. Resolve Authorities
+  // 5. Resolve Authorities
 
   // A. Persona-based intrinsic authorities
   if (persona === 'sovereign' || persona === 'ecosystem_architect') {

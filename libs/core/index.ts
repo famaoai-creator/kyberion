@@ -115,6 +115,8 @@ export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
 export * from './ten-vad-bridge.js';
 export * from './mission-hygiene.js';
+export * from './operational-learning.js';
+export * from './mission-work-reconciliation.js';
 export * from './context-security-scope.js';
 export * from './reasoning-participant.js';
 export * from './participant-context-resolver.js';
@@ -429,6 +431,7 @@ export type {
   WorkBoardType,
   WorkCoordinationEventType,
   WorkItem,
+  WorkItemContext,
   WorkItemFilter,
   WorkItemPriority,
   WorkItemSource,
@@ -1975,6 +1978,8 @@ export * from './surface-access-policy.js';
 export * from './surface-approval-ui.js';
 export * from './service-bootstrap-catalog.js';
 export * from './service-onboarding-catalog.js';
+export * from './service-connection-readiness.js';
+export * from './claude-cli-resolution.js';
 export * from './surface-provider-policy.js';
 export { resolveRef, handleStepError } from './src/pipeline-engine.js';
 export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
@@ -2146,7 +2151,10 @@ export {
   checkScheduleHealth,
   recordPipelineResult,
   runFeedbackLoop,
+  collectFailedSchedules,
+  sweepFailedSchedules,
 } from './src/feedback-loop.js';
+export type { FailedScheduleFinding } from './src/feedback-loop.js';
 
 // KP-05: knowledge delivery telemetry + task_result knowledge_feedback aggregation
 export {

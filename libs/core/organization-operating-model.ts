@@ -3,7 +3,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import { listProjectRecords } from './project-registry.js';
+import { listProjectRecords, loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
@@ -1519,6 +1519,383 @@ export function enqueueOrganizationLearningCandidate(
 ): OrganizationLearningCandidate {
   const record = buildOrganizationLearningCandidate(input);
   saveOrganizationLearningCandidate(record);
+  return record;
+}
+
+export interface BuildOrganizationScaffoldInput {
+  organizationId: string;
+  name: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  purpose?: string;
+  principles?: string[];
+  ownerRole?: string;
+}
+
+export interface OrganizationScaffold {
+  state: OrganizationOperationalState;
+  purpose?: OrganizationPurposeRecord;
+}
+
+export function buildOrganizationScaffold(
+  input: BuildOrganizationScaffoldInput,
+  now = new Date().toISOString()
+): OrganizationScaffold {
+  assertOrganizationId(input.organizationId);
+  const existing = loadOrganizationOperationalState(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  });
+  if (existing) {
+    throw new Error(
+      `Organization state already exists for '${input.organizationId}' (${input.tier}). Use 'purpose set' or 'reconcile' instead of 'init'.`
+    );
+  }
+  const state: OrganizationOperationalState = {
+    organization_id: input.organizationId,
+    name: input.name,
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: 'active',
+    active_project_ids: [],
+    active_operation_ids: [],
+    open_incident_ids: [],
+    pending_decision_ids: [],
+    updated_at: now,
+  };
+  assertRecordIdentity(state);
+  if (!validateOrganizationOperationalState(state)) {
+    throw new Error(
+      `Invalid organization operational state: ${validationErrors(validatorFor(STATE_SCHEMA_PATH))}`
+    );
+  }
+  const scaffold: OrganizationScaffold = { state };
+  if (input.purpose) {
+    scaffold.purpose = buildOrganizationPurposeRecord(
+      {
+        organizationId: input.organizationId,
+        name: input.name,
+        tier: input.tier,
+        tenantSlug: input.tenantSlug,
+        purpose: input.purpose,
+        principles: input.principles,
+        ownerRole: input.ownerRole || 'operator',
+      },
+      now
+    );
+  }
+  return scaffold;
+}
+
+export interface BuildOrganizationPurposeInput {
+  organizationId: string;
+  name: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  purpose: string;
+  principles?: string[];
+  ownerRole: string;
+  approvalState?: OrganizationPurposeRecord['approval_state'];
+}
+
+export function buildOrganizationPurposeRecord(
+  input: BuildOrganizationPurposeInput,
+  now = new Date().toISOString()
+): OrganizationPurposeRecord {
+  const existing = loadOrganizationPurpose(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  });
+  const record: OrganizationPurposeRecord = {
+    version: '1.0.0',
+    organization_id: input.organizationId,
+    name: input.name,
+    purpose: input.purpose,
+    ...(input.principles?.length
+      ? { principles: input.principles }
+      : existing?.principles?.length
+        ? { principles: existing.principles }
+        : {}),
+    ...(existing?.objectives?.length ? { objectives: existing.objectives } : {}),
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    owner_role: input.ownerRole,
+    approval_state: input.approvalState || existing?.approval_state || 'draft',
+    updated_at: now,
+  };
+  assertRecordIdentity(record);
+  if (!validateOrganizationPurpose(record)) {
+    throw new Error(
+      `Invalid organization purpose: ${validationErrors(validatorFor(PURPOSE_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export interface BuildOrganizationObjectiveInput {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  objective: OrganizationPurposeObjective;
+}
+
+export function buildOrganizationObjectiveAddition(
+  input: BuildOrganizationObjectiveInput,
+  now = new Date().toISOString()
+): OrganizationPurposeRecord {
+  const existing = loadOrganizationPurpose(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  });
+  if (!existing) {
+    throw new Error(
+      `Organization purpose not found for '${input.organizationId}'. Run 'purpose set' (or 'init --purpose') first.`
+    );
+  }
+  const objectives = existing.objectives || [];
+  if (objectives.some((entry) => entry.objective_id === input.objective.objective_id)) {
+    throw new Error(
+      `Objective '${input.objective.objective_id}' already exists for '${input.organizationId}'.`
+    );
+  }
+  const record: OrganizationPurposeRecord = {
+    ...existing,
+    objectives: [...objectives, input.objective],
+    updated_at: now,
+  };
+  if (!validateOrganizationPurpose(record)) {
+    throw new Error(
+      `Invalid organization purpose: ${validationErrors(validatorFor(PURPOSE_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export interface BuildOrganizationDomainInput {
+  organizationId: string;
+  domainId: string;
+  name: string;
+  ownerRole: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  purpose?: string;
+}
+
+export function buildOrganizationDomainRecord(
+  input: BuildOrganizationDomainInput,
+  now = new Date().toISOString()
+): OrganizationDomainRecord {
+  const record: OrganizationDomainRecord = {
+    version: '1.0.0',
+    domain_id: input.domainId,
+    organization_id: input.organizationId,
+    name: input.name,
+    ...(input.purpose ? { purpose: input.purpose } : {}),
+    owner_role: input.ownerRole,
+    capability_ids: [],
+    service_ids: [],
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: 'active',
+    updated_at: now,
+  };
+  assertRecordIdentity(record);
+  if (!validateOrganizationDomain(record)) {
+    throw new Error(
+      `Invalid organization domain: ${validationErrors(validatorFor(DOMAIN_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export interface BuildOrganizationServiceInput {
+  organizationId: string;
+  serviceId: string;
+  domainId: string;
+  name: string;
+  outcome: string;
+  ownerRole: string;
+  consumers: string[];
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  sloTarget?: string;
+  sloWindow?: string;
+  runbookRefs?: string[];
+  status?: OrganizationServiceRecord['status'];
+}
+
+export interface OrganizationServiceAddition {
+  service: OrganizationServiceRecord;
+  domain: OrganizationDomainRecord;
+}
+
+export function buildOrganizationServiceAddition(
+  input: BuildOrganizationServiceInput,
+  now = new Date().toISOString()
+): OrganizationServiceAddition {
+  if (!input.consumers.length) {
+    throw new Error('At least one --consumer is required for service add.');
+  }
+  const domain = loadOrganizationDomain(input.domainId, {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  });
+  if (!domain) {
+    throw new Error(
+      `Domain '${input.domainId}' not found for '${input.organizationId}'. Run 'domain add' first.`
+    );
+  }
+  const service: OrganizationServiceRecord = {
+    version: '1.0.0',
+    service_id: input.serviceId,
+    organization_id: input.organizationId,
+    domain_id: input.domainId,
+    name: input.name,
+    outcome: input.outcome,
+    owner_role: input.ownerRole,
+    consumers: input.consumers,
+    slo: {
+      target: input.sloTarget || `${input.name} is operating and observable`,
+      measurement_window: input.sloWindow || 'weekly',
+    },
+    slis: [
+      {
+        sli_id: `sli-${input.serviceId}-visibility`,
+        name: `${input.name} operational visibility`,
+        source_ref: 'organization-operating-model.reconciliation',
+        freshness_seconds: 3600,
+      },
+    ],
+    runbook_refs: input.runbookRefs?.length ? input.runbookRefs : ['docs/OPERATOR_UX_GUIDE.md'],
+    escalation_path: [input.ownerRole],
+    dependencies: [],
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: input.status || 'active',
+    updated_at: now,
+  };
+  assertRecordIdentity(service);
+  if (!validateOrganizationService(service)) {
+    throw new Error(
+      `Invalid organization service: ${validationErrors(validatorFor(SERVICE_SCHEMA_PATH))}`
+    );
+  }
+  const nextDomain: OrganizationDomainRecord = domain.service_ids.includes(input.serviceId)
+    ? domain
+    : { ...domain, service_ids: [...domain.service_ids, input.serviceId], updated_at: now };
+  return { service, domain: nextDomain };
+}
+
+export interface BuildOrganizationOperationInput {
+  organizationId: string;
+  operationId: string;
+  name: string;
+  operationType: OrganizationOperationType;
+  ownerRole: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  serviceId?: string;
+  purpose?: string;
+  triggerKind?: OrganizationOperationRecord['trigger']['kind'];
+  triggerExpression?: string;
+  executionKind?: OrganizationOperationRecord['execution_target']['kind'];
+  executionRef?: string;
+  evidenceOutputs?: string[];
+}
+
+export function buildOrganizationOperationRecord(
+  input: BuildOrganizationOperationInput,
+  now = new Date().toISOString()
+): OrganizationOperationRecord {
+  const record: OrganizationOperationRecord = {
+    version: '1.0.0',
+    operation_id: input.operationId,
+    organization_id: input.organizationId,
+    ...(input.serviceId ? { service_id: input.serviceId } : {}),
+    name: input.name,
+    ...(input.purpose ? { purpose: input.purpose } : {}),
+    operation_type: input.operationType,
+    owner_role: input.ownerRole,
+    trigger: {
+      kind: input.triggerKind || 'manual',
+      ...(input.triggerExpression ? { expression: input.triggerExpression } : {}),
+    },
+    automation_boundary: {
+      allowed_actions: [],
+      approval_required_actions: [],
+      forbidden_actions: [],
+    },
+    escalation_path: [input.ownerRole],
+    evidence_outputs: input.evidenceOutputs?.length
+      ? input.evidenceOutputs
+      : [`${input.operationId}-run-report`],
+    execution_target: {
+      kind: input.executionKind || 'mission',
+      ...(input.executionRef ? { ref: input.executionRef } : {}),
+    },
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: 'active',
+    updated_at: now,
+  };
+  assertRecordIdentity(record);
+  if (!validateOrganizationOperation(record)) {
+    throw new Error(
+      `Invalid organization operation: ${validationErrors(validatorFor(OPERATION_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export interface BuildOrganizationProjectLinkInput {
+  organizationId: string;
+  projectId: string;
+  tier?: OrganizationTier;
+  tenantSlug?: string;
+  detach?: boolean;
+}
+
+export function buildOrganizationProjectLink(
+  input: BuildOrganizationProjectLinkInput,
+  now = new Date().toISOString()
+): OrganizationOperationalState {
+  const state = loadOrganizationOperationalState(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  });
+  if (!state) {
+    throw new Error(
+      `Organization state not found for '${input.organizationId}'. Run 'init' first.`
+    );
+  }
+  if (!input.detach && !loadProjectRecord(input.projectId)) {
+    throw new Error(
+      `Project '${input.projectId}' not found in the project registry. Create it via 'pnpm project create' first.`
+    );
+  }
+  const current = state.active_project_ids || [];
+  if (input.detach) {
+    if (!current.includes(input.projectId)) {
+      throw new Error(`Project '${input.projectId}' is not attached to '${input.organizationId}'.`);
+    }
+  } else if (current.includes(input.projectId)) {
+    throw new Error(
+      `Project '${input.projectId}' is already attached to '${input.organizationId}'.`
+    );
+  }
+  const record: OrganizationOperationalState = {
+    ...state,
+    active_project_ids: input.detach
+      ? current.filter((entry) => entry !== input.projectId)
+      : [...current, input.projectId],
+    updated_at: now,
+  };
+  if (!validateOrganizationOperationalState(record)) {
+    throw new Error(
+      `Invalid organization operational state: ${validationErrors(validatorFor(STATE_SCHEMA_PATH))}`
+    );
+  }
   return record;
 }
 

@@ -104,6 +104,30 @@ describe('provider-capability-registry', () => {
     });
   });
 
+  it('uses the real Claude fallback when the pnpm placeholder shadows the CLI', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const exec = fakeExec(
+      {
+        claude: false,
+        '/real/bin/claude --version': true,
+        '/real/bin/claude auth status': true,
+      },
+      { claude: 'claude native binary not installed' }
+    );
+    const results = probeProviderCapabilities({
+      providerIds: ['claude'],
+      exec,
+      resolveClaudeCliFallbackCandidates: () => ['/real/bin/claude'],
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: true,
+    });
+  });
+
   it('marks Claude Code unauthenticated without hiding the installed CLI', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
