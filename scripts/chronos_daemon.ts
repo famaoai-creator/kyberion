@@ -22,11 +22,15 @@ import {
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
   enqueueChronosDelivery,
+  createTriggerRunner,
+  withExecutionContextAsync,
+  withTriggerLeaderLease,
 } from '@agent/core';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
 
 const TICK_INTERVAL_MS = 60_000;
+const triggerRunner = createTriggerRunner();
 
 // ---------------------------------------------------------------------------
 // ADF scan → registry sync
@@ -92,7 +96,7 @@ function syncSchedulesFromAdf(): void {
 // Tick: find due pipelines and run them
 // ---------------------------------------------------------------------------
 
-async function tick(): Promise<void> {
+async function tickAsLeader(): Promise<void> {
   const now = new Date();
   recordDaemonHeartbeat('chronos-daemon', {
     status: 'running',
@@ -104,81 +108,132 @@ async function tick(): Promise<void> {
   logger.info(`[CHRONOS] ${due.length} pipeline(s) due`);
 
   for (const scheduled of due) {
-    const claimed = claimScheduledPipelineRun(scheduled.id, { now });
-    if (!claimed || !claimed.runLock) {
-      logger.info(`[CHRONOS] → Skipped: ${scheduled.id} (already running or no longer due)`);
-      continue;
-    }
+    const minuteKey = now.toISOString().slice(0, 16);
+    const receipt = await triggerRunner.run(
+      {
+        idempotencyKey: `cron:${scheduled.id}:${minuteKey}`,
+        source: 'cron',
+        createdBy: { authority_role: 'chronos_gateway', level: 40 },
+        requestedAuthority: { authority_role: 'chronos_gateway', level: 40 },
+        payload: {
+          schedule_id: scheduled.id,
+          fired_at: now.toISOString(),
+          cron_runtime_context: {
+            fresh_thread: true,
+            persisted_between_fires: [
+              'pipeline-schedules.json',
+              'active/shared/runtime/trigger-deliveries.jsonl',
+              'pipeline trace and run journal artifacts',
+            ],
+          },
+        },
+      },
+      async ({ deliveryId }) => {
+        const claimed = claimScheduledPipelineRun(scheduled.id, { now });
+        if (!claimed || !claimed.runLock) {
+          logger.info(`[CHRONOS] → Skipped: ${scheduled.id} (already running or no longer due)`);
+          return `skipped:${scheduled.id}:${minuteKey}`;
+        }
 
-    const runToken = claimed.runLock.token;
-    logger.info(`[CHRONOS] → Starting: ${scheduled.id}`);
+        const runToken = claimed.runLock.token;
+        logger.info(`[CHRONOS] → Starting: ${scheduled.id}`);
 
-    try {
-      const resolvedPipelinePath = resolveScheduledPipelinePath(scheduled);
-      const adf = readValidatedPipelineAdf(resolvedPipelinePath);
-      const result = await runSteps(
-        adf.steps,
-        { ...(scheduled.context ?? {}), ...(adf.context ?? {}) },
-        { pipelinePath: resolvedPipelinePath }
-      );
-
-      let deliverySucceeded = true;
-      if (result.status === 'succeeded' && scheduled.deliver_to) {
         try {
-          const messageId = enqueueChronosDelivery({
-            scheduleId: scheduled.id,
-            pipelineName: scheduled.name,
-            runId: runToken,
-            status: result.status,
-            context: result.context,
-            target: scheduled.deliver_to,
-          });
-          logger.info(`[CHRONOS] ✓ ${scheduled.id}: direct delivery queued (${messageId})`);
-        } catch (deliveryError: any) {
-          deliverySucceeded = false;
-          logger.error(
-            `[CHRONOS] ✗ ${scheduled.id}: direct delivery failed: ${deliveryError.message}`
+          const resolvedPipelinePath = resolveScheduledPipelinePath(scheduled);
+          const adf = readValidatedPipelineAdf(resolvedPipelinePath);
+          const result = await runSteps(
+            adf.steps,
+            {
+              ...(scheduled.context ?? {}),
+              ...(adf.context ?? {}),
+              cron_runtime_context: {
+                trigger_id: deliveryId,
+                fired_at: now.toISOString(),
+                fresh_thread: true,
+                persisted_between_fires: [
+                  'pipeline-schedules.json',
+                  'active/shared/runtime/trigger-deliveries.jsonl',
+                  'pipeline trace and run journal artifacts',
+                ],
+              },
+            },
+            { pipelinePath: resolvedPipelinePath, runId: deliveryId }
           );
+
+          let deliverySucceeded = true;
+          if (result.status === 'succeeded' && scheduled.deliver_to) {
+            try {
+              const messageId = enqueueChronosDelivery({
+                scheduleId: scheduled.id,
+                pipelineName: scheduled.name,
+                runId: deliveryId,
+                status: result.status,
+                context: result.context,
+                target: scheduled.deliver_to,
+              });
+              logger.info(`[CHRONOS] ✓ ${scheduled.id}: direct delivery queued (${messageId})`);
+            } catch (deliveryError: any) {
+              deliverySucceeded = false;
+              logger.error(
+                `[CHRONOS] ✗ ${scheduled.id}: direct delivery failed: ${deliveryError.message}`
+              );
+              sendOpsAlert({
+                severity: 'warning',
+                title: 'Scheduled pipeline delivery failed',
+                context: {
+                  daemon_id: 'chronos-daemon',
+                  schedule_id: scheduled.id,
+                  delivery: scheduled.deliver_to,
+                  error: deliveryError?.message ?? String(deliveryError),
+                },
+                recommendation:
+                  'Inspect the target surface outbox and schedule deliver_to contract.',
+                dedupe_key: `chronos:${scheduled.id}:delivery-failed`,
+              });
+            }
+          }
+
+          completeScheduledPipelineRun(
+            scheduled.id,
+            runToken,
+            result.status === 'succeeded' && deliverySucceeded ? 'succeeded' : 'failed',
+            { now }
+          );
+          logger.info(`[CHRONOS] ✓ ${scheduled.id}: ${result.status}`);
+          return `cron-run:${runToken}`;
+        } catch (err: any) {
+          completeScheduledPipelineRun(scheduled.id, runToken, 'failed', { now });
+          logger.error(`[CHRONOS] ✗ ${scheduled.id}: ${err.message}`);
           sendOpsAlert({
             severity: 'warning',
-            title: 'Scheduled pipeline delivery failed',
+            title: 'Scheduled pipeline failed',
             context: {
               daemon_id: 'chronos-daemon',
               schedule_id: scheduled.id,
-              delivery: scheduled.deliver_to,
-              error: deliveryError?.message ?? String(deliveryError),
+              pipeline_path: scheduled.pipelinePath,
+              error: err?.message ?? String(err),
             },
-            recommendation: 'Inspect the target surface outbox and schedule deliver_to contract.',
-            dedupe_key: `chronos:${scheduled.id}:delivery-failed`,
+            recommendation: 'Inspect the pipeline trace and rerun the failed scheduled pipeline.',
+            dedupe_key: `chronos:${scheduled.id}:failed`,
           });
+          throw err;
         }
       }
-
-      completeScheduledPipelineRun(
-        scheduled.id,
-        runToken,
-        result.status === 'succeeded' && deliverySucceeded ? 'succeeded' : 'failed',
-        { now }
+    );
+    if (receipt.status === 'failed' || receipt.status === 'rejected') {
+      logger.warn(
+        `[CHRONOS] Trigger ${scheduled.id} ${receipt.status}: ${receipt.reason || 'unknown'}`
       );
-
-      logger.info(`[CHRONOS] ✓ ${scheduled.id}: ${result.status}`);
-    } catch (err: any) {
-      completeScheduledPipelineRun(scheduled.id, runToken, 'failed', { now });
-
-      logger.error(`[CHRONOS] ✗ ${scheduled.id}: ${err.message}`);
-      sendOpsAlert({
-        severity: 'warning',
-        title: 'Scheduled pipeline failed',
-        context: {
-          daemon_id: 'chronos-daemon',
-          schedule_id: scheduled.id,
-          pipeline_path: scheduled.pipelinePath,
-          error: err?.message ?? String(err),
-        },
-        recommendation: 'Inspect the pipeline trace and rerun the failed scheduled pipeline.',
-        dedupe_key: `chronos:${scheduled.id}:failed`,
-      });
     }
+  }
+}
+
+async function tick(): Promise<void> {
+  const result = await withTriggerLeaderLease('chronos-daemon', () =>
+    withExecutionContextAsync('chronos_gateway', tickAsLeader)
+  );
+  if (result === undefined) {
+    logger.info('[CHRONOS] Another scheduler leader owns this tick; skipping.');
   }
 }
 

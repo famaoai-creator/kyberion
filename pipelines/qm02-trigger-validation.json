@@ -1,0 +1,43 @@
+{
+  "pipeline_id": "qm02-trigger-validation",
+  "version": "1.0.0",
+  "action": "pipeline",
+  "description": "Deterministic validation envelope for QM-02 trigger unification, authority non-escalation, registry portability, and managed-process watch.",
+  "context": {
+    "mission_id": "MSN-QM02-TRIGGER-20260808"
+  },
+  "steps": [
+    {
+      "id": "core-build",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "core_build", "type": "ShellResult" },
+      "params": { "cmd": "pnpm --filter '@agent/core' build" }
+    },
+    {
+      "id": "trigger-contract-tests",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "trigger_contract_tests", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm exec vitest run libs/core/trigger-runner.test.ts libs/core/managed-process.watch.test.ts libs/core/src/pipeline-scheduler.test.ts"
+      }
+    },
+    {
+      "id": "script-integrity",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "script_integrity", "type": "ShellResult" },
+      "params": { "cmd": "pnpm run check:script-integrity" }
+    },
+    {
+      "id": "report",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["core_build", "trigger_contract_tests", "script_integrity"],
+      "params": {
+        "message": "QM-02 trigger validation completed for mission MSN-QM02-TRIGGER-20260808."
+      }
+    }
+  ]
+}
