@@ -97,6 +97,7 @@ import {
 } from './src/knowledge-feedback-loop.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { TraceContext, persistTrace } from './src/trace.js';
+import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from './gap-phase.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import {
@@ -2529,15 +2530,26 @@ function attachDeliveredKnowledgeRefs(
 function finalizeMissionTaskTrace(
   traceCtx: TraceContext,
   input: Pick<DispatchPlannedMissionTaskInput, 'task' | 'teamRole'>,
-  outcome: DispatchMissionTaskOutcome | null
+  outcome: DispatchMissionTaskOutcome | null,
+  gapRecorder?: GapRecorder
 ): void {
   try {
+    const gapPhases = gapRecorder ? sanitizeGapSamples(gapRecorder.samples()) : [];
     traceCtx.setAttributes({
       task_id: input.task.task_id,
       team_role: input.teamRole,
       dispatched: outcome?.dispatched ?? false,
       result_schema_ok: outcome?.result_schema_ok ?? false,
+      ...(gapPhases.length
+        ? { gap_phase_total_ms: gapPhases.reduce((sum, item) => sum + item.ms, 0) }
+        : {}),
     });
+    if (gapPhases.length) {
+      traceCtx.addEvent('gap_phases', {
+        gap_phases: JSON.stringify(gapPhases),
+        gap_phase_total_ms: gapPhases.reduce((sum, item) => sum + item.ms, 0),
+      });
+    }
     const trace = traceCtx.finalize();
     const dirOverride = missionTaskTraceDirOverride();
     persistTrace(trace, dirOverride ? { dir: dirOverride } : undefined);
@@ -2672,6 +2684,7 @@ async function dispatchPlannedMissionTask(
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
   });
+  const gapRecorder = createGapRecorder();
   const onBehalfOf = delegationChain ? delegationChainRootActor(delegationChain) : undefined;
   const traceCtx = new TraceContext('mission_task_dispatch', {
     missionId: input.missionId,
@@ -2693,17 +2706,18 @@ async function dispatchPlannedMissionTask(
           },
           traceCtx
         )
-      : await dispatchPlannedMissionTaskCore(input, traceCtx, delegationChain);
+      : await dispatchPlannedMissionTaskCore(input, traceCtx, delegationChain, gapRecorder);
     return outcome;
   } finally {
-    finalizeMissionTaskTrace(traceCtx, input, outcome);
+    finalizeMissionTaskTrace(traceCtx, input, outcome, gapRecorder);
   }
 }
 
 async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
   traceCtx: TraceContext,
-  delegationChain?: DelegationChain
+  delegationChain?: DelegationChain,
+  gapRecorder?: GapRecorder
 ): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
@@ -2781,9 +2795,13 @@ async function dispatchPlannedMissionTaskCore(
       : obtainTaskResultResponse(dispatchArgs);
   };
   try {
-    dispatchContext = await buildContext();
+    dispatchContext = await (gapRecorder
+      ? gapRecorder.measure('context_pack', () => buildContext())
+      : buildContext());
     try {
-      response = await dispatchOnce(dispatchContext);
+      response = await (gapRecorder
+        ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
+        : dispatchOnce(dispatchContext));
     } catch (dispatchError: any) {
       // OH-01 reactive compaction: a provider-side "prompt too long" gets one
       // forced-compaction rebuild + retry before the failure propagates.
@@ -2791,8 +2809,12 @@ async function dispatchPlannedMissionTaskCore(
       logger.warn(
         `[MISSION_WORKER] Dispatch prompt too long for ${input.task.task_id}; forcing context compaction and retrying once.`
       );
-      dispatchContext = await buildContext(true);
-      response = await dispatchOnce(dispatchContext);
+      dispatchContext = await (gapRecorder
+        ? gapRecorder.measure('context_pack', () => buildContext(true))
+        : buildContext(true));
+      response = await (gapRecorder
+        ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
+        : dispatchOnce(dispatchContext));
     }
   } catch (err: any) {
     if (err instanceof AgentBusyError || err?.name === 'AgentBusyError') {
