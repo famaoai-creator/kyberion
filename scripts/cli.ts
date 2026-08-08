@@ -1698,10 +1698,35 @@ function runActuator(
   }
 }
 
-export async function main(args = process.argv.slice(2)) {
-  installReasoningBackends();
-  installPythonVoiceBridgeIfAvailable();
+const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
+  'help',
+  '--help',
+  '-h',
+  'list',
+  'search',
+  'info',
+  'examples',
+  'mobile-profiles',
+  'web-profiles',
+  'artifact',
+  'open-artifact',
+  'packet',
+  'approvals',
+]);
 
+/**
+ * LC-13: metadata/status commands must not pay the provider, embedding, or
+ * voice bootstrap cost. `list --check` is the explicit exception because it
+ * asks for live runtime capability probes.
+ */
+export function shouldBootstrapRuntime(args: string[]): boolean {
+  const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
+  const command = normalizedArgs[0] || 'help';
+  if (command === 'list') return normalizedArgs.includes('--check');
+  return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
+}
+
+export async function main(args = process.argv.slice(2)) {
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
 
@@ -1709,6 +1734,11 @@ export async function main(args = process.argv.slice(2)) {
   const locale = resolveLocale(args);
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
+
+  if (shouldBootstrapRuntime(normalizedArgs)) {
+    installReasoningBackends();
+    installPythonVoiceBridgeIfAvailable();
+  }
 
   if (command === 'help' || command === '--help' || command === '-h') {
     printHelp(actuators, locale);

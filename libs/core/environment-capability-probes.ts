@@ -37,6 +37,10 @@ import {
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
+import {
+  normalizeReasoningBackendMode,
+  type ReasoningBackendMode,
+} from './reasoning-backend-policy.js';
 
 export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
@@ -50,7 +54,151 @@ export function installCoreEnvironmentProbes(): void {
  * Probe bodies                                                        *
  * ------------------------------------------------------------------ */
 
+/**
+ * Probe exactly the backend named by `KYBERION_REASONING_BACKEND` (aliases
+ * normalized via the reasoning-backend policy — the canonical catalog lives
+ * in `reasoning-backend-policy.ts` / `knowledge/product/governance/
+ * reasoning-backend-policy.json`). Exported for hermetic unit tests: the
+ * CLI-spawning checks are injectable via `deps`.
+ */
+export async function probeExplicitReasoningBackend(
+  backendRaw: string,
+  env: NodeJS.ProcessEnv = process.env,
+  deps: {
+    binaryProbe?: (command: string, args: readonly string[]) => boolean;
+    claudeProbe?: () => { available: boolean; reason?: string };
+  } = {}
+): Promise<{ available: boolean; reason?: string }> {
+  const binaryProbe = deps.binaryProbe ?? binaryAvailable;
+  const claudeProbe = deps.claudeProbe ?? (() => probeShellClaudeCliAvailability(env));
+  const backend = normalizeReasoningBackendMode(backendRaw as ReasoningBackendMode);
+
+  const unavailable = (detail: string): { available: boolean; reason: string } => ({
+    available: false,
+    reason: `KYBERION_REASONING_BACKEND=${backendRaw} is set but that backend is not reachable: ${detail}`,
+  });
+
+  switch (backend) {
+    case 'stub':
+      return {
+        available: false,
+        reason:
+          'KYBERION_REASONING_BACKEND=stub is explicitly selected — deterministic placeholders only. Configure a real backend (see `pnpm reasoning:setup`) to clear this.',
+      };
+    case 'claude-cli': {
+      // claude-cli is a shell backend; an API key does not make the CLI
+      // executable. Probe the selected runtime rather than short-circuiting
+      // on a credential intended for the Agent/API mode.
+      const probe = claudeProbe();
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'claude CLI probe failed');
+    }
+    case 'claude-agent': {
+      if (env.CLAUDE_API_KEY?.trim()) return { available: true };
+      const probe = claudeProbe();
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'claude CLI probe failed');
+    }
+    case 'codex-cli':
+      return binaryProbe('codex', ['--version'])
+        ? { available: true }
+        : unavailable('`codex --version` failed');
+    case 'gemini-cli':
+      return binaryProbe('gemini', ['--version'])
+        ? { available: true }
+        : unavailable('`gemini --version` failed');
+    case 'agy-cli':
+      return binaryProbe('agy', ['--version'])
+        ? { available: true }
+        : unavailable('`agy --version` failed');
+    case 'grok-cli':
+      return binaryProbe('grok', ['--version'])
+        ? { available: true }
+        : unavailable('`grok --version` failed');
+    case 'copilot':
+      return binaryProbe('gh', ['copilot', '--', '--help'])
+        ? { available: true }
+        : unavailable('`gh copilot -- --help` failed');
+    case 'anthropic':
+      return env.ANTHROPIC_API_KEY
+        ? { available: true }
+        : unavailable('ANTHROPIC_API_KEY is not set');
+    case 'gemini-api': {
+      const probe = await probeGeminiApiBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'Gemini API probe failed');
+    }
+    case 'openrouter': {
+      const probe = await probeOpenRouterBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'OpenRouter probe failed');
+    }
+    case 'ollama': {
+      const probe = await probeOllamaBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'Ollama probe failed');
+    }
+    case 'vllm': {
+      const probe = await probeVllmBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'vLLM probe failed');
+    }
+    case 'lmstudio': {
+      const probe = await probeLmStudioBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'LM Studio probe failed');
+    }
+    case 'llamacpp': {
+      const probe = await probeLlamaCppBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'llama.cpp probe failed');
+    }
+    case 'mlx': {
+      const probe = await probeMlxBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'MLX probe failed');
+    }
+    case 'localai': {
+      const probe = await probeLocalAiBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'LocalAI probe failed');
+    }
+    case 'local': {
+      const probe = await probeOpenAiCompatibleBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'local OpenAI-compatible probe failed');
+    }
+    case 'nemotron-api': {
+      const probe = await probeNemotronBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'Nemotron probe failed');
+    }
+    default:
+      return unavailable(
+        'unknown backend mode. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes) for the catalog.'
+      );
+  }
+}
+
 async function probeReasoningBackend(): Promise<{ available: boolean; reason?: string }> {
+  // An explicitly selected backend is probed specifically — a working
+  // *different* backend must not mask a broken selection.
+  const explicit = process.env.KYBERION_REASONING_BACKEND?.trim();
+  if (explicit) {
+    return probeExplicitReasoningBackend(explicit, process.env);
+  }
   if (binaryAvailable('codex', ['--version'])) {
     return { available: true };
   }
@@ -58,6 +206,9 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     return { available: true };
   }
   if (binaryAvailable('agy', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('grok', ['--version'])) {
     return { available: true };
   }
   if (process.env.CLAUDE_API_KEY !== undefined || probeShellClaudeCliAvailability().available) {
@@ -106,19 +257,10 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const nemotronProbe = await probeNemotronBackendAvailability(process.env);
     if (nemotronProbe.available) return { available: true };
   }
-  if (binaryAvailable('gemini', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('codex', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('agy', ['--version'])) {
-    return { available: true };
-  }
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

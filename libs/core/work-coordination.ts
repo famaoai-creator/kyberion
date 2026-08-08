@@ -1532,6 +1532,7 @@ export function importExternalWorkItem(input: {
   assigneeUserId?: string;
   labels?: string[];
   dependencies?: string[];
+  context?: WorkItemContext;
   metadata?: Record<string, unknown>;
 }): WorkItem {
   const existing = listWorkItems({ source: input.source }).find(
@@ -1550,6 +1551,7 @@ export function importExternalWorkItem(input: {
       assigneeUserId: input.assigneeUserId,
       labels: input.labels || existing.labels,
       dependencies: input.dependencies || existing.dependencies,
+      context: input.context || existing.context,
       metadata: input.metadata || existing.metadata,
     });
   }
@@ -1565,6 +1567,7 @@ export function importExternalWorkItem(input: {
     assigneeUserId: input.assigneeUserId,
     labels: input.labels,
     dependencies: input.dependencies,
+    context: input.context,
     metadata: input.metadata,
   });
   appendEvent({

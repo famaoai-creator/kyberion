@@ -54,11 +54,17 @@ describe('project-management facade', () => {
       name: 'Project Management Test',
       summary: 'Facade reconciliation fixture.',
       tier: 'confidential',
+      organization_id: 'ORG-PMC-TEST',
+      tenant_slug: 'tenant-pmc-test',
       status: 'active',
       pipeline_refs: ['pipelines/project-management-validation.json'],
     });
 
     const view = getProjectManagementView(PROJECT_ID);
+    expect(view.project).toMatchObject({
+      organization_id: 'ORG-PMC-TEST',
+      tenant_slug: 'tenant-pmc-test',
+    });
     expect(view.lineage.pipelines).toEqual([
       {
         pipeline_id: 'pipelines/project-management-validation.json',
@@ -97,6 +103,7 @@ describe('project-management facade', () => {
       name: 'Bootstrap Test Project',
       summary: 'Surface-independent bootstrap fixture.',
       tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
       utterance: '新しいプロジェクトを始める',
       primary_locale: 'ja-JP',
       service_bindings: ['github'],

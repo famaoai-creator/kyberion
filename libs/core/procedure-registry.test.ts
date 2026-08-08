@@ -76,6 +76,9 @@ describe('procedure-registry', () => {
     });
 
     it('caches on second call without forceRefresh', () => {
+      // The personal catalog is optional machine state; hide it so the read
+      // count is deterministic regardless of the host.
+      vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
       const spy = vi
         .spyOn(secureIo, 'safeReadFile')
         .mockReturnValue(JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));

@@ -113,7 +113,11 @@ export function resolveWorkItemContext(item: WorkItem): ResolvedWorkItemContext 
     missionFromLabel(item.labels || [])
   );
   const warnings: string[] = [];
-  if (!hasExplicitContext) warnings.push('work item context is inferred from legacy fields');
+  if (!hasExplicitContext && hasLegacyContext) {
+    warnings.push(
+      '[DEPRECATED] work item context is carried by legacy metadata/labels; set typed context on creation'
+    );
+  }
   if (!context.mission_id && !context.project_id)
     warnings.push('missing mission_id and project_id');
   return {

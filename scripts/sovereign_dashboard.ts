@@ -18,6 +18,7 @@ import {
   formatDateTime,
   resolveOperatorLocale,
   resolveTimeZone,
+  isServiceConnectionReady,
 } from '@agent/core';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
@@ -297,13 +298,11 @@ function readConnectionReview() {
     const serviceId = path.basename(file, '.json');
     const record = readJsonIfExists<Record<string, unknown>>(file);
     const requirements = readiness?.required_services?.[serviceId]?.required_keys_any || [];
-    const hasRequiredKey =
-      requirements.length === 0
-        ? Boolean(record)
-        : requirements.some((key) =>
-            Boolean(record && Object.prototype.hasOwnProperty.call(record, key))
-          );
-    const status = !record ? 'pending' : hasRequiredKey ? 'ready' : 'blocked';
+    const status = !record
+      ? 'pending'
+      : isServiceConnectionReady(serviceId, record)
+        ? 'ready'
+        : 'blocked';
     return {
       serviceId,
       status,
@@ -618,16 +617,9 @@ function drawOnboardingHome() {
   const requiredServices = Object.entries(readiness?.required_services || {});
   const readyServices: string[] = [];
   const blockedServices: string[] = [];
-  for (const [serviceId, policy] of requiredServices) {
+  for (const [serviceId] of requiredServices) {
     const record = serviceMap.get(serviceId);
-    const requiredKeys = policy.required_keys_any || [];
-    const hasRequiredKey =
-      requiredKeys.length === 0
-        ? Boolean(record)
-        : requiredKeys.some((key) =>
-            Boolean(record && Object.prototype.hasOwnProperty.call(record, key))
-          );
-    if (hasRequiredKey) readyServices.push(serviceId);
+    if (record && isServiceConnectionReady(serviceId, record)) readyServices.push(serviceId);
     else blockedServices.push(serviceId);
   }
 
@@ -667,9 +659,10 @@ function drawOnboardingHome() {
     console.log(chalk.dim('  Connections:'));
     for (const file of connectionFiles.slice(0, 4)) {
       const serviceId = path.basename(file, '.json');
-      const status = serviceMap.has(serviceId)
-        ? chalk.green(renderStatus('connection', 'connected', 'en'))
-        : chalk.yellow(renderStatus('connection', 'pending', 'en'));
+      const status =
+        serviceMap.has(serviceId) && isServiceConnectionReady(serviceId, serviceMap.get(serviceId)!)
+          ? chalk.green(renderStatus('connection', 'connected', 'en'))
+          : chalk.yellow(renderStatus('connection', 'pending', 'en'));
       console.log(`    ${chalk.gray('•')} ${serviceId.padEnd(16)} ${status}`);
     }
   } else {

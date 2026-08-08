@@ -19,4 +19,7 @@ for (; index < process.argv.length; index += 1) {
 
 const command = process.argv[index];
 if (!command) throw new Error('Usage: run_with_env.ts [NAME=value ...] command [args ...]');
-safeExec(command, process.argv.slice(index + 1), { env: assignments });
+// LC-14: this wrapper is used by `surfaces:*` package scripts. Forward the
+// child stdout so status/reconcile results remain visible to the operator.
+const output = safeExec(command, process.argv.slice(index + 1), { env: assignments });
+if (output) process.stdout.write(output);

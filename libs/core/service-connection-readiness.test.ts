@@ -1,0 +1,16 @@
+import { describe, expect, it } from 'vitest';
+import {
+  hasRequiredServiceConnectionValue,
+  isServiceConnectionReady,
+} from './service-connection-readiness.js';
+
+describe('service connection readiness', () => {
+  it('does not treat an empty required value as ready', () => {
+    expect(hasRequiredServiceConnectionValue({ voice_name: '' }, ['voice_name'])).toBe(false);
+    expect(isServiceConnectionReady('voice', { voice_name: '' })).toBe(false);
+  });
+
+  it('accepts a non-empty required value', () => {
+    expect(isServiceConnectionReady('voice', { voice_name: 'Kyoko' })).toBe(true);
+  });
+});
