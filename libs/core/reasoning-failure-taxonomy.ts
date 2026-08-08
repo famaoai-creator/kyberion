@@ -24,6 +24,9 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
   if (/abort|cancel|user.?stop|operator.?cancel/i.test(message)) {
     return { class: 'cancelled', retryable: false, allowFailover: false, demoteProvider: false };
   }
+  if (/claude-agent.*no active session|no active session.*claude-agent/i.test(message)) {
+    return { class: 'transient', retryable: false, allowFailover: true, demoteProvider: true };
+  }
   if (
     /egress|tier.?mismatch|spend.?cap|policy|approval.?required|forbidden|denied by/i.test(message)
   ) {
@@ -34,7 +37,10 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
       message
     )
   ) {
-    return { class: 'auth', retryable: false, allowFailover: false, demoteProvider: false };
+    // Credentials are provider-local. A failed credential must not strand the
+    // governed chain when another candidate is available; policy/egress
+    // denials remain hard stops below.
+    return { class: 'auth', retryable: false, allowFailover: true, demoteProvider: true };
   }
   if (
     /context.?limit|context.?window|max[_ -]?tokens|too many tokens|prompt too long/i.test(message)

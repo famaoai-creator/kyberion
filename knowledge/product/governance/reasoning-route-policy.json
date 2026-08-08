@@ -90,7 +90,7 @@
       "endpoint_policy": "public",
       "model_policy": "approved",
       "capabilities": ["text", "structured_output", "tools", "vision", "streaming"],
-      "supported_parameters": ["temperature", "top_p", "top_k", "stop"]
+      "supported_parameters": ["stop"]
     },
     "openrouter": {
       "adapter": "openai-compatible",

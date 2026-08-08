@@ -51,6 +51,12 @@ describe('reasoning-route-resolver', () => {
     ).toThrow(/Unsupported parameters/);
   });
 
+  it('rejects legacy sampling parameters for the current Gemini API route', () => {
+    expect(() =>
+      resolveSamplingParams({ mode: 'gemini-api', sampling: { temperature: 0.2 } })
+    ).toThrow(/Unsupported parameters/);
+  });
+
   it('does not silently pass through an unsafe translation policy', () => {
     const policy = {
       version: 'test',
