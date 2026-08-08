@@ -37,6 +37,7 @@ const mockProviders = vi.hoisted(() => {
 // tests override the return value to exercise the narrowing path.
 const mockCapabilityRegistry = vi.hoisted(() => ({
   peekProviderCapabilityRegistry: vi.fn(() => null as any),
+  loadProviderCapabilityRegistry: vi.fn(() => [] as any),
 }));
 
 vi.mock('./provider-discovery.js', () => ({
@@ -49,6 +50,7 @@ vi.mock('./capability-broker.js', () => ({
 
 vi.mock('./provider-capability-registry.js', () => ({
   peekProviderCapabilityRegistry: mockCapabilityRegistry.peekProviderCapabilityRegistry,
+  loadProviderCapabilityRegistry: mockCapabilityRegistry.loadProviderCapabilityRegistry,
 }));
 
 describe('reasoning-bootstrap', () => {
@@ -100,6 +102,8 @@ describe('reasoning-bootstrap', () => {
     mockProviders.setProviders(mockProviders.defaultProviders);
     mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReset();
     mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue(null);
+    mockCapabilityRegistry.loadProviderCapabilityRegistry.mockReset();
+    mockCapabilityRegistry.loadProviderCapabilityRegistry.mockReturnValue([]);
     delete process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING;
   });
 
@@ -302,6 +306,58 @@ describe('reasoning-bootstrap', () => {
         expect.stringContaining('excluding candidate mode=codex-cli provider=codex')
       );
       infoSpy.mockRestore();
+    });
+
+    it('retains a provider when the authentication probe errored', () => {
+      mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue([
+        {
+          provider_id: 'codex',
+          binary_found: true,
+          authenticated: false,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+          probe_error: 'temporary auth status failure',
+        },
+        {
+          provider_id: 'agy',
+          binary_found: true,
+          authenticated: 'unknown',
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+      ]);
+
+      const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+      expect(installed).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('codex-cli');
+    });
+
+    it('force-refreshes the capability registry when provider refresh is requested', () => {
+      const installed = installReasoningBackends({
+        mode: 'codex-cli',
+        force: true,
+        refreshProviders: true,
+      });
+
+      expect(installed).toBe(true);
+      expect(mockCapabilityRegistry.loadProviderCapabilityRegistry).toHaveBeenCalledWith({
+        forceRefresh: true,
+      });
+    });
+
+    it('reselects the backend in a long-lived process when refresh is requested', () => {
+      expect(installReasoningBackends({ mode: 'codex-cli', force: true })).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('codex-cli');
+
+      expect(
+        installReasoningBackends({ mode: 'agy-cli', force: true, refreshProviders: true })
+      ).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('agy-cli');
     });
 
     it('excludes a provider whose binary was not found', () => {

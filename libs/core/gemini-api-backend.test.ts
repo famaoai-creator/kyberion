@@ -94,6 +94,24 @@ describe('GeminiApiBackend', () => {
     expect(body.toolConfig.functionCallingConfig.mode).toBe('AUTO');
   });
 
+  it('translates the governed stop parameter to native generationConfig', async () => {
+    const request = vi.fn().mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: 'done' }] } }],
+    });
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-3.6-flash',
+      samplingParams: { stop: ['END'] },
+      request,
+    });
+
+    await backend.prompt('Respond briefly');
+
+    expect(request.mock.calls[0][0].data.generationConfig).toEqual({
+      stopSequences: ['END'],
+    });
+  });
+
   it('inlines validated image attachments for vision prompts', async () => {
     const request = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: 'A Kyberion mark.' }] } }],

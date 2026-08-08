@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 77490,
+      "size": 77756,
       "type": "json"
     },
     {
@@ -1743,13 +1743,13 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1478,
+      "size": 1546,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 10863,
+      "size": 11629,
       "type": "json"
     },
     {
@@ -2061,7 +2061,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1227,
+      "size": 1190,
       "type": "json"
     },
     {
@@ -2085,7 +2085,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2590,
+      "size": 2658,
       "type": "json"
     },
     {
@@ -2097,7 +2097,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 12204,
+      "size": 12171,
       "type": "json"
     },
     {
@@ -3885,13 +3885,13 @@
     {
       "path": "product/orchestration/provider-capabilities.fallback.json",
       "tier": "public",
-      "size": 9483,
+      "size": 10443,
       "type": "json"
     },
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 11723,
+      "size": 13030,
       "type": "json"
     },
     {

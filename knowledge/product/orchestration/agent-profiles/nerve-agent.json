@@ -7,7 +7,7 @@
       "capabilities": ["reasoning", "coordination", "routing", "analysis", "security"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
+        "preferred_modelId": "Gemini 3.6 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     }

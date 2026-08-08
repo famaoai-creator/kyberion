@@ -3,9 +3,10 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
         "auto-gemini-3",
         "auto-gemini-2.5",
-        "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
         "gemini-3.1-pro-preview",
         "gemini-3-flash-preview",
@@ -33,6 +34,26 @@
         "a2ui"
       ],
       "modelCapabilities": {
+        "gemini-3.6-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
+        "gemini-3.5-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "code",
+          "review",
+          "architecture"
+        ],
         "auto-gemini-3": [
           "reasoning",
           "planning",
@@ -55,21 +76,6 @@
           "review",
           "architecture",
           "a2a"
-        ],
-        "gemini-3.5-flash": [
-          "structured_json",
-          "surface",
-          "conversation",
-          "realtime",
-          "low_latency",
-          "routing",
-          "delegation",
-          "dashboard",
-          "a2ui",
-          "slack",
-          "presence",
-          "onboarding",
-          "gateway"
         ],
         "gemini-3.1-flash-lite": [
           "structured_json",
@@ -332,7 +338,12 @@
       }
     },
     "agy": {
-      "models": ["Gemini 3.5 Flash (Medium)"],
+      "models": [
+        "Gemini 3.6 Flash (Medium)",
+        "Gemini 3.6 Flash (High)",
+        "Gemini 3.6 Flash (Low)",
+        "Gemini 3.5 Flash (Medium)"
+      ],
       "capabilities": [
         "reasoning",
         "planning",
@@ -344,6 +355,35 @@
         "structured_json"
       ],
       "modelCapabilities": {
+        "Gemini 3.6 Flash (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.6 Flash (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.6 Flash (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
         "Gemini 3.5 Flash (Medium)": [
           "reasoning",
           "planning",

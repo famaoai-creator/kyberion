@@ -3,6 +3,7 @@ import { safeReadFile, safeStat, validateUrl } from './secure-io.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
 import { validateReasoningImageAttachmentPaths } from './reasoning-backend.js';
+import type { SamplingParams } from './reasoning-route-resolver.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -30,13 +31,15 @@ import type {
 } from './reasoning-backend.js';
 
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-export const GEMINI_API_DEFAULT_MODEL = 'gemini-flash-latest';
+export const GEMINI_API_DEFAULT_MODEL = 'gemini-3.6-flash';
 
 export interface GeminiApiBackendOptions {
   apiKey: string;
   model: string;
   baseURL?: string;
   timeoutMs?: number;
+  /** Route parameters translated to Gemini's native generationConfig shape. */
+  samplingParams?: Pick<SamplingParams, 'stop'>;
   /** Injectable for hermetic tests; production uses Kyberion's secure egress path. */
   request?: (options: SecureFetchOptions) => Promise<unknown>;
 }
@@ -67,7 +70,7 @@ interface GeminiGenerateContentResponse {
 interface GeminiGenerateContentRequest {
   systemInstruction?: { parts: Array<{ text: string }> };
   contents: GeminiContent[];
-  generationConfig?: { responseMimeType?: 'application/json' };
+  generationConfig?: { responseMimeType?: 'application/json'; stopSequences?: string[] };
   tools?: Array<{
     functionDeclarations: Array<{
       name: string;
@@ -169,6 +172,7 @@ export class GeminiApiBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly baseURL: string;
   private readonly timeoutMs: number;
+  private readonly samplingParams: Pick<SamplingParams, 'stop'>;
   private readonly request: (options: SecureFetchOptions) => Promise<unknown>;
 
   constructor(options: GeminiApiBackendOptions) {
@@ -179,6 +183,7 @@ export class GeminiApiBackend implements ReasoningBackend {
     this.baseURL = normalizeBaseUrl(options.baseURL || GEMINI_API_DEFAULT_BASE_URL);
     this.egressEndpoint = this.baseURL;
     this.timeoutMs = options.timeoutMs ?? 60_000;
+    this.samplingParams = { ...(options.samplingParams || {}) };
     this.request = options.request || secureFetch;
   }
 
@@ -191,14 +196,28 @@ export class GeminiApiBackend implements ReasoningBackend {
     options: { systemPrompt?: string; json?: boolean; signal?: AbortSignal } = {}
   ): Promise<string> {
     assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
+    const generationConfig = this.generationConfig(
+      options.json ? { responseMimeType: 'application/json' } : undefined
+    );
     const body: GeminiGenerateContentRequest = {
       ...(options.systemPrompt
         ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
         : {}),
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      ...(options.json ? { generationConfig: { responseMimeType: 'application/json' } } : {}),
+      ...(generationConfig ? { generationConfig } : {}),
     };
     return this.generateFromBody(body, options.signal);
+  }
+
+  private generationConfig(
+    overrides?: GeminiGenerateContentRequest['generationConfig']
+  ): GeminiGenerateContentRequest['generationConfig'] {
+    const stop = this.samplingParams.stop;
+    if (stop === undefined && !overrides) return undefined;
+    return {
+      ...(stop !== undefined ? { stopSequences: Array.isArray(stop) ? [...stop] : [stop] } : {}),
+      ...(overrides || {}),
+    };
   }
 
   private async generateFromBody(
@@ -206,6 +225,17 @@ export class GeminiApiBackend implements ReasoningBackend {
     signal?: AbortSignal
   ): Promise<string> {
     assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
+    const requestBody: GeminiGenerateContentRequest = {
+      ...body,
+      ...(this.generationConfig() || body.generationConfig
+        ? {
+            generationConfig: {
+              ...(this.generationConfig() || {}),
+              ...(body.generationConfig || {}),
+            },
+          }
+        : {}),
+    };
     const response = (await this.request({
       method: 'POST',
       url: endpointFor(this.baseURL, this.model),
@@ -213,7 +243,7 @@ export class GeminiApiBackend implements ReasoningBackend {
         'content-type': 'application/json',
         'x-goog-api-key': this.apiKey,
       },
-      data: body,
+      data: requestBody,
       authenticateRequest: true,
       timeout: this.timeoutMs,
       ...(signal ? { signal } : {}),
@@ -469,7 +499,8 @@ export class GeminiApiBackend implements ReasoningBackend {
 
 export function buildGeminiApiBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  modelOverride?: string
+  modelOverride?: string,
+  samplingParams?: Pick<SamplingParams, 'stop'>
 ): GeminiApiBackend | null {
   const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
   if (!apiKey) return null;
@@ -482,6 +513,7 @@ export function buildGeminiApiBackendFromEnv(
         GEMINI_API_DEFAULT_MODEL
     ),
     baseURL: env.KYBERION_GEMINI_URL?.trim(),
+    samplingParams,
   });
 }
 
