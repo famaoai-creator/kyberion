@@ -85,6 +85,8 @@ export interface MissionState {
   distillation?: {
     status: 'completed';
     completed_at: string;
+    mode?: 'llm' | 'structural';
+    llm_used?: boolean;
     output_path: string;
   };
   /** Set when governed distillation closes the mission lifecycle. */

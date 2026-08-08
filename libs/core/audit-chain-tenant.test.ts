@@ -36,6 +36,13 @@ vi.mock('./secure-io.js', async () => {
       actualFs.mkdirSync(path.dirname(p), { recursive: true });
       actualFs.writeFileSync(p, data, { flag: 'wx' });
     },
+    safeUnlinkSync: (p: string) => {
+      try {
+        actualFs.unlinkSync(p);
+      } catch (error: any) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    },
     safeWriteFile: (p: string, data: string) => {
       actualFs.mkdirSync(path.dirname(p), { recursive: true });
       actualFs.writeFileSync(p, data);

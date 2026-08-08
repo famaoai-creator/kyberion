@@ -1,6 +1,7 @@
 import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   computeLedgerEntryHash,
   GENESIS_HASH,
@@ -9,6 +10,7 @@ import {
   verifyLedgerEntryHash,
   type ChainAlg,
 } from './chain-integrity.js';
+import { withLockSync } from './src/lock-utils.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -63,26 +65,29 @@ export const record = (type: string, data: any) => {
  * Internal helper to write an entry with hash chaining to a specific file.
  */
 function _writeToLedger(ledgerPath: string, entryData: any): string {
-  const lastHash = _getLastHash(ledgerPath);
-  const chainKey = resolveAuditChainKey({ createIfMissing: true });
-  if (!chainKey) throw new Error('missing_audit_chain_key');
-  const entry: any = {
-    ...entryData,
-    parent_hash: lastHash,
-    chain_alg: 'hmac-sha256' satisfies ChainAlg,
-    chain_key_id: getAuditChainKeyId(chainKey),
-  };
+  const lockId = `ledger-${createHash('sha256').update(ledgerPath).digest('hex')}`;
+  return withLockSync(lockId, () => {
+    const lastHash = _getLastHash(ledgerPath);
+    const chainKey = resolveAuditChainKey({ createIfMissing: true });
+    if (!chainKey) throw new Error('missing_audit_chain_key');
+    const entry: any = {
+      ...entryData,
+      parent_hash: lastHash,
+      chain_alg: 'hmac-sha256' satisfies ChainAlg,
+      chain_key_id: getAuditChainKeyId(chainKey),
+    };
 
-  const hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key: chainKey });
-  entry.hash = hash;
+    const hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key: chainKey });
+    entry.hash = hash;
 
-  const dir = path.dirname(ledgerPath);
-  if (!safeExistsSync(dir)) {
-    safeMkdir(dir, { recursive: true });
-  }
+    const dir = path.dirname(ledgerPath);
+    if (!safeExistsSync(dir)) {
+      safeMkdir(dir, { recursive: true });
+    }
 
-  safeAppendFileSync(ledgerPath, JSON.stringify(entry) + '\n');
-  return hash;
+    safeAppendFileSync(ledgerPath, JSON.stringify(entry) + '\n');
+    return hash;
+  });
 }
 
 function _getLastHash(ledgerPath: string) {

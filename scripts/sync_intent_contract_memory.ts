@@ -1,32 +1,40 @@
 import * as AjvModule from 'ajv';
-import { compileSchemaFromPath, logger, pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
+import {
+  compileSchemaFromPath,
+  logger,
+  pathResolver,
+  safeExistsSync,
+  safeWriteFile,
+} from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
 
 const MEMORY_SCHEMA_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH
-  || pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH ||
+  pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
 const SEED_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH
-  || pathResolver.knowledge('product/governance/intent-contract-memory.json');
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH ||
+  pathResolver.knowledge('product/governance/intent-contract-memory.json');
 const RUNTIME_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH
-  || pathResolver.shared('runtime/intent-contract-memory.json');
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH ||
+  pathResolver.shared('runtime/intent-contract-memory.json');
 const DEFAULT_REPORT_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH
-  || pathResolver.shared('runtime/reports/intent-contract-memory-sync-latest.json');
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH ||
+  pathResolver.shared('runtime/reports/intent-contract-memory-sync-latest.json');
 const DEFAULT_EXPORT_DIR =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR
-  || pathResolver.shared('exports/intent-contract-memory-sync');
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR ||
+  pathResolver.shared('exports/intent-contract-memory-sync');
 
 type MemoryFile = {
   version: string;
-  entries: Array<{
-    intent_id: string;
-    contract_ref: { kind: string; ref: string };
-  } & Record<string, unknown>>;
+  entries: Array<
+    {
+      intent_id: string;
+      contract_ref: { kind: string; ref: string };
+    } & Record<string, unknown>
+  >;
 };
 
 function readJson<T>(absPath: string): T {
@@ -36,12 +44,17 @@ function readJson<T>(absPath: string): T {
 function validateMemory(value: unknown): asserts value is MemoryFile {
   const validate = compileSchemaFromPath(ajv as any, MEMORY_SCHEMA_PATH);
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`intent-contract-memory schema violation: ${errors}`);
   }
 }
 
-function entryKey(entry: { intent_id: string; contract_ref: { kind: string; ref: string } }): string {
+function entryKey(entry: {
+  intent_id: string;
+  contract_ref: { kind: string; ref: string };
+}): string {
   return `${entry.intent_id}::${entry.contract_ref.kind}::${entry.contract_ref.ref}`;
 }
 
@@ -68,7 +81,9 @@ function main(): void {
   const runtime = readJson<unknown>(RUNTIME_PATH);
   validateMemory(runtime);
 
-  const base = safeExistsSync(SEED_PATH) ? readJson<unknown>(SEED_PATH) : { version: '1.0.0', entries: [] };
+  const base = safeExistsSync(SEED_PATH)
+    ? readJson<unknown>(SEED_PATH)
+    : { version: '1.0.0', entries: [] };
   validateMemory(base);
 
   const seedMemory = base as MemoryFile;
@@ -124,11 +139,21 @@ function main(): void {
   if (persistExport) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const exportPath = `${exportDir}/intent-contract-memory-sync-${stamp}.json`;
-    safeWriteFile(exportPath, JSON.stringify(report, null, 2));
+    try {
+      safeWriteFile(exportPath, JSON.stringify(report, null, 2));
+    } catch (error) {
+      // The report is the authoritative in-workspace result. Export storage
+      // may be an offloaded/symlinked volume that is unavailable in a
+      // restricted runtime; do not turn a successful sync into a failed
+      // lifecycle transition merely because the optional export is blocked.
+      logger.warn(
+        `[sync:intent-contract-memory] export skipped: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   logger.info(
-    `[sync:intent-contract-memory] merged=${snapshot.entries.length} added=${added} updated=${updated} unchanged=${unchanged} report=${reportPath}`,
+    `[sync:intent-contract-memory] merged=${snapshot.entries.length} added=${added} updated=${updated} unchanged=${unchanged} report=${reportPath}`
   );
 }
 
