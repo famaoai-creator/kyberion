@@ -87,17 +87,62 @@ describe('provider-capability-registry', () => {
     expect(results[0]!.probe_error).toBeTruthy();
   });
 
-  it('leaves authenticated as "unknown" for providers with no cheap auth probe', async () => {
+  it('reports Claude Code login state through its cheap auth probe', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
 
-    const exec = fakeExec({ 'claude --version': true });
+    const exec = fakeExec({
+      'claude --version': true,
+      'claude auth status': true,
+    });
     const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
 
     expect(results[0]).toMatchObject({
       provider_id: 'claude',
       binary_found: true,
-      authenticated: 'unknown',
+      authenticated: true,
+    });
+  });
+
+  it('marks Claude Code unauthenticated without hiding the installed CLI', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = fakeExec(
+      {
+        'claude --version': true,
+        'claude auth status': false,
+      },
+      { 'claude auth status': 'Not logged in' }
+    );
+    const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: false,
+    });
+    expect(results[0]!.probe_error).toBe('Not logged in');
+  });
+
+  it('uses Claude auth JSON when the command exits successfully', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = ((command, args) => {
+      const key = `${command} ${args.join(' ')}`;
+      return {
+        ok: true,
+        stdout: key === 'claude auth status' ? JSON.stringify({ loggedIn: false }) : '1.0.0',
+        stderr: '',
+      };
+    }) satisfies ProbeExecFn;
+    const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: false,
     });
   });
 

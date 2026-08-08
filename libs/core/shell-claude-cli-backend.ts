@@ -33,6 +33,7 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -589,12 +590,12 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   }
 }
 
-// SYNC, NOT WALL-CLOCK-BUDGETED (XP-06): this is a one-shot health probe, not
-// a delegation's unit of work — it never goes through `spawnCli`/
-// `withWallClockBudget`. `spawnSync` blocks this thread until it returns (or
-// its own `timeout` fires), so there is no live handle to register and
-// nothing a wall-clock budget could kill mid-flight regardless; the bounded
-// `timeout` option below is this function's only, and sufficient, ceiling.
+// SYNC, NOT WALL-CLOCK-BUDGETED (XP-06): this is a one-shot local readiness
+// probe, not a delegation's unit of work — it never goes through `spawnCli`/
+// `withWallClockBudget`. It must not issue a paid model request during startup;
+// version and auth-status checks are sufficient to admit Claude to the
+// failover chain. `spawnSync` blocks this thread until each bounded probe
+// returns (or its own timeout fires).
 export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
@@ -603,31 +604,55 @@ export function probeShellClaudeCliAvailability(
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
-    const result = spawnSync(
-      bin,
-      ['-p', 'Return the word ok.', '--output-format', 'json', '--model', 'opus'],
-      {
-        encoding: 'utf8',
-        // XP-02: minimal allowlisted env; overrides in `env` (e.g. a test's
-        // KYBERION_CLAUDE_CLI_BIN, or the KYBERION_PROVIDER_ENV_ALLOWLIST=0
-        // escape hatch) are applied before allowlisting so they still take
-        // effect.
-        env: buildProviderChildEnv({ provider: 'claude', baseEnv: { ...process.env, ...env } }),
-        shell: false,
-        timeout: timeoutMs,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
+    const childEnv = buildProviderChildEnv({
+      provider: 'claude',
+      baseEnv: { ...process.env, ...env },
+    });
+    const versionResult = spawnSync(bin, ['--version'], {
+      encoding: 'utf8',
+      // XP-02: minimal allowlisted env; overrides in `env` (e.g. a test's
+      // KYBERION_CLAUDE_CLI_BIN, or the KYBERION_PROVIDER_ENV_ALLOWLIST=0
+      // escape hatch) are applied before allowlisting so they still take
+      // effect.
+      env: childEnv,
+      shell: false,
+      timeout: timeoutMs,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
-    if (result.error) {
-      return { available: false, reason: result.error.message };
+    if (versionResult.error) {
+      return { available: false, reason: versionResult.error.message };
     }
-    if (result.status !== 0) {
-      const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';
-      const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+    if (versionResult.status !== 0) {
+      const stderr = typeof versionResult.stderr === 'string' ? versionResult.stderr.trim() : '';
+      const stdout = typeof versionResult.stdout === 'string' ? versionResult.stdout.trim() : '';
       return {
         available: false,
-        reason: stderr || stdout || `exit code ${result.status}`,
+        reason: stderr || stdout || `exit code ${versionResult.status}`,
+      };
+    }
+
+    const authResult = spawnSync(bin, ['auth', 'status'], {
+      encoding: 'utf8',
+      env: childEnv,
+      shell: false,
+      timeout: timeoutMs,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (authResult.error) {
+      return { available: false, reason: authResult.error.message };
+    }
+    const authOk = isClaudeCliAuthenticated({
+      ok: authResult.status === 0,
+      stdout: typeof authResult.stdout === 'string' ? authResult.stdout : '',
+      stderr: typeof authResult.stderr === 'string' ? authResult.stderr : '',
+    });
+    if (!authOk) {
+      const stderr = typeof authResult.stderr === 'string' ? authResult.stderr.trim() : '';
+      const stdout = typeof authResult.stdout === 'string' ? authResult.stdout.trim() : '';
+      return {
+        available: false,
+        reason: stderr || stdout || `auth status exit code ${authResult.status}`,
       };
     }
     return { available: true };

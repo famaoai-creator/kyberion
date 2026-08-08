@@ -9,6 +9,8 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
         "auto-gemini-3",
         "auto-gemini-2.5",
         "gemini-3.1-pro-preview",
@@ -37,6 +39,26 @@
         "a2ui"
       ],
       "modelCapabilities": {
+        "gemini-3.6-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
+        "gemini-3.5-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "code",
+          "review",
+          "architecture"
+        ],
         "auto-gemini-3": [
           "reasoning",
           "planning",
@@ -380,6 +402,9 @@
     },
     "agy": {
       "models": [
+        "Gemini 3.6 Flash (Medium)",
+        "Gemini 3.6 Flash (High)",
+        "Gemini 3.6 Flash (Low)",
         "Gemini 3.5 Flash (Medium)",
         "Gemini 3.5 Flash (High)",
         "Gemini 3.5 Flash (Low)",
@@ -405,6 +430,35 @@
         "gateway"
       ],
       "modelCapabilities": {
+        "Gemini 3.6 Flash (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.6 Flash (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.6 Flash (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
         "Gemini 3.5 Flash (Medium)": [
           "reasoning",
           "planning",
