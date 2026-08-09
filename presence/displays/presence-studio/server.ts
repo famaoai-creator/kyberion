@@ -8,6 +8,7 @@ import {
   getPresenceStudioClientAddress,
   requirePresenceStudioAccess,
   requirePresenceStudioRateLimit,
+  PresenceStudioViewerError,
   presenceStudioEmailDeliverSchema,
   presenceStudioEmailDraftSchema,
   presenceStudioLocationSchema,
@@ -19,10 +20,12 @@ import {
   presenceStudioVoiceNativeListenSchema,
   presenceStudioVoiceSelectionSchema,
   presenceStudioVoiceStimulusSchema,
+  resolvePresenceStudioViewerContext,
   validateLocalServiceUrl,
 } from './security.js';
 import {
   buildPresenceSurfaceFrame,
+  CloudflareOsSurface,
   buildTrackGateReadinessSummaries,
   applyBrowserOnboarding,
   createBrowserConversationSession,
@@ -314,6 +317,7 @@ let latestSpeechSseState = 'idle';
 let speechStatePollInFlight = false;
 
 process.env.MISSION_ROLE ||= 'surface_runtime';
+const cloudflareOsSurface = new CloudflareOsSurface();
 
 const state: PresenceStudioState = {
   surfaces: {},
@@ -1230,6 +1234,121 @@ app.get('/api/surface-launcher', async (_req, res) => {
   }
 });
 
+app.get('/api/os/control-plane', (req, res) => {
+  try {
+    const access = resolvePresenceStudioViewerContext(req);
+    const rawMissionId = req.query.mission_id;
+    if (Array.isArray(rawMissionId)) {
+      return res.status(400).json({ ok: false, error: 'mission_id must be a single value' });
+    }
+    const snapshot = cloudflareOsSurface.snapshot(
+      typeof rawMissionId === 'string' ? rawMissionId : undefined,
+      access
+    );
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.json({ ok: true, ...snapshot });
+  } catch (error: unknown) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 400;
+    const message =
+      error instanceof PresenceStudioViewerError
+        ? error.message
+        : error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')
+          ? error.message
+          : 'Unable to load the OS control-plane projection.';
+    logger.warn(
+      presenceStudioAuditLine(req, 'os/control-plane.reject', {
+        status,
+        error: message,
+      })
+    );
+    return res.status(status).json({ ok: false, error: message });
+  }
+});
+
+app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
+  const actionId = String(req.params.actionId || '').trim();
+  const decision = req.body?.decision;
+  if (!actionId || (decision !== 'approved' && decision !== 'rejected')) {
+    return res.status(400).json({
+      ok: false,
+      error: 'actionId and decision (approved|rejected) are required',
+    });
+  }
+  try {
+    const access = resolvePresenceStudioViewerContext(req);
+    const item = cloudflareOsSurface.decideHeldAction(actionId, decision, access);
+    logger.info(
+      presenceStudioAuditLine(req, 'os/held-action.decision', {
+        action_id: actionId,
+        decision,
+        status: 200,
+      })
+    );
+    return res.json({ ok: true, item });
+  } catch (error: unknown) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 409;
+    const message =
+      error instanceof PresenceStudioViewerError
+        ? error.message
+        : error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')
+          ? error.message
+          : 'Unable to record the held-action decision.';
+    logger.warn(
+      presenceStudioAuditLine(req, 'os/held-action.decision.reject', {
+        action_id: actionId,
+        status,
+        error: message,
+      })
+    );
+    return res.status(status).json({ ok: false, error: message });
+  }
+});
+
+app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
+  const actionId = String(req.params.actionId || '').trim();
+  if (!actionId) return res.status(400).json({ ok: false, error: 'actionId is required' });
+  try {
+    const access = resolvePresenceStudioViewerContext(req);
+    const item = await cloudflareOsSurface.applyHeldAction(actionId, access);
+    if (item.status === 'failed') {
+      logger.warn(
+        presenceStudioAuditLine(req, 'os/held-action.apply.failed', {
+          action_id: actionId,
+          status: 502,
+        })
+      );
+      return res.status(502).json({
+        ok: false,
+        error: 'Held action application failed; inspect the audit record.',
+        item,
+      });
+    }
+    logger.info(
+      presenceStudioAuditLine(req, 'os/held-action.apply', {
+        action_id: actionId,
+        status: 200,
+      })
+    );
+    return res.json({ ok: true, item });
+  } catch (error: unknown) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 409;
+    const message =
+      error instanceof PresenceStudioViewerError
+        ? error.message
+        : error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')
+          ? error.message
+          : 'Unable to apply the held action.';
+    logger.warn(
+      presenceStudioAuditLine(req, 'os/held-action.apply.reject', {
+        action_id: actionId,
+        status,
+        error: message,
+      })
+    );
+    return res.status(status).json({ ok: false, error: message });
+  }
+});
+
 app.get('/api/approvals', (_req, res) => {
   res.json({
     ok: true,
@@ -1356,8 +1475,7 @@ app.get('/api/runtime-ref', (req, res) => {
 app.get('/api/artifacts/:artifactId', (req, res) => {
   const artifactId = String(req.params.artifactId || '').trim();
   const artifact = listArtifactRecords().find((item) => item.artifact_id === artifactId) as
-    | ArtifactRecordShape
-    | undefined;
+    ArtifactRecordShape | undefined;
   if (!artifact) {
     return res.status(404).json({ ok: false, error: `artifact not found: ${artifactId}` });
   }

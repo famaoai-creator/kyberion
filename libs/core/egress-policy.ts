@@ -1,6 +1,8 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
+import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -40,6 +42,7 @@ const SECURITY_POLICY_PATH = pathResolver.knowledge('product/governance/security
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: EgressPolicyFile | null = null;
 let cachedAllowedDomains: string[] | null = null;
+const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
 export function resetEgressPolicyCache(): void {
   cachedPolicyPath = null;
@@ -256,6 +259,37 @@ export interface EgressPayloadContext {
   tenant_slug?: string;
   /** Short description of what is being sent, for the audit trail. */
   purpose?: string;
+  /** Observation-derived taint; when present it is stricter than tier alone. */
+  provenance?: ProvenanceTaint;
+}
+
+/**
+ * Carry a trusted egress context through SDK/preset calls that eventually use
+ * secureFetch. An explicit secureFetch context still wins for fields it sets,
+ * while the ambient provenance is retained when the caller only adds a tier.
+ */
+export function withEgressPayloadContext<T>(context: EgressPayloadContext, fn: () => T): T {
+  return egressContextStorage.run(context, fn);
+}
+
+export function getEgressPayloadContext(): EgressPayloadContext | undefined {
+  return egressContextStorage.getStore();
+}
+
+export function resolveEgressPayloadContext(
+  explicit?: EgressPayloadContext
+): EgressPayloadContext | undefined {
+  const ambient = getEgressPayloadContext();
+  if (!ambient) return explicit;
+  if (!explicit) return ambient;
+  return {
+    ...ambient,
+    ...explicit,
+    ...(explicit.tier === undefined ? { tier: ambient.tier } : {}),
+    ...(explicit.tenant_slug === undefined ? { tenant_slug: ambient.tenant_slug } : {}),
+    ...(explicit.purpose === undefined ? { purpose: ambient.purpose } : {}),
+    ...(explicit.provenance === undefined ? { provenance: ambient.provenance } : {}),
+  };
 }
 
 export function evaluateEgressPolicy(
@@ -295,6 +329,32 @@ export function evaluateEgressPolicy(
   // not break a workflow, and letting it also soften tenant data leaving the
   // box would defeat the point of having tiers at all.
   const tier = context?.tier;
+  const provenance = context?.provenance;
+  if (provenance) {
+    const provenanceRank: Record<'public' | 'confidential' | 'personal', number> = {
+      public: 0,
+      confidential: 1,
+      personal: 2,
+    };
+    const requestedTier = tier || provenance.highestTier;
+    const wrongTenant = Boolean(
+      provenance.tenants.length > 0 &&
+      (!context?.tenant_slug || !provenance.tenants.includes(context.tenant_slug))
+    );
+    if (
+      provenance.prohibitExternal ||
+      wrongTenant ||
+      provenanceRank[requestedTier] < provenanceRank[provenance.highestTier]
+    ) {
+      return {
+        verdict: 'deny',
+        hostname,
+        reason: `[PROVENANCE_EGRESS_DENIED] ${provenance.prohibitExternal ? 'non-public provenance cannot leave the governed context' : wrongTenant ? 'target tenant is outside provenance scope' : 'payload tier is broader than provenance taint'}`,
+        mode: policy.mode || 'warn',
+        tier: requestedTier,
+      };
+    }
+  }
   if (tier === 'confidential' || tier === 'personal') {
     const tenantDomains = loadTenantEgressDomains(policy, context?.tenant_slug);
     const matched = tenantDomains.find((domain) => matchesDomain(hostname, domain));

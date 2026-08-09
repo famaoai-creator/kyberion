@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { secretGuard } from '@agent/core/secret-guard';
-import { pathResolver, safeExistsSync } from '@agent/core';
+import { pathResolver, safeExistsSync, type OsKnowledgeTier } from '@agent/core';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -21,6 +21,7 @@ export interface ChronosTokenRegistration {
   token_hash: string;
   role: ChronosAccessRole;
   tenant_slugs: string[];
+  tier_access?: OsKnowledgeTier[];
   label?: string;
 }
 
@@ -44,7 +45,12 @@ function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
         typeof value.token_hash === 'string' &&
         (value.role === 'readonly' || value.role === 'localadmin') &&
         Array.isArray(value.tenant_slugs) &&
-        value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.length > 0)
+        value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.length > 0) &&
+        (value.tier_access === undefined ||
+          (Array.isArray(value.tier_access) &&
+            value.tier_access.every(
+              (tier) => tier === 'public' || tier === 'confidential' || tier === 'personal'
+            )))
       );
     });
   } catch {

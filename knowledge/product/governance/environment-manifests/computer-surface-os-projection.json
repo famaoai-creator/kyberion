@@ -1,0 +1,72 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "computer-surface-os-projection",
+  "version": "2026-08-09",
+  "description": "Computer Surface Cloudflare OS projection — a localadmin/token-authorized, tenant-scoped, read-only projection of held actions and observations.",
+  "capabilities": [
+    {
+      "capability_id": "computer-surface.os-projection-tests",
+      "kind": "binary",
+      "description": "The Computer Surface OS projection route and read-only contract tests pass.",
+      "required_for": ["computer-surface", "validate"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": [
+          "exec",
+          "vitest",
+          "run",
+          "presence/displays/computer-surface/src/os-control-plane.test.ts"
+        ]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Computer Surface OS projection tests must pass before enabling the surface."
+      }
+    },
+    {
+      "capability_id": "computer-surface.tenant-binding",
+      "kind": "env-var",
+      "description": "Optional server-side tenant binding. When set, the Computer Surface projection is limited to this tenant.",
+      "required_for": ["computer-surface"],
+      "optional": true,
+      "probe": { "kind": "env", "name": "KYBERION_TENANT", "require_non_empty": true },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_TENANT=<tenant-slug>` for tenant-scoped Computer Surface data; leave unset for public observations only."
+      }
+    },
+    {
+      "capability_id": "computer-surface.os-principal",
+      "kind": "env-var",
+      "description": "Trusted human principal required whenever the Computer Surface projection is tenant-scoped.",
+      "required_for": ["computer-surface"],
+      "optional": true,
+      "probe": {
+        "kind": "env",
+        "name": "KYBERION_COMPUTER_SURFACE_PRINCIPAL",
+        "require_non_empty": true
+      },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_COMPUTER_SURFACE_PRINCIPAL=human:<operator>` whenever KYBERION_TENANT is set; the route fails closed without it."
+      }
+    },
+    {
+      "capability_id": "computer-surface.os-guarded-surface-url",
+      "kind": "env-var",
+      "description": "Optional HTTP(S) URL shown when held actions require human decision or apply.",
+      "required_for": ["computer-surface"],
+      "optional": true,
+      "probe": {
+        "kind": "env",
+        "name": "KYBERION_OS_GUARDED_SURFACE_URL",
+        "require_non_empty": true
+      },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_OS_GUARDED_SURFACE_URL=https://...` to provide the human decision surface link."
+      }
+    }
+  ]
+}

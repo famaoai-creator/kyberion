@@ -38,4 +38,15 @@ describe('viewer-context', () => {
       )
     ).toThrow(/tenant-b/);
   });
+
+  it('does not allow a viewer registration to widen the role tier policy', async () => {
+    const { resolveViewerTierAccess } = await import('./viewer-context.js');
+    expect(resolveViewerTierAccess('readonly', ['public', 'confidential'])).toEqual([
+      'public',
+      'confidential',
+    ]);
+    expect(() => resolveViewerTierAccess('readonly', ['personal'])).toThrow(
+      'exceeds the readonly role policy'
+    );
+  });
 });

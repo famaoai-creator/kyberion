@@ -675,6 +675,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_COMPUTER_SURFACE_PRINCIPAL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
       "category": "path",
       "type": "path",
@@ -989,6 +997,14 @@
     },
     {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_FIRST_WIN_LIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1734,6 +1750,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MOS_PRINCIPAL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_MYSTERY",
       "category": "runtime",
       "type": "string",
@@ -1950,6 +1974,14 @@
     },
     {
       "name": "KYBERION_OPS_ALERT_WEBHOOK_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_OS_GUARDED_SURFACE_URL",
       "category": "provider",
       "type": "string",
       "required": false,
@@ -2424,6 +2456,22 @@
     },
     {
       "name": "KYBERION_SERVICE_RUNTIME_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SHARE_GRANTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
@@ -2947,6 +2995,14 @@
       "description": "Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.",
       "documented": true,
       "subsystem": "surfaces"
+    },
+    {
+      "name": "KYBERION_VITEST_NETWORK_ALLOWLIST",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_VLLM_KEY",

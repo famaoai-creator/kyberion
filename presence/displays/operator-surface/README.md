@@ -9,15 +9,15 @@ Strategy: [`knowledge/product/architecture/operator-surface-strategy.md`](../../
 
 ## What this MVP includes
 
-| Page | Purpose |
-|---|---|
-| `/` | Mission list, scoped by `KYBERION_TENANT` |
-| `/missions/:id` | Mission detail: history, checkpoints, evidence, copy-able commands |
-| `/audit` | Audit-chain timeline (filtered by tenant) |
-| `/health` | Mission counts, recent audit volume, override events |
-| `/surfaces` | Read-only surface concierge: auth boundary, runtime state, scenario fit, next command |
-| `/intent-snapshots` | Placeholder for the diff view (full implementation deferred) |
-| `/knowledge` | Public-tier knowledge browser |
+| Page                | Purpose                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `/`                 | Mission list, scoped by `KYBERION_TENANT`                                             |
+| `/missions/:id`     | Mission detail: history, checkpoints, evidence, copy-able commands                    |
+| `/audit`            | Audit-chain timeline (filtered by tenant)                                             |
+| `/health`           | Mission counts, recent audit volume, override events                                  |
+| `/surfaces`         | Read-only surface concierge: auth boundary, runtime state, scenario fit, next command |
+| `/intent-snapshots` | Placeholder for the diff view (full implementation deferred)                          |
+| `/knowledge`        | Public-tier knowledge browser                                                         |
 
 The data layer (`src/lib/data.ts`) imports **only** read APIs from
 `@agent/core/secure-io`:
@@ -59,7 +59,8 @@ From [`operator-surface-strategy.md` §9](../../../knowledge/product/architectur
 - [x] `mos.read` audit events — every Server Component page emits a
       `mos.read` audit-chain event via the single `src/lib/audit-mos.ts`
       chokepoint; the contract test enforces that no other source file
-      touches `auditChain.record`
+      touches `auditChain.record`. The OS projection is recorded separately
+      as `resource_kind=os_control_plane`.
 - [ ] WAF placement — deployment-time concern, see §Deployment below
 - [ ] Client cert / OIDC + tenant scope — deployment-time, see §Auth
 - [ ] Independent auth review — deployment-time
@@ -90,6 +91,16 @@ Set `KYBERION_TENANT` in the environment before starting the server:
 KYBERION_TENANT=acme-corp pnpm dev
 ```
 
+For a tenant-scoped OS projection, also set a trusted human principal and,
+optionally, the guarded decision surface URL:
+
+```bash
+KYBERION_TENANT=acme-corp \
+KYBERION_MOS_PRINCIPAL=human:acme-operator \
+KYBERION_OS_GUARDED_SURFACE_URL=https://chronos.example.test \
+pnpm dev
+```
+
 When set, every loader filters mission state and audit events to that
 tenant only. Public-tier missions remain visible (cross-tenant tooling).
 There is **no UI control** to switch tenants — that boundary is
@@ -97,7 +108,8 @@ intentional.
 
 When unset, the server runs in tenant-agnostic mode and shows all
 non-personal missions. Acceptable for development; not acceptable for
-multi-tenant production.
+multi-tenant production. In this mode the OS panel deliberately shows only
+public observations and hides held actions.
 
 ## Deployment notes
 

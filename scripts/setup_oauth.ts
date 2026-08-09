@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import {
-  beginServiceOAuth,
+  beginInteractiveServiceOAuth,
   logger,
   pathResolver,
   safeExistsSync,
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
     void poll();
   });
 
-  const result = beginServiceOAuth(serviceId, { redirectUri });
+  const result = beginInteractiveServiceOAuth(serviceId, { redirectUri });
   const summaryPath = `${runtimeDir}/${serviceId}-setup.json`;
   safeWriteFile(
     summaryPath,

@@ -13,13 +13,20 @@ import {
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from './api-guard';
+import type { OsKnowledgeTier } from '@agent/core';
 
 export interface ViewerContext {
   role: ChronosAccessRole;
   tenantSlugs: string[] | 'all';
+  tierAccess?: OsKnowledgeTier[];
   source: 'token' | 'loopback' | 'anonymous';
   principalId?: string;
 }
+
+const CHRONOS_ROLE_TIER_ACCESS: Record<ChronosAccessRole, readonly OsKnowledgeTier[]> = {
+  readonly: ['public', 'confidential'],
+  localadmin: ['public', 'confidential'],
+};
 
 export class ViewerContextError extends Error {
   constructor(
@@ -49,7 +56,13 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
         typeof value.token_hash !== 'string' ||
         (value.role !== 'readonly' && value.role !== 'localadmin') ||
         !Array.isArray(value.tenant_slugs) ||
-        !value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.trim())
+        !value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.trim()) ||
+        (value.tier_access !== undefined &&
+          (!Array.isArray(value.tier_access) ||
+            value.tier_access.length === 0 ||
+            !value.tier_access.every(
+              (tier) => tier === 'public' || tier === 'confidential' || tier === 'personal'
+            )))
       ) {
         throw new Error('invalid chronos access entry');
       }
@@ -57,6 +70,14 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
         token_hash: value.token_hash,
         role: value.role,
         tenant_slugs: value.tenant_slugs.map((tenant) => String(tenant).trim()),
+        ...(Array.isArray(value.tier_access)
+          ? {
+              tier_access: value.tier_access.filter(
+                (tier): tier is OsKnowledgeTier =>
+                  tier === 'public' || tier === 'confidential' || tier === 'personal'
+              ),
+            }
+          : {}),
         ...(typeof value.label === 'string' ? { label: value.label } : {}),
       } as ChronosTokenRegistration;
     });
@@ -80,22 +101,44 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
       return {
         role: registration.role,
         tenantSlugs: registration.tenant_slugs,
+        tierAccess: resolveViewerTierAccess(registration.role, registration.tier_access),
         source: 'token',
         principalId: registration.label,
       };
     }
     const role = resolveChronosAccessRole(req);
     if (role) {
-      return { role, tenantSlugs: 'all', source: 'token' };
+      return { role, tenantSlugs: 'all', tierAccess: defaultTierAccess(role), source: 'token' };
     }
     throw new ViewerContextError(401, 'Unknown Chronos viewer token.');
   }
 
   const role = resolveChronosAccessRole(req);
   if (role && isChronosLoopbackRequest(req)) {
-    return { role, tenantSlugs: 'all', source: 'loopback' };
+    return { role, tenantSlugs: 'all', tierAccess: defaultTierAccess(role), source: 'loopback' };
   }
   throw new ViewerContextError(401, 'A Chronos viewer principal is required.');
+}
+
+/** Chronos roles currently expose public/confidential; personal remains masked. */
+export function defaultTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {
+  return [...CHRONOS_ROLE_TIER_ACCESS[role]];
+}
+
+export function resolveViewerTierAccess(
+  role: ChronosAccessRole,
+  requested?: readonly OsKnowledgeTier[]
+): OsKnowledgeTier[] {
+  const roleAccess = CHRONOS_ROLE_TIER_ACCESS[role];
+  if (!requested) return [...roleAccess];
+  const normalized = [...new Set(requested)];
+  if (normalized.length === 0 || normalized.some((tier) => !roleAccess.includes(tier))) {
+    throw new ViewerContextError(
+      403,
+      `Chronos viewer tier access exceeds the ${role} role policy.`
+    );
+  }
+  return normalized;
 }
 
 export function resolveViewerContextForRequest(
