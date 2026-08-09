@@ -11,6 +11,7 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
+import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
 import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
@@ -454,6 +455,7 @@ function normalizeWorkLoopFromRaw(
     trackName: request.context.track_name,
     locale: request.context.locale,
     serviceBindings: request.context.service_bindings,
+    ...resolveWorkScopeSignalOptions(request.context.runtime_context),
     requiresApproval: contract.approval.requires_approval,
   });
 

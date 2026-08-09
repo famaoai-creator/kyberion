@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
-import { loadWorkScopePolicy, resolveWorkScopeDecision } from './work-scope-decision.js';
+import {
+  loadWorkScopePolicy,
+  resolveWorkScopeDecision,
+  resolveWorkScopeSignalOptions,
+} from './work-scope-decision.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -40,7 +44,7 @@ describe('work-scope-decision', () => {
     expect(decision.execution_shape).toBe('mission');
     expect(decision.promotion_required).toBe(true);
     expect(decision.accumulation_triggers).toEqual(
-      expect.arrayContaining(['stakeholder_count_3plus', 'approval_required']),
+      expect.arrayContaining(['stakeholder_count_3plus', 'approval_required'])
     );
   });
 
@@ -66,6 +70,17 @@ describe('work-scope-decision', () => {
     expect(decision.mandatory_triggers).toContain('customer_signoff');
   });
 
+  it('promotes a high-stakes action to mission scope as a mandatory trigger', () => {
+    const decision = resolveWorkScopeDecision({
+      catalogMinimumShape: 'direct_reply',
+      highStakesAction: true,
+    });
+
+    expect(decision.execution_shape).toBe('mission');
+    expect(decision.promotion_required).toBe(true);
+    expect(decision.mandatory_triggers).toContain('high_stakes_action');
+  });
+
   it('promotes two accumulation triggers to mission scope', () => {
     const decision = resolveWorkScopeDecision({
       catalogMinimumShape: 'task_session',
@@ -76,7 +91,7 @@ describe('work-scope-decision', () => {
     expect(decision.execution_shape).toBe('mission');
     expect(decision.promotion_required).toBe(true);
     expect(decision.accumulation_triggers).toEqual(
-      expect.arrayContaining(['artifact_estimate_5plus', 'stakeholder_count_3plus']),
+      expect.arrayContaining(['artifact_estimate_5plus', 'stakeholder_count_3plus'])
     );
   });
 
@@ -89,6 +104,27 @@ describe('work-scope-decision', () => {
     expect(decision.execution_shape).toBe('task_session');
     expect(decision.promotion_required).toBe(false);
     expect(decision.accumulation_triggers).toEqual(['artifact_estimate_5plus']);
+  });
+
+  it('reads only explicit work-scope signals from runtime context', () => {
+    expect(
+      resolveWorkScopeSignalOptions({
+        work_scope_signals: {
+          external_audience: true,
+          expected_continuation_beyond_session: true,
+          cross_system_mutation: false,
+          replay_or_variant_likelihood: true,
+          high_stakes_action: true,
+        },
+        inferred_from_text: true,
+      })
+    ).toEqual({
+      externalAudience: true,
+      expectedContinuationBeyondSession: true,
+      crossSystemMutation: false,
+      replayOrVariantLikelihood: true,
+      highStakesAction: true,
+    });
   });
 
   it('never demotes a mission-level catalog minimum', () => {
@@ -107,12 +143,12 @@ describe('work-scope-decision', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/product/schemas/work-scope-policy.schema.json'),
+      path.resolve(root, 'knowledge/product/schemas/work-scope-policy.schema.json')
     );
     const policy = JSON.parse(
       safeReadFile(path.resolve(root, 'knowledge/product/governance/work-scope-policy.json'), {
         encoding: 'utf8',
-      }) as string,
+      }) as string
     );
 
     expect(validate(policy)).toBe(true);

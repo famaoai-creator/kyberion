@@ -554,6 +554,14 @@
 | EG-11            | PARTIAL | 2026-08-09: `entity_governance_cleanup` の mission-scoped dry-run、soft-delete、approved-by 必須、証跡 receipt を実装。登録済み workspace 不在5件は governed archive 済み。残: dry-run で検出した既存 mission/project/distill の裁定・soft-delete 適用。                                                                                                                                                                                                                                        |
 | EG-13            | DONE    | 2026-08-09: 2026-08索引と本台帳へ登録し、既存の複合/IDなし計画18件と不足ID alias(E2E-01〜06、AO-05、MO-09、RG-01、SR-01、UX-07)を STATUS の alias 台帳へ追加。`check:entity-governance` の `plan_ledger.missing` は空。                                                                                                                                                                                                                                                                         |
 
+### MG(ミッションゲート整合)
+
+正本: [MISSION_GATE_COHERENCE_PLAN_2026-08-10](../improvement-plans-2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md)
+
+| ID        | 状態 | 実装状況 / 残作業                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MG-01〜10 | DONE | 2026-08-10: direct_reply を含む mandatory promotion、high_stakes_action の導出、intent/assistant compiler からの蓄積信号給電、alignment の execution-shape 分岐、旧 Rule 7/5条件参照の正準化、reconcile-work の範囲統一、intent coverage の `execution_shape` 改名、authority/mission gate 境界文書、work-scope policy emitter と mission-gate docs lint を実装。対象 Vitest 47件、checker、git diff --check を通過。 |
+
 #### EG-13 計画文書エイリアス台帳
 
 ID を持つ実装項目は上記の ID 行を正本とし、ID を持たない設計文書および複合計画は、ここで文書ファイル自体を登録する。`check:entity-governance` はこの一覧と STATUS の両方を検査する。
