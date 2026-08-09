@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 // controls (review/decision buttons, input fields) are labelled in sidepanel.js.
 const html = readFileSync(
   path.resolve(__dirname, '../tools/adf-replay-extension/sidepanel.html'),
-  'utf8',
+  'utf8'
 );
 
 describe('Browser Bridge side panel accessibility', () => {
@@ -34,5 +34,15 @@ describe('Browser Bridge side panel accessibility', () => {
   it('keeps execution input values out of the recorded draft via a dedicated form region', () => {
     expect(html).toMatch(/id="execution-inputs"/);
     expect(html).toMatch(/INPUT VALUES \(記録されません\)/);
+  });
+
+  it('loads the shared redaction boundary before AI and panel logic', () => {
+    const pii = html.indexOf('src="pii-rules.generated.js"');
+    const ai = html.indexOf('src="built-in-ai.js"');
+    const panel = html.indexOf('src="sidepanel.js"');
+    expect(pii).toBeGreaterThan(-1);
+    expect(ai).toBeGreaterThan(pii);
+    expect(panel).toBeGreaterThan(ai);
+    expect(html).toMatch(/id="ai-scenario-use-intent-button"/);
   });
 });

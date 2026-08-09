@@ -1822,6 +1822,728 @@
         "qps-ploc": "⟦  Ḓėŀėŧïőñş ȧřė şőƒŧ: ėṽėřẏŧħïñɠ ɱőṽėş ŧő ȧƈŧïṽė/ȧřƈħïṽė/.ŧřȧşħ/ ȧñḓ şŧȧẏş řėşŧőřȧƀŀė ůñŧïŀ ŧħė ĵȧñïŧőř ṗůřɠėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       }
     },
+    "recorder": {
+      "recorder_commands_header": {
+        "en": "Commands:",
+        "ja": "コマンド:",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓş: ŀőř⟧"
+      },
+      "recorder_doctor_all_available": {
+        "en": "  - all registered observation sources are available",
+        "ja": "  - 登録済みの観測ソースはすべて利用可能です",
+        "qps-ploc": "⟦  - ȧŀŀ řėɠïşŧėřėḓ őƀşėřṽȧŧïőñ şőůřƈėş ȧřė ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "recorder_doctor_bridge": {
+        "en": "Desktop observation: bridge={bridge}; registry={registry}; available={available}",
+        "ja": "デスクトップ観測: bridge={bridge}; registry={registry}; available={available}",
+        "qps-ploc": "⟦Ḓėşķŧőṗ őƀşėřṽȧŧïőñ: ƀřïḓɠė={bridge}; řėɠïşŧřẏ={registry}; ȧṽȧïŀȧƀŀė={available} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "recorder_doctor_tier": {
+        "en": "  - observation tier is separate from personal/confidential/public data tier",
+        "ja": "  - 観測ティアは personal/confidential/public のデータティアとは別です",
+        "qps-ploc": "⟦  - őƀşėřṽȧŧïőñ ŧïėř ïş şėṗȧřȧŧė ƒřőɱ ṗėřşőñȧŀ/ƈőñƒïḓėñŧïȧŀ/ṗůƀŀïƈ ḓȧŧȧ ŧïėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_doctor_unavailable": {
+        "en": "  - unavailable (recording will explain): {sources}",
+        "ja": "  - 利用不可 (記録時に理由を説明): {sources}",
+        "qps-ploc": "⟦  - ůñȧṽȧïŀȧƀŀė (řėƈőřḓïñɠ ẇïŀŀ ėẋṗŀȧïñ): {sources} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "recorder_help_procedure_promote": {
+        "en": "Promote an approved desktop recording into a reusable procedure",
+        "ja": "承認済みOS記録を再利用可能な手順へ昇格",
+        "qps-ploc": "⟦Ṗřőɱőŧė ȧñ ȧṗṗřőṽėḓ ḓėşķŧőṗ řėƈőřḓïñɠ ïñŧő ȧ řėůşȧƀŀė ṗřőƈėḓůřė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "recorder_help_intent": {
+        "en": "Resolve an intent into procedure candidates and an execution preview",
+        "ja": "インテントから手順候補と実行プレビューを確認",
+        "qps-ploc": "⟦Řėşőŀṽė ȧñ ïñŧėñŧ ïñŧő ṗřőƈėḓůřė ƈȧñḓïḓȧŧėş ȧñḓ ȧñ ėẋėƈůŧïőñ ṗřėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "recorder_help_procedure_list": {
+        "en": "List registered procedures",
+        "ja": "登録済み手順の一覧",
+        "qps-ploc": "⟦Ŀïşŧ řėɠïşŧėřėḓ ṗřőƈėḓůřėş ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_help_procedure_inspect": {
+        "en": "Inspect procedure target, risk, and review state",
+        "ja": "手順の対象・リスク・レビュー状態を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ṗřőƈėḓůřė ŧȧřɠėŧ, řïşķ, ȧñḓ řėṽïėẇ şŧȧŧė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "recorder_help_procedure_repair": {
+        "en": "Reconcile an interrupted desktop promotion transaction",
+        "ja": "中断したdesktop手順昇格トランザクションを復旧",
+        "qps-ploc": "⟦Řėƈőñƈïŀė ȧñ ïñŧėřřůṗŧėḓ ḓėşķŧőṗ ṗřőɱőŧïőñ ŧřȧñşȧƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_help_procedure_run": {
+        "en": "Run a procedure through the approval boundary",
+        "ja": "承認境界を通して手順を実行",
+        "qps-ploc": "⟦Řůñ ȧ ṗřőƈėḓůřė ŧħřőůɠħ ŧħė ȧṗṗřőṽȧŀ ƀőůñḓȧřẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_help_feedback": {
+        "en": "Evaluate execution and create an improvement candidate",
+        "ja": "実行結果を評価し改善候補を作成",
+        "qps-ploc": "⟦Ėṽȧŀůȧŧė ėẋėƈůŧïőñ ȧñḓ ƈřėȧŧė ȧñ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_help_improvements": {
+        "en": "Inspect and review improvement candidates",
+        "ja": "改善候補の確認と人間レビュー",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧñḓ řėṽïėẇ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_help_home": {
+        "en": "Home: status digest and next action",
+        "ja": "ホーム: 状態ダイジェストと次の一手",
+        "qps-ploc": "⟦Ħőɱė: şŧȧŧůş ḓïɠėşŧ ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_help_ask": {
+        "en": "Talk to Kyberion (same brain as Slack)",
+        "ja": "Kyberion に話しかける(Slack と同じ脳)",
+        "qps-ploc": "⟦Ŧȧŀķ ŧő Ķẏƀėřïőñ (şȧɱė ƀřȧïñ ȧş Şŀȧƈķ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "recorder_help_inbox": {
+        "en": "Review and accept deliverables in the inbox",
+        "ja": "成果物 inbox の確認と受領",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_help_inbox_all": {
+        "en": "Mark unread inbox entries as read, optionally filtered",
+        "ja": "未読の一括既読化(タイトル/要約で絞込可)",
+        "qps-ploc": "⟦Ɱȧřķ ůñřėȧḓ ïñƀőẋ ėñŧřïėş ȧş řėȧḓ, őṗŧïőñȧŀŀẏ ƒïŀŧėřėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_help_approvals": {
+        "en": "Review and decide approval requests",
+        "ja": "承認キューの確認と裁可",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_help_notify": {
+        "en": "Inspect or configure notification targets",
+        "ja": "通知先の確認・設定",
+        "qps-ploc": "⟦Ïñşṗėƈŧ őř ƈőñƒïɠůřė ñőŧïƒïƈȧŧïőñ ŧȧřɠėŧş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_help_deals": {
+        "en": "List deals and inspect captured requirements",
+        "ja": "商談一覧と要件ヒアリング内容の確認",
+        "qps-ploc": "⟦Ŀïşŧ ḓėȧŀş ȧñḓ ïñşṗėƈŧ ƈȧṗŧůřėḓ řėɋůïřėɱėñŧş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_help_deals_audio": {
+        "en": "Ingest a call recording into a requirements draft",
+        "ja": "通話録音を要件ドラフトへ取り込み",
+        "qps-ploc": "⟦Ïñɠėşŧ ȧ ƈȧŀŀ řėƈőřḓïñɠ ïñŧő ȧ řėɋůïřėɱėñŧş ḓřȧƒŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "recorder_help_mission": {
+        "en": "Create a mission",
+        "ja": "ミッションの作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ɱïşşïőñ ŀőřėɱ⟧"
+      },
+      "recorder_help_preflight": {
+        "en": "Check application development prerequisites",
+        "ja": "アプリ開発の前提チェック",
+        "qps-ploc": "⟦Ƈħėƈķ ȧṗṗŀïƈȧŧïőñ ḓėṽėŀőṗɱėñŧ ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_help_doctor": {
+        "en": "Diagnose health and next action",
+        "ja": "健全性と次の一手の診断",
+        "qps-ploc": "⟦Ḓïȧɠñőşė ħėȧŀŧħ ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_help_dashboard": {
+        "en": "Show the dashboard",
+        "ja": "ダッシュボード表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė ḓȧşħƀőȧřḓ ŀőřėɱ⟧"
+      },
+      "recorder_help_office": {
+        "en": "Virtual office (agent activity visibility)",
+        "ja": "バーチャルオフィス(エージェント稼働の可視化)",
+        "qps-ploc": "⟦Ṽïřŧůȧŀ őƒƒïƈė (ȧɠėñŧ ȧƈŧïṽïŧẏ ṽïşïƀïŀïŧẏ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_help_record_desktop": {
+        "en": "Capture OS demonstration, observations, and screen evidence",
+        "ja": "OS実演・観測・画面証跡を記録",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ŐŞ ḓėɱőñşŧřȧŧïőñ, őƀşėřṽȧŧïőñş, ȧñḓ şƈřėėñ ėṽïḓėñƈė ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_help_recording_inspect": {
+        "en": "Inspect intent and steps reconstructed from an OS recording",
+        "ja": "OS記録から再構成した意図と手順を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ïñŧėñŧ ȧñḓ şŧėṗş řėƈőñşŧřůƈŧėḓ ƒřőɱ ȧñ ŐŞ řėƈőřḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_help_recording_review": {
+        "en": "Review an OS recording as a human",
+        "ja": "OS記録を人間レビューする",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñ ŐŞ řėƈőřḓïñɠ ȧş ȧ ħůɱȧñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_os_recorded": {
+        "en": "OS demonstration recorded: {recordingRef}",
+        "ja": "OS実演を記録しました: {recordingRef}",
+        "qps-ploc": "⟦ŐŞ ḓėɱőñşŧřȧŧïőñ řėƈőřḓėḓ: {recordingRef} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_intent_draft": {
+        "en": "Intent draft: {intentRef}",
+        "ja": "意図ドラフト: {intentRef}",
+        "qps-ploc": "⟦Ïñŧėñŧ ḓřȧƒŧ: {intentRef} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_screen_recorded": {
+        "en": "Screen recording: {path} ({frames} frames)",
+        "ja": "画面録画: {path} ({frames} frames)",
+        "qps-ploc": "⟦Şƈřėėñ řėƈőřḓïñɠ: {path} ({frames} ƒřȧɱėş) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_screen_unavailable": {
+        "en": "Screen recording: unavailable ({reason})",
+        "ja": "画面録画: unavailable ({reason})",
+        "qps-ploc": "⟦Şƈřėėñ řėƈőřḓïñɠ: ůñȧṽȧïŀȧƀŀė ({reason}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_next_actions": {
+        "en": "Next actions:",
+        "ja": "次の一手:",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñş: ŀőřė⟧"
+      },
+      "recorder_recording_unavailable": {
+        "en": "Cannot use OS recording: {error}",
+        "ja": "OS記録を扱えません: {error}",
+        "qps-ploc": "⟦Ƈȧññőŧ ůşė ŐŞ řėƈőřḓïñɠ: {error} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_inspect_summary": {
+        "en": "recording: {id} ({status})",
+        "ja": "recording: {id} ({status})",
+        "qps-ploc": "⟦řėƈőřḓïñɠ: {id} ({status}) ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_target_summary": {
+        "en": "target: {name}/{platform}",
+        "ja": "target: {name}/{platform}",
+        "qps-ploc": "⟦ŧȧřɠėŧ: {name}/{platform} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_steps_summary": {
+        "en": "steps: {count}",
+        "ja": "steps: {count}",
+        "qps-ploc": "⟦şŧėṗş: {count} ŀőřė⟧"
+      },
+      "recorder_intent_summary": {
+        "en": "intent: {intent}",
+        "ja": "intent: {intent}",
+        "qps-ploc": "⟦ïñŧėñŧ: {intent} ŀőřėɱ⟧"
+      },
+      "recorder_intent_source": {
+        "en": "intent source: {source}",
+        "ja": "意図の出所: {source}",
+        "qps-ploc": "⟦ïñŧėñŧ şőůřƈė: {source} ŀőřėɱ ï⟧"
+      },
+      "recorder_intent_hash_match": {
+        "en": "intent hash match: {match}",
+        "ja": "意図ハッシュ一致: {match}",
+        "qps-ploc": "⟦ïñŧėñŧ ħȧşħ ɱȧŧƈħ: {match} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_intent_review_state": {
+        "en": "Intent review: {status}",
+        "ja": "意図レビュー: {status}",
+        "qps-ploc": "⟦Ïñŧėñŧ řėṽïėẇ: {status} ŀőřėɱ ï⟧"
+      },
+      "recorder_review_usage": {
+        "en": "Usage: pnpm kyberion recording <inspect|review> <path> [--approve-recording|--reject-recording] [--approve-intent|--reject-intent]",
+        "ja": "使い方: pnpm kyberion recording <inspect|review> <path> [--approve-recording|--reject-recording] [--approve-intent|--reject-intent]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ řėƈőřḓïñɠ <ïñşṗėƈŧ|řėṽïėẇ> <ṗȧŧħ> [--ȧṗṗřőṽė-řėƈőřḓïñɠ|--řėĵėƈŧ-řėƈőřḓïñɠ] [--ȧṗṗřőṽė-ïñŧėñŧ|--řėĵėƈŧ-ïñŧėñŧ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "recorder_reviewed": {
+        "en": "Recording {id} → {status}",
+        "ja": "記録 {id} → {status}",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ {id} → {status} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_intent_reviewed": {
+        "en": "Intent review → {status}",
+        "ja": "意図レビュー → {status}",
+        "qps-ploc": "⟦Ïñŧėñŧ řėṽïėẇ → {status} ŀőřėɱ ï⟧"
+      },
+      "recorder_intent_review_required": {
+        "en": "The reconstructed intent must be approved before promotion.",
+        "ja": "昇格前に再構成された意図を承認してください。",
+        "qps-ploc": "⟦Ŧħė řėƈőñşŧřůƈŧėḓ ïñŧėñŧ ɱůşŧ ƀė ȧṗṗřőṽėḓ ƀėƒőřė ṗřőɱőŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_native_executor_required": {
+        "en": "This recording selected native operation {op}; GUI replay is blocked until a native executor is available.",
+        "ja": "この記録はネイティブ操作 {op} を選択しました。ネイティブ実行器が利用可能になるまでGUI再生を停止します。",
+        "qps-ploc": "⟦Ŧħïş řėƈőřḓïñɠ şėŀėƈŧėḓ ñȧŧïṽė őṗėřȧŧïőñ {op}; ƓŮÏ řėṗŀȧẏ ïş ƀŀőƈķėḓ ůñŧïŀ ȧ ñȧŧïṽė ėẋėƈůŧőř ïş ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "recorder_native_plan_deferred": {
+        "en": "Native operation suggestions remain in intent review; GUI replay is selected because no native executor is registered.",
+        "ja": "ネイティブ操作の候補は意図レビューに残します。ネイティブ実行器が未登録のため、GUI再生を選択します。",
+        "qps-ploc": "⟦Ñȧŧïṽė őṗėřȧŧïőñ şůɠɠėşŧïőñş řėɱȧïñ ïñ ïñŧėñŧ řėṽïėẇ; ƓŮÏ řėṗŀȧẏ ïş şėŀėƈŧėḓ ƀėƈȧůşė ñő ñȧŧïṽė ėẋėƈůŧőř ïş řėɠïşŧėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "recorder_desktop_input_invalid": {
+        "en": "The desktop step contains invalid coordinates or input parameters.",
+        "ja": "デスクトップ手順に不正な座標または入力パラメータがあります。",
+        "qps-ploc": "⟦Ŧħė ḓėşķŧőṗ şŧėṗ ƈőñŧȧïñş ïñṽȧŀïḓ ƈőőřḓïñȧŧėş őř ïñṗůŧ ṗȧřȧɱėŧėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_screenshot_redaction_failed": {
+        "en": "The screenshot was withheld because privacy redaction did not complete.",
+        "ja": "プライバシー加工を完了できなかったため、スクリーンショットを保存しませんでした。",
+        "qps-ploc": "⟦Ŧħė şƈřėėñşħőŧ ẇȧş ẇïŧħħėŀḓ ƀėƈȧůşė ṗřïṽȧƈẏ řėḓȧƈŧïőñ ḓïḓ ñőŧ ƈőɱṗŀėŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_transaction_repair_unsafe": {
+        "en": "Automatic recovery could not prove a safe rollback. Preserve the marker and inspect it before retrying.",
+        "ja": "安全なロールバックを証明できないため自動復旧できません。マーカーを保持したまま確認してから再試行してください。",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ řėƈőṽėřẏ ƈőůŀḓ ñőŧ ṗřőṽė ȧ şȧƒė řőŀŀƀȧƈķ. Ṗřėşėřṽė ŧħė ɱȧřķėř ȧñḓ ïñşṗėƈŧ ïŧ ƀėƒőřė řėŧřẏïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "recorder_transaction_status": {
+        "en": "Procedure {id}: desktop promotion transaction {status}",
+        "ja": "手順 {id}: desktop昇格トランザクション {status}",
+        "qps-ploc": "⟦Ṗřőƈėḓůřė {id}: ḓėşķŧőṗ ṗřőɱőŧïőñ ŧřȧñşȧƈŧïőñ {status} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_promoted": {
+        "en": "Promoted {id} into a desktop procedure",
+        "ja": "{id} をdesktop手順へ昇格しました",
+        "qps-ploc": "⟦Ṗřőɱőŧėḓ {id} ïñŧő ȧ ḓėşķŧőṗ ṗřőƈėḓůřė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "recorder_catalog": {
+        "en": "catalog: {path}",
+        "ja": "catalog: {path}",
+        "qps-ploc": "⟦ƈȧŧȧŀőɠ: {path} ŀőřė⟧"
+      },
+      "recorder_pipeline": {
+        "en": "pipeline: {path}",
+        "ja": "pipeline: {path}",
+        "qps-ploc": "⟦ṗïṗėŀïñė: {path} ŀőřėɱ⟧"
+      },
+      "recorder_recording_review_state": {
+        "en": "  recording review: {status}",
+        "ja": "  recording review: {status}",
+        "qps-ploc": "⟦  řėƈőřḓïñɠ řėṽïėẇ: {status} ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_high_risk_count": {
+        "en": "  high-risk actions: {count}",
+        "ja": "  high-risk actions: {count}",
+        "qps-ploc": "⟦  ħïɠħ-řïşķ ȧƈŧïőñş: {count} ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_blocked": {
+        "en": "  blocked: {error}",
+        "ja": "  blocked: {error}",
+        "qps-ploc": "⟦  ƀŀőƈķėḓ: {error} ŀőřėɱ⟧"
+      },
+      "recorder_pipeline_blocked": {
+        "en": "  pipeline blocked: {error}",
+        "ja": "  pipeline blocked: {error}",
+        "qps-ploc": "⟦  ṗïṗėŀïñė ƀŀőƈķėḓ: {error} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_promotion_failed": {
+        "en": "Desktop procedure promotion failed: {error}",
+        "ja": "desktop手順の昇格に失敗: {error}",
+        "qps-ploc": "⟦Ḓėşķŧőṗ ṗřőƈėḓůřė ṗřőɱőŧïőñ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_intent_ambiguous": {
+        "en": "Several procedure candidates match. Run `pnpm kyberion intent \"<request>\"` to inspect them.",
+        "ja": "手順候補が複数あります。pnpm kyberion intent \"<依頼>\" で確認してください。",
+        "qps-ploc": "⟦Şėṽėřȧŀ ṗřőƈėḓůřė ƈȧñḓïḓȧŧėş ɱȧŧƈħ. Řůñ `ṗñṗɱ ķẏƀėřïőñ ïñŧėñŧ \"<řėɋůėşŧ>\"` ŧő ïñşṗėƈŧ ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "recorder_improvement_created": {
+        "en": "Improvement candidate created: {id} (review with pnpm kyberion improvements)",
+        "ja": "改善候補を作成しました: {id} (pnpm kyberion improvements でレビュー)",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė ƈřėȧŧėḓ: {id} (řėṽïėẇ ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_no_procedures": {
+        "en": "No registered procedures.",
+        "ja": "登録済み手順はありません。",
+        "qps-ploc": "⟦Ñő řėɠïşŧėřėḓ ṗřőƈėḓůřėş. ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_procedure_count": {
+        "en": "Registered procedures ({count}):",
+        "ja": "登録済み手順 ({count} 件):",
+        "qps-ploc": "⟦Řėɠïşŧėřėḓ ṗřőƈėḓůřėş ({count}): ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_procedure_learn_next": {
+        "en": "Demonstrate and record the procedure, then review it.",
+        "ja": "手順を実演・記録してからレビューしてください。",
+        "qps-ploc": "⟦Ḓėɱőñşŧřȧŧė ȧñḓ řėƈőřḓ ŧħė ṗřőƈėḓůřė, ŧħėñ řėṽïėẇ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_resolution": {
+        "en": "Resolution: {outcome} / recommended pattern: {pattern}",
+        "ja": "判定: {outcome} / 推奨パターン: {pattern}",
+        "qps-ploc": "⟦Řėşőŀůŧïőñ: {outcome} / řėƈőɱɱėñḓėḓ ṗȧŧŧėřñ: {pattern} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_next_inspect": {
+        "en": "Next: pnpm kyberion procedure inspect {id}",
+        "ja": "次の一手: pnpm kyberion procedure inspect {id}",
+        "qps-ploc": "⟦Ñėẋŧ: ṗñṗɱ ķẏƀėřïőñ ṗřőƈėḓůřė ïñşṗėƈŧ {id} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_candidates_next": {
+        "en": "Choose a candidate and continue with procedure inspect/run.",
+        "ja": "候補を選んで procedure inspect/run に進んでください。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƈȧñḓïḓȧŧė ȧñḓ ƈőñŧïñůė ẇïŧħ ṗřőƈėḓůřė ïñşṗėƈŧ/řůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_unmatched": {
+        "en": "No matching procedure. Demonstration → human review → promotion is required.",
+        "ja": "一致する手順はありません。実演・記録 → 人間レビュー → 昇格が必要です。",
+        "qps-ploc": "⟦Ñő ɱȧŧƈħïñɠ ṗřőƈėḓůřė. Ḓėɱőñşŧřȧŧïőñ → ħůɱȧñ řėṽïėẇ → ṗřőɱőŧïőñ ïş řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_recording_ref_invalid": {
+        "en": "recording_ref is outside the allowed recording store",
+        "ja": "recording_ref が許可された recording store の外にあります",
+        "qps-ploc": "⟦řėƈőřḓïñɠ_řėƒ ïş őůŧşïḓė ŧħė ȧŀŀőẇėḓ řėƈőřḓïñɠ şŧőřė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "recorder_recording_read_failed": {
+        "en": "recording read failed: {error}",
+        "ja": "recording の読み込みに失敗: {error}",
+        "qps-ploc": "⟦řėƈőřḓïñɠ řėȧḓ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_unsupported_substrate": {
+        "en": "Unsupported substrate for CLI execution",
+        "ja": "CLI実行に未対応の substrate です",
+        "qps-ploc": "⟦Ůñşůṗṗőřŧėḓ şůƀşŧřȧŧė ƒőř ƇĿÏ ėẋėƈůŧïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_review_repair": {
+        "en": "Repair or re-record before reviewing again.",
+        "ja": "修正または再記録してから再レビューしてください",
+        "qps-ploc": "⟦Řėṗȧïř őř řė-řėƈőřḓ ƀėƒőřė řėṽïėẇïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recorder_required_inputs": {
+        "en": "required inputs: {inputs}",
+        "ja": "required inputs: {inputs}",
+        "qps-ploc": "⟦řėɋůïřėḓ ïñṗůŧş: {inputs} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_execution_failed": {
+        "en": "Execution failed: {error}",
+        "ja": "実行できません: {error}",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_inputs_invalid": {
+        "en": "--inputs is invalid: {error}",
+        "ja": "--inputs が不正です: {error}",
+        "qps-ploc": "⟦--ïñṗůŧş ïş ïñṽȧŀïḓ: {error} ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_browser_tab_required": {
+        "en": "Browser procedures require --tab-id to bind the target tab.",
+        "ja": "ブラウザ手順には --tab-id が必要です(対象タブを固定するため)。",
+        "qps-ploc": "⟦Ƀřőẇşėř ṗřőƈėḓůřėş řėɋůïřė --ŧȧƀ-ïḓ ŧő ƀïñḓ ŧħė ŧȧřɠėŧ ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_browser_build_required": {
+        "en": "browser-actuator is unavailable. Run pnpm build:actuators first: {error}",
+        "ja": "browser-actuator が利用できません。先に pnpm build:actuators を実行してください: {error}",
+        "qps-ploc": "⟦ƀřőẇşėř-ȧƈŧůȧŧőř ïş ůñȧṽȧïŀȧƀŀė. Řůñ ṗñṗɱ ƀůïŀḓ:ȧƈŧůȧŧőřş ƒïřşŧ: {error} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_feedback_recorded": {
+        "en": "Feedback recorded: {id} ({outcome})",
+        "ja": "評価を記録しました: {id} ({outcome})",
+        "qps-ploc": "⟦Ƒėėḓƀȧƈķ řėƈőřḓėḓ: {id} ({outcome}) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_feedback_review": {
+        "en": "Review: pnpm kyberion improvements --approve {id}",
+        "ja": "レビュー: pnpm kyberion improvements --approve {id}",
+        "qps-ploc": "⟦Řėṽïėẇ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --ȧṗṗřőṽė {id} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "recorder_no_improvement": {
+        "en": "No improvement candidate. Continue observing the current procedure.",
+        "ja": "改善候補はありません。現行手順を継続観測します。",
+        "qps-ploc": "⟦Ñő ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė. Ƈőñŧïñůė őƀşėřṽïñɠ ŧħė ƈůřřėñŧ ṗřőƈėḓůřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_catalog_review_note": {
+        "en": "The procedure catalog was not changed automatically. Apply the reviewed promotion separately.",
+        "ja": "手順カタログは自動変更していません。実装レビュー後に昇格内容を反映します。",
+        "qps-ploc": "⟦Ŧħė ṗřőƈėḓůřė ƈȧŧȧŀőɠ ẇȧş ñőŧ ƈħȧñɠėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. Ȧṗṗŀẏ ŧħė řėṽïėẇėḓ ṗřőɱőŧïőñ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "recorder_no_candidates": {
+        "en": "No execution-feedback improvement candidates.",
+        "ja": "実行フィードバック由来の改善候補はありません。",
+        "qps-ploc": "⟦Ñő ėẋėƈůŧïőñ-ƒėėḓƀȧƈķ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧėş. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_default_correction": {
+        "en": "Review the execution result, success conditions, and target scope.",
+        "ja": "実行結果を確認し、手順の成功条件と対象範囲を見直す",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ėẋėƈůŧïőñ řėşůŀŧ, şůƈƈėşş ƈőñḓïŧïőñş, ȧñḓ ŧȧřɠėŧ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_candidate_title": {
+        "en": "Improvement candidate: {id}",
+        "ja": "改善候補: {id}",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė: {id} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_candidate_summary": {
+        "en": "User outcome {outcome}. Correction: {correction}",
+        "ja": "ユーザー評価 {outcome}。修正内容: {correction}",
+        "qps-ploc": "⟦Ůşėř őůŧƈőɱė {outcome}. Ƈőřřėƈŧïőñ: {correction} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "recorder_notify_usage": {
+        "en": "Usage: pnpm kyberion notify --set <{channels}>:<channel-id>",
+        "ja": "使い方: pnpm kyberion notify --set <{channels}>:<channel-id>",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ñőŧïƒẏ --şėŧ <{channels}>:<ƈħȧññėŀ-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_notify_saved": {
+        "en": "Default notification channel set to {surface}:{target} ({path})",
+        "ja": "既定の通知先を {surface}:{target} に設定しました ({path})",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ ñőŧïƒïƈȧŧïőñ ƈħȧññėŀ şėŧ ŧő {surface}:{target} ({path}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "recorder_inbox_marked": {
+        "en": "✓ Marked {count} inbox entries as read{match}",
+        "ja": "✓ inbox {count} 件を既読化しました{match}",
+        "qps-ploc": "⟦✓ Ɱȧřķėḓ {count} ïñƀőẋ ėñŧřïėş ȧş řėȧḓ{match} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_inbox_not_found": {
+        "en": "Inbox entry not found: {id}",
+        "ja": "inbox エントリが見つかりません: {id}",
+        "qps-ploc": "⟦Ïñƀőẋ ėñŧřẏ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_inbox_updated": {
+        "en": "✓ {id} → {status}: {title}",
+        "ja": "✓ {id} → {status}: {title}",
+        "qps-ploc": "⟦✓ {id} → {status}: {title} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_inbox_empty": {
+        "en": "Inbox is empty.",
+        "ja": "Inbox は空です。",
+        "qps-ploc": "⟦Ïñƀőẋ ïş ėɱṗŧẏ. ŀőřė⟧"
+      },
+      "recorder_inbox_header": {
+        "en": "Inbox ({unread} unread / {total} total):",
+        "ja": "Inbox ({unread} 件未読 / {total} 件):",
+        "qps-ploc": "⟦Ïñƀőẋ ({unread} ůñřėȧḓ / {total} ŧőŧȧŀ): ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_inbox_summary": {
+        "en": "Read: pnpm kyberion inbox --read <id> / Accept: --accept <id>",
+        "ja": "既読化: pnpm kyberion inbox --read <id> / 受領: --accept <id>",
+        "qps-ploc": "⟦Řėȧḓ: ṗñṗɱ ķẏƀėřïőñ ïñƀőẋ --řėȧḓ <ïḓ> / Ȧƈƈėṗŧ: --ȧƈƈėṗŧ <ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_approvals_not_found": {
+        "en": "Pending approval not found: {id}",
+        "ja": "承認待ちが見つかりません: {id}",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_approval_updated": {
+        "en": "✓ {id} → {status}: {title}",
+        "ja": "✓ {id} → {status}: {title}",
+        "qps-ploc": "⟦✓ {id} → {status}: {title} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_approvals_empty": {
+        "en": "There are no pending approvals.",
+        "ja": "承認待ちはありません。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ñő ṗėñḓïñɠ ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_approvals_header": {
+        "en": "Pending approvals ({count}):",
+        "ja": "承認待ち ({count} 件):",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ({count}): ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_approvals_summary": {
+        "en": "Decide: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"]",
+        "ja": "裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"]",
+        "qps-ploc": "⟦Ḓėƈïḓė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė <ïḓ> / --ḓėñẏ <ïḓ> [--ñőŧė \"...\"] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "recorder_ask_usage": {
+        "en": "Usage: pnpm kyberion ask \"<request>\"",
+        "ja": "使い方: pnpm kyberion ask \"<依頼・質問>\"",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ȧşķ \"<řėɋůėşŧ>\" ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "recorder_ask_empty": {
+        "en": "(No response — check backend settings with pnpm doctor)",
+        "ja": "(応答が空でした — pnpm doctor で backend 設定を確認してください)",
+        "qps-ploc": "⟦(Ñő řėşṗőñşė — ƈħėƈķ ƀȧƈķėñḓ şėŧŧïñɠş ẇïŧħ ṗñṗɱ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_procedure_not_found": {
+        "en": "Procedure not found: {id}",
+        "ja": "手順が見つかりません: {id}",
+        "qps-ploc": "⟦Ṗřőƈėḓůřė ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_procedure_entry": {
+        "en": "  [{id}] {substrate}/{executor} risk={risk} status={status}",
+        "ja": "  [{id}] {substrate}/{executor} risk={risk} status={status}",
+        "qps-ploc": "⟦  [{id}] {substrate}/{executor} řïşķ={risk} şŧȧŧůş={status} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_procedure_target": {
+        "en": "      target: {target}",
+        "ja": "      対象: {target}",
+        "qps-ploc": "⟦      ŧȧřɠėŧ: {target} ŀőřėɱ ï⟧"
+      },
+      "recorder_procedure_intent": {
+        "en": "      intent: {intent}",
+        "ja": "      intent: {intent}",
+        "qps-ploc": "⟦      ïñŧėñŧ: {intent} ŀőřėɱ ï⟧"
+      },
+      "recorder_intent_usage": {
+        "en": "Usage: pnpm kyberion intent \"<request>\" [--substrate browser|desktop|service]",
+        "ja": "使い方: pnpm kyberion intent \"<依頼>\" [--substrate browser|desktop|service]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ïñŧėñŧ \"<řėɋůėşŧ>\" [--şůƀşŧřȧŧė ƀřőẇşėř|ḓėşķŧőṗ|şėřṽïƈė] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_intent_label": {
+        "en": "Intent: {text}",
+        "ja": "Intent: {text}",
+        "qps-ploc": "⟦Ïñŧėñŧ: {text} ŀőřė⟧"
+      },
+      "recorder_intent_candidates": {
+        "en": "Candidates:",
+        "ja": "候補:",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧėş: ŀőř⟧"
+      },
+      "recorder_execution_status": {
+        "en": "Procedure {id}: {status}",
+        "ja": "手順 {id}: {status}",
+        "qps-ploc": "⟦Ṗřőƈėḓůřė {id}: {status} ŀőřėɱ ï⟧"
+      },
+      "recorder_execution_approval": {
+        "en": "Approval request: {id}",
+        "ja": "承認要求: {id}",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ: {id} ŀőřėɱ ï⟧"
+      },
+      "recorder_execution_confirm": {
+        "en": "Confirm: pnpm kyberion approvals --approve {id}",
+        "ja": "確認: pnpm kyberion approvals --approve {id}",
+        "qps-ploc": "⟦Ƈőñƒïřɱ: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė {id} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_execution_lease": {
+        "en": "lease: {lease}",
+        "ja": "lease: {lease}",
+        "qps-ploc": "⟦ŀėȧşė: {lease} ŀőřė⟧"
+      },
+      "recorder_execution_reason": {
+        "en": "Reason: {reason}",
+        "ja": "理由: {reason}",
+        "qps-ploc": "⟦Řėȧşőñ: {reason} ŀőřėɱ⟧"
+      },
+      "recorder_execution_feedback": {
+        "en": "Evaluate: pnpm kyberion feedback {id} --outcome satisfied --correlation-id {correlationId}",
+        "ja": "評価: pnpm kyberion feedback {id} --outcome satisfied --correlation-id {correlationId}",
+        "qps-ploc": "⟦Ėṽȧŀůȧŧė: ṗñṗɱ ķẏƀėřïőñ ƒėėḓƀȧƈķ {id} --őůŧƈőɱė şȧŧïşƒïėḓ --ƈőřřėŀȧŧïőñ-ïḓ {correlationId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "recorder_procedure_promote_usage": {
+        "en": "Usage: pnpm kyberion procedure promote <id> --substrate desktop --recording <path> --intent \"<request>\"",
+        "ja": "使い方: pnpm kyberion procedure promote <id> --substrate desktop --recording <path> --intent \"<依頼>\"",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ṗřőƈėḓůřė ṗřőɱőŧė <ïḓ> --şůƀşŧřȧŧė ḓėşķŧőṗ --řėƈőřḓïñɠ <ṗȧŧħ> --ïñŧėñŧ \"<řėɋůėşŧ>\" ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "recorder_feedback_usage": {
+        "en": "Usage: pnpm kyberion feedback <intent-id> --outcome satisfied|partially_satisfied|dissatisfied [--correction \"...\"] [--correlation-id <id>]",
+        "ja": "使い方: pnpm kyberion feedback <intent-id> --outcome satisfied|partially_satisfied|dissatisfied [--correction \"...\"] [--correlation-id <id>]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ƒėėḓƀȧƈķ <ïñŧėñŧ-ïḓ> --őůŧƈőɱė şȧŧïşƒïėḓ|ṗȧřŧïȧŀŀẏ_şȧŧïşƒïėḓ|ḓïşşȧŧïşƒïėḓ [--ƈőřřėƈŧïőñ \"...\"] [--ƈőřřėŀȧŧïőñ-ïḓ <ïḓ>] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "recorder_feedback_candidate": {
+        "en": "Improvement candidate: {id}",
+        "ja": "改善候補: {id}",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė: {id} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_improvement_not_found": {
+        "en": "Proposed improvement candidate not found: {id}",
+        "ja": "提案中の改善候補が見つかりません: {id}",
+        "qps-ploc": "⟦Ṗřőṗőşėḓ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_improvement_updated": {
+        "en": "✓ {id} → {status}",
+        "ja": "✓ {id} → {status}",
+        "qps-ploc": "⟦✓ {id} → {status} ŀőřėɱ⟧"
+      },
+      "recorder_improvement_header": {
+        "en": "Improvement candidates ({count}):",
+        "ja": "改善候補 ({count} 件):",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧėş ({count}): ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_improvement_approve": {
+        "en": "Review: pnpm kyberion improvements --approve <candidate-id>",
+        "ja": "承認: pnpm kyberion improvements --approve <candidate-id>",
+        "qps-ploc": "⟦Řėṽïėẇ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --ȧṗṗřőṽė <ƈȧñḓïḓȧŧė-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_home_title": {
+        "en": "Kyberion Home",
+        "ja": "Kyberion Home",
+        "qps-ploc": "⟦Ķẏƀėřïőñ Ħőɱė ŀőřė⟧"
+      },
+      "recorder_home_status": {
+        "en": "Status: {label} — {detail}",
+        "ja": "状態: {label} — {detail}",
+        "qps-ploc": "⟦Şŧȧŧůş: {label} — {detail} ŀőřėɱ ïṗ⟧"
+      },
+      "recorder_home_doctor": {
+        "en": "Doctor gaps: {count}",
+        "ja": "Doctor の不足: {count}",
+        "qps-ploc": "⟦Ḓőƈŧőř ɠȧṗş: {count} ŀőřėɱ ⟧"
+      },
+      "recorder_home_counts": {
+        "en": "Pending approvals {approvals} / questions {questions} / unread inbox {inbox}",
+        "ja": "承認待ち {approvals} 件 / 質問 {questions} 件 / inbox 未読 {inbox} 件",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş {approvals} / ɋůėşŧïőñş {questions} / ůñřėȧḓ ïñƀőẋ {inbox} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_home_missions": {
+        "en": "Active missions: {active} (recently active in 7 days: {recent}){suffix}",
+        "ja": "実行中ミッション: {active} 件(直近7日で動きあり {recent} 件){suffix}",
+        "qps-ploc": "⟦Ȧƈŧïṽė ɱïşşïőñş: {active} (řėƈėñŧŀẏ ȧƈŧïṽė ïñ 7 ḓȧẏş: {recent}){suffix} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_customer_binding_warning": {
+        "en": "⚠ Customer-mode channel bindings: {count} active (check for misbinding)",
+        "ja": "⚠ 顧客モード channel binding: {count} 件アクティブ(誤バインディング注意)",
+        "qps-ploc": "⟦⚠ Ƈůşŧőɱėř-ɱőḓė ƈħȧññėŀ ƀïñḓïñɠş: {count} ȧƈŧïṽė (ƈħėƈķ ƒőř ɱïşƀïñḓïñɠ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_customer_binding_more": {
+        "en": "  ... and {count} more",
+        "ja": "  ... 他 {count} 件",
+        "qps-ploc": "⟦  ... ȧñḓ {count} ɱőřė ŀőřėɱ ï⟧"
+      },
+      "recorder_deal_not_found": {
+        "en": "Deal not found: {id}",
+        "ja": "商談が見つかりません: {id}",
+        "qps-ploc": "⟦Ḓėȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ⟧"
+      },
+      "recorder_deal_audio_usage": {
+        "en": "Usage: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>",
+        "ja": "使い方: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --ïñɠėşŧ-ȧůḓïő <ḓėȧŀ-ïḓ> --ȧůḓïő <ṗȧŧħ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_deal_audio_failed": {
+        "en": "Ingestion failed (transcription unavailable or reasoning backend is stub). Check the logs.",
+        "ja": "取り込みに失敗しました(文字起こし不可、または reasoning backend が stub)。ログを確認してください。",
+        "qps-ploc": "⟦Ïñɠėşŧïőñ ƒȧïŀėḓ (ŧřȧñşƈřïṗŧïőñ ůñȧṽȧïŀȧƀŀė őř řėȧşőñïñɠ ƀȧƈķėñḓ ïş şŧůƀ). Ƈħėƈķ ŧħė ŀőɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "recorder_deal_audio_updated": {
+        "en": "✓ Requirements draft updated (capture {count})",
+        "ja": "✓ 要件ドラフト更新 ({count} 回目の取り込み)",
+        "qps-ploc": "⟦✓ Řėɋůïřėɱėñŧş ḓřȧƒŧ ůṗḓȧŧėḓ (ƈȧṗŧůřė {count}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recorder_deal_transcript": {
+        "en": "  Transcript: {path}",
+        "ja": "  文字起こし: {path}",
+        "qps-ploc": "⟦  Ŧřȧñşƈřïṗŧ: {path} ŀőřėɱ ⟧"
+      },
+      "recorder_deal_requirements_next": {
+        "en": "  Inspect: pnpm kyberion deals --requirements {id}",
+        "ja": "  確認: pnpm kyberion deals --requirements {id}",
+        "qps-ploc": "⟦  Ïñşṗėƈŧ: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --řėɋůïřėɱėñŧş {id} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "recorder_deal_requirements_none": {
+        "en": "Requirements have not been captured yet ({id} / stage: {stage}). They are collected automatically during discovery conversations.",
+        "ja": "要件キャプチャはまだありません ({id} / stage: {stage})。discovery ステージの顧客対話で自動収集されます。",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ħȧṽė ñőŧ ƀėėñ ƈȧṗŧůřėḓ ẏėŧ ({id} / şŧȧɠė: {stage}). Ŧħėẏ ȧřė ƈőŀŀėƈŧėḓ ȧůŧőɱȧŧïƈȧŀŀẏ ḓůřïñɠ ḓïşƈőṽėřẏ ƈőñṽėřşȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "recorder_deal_requirements_header": {
+        "en": "Requirements draft {id} ({turns} turns / updated {updated})",
+        "ja": "要件ドラフト {id} ({turns} ターン / 更新 {updated})",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ḓřȧƒŧ {id} ({turns} ŧůřñş / ůṗḓȧŧėḓ {updated}) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "recorder_deal_open_questions": {
+        "en": "  Open questions:",
+        "ja": "  未解決の質問:",
+        "qps-ploc": "⟦  Őṗėñ ɋůėşŧïőñş: ŀőřėɱ⟧"
+      },
+      "recorder_deal_empty": {
+        "en": "There are no deals. They start automatically from customer channel bindings.",
+        "ja": "商談はありません。顧客チャネルの binding から自動で開始されます。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ñő ḓėȧŀş. Ŧħėẏ şŧȧřŧ ȧůŧőɱȧŧïƈȧŀŀẏ ƒřőɱ ƈůşŧőɱėř ƈħȧññėŀ ƀïñḓïñɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "recorder_deal_header": {
+        "en": "Deals ({count}):",
+        "ja": "商談 ({count} 件):",
+        "qps-ploc": "⟦Ḓėȧŀş ({count}): ŀőřėɱ⟧"
+      },
+      "recorder_deal_requirements_command": {
+        "en": "Requirements hearing: pnpm kyberion deals --requirements <deal-id>",
+        "ja": "要件ヒアリング内容: pnpm kyberion deals --requirements <deal-id>",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ħėȧřïñɠ: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --řėɋůïřėɱėñŧş <ḓėȧŀ-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_capture_not_promotable": {
+        "en": "No native OS events were captured. Keep this recording as observation evidence and re-record after enabling Accessibility permission.",
+        "ja": "ネイティブOSイベントを取得できませんでした。この記録は観測証跡として保持し、アクセシビリティ権限を有効にして再記録してください。",
+        "qps-ploc": "⟦Ñő ñȧŧïṽė ŐŞ ėṽėñŧş ẇėřė ƈȧṗŧůřėḓ. Ķėėṗ ŧħïş řėƈőřḓïñɠ ȧş őƀşėřṽȧŧïőñ ėṽïḓėñƈė ȧñḓ řė-řėƈőřḓ ȧƒŧėř ėñȧƀŀïñɠ Ȧƈƈėşşïƀïŀïŧẏ ṗėřɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "recorder_procedure_usage": {
+        "en": "Usage: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
+        "ja": "使い方: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ṗřőƈėḓůřė <ŀïşŧ|ïñşṗėƈŧ|řůñ|ṗřőɱőŧė> [ṗřőƈėḓůřė-ïḓ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_record_usage": {
+        "en": "Usage: pnpm kyberion record desktop [--duration <sec>]",
+        "ja": "使い方: pnpm kyberion record desktop [--duration <sec>]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ řėƈőřḓ ḓėşķŧőṗ [--ḓůřȧŧïőñ <şėƈ>] ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_unknown_subcommand": {
+        "en": "Unknown subcommand: {subcommand}",
+        "ja": "不明なサブコマンド: {subcommand}",
+        "qps-ploc": "⟦Ůñķñőẇñ şůƀƈőɱɱȧñḓ: {subcommand} ŀőřėɱ ïṗşů⟧"
+      }
+    },
     "status": {
       "progress_working": {
         "en": "Working",

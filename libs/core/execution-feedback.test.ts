@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildExecutionFeedbackHints,
   loadExecutionFeedbackStore,
+  materializeExecutionFeedbackCandidate,
   parseExecutionFeedbackText,
   recordExecutionFeedback,
   resolveExecutionFeedbackPath,
@@ -9,11 +10,13 @@ import {
   validateExecutionFeedback,
 } from './execution-feedback.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 describe('execution feedback loop', () => {
   const feedbackPath = resolveExecutionFeedbackPath();
   let originalExists = false;
   let originalRaw: string | null = null;
+  const createdCandidateIds = new Set<string>();
 
   beforeAll(() => {
     originalExists = safeExistsSync(feedbackPath);
@@ -30,6 +33,15 @@ describe('execution feedback loop', () => {
   afterAll(() => {
     if (originalExists && originalRaw !== null) safeWriteFile(feedbackPath, originalRaw);
     else if (safeExistsSync(feedbackPath)) safeRmSync(feedbackPath);
+  });
+
+  afterEach(() => {
+    for (const candidateId of createdCandidateIds) {
+      safeRmSync(pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`), {
+        force: true,
+      });
+    }
+    createdCandidateIds.clear();
   });
 
   it('records feedback and summarizes repeated corrections per scenario', () => {
@@ -73,6 +85,30 @@ describe('execution feedback loop', () => {
       intent_id: 'schedule-read-agenda',
       outcome: 'partially_satisfied',
       correction: '対象期間を確認して',
+    });
+  });
+
+  it('materializes a non-positive result as a reviewable procedure candidate', () => {
+    const feedback = recordExecutionFeedback({
+      scenario_id: 'use-case-browser-invoice',
+      intent_id: 'browser-invoice',
+      outcome: 'dissatisfied',
+      correction: '送信前に内容を確認したい',
+      source: 'operator',
+    });
+    const result = materializeExecutionFeedbackCandidate({
+      feedback,
+      procedureId: 'invoice.submit',
+    });
+    if (result.candidate) createdCandidateIds.add(result.candidate.candidate_id);
+
+    expect(result.summary.improvement_status).toBe('candidate');
+    expect(result.candidate?.status).toBe('proposed');
+    expect(result.candidate?.target_kind).toBe('procedure');
+    expect(result.candidate?.metadata).toMatchObject({
+      improvement_kind: 'execution_feedback',
+      procedure_id: 'invoice.submit',
+      review_required: true,
     });
   });
 });

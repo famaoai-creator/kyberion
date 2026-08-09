@@ -3,7 +3,16 @@
   "$id": "https://kyberion.local/schemas/distill-candidate-record.schema.json",
   "title": "Distill Candidate Record",
   "type": "object",
-  "required": ["candidate_id", "source_type", "title", "summary", "status", "target_kind", "created_at", "updated_at"],
+  "required": [
+    "candidate_id",
+    "source_type",
+    "title",
+    "summary",
+    "status",
+    "target_kind",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
     "candidate_id": { "type": "string", "minLength": 1 },
     "source_type": { "type": "string", "enum": ["task_session", "mission", "artifact"] },
@@ -20,7 +29,10 @@
     "title": { "type": "string", "minLength": 1 },
     "summary": { "type": "string", "minLength": 1 },
     "status": { "type": "string", "enum": ["proposed", "promoted", "archived"] },
-    "target_kind": { "type": "string", "enum": ["pattern", "sop_candidate", "knowledge_hint", "report_template"] },
+    "target_kind": {
+      "type": "string",
+      "enum": ["pattern", "sop_candidate", "knowledge_hint", "report_template", "procedure"]
+    },
     "specialist_id": { "type": "string" },
     "locale": { "type": "string" },
     "work_loop": { "$ref": "./organization-work-loop.schema.json" },
