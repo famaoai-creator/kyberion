@@ -41,6 +41,8 @@ async function createHarness() {
     nativeError: undefined as string | undefined,
     execute: (_step: any, _value: any): any => ({ status: 'done', detail: 'ok' }),
     hostAccess: true,
+    piiScrubberReady: true,
+    injectedFiles: [] as string[][],
   };
 
   const chrome: any = {
@@ -92,7 +94,8 @@ async function createHarness() {
         tabId === tab.id ? { ...tab, status: 'complete' } : null
       ),
       sendMessage: vi.fn(async (_tabId: number, message: any) => {
-        if (message.type === 'bridge:ping') return { ok: true };
+        if (message.type === 'bridge:ping')
+          return { ok: true, piiScrubberReady: hooks.piiScrubberReady };
         if (message.type === 'bridge:observe')
           return {
             title: tab.title,
@@ -105,7 +108,11 @@ async function createHarness() {
         return { ok: true };
       }),
     },
-    scripting: { executeScript: vi.fn(async () => undefined) },
+    scripting: {
+      executeScript: vi.fn(async (details: any) => {
+        if (Array.isArray(details?.files)) hooks.injectedFiles.push(details.files);
+      }),
+    },
     permissions: {
       contains: vi.fn(async () => hooks.hostAccess),
       request: vi.fn(async () => true),
@@ -176,6 +183,15 @@ describe('Browser Bridge extension state transitions', () => {
 
     expect(response.ok).toBe(true);
     expect(response.state.connected).toBeNull();
+  });
+
+  it('refreshes shared PII rules without redeclaring an existing content script', async () => {
+    const harness = await createHarness();
+    harness.hooks.piiScrubberReady = false;
+
+    await harness.send({ type: 'bridge:connect-active-tab' });
+
+    expect(harness.hooks.injectedFiles).toEqual([['pii-rules.generated.js']]);
   });
 
   it('pauses on navigation and resumes recording after reconnecting to the same origin', async () => {

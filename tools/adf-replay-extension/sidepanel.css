@@ -193,6 +193,13 @@ button.is-busy {
   font-size: 12px;
   line-height: 1.5;
 }
+.ai-status {
+  min-height: 18px;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
 .action-list {
   display: grid;
   gap: 8px;

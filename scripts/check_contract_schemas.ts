@@ -171,6 +171,37 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'desktop-pipeline',
+      schemaPath: 'knowledge/product/schemas/desktop-pipeline.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'desktop-pipeline.v1',
+          procedure_id: 'desktop.notes.capture',
+          executor: 'system',
+          recording_ref: 'active/shared/runtime/recordings/desktop.notes.capture.json',
+          recording_hash: 'a'.repeat(64),
+          steps: [
+            {
+              step_id: 'desktop-step-1',
+              op: 'system:screenshot',
+              risk_class: 'read',
+              selector: { app: 'Notes' },
+            },
+          ],
+        },
+      ],
+      invalidPayloads: [
+        {
+          schema_version: 'desktop-pipeline.v1',
+          procedure_id: 'desktop.notes.capture',
+          executor: 'system',
+          recording_ref: 'active/shared/runtime/recordings/desktop.notes.capture.json',
+          recording_hash: 'not-a-hash',
+          steps: [],
+        },
+      ],
+    },
+    {
       id: 'procedure-delta',
       schemaPath: 'knowledge/product/schemas/procedure-delta.schema.json',
       validPayloads: [
@@ -265,7 +296,7 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
-      // Substrate contract (executor deferred): desktop UI automation.
+      // Desktop UI automation contract; execution is approval-gated by the dispatcher.
       id: 'desktop-recording',
       schemaPath: 'knowledge/product/schemas/desktop-recording.schema.json',
       validPayloads: [
@@ -276,9 +307,18 @@ function createChecks(): ContractCheck[] {
           created_at: '2026-06-24T00:00:00.000Z',
           target: { name: 'Excel', platform: 'darwin' },
           steps: [
-            { step_id: 'd1', op: 'click_element', summary: 'OKをクリック', risk_class: 'low' },
+            {
+              step_id: 'd1',
+              op: 'click_element',
+              summary: 'OKをクリック',
+              risk_class: 'low',
+              evidence: ['active_window:application'],
+            },
           ],
           risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+          recording_hash: 'a'.repeat(64),
+          policy_version: 'desktop-policy.v1',
+          review: { status: 'pending' },
         },
       ],
       invalidPayloads: [
@@ -290,6 +330,48 @@ function createChecks(): ContractCheck[] {
           target: { name: 'X', platform: 'solaris' },
           steps: [],
           risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+        },
+      ],
+    },
+    {
+      id: 'desktop-intent',
+      schemaPath: 'knowledge/product/schemas/desktop-intent.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'desktop-intent.v1',
+          intent: 'Review the desktop workflow',
+          source_recording_id: 'DR-1',
+          generated_at: '2026-08-09T00:00:00.000Z',
+          steps: [
+            {
+              id: 's1',
+              title: 'Observe',
+              detail: 'Observe the reviewed target.',
+              evidence: ['active_window:application'],
+              confidence: 0.9,
+              op: 'screenshot',
+            },
+          ],
+          review: { status: 'pending' },
+        },
+      ],
+      invalidPayloads: [
+        {
+          schema_version: 'desktop-intent.v1',
+          intent: '',
+          source_recording_id: 'DR-1',
+          generated_at: 'not-a-date-but-nonempty',
+          steps: [
+            {
+              id: 's1',
+              title: 'Observe',
+              detail: 'Observe',
+              evidence: [],
+              confidence: 2,
+              op: 'screenshot',
+            },
+          ],
+          review: { status: 'pending' },
         },
       ],
     },

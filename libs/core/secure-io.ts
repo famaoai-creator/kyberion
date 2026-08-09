@@ -1,6 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  execFileSync,
+  spawn,
+  spawnSync,
+  type ChildProcessWithoutNullStreams,
+} from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
@@ -647,6 +652,28 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     input,
     stdio: ['pipe', 'pipe', 'pipe'],
   }) as string;
+}
+
+/**
+ * Start a long-lived helper through the same command and policy boundary as
+ * safeExec. Callers own the returned process and must stop it explicitly.
+ * This is intentionally the only async process-spawn escape hatch exposed to
+ * core modules; direct node:child_process imports are not allowed at feature
+ * boundaries.
+ */
+export function safeSpawn(
+  command: string,
+  args: string[] = [],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+): ChildProcessWithoutNullStreams {
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
+  assertExecPolicy(command);
+  return spawn(command, args, {
+    cwd: options.cwd ?? process.cwd(),
+    env: buildSafeExecEnv(options.env ?? {}),
+    shell: false,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 /**

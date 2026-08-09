@@ -46,6 +46,7 @@ import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import { AdvisoryPolicyViolation } from './ce-adoption.js';
+import { assertDistillationTextEgress } from './frame-redaction.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -1078,6 +1079,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    assertDistillationTextEgress([instruction, context].filter(Boolean).join('\n\n'));
     let servedBackendName = '';
     const first = await this.runWithFailover(
       'delegateTask',
@@ -1098,6 +1100,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       'delegateTask',
       (backend) => {
         servedBackendName = backend.name;
+        assertDistillationTextEgress([instruction, first, context].filter(Boolean).join('\n\n'));
         return backend.delegateTask(
           buildDelegationSummaryContinuationPrompt(instruction, first),
           context,
@@ -1123,6 +1126,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   }
 
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
+    assertDistillationTextEgress(prompt);
     return this.runWithFailover(
       'prompt',
       (backend) => backend.prompt(prompt, options),
@@ -1131,6 +1135,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   }
 
   async *streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    assertDistillationTextEgress(prompt);
     throwIfReasoningAborted(options?.signal);
     enforceSpendGuardForReasoning();
     const candidates = this.candidates.slice(0, this.failoverPolicy.max_attempts);
@@ -1171,6 +1176,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     tools: ToolDefinition[],
     options?: ReasoningCallOptions
   ): Promise<GenerateWithToolsResult> {
+    assertDistillationTextEgress(prompt);
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
     let primaryCandidate: ReasoningBackendCandidate | undefined;
@@ -1219,6 +1225,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     images: ReasoningImageAttachment[],
     options?: ReasoningCallOptions
   ): Promise<string> {
+    assertDistillationTextEgress(prompt);
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
     let primaryCandidate: ReasoningBackendCandidate | undefined;

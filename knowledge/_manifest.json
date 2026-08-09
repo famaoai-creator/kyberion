@@ -1053,7 +1053,7 @@
     {
       "path": "product/governance/approval-policy.json",
       "tier": "public",
-      "size": 2715,
+      "size": 2911,
       "type": "json"
     },
     {
@@ -1065,7 +1065,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 9312,
+      "size": 9351,
       "type": "json"
     },
     {
@@ -1113,7 +1113,7 @@
     {
       "path": "product/governance/authority-roles/ecosystem_architect.json",
       "tier": "public",
-      "size": 555,
+      "size": 546,
       "type": "json"
     },
     {
@@ -1431,7 +1431,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6646,
+      "size": 6610,
       "type": "json"
     },
     {
@@ -2181,7 +2181,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19930,
+      "size": 19969,
       "type": "json"
     },
     {
@@ -3643,10 +3643,22 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/native-op-ladder.md",
+      "tier": "public",
+      "size": 544,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/negotiation-protocol.md",
       "tier": "public",
       "size": 3472,
       "type": "md"
+    },
+    {
+      "path": "product/orchestration/observation-to-op-map.json",
+      "tier": "public",
+      "size": 869,
+      "type": "json"
     },
     {
       "path": "product/orchestration/oh-my-openagent-clean-room-notes.md",
@@ -4707,7 +4719,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 275822,
+      "size": 322687,
       "type": "json"
     },
     {
@@ -6367,15 +6379,27 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/desktop-intent.schema.json",
+      "tier": "public",
+      "size": 1585,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/desktop-pipeline.schema.json",
+      "tier": "public",
+      "size": 1696,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/desktop-recording.schema.json",
       "tier": "public",
-      "size": 2540,
+      "size": 4378,
       "type": "json"
     },
     {
       "path": "product/schemas/distill-candidate-record.schema.json",
       "tier": "public",
-      "size": 1703,
+      "size": 1768,
       "type": "json"
     },
     {
