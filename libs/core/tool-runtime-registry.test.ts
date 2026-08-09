@@ -22,16 +22,34 @@ vi.mock('./secure-io.js', async () => {
     safeExecResult: vi.fn((command: string, args: string[] = []) => {
       if (
         command === 'which' &&
-        ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(
-          args[0] || ''
-        )
+        [
+          'uvx',
+          'uv',
+          'npx',
+          'pnpm',
+          'brew',
+          'winget',
+          'ffmpeg',
+          'sox',
+          'tesseract',
+          'python3',
+        ].includes(args[0] || '')
       ) {
         return { status: 0, stdout: `/mock/${args[0]}\n`, stderr: '', error: null };
       }
       if (
-        ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(
-          command
-        )
+        [
+          'uvx',
+          'uv',
+          'npx',
+          'pnpm',
+          'brew',
+          'winget',
+          'ffmpeg',
+          'sox',
+          'tesseract',
+          'python3',
+        ].includes(command)
       ) {
         return { status: 0, stdout: `/mock/${command}`, stderr: '', error: null };
       }
@@ -104,7 +122,7 @@ describe('tool runtime registry', () => {
                 command: 'uv',
                 args: ['tool', 'run', 'mflux-generate'],
               },
-              managed_env_subpath: 'tool-runtimes/mflux',
+              managed_env_subpath: path.join('tool-runtimes', 'mflux'),
               notes: 'test fixture',
             },
             {
@@ -174,12 +192,19 @@ describe('tool runtime registry', () => {
                 command: 'brew',
                 args: ['install', 'ffmpeg'],
               },
+              install_backend_platform_overrides: {
+                win32: {
+                  kind: 'winget',
+                  command: 'winget',
+                  args: ['install', '--id', 'Gyan.FFmpeg', '--exact'],
+                },
+              },
               installed_backend: {
                 kind: 'system',
                 command: 'ffmpeg',
                 args: ['-version'],
               },
-              managed_env_subpath: 'tool-runtimes/ffmpeg',
+              managed_env_subpath: path.join('tool-runtimes', 'ffmpeg'),
               notes: 'test fixture',
             },
             {
@@ -254,7 +279,7 @@ describe('tool runtime registry', () => {
                 command: 'python3',
                 args: ['-c', 'import mlx_audio; print("ok")'],
               },
-              managed_env_subpath: 'tool-runtimes/mlx-audio',
+              managed_env_subpath: path.join('tool-runtimes', 'mlx-audio'),
               notes: 'test fixture',
             },
             {
@@ -279,7 +304,7 @@ describe('tool runtime registry', () => {
                 command: 'python3',
                 args: ['-c', 'import mlx_whisper; print("ok")'],
               },
-              managed_env_subpath: 'tool-runtimes/mlx-whisper',
+              managed_env_subpath: path.join('tool-runtimes', 'mlx-whisper'),
               notes: 'test fixture',
             },
           ],
@@ -322,7 +347,7 @@ describe('tool runtime registry', () => {
     expect(resolution.selected_action).toBe('run_trial');
     expect(resolution.selected_backend?.command).toBe('uvx');
     expect(resolution.requires_install).toBe(false);
-    expect(resolution.managed_env_path).toContain('tool-runtimes/mflux');
+    expect(resolution.managed_env_path).toContain(path.join('tool-runtimes', 'mflux'));
   });
 
   it('supports node and system runtime records', () => {
@@ -334,7 +359,17 @@ describe('tool runtime registry', () => {
     const ffmpeg = probeToolRuntime('ffmpeg', 'approved_install', 'darwin');
     expect(ffmpeg.selected_action).toBe('install');
     expect(ffmpeg.selected_backend?.kind).toBe('brew');
-    expect(ffmpeg.managed_env_path).toContain('tool-runtimes/ffmpeg');
+    expect(ffmpeg.managed_env_path).toContain(path.join('tool-runtimes', 'ffmpeg'));
+
+    const ffmpegWindows = probeToolRuntime('ffmpeg', 'approved_install', 'win32');
+    expect(ffmpegWindows.selected_action).toBe('install');
+    expect(ffmpegWindows.selected_backend?.kind).toBe('winget');
+    expect(ffmpegWindows.selected_backend?.args).toEqual([
+      'install',
+      '--id',
+      'Gyan.FFmpeg',
+      '--exact',
+    ]);
   });
 
   it('lists inventory items with lifecycle stages', () => {
@@ -396,19 +431,25 @@ describe('tool runtime registry', () => {
     const tts = probeToolRuntime('mlx_audio', 'trial', 'darwin');
     expect(tts.selected_action).toBe('run_trial');
     expect(tts.selected_backend?.command).toBe('python3');
-    expect(tts.managed_env_path).toContain('tool-runtimes/mlx-audio');
+    expect(tts.managed_env_path).toContain(path.join('tool-runtimes', 'mlx-audio'));
 
     const stt = probeToolRuntime('mlx_whisper', 'approved_install', 'darwin');
     expect(stt.selected_action).toBe('install');
     expect(stt.selected_backend?.command).toBe('uv');
-    expect(stt.managed_env_path).toContain('tool-runtimes/mlx-whisper');
+    expect(stt.managed_env_path).toContain(path.join('tool-runtimes', 'mlx-whisper'));
   });
 
   it('resolves the managed python binary when present on disk', () => {
-    const runtimeRoot = path.join(managedRoot, 'tool-runtimes', 'mlx-audio', 'bin');
+    const runtimeRoot = path.join(
+      managedRoot,
+      'tool-runtimes',
+      'mlx-audio',
+      process.platform === 'win32' ? 'Scripts' : 'bin'
+    );
     safeMkdir(runtimeRoot, { recursive: true });
-    safeWriteFile(path.join(runtimeRoot, 'python'), '', { encoding: 'utf8' });
+    const pythonName = process.platform === 'win32' ? 'python.exe' : 'python';
+    safeWriteFile(path.join(runtimeRoot, pythonName), '', { encoding: 'utf8' });
 
-    expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, 'python'));
+    expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, pythonName));
   });
 });
