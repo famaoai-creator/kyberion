@@ -81,6 +81,7 @@ export interface MissionControllerRoutingContext {
   ) => Awaitable<void>;
   pauseMission: (id: string, note?: string) => Awaitable<void>;
   cancelMission: (id: string, note?: string) => Awaitable<void>;
+  repairLegacyMissionState: (id: string, note?: string) => Awaitable<void>;
   recordRoutingDecisionInMissionState: (
     missionId: string,
     routingDecision: Record<string, unknown> | null,
@@ -768,6 +769,9 @@ export async function runMissionControllerAction(
       break;
     case 'cancel':
       await context.cancelMission(arg1!, getValue('--note', context.argv));
+      break;
+    case 'repair':
+      await context.repairLegacyMissionState(arg1!, getValue('--note', context.argv));
       break;
     case 'record-task':
       await context.recordTask(arg1!, arg2!, JSON.parse(context.arg3 || '{}'));

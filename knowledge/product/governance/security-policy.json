@@ -210,6 +210,7 @@
       "allow_read": [
         "active/missions/",
         "active/archive/missions/",
+        "active/archive/failed_missions/",
         "active/audit/",
         "active/shared/",
         "customer/",
@@ -222,6 +223,7 @@
       "allow_write": [
         "active/missions/",
         "active/archive/missions/",
+        "active/archive/failed_missions/",
         "active/audit/",
         "active/shared/",
         "active/shared/coordination/",

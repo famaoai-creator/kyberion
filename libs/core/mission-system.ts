@@ -9,6 +9,7 @@ import {
 import {
   delegateMission as _delegateMission,
   cancelMission as _cancelMission,
+  repairLegacyMissionState as _repairLegacyMissionState,
   finishMission as _finishMission,
   grantMissionAccess as _grantMissionAccess,
   grantMissionSudo as _grantMissionSudo,
@@ -208,6 +209,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     cancelMission(id: string, note?: string) {
       return _cancelMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    },
+    repairLegacyMissionState(id: string, note?: string) {
+      return _repairLegacyMissionState(id, note).then(() =>
+        syncProjectOperationalStateIfLinked(id)
+      );
     },
     recordTask(missionId: string, description: string, details: any = {}) {
       return _recordTask(missionId, description, details).then(() =>
