@@ -14,6 +14,9 @@ import {
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
   listSurfaceOutboxMessages,
+  assessDesktopObservationReadiness,
+  listDesktopObservationSources,
+  macosAutomationBridge,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { formatEnvValidationReport, validateEnv } from '@agent/core';
@@ -30,6 +33,7 @@ import { getEmbeddingBackend, installEmbeddingBackendIfAvailable } from '@agent/
 import { probeAppleIntelligence } from '@agent/core';
 import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
@@ -63,6 +67,7 @@ export interface DoctorRunReport {
   meshDeliveryLines: string[];
   surfaceDeliveryLines: string[];
   localCapabilityLines: string[];
+  desktopObservationLines: string[];
 }
 
 /**
@@ -289,6 +294,26 @@ function runtimeToDependencyActuator(runtime?: string): string | null {
   }
 }
 
+export function collectDesktopObservationDoctorLines(): string[] {
+  const probe = macosAutomationBridge.probe();
+  const readiness = assessDesktopObservationReadiness(probe);
+  const available = readiness.filter((entry) => entry.available).map((entry) => entry.source_id);
+  const unavailable = readiness
+    .filter((entry) => !entry.available)
+    .map((entry) => `${entry.source_id}=${entry.reason}`);
+  return [
+    t('recorder:recorder_doctor_bridge', {
+      bridge: probe.available ? 'available' : 'unavailable',
+      registry: listDesktopObservationSources().length,
+      available: available.join(',') || 'none',
+    }),
+    ...(unavailable.length > 0
+      ? [t('recorder:recorder_doctor_unavailable', { sources: unavailable.join('; ') })]
+      : [t('recorder:recorder_doctor_all_available')]),
+    t('recorder:recorder_doctor_tier'),
+  ];
+}
+
 function formatMissingCapabilityNextStep(
   firstMissingSummary: DoctorRunReport['summaries'][number]
 ): { message: string; title: string; reason: string; command: string } {
@@ -361,6 +386,7 @@ export async function collectDoctorReport(argv: {
     meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
     surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
+    desktopObservationLines: collectDesktopObservationDoctorLines(),
   };
 }
 
@@ -431,6 +457,9 @@ async function main(): Promise<void> {
     console.log(line);
   }
   for (const line of report.surfaceDeliveryLines) {
+    console.log(line);
+  }
+  for (const line of report.desktopObservationLines) {
     console.log(line);
   }
   console.log('');

@@ -29,15 +29,18 @@ import * as missionControllerRouter from './refactor/mission-controller-router.j
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
-describe('mission_controller argument parsing', () => {
-  beforeEach(() => {
-    safeRmSync(pathResolver.shared('runtime/project-registry/PRJ-TEST-AUTO-TRACK.json'), {
-      force: true,
-    });
-    safeRmSync(pathResolver.shared('runtime/project-tracks/TRK-TEST-AUTO-TRACK.json'), {
-      force: true,
-    });
+function cleanupAutoTrackFixture(): void {
+  safeRmSync(pathResolver.shared('runtime/projects/PRJ-TEST-AUTO-TRACK.json'), {
+    force: true,
   });
+  safeRmSync(pathResolver.shared('runtime/project-tracks/TRK-TEST-AUTO-TRACK.json'), {
+    force: true,
+  });
+}
+
+describe('mission_controller argument parsing', () => {
+  beforeEach(cleanupAutoTrackFixture);
+  afterEach(cleanupAutoTrackFixture);
 
   it('removes project traceability flags and their values from positional arguments', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([

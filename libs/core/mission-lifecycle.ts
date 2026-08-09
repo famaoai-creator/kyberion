@@ -49,6 +49,7 @@ import {
   type IntentReconciliationInput,
 } from './intent-reconciliation.js';
 import { loadState, saveState } from './mission-state.js';
+import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import {
   readTrustLedger,
   recordAgentRuntimeEvent,
@@ -1879,6 +1880,92 @@ export async function cancelMission(id: string, note?: string): Promise<void> {
     }
   );
   logger.warn(`🛑 Mission ${upperId} cancelled.`);
+}
+
+function inferMissionTierFromPath(
+  missionPath: string
+): 'personal' | 'confidential' | 'public' | null {
+  const relative = path
+    .relative(pathResolver.rootDir(), path.resolve(missionPath))
+    .split(path.sep)
+    .filter(Boolean);
+  if (relative[0] === 'knowledge' && relative[1] === 'personal' && relative[2] === 'missions') {
+    return 'personal';
+  }
+  if (
+    relative[0] === 'active' &&
+    relative[1] === 'missions' &&
+    (relative[2] === 'confidential' || relative[2] === 'public')
+  ) {
+    return relative[2];
+  }
+  return null;
+}
+
+/** Repair legacy mission records through the controller without inventing completion evidence. */
+export async function repairLegacyMissionState(id: string, note?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller repair <MISSION_ID> [--note "..."]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  const missionPath = findMissionPath(upperId);
+  if (!missionPath) {
+    logger.error(`Mission ${upperId} directory not found.`);
+    return;
+  }
+
+  let latestCommit = state.git?.latest_commit || '';
+  if (!latestCommit) {
+    try {
+      latestCommit = getGitHash(missionPath);
+    } catch {
+      latestCommit = 'legacy-repair';
+    }
+  }
+  let branch = state.git?.branch || getCurrentBranch(missionPath);
+  if (!branch || branch === 'HEAD' || branch === 'detached') {
+    branch = deriveMissionBranchName(upperId);
+  }
+
+  const tierFromPath = inferMissionTierFromPath(missionPath);
+  if (!tierFromPath) {
+    throw new Error(
+      `[MISSION_STATE_TIER] Cannot infer a governed tier from mission path: ${missionPath}`
+    );
+  }
+  if (state.tier && state.tier !== tierFromPath) {
+    throw new Error(
+      `[MISSION_STATE_TIER] Mission tier '${state.tier}' conflicts with governed path tier '${tierFromPath}'`
+    );
+  }
+  state.tier = tierFromPath;
+  state.execution_mode = state.execution_mode === 'delegated' ? 'delegated' : 'local';
+  state.priority = typeof state.priority === 'number' ? state.priority : 3;
+  state.assigned_persona = state.assigned_persona || 'operator';
+  state.confidence_score = typeof state.confidence_score === 'number' ? state.confidence_score : 1;
+  state.git = {
+    branch,
+    start_commit: state.git?.start_commit || latestCommit,
+    latest_commit: latestCommit,
+    checkpoints: Array.isArray(state.git?.checkpoints) ? state.git.checkpoints : [],
+  };
+  state.history = [
+    ...(Array.isArray(state.history) ? state.history : []),
+    {
+      ts: new Date().toISOString(),
+      event: 'LEGACY_STATE_REPAIRED',
+      note:
+        note || 'Repaired legacy mission state to the current schema before lifecycle transition.',
+    },
+  ];
+  await saveState(upperId, state);
+  logger.success(`✅ Repaired legacy mission state for ${upperId}.`);
 }
 
 export async function grantMissionAccess(

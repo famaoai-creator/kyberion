@@ -975,6 +975,8 @@ vi.mock('@agent/core', () => ({
   createVirtualCameraInjectionBridge,
   createScreenCaptureBridge,
   createScreenRecordingBridge,
+  redactScreenVideoFrame: vi.fn(async (frame: any) => frame),
+  redactScreenCaptureFile: vi.fn(async (_input: string, _output: string) => undefined),
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,

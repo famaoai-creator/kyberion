@@ -147,6 +147,10 @@ async function handleMessage(message, sender) {
   switch (message?.type) {
     case 'bridge:get-state':
       return { state: await loadState() };
+    case 'bridge:get-ai-page-source':
+      return getAiPageSource();
+    case 'bridge:get-ai-target-candidates':
+      return getAiTargetCandidates();
     case 'bridge:connect-active-tab':
       return connectActiveTab();
     case 'bridge:disconnect':
@@ -200,6 +204,37 @@ async function handleMessage(message, sender) {
 
 async function connectActiveTab() {
   return connectTab(await activeTab());
+}
+
+async function getAiPageSource() {
+  const state = await loadState();
+  const tabId = state.connected?.tabId;
+  if (tabId === undefined || tabId === null) {
+    throw new Error('先に Live タブから現在のページを接続してください。');
+  }
+  const source = await chrome.tabs.sendMessage(tabId, { type: 'bridge:get-ai-page-source' });
+  if (!source?.ok) throw new Error(source?.error || 'ページ内容を取得できませんでした。');
+  return { source };
+}
+
+async function getAiTargetCandidates() {
+  const state = await loadState();
+  const tabId = state.connected?.tabId;
+  if (tabId === undefined || tabId === null) {
+    throw new Error('先に Live タブから現在のページを接続してください。');
+  }
+  const candidates = await chrome.tabs.sendMessage(tabId, {
+    type: 'bridge:get-ai-target-candidates',
+  });
+  if (!candidates?.ok) throw new Error(candidates?.error || '要素候補を取得できませんでした。');
+  return {
+    candidates: candidates.candidates || [],
+    candidateCount: Number.isInteger(candidates.candidateCount)
+      ? candidates.candidateCount
+      : (candidates.candidates || []).length,
+    truncated: Boolean(candidates.truncated),
+    snapshot_hash: typeof candidates.snapshot_hash === 'string' ? candidates.snapshot_hash : null,
+  };
 }
 
 async function connectTab(tab) {
@@ -916,16 +951,21 @@ function originOf(value) {
 }
 
 async function ensureContentScript(tabId) {
-  let injected = false;
+  let contentReady = false;
+  let piiScrubberReady = false;
   try {
     const response = await chrome.tabs.sendMessage(tabId, { type: 'bridge:ping' });
-    injected = Boolean(response?.ok);
+    contentReady = Boolean(response?.ok);
+    piiScrubberReady = Boolean(response?.piiScrubberReady);
   } catch (_) {
     // No content script yet — inject below (needs host access or an activeTab grant).
   }
-  if (!injected) {
+  if (!contentReady || !piiScrubberReady) {
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: contentReady ? ['pii-rules.generated.js'] : ['pii-rules.generated.js', 'content.js'],
+      });
     } catch (_) {
       throw new Error(
         'このページにアクセスできません。Side Panel の「このタブを接続」でサイトへのアクセスを許可してください。許可後はページ遷移や再接続でも継続できます。'
@@ -1410,6 +1450,21 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
           anchor_step_index: step.step_index,
           reason,
           failed_at: new Date().toISOString(),
+          ...(step.ref
+            ? {
+                target: {
+                  ref: String(step.ref),
+                  role: String(step.role || ''),
+                  name: String(step.name || ''),
+                  ...(typeof step.snapshot_hash === 'string'
+                    ? { snapshot_hash: step.snapshot_hash }
+                    : {}),
+                  ...(typeof step.dom_path === 'string' && step.dom_path.length <= 600
+                    ? { dom_path: step.dom_path }
+                    : {}),
+                },
+              }
+            : {}),
         };
         repairState.notice = `手順「${procedureId}」の step ${step.step_index + 1} で失敗しました: ${errorMsg}`;
         await saveState(repairState);

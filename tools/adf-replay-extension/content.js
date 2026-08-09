@@ -25,11 +25,38 @@ let sentinelObserver = null;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'bridge:ping') {
-    sendResponse({ ok: true });
+    sendResponse({
+      ok: true,
+      piiScrubberReady: typeof globalThis.__kyberionPiiScrub === 'function',
+    });
     return;
   }
   if (message?.type === 'bridge:observe') {
     observePage().then(sendResponse);
+    return true;
+  }
+  if (message?.type === 'bridge:get-ai-page-source') {
+    sendResponse(getAiPageSource());
+    return;
+  }
+  if (message?.type === 'bridge:get-ai-target-candidates') {
+    if (typeof globalThis.__kyberionPiiScrub !== 'function') {
+      sendResponse({
+        ok: false,
+        error: 'PII scrubber が読み込まれていないため、AI への送信を停止しました。',
+      });
+      return;
+    }
+    // Re-snapshot immediately before collecting candidates so the returned
+    // candidate list and snapshot hash describe the same current DOM.
+    observePage()
+      .then(() => sendResponse(getAiTargetCandidates()))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     return true;
   }
   if (message?.type === 'bridge:set-recording') {
@@ -621,6 +648,69 @@ async function observePage() {
   };
 }
 
+// The Built-in AI adapter runs in the extension Side Panel, not in this page
+// context. Send only redacted rendered text across the extension boundary;
+// page markup, scripts, and page instructions never become AI instructions.
+function getAiPageSource() {
+  const scrub = globalThis.__kyberionPiiScrub;
+  if (typeof scrub !== 'function') {
+    return {
+      ok: false,
+      error: 'PII scrubber が読み込まれていないため、AI への送信を停止しました。',
+    };
+  }
+  const source =
+    document.querySelector('article, main, [role="main"]')?.innerText ||
+    document.body?.innerText ||
+    '';
+  const redactedText = scrub(String(source)).replace(/\s+/g, ' ').trim();
+  const text = redactedText.slice(0, 30_000);
+  if (!text) return { ok: false, error: 'ページから要約対象のテキストを取得できませんでした。' };
+  // Never send query strings or fragments: they commonly contain tokens,
+  // identifiers, or search terms. Keep only the origin and redacted path.
+  const safeUrl = scrub(`${location.origin}${location.pathname}`)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+  const safeTitle = scrub(String(document.title || ''))
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+  return {
+    ok: true,
+    url: safeUrl,
+    title: safeTitle,
+    text,
+    truncated: redactedText.length > text.length,
+  };
+}
+
+function getAiTargetCandidates() {
+  if (typeof globalThis.__kyberionPiiScrub !== 'function') {
+    return {
+      ok: false,
+      error: 'PII scrubber が読み込まれていないため、AI への送信を停止しました。',
+    };
+  }
+  const allElements = interactiveElements();
+  const candidates = allElements
+    .slice(0, 80)
+    .map((element, index) => ({
+      index,
+      role: roleOf(element),
+      name: safeText(accessibleName(element)),
+      text: safeText(element.textContent || ''),
+    }))
+    .filter((candidate) => candidate.name || candidate.text);
+  return {
+    ok: true,
+    candidates,
+    candidateCount: allElements.length,
+    truncated: allElements.length > 80,
+    snapshot_hash: snapshotHash || null,
+  };
+}
+
 function interactiveElements() {
   return [
     ...document.querySelectorAll(
@@ -755,15 +845,9 @@ function isEditableField(element) {
 }
 
 function safeText(value) {
-  return String(value)
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
-    .replace(/\b(?:\d[ -]?){13,16}\b/g, '[redacted-card]')
-    .replace(/(?:\+?\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[redacted-phone]')
-    .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')
-    .replace(/\b\d{12,}\b/g, '[redacted-number]')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 500);
+  const scrub = globalThis.__kyberionPiiScrub;
+  if (typeof scrub !== 'function') return '[REDACTED:pii-scrubber-unavailable]';
+  return scrub(value).replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
 // ---------------------------------------------------------------------------

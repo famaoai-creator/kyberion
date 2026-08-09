@@ -5,6 +5,7 @@
   "write_scopes": [
     "active/missions/",
     "active/archive/missions/",
+    "active/archive/failed_missions/",
     "knowledge/personal/missions/",
     "knowledge/personal/governance/",
     "knowledge/evolution/",
@@ -14,20 +15,7 @@
     "active/audit/",
     "registry.json"
   ],
-  "scope_classes": [
-    "mission_state",
-    "coordination_runtime",
-    "observability",
-    "audit"
-  ],
-  "allowed_actuators": [
-    "artifact-actuator",
-    "approval-actuator",
-    "orchestrator-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential",
-    "personal"
-  ]
+  "scope_classes": ["mission_state", "coordination_runtime", "observability", "audit"],
+  "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
+  "tier_access": ["public", "confidential", "personal"]
 }

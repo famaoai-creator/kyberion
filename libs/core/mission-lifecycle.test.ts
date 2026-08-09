@@ -34,6 +34,7 @@ import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,
   finishMission,
+  repairLegacyMissionState,
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
   verifyMission,
@@ -41,6 +42,8 @@ import {
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+const personalRepairMissionId = 'MSN-LIFECYCLE-REPAIR-PERSONAL-001';
+const personalRepairMissionPath = pathResolver.missionDir(personalRepairMissionId, 'personal');
 
 interface MissionTaskSnapshot {
   task_id?: string;
@@ -109,18 +112,48 @@ function seedMissionEvidence(fileName: string, contents: string): void {
 }
 
 beforeEach(() => {
-  if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
+  if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
 });
 
 afterEach(() => {
   safeRmSync(pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`));
   safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
+  safeRmSync(personalRepairMissionPath, { recursive: true, force: true });
 });
 
 describe('mission lifecycle finish gate', () => {
+  it('repairs a legacy personal mission without downgrading its tier', async () => {
+    safeMkdir(personalRepairMissionPath, { recursive: true });
+    safeWriteFile(
+      `${personalRepairMissionPath}/mission-state.json`,
+      JSON.stringify(
+        {
+          mission_id: personalRepairMissionId,
+          status: 'active',
+          history: [],
+        },
+        null,
+        2
+      )
+    );
+
+    await repairLegacyMissionState(personalRepairMissionId, 'personal tier repair test');
+
+    const repaired = JSON.parse(
+      safeReadFile(`${personalRepairMissionPath}/mission-state.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(repaired.tier).toBe('personal');
+    expect(repaired.history.at(-1)).toMatchObject({
+      event: 'LEGACY_STATE_REPAIRED',
+      note: 'personal tier repair test',
+    });
+  });
+
   it('collects only top-level evidence files', () => {
     seedMissionEvidence('report.md', '# Report');
     safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });

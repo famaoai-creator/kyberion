@@ -89,6 +89,7 @@
         "scripts/",
         "pipelines/",
         "schemas/",
+        "tools/adf-replay-extension/",
         "active/missions/"
       ],
       "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],
@@ -109,6 +110,7 @@
       "write_scopes": [
         "active/missions/",
         "active/archive/missions/",
+        "active/archive/failed_missions/",
         "knowledge/personal/missions/",
         "knowledge/personal/governance/",
         "knowledge/evolution/",

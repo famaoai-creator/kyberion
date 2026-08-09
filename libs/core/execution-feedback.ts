@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  createDistillCandidateRecord,
+  listDistillCandidateRecords,
+  saveDistillCandidateRecord,
+  updateDistillCandidateRecord,
+  type DistillCandidateRecord,
+} from './distill-candidate-registry.js';
+import { t } from './t.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -63,6 +71,102 @@ export interface ExecutionFeedbackRequest {
   correlation_id?: string;
   outcomes: ExecutionFeedbackOutcome[];
   structured: true;
+}
+
+export interface ExecutionFeedbackCandidateResult {
+  summary: ExecutionFeedbackSummary;
+  candidate: DistillCandidateRecord | null;
+}
+
+/**
+ * Turn a non-positive execution result into a reviewable improvement item.
+ *
+ * Feedback is deliberately kept separate from the procedure catalog: a user
+ * correction proposes a change, but never silently changes an executable
+ * procedure. A human must review the candidate before it can be promoted.
+ */
+export function materializeExecutionFeedbackCandidate(input: {
+  feedback: ExecutionFeedbackRecord;
+  procedureId?: string;
+}): ExecutionFeedbackCandidateResult {
+  const summary = summarizeExecutionFeedback({
+    scenarioId: input.feedback.scenario_id,
+    intentId: input.feedback.intent_id,
+  });
+  if (summary.improvement_status !== 'candidate') {
+    return { summary, candidate: null };
+  }
+
+  const existing = listDistillCandidateRecords().find((candidate) => {
+    const metadata = candidate.metadata;
+    return (
+      candidate.status === 'proposed' &&
+      metadata?.improvement_kind === 'execution_feedback' &&
+      metadata.scenario_id === input.feedback.scenario_id &&
+      metadata.intent_id === input.feedback.intent_id
+    );
+  });
+  const correction =
+    summary.common_corrections[0] ||
+    input.feedback.correction ||
+    input.feedback.comment ||
+    t('recorder:recorder_default_correction', undefined, 'en');
+  // Persist a locale-neutral canonical representation. The CLI translates its
+  // surrounding state, but a candidate must not change identity or content
+  // merely because it was materialized from a different operator locale.
+  const title = t(
+    'recorder:recorder_candidate_title',
+    {
+      id: input.procedureId || input.feedback.intent_id,
+    },
+    'en'
+  );
+  const candidateInput = {
+    source_type: 'task_session' as const,
+    tier: 'personal' as const,
+    task_session_id: input.feedback.correlation_id,
+    title,
+    summary: t(
+      'recorder:recorder_candidate_summary',
+      {
+        outcome: input.feedback.outcome,
+        correction,
+      },
+      'en'
+    ),
+    locale: 'en',
+    status: 'proposed' as const,
+    target_kind: 'procedure' as const,
+    evidence_refs: [
+      `execution-feedback:${input.feedback.feedback_id}`,
+      `intent:${input.feedback.intent_id}`,
+    ],
+    metadata: {
+      improvement_kind: 'execution_feedback',
+      scenario_id: input.feedback.scenario_id,
+      intent_id: input.feedback.intent_id,
+      ...(input.procedureId ? { procedure_id: input.procedureId } : {}),
+      latest_outcome: input.feedback.outcome,
+      common_corrections: summary.common_corrections,
+      review_required: true,
+      recommended_action: 'review and update the procedure before the next run',
+    },
+  };
+  const candidate = existing
+    ? updateDistillCandidateRecord(existing.candidate_id, {
+        title: candidateInput.title,
+        summary: candidateInput.summary,
+        evidence_refs: [
+          ...new Set([...(existing.evidence_refs || []), ...candidateInput.evidence_refs]),
+        ],
+        metadata: { ...(existing.metadata || {}), ...candidateInput.metadata },
+      })
+    : (() => {
+        const created = createDistillCandidateRecord(candidateInput);
+        saveDistillCandidateRecord(created);
+        return created;
+      })();
+  return { summary, candidate };
 }
 
 export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput | null {

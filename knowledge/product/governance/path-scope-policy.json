@@ -9,6 +9,7 @@
       "allow_prefixes": [
         "active/missions/",
         "active/archive/missions/",
+        "active/archive/failed_missions/",
         "active/shared/coordination/",
         "active/shared/runtime/mission_queue.jsonl"
       ]

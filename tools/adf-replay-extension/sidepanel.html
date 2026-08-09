@@ -38,6 +38,18 @@
           />
           <button id="intent-resolve-button" class="primary" type="button">解決</button>
         </div>
+        <div class="button-row">
+          <button id="ai-scenario-button" class="secondary" type="button">
+            Chrome内蔵AIでページから候補抽出
+          </button>
+        </div>
+        <p id="ai-scenario-status" class="ai-status" aria-live="polite"></p>
+        <pre id="ai-scenario-result" class="draft-preview" hidden></pre>
+        <div class="button-row">
+          <button id="ai-scenario-use-intent-button" class="secondary" type="button" hidden>
+            候補を intent に設定
+          </button>
+        </div>
         <div id="intent-result" class="intent-result" hidden>
           <p id="intent-outcome-label" class="intent-outcome"></p>
           <div id="intent-matched-info" class="intent-matched" hidden>
@@ -68,10 +80,15 @@
             <button id="intent-repair-record-button" class="secondary" type="button">
               修正操作を記録する
             </button>
+            <button id="ai-repair-button" class="secondary" type="button">
+              AIで対象候補を確認
+            </button>
             <button id="intent-repair-apply-button" class="primary" type="button" hidden>
               修正を手順に反映
             </button>
           </div>
+          <p id="ai-repair-status" class="ai-status" aria-live="polite"></p>
+          <pre id="ai-repair-result" class="draft-preview" hidden></pre>
         </div>
       </section>
 
@@ -92,6 +109,23 @@
           接続は現在のタブと origin に限定されます。ページ遷移で origin
           が変わった場合は、記録を停止して再接続します。
         </p>
+        <div class="execution-inputs">
+          <p class="section-kicker">LOCAL BUILT-IN AI</p>
+          <p>
+            redaction 済みのページ本文を Chrome 内蔵 AI で要約します。ADF の実行判断には使いません。
+          </p>
+          <div class="button-row">
+            <button id="ai-prepare-button" class="secondary" type="button">
+              Chrome内蔵AIを準備
+            </button>
+            <button id="ai-page-summary-button" class="secondary" type="button">
+              現在ページを要約
+            </button>
+          </div>
+          <p id="ai-prepare-status" class="ai-status" aria-live="polite"></p>
+          <p id="ai-page-summary-status" class="ai-status" aria-live="polite"></p>
+          <pre id="ai-page-summary" class="draft-preview" hidden></pre>
+        </div>
       </section>
 
       <section class="panel" data-panel="record">
@@ -200,7 +234,12 @@
             <button id="generate-report-button" class="primary" type="button">
               レポートを生成
             </button>
+            <button id="ai-observation-summary-button" class="secondary" type="button">
+              Chrome内蔵AIで要約
+            </button>
           </div>
+          <p id="ai-observation-summary-status" class="ai-status" aria-live="polite"></p>
+          <pre id="ai-observation-summary" class="draft-preview" hidden></pre>
           <pre id="observation-report-body" class="draft-preview" hidden></pre>
         </div>
         <div class="button-row">
@@ -218,6 +257,8 @@
     </main>
 
     <footer id="notice" class="notice" aria-live="polite"></footer>
+    <script src="pii-rules.generated.js"></script>
+    <script src="built-in-ai.js"></script>
     <script src="sidepanel.js"></script>
   </body>
 </html>
