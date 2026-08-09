@@ -275,7 +275,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (156)
+## runtime (157)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -327,6 +327,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DRAFT_REFINE`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EGRESS_POLICY`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EMAIL_FROM`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_ENTITY_GOVERNANCE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ENV_REGISTRY_STRICT`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FIRST_WIN_LIVE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                                | string | no       | _undocumented_                                                                                          |
