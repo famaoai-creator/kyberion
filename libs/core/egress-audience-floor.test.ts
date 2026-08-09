@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   composeAudienceFloor,
+  evaluateEgressPolicy,
   evaluateAudienceEgress,
   normalizeEgressHost,
   resetEgressPolicyCache,
@@ -59,6 +60,22 @@ describe('audience egress floor (QM-11)', () => {
   it('an empty audience permits nothing', () => {
     const floor = composeAudienceFloor([]);
     expect(evaluateAudienceEgress('anything.example', floor).verdict).toBe('deny');
+  });
+
+  it('observation provenance denies external egress even for an otherwise allowed host', () => {
+    const decision = evaluateEgressPolicy('https://docs.example', {
+      tier: 'public',
+      tenant_slug: 'tenant-a',
+      provenance: {
+        missionId: 'mission-provenance',
+        highestTier: 'personal',
+        tenants: ['tenant-a'],
+        prohibitExternal: true,
+        observationIds: ['observation-1'],
+      },
+    });
+    expect(decision.verdict).toBe('deny');
+    expect(decision.reason).toContain('PROVENANCE_EGRESS_DENIED');
   });
 
   it('normalizes wildcard and trailing-dot host forms', () => {

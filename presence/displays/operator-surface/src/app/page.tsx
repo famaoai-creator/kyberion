@@ -1,6 +1,14 @@
-import { listMissions, getCapabilities, getProviderPins } from '@/lib/data';
+import {
+  getCapabilities,
+  getCloudflareOsSnapshot,
+  getGuardedSurfaceUrl,
+  getProviderPins,
+  getTenantScope,
+  listMissions,
+} from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
 import CapabilityDashboard from '@/components/CapabilityDashboard';
+import OsControlPlanePanel from '@/components/OsControlPlanePanel';
 import { renderStatus } from '@agent/core';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +17,15 @@ export default async function MissionsPage() {
   const missions = listMissions();
   const bundles = getCapabilities();
   const pins = getProviderPins();
+  const osSnapshot = getCloudflareOsSnapshot();
+  const tenantScope = getTenantScope();
+  const guardedSurfaceUrl = getGuardedSurfaceUrl();
   emitMosRead({ page: '/', resource_kind: 'mission_list', result_count: missions.length });
+  emitMosRead({
+    page: '/',
+    resource_kind: 'os_control_plane',
+    result_count: osSnapshot.heldActions.length + osSnapshot.observations.length,
+  });
   return (
     <section>
       <h1 style={{ marginBottom: '4px' }}>Missions</h1>
@@ -70,6 +86,11 @@ export default async function MissionsPage() {
 
       {/* Capability and Pin Control Dashboard */}
       <CapabilityDashboard bundles={bundles} pins={pins} />
+      <OsControlPlanePanel
+        snapshot={osSnapshot}
+        tenantScope={tenantScope}
+        guardedSurfaceUrl={guardedSurfaceUrl}
+      />
     </section>
   );
 }

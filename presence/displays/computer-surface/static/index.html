@@ -10,12 +10,14 @@
         color-scheme: dark;
         --bg: var(--kb-bg-main);
         --panel: var(--kb-panel-bg);
-        --border: var(--kb-border, rgba(255,255,255,0.1));
+        --border: var(--kb-border, rgba(255, 255, 255, 0.1));
         --text: var(--kb-text-primary);
         --muted: var(--kb-text-secondary);
         --accent: var(--kb-accent);
       }
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         min-height: 100vh;
@@ -62,7 +64,7 @@
         border: 1px solid var(--border);
         border-radius: 18px;
         padding: 14px;
-        background: rgba(0,0,0,0.16);
+        background: rgba(0, 0, 0, 0.16);
       }
       .metric .label {
         color: var(--muted);
@@ -82,6 +84,115 @@
         color: #d1f5ff;
         font-size: 12px;
         word-break: break-all;
+      }
+      .os-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .os-title {
+        margin-top: 8px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .os-sub {
+        margin-top: 6px;
+        color: var(--muted);
+        line-height: 1.5;
+        font-size: 12px;
+      }
+      .os-badge {
+        flex-shrink: 0;
+        border: 1px solid rgba(125, 211, 252, 0.3);
+        border-radius: 999px;
+        padding: 4px 8px;
+        color: rgba(189, 224, 254, 0.85);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+      }
+      .os-warning {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border: 1px solid rgba(253, 230, 138, 0.45);
+        border-radius: 10px;
+        color: rgba(254, 240, 178, 0.95);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .os-warning.hidden {
+        display: none;
+      }
+      .os-columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .os-heading {
+        margin: 0 0 8px;
+        color: var(--text);
+        font-size: 13px;
+      }
+      .os-list {
+        display: grid;
+        gap: 8px;
+      }
+      .os-item {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .os-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+      .os-item strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+      .os-status {
+        color: rgba(125, 211, 252, 0.95);
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+      .os-meta {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      .os-empty {
+        margin: 0;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .os-next {
+        margin-top: 14px;
+        padding: 10px 12px;
+        border: 1px solid rgba(253, 230, 138, 0.45);
+        border-radius: 10px;
+        color: rgba(237, 246, 255, 0.9);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .os-next a {
+        color: rgba(125, 211, 252, 0.95);
+        font-weight: 700;
+      }
+      .os-next.hidden {
+        display: none;
       }
       .header-row {
         display: flex;
@@ -106,10 +217,24 @@
         background: rgba(34, 211, 238, 0.08);
         color: rgba(189, 224, 254, 0.85);
       }
-      .conn-pill.conn-live { border-color: rgba(74, 222, 128, 0.45); background: rgba(74, 222, 128, 0.12); color: rgba(190, 242, 200, 0.95); }
-      .conn-pill.conn-retrying { border-color: rgba(253, 230, 138, 0.45); background: rgba(253, 230, 138, 0.12); color: rgba(254, 240, 178, 0.95); }
-      .conn-pill.conn-offline { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.12); color: rgba(254, 202, 202, 0.95); }
-      .conn-pill.conn-pending { opacity: 0.6; }
+      .conn-pill.conn-live {
+        border-color: rgba(74, 222, 128, 0.45);
+        background: rgba(74, 222, 128, 0.12);
+        color: rgba(190, 242, 200, 0.95);
+      }
+      .conn-pill.conn-retrying {
+        border-color: rgba(253, 230, 138, 0.45);
+        background: rgba(253, 230, 138, 0.12);
+        color: rgba(254, 240, 178, 0.95);
+      }
+      .conn-pill.conn-offline {
+        border-color: rgba(248, 113, 113, 0.45);
+        background: rgba(248, 113, 113, 0.12);
+        color: rgba(254, 202, 202, 0.95);
+      }
+      .conn-pill.conn-pending {
+        opacity: 0.6;
+      }
       .updated-text {
         font-family: ui-monospace, monospace;
         color: var(--muted);
@@ -129,10 +254,18 @@
         text-transform: uppercase;
         color: rgba(237, 246, 255, 0.85);
       }
-      .identity-badge.hidden { display: none; }
-      .identity-badge .badge-id { color: rgba(125, 211, 252, 0.95); }
-      .identity-badge .badge-tier { color: rgba(237, 246, 255, 0.55); }
-      .identity-badge .badge-sep { color: rgba(237, 246, 255, 0.3); }
+      .identity-badge.hidden {
+        display: none;
+      }
+      .identity-badge .badge-id {
+        color: rgba(125, 211, 252, 0.95);
+      }
+      .identity-badge .badge-tier {
+        color: rgba(237, 246, 255, 0.55);
+      }
+      .identity-badge .badge-sep {
+        color: rgba(237, 246, 255, 0.3);
+      }
       .identity-badge.identity-badge-warn {
         border-color: rgba(253, 230, 138, 0.55);
         background: rgba(253, 230, 138, 0.1);
@@ -146,17 +279,56 @@
         padding: 12px 14px;
         border-radius: 16px;
         border: 1px solid rgba(34, 211, 238, 0.25);
-        background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(125, 211, 252, 0.03) 60%, transparent);
+        background: linear-gradient(
+          90deg,
+          rgba(34, 211, 238, 0.08),
+          rgba(125, 211, 252, 0.03) 60%,
+          transparent
+        );
         font-size: 12.5px;
         color: rgba(237, 246, 255, 0.85);
       }
-      .first-run-banner.hidden { display: none; }
-      .first-run-banner .first-run-icon { font-size: 18px; line-height: 1; margin-top: 2px; }
-      .first-run-banner code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; background: rgba(0,0,0,0.3); padding: 0 4px; border-radius: 3px; color: rgba(189, 224, 254, 0.95); }
-      .first-run-banner ol { margin: 6px 0 0; padding-left: 18px; color: rgba(237, 246, 255, 0.65); font-size: 11.5px; }
-      .first-run-banner .first-run-eyebrow { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(125, 211, 252, 0.85); }
-      .first-run-close { background: transparent; border: none; color: rgba(237, 246, 255, 0.5); font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
-      .first-run-close:hover { color: rgba(237, 246, 255, 0.9); }
+      .first-run-banner.hidden {
+        display: none;
+      }
+      .first-run-banner .first-run-icon {
+        font-size: 18px;
+        line-height: 1;
+        margin-top: 2px;
+      }
+      .first-run-banner code {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 11px;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0 4px;
+        border-radius: 3px;
+        color: rgba(189, 224, 254, 0.95);
+      }
+      .first-run-banner ol {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: rgba(237, 246, 255, 0.65);
+        font-size: 11.5px;
+      }
+      .first-run-banner .first-run-eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: rgba(125, 211, 252, 0.85);
+      }
+      .first-run-close {
+        background: transparent;
+        border: none;
+        color: rgba(237, 246, 255, 0.5);
+        font-size: 18px;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .first-run-close:hover {
+        color: rgba(237, 246, 255, 0.9);
+      }
       .dev-panel {
         margin-top: 12px;
         padding: 12px 14px;
@@ -172,24 +344,49 @@
         gap: 10px;
         font-size: 12px;
       }
-      .dev-panel summary::-webkit-details-marker { display: none; }
-      .dev-panel-title { font-weight: 700; }
-      .dev-panel-hint { color: var(--muted); font-size: 11.5px; }
-      .dev-panel-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .dev-panel-body textarea, .dev-panel-body pre {
+      .dev-panel summary::-webkit-details-marker {
+        display: none;
+      }
+      .dev-panel-title {
+        font-weight: 700;
+      }
+      .dev-panel-hint {
+        color: var(--muted);
+        font-size: 11.5px;
+      }
+      .dev-panel-body {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .dev-panel-body textarea,
+      .dev-panel-body pre {
         width: 100%;
         font-family: ui-monospace, SFMono-Regular, monospace;
         font-size: 12px;
-        background: rgba(0,0,0,0.45);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 10px;
         color: rgba(237, 246, 255, 0.9);
         padding: 10px;
         box-sizing: border-box;
       }
-      .dev-panel-body textarea { resize: vertical; min-height: 160px; }
-      .dev-panel-body pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
-      .dev-panel-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      .dev-panel-body textarea {
+        resize: vertical;
+        min-height: 160px;
+      }
+      .dev-panel-body pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 0;
+      }
+      .dev-panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
       .dev-panel-actions .button {
         appearance: none;
         background: rgba(34, 211, 238, 0.15);
@@ -200,12 +397,33 @@
         font-size: 11px;
         cursor: pointer;
       }
-      .dev-panel-actions .button-ghost { background: transparent; border: 1px solid rgba(255,255,255,0.16); }
-      .dev-panel-result { font-size: 11px; color: var(--muted); }
-      .dev-panel-result.ok { color: rgba(190, 242, 200, 0.95); }
-      .dev-panel-result.err { color: rgba(254, 202, 202, 0.95); }
-      .dev-label { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-      @media (max-width: 720px) { .dev-panel-body { grid-template-columns: 1fr; } }
+      .dev-panel-actions .button-ghost {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+      }
+      .dev-panel-result {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .dev-panel-result.ok {
+        color: rgba(190, 242, 200, 0.95);
+      }
+      .dev-panel-result.err {
+        color: rgba(254, 202, 202, 0.95);
+      }
+      .dev-label {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      @media (max-width: 720px) {
+        .dev-panel-body {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -215,23 +433,41 @@
           <div>
             <div class="eyebrow">作業の手元ミラー — ブラウザ/ターミナルの現在の手元</div>
             <div class="title">Computer Surface</div>
-            <div class="sub">Kyberion がいまブラウザ/ターミナルで何をしているかをそのまま映すミラー。表示専用（操作は chronos / studio から）。A2UI state updates from computer interaction executors.</div>
+            <div class="sub">
+              Kyberion
+              がいまブラウザ/ターミナルで何をしているかをそのまま映すミラー。表示専用（操作は
+              chronos / studio から）。A2UI state updates from computer interaction executors.
+            </div>
           </div>
           <div class="header-meta">
             <div id="identity-badge" class="identity-badge hidden" title=""></div>
-            <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state">…</span>
+            <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state"
+              >…</span
+            >
             <span id="last-updated" class="updated-text">waiting for state</span>
           </div>
         </div>
         <div id="first-run-banner" class="first-run-banner hidden">
           <div class="first-run-icon">✨</div>
-          <div style="flex:1">
+          <div style="flex: 1">
             <div class="first-run-eyebrow">First Run</div>
-            <div><span id="first-run-greeting">Welcome.</span> <span style="color:rgba(237,246,255,0.6)">No browser/terminal interaction yet — try one of these.</span></div>
+            <div>
+              <span id="first-run-greeting">Welcome.</span>
+              <span style="color: rgba(237, 246, 255, 0.6)"
+                >No browser/terminal interaction yet — try one of these.</span
+              >
+            </div>
             <ol>
-              <li>Run a computer-actuator interaction that posts to <code>/a2ui/dispatch</code>.</li>
-              <li>Or open the <strong>Developer</strong> sandbox below and POST a sample <code>updateDataModel</code> message.</li>
-              <li>Once the executor reports back, Session / Executor / Status fill in automatically.</li>
+              <li>
+                Run a computer-actuator interaction that posts to <code>/a2ui/dispatch</code>.
+              </li>
+              <li>
+                Or open the <strong>Developer</strong> sandbox below and POST a sample
+                <code>updateDataModel</code> message.
+              </li>
+              <li>
+                Once the executor reports back, Session / Executor / Status fill in automatically.
+              </li>
             </ol>
           </div>
           <button id="first-run-close" class="first-run-close" aria-label="Dismiss">×</button>
@@ -239,27 +475,75 @@
       </section>
       <section class="panel">
         <div class="grid">
-          <div class="metric"><div class="label">Session</div><div class="value" id="sessionId">—</div></div>
-          <div class="metric"><div class="label">Executor</div><div class="value" id="executor">—</div></div>
-          <div class="metric"><div class="label">Status</div><div class="value" id="status">idle</div></div>
-          <div class="metric"><div class="label">Latest Action</div><div class="value" id="latestAction">—</div></div>
-          <div class="metric"><div class="label">Target</div><div class="value" id="target">—</div></div>
-          <div class="metric"><div class="label">Action Count</div><div class="value" id="actionCount">0</div></div>
+          <div class="metric">
+            <div class="label">Session</div>
+            <div class="value" id="sessionId">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Executor</div>
+            <div class="value" id="executor">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Status</div>
+            <div class="value" id="status">idle</div>
+          </div>
+          <div class="metric">
+            <div class="label">Latest Action</div>
+            <div class="value" id="latestAction">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Target</div>
+            <div class="value" id="target">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Action Count</div>
+            <div class="value" id="actionCount">0</div>
+          </div>
         </div>
         <div class="path" id="detail">No interaction detail yet.</div>
         <div class="path" id="metadata"></div>
         <div class="path" id="screenshotPath"></div>
       </section>
+      <section class="panel" id="os-control-plane-panel">
+        <div class="os-header">
+          <div>
+            <div class="eyebrow">Cloudflare OS projection</div>
+            <div class="os-title">Held actions &amp; observations</div>
+            <div class="os-sub">
+              Tenant-scoped read-only projection. Decisions and apply remain in the guarded surface.
+            </div>
+            <div id="os-scope-warning" class="os-warning hidden">
+              Tenant scope is not configured. Only public observations are shown; held actions are
+              hidden.
+            </div>
+          </div>
+          <span class="os-badge">READ-ONLY</span>
+        </div>
+        <div class="os-columns">
+          <div>
+            <h3 class="os-heading">Held actions (<span id="os-held-count">0</span>)</h3>
+            <div id="os-held-actions" class="os-list"><p class="os-empty">Loading…</p></div>
+          </div>
+          <div>
+            <h3 class="os-heading">Observation audit (<span id="os-observation-count">0</span>)</h3>
+            <div id="os-observations" class="os-list"><p class="os-empty">Loading…</p></div>
+          </div>
+        </div>
+        <div id="os-next-action" class="os-next hidden"></div>
+      </section>
       <details class="dev-panel" id="dev-panel">
         <summary>
-          <span style="font-size:14px">⚙</span>
+          <span style="font-size: 14px">⚙</span>
           <span class="dev-panel-title">Developer · A2UI dispatch sandbox</span>
-          <span class="dev-panel-hint">Send a sample updateDataModel and watch the metrics update live.</span>
+          <span class="dev-panel-hint"
+            >Send a sample updateDataModel and watch the metrics update live.</span
+          >
         </summary>
         <div class="dev-panel-body">
           <div>
             <label class="dev-label" for="dev-a2ui-payload">A2UI message body (JSON)</label>
-            <textarea id="dev-a2ui-payload" rows="9" spellcheck="false">{
+            <textarea id="dev-a2ui-payload" rows="9" spellcheck="false">
+{
   "updateDataModel": {
     "surfaceId": "computer-surface",
     "data": {
@@ -289,35 +573,56 @@
     </main>
     <script>
       const ids = {
-        sessionId: document.getElementById("sessionId"),
-        executor: document.getElementById("executor"),
-        status: document.getElementById("status"),
-        latestAction: document.getElementById("latestAction"),
-        target: document.getElementById("target"),
-        actionCount: document.getElementById("actionCount"),
-        detail: document.getElementById("detail"),
-        metadata: document.getElementById("metadata"),
-        screenshotPath: document.getElementById("screenshotPath"),
+        sessionId: document.getElementById('sessionId'),
+        executor: document.getElementById('executor'),
+        status: document.getElementById('status'),
+        latestAction: document.getElementById('latestAction'),
+        target: document.getElementById('target'),
+        actionCount: document.getElementById('actionCount'),
+        detail: document.getElementById('detail'),
+        metadata: document.getElementById('metadata'),
+        screenshotPath: document.getElementById('screenshotPath'),
       };
-      const identityBadgeEl = document.getElementById("identity-badge");
-      const connPillEl = document.getElementById("conn-pill");
-      const lastUpdatedEl = document.getElementById("last-updated");
-      const firstRunBanner = document.getElementById("first-run-banner");
-      const FIRST_RUN_KEY = "computer-surface.first-run.dismissed";
+      const osIds = {
+        scopeWarning: document.getElementById('os-scope-warning'),
+        heldCount: document.getElementById('os-held-count'),
+        heldActions: document.getElementById('os-held-actions'),
+        observationCount: document.getElementById('os-observation-count'),
+        observations: document.getElementById('os-observations'),
+        nextAction: document.getElementById('os-next-action'),
+      };
+      const identityBadgeEl = document.getElementById('identity-badge');
+      const connPillEl = document.getElementById('conn-pill');
+      const lastUpdatedEl = document.getElementById('last-updated');
+      const firstRunBanner = document.getElementById('first-run-banner');
+      const FIRST_RUN_KEY = 'computer-surface.first-run.dismissed';
       let lastActionCount = 0;
 
       function escapeHtml(value) {
-        return String(value || "").replace(/[&<>"']/g, (ch) => ({
-          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-        }[ch]));
+        return String(value || '').replace(
+          /[&<>"']/g,
+          (ch) =>
+            ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;',
+            })[ch]
+        );
       }
 
       function formatTimestamp(value) {
-        if (!value) return "waiting for state";
-        const dt = typeof value === "string" ? new Date(value) : value;
+        if (!value) return 'waiting for state';
+        const dt = typeof value === 'string' ? new Date(value) : value;
         if (isNaN(dt.getTime())) return String(value);
         try {
-          return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(dt);
+          return new Intl.DateTimeFormat(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+          }).format(dt);
         } catch (_) {
           return dt.toLocaleTimeString();
         }
@@ -326,10 +631,22 @@
       function setConnState(state) {
         if (!connPillEl) return;
         const map = {
-          live: { text: "LIVE", className: "conn-pill conn-live", title: "SSE stream connected" },
-          retrying: { text: "RETRY", className: "conn-pill conn-retrying", title: "Reconnecting..." },
-          offline: { text: "OFFLINE", className: "conn-pill conn-offline", title: "SSE stream closed" },
-          pending: { text: "…", className: "conn-pill conn-pending", title: "Awaiting first event" },
+          live: { text: 'LIVE', className: 'conn-pill conn-live', title: 'SSE stream connected' },
+          retrying: {
+            text: 'RETRY',
+            className: 'conn-pill conn-retrying',
+            title: 'Reconnecting...',
+          },
+          offline: {
+            text: 'OFFLINE',
+            className: 'conn-pill conn-offline',
+            title: 'SSE stream closed',
+          },
+          pending: {
+            text: '…',
+            className: 'conn-pill conn-pending',
+            title: 'Awaiting first event',
+          },
         };
         const target = map[state] || map.pending;
         connPillEl.textContent = target.text;
@@ -340,130 +657,240 @@
       function renderIdentityBadge(payload) {
         if (!identityBadgeEl || !payload) return;
         if (!payload.onboarded) {
-          identityBadgeEl.classList.remove("hidden");
-          identityBadgeEl.classList.add("identity-badge-warn");
-          identityBadgeEl.textContent = "Onboarding required";
-          identityBadgeEl.title = "knowledge/personal/my-identity.json was not found.";
+          identityBadgeEl.classList.remove('hidden');
+          identityBadgeEl.classList.add('identity-badge-warn');
+          identityBadgeEl.textContent = 'Onboarding required';
+          identityBadgeEl.title = 'knowledge/personal/my-identity.json was not found.';
           return;
         }
-        const name = payload.sovereign?.name || "Sovereign";
-        const agentId = payload.agent?.agent_id || "agent";
-        const tier = (payload.agent?.trust_tier || "—").toString();
-        identityBadgeEl.classList.remove("hidden");
-        identityBadgeEl.classList.remove("identity-badge-warn");
+        const name = payload.sovereign?.name || 'Sovereign';
+        const agentId = payload.agent?.agent_id || 'agent';
+        const tier = (payload.agent?.trust_tier || '—').toString();
+        identityBadgeEl.classList.remove('hidden');
+        identityBadgeEl.classList.remove('identity-badge-warn');
         identityBadgeEl.innerHTML =
-          '<span class="badge-name">' + escapeHtml(name) + '</span>' +
+          '<span class="badge-name">' +
+          escapeHtml(name) +
+          '</span>' +
           '<span class="badge-sep">·</span>' +
-          '<span class="badge-id">' + escapeHtml(agentId) + '</span>' +
+          '<span class="badge-id">' +
+          escapeHtml(agentId) +
+          '</span>' +
           '<span class="badge-sep">·</span>' +
-          '<span class="badge-tier">' + escapeHtml(tier.toUpperCase()) + '</span>';
-        identityBadgeEl.title = payload.vision || "";
+          '<span class="badge-tier">' +
+          escapeHtml(tier.toUpperCase()) +
+          '</span>';
+        identityBadgeEl.title = payload.vision || '';
       }
 
       function maybeShowFirstRunBanner(identityPayload) {
         if (!firstRunBanner) return;
         let dismissed = false;
-        try { dismissed = localStorage.getItem(FIRST_RUN_KEY) === "1"; } catch (_) {}
+        try {
+          dismissed = localStorage.getItem(FIRST_RUN_KEY) === '1';
+        } catch (_) {}
         if (dismissed) return;
         if (!identityPayload || !identityPayload.onboarded) return;
         // Only show while no actions have been recorded.
         if (lastActionCount > 0) return;
-        const greeting = document.getElementById("first-run-greeting");
-        if (greeting && identityPayload.sovereign?.name) greeting.textContent = "Welcome, " + identityPayload.sovereign.name + ".";
-        firstRunBanner.classList.remove("hidden");
+        const greeting = document.getElementById('first-run-greeting');
+        if (greeting && identityPayload.sovereign?.name)
+          greeting.textContent = 'Welcome, ' + identityPayload.sovereign.name + '.';
+        firstRunBanner.classList.remove('hidden');
       }
-      const firstRunCloseBtn = document.getElementById("first-run-close");
+      const firstRunCloseBtn = document.getElementById('first-run-close');
       if (firstRunCloseBtn) {
-        firstRunCloseBtn.addEventListener("click", () => {
-          firstRunBanner.classList.add("hidden");
-          try { localStorage.setItem(FIRST_RUN_KEY, "1"); } catch (_) {}
+        firstRunCloseBtn.addEventListener('click', () => {
+          firstRunBanner.classList.add('hidden');
+          try {
+            localStorage.setItem(FIRST_RUN_KEY, '1');
+          } catch (_) {}
         });
       }
 
       function applyState(payload) {
-        const surface = payload?.surfaces?.["computer-surface"];
+        const surface = payload?.surfaces?.['computer-surface'];
         const data = surface?.data || {};
-        ids.sessionId.textContent = data.sessionId || "—";
-        ids.executor.textContent = data.executor || "—";
-        ids.status.textContent = data.status || "idle";
-        ids.latestAction.textContent = data.latestAction || "—";
-        ids.target.textContent = data.target || "—";
+        ids.sessionId.textContent = data.sessionId || '—';
+        ids.executor.textContent = data.executor || '—';
+        ids.status.textContent = data.status || 'idle';
+        ids.latestAction.textContent = data.latestAction || '—';
+        ids.target.textContent = data.target || '—';
         ids.actionCount.textContent = String(data.actionCount || 0);
-        ids.detail.textContent = data.detail || "No interaction detail yet.";
-        ids.metadata.textContent = data.metadata && Object.keys(data.metadata).length ? "metadata: " + JSON.stringify(data.metadata) : "";
-        ids.screenshotPath.textContent = data.screenshotPath ? "screenshot: " + data.screenshotPath : "";
+        ids.detail.textContent = data.detail || 'No interaction detail yet.';
+        ids.metadata.textContent =
+          data.metadata && Object.keys(data.metadata).length
+            ? 'metadata: ' + JSON.stringify(data.metadata)
+            : '';
+        ids.screenshotPath.textContent = data.screenshotPath
+          ? 'screenshot: ' + data.screenshotPath
+          : '';
         lastActionCount = Number(data.actionCount || 0);
         if (lastUpdatedEl) {
           lastUpdatedEl.textContent = formatTimestamp(data.updatedAt || payload?.lastUpdatedAt);
         }
         // Auto-dismiss banner once activity arrives.
-        if (lastActionCount > 0 && firstRunBanner) firstRunBanner.classList.add("hidden");
+        if (lastActionCount > 0 && firstRunBanner) firstRunBanner.classList.add('hidden');
+      }
+
+      function renderOsControlPlane(payload) {
+        const heldActions = Array.isArray(payload?.heldActions) ? payload.heldActions : [];
+        const observations = Array.isArray(payload?.observations) ? payload.observations : [];
+        if (osIds.scopeWarning)
+          osIds.scopeWarning.classList.toggle('hidden', Boolean(payload?.tenantScope));
+        if (osIds.heldCount) osIds.heldCount.textContent = String(heldActions.length);
+        if (osIds.observationCount)
+          osIds.observationCount.textContent = String(observations.length);
+        if (osIds.heldActions) {
+          osIds.heldActions.innerHTML = heldActions.length
+            ? heldActions
+                .slice(0, 8)
+                .map(
+                  (item) =>
+                    `<article class="os-item"><div class="os-row"><strong>${escapeHtml(item.op)}</strong><span class="os-status">${escapeHtml(item.status)}</span></div><div class="os-meta">${escapeHtml(item.missionId)} · ${escapeHtml(item.tenantSlug || 'public')} · ${escapeHtml(item.submittedBy)}</div><div class="os-meta">${item.irreversible ? 'irreversible' : 'reversible'} · ${escapeHtml(item.effectBinding || 'effect binding unavailable')} · submitted ${escapeHtml(item.submittedAt)}</div></article>`
+                )
+                .join('')
+            : `<p class="os-empty">No held actions are visible to this operator.</p>`;
+        }
+        if (osIds.observations) {
+          osIds.observations.innerHTML = observations.length
+            ? observations
+                .slice(0, 8)
+                .map(
+                  (item) =>
+                    `<article class="os-item"><div class="os-row"><strong>${escapeHtml(item.service)}</strong><span class="os-status">${escapeHtml(item.tier)}</span></div><div class="os-meta">${escapeHtml(item.resourceRef)} · ${escapeHtml(item.purpose)}</div><div class="os-meta">${escapeHtml(item.summary)}</div><div class="os-meta">${escapeHtml(item.id)} · observed ${escapeHtml(item.observedAt)}</div></article>`
+                )
+                .join('')
+            : `<p class="os-empty">No observations recorded yet.</p>`;
+        }
+        if (osIds.nextAction) {
+          if (heldActions.length) {
+            const url = payload?.guardedSurfaceUrl;
+            osIds.nextAction.classList.remove('hidden');
+            osIds.nextAction.innerHTML = url
+              ? `<strong>Human action required.</strong> <a href="${escapeHtml(url)}">Open the guarded surface to decide or apply.</a>`
+              : `<strong>Human action required.</strong> Configure <code>KYBERION_OS_GUARDED_SURFACE_URL</code> for the decision surface.`;
+          } else {
+            osIds.nextAction.classList.add('hidden');
+            osIds.nextAction.textContent = '';
+          }
+        }
       }
 
       let identityCache = null;
-      fetch("/api/identity")
+      fetch('/api/identity')
         .then((r) => r.json())
-        .then((p) => { identityCache = p; renderIdentityBadge(p); maybeShowFirstRunBanner(p); })
+        .then((p) => {
+          identityCache = p;
+          renderIdentityBadge(p);
+          maybeShowFirstRunBanner(p);
+        })
         .catch(() => {});
 
-      fetch("/api/state").then((res) => res.json()).then(applyState).catch(() => {});
-      const source = new EventSource("/api/stream");
-      source.addEventListener("open", () => setConnState("live"));
-      source.addEventListener("error", () => setConnState(source.readyState === EventSource.CONNECTING ? "retrying" : "offline"));
-      source.addEventListener("state", (event) => {
-        setConnState("live");
-        try { applyState(JSON.parse(event.data)); } catch (_) {}
+      fetch('/api/state')
+        .then((res) => res.json())
+        .then(applyState)
+        .catch(() => {});
+      fetch('/api/os/control-plane', { headers: { 'Cache-Control': 'no-cache' } })
+        .then((res) => {
+          if (!res.ok) throw new Error(`OS projection request failed (${res.status})`);
+          return res.json();
+        })
+        .then(renderOsControlPlane)
+        .catch(() => {
+          if (osIds.heldActions)
+            osIds.heldActions.innerHTML = `<p class="os-empty">OS projection unavailable.</p>`;
+          if (osIds.observations)
+            osIds.observations.innerHTML = `<p class="os-empty">OS projection unavailable.</p>`;
+        });
+      const source = new EventSource('/api/stream');
+      source.addEventListener('open', () => setConnState('live'));
+      source.addEventListener('error', () =>
+        setConnState(source.readyState === EventSource.CONNECTING ? 'retrying' : 'offline')
+      );
+      source.addEventListener('state', (event) => {
+        setConnState('live');
+        try {
+          applyState(JSON.parse(event.data));
+        } catch (_) {}
       });
 
       // ----------------- Developer dispatch sandbox -----------------
-      const devA2uiPayload = document.getElementById("dev-a2ui-payload");
-      const devA2uiSend = document.getElementById("dev-a2ui-send");
-      const devA2uiReset = document.getElementById("dev-a2ui-reset");
-      const devA2uiResult = document.getElementById("dev-a2ui-result");
-      const devA2uiCurl = document.getElementById("dev-a2ui-curl");
-      const DEV_DEFAULT = devA2uiPayload ? devA2uiPayload.value : "";
+      const devA2uiPayload = document.getElementById('dev-a2ui-payload');
+      const devA2uiSend = document.getElementById('dev-a2ui-send');
+      const devA2uiReset = document.getElementById('dev-a2ui-reset');
+      const devA2uiResult = document.getElementById('dev-a2ui-result');
+      const devA2uiCurl = document.getElementById('dev-a2ui-curl');
+      const DEV_DEFAULT = devA2uiPayload ? devA2uiPayload.value : '';
 
       function refreshDevCurl() {
         if (!devA2uiCurl || !devA2uiPayload) return;
         const raw = devA2uiPayload.value;
         let pretty;
-        try { pretty = JSON.stringify(JSON.parse(raw)); }
-        catch (_) { pretty = raw.replace(/\s+/g, " ").trim(); }
+        try {
+          pretty = JSON.stringify(JSON.parse(raw));
+        } catch (_) {
+          pretty = raw.replace(/\s+/g, ' ').trim();
+        }
         const escaped = pretty.replace(/'/g, "'\\''");
         devA2uiCurl.textContent =
-          "curl -X POST " + window.location.origin + "/a2ui/dispatch \\\n" +
+          'curl -X POST ' +
+          window.location.origin +
+          '/a2ui/dispatch \\\n' +
           "  -H 'Content-Type: application/json' \\\n" +
-          "  -d '" + escaped + "'";
+          "  -d '" +
+          escaped +
+          "'";
       }
       if (devA2uiPayload) {
-        devA2uiPayload.addEventListener("input", refreshDevCurl);
+        devA2uiPayload.addEventListener('input', refreshDevCurl);
         refreshDevCurl();
       }
       if (devA2uiReset) {
-        devA2uiReset.addEventListener("click", () => {
+        devA2uiReset.addEventListener('click', () => {
           if (devA2uiPayload) devA2uiPayload.value = DEV_DEFAULT;
-          if (devA2uiResult) { devA2uiResult.textContent = ""; devA2uiResult.className = "dev-panel-result"; }
+          if (devA2uiResult) {
+            devA2uiResult.textContent = '';
+            devA2uiResult.className = 'dev-panel-result';
+          }
           refreshDevCurl();
         });
       }
       if (devA2uiSend) {
-        devA2uiSend.addEventListener("click", async () => {
+        devA2uiSend.addEventListener('click', async () => {
           if (!devA2uiPayload) return;
           let payload;
-          try { payload = JSON.parse(devA2uiPayload.value); }
-          catch (err) {
-            if (devA2uiResult) { devA2uiResult.textContent = "Invalid JSON: " + (err.message || err); devA2uiResult.className = "dev-panel-result err"; }
+          try {
+            payload = JSON.parse(devA2uiPayload.value);
+          } catch (err) {
+            if (devA2uiResult) {
+              devA2uiResult.textContent = 'Invalid JSON: ' + (err.message || err);
+              devA2uiResult.className = 'dev-panel-result err';
+            }
             return;
           }
           devA2uiSend.disabled = true;
-          if (devA2uiResult) { devA2uiResult.textContent = "Dispatching…"; devA2uiResult.className = "dev-panel-result"; }
+          if (devA2uiResult) {
+            devA2uiResult.textContent = 'Dispatching…';
+            devA2uiResult.className = 'dev-panel-result';
+          }
           try {
-            const r = await fetch("/a2ui/dispatch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            const r = await fetch('/a2ui/dispatch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
             const body = await r.json().catch(() => ({}));
-            if (!r.ok || body.ok === false) throw new Error(body.error || ("HTTP " + r.status));
-            if (devA2uiResult) { devA2uiResult.textContent = "OK · applied " + (body.applied || 1); devA2uiResult.className = "dev-panel-result ok"; }
+            if (!r.ok || body.ok === false) throw new Error(body.error || 'HTTP ' + r.status);
+            if (devA2uiResult) {
+              devA2uiResult.textContent = 'OK · applied ' + (body.applied || 1);
+              devA2uiResult.className = 'dev-panel-result ok';
+            }
           } catch (err) {
-            if (devA2uiResult) { devA2uiResult.textContent = "Dispatch failed: " + (err.message || err); devA2uiResult.className = "dev-panel-result err"; }
+            if (devA2uiResult) {
+              devA2uiResult.textContent = 'Dispatch failed: ' + (err.message || err);
+              devA2uiResult.className = 'dev-panel-result err';
+            }
           } finally {
             devA2uiSend.disabled = false;
           }

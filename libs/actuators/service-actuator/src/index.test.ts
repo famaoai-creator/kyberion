@@ -9,6 +9,17 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
   executeMcp: vi.fn(),
+  controlPlane: {
+    enforceIntroduction: vi.fn(),
+    recordObservation: vi.fn(),
+    projectTaint: vi.fn(() => ({
+      missionId: 'mission-test',
+      highestTier: 'public' as const,
+      tenants: [],
+      prohibitExternal: false,
+      observationIds: [],
+    })),
+  },
   retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -22,6 +33,14 @@ vi.mock('@agent/core', async () => {
     safeReadFile: mocks.safeReadFile,
     executeServicePreset: mocks.executeServicePreset,
     executeMcp: mocks.executeMcp,
+    CloudflareOsControlPlane: class {
+      enforceIntroduction(...args: any[]) {
+        return mocks.controlPlane.enforceIntroduction(...args);
+      }
+      recordObservation(...args: any[]) {
+        return mocks.controlPlane.recordObservation(...args);
+      }
+    },
     buildGovernedRetryOptions: vi.fn(({ manifestPath, defaults, override }: any) => {
       let retryPolicy = {};
       try {
@@ -39,7 +58,18 @@ vi.mock('@agent/core', async () => {
 describe('service-actuator handleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.controlPlane.enforceIntroduction.mockReset();
+    mocks.controlPlane.recordObservation.mockReset();
+    mocks.controlPlane.projectTaint.mockReset();
+    mocks.controlPlane.projectTaint.mockReturnValue({
+      missionId: 'mission-test',
+      highestTier: 'public',
+      tenants: [],
+      prohibitExternal: false,
+      observationIds: [],
+    });
     delete process.env.KYBERION_ALLOW_UNSAFE_CLI;
+    delete process.env.MISSION_ID;
   });
 
   it('uses the manifest retry policy for service pipeline steps', async () => {
@@ -108,6 +138,140 @@ describe('service-actuator handleAction', () => {
       'secret-guard'
     );
     expect(result).toEqual({ ok: true });
+  });
+
+  it('enforces an explicitly requested resource introduction before service execution', async () => {
+    process.env.MISSION_ID = 'mission-introduction-test';
+    mocks.controlPlane.enforceIntroduction.mockImplementation(() => {
+      throw new Error('[POLICY_VIOLATION] Resource introduction required');
+    });
+    const { handleAction } = await import('./index.js');
+
+    await expect(
+      handleAction({
+        service_id: 'github',
+        mode: 'PRESET',
+        action: 'create_issue',
+        params: { title: 'blocked' },
+        context: {
+          mission_id: 'mission-introduction-test',
+          resource_ref: 'repo:famaoai/kyberion',
+          introduction_mode: 'enforce',
+          resource_scope: 'write',
+          security_scope: {
+            tenant_id: 'tenant-a',
+            mission_id: 'mission-introduction-test',
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'create issue',
+          },
+        },
+      })
+    ).rejects.toThrow('Resource introduction required');
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+  });
+
+  it('records an explicitly described service observation after a read', async () => {
+    process.env.MISSION_ID = 'mission-observation-test';
+    mocks.executeServicePreset.mockResolvedValue({ issues: [] });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'list_issues',
+      params: {},
+      context: {
+        mission_id: 'mission-observation-test',
+        resource_ref: 'repo:famaoai/kyberion',
+        observation: {
+          tier: 'public',
+          purpose: 'review backlog',
+          summary: 'issue list',
+        },
+        security_scope: {
+          tenant_id: 'tenant-a',
+          mission_id: 'mission-observation-test',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'review backlog',
+        },
+      },
+    });
+
+    expect(mocks.controlPlane.recordObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-observation-test',
+        resourceRef: 'repo:famaoai/kyberion',
+        tier: 'public',
+        purpose: 'review backlog',
+      })
+    );
+  });
+
+  it('derives observation sensitivity from the security scope, not caller claims', async () => {
+    process.env.MISSION_ID = 'mission-observation-taint-test';
+    mocks.executeServicePreset.mockResolvedValue({ issues: [] });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'list_issues',
+      params: {},
+      context: {
+        resource_ref: 'repo:famaoai/kyberion',
+        observation: {
+          tier: 'public',
+          purpose: 'caller-supplied purpose must be ignored',
+          summary: 'issue list',
+        },
+        security_scope: {
+          tenant_id: 'tenant-a',
+          mission_id: 'mission-observation-taint-test',
+          read_tiers: ['public', 'confidential'],
+          write_tier: 'confidential',
+          purpose: 'review confidential backlog',
+        },
+      },
+    });
+
+    expect(mocks.controlPlane.recordObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: 'confidential',
+        purpose: 'review confidential backlog',
+      })
+    );
+  });
+
+  it('does not turn observation persistence failure into a side-effect retry', async () => {
+    process.env.MISSION_ID = 'mission-observation-retry-test';
+    mocks.executeServicePreset.mockResolvedValue({ ok: true });
+    mocks.controlPlane.recordObservation.mockImplementation(() => {
+      throw new Error('observation store unavailable');
+    });
+    const { handleAction } = await import('./index.js');
+
+    await expect(
+      handleAction({
+        service_id: 'github',
+        mode: 'PRESET',
+        action: 'list_issues',
+        params: {},
+        context: {
+          resource_ref: 'repo:famaoai/kyberion',
+          observation: { summary: 'issue list' },
+          security_scope: {
+            tenant_id: 'tenant-a',
+            mission_id: 'mission-observation-retry-test',
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'review backlog',
+          },
+        },
+      })
+    ).resolves.toEqual({ ok: true });
+    expect(mocks.executeServicePreset).toHaveBeenCalledTimes(1);
   });
 
   it('blocks raw CLI mode unless explicitly enabled', async () => {
@@ -200,6 +364,11 @@ describe('service-actuator handleAction', () => {
         title: 'Schema check',
       },
       auth: 'secret-guard',
+      context: {
+        mission_id: 'mission-schema-test',
+        resource_ref: 'repo:famaoai/kyberion',
+        introduction_mode: 'warn',
+      },
     };
     const mcpRequest = {
       service_id: 'github-mcp',
@@ -227,6 +396,11 @@ describe('service-actuator handleAction', () => {
             },
             auth: 'secret-guard',
             method: 'POST',
+            context: {
+              mission_id: 'mission-schema-test',
+              resource_ref: 'repo:famaoai/kyberion',
+              introduction_mode: 'warn',
+            },
           },
         },
       ],
