@@ -5,11 +5,17 @@ import {
   buildAutomationSlashCommand,
   createAutomationBlueprintFromPipeline,
   findAutomationBlueprint,
+  listMissingAutomationBindingIntroductions,
   loadAutomationBlueprint,
+  matchesAutomationBlueprintVocabulary,
   parseAutomationSlashRequest,
+  reconcileAutomationBlueprintSeed,
   registerAutomationBlueprint,
+  requestMissingAutomationBindingIntroductions,
   resolveAutomationBlueprint,
+  validateAutomationBlueprintBindings,
 } from './automation-blueprint.js';
+import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
 import { loadScheduleRegistry } from './src/pipeline-scheduler.js';
 import { pathResolver } from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
@@ -70,6 +76,119 @@ describe('automation-blueprint', () => {
     });
   });
 
+  it('carries credential-free binding shapes from the pipeline context', () => {
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        required_bindings: [
+          {
+            name: 'slack_publish',
+            service: 'slack',
+            preset: 'post_message',
+            secret: 'SLACK_TOKEN',
+          },
+        ],
+        vocabulary: { proposal: '提案書' },
+        fingerprint: 'gadget-seed-v1',
+      },
+    });
+
+    expect(blueprint.required_bindings).toEqual([
+      {
+        name: 'slack_publish',
+        service: 'slack',
+        preset: 'post_message',
+        secret: 'SLACK_TOKEN',
+      },
+    ]);
+    expect(blueprint.vocabulary).toEqual({ proposal: '提案書' });
+    expect(blueprint.fingerprint).toBe('gadget-seed-v1');
+    expect(listMissingAutomationBindingIntroductions(blueprint, {})).toEqual(
+      blueprint.required_bindings
+    );
+    expect(() => validateAutomationBlueprintBindings(blueprint, {})).toThrow(
+      'Missing required automation bindings: slack_publish'
+    );
+    expect(validateAutomationBlueprintBindings(blueprint, ['slack_publish'])).toEqual([
+      'slack_publish',
+    ]);
+  });
+
+  it('rejects binding values disguised as blueprint shape declarations', () => {
+    expect(() =>
+      createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+        ...source,
+        context: {
+          required_bindings: [
+            { name: 'slack_publish', service: 'slack', secret: 'actual secret value' },
+          ],
+        },
+      })
+    ).toThrow('credential-free name shape');
+    expect(() =>
+      createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+        ...source,
+        context: {
+          required_bindings: [
+            { name: 'slack_publish', service: 'slack', secret: 'xoxb-123456789012345678901234' },
+          ],
+        },
+      })
+    ).toThrow('secret must be a reference name');
+    expect(() =>
+      createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+        ...source,
+        context: {
+          required_bindings: [
+            {
+              name: 'slack_publish',
+              service: 'slack',
+              secret: 'SLACK_TOKEN',
+              value: 'actual-secret-value',
+            },
+          ],
+        },
+      })
+    ).toThrow('Unknown blueprint binding property');
+  });
+
+  it('turns missing bindings into held OS-03 introduction requests', () => {
+    const plane = new CloudflareOsControlPlane({ persist: false });
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        required_bindings: [{ name: 'slack_publish', service: 'slack', secret: 'SLACK_TOKEN' }],
+      },
+    });
+
+    const requests = requestMissingAutomationBindingIntroductions(
+      blueprint,
+      {},
+      {
+        controlPlane: plane,
+        missionId: 'mission-automation-binding',
+        taskId: 'task-automation-binding',
+        requestedBy: 'worker',
+        scope: 'write',
+        resourceRefs: { slack_publish: 'team:T1' },
+      }
+    );
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].request).toMatchObject({
+      missionId: 'mission-automation-binding',
+      taskId: 'task-automation-binding',
+      op: 'resource:introduction',
+      params: {
+        service: 'slack',
+        resourceRef: 'team:T1',
+        scope: 'write',
+      },
+      status: 'pending',
+    });
+    expect(JSON.stringify(requests[0].request)).not.toContain('SLACK_TOKEN');
+  });
+
   it('keeps defaults and rejects invalid slot values', () => {
     const blueprint = createAutomationBlueprintFromPipeline('pipelines/daily-report.json', source);
     expect(resolveAutomationBlueprint(blueprint).schedule.cron).toBe('30 3 * * *');
@@ -111,6 +230,117 @@ describe('automation-blueprint', () => {
         trigger: expect.objectContaining({ cron: '15 8 * * *' }),
       }),
     ]);
+  });
+
+  it('refuses to register a blueprint before required bindings are wired', () => {
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        required_bindings: [{ name: 'calendar_read', service: 'google_calendar' }],
+      },
+    });
+    expect(() =>
+      registerAutomationBlueprint(
+        { blueprint, pipeline: { steps: [], ...source } },
+        {},
+        { rootDir: pathResolver.sharedTmp(`automation-binding-${Date.now()}`) }
+      )
+    ).toThrow('Missing required automation bindings: calendar_read');
+  });
+
+  it('returns held introduction requests instead of scheduling an unwired blueprint', () => {
+    const plane = new CloudflareOsControlPlane({ persist: false });
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        required_bindings: [{ name: 'calendar_read', service: 'google_calendar' }],
+      },
+    });
+    const result = registerAutomationBlueprint(
+      { blueprint, pipeline: { steps: [], ...source } },
+      {},
+      {
+        introductions: {
+          controlPlane: plane,
+          missionId: 'mission-automation-register',
+          requestedBy: 'worker',
+          scope: 'read',
+          resourceRefs: { calendar_read: 'calendar:primary' },
+        },
+        rootDir: pathResolver.sharedTmp(`automation-introduction-${Date.now()}`),
+      }
+    );
+
+    expect(result.scheduled).toBeUndefined();
+    expect(result.introductionRequests).toHaveLength(1);
+  });
+
+  it('sanitizes binding declarations before writing scheduled context', () => {
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        required_bindings: [{ name: 'slack_publish', service: 'slack' }],
+      },
+    });
+    const rootDir = pathResolver.sharedTmp(`automation-context-${Date.now()}`);
+    tempRoots.push(rootDir);
+    const registered = registerAutomationBlueprint(
+      {
+        blueprint,
+        pipeline: {
+          steps: [],
+          ...source,
+          context: {
+            required_bindings: [
+              { name: 'slack_publish', service: 'slack', value: 'actual-secret-value' },
+            ],
+          },
+        },
+      },
+      {},
+      { rootDir, bindings: ['slack_publish'] }
+    );
+
+    expect(registered.scheduled?.context).toEqual({
+      required_bindings: [{ name: 'slack_publish', service: 'slack' }],
+    });
+  });
+
+  it('resolves vocabulary and preserves operator-customized seeds', () => {
+    const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
+      ...source,
+      context: {
+        vocabulary: { proposal: '提案書' },
+        fingerprint: 'gadget-seed-v1',
+      },
+    });
+    expect(matchesAutomationBlueprintVocabulary(blueprint, '提案書')).toBe(true);
+    expect(matchesAutomationBlueprintVocabulary(blueprint, 'proposal')).toBe(true);
+
+    const shipped = { ...blueprint, name: 'Updated', fingerprint: 'gadget-seed-v2' };
+    expect(reconcileAutomationBlueprintSeed(blueprint, blueprint, shipped)).toEqual({
+      blueprint: shipped,
+      action: 'update',
+    });
+    const customized = { ...blueprint, name: 'Operator custom' };
+    expect(reconcileAutomationBlueprintSeed(customized, blueprint, shipped)).toEqual({
+      blueprint: customized,
+      action: 'preserve',
+    });
+  });
+
+  it('loads the catalog pipeline that declares a real binding shape', () => {
+    const loaded = loadAutomationBlueprint('pipelines/action-item-reminders.json');
+    expect(loaded.blueprint.required_bindings).toEqual([
+      {
+        name: 'slack_publish',
+        service: 'slack',
+        preset: 'outbox',
+        secret: 'SLACK_BOT_TOKEN',
+      },
+    ]);
+    expect(loaded.blueprint.vocabulary).toEqual({ reminder: 'リマインダー' });
+    expect(loaded.blueprint.fingerprint).toBe('action-item-reminders-v2');
   });
 
   it('loads only validated schedule-backed pipelines from the catalog', () => {

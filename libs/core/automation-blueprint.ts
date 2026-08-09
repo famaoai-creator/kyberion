@@ -10,6 +10,12 @@ import {
 } from './src/pipeline-scheduler.js';
 import { validateChronosDeliveryTarget } from './chronos-delivery.js';
 import type { PipelineAdf, PipelineSchedule } from './pipeline-contract.js';
+import type {
+  BlueprintBindingRequirement,
+  CloudflareOsControlPlane,
+  HeldActionRecord,
+  ResourceScope,
+} from './cloudflare-os-control-plane.js';
 
 export type AutomationBlueprintSlotType = 'number' | 'text' | 'choice';
 
@@ -25,6 +31,28 @@ export interface AutomationBlueprintSlot {
   choices?: string[];
 }
 
+export type AutomationBlueprintBindingRequirement = BlueprintBindingRequirement;
+
+export interface AutomationBlueprintIntroductionOptions {
+  controlPlane: Pick<CloudflareOsControlPlane, 'requestResourceIntroduction'>;
+  missionId: string;
+  taskId?: string;
+  requestedBy: string;
+  scope: ResourceScope;
+  resourceRefs: Readonly<Record<string, string>>;
+  expiresAt?: string;
+}
+
+export interface AutomationBlueprintBindingIntroductionRequest {
+  binding: AutomationBlueprintBindingRequirement;
+  request: HeldActionRecord;
+}
+
+export interface AutomationBlueprintSeedReconciliation {
+  blueprint: AutomationBlueprint;
+  action: 'install' | 'update' | 'preserve' | 'unchanged';
+}
+
 export interface AutomationBlueprint {
   blueprint_id: string;
   name: string;
@@ -32,6 +60,9 @@ export interface AutomationBlueprint {
   cron_template: string;
   timezone?: string;
   slots: AutomationBlueprintSlot[];
+  required_bindings?: AutomationBlueprintBindingRequirement[];
+  vocabulary?: Record<string, string>;
+  fingerprint?: string;
   delivery?: {
     surface: string;
     channel_slot?: string;
@@ -45,6 +76,7 @@ export interface ResolvedAutomationBlueprint {
   pipeline_ref: string;
   schedule: PipelineSchedule;
   values: Record<string, string | number>;
+  required_bindings: AutomationBlueprintBindingRequirement[];
 }
 
 export interface AutomationQuestionSeed {
@@ -95,7 +127,8 @@ export interface AutomationSlashRequest {
 
 export interface AutomationBlueprintRegistration {
   resolved: ResolvedAutomationBlueprint;
-  scheduled: ScheduledPipeline;
+  scheduled?: ScheduledPipeline;
+  introductionRequests?: AutomationBlueprintBindingIntroductionRequest[];
 }
 
 export interface AutomationBlueprintCatalogEntry {
@@ -118,6 +151,89 @@ const CRON_FIELD_RANGES: Record<(typeof CRON_FIELD_NAMES)[number], [number, numb
   month: [1, 12],
   day_of_week: [0, 6],
 };
+
+const BINDING_SHAPE_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/u;
+const BINDING_DECLARATION_KEYS = new Set(['name', 'service', 'preset', 'secret']);
+const SECRET_VALUE_PATTERNS = [
+  /^xox[baprs]-[A-Za-z0-9-]+$/u,
+  /^sk-[A-Za-z0-9_-]{16,}$/u,
+  /^gh[pousr]_[A-Za-z0-9_]{20,}$/u,
+  /^AKIA[0-9A-Z]{16}$/u,
+];
+
+function bindingShape(value: unknown, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!BINDING_SHAPE_PATTERN.test(normalized)) {
+    throw new Error(
+      `[POLICY_VIOLATION] Invalid blueprint binding ${label}; use a credential-free name shape`
+    );
+  }
+  return normalized;
+}
+
+function secretReferenceShape(value: unknown, label: string): string {
+  const normalized = bindingShape(value, label);
+  if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    throw new Error(
+      `[POLICY_VIOLATION] Invalid blueprint binding ${label}; secret must be a reference name, not a credential value`
+    );
+  }
+  return normalized;
+}
+
+function normalizeBindingRequirements(value: unknown): AutomationBlueprintBindingRequirement[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new Error('[POLICY_VIOLATION] Blueprint required_bindings must be an array');
+  }
+  const seen = new Set<string>();
+  return value.map((candidate, index) => {
+    if (!candidate || typeof candidate !== 'object') {
+      throw new Error(`[POLICY_VIOLATION] Blueprint binding ${index} must be an object`);
+    }
+    const record = candidate as Record<string, unknown>;
+    const unknownKey = Object.keys(record).find((key) => !BINDING_DECLARATION_KEYS.has(key));
+    if (unknownKey) {
+      throw new Error(
+        `[POLICY_VIOLATION] Unknown blueprint binding property for ${String(record.name || index)}: ${unknownKey}`
+      );
+    }
+    const name = bindingShape(record.name, `name at index ${index}`);
+    if (seen.has(name)) {
+      throw new Error(`[POLICY_VIOLATION] Duplicate blueprint binding: ${name}`);
+    }
+    seen.add(name);
+    const service = bindingShape(record.service, `service for ${name}`);
+    const preset =
+      record.preset === undefined ? undefined : bindingShape(record.preset, `preset for ${name}`);
+    const secret =
+      record.secret === undefined
+        ? undefined
+        : secretReferenceShape(record.secret, `secret for ${name}`);
+    return {
+      name,
+      service,
+      ...(preset ? { preset } : {}),
+      ...(secret ? { secret } : {}),
+    };
+  });
+}
+
+function normalizeVocabulary(value: unknown): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('[POLICY_VIOLATION] Blueprint vocabulary must be an object');
+  }
+  const vocabulary: Record<string, string> = {};
+  for (const [key, candidate] of Object.entries(value)) {
+    const normalizedKey = bindingShape(key, 'vocabulary key');
+    if (typeof candidate !== 'string' || !candidate.trim() || candidate.length > 500) {
+      throw new Error(`[POLICY_VIOLATION] Invalid blueprint vocabulary value: ${normalizedKey}`);
+    }
+    vocabulary[normalizedKey] = candidate.trim();
+  }
+  return vocabulary;
+}
 
 function normalizeId(value: string): string {
   const normalized = String(value || '')
@@ -182,7 +298,7 @@ function deliverySlot(schedule: PipelineSchedule): AutomationBlueprint['delivery
 /** Extract one shared slot schema from an existing scheduled pipeline. */
 export function createAutomationBlueprintFromPipeline(
   pipelineRef: string,
-  pipeline: Pick<PipelineAdf, 'name' | 'schedule'>
+  pipeline: Pick<PipelineAdf, 'name' | 'schedule' | 'context'>
 ): AutomationBlueprint {
   if (!pipeline.schedule?.cron) throw new Error('Pipeline does not declare a schedule.cron.');
   const ref = String(pipelineRef || '').trim();
@@ -216,6 +332,13 @@ export function createAutomationBlueprintFromPipeline(
     });
   }
   const blueprintId = normalizeId(pipeline.schedule.id || pipeline.name || ref);
+  const context = pipeline.context || {};
+  const requiredBindings = normalizeBindingRequirements(context.required_bindings);
+  const vocabulary = normalizeVocabulary(context.vocabulary);
+  const fingerprint =
+    context.fingerprint === undefined
+      ? undefined
+      : bindingShape(context.fingerprint, 'fingerprint');
   return {
     blueprint_id: blueprintId,
     name: String(pipeline.name || blueprintId),
@@ -223,6 +346,9 @@ export function createAutomationBlueprintFromPipeline(
     cron_template: cronTemplate,
     ...(pipeline.schedule.timezone ? { timezone: pipeline.schedule.timezone } : {}),
     slots,
+    ...(requiredBindings.length ? { required_bindings: requiredBindings } : {}),
+    ...(vocabulary ? { vocabulary } : {}),
+    ...(fingerprint ? { fingerprint } : {}),
     ...(delivery ? { delivery } : {}),
   };
 }
@@ -349,7 +475,136 @@ export function resolveAutomationBlueprint(
       ...(blueprint.delivery.template ? { template: blueprint.delivery.template } : {}),
     };
   }
-  return { pipeline_ref: blueprint.pipeline_ref, schedule, values: resolvedValues };
+  return {
+    pipeline_ref: blueprint.pipeline_ref,
+    schedule,
+    values: resolvedValues,
+    required_bindings: (blueprint.required_bindings || []).map((binding) => ({ ...binding })),
+  };
+}
+
+function availableBindingNames(
+  availableBindings: Readonly<Record<string, unknown> | ReadonlySet<string> | readonly string[]>
+): Set<string> {
+  if (availableBindings instanceof Set) return new Set(availableBindings);
+  if (Array.isArray(availableBindings)) {
+    return new Set(availableBindings.filter((name) => typeof name === 'string' && name.trim()));
+  }
+  return new Set(
+    Object.entries(availableBindings)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([name]) => name)
+  );
+}
+
+export function listMissingAutomationBindingIntroductions(
+  blueprint: AutomationBlueprint,
+  availableBindings: Readonly<
+    Record<string, unknown> | ReadonlySet<string> | readonly string[]
+  > = {}
+): AutomationBlueprintBindingRequirement[] {
+  const available = availableBindingNames(availableBindings);
+  return (blueprint.required_bindings || [])
+    .filter((binding) => !available.has(binding.name))
+    .map((binding) => ({ ...binding }));
+}
+
+/** Fail before scheduling when a blueprint's credential-free binding shape is not wired. */
+export function validateAutomationBlueprintBindings(
+  blueprint: AutomationBlueprint,
+  availableBindings: Readonly<
+    Record<string, unknown> | ReadonlySet<string> | readonly string[]
+  > = {}
+): string[] {
+  const missing = listMissingAutomationBindingIntroductions(blueprint, availableBindings);
+  if (missing.length) {
+    throw new Error(
+      `[POLICY_VIOLATION] Missing required automation bindings: ${missing
+        .map((binding) => binding.name)
+        .join(', ')}`
+    );
+  }
+  return (blueprint.required_bindings || []).map((binding) => binding.name);
+}
+
+/** Convert missing shape declarations into OS-03 held introduction requests. */
+export function requestMissingAutomationBindingIntroductions(
+  blueprint: AutomationBlueprint,
+  availableBindings: Readonly<Record<string, unknown> | ReadonlySet<string> | readonly string[]>,
+  options: AutomationBlueprintIntroductionOptions
+): AutomationBlueprintBindingIntroductionRequest[] {
+  const missing = listMissingAutomationBindingIntroductions(blueprint, availableBindings);
+  const resourceRefs = missing.map((binding) => {
+    const resourceRef = String(options.resourceRefs[binding.name] || '').trim();
+    if (!resourceRef) {
+      throw new Error(
+        `[POLICY_VIOLATION] Missing resourceRef for automation binding introduction: ${binding.name}`
+      );
+    }
+    return { binding, resourceRef };
+  });
+  return resourceRefs.map(({ binding, resourceRef }) => {
+    const request = options.controlPlane.requestResourceIntroduction({
+      missionId: options.missionId,
+      ...(options.taskId ? { taskId: options.taskId } : {}),
+      service: binding.service,
+      resourceRef,
+      scope: options.scope,
+      requestedBy: options.requestedBy,
+      ...(options.expiresAt ? { expiresAt: options.expiresAt } : {}),
+    });
+    return { binding: { ...binding }, request };
+  });
+}
+
+function canonicalBlueprintValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalBlueprintValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalBlueprintValue(entry)])
+    );
+  }
+  return value;
+}
+
+function sameBlueprint(left: AutomationBlueprint, right: AutomationBlueprint): boolean {
+  return (
+    JSON.stringify(canonicalBlueprintValue(left)) === JSON.stringify(canonicalBlueprintValue(right))
+  );
+}
+
+/** Install a seed, update an untouched prior seed, and preserve operator edits. */
+export function reconcileAutomationBlueprintSeed(
+  current: AutomationBlueprint | undefined,
+  previousShipped: AutomationBlueprint | undefined,
+  shipped: AutomationBlueprint
+): AutomationBlueprintSeedReconciliation {
+  if (!current) return { blueprint: { ...shipped }, action: 'install' };
+  if (shipped.fingerprint && current.fingerprint === shipped.fingerprint) {
+    return { blueprint: { ...current }, action: 'unchanged' };
+  }
+  if (previousShipped && sameBlueprint(current, previousShipped)) {
+    return { blueprint: { ...shipped }, action: 'update' };
+  }
+  return { blueprint: { ...current }, action: 'preserve' };
+}
+
+/** Match a catalog request against its canonical id, name, or declared vocabulary. */
+export function matchesAutomationBlueprintVocabulary(
+  blueprint: AutomationBlueprint,
+  request: string
+): boolean {
+  const normalized = String(request || '').trim();
+  if (!normalized) return false;
+  const lower = normalized.toLowerCase();
+  return (
+    blueprint.name.trim().toLowerCase() === lower ||
+    Object.entries(blueprint.vocabulary || {}).some(
+      ([key, value]) => key.toLowerCase() === lower || value.trim().toLowerCase() === lower
+    )
+  );
 }
 
 function validatePipelineRef(pipelineRef: string): string {
@@ -413,17 +668,42 @@ export function listAutomationBlueprintCatalog(): AutomationBlueprintCatalogEntr
 }
 
 export function findAutomationBlueprint(blueprintId: string): AutomationBlueprintCatalogEntry {
-  const id = normalizeId(blueprintId);
+  const requested = String(blueprintId || '').trim();
+  let id: string | undefined;
+  try {
+    id = normalizeId(requested);
+  } catch {
+    id = undefined;
+  }
   const matches = listAutomationBlueprintCatalog().filter(
-    (entry) => entry.blueprint.blueprint_id === id
+    (entry) =>
+      (id !== undefined && entry.blueprint.blueprint_id === id) ||
+      matchesAutomationBlueprintVocabulary(entry.blueprint, requested)
   );
   if (matches.length === 0) {
     throw new Error(`[POLICY_VIOLATION] Unknown automation Blueprint: ${blueprintId}`);
   }
   if (matches.length > 1) {
-    throw new Error(`[POLICY_VIOLATION] Duplicate automation Blueprint id: ${id}`);
+    throw new Error(`[POLICY_VIOLATION] Duplicate automation Blueprint request: ${requested}`);
   }
   return matches[0];
+}
+
+function scheduledPipelineContext(
+  context: Record<string, unknown> | undefined,
+  blueprint: AutomationBlueprint
+): Record<string, unknown> {
+  const sanitized = { ...(context || {}) };
+  if (blueprint.required_bindings?.length) {
+    sanitized.required_bindings = blueprint.required_bindings.map((binding) => ({ ...binding }));
+  } else {
+    delete sanitized.required_bindings;
+  }
+  if (blueprint.vocabulary) sanitized.vocabulary = { ...blueprint.vocabulary };
+  else delete sanitized.vocabulary;
+  if (blueprint.fingerprint) sanitized.fingerprint = blueprint.fingerprint;
+  else delete sanitized.fingerprint;
+  return sanitized;
 }
 
 /** Parse `/kyberion schedule <blueprint> [slot=value ...] [--form]`. */
@@ -459,9 +739,28 @@ export function parseAutomationSlashRequest(text: string): AutomationSlashReques
 export function registerAutomationBlueprint(
   entry: AutomationBlueprintCatalogEntry,
   values: Record<string, unknown> = {},
-  options: PipelineSchedulerOptions & { pipelinePath?: string } = {}
+  options: PipelineSchedulerOptions & {
+    pipelinePath?: string;
+    bindings?: Readonly<Record<string, unknown> | ReadonlySet<string> | readonly string[]>;
+    introductions?: AutomationBlueprintIntroductionOptions;
+  } = {}
 ): AutomationBlueprintRegistration {
   const resolved = resolveAutomationBlueprint(entry.blueprint, values);
+  const missing = listMissingAutomationBindingIntroductions(
+    entry.blueprint,
+    options.bindings || {}
+  );
+  if (missing.length && options.introductions) {
+    return {
+      resolved,
+      introductionRequests: requestMissingAutomationBindingIntroductions(
+        entry.blueprint,
+        options.bindings || {},
+        options.introductions
+      ),
+    };
+  }
+  validateAutomationBlueprintBindings(entry.blueprint, options.bindings);
   const target = resolved.schedule.deliver_to;
   const validatedTarget = target
     ? validateChronosDeliveryTarget(target as Parameters<typeof validateChronosDeliveryTarget>[0])
@@ -477,7 +776,7 @@ export function registerAutomationBlueprint(
       timezone: resolved.schedule.timezone,
     },
     enabled: resolved.schedule.enabled !== false,
-    context: entry.pipeline.context ?? {},
+    context: scheduledPipelineContext(entry.pipeline.context, entry.blueprint),
     ...(validatedTarget ? { deliver_to: validatedTarget } : {}),
   };
   registerScheduledPipeline(scheduled, options);

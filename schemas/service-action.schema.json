@@ -12,7 +12,8 @@
         "action": { "type": "string" },
         "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
         "params": { "type": "object" },
-        "auth": { "enum": ["none", "secret-guard", "session"] }
+        "auth": { "enum": ["none", "secret-guard", "session"] },
+        "context": { "type": "object" }
       }
     },
     {
@@ -37,6 +38,7 @@
                   "params": { "type": "object" },
                   "auth": { "enum": ["none", "secret-guard", "session"] },
                   "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+                  "context": { "type": "object" },
                   "export_as": { "type": "string" },
                   "retry": { "type": "object" }
                 }

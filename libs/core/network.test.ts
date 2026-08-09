@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resetEgressPolicyCache } from './egress-policy.js';
+import { resetEgressPolicyCache, withEgressPayloadContext } from './egress-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -82,6 +82,29 @@ describe('secureFetch', () => {
 
     expect(mocks.axios).toHaveBeenCalled();
     expect(mocks.warn).toHaveBeenCalled();
+  });
+
+  it('applies ambient provenance to secureFetch calls without explicit context', async () => {
+    const { secureFetch } = await import('./network.js');
+
+    await expect(
+      withEgressPayloadContext(
+        {
+          tier: 'personal',
+          tenant_slug: 'tenant-a',
+          purpose: 'service write',
+          provenance: {
+            missionId: 'mission-egress',
+            highestTier: 'personal',
+            tenants: ['tenant-a'],
+            prohibitExternal: true,
+            observationIds: ['observation-1'],
+          },
+        },
+        () => secureFetch({ url: 'https://docs.example.com/write', method: 'POST' })
+      )
+    ).rejects.toThrow('PROVENANCE_EGRESS_DENIED');
+    expect(mocks.axios).not.toHaveBeenCalled();
   });
 
   it('redacts sensitive payload fields and headers before dispatching', async () => {
