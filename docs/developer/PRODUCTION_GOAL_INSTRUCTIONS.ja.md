@@ -41,7 +41,7 @@ Kyberion を OSS としてユーザー獲得でき、FDE / 導入支援の土台
 - temp / trace / artifact は active/shared/tmp/ または mission-local storage に置く。
 - 既存 Actuator と CAPABILITIES_GUIDE.md を確認してから新規実装する。
 - ADF / pipeline を扱う場合は draft → preflight → repair if safe → commit → execute の順に進める。
-- 5+ artifacts、外部向け証跡、再実行前提、同型作業の反復、複数視点が必要な作業では mission_controller.ts と pipelines/ を使う。
+- ミッション必須トリガーが1つでもある、または蓄積トリガーが2つ以上ある作業では `mission_controller.ts` と `pipelines/` を使う。該当しなければ、正本ポリシーに従って最低限の execution shape を選ぶ。
 
 優先順位:
 1. P0-6: Golden scenario catalog の schema 管理

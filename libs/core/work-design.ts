@@ -618,6 +618,7 @@ export function buildOrganizationWorkLoopSummary(input: {
   approvalRequired?: boolean;
   crossSystemMutation?: boolean;
   expectedContinuationBeyondSession?: boolean;
+  highStakesAction?: boolean;
   highStakesOrDogfoodEvidence?: boolean;
   customerSignoff?: boolean;
   productionRelease?: boolean;
@@ -663,6 +664,7 @@ export function buildOrganizationWorkLoopSummary(input: {
     approvalRequired: input.approvalRequired ?? input.requiresApproval,
     crossSystemMutation: input.crossSystemMutation,
     expectedContinuationBeyondSession: input.expectedContinuationBeyondSession,
+    highStakesAction: input.highStakesAction,
     highStakesOrDogfoodEvidence: input.highStakesOrDogfoodEvidence,
     customerSignoff: input.customerSignoff,
     productionRelease: input.productionRelease,

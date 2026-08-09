@@ -815,6 +815,45 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.createTaskSession).not.toHaveBeenCalled();
   });
 
+  it('promotes a direct-reply route when a mandatory work-scope trigger is present', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'knowledge-query',
+      shape: 'direct_reply',
+      routeFamily: 'direct_reply',
+      queryType: 'knowledge_search',
+      queryText: 'mission authority',
+    });
+    mocks.compileUserIntentFlow.mockResolvedValue({
+      intentContract: { resolution: { execution_shape: 'direct_reply' } },
+      workLoop: {
+        work_scope_decision: {
+          execution_shape: 'mission',
+          minimum_catalog_shape: 'direct_reply',
+          promotion_required: true,
+          mandatory_triggers: ['customer_signoff'],
+          accumulation_triggers: [],
+          matched_rule_ids: ['mandatory-trigger-promotion'],
+          policy_version: '1.0.0',
+          rationale: 'A mandatory trigger requires mission scope.',
+        },
+      },
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'mission authority を顧客承認付きで扱って',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'node',
+      expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
+      expect.any(Object)
+    );
+    expect(mocks.queryKnowledge).not.toHaveBeenCalled();
+  });
+
   it('executes capture_photo task sessions through the virtual camera bridge path', async () => {
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'capture-photo',

@@ -64,6 +64,7 @@
               "approval_required": { "type": "boolean" },
               "cross_system_mutation": { "type": "boolean" },
               "expected_continuation_beyond_session": { "type": "boolean" },
+              "high_stakes_action": { "type": "boolean" },
               "high_stakes_or_dogfood_evidence": { "type": "boolean" },
               "customer_signoff": { "type": "boolean" },
               "production_release": { "type": "boolean" },

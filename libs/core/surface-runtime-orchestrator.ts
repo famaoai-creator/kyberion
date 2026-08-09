@@ -1214,9 +1214,7 @@ function getWorkScopeDecision(context: SurfaceRuntimeRouteContext): WorkScopeDec
 
 function shouldPromoteToMission(context: SurfaceRuntimeRouteContext): boolean {
   const workScopeDecision = getWorkScopeDecision(context);
-  if (!workScopeDecision?.promotion_required) return false;
-  const routeFamily = resolvedSurfaceIntent(context).routeFamily;
-  return routeFamily === 'task_session' || routeFamily === 'pipeline';
+  return Boolean(workScopeDecision?.promotion_required);
 }
 
 function buildWorkScopeGovernancePayload(

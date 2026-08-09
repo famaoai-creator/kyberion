@@ -587,9 +587,10 @@ $MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json
 ```
 
 Normally, execute generated tasks with `dispatch-tickets` followed by
-`dispatch-workitems`. Use `reconcile-work` only when work was already completed
-through another governed path, such as a feature branch created before the
-Mission tasks were dispatched. Start from
+`dispatch-workitems`. Use `reconcile-work` when work was already completed
+directly within the mission by its owner, or through another governed path before
+dispatch, such as a feature branch created before the Mission tasks were
+dispatched. Start from
 `knowledge/product/schemas/mission-work-reconciliation.example.json` and map
 every task acceptance criterion to hash-bound Evidence plus a passed
 verification record.
