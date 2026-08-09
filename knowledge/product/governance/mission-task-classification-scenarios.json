@@ -658,6 +658,102 @@
         ],
         "promotion_required": false
       }
+    },
+    {
+      "scenario_id": "direct-reply-mandatory-trigger-ja",
+      "utterance": "mission authority を教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply",
+        "customer_signoff": true
+      },
+      "expected": {
+        "intent_id": "knowledge-query",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "direct-reply-one-accumulation-ja",
+      "utterance": "mission authority を教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply",
+        "artifact_estimate": 5
+      },
+      "expected": {
+        "intent_id": "knowledge-query",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "direct-reply-two-accumulations-ja",
+      "utterance": "mission authority を教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply",
+        "artifact_estimate": 5,
+        "stakeholder_count": 3
+      },
+      "expected": {
+        "intent_id": "knowledge-query",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "catalog-floor-non-demotion-ja",
+      "utterance": "mission authority を教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "knowledge-query",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": true
+      }
     }
   ]
 }

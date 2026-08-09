@@ -348,13 +348,17 @@ The control plane for running an organization beyond individual missions: purpos
 
 The `work_shape` field classifying a work item's operating mode: `solution_project`, `service_operation`, `routine_operation`, `incident_response`, `governance_cadence`, or `improvement_experiment`. It distinguishes running the organization from building solutions.
 
+### Execution Shape
+
+The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs; `work_shape` describes the operating mode of a `WorkItem`, so the two fields are not interchangeable.
+
 ### WorkItem
 
 The canonical unit of executable work shared by all views and surfaces (`libs/core/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
 
 ### WorkItem Context
 
-The typed identity chain on a work item: `organization_id → tenant_slug → mission_id → project_id → task_id`, plus `work_shape`. Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+The typed identity chain on a work item: `organization_id → tenant_slug → mission_id → project_id → task_id`, plus `work_shape`. This is field-listing order, not a containment claim; the canonical containment hierarchy is defined in [entity-scope-hierarchy](knowledge/product/architecture/entity-scope-hierarchy.md). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
 
 ### Work Visibility Scope
 

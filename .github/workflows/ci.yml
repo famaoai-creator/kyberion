@@ -60,6 +60,16 @@ jobs:
       - name: Check contract schemas
         run: pnpm run check:contract-schemas
 
+      # MG-02: every mandatory mission-gate trigger declared by policy must
+      # remain reachable from the work-scope decision implementation.
+      - name: Check work-scope policy emitters
+        run: pnpm run check:work-scope-policy
+
+      # MG-10: keep operator-facing guidance on the canonical two-dimensional
+      # mission gate and prevent retired Rule 7 wording from returning.
+      - name: Check mission-gate documentation
+        run: pnpm run check:mission-gate-docs
+
       # Knowledge snapshots drift when governed data changes without
       # regeneration (2026-07-08: agent-profile-index / service-endpoints /
       # capabilities guide all drifted). check:catalogs includes the

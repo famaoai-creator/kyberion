@@ -4,14 +4,16 @@
 
 Kyberion の権限モデルは **ExecutionMode** を中心に再設計されました。プロセスがどの領域で動いているかを `system / mission / sovereign` の 3 モードで明文化し、モードごとに書き込み可能なパスを厳格に分離します。
 
+この `ExecutionMode` は書き込み権限の境界を定義し、作業を mission 化するかどうかは定義しません。実行形状の選択は [`work-scope-policy.json`](./work-scope-policy.json) のミッションゲートに従い、`system` / `sovereign` の権限を持つ作業でも、作業自体が mission-shaped ならそのゲートを通過します。両者に個人タスクという新しい概念は導入しません。
+
 ### 命名の注意
 
-| 用語 | 定義 | 値の数 | 場所 |
-|---|---|---|---|
-| **Persona** | 実行コンテキスト ID | 6 種 | `libs/core/types.ts` |
-| **Perspective** | AI 思考スタイル | 27 種 | `knowledge/product/personalities/matrix.md` |
-| **Authority** | 物理操作の特権 | 6 種 | `libs/core/types.ts` |
-| **docAuthority** | ドキュメント信頼レベル | 5 段階 | knowledge frontmatter |
+| 用語             | 定義                   | 値の数 | 場所                                        |
+| ---------------- | ---------------------- | ------ | ------------------------------------------- |
+| **Persona**      | 実行コンテキスト ID    | 6 種   | `libs/core/types.ts`                        |
+| **Perspective**  | AI 思考スタイル        | 27 種  | `knowledge/product/personalities/matrix.md` |
+| **Authority**    | 物理操作の特権         | 6 種   | `libs/core/types.ts`                        |
+| **docAuthority** | ドキュメント信頼レベル | 5 段階 | knowledge frontmatter                       |
 
 以前は "Persona" が実行 ID と思考スタイルの両方に使われていました。v3.0 からは思考スタイルを **Perspective** と呼びます。
 
@@ -28,22 +30,25 @@ persona === 'ecosystem_architect' → executionMode = 'system'
 ```
 
 ### SYSTEM モード (`ecosystem_architect`)
+
 Kyberion 自体のメンテナンス。
 
-| | 対象パス |
-|---|---|
-| 書き込み可 | `knowledge/product/`, `libs/`, `scripts/`, `pipelines/`, `schemas/`, `presence/`, `satellites/`, `plugins/`, root ドキュメント群, `active/audit/`, `active/shared/logs/` |
-| 書き込み不可 | `knowledge/personal/`, `knowledge/confidential/`, `active/missions/`, `active/projects/`, `customer/` |
+|              | 対象パス                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 書き込み可   | `knowledge/product/`, `libs/`, `scripts/`, `pipelines/`, `schemas/`, `presence/`, `satellites/`, `plugins/`, root ドキュメント群, `active/audit/`, `active/shared/logs/` |
+| 書き込み不可 | `knowledge/personal/`, `knowledge/confidential/`, `active/missions/`, `active/projects/`, `customer/`                                                                    |
 
 ### MISSION モード (`worker`, `analyst`, `mission_owner`)
+
 ミッション・タスクの実行。
 
-| | 対象パス |
-|---|---|
-| 書き込み可 | `active/missions/${MISSION_ID}/`, `active/projects/`, `customer/`, `knowledge/product/evolution/`（蒸留のみ）, `active/audit/`, `active/shared/logs/` |
-| 書き込み不可 | `knowledge/product/`（evolution 以外）, `libs/`, `scripts/`, `knowledge/personal/`, `knowledge/confidential/` |
+|              | 対象パス                                                                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 書き込み可   | `active/missions/${MISSION_ID}/`, `active/projects/`, `customer/`, `knowledge/product/evolution/`（蒸留のみ）, `active/audit/`, `active/shared/logs/` |
+| 書き込み不可 | `knowledge/product/`（evolution 以外）, `libs/`, `scripts/`, `knowledge/personal/`, `knowledge/confidential/`                                         |
 
 ### SOVEREIGN モード (`sovereign`)
+
 緊急・全権。すべての操作が audit に記録されます。
 
 ---
@@ -51,7 +56,9 @@ Kyberion 自体のメンテナンス。
 ## 3. 構成要素
 
 ### A. Persona (実行 ID)
+
 `KYBERION_PERSONA` 環境変数または `resolveIdentityContext()` で解決されます。
+
 - **sovereign**: 全境界を超越。すべてが audit 記録対象。
 - **ecosystem_architect**: SYSTEM モード。Kyberion コアの維持管理専用。
 - **mission_owner**: MISSION モード上位。ミッション全体を統制。
@@ -60,6 +67,7 @@ Kyberion 自体のメンテナンス。
 - **unknown**: 未解決。ほとんどの書き込みが拒否される。
 
 ### B. Authority Role (機能ロール)
+
 `MISSION_ROLE` として注入され、`security-policy.json` の `authority_role_permissions` と対応します。
 
 28 の知識ロールと Authority Role の対応は `knowledge/product/governance/role-authority-map.json` を参照してください。
@@ -71,7 +79,9 @@ Kyberion 自体のメンテナンス。
 Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
 
 ### C. Authority (特権)
+
 特定の物理操作に対して与えられる、時間制限付きの「鍵」です。
+
 - **SUDO**: セキュリティガードを完全にバイパスする全能特権。
 - **GIT_WRITE**: リポジトリの変更・ブランチ操作。
 - **SECRET_READ**: 秘匿情報の取得（スコープ制限あり）。
@@ -81,12 +91,12 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 
 ### D. Tier (知識階層)
 
-| Tier | パス | 書き込み可能な Persona |
-|---|---|---|
-| **product** | `knowledge/product/` | `sovereign`, `ecosystem_architect` |
+| Tier             | パス                      | 書き込み可能な Persona                  |
+| ---------------- | ------------------------- | --------------------------------------- |
+| **product**      | `knowledge/product/`      | `sovereign`, `ecosystem_architect`      |
 | **confidential** | `knowledge/confidential/` | `sovereign`（ecosystem_architect 不可） |
-| **personal** | `knowledge/personal/` | `sovereign` のみ |
-| **public** | `knowledge/public/` | `sovereign`, `ecosystem_architect` |
+| **personal**     | `knowledge/personal/`     | `sovereign` のみ                        |
+| **public**       | `knowledge/public/`       | `sovereign`, `ecosystem_architect`      |
 
 > v3.0 変更点: `confidential` から `ecosystem_architect` の write を削除（SYSTEM モードは confidential に書かない）。
 
@@ -95,6 +105,7 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 ## 4. 評価順序
 
 権限判定は次の順で行われます。
+
 1. `default_allow`（`active/audit/`, `active/shared/logs/` を含む）
 2. `Authority` による明示的な許可
 3. `Authority Role` による実行スコープ許可
@@ -107,12 +118,16 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 ## 5. ガバナンス・プロトコル
 
 ### Temporal Grant (時間制限付き付与)
+
 Authority は原則としてミッションに紐づけて発行されます。Authority Role は長寿命の責務、Authority は短寿命の鍵です。
+
 - `mission_controller grant <MISSION_ID> <SERVICE_ID>` により、必要なときだけ権限を委譲します。
 - 付与された権限は `active/shared/auth-grants.json` に記録され、期限が切れると自動的に無効化されます。
 
 ### Sovereign Sudo (主権者による委譲)
+
 緊急時や初期設定時、主権者は明示的に `SUDO` モードを起動できます。
+
 - `mission_controller sudo <MISSION_ID> ON`
 - この操作は system-ledger に永久に記録され、監査の対象となります。
 
@@ -133,4 +148,4 @@ Persona が `unknown` のままだとほとんどの書き込みが拒否され�
 
 ---
 
-*Status: v3.0 — ExecutionMode / 4-tier / 28-role mapping (2026-06-02)*
+_Status: v3.0 — ExecutionMode / 4-tier / 28-role mapping (2026-06-02)_

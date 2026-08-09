@@ -371,7 +371,7 @@ Kyberion の実務では、`project` / `track` / `mission` / `task` / `direct_re
 
 運用原則:
 
-- 迷ったら `direct_reply` に寄せず、**継続性・再実行・監査が必要なら mission に上げる**。
+- `mission` への昇格は、[`work-scope-policy.json`](../knowledge/product/governance/work-scope-policy.json) の必須トリガー1つ、または蓄積トリガー2つで決まる。該当しない場合は `direct_reply` を含む最低限の execution shape を選ぶ。
 - `track` は「どの変更レーンか」を表し、`mission` は「そのレーンで今の実行を完遂する単位」。
 - `task` は mission から切り出された最小作業単位であり、`deliverable` と `assigned_to` が明示されるべき。
 - `direct_reply` はその場で返せば十分なものに限定し、長期 state を抱えない。

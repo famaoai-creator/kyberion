@@ -12,6 +12,7 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
+import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -1270,6 +1271,7 @@ function buildFallbackWorkLoop(
     trackName: input.trackName,
     locale: input.locale,
     serviceBindings: input.serviceBindings,
+    ...resolveWorkScopeSignalOptions(input.runtimeContext),
     requiresApproval: contract.approval.requires_approval,
   });
 }
