@@ -14,10 +14,12 @@
 
 ```
       スコープ階層(既存: 配置 + アクセス制御)     本計画が接続する2面
-  tenant ─ project ─ mission ─ task ─ session
+  tenant_slug ─ organization_id ─ project ─ mission ─ task ─ session
         │                                   ├─ AL: 保持(retention catalog + スコープ連動 GC)
         │                                   └─ NI: 識別(AgentIdentity の所属・ライフサイクル)
 ```
+
+包含順の正本は [`entity-scope-hierarchy.md`](../../../knowledge/product/architecture/entity-scope-hierarchy.md) である。
 
 ## 1. 診断(2026-07-26、実コード突合)
 

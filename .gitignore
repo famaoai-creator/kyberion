@@ -21,6 +21,15 @@ knowledge/confidential/
 
 # Individual/Personal Knowledge (Non-Git)
 knowledge/personal/
+# Tracked, intentionally public operator fixtures. Keep the broad personal
+# boundary while making these exceptions explicit for EG-12.
+!knowledge/personal/
+knowledge/personal/*
+!knowledge/personal/README.md
+!knowledge/personal/voice/
+knowledge/personal/voice/*
+!knowledge/personal/voice/config.json
+!knowledge/personal/voice/profile-registry.json
 
 # Per-user experimental / confidential project scaffolds
 projects/
@@ -40,7 +49,6 @@ projects/
 # Runtime artifacts
 cache/
 outputs/
-active/
 /archive/
 work/
 temp_ppt/
@@ -73,8 +81,18 @@ satellites/*/tsconfig.tsbuildinfo
 !libs/core/types/pptx-protocol.js
 
 # Plugin runtime data
-*.jsonl
+# Runtime JSONL is ignored by declared runtime scopes, not by a repository-wide
+# pattern that can silently hide tracked audit/execution ledgers.
+/active/shared/logs/**/*.jsonl
+/active/shared/runtime/**/*.jsonl
+/active/missions/**/*.jsonl
+/active/projects/**/*.jsonl
 vault/
+!vault/
+vault/*
+!vault/mounts/
+vault/mounts/*
+!vault/mounts/.gitkeep
 last_session_diff.patch
 
 # Local coverage output
@@ -90,9 +108,6 @@ libs/actuators/media-generation-actuator/src/*.js
 libs/actuators/media-generation-actuator/src/*.js.map
 libs/actuators/media-generation-actuator/src/*.d.ts
 libs/actuators/media-generation-actuator/src/*.d.ts.map
-
-# Local distillation scratch output
-knowledge/evolution/distill_*.md
 
 # Repo-local generated notes that should not be committed
 vision/famaocloud.md

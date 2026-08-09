@@ -98,17 +98,21 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.reason).toMatch(/tenant\.scope_violation/);
   });
 
-  it('legacy active mission confidential paths are not tenant-scoped', () => {
+  it.each([
+    ['mission', 'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json'],
+    ['project', 'active/projects/confidential/other-tenant/PRJ-FOO/state.json'],
+  ])('denies and audits cross-tenant %s writes', async (_kind, relativePath) => {
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
-    const target = path.join(
-      ROOT,
-      'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json'
-    );
+    const target = path.join(ROOT, relativePath);
     const result = validateWritePermission(target);
-    if (!result.allowed) {
-      expect(result.reason).not.toMatch(/tenant\.scope_violation/);
-    }
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/tenant\.scope_violation/);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const { auditChain } = await import('./audit-chain.js');
+    expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'tenant.scope_violation', result: 'denied' })
+    );
   });
 
   it('SUDO bypasses tenant scope (cross-tenant tooling)', () => {
@@ -175,7 +179,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     );
   });
 
-  it('legacy non-slug confidential paths are not tenant-scoped', () => {
+  it('legacy non-slug confidential paths remain outside tenant scope until migrated', () => {
     // Existing single-tenant layouts use confidential/{MSN-...}/ which are not slugs.
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
