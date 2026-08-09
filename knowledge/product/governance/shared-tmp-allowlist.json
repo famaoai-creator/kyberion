@@ -184,6 +184,12 @@
       "note": "ephemeral git clone staging dir; removed after plugin-pack import"
     },
     {
+      "file": "libs/core/procedure-dispatcher.ts",
+      "count": 3,
+      "classification": "migrate-candidate",
+      "note": "desktop procedure screenshot raw and redacted outputs; session-scoped artifacts"
+    },
+    {
       "file": "libs/core/programmatic-tool-calling.ts",
       "count": 1,
       "classification": "legit-tmp",
@@ -200,6 +206,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "temp capture file"
+    },
+    {
+      "file": "libs/core/screen-frame-redaction.ts",
+      "count": 1,
+      "classification": "migrate-candidate",
+      "note": "screen-frame OCR/redaction intermediate; frame-scoped artifact"
     },
     {
       "file": "libs/core/src/native-pdf-engine/parser.ts",
