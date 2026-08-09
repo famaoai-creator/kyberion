@@ -1,6 +1,10 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import {
+  toPersistedOAuthCallbackResult,
+  type OAuthCallbackResult,
+} from './oauth-callback-result.js';
+import {
   completeOAuthCallback,
   logger,
   pathResolver,
@@ -91,13 +95,14 @@ app.get(CALLBACK_PATH, async (req, res) => {
 
     const result = await completeOAuthCallback({ serviceId, code, state, error, errorDescription });
     ensureRuntimeDir();
+    const persistedResult = toPersistedOAuthCallbackResult(result as OAuthCallbackResult);
     safeWriteFile(
       LATEST_RESULT_PATH,
       JSON.stringify(
         {
           ts: new Date().toISOString(),
           callback_path: CALLBACK_PATH,
-          ...result,
+          ...persistedResult,
         },
         null,
         2

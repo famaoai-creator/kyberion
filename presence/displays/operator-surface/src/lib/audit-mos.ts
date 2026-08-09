@@ -29,7 +29,8 @@ export interface MosReadEvent {
     | 'intent_snapshots'
     | 'surface_directory'
     | 'deliverable_inbox'
-    | 'reasoning_routes';
+    | 'reasoning_routes'
+    | 'os_control_plane';
   resource_id?: string;
   result_count?: number;
 }

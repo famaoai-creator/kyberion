@@ -163,6 +163,59 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   };
 }
 
+export interface PresenceStudioViewerContext {
+  principalId: string;
+  tenantSlugs: string[] | 'all';
+  source: 'loopback' | 'token';
+}
+
+export class PresenceStudioViewerError extends Error {
+  constructor(
+    public readonly status: 401 | 403,
+    message: string
+  ) {
+    super(message);
+    this.name = 'PresenceStudioViewerError';
+  }
+}
+
+/**
+ * Resolve OS-surface authority server-side. The client can narrow the mission
+ * filter, but it cannot choose the principal or tenant set. Loopback is the
+ * single-operator local-admin boundary; remote access requires the configured
+ * bearer token and an active server tenant.
+ */
+export function resolvePresenceStudioViewerContext(
+  req: Pick<Request, 'headers' | 'socket'>
+): PresenceStudioViewerContext {
+  const auth = authorizePresenceStudioRequest(req);
+  if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
+
+  const tenant = String(process.env.KYBERION_TENANT || '').trim();
+  if (isLoopbackAddress(getPresenceStudioClientAddress(req))) {
+    return {
+      principalId: 'human:presence-studio-localadmin',
+      tenantSlugs: tenant ? [tenant] : 'all',
+      source: 'loopback',
+    };
+  }
+
+  if (auth.reason !== 'token') {
+    throw new PresenceStudioViewerError(401, 'OS surface remote access requires a bearer token.');
+  }
+  if (!tenant) {
+    throw new PresenceStudioViewerError(
+      403,
+      'OS surface remote access requires server-side KYBERION_TENANT scope.'
+    );
+  }
+  return {
+    principalId: 'human:presence-studio-token',
+    tenantSlugs: [tenant],
+    source: 'token',
+  };
+}
+
 export function requirePresenceStudioAccess(): RequestHandler {
   return (req, res, next) => {
     const auth = authorizePresenceStudioRequest(req);

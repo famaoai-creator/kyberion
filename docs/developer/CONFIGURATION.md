@@ -10,7 +10,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (34)
+## secret (35)
 
 | Variable                                  | Type   | Required | Description                                                                                                                                                            |
 | ----------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,12 +44,13 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_RUNWAY_API_KEY`                 | string | no       | API key used by the explicit Runway video-generation backends.                                                                                                         |
 | `KYBERION_SECRET_RESOLVER_COMMAND`        | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_SECRET_RESOLVER_TIMEOUT_MS`     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SHARE_GRANTS_HMAC_KEY`          | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_SOVEREIGN_SECRET`               | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_SUDO_KEY`                       | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                       | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (81)
+## path (82)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -113,6 +114,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SERVICE_PRESETS_DIR`                                   | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_RUNTIME_POLICY_PATH`                           | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SHARE_GRANTS_PATH`                                     | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_STT_MODEL_DIR`                                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
@@ -194,7 +196,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_                                                                                              |
 | `KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS`    | number | no       | Maximum milliseconds a mission work item waits for one provider response before recording a blocked result. |
 
-## provider (73)
+## provider (74)
 
 | Variable                                  | Type                                         | Required | Description                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -256,6 +258,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_OPENROUTER_REQUIRED_PARAMETERS` | string                                       | no       | Comma-separated OpenRouter supported parameters required by the selected model.                                                                                                                                                                                                                                                 |
 | `KYBERION_OPENROUTER_URL`                 | string                                       | no       | Optional OpenRouter-compatible API base URL; defaults to https://openrouter.ai/api/v1.                                                                                                                                                                                                                                          |
 | `KYBERION_OPS_ALERT_WEBHOOK_URL`          | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_OS_GUARDED_SURFACE_URL`         | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_PEER_HOST`                      | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_REASONING_BACKEND`              | string                                       | no       | Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, agy-cli (Antigravity CLI), openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests). gemini-cli remains available for explicit Enterprise configurations. |
 | `KYBERION_REASONING_MODEL`                | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
@@ -272,7 +275,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (152)
+## runtime (156)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -307,6 +310,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CODEX_CLI_EXTRA_ARGS`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CODEX_INSTANCES`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CODEX_MODE`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_COMPUTER_SURFACE_PRINCIPAL`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CURATION_SCAN_ROOTS`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CURATION_TENANT_ROOTDIR`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CUSTOMER`                            | string | no       | Active customer profile slug used to resolve the profile root.                                          |
@@ -324,6 +328,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_EGRESS_POLICY`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EMAIL_FROM`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ENV_REGISTRY_STRICT`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_FIRST_WIN_LIVE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FORMAT`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GATE_OVERRIDE_SIGNATURE`             | string | no       | _undocumented_                                                                                          |
@@ -354,6 +359,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_MFLUX_STEPS`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MOBILE_TOOLCHAIN`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MODE`                                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MOS_PRINCIPAL`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MYSTERY`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_NHI_ACTOR`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_NHI_ID`                              | string | no       | _undocumented_                                                                                          |
@@ -418,6 +424,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VAD`                                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIDEO_RENDER_RUN_MODE`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIEWER_SCOPE`                        | string | no       | Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.                        |
+| `KYBERION_VITEST_NETWORK_ALLOWLIST`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_LANGUAGE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_PLAY_BLACKHOLE`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_PROFILE_ID`                    | string | no       | _undocumented_                                                                                          |

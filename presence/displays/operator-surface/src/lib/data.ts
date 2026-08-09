@@ -19,7 +19,11 @@ import {
   pathResolver,
   loadCapabilityBundleRegistry,
   scanProviderCapabilities,
+  CloudflareOsControlPlane,
+  CloudflareOsReadOnlySurface,
   type CapabilityBundleEntry,
+  type CloudflareOsSurfaceAccess,
+  type CloudflareOsSurfaceSnapshot,
   getSurfaceDirectory,
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
@@ -42,6 +46,8 @@ export type {
   SurfaceDirectorySummary,
   SurfaceScenarioGuide,
   SurfaceLauncherRecommendation,
+  CloudflareOsSurfaceAccess,
+  CloudflareOsSurfaceSnapshot,
 };
 
 const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
@@ -50,6 +56,46 @@ export function getTenantScope(): string | undefined {
   const slug = (process.env.KYBERION_TENANT || '').trim();
   if (!slug) return undefined;
   return TENANT_SLUG_RE.test(slug) ? slug : undefined;
+}
+
+/**
+ * Build the MOS OS projection scope without accepting tenant input from the
+ * browser. An explicitly configured tenant sees its own confidential data;
+ * an unscoped MOS is limited to public observations and cannot see held
+ * actions belonging to an unknown tenant.
+ */
+export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
+  const tenant = getTenantScope();
+  const configuredPrincipal = (process.env.KYBERION_MOS_PRINCIPAL || '').trim();
+  if (tenant && !configuredPrincipal) {
+    throw new Error(
+      '[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL is required for tenant-scoped OS projection'
+    );
+  }
+  if (configuredPrincipal && !configuredPrincipal.startsWith('human:')) {
+    throw new Error('[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL must identify a human viewer');
+  }
+  return {
+    principalId: configuredPrincipal || 'human:operator-surface-local',
+    tenantSlugs: tenant ? [tenant] : [],
+  };
+}
+
+export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurfaceSnapshot {
+  return new CloudflareOsReadOnlySurface(
+    new CloudflareOsControlPlane({ auditRestoreFailures: false })
+  ).snapshot(missionId, getOsSurfaceAccess());
+}
+
+export function getGuardedSurfaceUrl(): string | undefined {
+  const configured = (process.env.KYBERION_OS_GUARDED_SURFACE_URL || '').trim();
+  if (!configured) return undefined;
+  try {
+    const url = new URL(configured);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface MissionRow {

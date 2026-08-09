@@ -126,4 +126,19 @@ describe('MOS no-write-API contract', () => {
     expect(text).not.toContain('safeMkdir');
     expect(text).not.toContain('safeAppendFileSync');
   });
+
+  it('the OS projection uses the read-only restore mode', () => {
+    const dataLayer = path.join(SRC, 'lib/data.ts');
+    const text = safeReadFile(dataLayer, { encoding: 'utf8' }) as string;
+    expect(text).toContain('auditRestoreFailures: false');
+  });
+
+  it('keeps the OS panel read-only and exposes recovery guidance only as a link', () => {
+    const panel = path.join(SRC, 'components/OsControlPlanePanel.tsx');
+    const text = safeReadFile(panel, { encoding: 'utf8' }) as string;
+    expect(text).toContain('Human action required.');
+    expect(text).toContain('observed {item.observedAt}');
+    expect(text).not.toContain('fetch(');
+    expect(text).not.toContain('method:');
+  });
 });

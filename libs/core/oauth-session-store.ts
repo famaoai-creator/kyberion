@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
+  safeCreateExclusiveFileSync,
   safeFsyncFile,
   safeMkdir,
   safeReadFile,
@@ -21,16 +22,47 @@ export interface PendingOAuthSession {
   redirectUri?: string;
   scopes: string[];
   createdAt: string;
+  expiresAt?: string;
+  callbackStartedAt?: string;
+  callbackExpiresAt?: string;
 }
 
 export const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
+export const OAUTH_INITIATION_TTL_MS = 10 * 60 * 1000;
+export const OAUTH_CALLBACK_TTL_MS = 2 * 60 * 1000;
+const OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{8,256}$/;
+
+export function isSafeOAuthState(state: string): boolean {
+  return OAUTH_STATE_PATTERN.test(state);
+}
+
+export function assertSafeOAuthState(state: string): void {
+  if (!isSafeOAuthState(state)) {
+    throw new Error('OAuth state must be a safe token');
+  }
+}
+
+function statesEqual(left: string, right: string): boolean {
+  if (!isSafeOAuthState(left) || !isSafeOAuthState(right)) return false;
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
 
 export function serviceSessionDir(serviceId: string): string {
   return path.join(OAUTH_SESSION_ROOT, serviceId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-'));
 }
 
 export function serviceSessionPath(serviceId: string, state: string): string {
+  assertSafeOAuthState(state);
   return path.join(serviceSessionDir(serviceId), `${state}.json`);
+}
+
+export function serviceSessionLockPath(serviceId: string, state: string): string {
+  assertSafeOAuthState(state);
+  return path.join(serviceSessionDir(serviceId), `.${state}.callback.lock`);
 }
 
 export function randomUrlSafe(length = 48): string {
@@ -66,7 +98,18 @@ export function loadPendingOAuthSession(
     const filePath = serviceSessionPath(serviceId, state);
     if (!safeExistsSync(filePath)) return null;
     try {
-      return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      const session = JSON.parse(
+        safeReadFile(filePath, { encoding: 'utf8' }) as string
+      ) as PendingOAuthSession;
+      if (session.serviceId !== serviceId || !statesEqual(session.state, state)) {
+        clearPendingOAuthSession(serviceId, state);
+        return null;
+      }
+      if (isOAuthSessionExpired(session)) {
+        clearPendingOAuthSession(serviceId, session.state);
+        return null;
+      }
+      return session;
     } catch (_) {
       return null;
     }
@@ -78,7 +121,14 @@ export function loadPendingOAuthSession(
       .sort()
       .reverse();
     if (files.length === 0) return null;
-    return JSON.parse(safeReadFile(path.join(dir, files[0]), { encoding: 'utf8' }) as string);
+    const session = JSON.parse(
+      safeReadFile(path.join(dir, files[0]), { encoding: 'utf8' }) as string
+    ) as PendingOAuthSession;
+    if (isOAuthSessionExpired(session)) {
+      clearPendingOAuthSession(serviceId, session.state);
+      return null;
+    }
+    return session;
   } catch (_) {
     return null;
   }
@@ -104,6 +154,13 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
           const session = JSON.parse(
             safeReadFile(path.join(fullDir, fileName), { encoding: 'utf8' }) as string
           ) as PendingOAuthSession;
+          if (!isSafeOAuthState(session.state)) {
+            continue;
+          }
+          if (isOAuthSessionExpired(session)) {
+            clearPendingOAuthSession(session.serviceId, session.state);
+            continue;
+          }
           sessions.push(session);
         } catch (err) {
           logger.warn(`suppressed error in listPendingOAuthSessions: ${err}`);
@@ -127,5 +184,83 @@ export function normalizeScopes(scopes?: string[] | string): string[] {
 
 export function findPendingOAuthSessionByState(state: string): PendingOAuthSession | null {
   if (!state) return null;
-  return listPendingOAuthSessions().find((session) => session.state === state) || null;
+  assertSafeOAuthState(state);
+  const candidate = Buffer.from(state);
+  return (
+    listPendingOAuthSessions().find((session) => {
+      const actual = Buffer.from(session.state);
+      return actual.length === candidate.length && crypto.timingSafeEqual(actual, candidate);
+    }) || null
+  );
+}
+
+export function isOAuthSessionExpired(
+  session: Pick<PendingOAuthSession, 'expiresAt' | 'callbackExpiresAt'>,
+  now = Date.now()
+): boolean {
+  // Sessions created before expiry metadata was introduced are not safe to
+  // resume: discard them rather than turning a migration gap into an
+  // indefinite OAuth grant.
+  if (!session.expiresAt) return true;
+  const expiresAt = Date.parse(session.expiresAt);
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) return true;
+  if (!session.callbackExpiresAt) return false;
+  const callbackExpiresAt = Date.parse(session.callbackExpiresAt);
+  return !Number.isFinite(callbackExpiresAt) || callbackExpiresAt <= now;
+}
+
+export function acquirePendingOAuthCallback(
+  serviceId: string,
+  state: string,
+  now = Date.now()
+): { session: PendingOAuthSession; release: () => void } | null {
+  const lockPath = serviceSessionLockPath(serviceId, state);
+  let lockCreated = false;
+  try {
+    safeCreateExclusiveFileSync(lockPath, `${process.pid}:${now}\n`);
+    lockCreated = true;
+  } catch (error) {
+    if (!safeExistsSync(lockPath)) throw error;
+    try {
+      const lockContents = String(safeReadFile(lockPath, { encoding: 'utf8' }));
+      const lockCreatedAt = Number(lockContents.trim().split(':').at(-1));
+      if (!Number.isFinite(lockCreatedAt) || now - lockCreatedAt <= OAUTH_CALLBACK_TTL_MS) {
+        return null;
+      }
+      safeUnlinkSync(lockPath);
+      safeCreateExclusiveFileSync(lockPath, `${process.pid}:${now}\n`);
+      lockCreated = true;
+    } catch {
+      return null;
+    }
+  }
+
+  if (!lockCreated) return null;
+
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (safeExistsSync(lockPath)) safeUnlinkSync(lockPath);
+  };
+
+  const session = loadPendingOAuthSession(serviceId, state);
+  if (!session) {
+    release();
+    return null;
+  }
+
+  const startedAt = new Date(now).toISOString();
+  const updated: PendingOAuthSession = {
+    ...session,
+    callbackStartedAt: startedAt,
+    callbackExpiresAt: new Date(now + OAUTH_CALLBACK_TTL_MS).toISOString(),
+  };
+  try {
+    savePendingOAuthSession(updated);
+    return { session: updated, release };
+  } catch (error) {
+    release();
+    throw error;
+  }
 }

@@ -39,13 +39,41 @@
     {
       "capability_id": "mos.tenant-binding",
       "kind": "env-var",
-      "description": "When KYBERION_TENANT is set, MOS picks up the per-tenant view; for single-tenant deployments this is optional.",
+      "description": "When KYBERION_TENANT is set, MOS picks up the per-tenant view; tenant-scoped OS projection additionally requires KYBERION_MOS_PRINCIPAL.",
       "required_for": ["mos"],
       "optional": true,
       "probe": { "kind": "env", "name": "KYBERION_TENANT", "require_non_empty": true },
       "install": {
         "operator_confirmed": false,
         "instruction": "Set `KYBERION_TENANT=<tenant-slug>` to bind MOS to a tenant. Leave unset for single-tenant deployments."
+      }
+    },
+    {
+      "capability_id": "mos.os-principal",
+      "kind": "env-var",
+      "description": "Trusted human principal used by the tenant-scoped read-only OS projection.",
+      "required_for": ["mos"],
+      "optional": true,
+      "probe": { "kind": "env", "name": "KYBERION_MOS_PRINCIPAL", "require_non_empty": true },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_MOS_PRINCIPAL=human:<operator>` whenever KYBERION_TENANT is set; the OS projection fails closed without it."
+      }
+    },
+    {
+      "capability_id": "mos.os-guarded-surface-url",
+      "kind": "env-var",
+      "description": "Optional HTTP(S) URL for the guarded surface where held actions can be decided or applied.",
+      "required_for": ["mos"],
+      "optional": true,
+      "probe": {
+        "kind": "env",
+        "name": "KYBERION_OS_GUARDED_SURFACE_URL",
+        "require_non_empty": true
+      },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_OS_GUARDED_SURFACE_URL=https://...` to show a human intervention link when held actions exist."
       }
     }
   ]

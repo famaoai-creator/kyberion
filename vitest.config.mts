@@ -72,6 +72,7 @@ export default defineConfig({
     // combined-run flakes (writes landing in another suite's tmp root).
     pool: 'forks',
     maxWorkers: 4,
+    setupFiles: ['./tests/vitest-network-guard.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],

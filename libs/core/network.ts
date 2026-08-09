@@ -3,7 +3,11 @@ import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
-import { evaluateEgressPolicy, type EgressPayloadContext } from './egress-policy.js';
+import {
+  evaluateEgressPolicy,
+  resolveEgressPayloadContext,
+  type EgressPayloadContext,
+} from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
@@ -121,7 +125,8 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   });
 
   // 1. Verify Endpoint Integrity for all requests.
-  const egressDecision = evaluateEgressPolicy(url, kyberion_egress_context);
+  const egressContext = resolveEgressPayloadContext(kyberion_egress_context);
+  const egressDecision = evaluateEgressPolicy(url, egressContext);
   if (egressDecision.verdict === 'deny') {
     recordGovernanceAction(
       process.env.KYBERION_PERSONA || 'unknown',
@@ -141,8 +146,8 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
         allowed: false,
         // SA-04 acceptance 4: every outbound attempt is auditable with its tier.
         tier: egressDecision.tier ?? 'unspecified',
-        tenant: kyberion_egress_context?.tenant_slug ?? null,
-        purpose: kyberion_egress_context?.purpose ?? null,
+        tenant: egressContext?.tenant_slug ?? null,
+        purpose: egressContext?.purpose ?? null,
       },
     });
     if (egressDecision.tier === 'confidential' || egressDecision.tier === 'personal') {
