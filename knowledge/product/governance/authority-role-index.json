@@ -110,6 +110,7 @@
       "write_scopes": [
         "active/missions/",
         "active/archive/missions/",
+        "active/archive/failed_missions/",
         "knowledge/personal/missions/",
         "knowledge/personal/governance/",
         "knowledge/evolution/",
