@@ -25,13 +25,19 @@
           "supported_modes": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "enum": ["trial", "approved_install", "installed", "pinned"] }
+            "items": {
+              "type": "string",
+              "enum": ["trial", "approved_install", "installed", "pinned"]
+            }
           },
           "trial_backend": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "kind": {
+                "type": "string",
+                "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "winget", "system"]
+              },
               "command": { "type": "string", "minLength": 1 },
               "args": {
                 "type": "array",
@@ -45,7 +51,10 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "kind": {
+                "type": "string",
+                "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "winget", "system"]
+              },
               "command": { "type": "string", "minLength": 1 },
               "args": {
                 "type": "array",
@@ -55,11 +64,24 @@
             },
             "required": ["kind", "command", "args"]
           },
+          "install_backend_platform_overrides": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "any": { "$ref": "#/$defs/backend" },
+              "darwin": { "$ref": "#/$defs/backend" },
+              "linux": { "$ref": "#/$defs/backend" },
+              "win32": { "$ref": "#/$defs/backend" }
+            }
+          },
           "installed_backend": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "kind": {
+                "type": "string",
+                "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "winget", "system"]
+              },
               "command": { "type": "string", "minLength": 1 },
               "args": {
                 "type": "array",
@@ -73,9 +95,33 @@
           "managed_env_subpath": { "type": "string", "minLength": 1 },
           "notes": { "type": "string" }
         },
-        "required": ["tool_id", "display_name", "ecosystem", "status", "platforms", "supported_modes", "trial_backend"]
+        "required": [
+          "tool_id",
+          "display_name",
+          "ecosystem",
+          "status",
+          "platforms",
+          "supported_modes",
+          "trial_backend"
+        ]
       }
     }
   },
-  "required": ["version", "default_tool_id", "tools"]
+  "required": ["version", "default_tool_id", "tools"],
+  "$defs": {
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "winget", "system"]
+        },
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
+      },
+      "required": ["kind", "command", "args"]
+    }
+  }
 }

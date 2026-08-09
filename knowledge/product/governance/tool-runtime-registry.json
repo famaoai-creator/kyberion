@@ -105,6 +105,23 @@
         "args": ["install", "ffmpeg"],
         "description": "Install FFmpeg through Homebrew on macOS."
       },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "Gyan.FFmpeg",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install FFmpeg through WinGet on Windows."
+        }
+      },
       "installed_backend": {
         "kind": "system",
         "command": "ffmpeg",
@@ -133,6 +150,23 @@
         "args": ["install", "sox"],
         "description": "Install SoX through Homebrew on macOS."
       },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "ChrisBagwell.SoX",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install SoX through WinGet on Windows."
+        }
+      },
       "installed_backend": {
         "kind": "system",
         "command": "sox",
@@ -160,6 +194,23 @@
         "command": "brew",
         "args": ["install", "tesseract"],
         "description": "Install Tesseract through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "tesseract-ocr.tesseract",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install Tesseract through WinGet on Windows."
+        }
       },
       "installed_backend": {
         "kind": "system",
@@ -422,6 +473,23 @@
         "args": ["install", "ollama"],
         "description": "Install Ollama via Homebrew on macOS."
       },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "Ollama.Ollama",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install Ollama through WinGet on Windows."
+        }
+      },
       "installed_backend": {
         "kind": "system",
         "command": "ollama",
@@ -477,6 +545,23 @@
         "command": "brew",
         "args": ["install", "llama.cpp"],
         "description": "Install llama.cpp binaries via Homebrew."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "ggml.llamacpp",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install llama.cpp through WinGet on Windows."
+        }
       },
       "installed_backend": {
         "kind": "system",
