@@ -14,7 +14,7 @@
     "agent_id": "mg-coherence-independent-reviewer",
     "team_role": "reviewer",
     "specialist_roles": ["code-reviewer", "security"],
-    "independent_from": ["famao"],
+    "independent_from": ["famao", "famaо"],
     "independence_verified": true
   },
   "verdict": "approved",
