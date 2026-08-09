@@ -943,8 +943,10 @@ function resolvePolicyTargetPath(policy: MissionLifecyclePolicy, mission: string
  */
 function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   try {
+    const auditPath = pathResolver.sharedLogsAudit('mission-purge.jsonl');
+    safeMkdir(path.dirname(auditPath), { recursive: true });
     safeAppendFileSync(
-      pathResolver.sharedLogsAudit('mission-purge.jsonl'),
+      auditPath,
       `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
       { encoding: 'utf8' }
     );

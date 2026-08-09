@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as path from 'node:path';
-import { 
-  rootDir, 
-  missionDir, 
-  missionEvidenceDir, 
+import {
+  rootDir,
+  missionDir,
+  missionEvidenceDir,
   findMissionPath,
   ledger,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  safeRmSync
+  safeRmSync,
 } from '@agent/core';
 import { detectTier } from '@agent/core/governance';
 
@@ -30,10 +30,14 @@ describe('Tiered Mission Architecture', () => {
 
   it('should resolve tiered mission directories correctly', () => {
     const personalDir = missionDir(TEST_MISSION_ID, 'personal');
-    expect(personalDir).toBe(path.join(PROJECT_ROOT, 'knowledge/personal/missions', TEST_MISSION_ID));
+    expect(personalDir).toBe(
+      path.join(PROJECT_ROOT, 'knowledge/personal/missions', TEST_MISSION_ID)
+    );
 
     const confidentialDir = missionDir(TEST_MISSION_ID, 'confidential');
-    expect(confidentialDir).toBe(path.join(PROJECT_ROOT, 'active/missions/confidential', TEST_MISSION_ID));
+    expect(confidentialDir).toBe(
+      path.join(PROJECT_ROOT, 'active/missions/confidential', TEST_MISSION_ID)
+    );
 
     const publicDir = missionDir(TEST_MISSION_ID, 'public');
     expect(publicDir).toBe(path.join(PROJECT_ROOT, 'active/missions/public', TEST_MISSION_ID));
@@ -41,12 +45,16 @@ describe('Tiered Mission Architecture', () => {
 
   it('should find mission path across all tiers', () => {
     // Manually create a mission dir in personal tier for testing findMissionPath
-    const personalMissionPath = path.join(PROJECT_ROOT, 'knowledge/personal/missions', TEST_MISSION_ID);
+    const personalMissionPath = path.join(
+      PROJECT_ROOT,
+      'knowledge/personal/missions',
+      TEST_MISSION_ID
+    );
     if (!safeExistsSync(personalMissionPath)) safeMkdir(personalMissionPath, { recursive: true });
-    
+
     const foundPath = findMissionPath(TEST_MISSION_ID);
     expect(foundPath).toBe(personalMissionPath);
-    
+
     // Cleanup
     safeRmSync(personalMissionPath, { recursive: true, force: true });
   });
@@ -57,11 +65,13 @@ describe('Tiered Mission Architecture', () => {
     const missionLedgerPath = path.join(missionPath, 'evidence/ledger.jsonl');
     const globalLedgerPath = path.join(PROJECT_ROOT, 'active/audit/system-ledger.jsonl');
 
+    safeMkdir(missionPath, { recursive: true });
+
     // Record a mission event
-    ledger.record('TEST_EVENT', { 
-      mission_id: missionId, 
+    ledger.record('TEST_EVENT', {
+      mission_id: missionId,
       role: 'Tester',
-      secret_data: 'DO_NOT_SHOW_IN_GLOBAL' 
+      secret_data: 'DO_NOT_SHOW_IN_GLOBAL',
     });
 
     // 1. Check Mission Ledger (Should have details)

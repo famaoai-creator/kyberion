@@ -367,6 +367,13 @@ export function tenantMissionDir(
   return dir;
 }
 
+function currentTenantSlug(): string | undefined {
+  const value = String(process.env.KYBERION_TENANT || '')
+    .trim()
+    .toLowerCase();
+  return /^[a-z][a-z0-9-]{1,30}$/.test(value) ? value : undefined;
+}
+
 /**
  * Searches for a mission directory across all available tiers.
  * Priority: personal -> confidential -> public
@@ -381,6 +388,11 @@ export function findMissionPath(missionId: string): string | null {
       for (const tier of tiers) {
         const subPath = config.directories?.[tier];
         if (subPath) {
+          const tenant = currentTenantSlug();
+          if (tenant) {
+            const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
+            if (rawExistsSync(scopedPath)) return scopedPath;
+          }
           const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
           if (rawExistsSync(fullPath)) return fullPath;
         }

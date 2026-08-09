@@ -1,12 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver } from '@agent/core';
+import { pathResolver, tenantMissionDir } from '@agent/core';
 import { grantVoiceConsent, revokeVoiceConsent } from './voice_consent.js';
 
 const ROOT = pathResolver.rootDir();
 const FIX_MISSION = 'MSN-VOICE-CONSENT-FIXTURE-001';
-const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', FIX_MISSION);
+const MISSION_DIR = tenantMissionDir(FIX_MISSION, 'alpha-team', 'confidential');
 
 describe('voice_consent CLI helpers', () => {
   let savedMission: string | undefined;
@@ -31,7 +31,7 @@ describe('voice_consent CLI helpers', () => {
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
         tenant_slug: 'alpha-team',
-      }),
+      })
     );
   });
 
@@ -51,14 +51,14 @@ describe('voice_consent CLI helpers', () => {
     const auditPath = path.join(
       ROOT,
       'active/shared/logs/audit',
-      `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+      `audit-${new Date().toISOString().slice(0, 10)}.jsonl`
     );
     const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
 
     grantVoiceConsent(FIX_MISSION, 'operator', 'meeting speak', 'test grant');
 
     const granted = JSON.parse(
-      fs.readFileSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'), 'utf8'),
+      fs.readFileSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'), 'utf8')
     );
     expect(granted.consent).toBe('granted');
     expect(granted.tenant_slug).toBe('alpha-team');
@@ -66,7 +66,7 @@ describe('voice_consent CLI helpers', () => {
 
     revokeVoiceConsent(FIX_MISSION, 'test revoke');
     const revoked = JSON.parse(
-      fs.readFileSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'), 'utf8'),
+      fs.readFileSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'), 'utf8')
     );
     expect(revoked.consent).toBe('revoked');
     expect(revoked.audit_event_id).toBeTruthy();
@@ -80,7 +80,14 @@ describe('voice_consent CLI helpers', () => {
 
   it('rejects invalid expiration timestamps before writing consent', () => {
     expect(() => {
-      grantVoiceConsent(FIX_MISSION, 'operator', 'meeting speak', 'test grant', false, 'not-a-date');
+      grantVoiceConsent(
+        FIX_MISSION,
+        'operator',
+        'meeting speak',
+        'test grant',
+        false,
+        'not-a-date'
+      );
     }).toThrow(/expires_at/);
     expect(fs.existsSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'))).toBe(false);
   });
