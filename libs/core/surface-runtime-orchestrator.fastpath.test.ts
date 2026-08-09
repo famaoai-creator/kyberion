@@ -276,6 +276,47 @@ describe('surface-runtime-orchestrator fast-path', () => {
     }
   });
 
+  it('promotes a pipeline route before executing the pipeline when mission scope is required', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'check-kyberion-baseline',
+      shape: 'pipeline',
+      routeFamily: 'pipeline',
+      pipelineId: 'baseline-check',
+    });
+    mocks.compileUserIntentFlow.mockResolvedValue({
+      intentContract: { resolution: { execution_shape: 'pipeline' } },
+      workLoop: {
+        work_scope_decision: {
+          execution_shape: 'mission',
+          minimum_catalog_shape: 'pipeline',
+          promotion_required: true,
+          mandatory_triggers: ['high_stakes_action'],
+          accumulation_triggers: [],
+          matched_rule_ids: ['mandatory-trigger-promotion'],
+          policy_version: '1.0.0',
+          rationale: 'A mandatory trigger requires mission scope.',
+        },
+      },
+    });
+
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'Kyberionのベースライン状態を確認して',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'node',
+      expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
+      expect.any(Object)
+    );
+    expect(mocks.safeExec.mock.calls).not.toEqual(
+      expect.arrayContaining([expect.arrayContaining(['dist/scripts/run_pipeline.js'])])
+    );
+  });
+
   it('executes mission action hint and emits execution-receipt', async () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'classify-mission',

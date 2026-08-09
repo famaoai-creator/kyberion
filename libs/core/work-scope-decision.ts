@@ -33,21 +33,6 @@ export interface WorkScopeDecisionInput {
   securitySensitiveCrossSystemChange?: boolean;
 }
 
-/**
- * Mandatory trigger ids that the decision layer can emit. Keep this list next
- * to the derivation logic so the governance checker can detect a policy id
- * that has no reachable implementation path.
- */
-export const DERIVABLE_MANDATORY_TRIGGER_IDS = [
-  'external_regulatory_evidence',
-  'high_stakes_action',
-  'mission_handoff',
-  'production_release',
-  'customer_signoff',
-  'security_sensitive_cross_system_change',
-  'high_stakes_or_dogfood_evidence',
-] as const;
-
 export interface WorkScopeSignalOptions {
   externalAudience?: boolean;
   expectedContinuationBeyondSession?: boolean;
@@ -159,24 +144,33 @@ function normalizeCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
+type MandatoryTriggerEmitter = (input: WorkScopeDecisionInput) => boolean;
+
+/**
+ * The checker must inspect the same emitters used by the decision layer.
+ * Keeping the policy ids and their predicates together prevents a second,
+ * stale list from claiming that a trigger is reachable.
+ */
+export const MANDATORY_TRIGGER_EMITTERS: Record<string, MandatoryTriggerEmitter> = {
+  external_regulatory_evidence: (input) =>
+    normalizeBoolean(input.externalAudience) || normalizeBoolean(input.regulatoryAudience),
+  high_stakes_action: (input) => normalizeBoolean(input.highStakesAction),
+  high_stakes_or_dogfood_evidence: (input) => normalizeBoolean(input.highStakesOrDogfoodEvidence),
+  customer_signoff: (input) => normalizeBoolean(input.customerSignoff),
+  production_release: (input) => normalizeBoolean(input.productionRelease),
+  mission_handoff: (input) => normalizeBoolean(input.missionHandoff),
+  security_sensitive_cross_system_change: (input) =>
+    normalizeBoolean(input.securitySensitiveCrossSystemChange) ||
+    (normalizeBoolean(input.crossSystemMutation) &&
+      normalizeBoolean(input.highStakesOrDogfoodEvidence)),
+};
+
+export const DERIVABLE_MANDATORY_TRIGGER_IDS = Object.keys(MANDATORY_TRIGGER_EMITTERS);
+
 function deriveMandatoryTriggers(input: WorkScopeDecisionInput, policy: WorkScopePolicy): string[] {
-  const triggers: string[] = [];
-  if (normalizeBoolean(input.externalAudience)) triggers.push('external_regulatory_evidence');
-  if (normalizeBoolean(input.regulatoryAudience)) triggers.push('external_regulatory_evidence');
-  if (normalizeBoolean(input.highStakesAction)) triggers.push('high_stakes_action');
-  if (normalizeBoolean(input.highStakesOrDogfoodEvidence))
-    triggers.push('high_stakes_or_dogfood_evidence');
-  if (normalizeBoolean(input.customerSignoff)) triggers.push('customer_signoff');
-  if (normalizeBoolean(input.productionRelease)) triggers.push('production_release');
-  if (normalizeBoolean(input.missionHandoff)) triggers.push('mission_handoff');
-  if (normalizeBoolean(input.securitySensitiveCrossSystemChange))
-    triggers.push('security_sensitive_cross_system_change');
-  if (
-    normalizeBoolean(input.crossSystemMutation) &&
-    normalizeBoolean(input.highStakesOrDogfoodEvidence)
-  ) {
-    triggers.push('security_sensitive_cross_system_change');
-  }
+  const triggers = Object.entries(MANDATORY_TRIGGER_EMITTERS)
+    .filter(([, emitter]) => emitter(input))
+    .map(([trigger]) => trigger);
   return Array.from(
     new Set(triggers.filter((trigger) => policy.mandatory_triggers.includes(trigger)))
   );

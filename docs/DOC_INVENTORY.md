@@ -72,12 +72,12 @@ These remain at `docs/` root (not moved this pass) because they are heavily link
 
 ### Operator-facing (deploy / run / daily ops)
 
-| File                           | Notes                                                           |
-| ------------------------------ | --------------------------------------------------------------- |
-| `INITIALIZATION.md`            | First-time setup (canonical, referenced by `AGENTS.md` Rule 7). |
-| `OPERATOR_UX_GUIDE.md`         | Day-to-day operations: Slack, Chronos, terminal, directories.   |
-| `PRIVACY.md` / `PRIVACY.ja.md` | Data flow + telemetry policy.                                   |
-| `operator/DEPLOYMENT.md`       | macOS / Linux / Docker deployment runbook (new in Phase D'-3).  |
+| File                           | Notes                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `INITIALIZATION.md`            | First-time setup (canonical, referenced by the onboarding section in `AGENTS.md`). |
+| `OPERATOR_UX_GUIDE.md`         | Day-to-day operations: Slack, Chronos, terminal, directories.                      |
+| `PRIVACY.md` / `PRIVACY.ja.md` | Data flow + telemetry policy.                                                      |
+| `operator/DEPLOYMENT.md`       | macOS / Linux / Docker deployment runbook (new in Phase D'-3).                     |
 
 ### Developer-facing (extend / contribute)
 

@@ -10,6 +10,7 @@ import { isInjectionSuspected } from './untrusted-content.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
   buildOrganizationWorkLoopSummary,
+  overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
 import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
@@ -1251,7 +1252,8 @@ async function compileWorkLoopWithLlm(
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;
   const result = validateWorkLoop(parsed);
-  return result.valid ? result.value! : null;
+  if (!result.valid) return null;
+  return overlayCanonicalWorkScopeDecision(result.value!, buildFallbackWorkLoop(input, contract));
 }
 
 function buildFallbackWorkLoop(
