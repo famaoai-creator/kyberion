@@ -2499,7 +2499,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 20113,
+      "size": 22477,
       "type": "json"
     },
     {
@@ -7797,7 +7797,7 @@
     {
       "path": "product/schemas/tool-runtime-registry.schema.json",
       "tier": "public",
-      "size": 3194,
+      "size": 4369,
       "type": "json"
     },
     {

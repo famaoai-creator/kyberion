@@ -21,7 +21,7 @@ vi.mock('./secure-io.js', async () => {
     ...actual,
     safeExecResult: vi.fn((command: string, args: string[] = []) => {
       if (
-        command === 'which' &&
+        ['which', 'where.exe'].includes(command) &&
         [
           'uvx',
           'uv',
@@ -141,6 +141,13 @@ describe('tool runtime registry', () => {
                 kind: 'uv',
                 command: 'uv',
                 args: ['pip', 'install', 'google-antigravity'],
+              },
+              install_backend_platform_overrides: {
+                any: {
+                  kind: 'system',
+                  command: 'any-installer',
+                  args: [],
+                },
               },
               installed_backend: {
                 kind: 'system',
@@ -370,6 +377,21 @@ describe('tool runtime registry', () => {
       'Gyan.FFmpeg',
       '--exact',
     ]);
+    const agyLinux = probeToolRuntime('agy_sdk', 'approved_install', 'linux');
+    expect(agyLinux.selected_backend?.command).toBe('any-installer');
+  });
+
+  it('keeps WinGet fallbacks available when the governed registry is missing', () => {
+    vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', path.join(tmpRoot, 'missing-registry.json'));
+    resetToolRuntimeRegistryCache();
+
+    const ollama = probeToolRuntime('ollama', 'approved_install', 'win32');
+    expect(ollama.selected_backend?.command).toBe('winget');
+    expect(ollama.selected_backend?.args).toContain('Ollama.Ollama');
+
+    const llamaCpp = probeToolRuntime('llamacpp', 'approved_install', 'win32');
+    expect(llamaCpp.selected_backend?.command).toBe('winget');
+    expect(llamaCpp.selected_backend?.args).toContain('ggml.llamacpp');
   });
 
   it('lists inventory items with lifecycle stages', () => {
