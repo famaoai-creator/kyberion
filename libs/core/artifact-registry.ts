@@ -5,6 +5,8 @@ import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './s
 
 export interface ArtifactOwnershipRecord {
   artifact_id: string;
+  tenant_slug?: string;
+  organization_id?: string;
   project_id?: string;
   mission_id?: string;
   task_session_id?: string;
@@ -18,13 +20,14 @@ export interface ArtifactOwnershipRecord {
 }
 
 export interface ArtifactOwnershipQuery {
+  tenantSlug?: string;
+  organizationId?: string;
   projectId?: string;
   missionId?: string;
   taskSessionId?: string;
   kind?: string;
   storageClass?:
-    | ArtifactOwnershipRecord['storage_class']
-    | ArtifactOwnershipRecord['storage_class'][];
+    ArtifactOwnershipRecord['storage_class'] | ArtifactOwnershipRecord['storage_class'][];
   includeTmp?: boolean;
 }
 
@@ -65,6 +68,8 @@ function normalizeStorageClasses(
 }
 
 function matchesQuery(record: ArtifactOwnershipRecord, query: ArtifactOwnershipQuery): boolean {
+  if (query.tenantSlug && record.tenant_slug !== query.tenantSlug) return false;
+  if (query.organizationId && record.organization_id !== query.organizationId) return false;
   if (query.projectId && record.project_id !== query.projectId) return false;
   if (query.missionId && record.mission_id !== query.missionId) return false;
   if (query.taskSessionId && record.task_session_id !== query.taskSessionId) return false;

@@ -407,6 +407,7 @@ export {
   listBoards,
   listCoordinationEvents,
   listWorkItems,
+  migrateLegacyWorkItemContexts,
   normalizeWorkItemLabels,
   releaseWorkItem,
   renewWorkItemLease,
@@ -2067,6 +2068,8 @@ export * from './share-grant-live-sessions.js';
 export * from './share-grant-authorizer.js';
 export * from './provenance-taint.js';
 export * from './tenant-registry.js';
+export * from './tenant-governance.js';
+export * from './entity-scope.js';
 export * from './tenant-knowledge-retrieval.js';
 export * from './ingest-asset-ledger.js';
 export * from './ingest-quota.js';
