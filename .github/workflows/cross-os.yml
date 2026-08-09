@@ -77,6 +77,9 @@ jobs:
       # media backends). Keep that coverage on the Unix runners and exercise
       # the Windows-native surface with its platform-focused suite below.
       - name: Unit tests (core)
+        env:
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
         if: runner.os != 'Windows'
         run: pnpm run test:core
 

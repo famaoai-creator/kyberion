@@ -322,6 +322,12 @@
       "note": "actuator input handoff file"
     },
     {
+      "file": "scripts/entity_governance_cleanup.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "dry-run receipt before an approved governed cleanup; apply receipts are mission evidence"
+    },
+    {
       "file": "scripts/generate_project_os.ts",
       "count": 1,
       "classification": "migrate-candidate",
