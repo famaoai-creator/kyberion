@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-08T14:33:31.817Z",
+  "generated_at": "2026-08-09T16:54:05.745Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -117,7 +117,6 @@
     "scripts/demos/demo_imessage_flow.ts": 2,
     "scripts/demos/demo_telegram_flow.ts": 2,
     "scripts/generate_all_objects_layout_sample.ts": 36,
-    "scripts/kyberion_home.ts": 36,
     "scripts/minutes_record.ts": 6,
     "scripts/onboarding_wizard.ts": 49,
     "scripts/process_portal_inbox.ts": 5,

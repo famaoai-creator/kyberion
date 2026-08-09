@@ -155,6 +155,7 @@
         "presence/",
         "satellites/",
         "plugins/",
+        "tools/adf-replay-extension/",
         "docs/developer/",
         "package.json",
         "pnpm-lock.yaml",

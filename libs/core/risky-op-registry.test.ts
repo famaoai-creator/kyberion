@@ -16,6 +16,7 @@ describe('risky-op-registry', () => {
       expect(RISKY_OPS.VAULT_WRITE).toBe('vault:write');
       expect(RISKY_OPS.CLAUDE_BROWSER_INTERACTIVE).toBe('claude:browser_interactive');
       expect(RISKY_OPS.CLAUDE_DOCUMENT_GENERATION).toBe('claude:document_generation');
+      expect(RISKY_OPS.DESKTOP_DESTRUCTIVE_ACTION).toBe('desktop:destructive_action');
     });
   });
 
@@ -23,6 +24,7 @@ describe('risky-op-registry', () => {
     it('returns true for known ops', () => {
       expect(isKnownRiskyOp('secret:grant_access')).toBe(true);
       expect(isKnownRiskyOp('vault:write')).toBe(true);
+      expect(isKnownRiskyOp('desktop:destructive_action')).toBe(true);
     });
 
     it('returns false for unknown ops', () => {

@@ -1,0 +1,29 @@
+{
+  "schema_version": "observation-to-op.v1",
+  "entries": [
+    {
+      "id": "github-issue",
+      "signals": ["github", "issue", "pull request"],
+      "preferred_ops": ["gh:issue", "gh:pr"],
+      "fallback_ops": ["browser:click", "system:mouse_click"]
+    },
+    {
+      "id": "terminal-command",
+      "signals": ["terminal", "shell", "command", "cli"],
+      "preferred_ops": ["system:exec"],
+      "fallback_ops": ["system:keyboard"]
+    },
+    {
+      "id": "local-file",
+      "signals": ["file", "document", "folder"],
+      "preferred_ops": ["file:read_file", "file:write_file"],
+      "fallback_ops": ["system:open_file"]
+    },
+    {
+      "id": "unknown-web-form",
+      "signals": ["form", "web app", "desktop app"],
+      "preferred_ops": [],
+      "fallback_ops": ["browser:click", "browser:fill", "system:mouse_click", "system:keyboard"]
+    }
+  ]
+}

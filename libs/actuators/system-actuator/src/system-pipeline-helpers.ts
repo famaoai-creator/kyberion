@@ -31,6 +31,8 @@ import {
   createVirtualCameraInjectionBridge,
   createScreenCaptureBridge,
   createScreenRecordingBridge,
+  redactScreenVideoFrame,
+  redactScreenCaptureFile,
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
@@ -113,6 +115,28 @@ const DEFAULT_SYSTEM_RETRY = {
   factor: 2,
   jitter: true,
 };
+
+async function writeRedactedScreenFrames(
+  bridge: ReturnType<typeof createScreenCaptureBridge>,
+  bus: StubVideoFrameBus,
+  input: Record<string, unknown>
+): Promise<void> {
+  const redactingBus = {
+    writeFrames: async (stream: AsyncIterable<any>) =>
+      bus.writeFrames(
+        (async function* () {
+          for await (const frame of stream) {
+            const redacted = await redactScreenVideoFrame(frame);
+            if (!redacted || redacted.payload.byteLength === 0) {
+              throw new Error('screen frame withheld: redaction_failed');
+            }
+            yield redacted;
+          }
+        })()
+      ),
+  };
+  await bridge.pipeTo(redactingBus as any, input);
+}
 const warnedSystemOpAliases = new Set<string>();
 
 interface PipelineStep {
@@ -387,6 +411,31 @@ function resolveCanonicalScreenRecordingPath(params: Record<string, unknown>): s
   return absolute;
 }
 
+function resolveCanonicalScreenCapturePath(
+  params: Record<string, unknown>,
+  resolve: (value: unknown) => unknown
+): string {
+  const requested =
+    typeof params.path === 'string' && params.path.trim()
+      ? pathResolver.rootResolve(String(resolve(params.path)))
+      : pathResolver.shared(
+          `runtime/computer/screenshots/screenshot-${Date.now()}-${randomUUID()}.png`
+        );
+  const absolute = path.resolve(requested);
+  const allowedRoots = [
+    path.resolve(pathResolver.shared('runtime/computer/screenshots')),
+    path.resolve(pathResolver.shared('tmp')),
+  ];
+  if (
+    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
+  ) {
+    throw new Error(
+      'screenshot output must remain within the governed screenshot or shared tmp store'
+    );
+  }
+  return absolute;
+}
+
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
@@ -402,10 +451,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
       let captureMode: 'screen' | 'focused_window' =
         params.capture_mode === 'focused_window' ? 'focused_window' : 'screen';
-      let screenshotPath =
-        typeof params.path === 'string' && params.path.trim()
-          ? pathResolver.rootResolve(resolve(params.path))
-          : pathResolver.shared(`runtime/computer/screenshots/screenshot-${Date.now()}.png`);
+      const screenshotPath = resolveCanonicalScreenCapturePath(params, resolve);
+      const rawScreenshotPath = pathResolver.shared(
+        path.join('tmp', 'screen-captures', `raw-${randomUUID()}.png`)
+      );
       if (!safeExistsSync(path.dirname(screenshotPath))) {
         safeMkdir(path.dirname(screenshotPath), { recursive: true });
       }
@@ -423,18 +472,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       const bridge = createScreenCaptureBridge();
       const captureResult = await bridge.captureScreenshot({
-        save_path: screenshotPath,
+        save_path: rawScreenshotPath,
         display_index: displaySelection.display_index,
         capture_mode: captureMode,
         application: application || undefined,
         window_title: windowTitle || undefined,
         window_match_policy: windowMatchPolicy,
       } as any);
-      screenshotPath = captureResult.save_path || screenshotPath;
+      await redactScreenCaptureFile(captureResult.save_path || rawScreenshotPath, screenshotPath);
       return {
         ...ctx,
-        [params.export_as || 'screenshot_path']: captureResult.save_path || screenshotPath,
-        screenshot_path: captureResult.save_path || screenshotPath,
+        [params.export_as || 'screenshot_path']: screenshotPath,
+        screenshot_path: screenshotPath,
         screenshot_display_index: displaySelection.display_index,
         screenshot_display_name: displaySelection.display_name,
         screenshot_display_selection_source: displaySelection.selection_source,
@@ -453,7 +502,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         params,
         resolve
       );
-      const bridge = createScreenRecordingBridge();
+      const bridge = createScreenRecordingBridge({ frame_redactor: redactScreenVideoFrame });
       const probe = await bridge.probe();
       if (!probe.available) {
         throw new Error(
@@ -551,7 +600,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       );
       const bridge = createScreenCaptureBridge();
       const bus = new StubVideoFrameBus();
-      await bridge.pipeTo(bus, {
+      await writeRedactedScreenFrames(bridge, bus, {
         max_frames: Math.max(1, Number(params.max_frames || 2)),
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         display_index: displaySelection.display_index,
@@ -585,7 +634,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       );
       const bridge = createScreenCaptureBridge();
       const captureBus = new StubVideoFrameBus();
-      await bridge.pipeTo(captureBus, {
+      await writeRedactedScreenFrames(bridge, captureBus, {
         max_frames: Math.max(1, Number(params.max_frames || 2)),
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         display_index: displaySelection.display_index,

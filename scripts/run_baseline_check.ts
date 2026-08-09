@@ -38,6 +38,9 @@ import {
   type FailedScheduleFinding,
   type OpsAlertReceipt,
   hasRequiredServiceConnectionValue,
+  assessDesktopObservationReadiness,
+  listDesktopObservationSources,
+  macosAutomationBridge,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
@@ -834,6 +837,17 @@ async function main() {
     pathResolver.sharedLogsAudit(),
     schedulerNow.getTime()
   );
+  // DR-04: observation permissions/costs are surfaced at session start. This
+  // is observational and intentionally does not change baseline health: a
+  // non-macOS host can still use the permission-free clipboard source while
+  // reporting the unavailable accessibility/frame sources explicitly.
+  const desktopObservationProbe = macosAutomationBridge.probe();
+  const desktopObservation = {
+    registry: listDesktopObservationSources(),
+    readiness: assessDesktopObservationReadiness(desktopObservationProbe),
+    bridge: desktopObservationProbe,
+    data_tier_note: 'observation_tier is separate from personal/confidential/public data tier',
+  };
 
   // LC-01b/LC-01c: escalate via ops alerts with day-level dedup (the baseline
   // runs hourly; one alert per class per UTC day). Hard-gated under vitest so
@@ -1041,6 +1055,7 @@ async function main() {
       ...auditLedger,
       freshness_max_age_ms: AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
     },
+    desktop_observation: desktopObservation,
     // XP-01: population job output — never consulted by deriveBaselineStatus,
     // purely observational (acceptance criterion 3: probe results surfaced
     // on the baseline-check observation surface).
