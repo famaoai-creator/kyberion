@@ -46,6 +46,7 @@ import { ChronosOffice } from '../components/ChronosOffice';
 import { WorkItemsWorkspace } from '../components/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../components/SurfaceControlWorkspace';
 import { OrganizationOperatingModel } from '../components/OrganizationOperatingModel';
+import { CloudflareOsPanel } from '../components/CloudflareOsPanel';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -1494,6 +1495,7 @@ export default function ChronosMirrorV2() {
           {consoleSection === 'home' ? (
             <>
               <ChronosOffice compact onOpenOperations={() => openConsoleSection('operations')} />
+              <CloudflareOsPanel missionId={selectedMissionId} />
               <MissionJourneySummary
                 summary={operatorHomeSummary}
                 onOpenMissions={() => openConsoleSection('missions')}

@@ -664,6 +664,61 @@
         "ja": "control summary",
         "qps-ploc": "⟦ƈőñŧřőŀ şůɱɱȧřẏ ŀőřė⟧"
       },
+      "chronos_os_control_plane": {
+        "en": "OS control plane",
+        "ja": "OS control plane",
+        "qps-ploc": "⟦ŐŞ ƈőñŧřőŀ ṗŀȧñė ŀőřėɱ⟧"
+      },
+      "chronos_os_control_plane_description": {
+        "en": "Tenant-scoped read-only projection. Decisions and apply remain in the guarded surface.",
+        "ja": "テナント単位の read-only 投影です。判断と適用はガードされた surface で行います。",
+        "qps-ploc": "⟦Ŧėñȧñŧ-şƈőṗėḓ řėȧḓ-őñŀẏ ṗřőĵėƈŧïőñ. Ḓėƈïşïőñş ȧñḓ ȧṗṗŀẏ řėɱȧïñ ïñ ŧħė ɠůȧřḓėḓ şůřƒȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "chronos_os_held_actions": {
+        "en": "Held actions",
+        "ja": "保留中の action",
+        "qps-ploc": "⟦Ħėŀḓ ȧƈŧïőñş ŀőř⟧"
+      },
+      "chronos_os_held_actions_observations": {
+        "en": "Held actions & observations",
+        "ja": "保留中の action と observation",
+        "qps-ploc": "⟦Ħėŀḓ ȧƈŧïőñş & őƀşėřṽȧŧïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_os_observations": {
+        "en": "Observation audit",
+        "ja": "Observation audit",
+        "qps-ploc": "⟦Őƀşėřṽȧŧïőñ ȧůḓïŧ ŀőřėɱ⟧"
+      },
+      "chronos_os_no_held_actions": {
+        "en": "No held actions are waiting.",
+        "ja": "保留中の action はありません。",
+        "qps-ploc": "⟦Ñő ħėŀḓ ȧƈŧïőñş ȧřė ẇȧïŧïñɠ. ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_os_no_observations": {
+        "en": "No observations recorded yet.",
+        "ja": "Observation はまだ記録されていません。",
+        "qps-ploc": "⟦Ñő őƀşėřṽȧŧïőñş řėƈőřḓėḓ ẏėŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_os_apply_failed": {
+        "en": "apply failed; inspect audit",
+        "ja": "適用に失敗しました。audit を確認してください。",
+        "qps-ploc": "⟦ȧṗṗŀẏ ƒȧïŀėḓ; ïñşṗėƈŧ ȧůḓïŧ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_os_irreversible": {
+        "en": "irreversible",
+        "ja": "不可逆",
+        "qps-ploc": "⟦ïřřėṽėřşïƀŀė ŀőř⟧"
+      },
+      "chronos_os_reversible": {
+        "en": "reversible",
+        "ja": "可逆",
+        "qps-ploc": "⟦řėṽėřşïƀŀė ŀőř⟧"
+      },
+      "chronos_os_effect_binding_unavailable": {
+        "en": "effect binding unavailable",
+        "ja": "effect binding は利用できません",
+        "qps-ploc": "⟦ėƒƒėƈŧ ƀïñḓïñɠ ůñȧṽȧïŀȧƀŀė ŀőřėɱ ïṗ⟧"
+      },
       "chronos_correlation": {
         "en": "correlation",
         "ja": "correlation",

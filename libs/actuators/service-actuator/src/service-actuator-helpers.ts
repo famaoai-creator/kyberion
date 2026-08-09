@@ -24,6 +24,14 @@ import {
   buildGovernedRetryOptions,
   loadServiceEndpointsCatalog,
   getServicePresetRecord,
+  CloudflareOsControlPlane,
+  withEgressPayloadContext,
+  validateContextSecurityScope,
+  type ContextSecurityScope,
+  type EgressPayloadContext,
+  type IntroductionMode,
+  type OsKnowledgeTier,
+  type ResourceScope,
 } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
@@ -64,6 +72,7 @@ const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
 };
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+const cloudflareOsControlPlane = new CloudflareOsControlPlane();
 
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
@@ -225,6 +234,9 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
           params: step.params.params,
           auth: step.params.auth,
           method: step.params.method,
+          // The pipeline envelope is authoritative. A step may add context
+          // but cannot weaken or redirect the parent mission scope.
+          context: { ...(step.params.context || {}), ...input.context },
         });
       }, buildPipelineRetryPolicy(step.params.retry));
 
@@ -248,48 +260,206 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
     `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
   );
 
-  switch (input.mode) {
-    case 'PRESET':
-      return await executeServicePreset(
-        input.service_id,
-        input.action,
-        input.params,
-        input.auth === 'secret-guard' ? 'secret-guard' : 'none'
+  const preparedObservation = prepareServiceObservation(input);
+  enforceResourceIntroduction(input);
+
+  const egressContext = prepareServiceEgressContext(input);
+
+  const execute = async (): Promise<unknown> => {
+    switch (input.mode) {
+      case 'PRESET':
+        return await executeServicePreset(
+          input.service_id,
+          input.action,
+          input.params,
+          input.auth === 'secret-guard' ? 'secret-guard' : 'none'
+        );
+
+      case 'MCP':
+        assertUnsafeCliAllowed();
+        const mcpCmd = String(input.params.command || 'npx');
+        const mcpArgs = Array.isArray(input.params.args) ? input.params.args.map(String) : [];
+        return await executeMcp(mcpCmd, mcpArgs, {
+          action: input.params.mcp_action || 'call_tool',
+          name: input.action,
+          arguments: input.params.arguments || input.params,
+        });
+
+      case 'OAUTH':
+        if (input.action === 'begin')
+          return beginServiceOAuth(input.service_id, input.params || {});
+        if (input.action === 'exchange') {
+          return await exchangeServiceOAuthCode(input.service_id, input.params || {});
+        }
+        if (input.action === 'refresh') {
+          return await refreshServiceOAuthToken(input.service_id, input.params || {});
+        }
+        throw new Error(`Unsupported OAuth action: ${input.action}`);
+
+      case 'RECONCILE':
+        return await reconcileServices(input);
+
+      case 'API':
+        return await executeApiRequest(input);
+
+      case 'CLI':
+        return await executeCliRequest(input);
+
+      default:
+        throw new Error(`Unsupported mode: ${input.mode}`);
+    }
+  };
+
+  const result = egressContext
+    ? await withEgressPayloadContext(egressContext, execute)
+    : await execute();
+
+  recordServiceObservation(preparedObservation, result);
+  return result;
+}
+
+interface PreparedObservation {
+  missionId: string;
+  taskId?: string;
+  service: string;
+  resourceRef: string;
+  tier: OsKnowledgeTier;
+  tenantSlug: string;
+  purpose: string;
+  summary: string;
+}
+
+function resolveTrustedScope(
+  context: Record<string, any>,
+  required: boolean
+): ContextSecurityScope | null {
+  const raw = context.security_scope;
+  if (!raw || typeof raw !== 'object') {
+    if (required) {
+      throw new Error('[POLICY_VIOLATION] Governed service actions require security_scope');
+    }
+    return null;
+  }
+  const scope = raw as ContextSecurityScope;
+  const errors = validateContextSecurityScope(scope);
+  if (errors.length > 0) {
+    throw new Error(`[POLICY_VIOLATION] Invalid service security_scope: ${errors.join('; ')}`);
+  }
+  const runtimeMissionId = String(process.env.MISSION_ID || '').trim();
+  if (required && (!runtimeMissionId || runtimeMissionId !== scope.mission_id)) {
+    throw new Error('[POLICY_VIOLATION] Service security_scope is not bound to the active mission');
+  }
+  if (context.mission_id && context.mission_id !== scope.mission_id) {
+    throw new Error('[POLICY_VIOLATION] Service mission_id conflicts with security_scope');
+  }
+  return scope;
+}
+
+function enforceResourceIntroduction(input: ServiceAction): void {
+  if (input.mode === 'OAUTH' || input.mode === 'RECONCILE') return;
+  const context = input.context || {};
+  const mode = (context.introduction_mode ||
+    context.introductionMode ||
+    'warn') as IntroductionMode;
+  if (mode !== 'warn' && mode !== 'enforce') {
+    throw new Error(`[POLICY_VIOLATION] Invalid introduction mode: ${String(mode)}`);
+  }
+  const securityScope = resolveTrustedScope(context, mode === 'enforce');
+  if (!securityScope) return;
+  const missionId = securityScope.mission_id;
+  const resourceRef = String(context.resource_ref || context.resourceRef || '').trim();
+  if (!missionId || !resourceRef) {
+    if (mode === 'enforce') {
+      throw new Error(
+        '[POLICY_VIOLATION] Enforced service actions require mission_id and resource_ref'
       );
+    }
+    return;
+  }
+  const resourceScope = (context.resource_scope ||
+    context.resourceScope ||
+    (context.observation ? 'read' : input.method === 'GET' ? 'read' : 'write')) as ResourceScope;
+  if (resourceScope !== 'read' && resourceScope !== 'write') {
+    throw new Error(`[POLICY_VIOLATION] Invalid resource scope: ${String(resourceScope)}`);
+  }
+  cloudflareOsControlPlane.enforceIntroduction({
+    missionId,
+    taskId: String(context.task_id || context.taskId || '').trim() || undefined,
+    service: input.service_id,
+    resourceRef,
+    scope: resourceScope,
+    mode,
+  });
+}
 
-    case 'MCP':
-      assertUnsafeCliAllowed();
-      const mcpCmd = String(input.params.command || 'npx');
-      const mcpArgs = Array.isArray(input.params.args) ? input.params.args.map(String) : [];
-      return await executeMcp(mcpCmd, mcpArgs, {
-        action: input.params.mcp_action || 'call_tool',
-        name: input.action,
-        arguments: input.params.arguments || input.params,
-      });
+function prepareServiceObservation(input: ServiceAction): PreparedObservation | null {
+  const context = input.context || {};
+  const observation = context.observation;
+  if (!observation || typeof observation !== 'object') return null;
+  const scope = resolveTrustedScope(context, true);
+  if (!scope) return null;
+  const resourceRef = String(
+    (observation as Record<string, unknown>).resource_ref ||
+      (observation as Record<string, unknown>).resourceRef ||
+      context.resource_ref ||
+      context.resourceRef ||
+      ''
+  ).trim();
+  if (!resourceRef) {
+    throw new Error('[POLICY_VIOLATION] Service observations require resource_ref');
+  }
+  const tier = scope.read_tiers.reduce<OsKnowledgeTier>(
+    (highest, candidate) =>
+      candidate === 'personal' || (candidate === 'confidential' && highest === 'public')
+        ? candidate
+        : highest,
+    'public'
+  );
+  const summary = String(
+    (observation as Record<string, unknown>).summary || `${input.service_id}:${input.action}`
+  ).slice(0, 240);
+  return {
+    missionId: scope.mission_id,
+    taskId: String(context.task_id || context.taskId || '').trim() || undefined,
+    service: input.service_id,
+    resourceRef,
+    tier,
+    tenantSlug: scope.tenant_id,
+    purpose: scope.purpose,
+    summary,
+  };
+}
 
-    case 'OAUTH':
-      if (input.action === 'begin') {
-        return beginServiceOAuth(input.service_id, input.params || {});
-      }
-      if (input.action === 'exchange') {
-        return await exchangeServiceOAuthCode(input.service_id, input.params || {});
-      }
-      if (input.action === 'refresh') {
-        return await refreshServiceOAuthToken(input.service_id, input.params || {});
-      }
-      throw new Error(`Unsupported OAuth action: ${input.action}`);
+function prepareServiceEgressContext(input: ServiceAction): EgressPayloadContext | undefined {
+  const context = input.context || {};
+  const scope = resolveTrustedScope(context, false);
+  if (!scope) return undefined;
 
-    case 'RECONCILE':
-      return await reconcileServices(input);
+  const resourceScope = (context.resource_scope ||
+    context.resourceScope ||
+    (context.observation ? 'read' : input.method === 'GET' ? 'read' : 'write')) as ResourceScope;
+  if (resourceScope !== 'write') return undefined;
 
-    case 'API':
-      return await executeApiRequest(input);
+  const provenance = cloudflareOsControlPlane.projectTaint(scope.mission_id);
+  return {
+    tier: provenance.highestTier,
+    tenant_slug: scope.tenant_id,
+    purpose: scope.purpose,
+    provenance,
+  };
+}
 
-    case 'CLI':
-      return await executeCliRequest(input);
-
-    default:
-      throw new Error(`Unsupported mode: ${input.mode}`);
+function recordServiceObservation(observation: PreparedObservation | null, _result: unknown): void {
+  if (!observation) return;
+  try {
+    cloudflareOsControlPlane.recordObservation({ ...observation });
+  } catch (error) {
+    // The external operation has already completed. Do not throw into the
+    // governed retry loop and duplicate a side effect; preserve the failure
+    // as an operational warning for the audit/recovery path.
+    logger.warn(
+      `[service-actuator] observation recording failed after service execution: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 

@@ -14,7 +14,17 @@
     "report_path": "active/shared/tmp/action-item-reminders-report.json",
     "tone": "friendly",
     "language": "ja",
-    "max_items": 20
+    "max_items": 20,
+    "required_bindings": [
+      {
+        "name": "slack_publish",
+        "service": "slack",
+        "preset": "outbox",
+        "secret": "SLACK_BOT_TOKEN"
+      }
+    ],
+    "vocabulary": { "reminder": "リマインダー" },
+    "fingerprint": "action-item-reminders-v2"
   },
   "steps": [
     {

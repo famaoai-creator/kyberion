@@ -1281,7 +1281,13 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 77756,
+      "size": 79071,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/environment-manifests/computer-surface-os-projection.json",
+      "tier": "public",
+      "size": 2835,
       "type": "json"
     },
     {
@@ -1311,7 +1317,7 @@
     {
       "path": "product/governance/environment-manifests/mos-operator-surface.json",
       "tier": "public",
-      "size": 2076,
+      "size": 3236,
       "type": "json"
     },
     {
@@ -4683,7 +4689,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 273114,
+      "size": 275822,
       "type": "json"
     },
     {
