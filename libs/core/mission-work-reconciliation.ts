@@ -358,6 +358,30 @@ function assertCommitBoundSourceFile(input: {
   return repositoryRelativePath;
 }
 
+function isCommitBoundSourceFile(input: {
+  sourceRepository: string;
+  sourceCommit: string;
+  absolutePath: string;
+}): boolean {
+  if (!isInside(input.sourceRepository, input.absolutePath)) return false;
+  if (!safeExistsSync(input.absolutePath) || !safeStat(input.absolutePath).isFile()) return false;
+  const repositoryRelativePath = nodePath
+    .relative(input.sourceRepository, input.absolutePath)
+    .split(nodePath.sep)
+    .join('/');
+  try {
+    safeExec('git', ['cat-file', '-e', `${input.sourceCommit}:${repositoryRelativePath}`], {
+      cwd: input.sourceRepository,
+    });
+    safeExec('git', ['diff', '--quiet', input.sourceCommit, '--', repositoryRelativePath], {
+      cwd: input.sourceRepository,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function validateReconciledArtifactReview(input: {
   missionId: string;
   missionType?: string;
@@ -448,6 +472,17 @@ function validateReconciledArtifactReview(input: {
   );
   const requireIndependence =
     derivedProfile.independence_required || declaredProfile?.independence_required === true;
+  const declaredProfileArtifactPath = declaredProfile?.artifact_path;
+  const declaredProfileArtifactIsSourceBound = Boolean(
+    declaredProfileArtifactPath &&
+    isCommitBoundSourceFile({
+      sourceRepository: input.sourceRepository,
+      sourceCommit: input.sourceCommit,
+      absolutePath: nodePath.isAbsolute(declaredProfileArtifactPath)
+        ? declaredProfileArtifactPath
+        : nodePath.resolve(input.sourceRepository, declaredProfileArtifactPath),
+    })
+  );
   const reasons: string[] = [];
   if (receipt.artifact.kind !== inferredArtifactKind) {
     reasons.push(
@@ -457,10 +492,17 @@ function validateReconciledArtifactReview(input: {
   if (receipt.artifact.sha256 !== currentHash) {
     reasons.push(`review ${receipt.review_id} was invalidated by artifact change`);
   }
-  if (declaredProfile?.artifact_path && declaredProfile.artifact_path !== normalizedArtifactPath) {
+  if (
+    declaredProfileArtifactIsSourceBound &&
+    declaredProfileArtifactPath !== normalizedArtifactPath
+  ) {
     reasons.push('reviewed artifact path does not match the declared review profile');
   }
-  if (declaredProfile?.artifact_sha256 && declaredProfile.artifact_sha256 !== currentHash) {
+  if (
+    declaredProfileArtifactIsSourceBound &&
+    declaredProfile?.artifact_sha256 &&
+    declaredProfile.artifact_sha256 !== currentHash
+  ) {
     reasons.push('reviewed artifact hash does not match the declared review profile');
   }
   if (requireIndependence && implementerAgentIds.length === 0) {
