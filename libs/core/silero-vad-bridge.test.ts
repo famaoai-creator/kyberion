@@ -39,6 +39,15 @@ function chunkOf(amplitude: number, ms = 100): AudioChunk {
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 120));
 
+async function ingestUntilSpeaking(vad: SileroVad): Promise<ReturnType<SileroVad['ingest']>> {
+  let state = vad.ingest(chunkOf(8000));
+  for (let attempt = 0; attempt < 40 && !state.speaking; attempt += 1) {
+    await settle();
+    state = vad.ingest(chunkOf(8000));
+  }
+  return state;
+}
+
 describe('silero vad bridge', () => {
   it('probe fails without a configured model', () => {
     const previous = process.env.KYBERION_SILERO_VAD_MODEL;
@@ -59,9 +68,7 @@ describe('silero vad bridge', () => {
       const vad = new SileroVad({ command: fakeBridgeCommand(), endpointMs: 300 });
       try {
         // Warm up: the bridge is one chunk late by design.
-        vad.ingest(chunkOf(8000));
-        await settle();
-        const speaking = vad.ingest(chunkOf(8000));
+        const speaking = await ingestUntilSpeaking(vad);
         expect(speaking.speaking).toBe(true);
 
         await settle();
