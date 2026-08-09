@@ -14,46 +14,143 @@ import {
 } from '@agent/core';
 import {
   acceptInboxEntryWithHumanReceipt,
+  createScreenRecordingBridge,
+  createDesktopEventFeed,
+  computeDesktopRecordingHash,
+  DesktopDemonstrationRecorder,
+  dispatchProcedure,
   decideApprovalRequest,
   ingestAudioIntoDealRequirements,
+  listDistillCandidateRecords,
+  loadDesktopPipeline,
   listApprovalRequests,
   listCustomerChannelBindings,
   listDeals,
   listInboxEntries,
+  loadProcedures,
   loadNotificationPreferences,
+  materializeExecutionFeedbackCandidate,
+  promoteDesktopProcedure,
+  reconcileDesktopPromotionTransaction,
+  reconstructDesktopIntent,
+  intentDraftHash,
+  reviewDesktopIntent,
+  validateDesktopIntentDraft,
+  redactScreenVideoFrame,
+  recordExecutionFeedback,
+  resolveAllowlistedRecordingRef,
+  resolveProcedure,
+  updateDistillCandidateRecord,
+  validateBrowserExtensionRecording,
+  validateDesktopRecording,
+  sanitizeDesktopObservationText,
+  validateServiceRecording,
+  withExecutionContext,
+  pathResolver,
   markInboxEntry,
   readDealRequirementsCapture,
   runSurfaceMessageConversation,
   saveNotificationPreferences,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  sampleDesktopObservation,
+  osAutomationBridge,
+  type BrowserExtensionOperation,
+  type BrowserExtensionRecording,
+  type DesktopRecording,
+  type ServiceRecording,
   type NotificationChannelTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectOperatorHomeSummary } from '@agent/core';
 import { collectDoctorReport } from './run_doctor.js';
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import { t as translate } from '@agent/core/t';
+import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
+import type { VocabularyKey } from '@agent/core';
+
+let cliLocale: SupportedLocale = resolveLocale();
+
+function ui(key: VocabularyKey, params?: Record<string, string | number>): string {
+  return translate(key, params, cliLocale);
+}
+
+function localizeRecorderError(error: string): string {
+  if (error.includes('intent review') || error.includes('desktop intent'))
+    return ui('recorder:recorder_intent_review_required');
+  if (error.includes('recording review must be approved'))
+    return ui('recorder:recorder_review_repair');
+  const native = error.match(/native operation ([a-z0-9_:-]+)/iu);
+  if (native) return ui('recorder:recorder_native_executor_required', { op: native[1] });
+  const nativeBinding = error.match(/native execution bindings \(([^,)]+)/iu);
+  if (nativeBinding)
+    return ui('recorder:recorder_native_executor_required', { op: nativeBinding[1] });
+  if (error.includes('invalid coordinates or click_count') || error.includes('invalid selector'))
+    return ui('recorder:recorder_desktop_input_invalid');
+  if (error.includes('screen frame withheld') || error.includes('redaction'))
+    return ui('recorder:recorder_screenshot_redaction_failed');
+  return error;
+}
+
+function localizeRecorderWarning(warning: string): string {
+  if (warning.startsWith('native operation suggestions remain'))
+    return ui('recorder:recorder_native_plan_deferred');
+  return warning;
+}
 
 const COMMANDS: ReadonlyArray<readonly [string, string]> = [
-  ['pnpm kyberion', 'ホーム: 状態ダイジェストと次の一手'],
-  ['pnpm kyberion ask "<依頼>"', 'Kyberion に話しかける(Slack と同じ脳)'],
-  ['pnpm kyberion inbox [--read <id>|--accept <id>]', '成果物 inbox の確認と受領'],
-  ['pnpm kyberion inbox --read-all [--match <文字列>]', '未読の一括既読化(タイトル/要約で絞込可)'],
-  ['pnpm kyberion approvals [--approve <id>|--deny <id>]', '承認キューの確認と裁可'],
-  ['pnpm kyberion notify [--set slack:<channel>]', '通知先の確認・設定'],
-  ['pnpm kyberion deals [--requirements <deal-id>]', '商談一覧と要件ヒアリング内容の確認'],
+  ['pnpm kyberion', 'i18n:recorder:recorder_help_home'],
+  ['pnpm kyberion ask "<request>"', 'i18n:recorder:recorder_help_ask'],
+  ['pnpm kyberion intent "<intent>"', 'i18n:recorder:recorder_help_intent'],
+  ['pnpm kyberion procedure list', 'i18n:recorder:recorder_help_procedure_list'],
+  ['pnpm kyberion procedure inspect <id>', 'i18n:recorder:recorder_help_procedure_inspect'],
+  ['pnpm kyberion procedure repair <id>', 'i18n:recorder:recorder_help_procedure_repair'],
+  [
+    'pnpm kyberion procedure promote <id> --substrate desktop --recording <path> --intent "..."',
+    'i18n:recorder:recorder_help_procedure_promote',
+  ],
+  [
+    "pnpm kyberion procedure run <id> --inputs '{}' [--cdp-port <port>] [--record-video]",
+    'i18n:recorder:recorder_help_procedure_run',
+  ],
+  [
+    'pnpm kyberion feedback <intent-id> --outcome dissatisfied --correction "..."',
+    'i18n:recorder:recorder_help_feedback',
+  ],
+  ['pnpm kyberion improvements', 'i18n:recorder:recorder_help_improvements'],
+  ['pnpm kyberion record desktop [--duration <sec>]', 'i18n:recorder:recorder_help_record_desktop'],
+  ['pnpm kyberion recording inspect <path>', 'i18n:recorder:recorder_help_recording_inspect'],
+  [
+    'pnpm kyberion recording review <path> --approve-recording --approve-intent',
+    'i18n:recorder:recorder_help_recording_review',
+  ],
+  ['pnpm kyberion inbox [--read <id>|--accept <id>]', 'i18n:recorder:recorder_help_inbox'],
+  ['pnpm kyberion inbox --read-all [--match <text>]', 'i18n:recorder:recorder_help_inbox_all'],
+  ['pnpm kyberion approvals [--approve <id>|--deny <id>]', 'i18n:recorder:recorder_help_approvals'],
+  ['pnpm kyberion notify [--set slack:<channel>]', 'i18n:recorder:recorder_help_notify'],
+  ['pnpm kyberion deals [--requirements <deal-id>]', 'i18n:recorder:recorder_help_deals'],
   [
     'pnpm kyberion deals --ingest-audio <deal-id> --audio <path>',
-    '通話録音を要件ドラフトへ取り込み',
+    'i18n:recorder:recorder_help_deals_audio',
   ],
-  ['pnpm mission create', 'ミッションの作成'],
-  ['pnpm app:preflight', 'アプリ開発の前提チェック'],
-  ['pnpm doctor', '健全性と次の一手の診断'],
-  ['pnpm dashboard', 'ダッシュボード表示'],
-  ['pnpm office [-- --watch 30]', 'バーチャルオフィス(エージェント稼働の可視化)'],
+  ['pnpm mission create', 'i18n:recorder:recorder_help_mission'],
+  ['pnpm app:preflight', 'i18n:recorder:recorder_help_preflight'],
+  ['pnpm doctor', 'i18n:recorder:recorder_help_doctor'],
+  ['pnpm dashboard', 'i18n:recorder:recorder_help_dashboard'],
+  ['pnpm office [-- --watch 30]', 'i18n:recorder:recorder_help_office'],
 ] as const;
 
 function printCommands(): void {
-  console.log('コマンド:');
+  console.log(ui('recorder:recorder_commands_header'));
   for (const [command, description] of COMMANDS) {
-    console.log(`  ${command.padEnd(52)} ${description}`);
+    const rendered = description.startsWith('i18n:')
+      ? ui(description.slice('i18n:'.length) as VocabularyKey)
+      : description;
+    console.log(`  ${command.padEnd(52)} ${rendered}`);
   }
 }
 
@@ -64,14 +161,14 @@ function handleNotifySubcommand(setValue: string): void {
   const target = rest.join(':');
   const allowed = ['slack', 'imessage', 'telegram', 'discord'];
   if (!allowed.includes(surface) || !target) {
-    console.error(`Usage: pnpm kyberion notify --set <${allowed.join('|')}>:<channel-id>`);
+    console.error(ui('recorder:recorder_notify_usage', { channels: allowed.join('|') }));
     process.exitCode = 1;
     return;
   }
   const prefs = loadNotificationPreferences();
   prefs.default_channel = { surface, target } as NotificationChannelTarget;
   const filePath = saveNotificationPreferences(prefs);
-  console.log(`Default notification channel set to ${surface}:${target} (${filePath})`);
+  console.log(ui('recorder:recorder_notify_saved', { surface, target, path: filePath }));
 }
 
 function handleInboxSubcommand(argv: {
@@ -91,7 +188,10 @@ function handleInboxSubcommand(argv: {
       markInboxEntry(entry.entry_id, 'read', { reviewedBy: 'operator' });
     }
     console.log(
-      `✓ ${entries.length} 件を既読化しました${argv.match ? `(match: ${argv.match})` : ''}`
+      ui('recorder:recorder_inbox_marked', {
+        count: entries.length,
+        match: argv.match ? ` (match: ${argv.match})` : '',
+      })
     );
     return;
   }
@@ -108,11 +208,17 @@ function handleInboxSubcommand(argv: {
             'I accept this deliverable and retain responsibility for its use.',
         });
     if (!updated) {
-      console.error(`inbox entry not found: ${entryId}`);
+      console.error(ui('recorder:recorder_inbox_not_found', { id: entryId }));
       process.exitCode = 1;
       return;
     }
-    console.log(`✓ ${updated.entry_id} → ${updated.status}: ${updated.title}`);
+    console.log(
+      ui('recorder:recorder_inbox_updated', {
+        id: updated.entry_id,
+        status: updated.status,
+        title: updated.title,
+      })
+    );
     return;
   }
   const entries = listInboxEntries({ limit: 30 });
@@ -121,11 +227,13 @@ function handleInboxSubcommand(argv: {
     return;
   }
   if (entries.length === 0) {
-    console.log('Inbox は空です。');
+    console.log(ui('recorder:recorder_inbox_empty'));
     return;
   }
   const unread = entries.filter((entry) => entry.status === 'unread');
-  console.log(`Inbox (${unread.length} 件未読 / ${entries.length} 件):`);
+  console.log(
+    ui('recorder:recorder_inbox_header', { unread: unread.length, total: entries.length })
+  );
   for (const entry of entries) {
     const marker = entry.status === 'unread' ? '●' : entry.status === 'accepted' ? '✔' : '○';
     console.log(`  ${marker} [${entry.entry_id}] ${entry.title}`);
@@ -137,7 +245,7 @@ function handleInboxSubcommand(argv: {
     }
   }
   console.log('');
-  console.log('既読化: pnpm kyberion inbox --read <id> / 受領: --accept <id>');
+  console.log(ui('recorder:recorder_inbox_summary'));
 }
 
 function handleApprovalsSubcommand(argv: {
@@ -151,7 +259,7 @@ function handleApprovalsSubcommand(argv: {
     const requestId = String(argv.approve || argv.deny);
     const request = pending.find((entry) => entry.id === requestId);
     if (!request) {
-      console.error(`pending approval not found: ${requestId}`);
+      console.error(ui('recorder:recorder_approvals_not_found', { id: requestId }));
       process.exitCode = 1;
       return;
     }
@@ -169,7 +277,13 @@ function handleApprovalsSubcommand(argv: {
       effectBinding: request.accountability?.effectBinding,
       note: argv.note || 'decided via pnpm kyberion approvals',
     });
-    console.log(`✓ ${decided.id} → ${decided.status}: ${decided.title}`);
+    console.log(
+      ui('recorder:recorder_approval_updated', {
+        id: decided.id,
+        status: decided.status,
+        title: decided.title,
+      })
+    );
     return;
   }
   if (argv.json) {
@@ -177,10 +291,10 @@ function handleApprovalsSubcommand(argv: {
     return;
   }
   if (pending.length === 0) {
-    console.log('承認待ちはありません。');
+    console.log(ui('recorder:recorder_approvals_empty'));
     return;
   }
-  console.log(`承認待ち (${pending.length} 件):`);
+  console.log(ui('recorder:recorder_approvals_header', { count: pending.length }));
   for (const request of pending) {
     console.log(`  ● [${request.id}] ${request.title}`);
     if (request.summary) console.log(`      ${String(request.summary).slice(0, 120)}`);
@@ -189,16 +303,21 @@ function handleApprovalsSubcommand(argv: {
     );
   }
   console.log('');
-  console.log('裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note "..."]');
+  console.log(ui('recorder:recorder_approvals_summary'));
 }
 
 async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
   if (!text.trim()) {
-    console.error('Usage: pnpm kyberion ask "<依頼・質問>"');
+    console.error(ui('recorder:recorder_ask_usage'));
     process.exitCode = 1;
     return;
   }
   const correlationId = `kyberion-ask-${Date.now().toString(36)}`;
+  const intentResolution = await withExecutionContext(
+    'sovereign_concierge',
+    () => resolveProcedure(text),
+    'sovereign'
+  );
   const result = await runSurfaceMessageConversation({
     surface: 'cli',
     text,
@@ -212,12 +331,990 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
     delegationSummaryInstruction:
       'Produce a concise terminal-friendly reply in the operator language. No A2A blocks.',
   });
+  const improvement = result.executionFeedbackRecord
+    ? materializeExecutionFeedbackCandidate({ feedback: result.executionFeedbackRecord })
+    : null;
   if (json) {
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify({ ...result, intentResolution, improvement }, null, 2));
     return;
   }
+  if (intentResolution.outcome === 'matched' && intentResolution.best) {
+    console.log(
+      `[intent] ${intentResolution.best.procedure_id} ` +
+        `(confidence=${intentResolution.best.confidence.toFixed(2)})`
+    );
+  } else if (intentResolution.outcome === 'ambiguous') {
+    console.log(ui('recorder:recorder_intent_ambiguous'));
+  }
   const reply = (result as { text?: string })?.text;
-  console.log(reply?.trim() || '(応答が空でした — pnpm doctor で backend 設定を確認してください)');
+  console.log(reply?.trim() || ui('recorder:recorder_ask_empty'));
+  if (improvement?.candidate) {
+    console.log(
+      ui('recorder:recorder_improvement_created', { id: improvement.candidate.candidate_id })
+    );
+  }
+}
+
+function procedureEntryOrReport(procedureId: string) {
+  const entry = loadProcedures().find((candidate) => candidate.procedure_id === procedureId);
+  if (!entry) {
+    console.error(ui('recorder:recorder_procedure_not_found', { id: procedureId }));
+    process.exitCode = 1;
+    return null;
+  }
+  return entry;
+}
+
+function printProcedureEntry(entry: ReturnType<typeof loadProcedures>[number]): void {
+  console.log(
+    ui('recorder:recorder_procedure_entry', {
+      id: entry.procedure_id,
+      substrate: entry.substrate,
+      executor: entry.adapter.executor,
+      risk: entry.risk_class,
+      status: entry.status,
+    })
+  );
+  console.log(ui('recorder:recorder_procedure_target', { target: entry.target.name }));
+  if (entry.intent_phrases.length > 0) {
+    console.log(
+      ui('recorder:recorder_procedure_intent', { intent: entry.intent_phrases.join(' / ') })
+    );
+  }
+}
+
+function handleProcedureList(argv: { substrate?: string; json?: boolean }): void {
+  const procedures = loadProcedures().filter(
+    (entry) => !argv.substrate || entry.substrate === argv.substrate
+  );
+  if (argv.json) {
+    console.log(JSON.stringify(procedures, null, 2));
+    return;
+  }
+  if (procedures.length === 0) {
+    console.log(ui('recorder:recorder_no_procedures'));
+    return;
+  }
+  console.log(ui('recorder:recorder_procedure_count', { count: procedures.length }));
+  for (const entry of procedures) printProcedureEntry(entry);
+}
+
+async function handleIntentSubcommand(
+  text: string,
+  argv: { substrate?: string; origin?: string; json?: boolean }
+): Promise<void> {
+  if (!text.trim()) {
+    console.error(ui('recorder:recorder_intent_usage'));
+    process.exitCode = 1;
+    return;
+  }
+  const resolution = await withExecutionContext(
+    'sovereign_concierge',
+    () => resolveProcedure(text, { substrate: argv.substrate, origin: argv.origin }),
+    'sovereign'
+  );
+  const procedure = resolution.best
+    ? loadProcedures().find((entry) => entry.procedure_id === resolution.best?.procedure_id)
+    : undefined;
+  const payload = {
+    intent: text,
+    resolution,
+    procedure: procedure
+      ? {
+          procedure_id: procedure.procedure_id,
+          substrate: procedure.substrate,
+          executor: procedure.adapter.executor,
+          target: procedure.target,
+          risk_class: procedure.risk_class,
+          required_inputs: procedure.required_inputs || [],
+          required_secrets: (procedure.required_secrets || []).map((secret) => ({
+            name: secret.name,
+            scope: secret.scope,
+          })),
+          review_required: procedure.risk_class !== 'low',
+        }
+      : null,
+    next_actions: procedure
+      ? [
+          `pnpm kyberion procedure inspect ${procedure.procedure_id}`,
+          `pnpm kyberion procedure run ${procedure.procedure_id} --inputs '{}'`,
+        ]
+      : [ui('recorder:recorder_procedure_learn_next')],
+  };
+  if (argv.json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  console.log(ui('recorder:recorder_intent_label', { text }));
+  console.log(
+    ui('recorder:recorder_resolution', {
+      outcome: resolution.outcome,
+      pattern: resolution.recommendedPattern,
+    })
+  );
+  if (procedure) {
+    printProcedureEntry(procedure);
+    console.log(`  ${ui('recorder:recorder_next_inspect', { id: procedure.procedure_id })}`);
+    console.log(`           pnpm kyberion procedure run ${procedure.procedure_id} --inputs '{}'`);
+  } else if (resolution.candidates.length > 0) {
+    console.log(ui('recorder:recorder_intent_candidates'));
+    for (const candidate of resolution.candidates) {
+      console.log(
+        `  - ${candidate.procedure_id} (${candidate.confidence.toFixed(2)}) ${candidate.reason}`
+      );
+    }
+    console.log(ui('recorder:recorder_candidates_next'));
+  } else {
+    console.log(ui('recorder:recorder_unmatched'));
+  }
+}
+
+function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]): {
+  value?: BrowserExtensionRecording | DesktopRecording | ServiceRecording;
+  error?: string;
+} {
+  const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
+  if (!recordingPath) {
+    return { error: ui('recorder:recorder_recording_ref_invalid') };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+  } catch (error) {
+    return {
+      error: ui('recorder:recorder_recording_read_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    };
+  }
+  const validation =
+    entry.substrate === 'browser'
+      ? validateBrowserExtensionRecording(raw)
+      : entry.substrate === 'service'
+        ? validateServiceRecording(raw)
+        : entry.substrate === 'desktop'
+          ? validateDesktopRecording(raw)
+          : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
+  if (!validation.value) return { error: validation.errors.join('; ') };
+  return { value: validation.value };
+}
+
+function resolveRecordingPath(ref: string): string | null {
+  return resolveAllowlistedRecordingRef(ref.trim());
+}
+
+async function handleDesktopRecord(argv: {
+  duration?: number;
+  fps?: number;
+  displayIndex?: number;
+  captureMode?: string;
+  json?: boolean;
+}): Promise<void> {
+  const duration = Math.min(300, Math.max(1, Math.round(Number(argv.duration || 15))));
+  const fps = Math.min(30, Math.max(1, Math.round(Number(argv.fps || 1))));
+  const runId = `cli-${Date.now()}`;
+  const recordingDir = pathResolver.shared('runtime/recordings');
+  const videoAbs = pathResolver.shared(`runtime/recordings/desktop-screen-${runId}.mp4`);
+  safeMkdir(recordingDir, { recursive: true });
+  const eventFeed = createDesktopEventFeed();
+  eventFeed.start();
+  let pollError: string | undefined;
+
+  const recorder = new DesktopDemonstrationRecorder({
+    sample: () => sampleDesktopObservation(osAutomationBridge),
+    eventSource: () => eventFeed.drain(),
+    baseIntervalMs: 1_000,
+    browserIntervalMs: 1_500,
+    heartbeatMs: 5_000,
+  });
+  recorder.start();
+  const timer = setInterval(() => {
+    try {
+      recorder.pollOnce(Date.now());
+    } catch (error) {
+      pollError = error instanceof Error ? error.message : String(error);
+    }
+  }, 1_000);
+  let screenRecording:
+    | { status: 'succeeded'; output_path: string; frame_count: number; fps: number }
+    | { status: 'unavailable'; reason: string };
+  try {
+    const bridge = createScreenRecordingBridge({ frame_redactor: redactScreenVideoFrame });
+    const probe = await bridge.probe();
+    if (!probe.available) {
+      screenRecording = {
+        status: 'unavailable',
+        reason: probe.capture_bridge?.reason || 'screen recording bridge unavailable',
+      };
+    } else {
+      const result = await bridge.recordToMp4(videoAbs, {
+        display_index: argv.displayIndex,
+        capture_mode: argv.captureMode === 'focused_window' ? 'focused_window' : 'screen',
+        max_frames: duration * fps,
+        frame_interval_ms: Math.round(1_000 / fps),
+        fps,
+        cleanup: true,
+      });
+      screenRecording = { status: 'succeeded', ...result };
+    }
+  } catch (error) {
+    screenRecording = {
+      status: 'unavailable',
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    clearInterval(timer);
+    // Drain events that arrived during the final screen frame before stopping
+    // the native tap. Otherwise the tail of a demonstration is silently
+    // omitted from the promotion candidate.
+    recorder.pollOnce(Date.now());
+    eventFeed.stop();
+  }
+
+  let recording = recorder.stop();
+  const feedStatus = eventFeed.status();
+  const capture = pollError
+    ? {
+        event_source: 'state-observation-only' as const,
+        status: 'unavailable' as const,
+        reason:
+          sanitizeDesktopObservationText(`OS observation failed: ${pollError}`) ||
+          'OS observation failed',
+      }
+    : feedStatus.status === 'active'
+      ? feedStatus
+      : {
+          event_source: 'state-observation-only' as const,
+          status: 'unavailable' as const,
+          reason:
+            sanitizeDesktopObservationText(
+              feedStatus.reason || 'OS event feed became unavailable during capture'
+            ) || 'OS event feed became unavailable during capture',
+        };
+  const screenArtifact =
+    screenRecording.status === 'succeeded' && safeExistsSync(screenRecording.output_path)
+      ? (() => {
+          const payload = safeReadFile(screenRecording.output_path, { encoding: null }) as Buffer;
+          return {
+            status: 'succeeded' as const,
+            recording_ref: pathResolver.toRepoRelative(screenRecording.output_path),
+            sha256: createHash('sha256').update(payload).digest('hex'),
+            frame_count: screenRecording.frame_count,
+            fps: screenRecording.fps,
+          };
+        })()
+      : {
+          status: 'unavailable' as const,
+          reason:
+            sanitizeDesktopObservationText(
+              screenRecording.status === 'unavailable'
+                ? screenRecording.reason
+                : 'screen recording output was not created'
+            ) || 'screen recording output was not created',
+        };
+  recording = {
+    ...recording,
+    capture,
+    artifacts: { screen_recording: screenArtifact },
+  };
+  const intent = reconstructDesktopIntent(recording);
+  recording = {
+    ...recording,
+    intent_hash: intentDraftHash(intent),
+  };
+  recording.recording_hash = computeDesktopRecordingHash(recording);
+  const recordingValidation = validateDesktopRecording(recording);
+  if (!recordingValidation.value) {
+    throw new Error(`recording failed validation: ${recordingValidation.errors.join('; ')}`);
+  }
+  const recordingAbs = pathResolver.shared(`runtime/recordings/${recording.recording_id}.json`);
+  const intentAbs = pathResolver.shared(`runtime/recordings/${recording.recording_id}.intent.json`);
+  const screenUnavailableReason =
+    screenArtifact.status === 'unavailable'
+      ? screenArtifact.reason
+      : 'screen recording output was not created';
+  safeWriteFile(recordingAbs, `${JSON.stringify(recording, null, 2)}\n`);
+  safeWriteFile(intentAbs, `${JSON.stringify(intent, null, 2)}\n`);
+  const payload = {
+    recording,
+    intent,
+    artifacts: {
+      recording_ref: pathResolver.toRepoRelative(recordingAbs),
+      intent_ref: pathResolver.toRepoRelative(intentAbs),
+      screen_recording: screenArtifact,
+    },
+    next_actions: [
+      `pnpm kyberion recording inspect ${pathResolver.toRepoRelative(recordingAbs)}`,
+      ...(capture.event_source === 'native-cg-event-tap' && recording.steps.length > 0
+        ? [
+            `pnpm kyberion recording review ${pathResolver.toRepoRelative(recordingAbs)} --approve-recording --approve-intent`,
+            `pnpm kyberion procedure promote <id> --substrate desktop --recording ${pathResolver.toRepoRelative(recordingAbs)} --intent "<intent>"`,
+          ]
+        : [ui('recorder:recorder_capture_not_promotable')]),
+    ],
+  };
+  if (argv.json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  console.log(
+    ui('recorder:recorder_os_recorded', { recordingRef: payload.artifacts.recording_ref })
+  );
+  console.log(ui('recorder:recorder_intent_draft', { intentRef: payload.artifacts.intent_ref }));
+  console.log(
+    screenArtifact.status === 'succeeded' && screenRecording.status === 'succeeded'
+      ? ui('recorder:recorder_screen_recorded', {
+          path: screenRecording.output_path,
+          frames: screenRecording.frame_count,
+        })
+      : ui('recorder:recorder_screen_unavailable', { reason: screenUnavailableReason })
+  );
+  console.log(ui('recorder:recorder_next_actions'));
+  for (const nextAction of payload.next_actions) console.log(`  ${nextAction}`);
+}
+
+function loadDesktopRecording(ref: string): {
+  value?: ReturnType<typeof validateDesktopRecording>['value'];
+  error?: string;
+} {
+  const recordingPath = resolveRecordingPath(ref);
+  if (!recordingPath)
+    return { error: 'recording path is outside the allowlisted recording stores' };
+  try {
+    const raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+    const validation = validateDesktopRecording(raw);
+    return validation.value ? { value: validation.value } : { error: validation.errors.join('; ') };
+  } catch (error) {
+    return {
+      error: ui('recorder:recorder_recording_read_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    };
+  }
+}
+
+function resolveIntentPath(recordingPath: string): string {
+  return path.join(
+    path.dirname(recordingPath),
+    `${path.basename(recordingPath, '.json')}.intent.json`
+  );
+}
+
+function loadDesktopIntent(
+  recording: ReturnType<typeof validateDesktopRecording>['value'],
+  recordingPath: string,
+  options: { allowReconstruct?: boolean } = {}
+) {
+  const intentPath = resolveIntentPath(recordingPath);
+  const allowReconstruct = options.allowReconstruct !== false;
+  if (!safeExistsSync(intentPath)) {
+    if (!allowReconstruct)
+      throw new Error(
+        `intent review artifact not found: ${pathResolver.toRepoRelative(intentPath)}`
+      );
+    return { intent: reconstructDesktopIntent(recording!), intentPath, reconstructed: true };
+  }
+  try {
+    return {
+      intent: validateDesktopIntentDraft(
+        JSON.parse(safeReadFile(intentPath, { encoding: 'utf8' }) as string)
+      ),
+      intentPath,
+      reconstructed: false,
+    };
+  } catch (error) {
+    if (!allowReconstruct)
+      throw new Error(
+        `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`
+      );
+    return { intent: reconstructDesktopIntent(recording!), intentPath, reconstructed: true };
+  }
+}
+
+async function handleRecordingSubcommand(
+  action: string,
+  ref: string,
+  argv: {
+    approve?: boolean;
+    reject?: boolean;
+    approveIntent?: boolean;
+    rejectIntent?: boolean;
+    reviewer?: string;
+    note?: string;
+    json?: boolean;
+  }
+): Promise<void> {
+  const loaded = loadDesktopRecording(ref);
+  if (!loaded.value) {
+    console.error(
+      ui('recorder:recorder_recording_unavailable', { error: loaded.error || 'unknown error' })
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const recordingPath = resolveRecordingPath(ref)!;
+  const currentIntent = loadDesktopIntent(loaded.value, recordingPath);
+  if (action === 'inspect') {
+    const intent = currentIntent.intent;
+    const payload = {
+      recording: loaded.value,
+      intent,
+      intent_ref: pathResolver.toRepoRelative(currentIntent.intentPath),
+      intent_source: currentIntent.reconstructed ? 'reconstructed_fallback' : 'persisted_artifact',
+      intent_hash_match: Boolean(
+        loaded.value.intent_hash && intentDraftHash(intent) === loaded.value.intent_hash
+      ),
+      next_actions: [`pnpm kyberion recording review ${ref} --approve-recording --approve-intent`],
+    };
+    if (argv.json) console.log(JSON.stringify(payload, null, 2));
+    else {
+      console.log(
+        ui('recorder:recorder_inspect_summary', {
+          id: loaded.value.recording_id,
+          status: loaded.value.review.status,
+        })
+      );
+      console.log(
+        ui('recorder:recorder_target_summary', {
+          name: loaded.value.target.name,
+          platform: loaded.value.target.platform,
+        })
+      );
+      console.log(ui('recorder:recorder_steps_summary', { count: loaded.value.steps.length }));
+      console.log(ui('recorder:recorder_intent_summary', { intent: intent.intent }));
+      console.log(`  ${ui('recorder:recorder_intent_source', { source: payload.intent_source })}`);
+      console.log(
+        `  ${ui('recorder:recorder_intent_hash_match', { match: payload.intent_hash_match ? 'true' : 'false' })}`
+      );
+      for (const step of intent.steps) console.log(`  - ${step.op}: ${step.title}`);
+      console.log(`${ui('recorder:recorder_next_actions')} ${payload.next_actions[0]}`);
+    }
+    return;
+  }
+  if (
+    action !== 'review' ||
+    (!argv.approve && !argv.reject && !argv.approveIntent && !argv.rejectIntent)
+  ) {
+    console.error(ui('recorder:recorder_review_usage'));
+    process.exitCode = 1;
+    return;
+  }
+  if (
+    Number(Boolean(argv.approve)) + Number(Boolean(argv.reject)) > 1 ||
+    Number(Boolean(argv.approveIntent)) + Number(Boolean(argv.rejectIntent)) > 1
+  ) {
+    console.error(ui('recorder:recorder_review_usage'));
+    process.exitCode = 1;
+    return;
+  }
+  const reviewer = argv.reviewer || 'human:operator';
+  let updated =
+    argv.approve || argv.reject
+      ? ({
+          ...loaded.value,
+          review: {
+            status: argv.approve ? 'approved' : 'rejected',
+            reviewer,
+            reviewed_at: new Date().toISOString(),
+            ...(argv.note ? { note: argv.note } : {}),
+          },
+        } as const)
+      : loaded.value;
+  let intent = currentIntent.intent;
+  if (argv.approveIntent || argv.rejectIntent) {
+    intent = reviewDesktopIntent(
+      intent,
+      argv.approveIntent ? 'approved' : 'rejected',
+      reviewer,
+      argv.note
+    );
+    safeWriteFile(currentIntent.intentPath, `${JSON.stringify(intent, null, 2)}\n`);
+    updated = {
+      ...updated,
+      intent_hash: intentDraftHash(intent),
+      recording_hash: computeDesktopRecordingHash({
+        ...updated,
+        intent_hash: intentDraftHash(intent),
+      }),
+    };
+  }
+  if (argv.approve || argv.reject || argv.approveIntent || argv.rejectIntent)
+    safeWriteFile(recordingPath, `${JSON.stringify(updated, null, 2)}\n`);
+  console.log(
+    ui('recorder:recorder_reviewed', { id: updated.recording_id, status: updated.review.status })
+  );
+  if (argv.approveIntent || argv.rejectIntent)
+    console.log(ui('recorder:recorder_intent_reviewed', { status: intent.review.status }));
+}
+
+async function handleProcedureInspect(procedureId: string, json: boolean): Promise<void> {
+  const entry = procedureEntryOrReport(procedureId);
+  if (!entry) return;
+  const loaded = loadProcedureRecording(entry);
+  const pipeline = entry.substrate === 'desktop' ? loadDesktopPipeline(entry.pipeline_ref) : null;
+  const desktopRecording =
+    entry.substrate === 'desktop' && loaded.value ? (loaded.value as DesktopRecording) : undefined;
+  const browserRecording =
+    entry.substrate === 'browser' && loaded.value
+      ? (loaded.value as BrowserExtensionRecording)
+      : undefined;
+  const payload = {
+    procedure: entry,
+    recording: loaded.value
+      ? {
+          review_status: loaded.value.review?.status,
+          intent_review_status: desktopRecording
+            ? (() => {
+                try {
+                  return loadDesktopIntent(
+                    desktopRecording,
+                    resolveAllowlistedRecordingRef(entry.adapter.recording_ref)!,
+                    { allowReconstruct: false }
+                  ).intent.review.status;
+                } catch {
+                  return 'missing';
+                }
+              })()
+            : undefined,
+          intent_hash: desktopRecording?.intent_hash,
+          ...(browserRecording ? { action_count: browserRecording.actions.length } : {}),
+          risk_summary: loaded.value.risk_summary,
+          ...(desktopRecording ? { step_count: desktopRecording.steps.length } : {}),
+        }
+      : null,
+    recording_error: loaded.error,
+    pipeline_error: pipeline && !pipeline.value ? pipeline.errors.join('; ') : undefined,
+    next_actions:
+      loaded.error || (pipeline && !pipeline.value)
+        ? [ui('recorder:recorder_review_repair')]
+        : [`pnpm kyberion procedure run ${entry.procedure_id} --inputs '{}'`],
+  };
+  if (json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  printProcedureEntry(entry);
+  console.log(ui('recorder:recorder_pipeline', { path: entry.pipeline_ref }));
+  console.log(
+    `  ${ui('recorder:recorder_required_inputs', { inputs: (entry.required_inputs || []).map((input) => input.name).join(', ') || 'none' })}`
+  );
+  if (loaded.value?.review)
+    console.log(
+      ui('recorder:recorder_recording_review_state', { status: loaded.value.review.status })
+    );
+  if (entry.substrate === 'desktop' && loaded.value) {
+    let intentStatus = 'missing';
+    try {
+      const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
+      if (recordingPath && desktopRecording)
+        intentStatus = loadDesktopIntent(desktopRecording, recordingPath, {
+          allowReconstruct: false,
+        }).intent.review.status;
+    } catch {
+      // The localized missing state is enough for the operator; execution will explain the repair action.
+    }
+    console.log(ui('recorder:recorder_intent_review_state', { status: intentStatus }));
+  }
+  if (loaded.value?.risk_summary) {
+    console.log(
+      ui('recorder:recorder_high_risk_count', {
+        count: loaded.value.risk_summary.approval_required_count,
+      })
+    );
+  }
+  if (loaded.error) console.log(ui('recorder:recorder_blocked', { error: loaded.error }));
+  if (pipeline && !pipeline.value)
+    console.log(ui('recorder:recorder_pipeline_blocked', { error: pipeline.errors.join('; ') }));
+}
+
+async function handleProcedureRun(
+  procedureId: string,
+  argv: {
+    inputs?: string;
+    missionId?: string;
+    origin?: string;
+    tabId?: string;
+    cdpUrl?: string;
+    cdpPort?: number;
+    recordVideo?: boolean;
+    recordTrace?: boolean;
+    correlationId?: string;
+    reviewer?: string;
+    json?: boolean;
+  }
+): Promise<void> {
+  const entry = procedureEntryOrReport(procedureId);
+  if (!entry) return;
+  const loaded = loadProcedureRecording(entry);
+  if (!loaded.value) {
+    console.error(
+      ui('recorder:recorder_execution_failed', { error: loaded.error || 'recording unavailable' })
+    );
+    process.exitCode = 1;
+    return;
+  }
+  let inputs: Record<string, unknown> = {};
+  if (argv.inputs) {
+    try {
+      const parsed = JSON.parse(argv.inputs);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        throw new Error('JSON object required');
+      inputs = parsed as Record<string, unknown>;
+    } catch (error) {
+      console.error(
+        ui('recorder:recorder_inputs_invalid', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const missionId = argv.missionId || process.env.MISSION_ID || `MSN-CLI-${procedureId}`;
+  const correlationId = (argv.correlationId || `cli:${procedureId}:${randomUUID()}`)
+    .trim()
+    .slice(0, 240);
+  let result;
+  let browserEvidence: unknown;
+  if (entry.substrate === 'service') {
+    result = await withExecutionContext('surface_runtime', () =>
+      dispatchProcedure({
+        procedure: entry,
+        serviceRecording: loaded.value as ServiceRecording,
+        serviceInputs: inputs,
+        agentId: 'kyberion-home-cli',
+        missionId,
+        correlationId,
+        channel: 'cli',
+      })
+    );
+  } else if (entry.substrate === 'desktop') {
+    let desktopIntent;
+    try {
+      const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
+      if (!recordingPath) throw new Error(ui('recorder:recorder_recording_ref_invalid'));
+      desktopIntent = loadDesktopIntent(loaded.value as DesktopRecording, recordingPath, {
+        allowReconstruct: false,
+      }).intent;
+    } catch (error) {
+      console.error(
+        ui('recorder:recorder_execution_failed', {
+          error: localizeRecorderError(error instanceof Error ? error.message : String(error)),
+        })
+      );
+      process.exitCode = 1;
+      return;
+    }
+    result = await withExecutionContext('surface_runtime', () =>
+      dispatchProcedure({
+        procedure: entry,
+        desktopRecording: loaded.value as DesktopRecording,
+        desktopIntent,
+        desktopInputs: Object.fromEntries(
+          Object.entries(inputs).map(([key, value]) => [key, String(value)])
+        ),
+        agentId: 'kyberion-home-cli',
+        missionId,
+        correlationId,
+        channel: 'cli',
+      })
+    );
+  } else if (entry.substrate === 'browser') {
+    const browserRecording = loaded.value as BrowserExtensionRecording;
+    const origin = argv.origin || browserRecording.tab.origin;
+    const tabId = argv.tabId || '';
+    if (!tabId) {
+      console.error(ui('recorder:recorder_browser_tab_required'));
+      process.exitCode = 1;
+      return;
+    }
+    const requestedOperations = Array.from(
+      new Set(
+        browserRecording.actions
+          .map((action: { op: string }) => action.op)
+          .filter((op: string) => op !== 'sensitive_input_omitted')
+      )
+    ) as Array<Exclude<BrowserExtensionOperation, 'sensitive_input_omitted'>>;
+    const actuatorPath = pathResolver.rootResolve(
+      'dist/libs/actuators/browser-actuator/src/index.js'
+    );
+    type BrowserActuatorResult = {
+      status?: string;
+      results?: unknown[];
+      errors?: string[];
+      context?: unknown;
+    };
+    let browserActuator: {
+      handleAction: (input: Record<string, unknown>) => Promise<BrowserActuatorResult>;
+    };
+    try {
+      browserActuator = (await import(pathToFileURL(actuatorPath).href)) as typeof browserActuator;
+    } catch (error) {
+      console.error(
+        ui('recorder:recorder_browser_build_required', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      process.exitCode = 1;
+      return;
+    }
+    const playwrightEntry = {
+      ...entry,
+      execution_substrate: 'playwright' as const,
+    };
+    result = await withExecutionContext('surface_runtime', () =>
+      dispatchProcedure({
+        procedure: playwrightEntry,
+        recording: browserRecording,
+        session: {
+          kind: 'browser-extension-session.v1',
+          mission_id: missionId,
+          pipeline_id: entry.pipeline_ref,
+          tab_id: tabId,
+          origin,
+          mode: 'execute',
+          recording_id: browserRecording.recording_id,
+          requested_operations: requestedOperations,
+        },
+        agentId: 'kyberion-home-cli',
+        missionId,
+        pipelineId: entry.pipeline_ref,
+        correlationId,
+        channel: 'cli',
+        executeBrowserPipeline: async ({ steps, sessionId, options }) => {
+          const actuatorResult = await browserActuator.handleAction({
+            action: 'pipeline',
+            steps,
+            session_id: sessionId || tabId,
+            options: {
+              ...(options || {}),
+              connect_over_cdp: true,
+              record_trace: argv.recordTrace !== false,
+              record_video: argv.recordVideo !== false,
+              ...(argv.cdpUrl ? { cdp_url: argv.cdpUrl } : {}),
+              ...(argv.cdpPort ? { cdp_port: argv.cdpPort } : {}),
+            },
+            context: {
+              procedure_id: entry.procedure_id,
+              mission_id: missionId,
+              source: 'kyberion-home-cli',
+            },
+          });
+          browserEvidence = actuatorResult?.context;
+          return {
+            status: actuatorResult?.status === 'succeeded' ? 'succeeded' : 'failed',
+            results: Array.isArray(actuatorResult?.results) ? actuatorResult.results : undefined,
+            errors: actuatorResult?.errors,
+          };
+        },
+      })
+    );
+  } else {
+    console.error(`${ui('recorder:recorder_unsupported_substrate')}: ${entry.substrate}`);
+    process.exitCode = 1;
+    return;
+  }
+  const output = {
+    procedure_id: procedureId,
+    substrate: entry.substrate,
+    mission_id: missionId,
+    correlation_id: correlationId,
+    recording_ref: entry.adapter.recording_ref,
+    ...(browserEvidence ? { evidence: browserEvidence } : {}),
+    result,
+  };
+  if (argv.json) {
+    console.log(JSON.stringify(output, null, 2));
+    return;
+  }
+  console.log(ui('recorder:recorder_execution_status', { id: procedureId, status: result.status }));
+  if (result.approvalRequestId) {
+    console.log(ui('recorder:recorder_execution_approval', { id: result.approvalRequestId }));
+    console.log(ui('recorder:recorder_execution_confirm', { id: result.approvalRequestId }));
+  }
+  if (result.lease)
+    console.log(ui('recorder:recorder_execution_lease', { lease: JSON.stringify(result.lease) }));
+  if (result.errors.length > 0)
+    console.log(
+      ui('recorder:recorder_execution_reason', {
+        reason: result.errors.map(localizeRecorderError).join('; '),
+      })
+    );
+  if (result.status === 'executed') {
+    console.log(ui('recorder:recorder_execution_feedback', { id: procedureId, correlationId }));
+  }
+}
+
+function handleProcedurePromote(argv: {
+  procedureId?: string;
+  substrate?: string;
+  recording?: string;
+  intent?: string;
+  json?: boolean;
+}): void {
+  if (argv.substrate !== 'desktop' || !argv.procedureId || !argv.recording || !argv.intent) {
+    console.error(ui('recorder:recorder_procedure_promote_usage'));
+    process.exitCode = 1;
+    return;
+  }
+  try {
+    const promoted = promoteDesktopProcedure({
+      procedureId: argv.procedureId,
+      recordingRef: argv.recording,
+      intentPhrases: [argv.intent],
+    });
+    const payload = {
+      procedure: promoted.procedureEntry,
+      catalog_path: promoted.catalogPath,
+      pipeline_path: promoted.pipelinePath,
+      warnings: promoted.warnings,
+      next_actions: [
+        `pnpm kyberion intent "${argv.intent}" --substrate desktop`,
+        `pnpm kyberion procedure run ${argv.procedureId} --inputs '{}'`,
+      ],
+    };
+    if (argv.json) console.log(JSON.stringify(payload, null, 2));
+    else {
+      console.log(ui('recorder:recorder_promoted', { id: promoted.procedureEntry.procedure_id }));
+      console.log(ui('recorder:recorder_catalog', { path: promoted.catalogPath }));
+      console.log(ui('recorder:recorder_pipeline', { path: promoted.pipelinePath }));
+      for (const warning of promoted.warnings || [])
+        console.log(`  warning: ${localizeRecorderWarning(warning)}`);
+      console.log(`${ui('recorder:recorder_next_actions')} ${payload.next_actions[0]}`);
+    }
+  } catch (error) {
+    console.error(
+      ui('recorder:recorder_promotion_failed', {
+        error: localizeRecorderError(error instanceof Error ? error.message : String(error)),
+      })
+    );
+    process.exitCode = 1;
+  }
+}
+
+function handleProcedureRepair(procedureId: string, json: boolean): void {
+  const status = reconcileDesktopPromotionTransaction(procedureId);
+  const payload = { procedure_id: procedureId, transaction: status };
+  if (json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  console.log(ui('recorder:recorder_transaction_status', { id: procedureId, status }));
+  if (status === 'pending') {
+    console.error(ui('recorder:recorder_transaction_repair_unsafe'));
+    process.exitCode = 1;
+  }
+}
+
+function handleFeedbackSubcommand(argv: {
+  intentId?: string;
+  scenarioId?: string;
+  outcome?: string;
+  comment?: string;
+  correction?: string;
+  procedureId?: string;
+  correlationId?: string;
+  json?: boolean;
+}): void {
+  const intentId = String(argv.intentId || '').trim();
+  const outcome = String(argv.outcome || '').trim() as
+    'satisfied' | 'partially_satisfied' | 'dissatisfied';
+  if (!intentId || !['satisfied', 'partially_satisfied', 'dissatisfied'].includes(outcome)) {
+    console.error(ui('recorder:recorder_feedback_usage'));
+    process.exitCode = 1;
+    return;
+  }
+  const feedback = recordExecutionFeedback({
+    scenario_id: argv.scenarioId || `use-case-${intentId}`,
+    intent_id: intentId,
+    outcome,
+    comment: argv.comment,
+    correction: argv.correction,
+    correlation_id: argv.correlationId,
+    source: 'operator',
+    surface: 'cli',
+  });
+  const improvement = materializeExecutionFeedbackCandidate({
+    feedback,
+    procedureId: argv.procedureId || intentId,
+  });
+  const payload = { feedback, summary: improvement.summary, candidate: improvement.candidate };
+  if (argv.json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  console.log(
+    ui('recorder:recorder_feedback_recorded', {
+      id: feedback.feedback_id,
+      outcome: feedback.outcome,
+    })
+  );
+  if (improvement.candidate) {
+    console.log(
+      ui('recorder:recorder_feedback_candidate', { id: improvement.candidate.candidate_id })
+    );
+    console.log(
+      ui('recorder:recorder_feedback_review', { id: improvement.candidate.candidate_id })
+    );
+  } else {
+    console.log(ui('recorder:recorder_no_improvement'));
+  }
+}
+
+function handleImprovements(argv: {
+  approve?: string;
+  deny?: string;
+  note?: string;
+  json?: boolean;
+}): void {
+  if (argv.approve || argv.deny) {
+    const candidateId = String(argv.approve || argv.deny);
+    const candidate = listDistillCandidateRecords().find(
+      (entry) => entry.candidate_id === candidateId
+    );
+    if (!candidate || candidate.status !== 'proposed') {
+      console.error(ui('recorder:recorder_improvement_not_found', { id: candidateId }));
+      process.exitCode = 1;
+      return;
+    }
+    const reviewed = updateDistillCandidateRecord(candidateId, {
+      status: argv.approve ? 'promoted' : 'archived',
+      ...(argv.approve ? { promoted_ref: `procedure-improvement:${candidateId}` } : {}),
+      metadata: {
+        ...(candidate.metadata || {}),
+        review: {
+          status: argv.approve ? 'approved' : 'rejected',
+          reviewer: 'human:operator',
+          note: argv.note || 'reviewed via pnpm kyberion improvements',
+        },
+      },
+    });
+    console.log(
+      ui('recorder:recorder_improvement_updated', {
+        id: reviewed?.candidate_id || candidateId,
+        status: reviewed?.status || 'unknown',
+      })
+    );
+    if (argv.approve) console.log(ui('recorder:recorder_catalog_review_note'));
+    return;
+  }
+  const candidates = listDistillCandidateRecords().filter(
+    (candidate) => candidate.metadata?.improvement_kind === 'execution_feedback'
+  );
+  if (argv.json) {
+    console.log(JSON.stringify(candidates, null, 2));
+    return;
+  }
+  if (candidates.length === 0) {
+    console.log(ui('recorder:recorder_no_candidates'));
+    return;
+  }
+  console.log(ui('recorder:recorder_improvement_header', { count: candidates.length }));
+  for (const candidate of candidates) {
+    console.log(`  [${candidate.candidate_id}] ${candidate.status} ${candidate.title}`);
+    console.log(`      ${candidate.summary}`);
+  }
+  console.log(ui('recorder:recorder_improvement_approve'));
 }
 
 function printCustomerBindingsWarning(): void {
@@ -227,16 +1324,15 @@ function printCustomerBindingsWarning(): void {
     );
     if (bindings.length === 0) return;
     console.log('');
-    console.log(
-      `⚠ 顧客モード channel binding: ${bindings.length} 件アクティブ(誤バインディング注意)`
-    );
+    console.log(ui('recorder:recorder_customer_binding_warning', { count: bindings.length }));
     for (const entry of bindings.slice(0, 5)) {
       console.log(
         `  - ${entry.binding.surface}:${entry.binding.channel_id} → ${entry.tenantSlug}` +
           (entry.binding.counterpart?.org ? ` (${entry.binding.counterpart.org})` : '')
       );
     }
-    if (bindings.length > 5) console.log(`  ... 他 ${bindings.length - 5} 件`);
+    if (bindings.length > 5)
+      console.log(ui('recorder:recorder_customer_binding_more', { count: bindings.length - 5 }));
   } catch {
     // home must never fail on an optional panel
   }
@@ -263,11 +1359,17 @@ async function showHome(json: boolean): Promise<void> {
     return;
   }
 
-  console.log('Kyberion Home');
-  console.log(`Status: ${home.statusLabel} — ${home.statusDetail}`);
-  console.log(`Doctor gaps: ${doctor.totalMissing}`);
+  console.log(ui('recorder:recorder_home_title'));
   console.log(
-    `承認待ち ${governance.pending_approvals} 件 / 質問 ${home.counts.clarificationQuestions} 件 / inbox 未読 ${home.counts.unreadInbox} 件`
+    ui('recorder:recorder_home_status', { label: home.statusLabel, detail: home.statusDetail })
+  );
+  console.log(ui('recorder:recorder_home_doctor', { count: doctor.totalMissing }));
+  console.log(
+    ui('recorder:recorder_home_counts', {
+      approvals: governance.pending_approvals,
+      questions: home.counts.clarificationQuestions,
+      inbox: home.counts.unreadInbox,
+    })
   );
   const recent = [...home.activeMissions]
     .sort((left, right) =>
@@ -275,8 +1377,11 @@ async function showHome(json: boolean): Promise<void> {
     )
     .slice(0, 3);
   console.log(
-    `実行中ミッション: ${home.counts.activeMissions} 件(直近7日で動きあり ${home.counts.recentlyActiveMissions} 件)` +
-      (recent.length > 0 ? ' — 直近:' : '')
+    ui('recorder:recorder_home_missions', {
+      active: home.counts.activeMissions,
+      recent: home.counts.recentlyActiveMissions,
+      suffix: recent.length > 0 ? ' — recent:' : '',
+    })
   );
   for (const mission of recent) {
     console.log(
@@ -304,12 +1409,12 @@ async function handleDealsIngestAudio(argv: {
     .flatMap((tenantSlug) => listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal })))
     .find((entry) => entry.deal.deal_id === argv.ingestAudio);
   if (!match) {
-    console.error(`deal not found: ${argv.ingestAudio}`);
+    console.error(ui('recorder:recorder_deal_not_found', { id: argv.ingestAudio || '' }));
     process.exitCode = 1;
     return;
   }
   if (!argv.audio) {
-    console.error('Usage: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>');
+    console.error(ui('recorder:recorder_deal_audio_usage'));
     process.exitCode = 1;
     return;
   }
@@ -320,15 +1425,14 @@ async function handleDealsIngestAudio(argv: {
     projectName: match.deal.summary?.slice(0, 80),
   });
   if (!result) {
-    console.error(
-      '取り込みに失敗しました(文字起こし不可、または reasoning backend が stub)。ログを確認してください。'
-    );
+    console.error(ui('recorder:recorder_deal_audio_failed'));
     process.exitCode = 1;
     return;
   }
-  console.log(`✓ 要件ドラフト更新 (${result.capture.turns_captured} 回目の取り込み)`);
-  if (result.transcript_path) console.log(`  文字起こし: ${result.transcript_path}`);
-  console.log(`  確認: pnpm kyberion deals --requirements ${match.deal.deal_id}`);
+  console.log(ui('recorder:recorder_deal_audio_updated', { count: result.capture.turns_captured }));
+  if (result.transcript_path)
+    console.log(ui('recorder:recorder_deal_transcript', { path: result.transcript_path }));
+  console.log(ui('recorder:recorder_deal_requirements_next', { id: match.deal.deal_id }));
 }
 
 function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }): void {
@@ -341,15 +1445,17 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
   if (argv.requirements) {
     const match = deals.find((entry) => entry.deal.deal_id === argv.requirements);
     if (!match) {
-      console.error(`deal not found: ${argv.requirements}`);
+      console.error(ui('recorder:recorder_deal_not_found', { id: argv.requirements }));
       process.exitCode = 1;
       return;
     }
     const capture = readDealRequirementsCapture(match.tenantSlug, match.deal.deal_id);
     if (!capture) {
       console.log(
-        `要件キャプチャはまだありません (${match.deal.deal_id} / stage: ${match.deal.stage})。` +
-          ' discovery ステージの顧客対話で自動収集されます。'
+        ui('recorder:recorder_deal_requirements_none', {
+          id: match.deal.deal_id,
+          stage: match.deal.stage,
+        })
       );
       return;
     }
@@ -359,7 +1465,11 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
     }
     const req = capture.requirements;
     console.log(
-      `要件ドラフト ${match.deal.deal_id} (${capture.turns_captured} ターン / 更新 ${capture.updated_at})`
+      ui('recorder:recorder_deal_requirements_header', {
+        id: match.deal.deal_id,
+        turns: capture.turns_captured,
+        updated: capture.updated_at,
+      })
     );
     for (const fr of req.functional_requirements || []) {
       console.log(`  [${fr.priority}] ${fr.id}: ${fr.description}`);
@@ -369,7 +1479,7 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
     }
     const open = (req.open_questions || []).filter((q) => (q.status || 'open') === 'open');
     if (open.length > 0) {
-      console.log('  未解決の質問:');
+      console.log(ui('recorder:recorder_deal_open_questions'));
       for (const q of open) console.log(`    - ${q.blocking ? '[blocking] ' : ''}${q.question}`);
     }
     return;
@@ -380,17 +1490,17 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
     return;
   }
   if (deals.length === 0) {
-    console.log('商談はありません。顧客チャネルの binding から自動で開始されます。');
+    console.log(ui('recorder:recorder_deal_empty'));
     return;
   }
-  console.log(`商談 (${deals.length} 件):`);
+  console.log(ui('recorder:recorder_deal_header', { count: deals.length }));
   for (const { tenantSlug, deal } of deals) {
     console.log(
       `  [${deal.deal_id}] ${tenantSlug} / ${deal.stage.padEnd(10)} ${deal.summary.slice(0, 60)}`
     );
   }
   console.log('');
-  console.log('要件ヒアリング内容: pnpm kyberion deals --requirements <deal-id>');
+  console.log(ui('recorder:recorder_deal_requirements_command'));
 }
 
 async function main(): Promise<void> {
@@ -398,6 +1508,10 @@ async function main(): Promise<void> {
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
+  }
+  const localeFlagIndex = process.argv.indexOf('--locale');
+  if (localeFlagIndex >= 0 && process.argv[localeFlagIndex + 1]) {
+    cliLocale = resolveLocale({ explicit: process.argv[localeFlagIndex + 1] });
   }
   // yargs intercepts a literal `help` positional with its own dump — answer
   // with the command table (what the home screen advertises) instead.
@@ -407,6 +1521,11 @@ async function main(): Promise<void> {
   }
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
+    .option('locale', {
+      type: 'string',
+      choices: ['en', 'ja', 'qps-ploc'],
+      description: 'CLI output locale',
+    })
     .option('set', { type: 'string', description: 'notify: set default channel surface:target' })
     .option('read', { type: 'string', description: 'inbox: mark entry as read' })
     .option('read-all', { type: 'boolean', description: 'inbox: mark all unread as read' })
@@ -415,6 +1534,68 @@ async function main(): Promise<void> {
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
     .option('note', { type: 'string', description: 'approvals: decision note' })
+    .option('substrate', { type: 'string', choices: ['browser', 'desktop', 'service'] })
+    .option('origin', { type: 'string', description: 'browser procedure origin binding' })
+    .option('tab-id', { type: 'string', description: 'browser procedure tab binding' })
+    .option('cdp-url', {
+      type: 'string',
+      description: 'Chrome DevTools endpoint for CLI browser execution',
+    })
+    .option('cdp-port', {
+      type: 'number',
+      description: 'Chrome DevTools port for CLI browser execution',
+    })
+    .option('record-video', {
+      type: 'boolean',
+      default: true,
+      description: 'record browser video evidence when the runtime supports it',
+    })
+    .option('record-trace', {
+      type: 'boolean',
+      default: true,
+      description: 'record browser trace evidence',
+    })
+    .option('mission-id', { type: 'string', description: 'mission id for a procedure run' })
+    .option('correlation-id', {
+      type: 'string',
+      description: 'correlation id shared by execution and feedback',
+    })
+    .option('inputs', { type: 'string', description: 'procedure runtime inputs as a JSON object' })
+    .option('outcome', {
+      type: 'string',
+      choices: ['satisfied', 'partially_satisfied', 'dissatisfied'],
+      description: 'execution feedback outcome',
+    })
+    .option('scenario-id', { type: 'string', description: 'execution feedback scenario id' })
+    .option('comment', { type: 'string', description: 'execution feedback comment' })
+    .option('correction', { type: 'string', description: 'execution feedback correction' })
+    .option('procedure-id', {
+      type: 'string',
+      description: 'procedure id associated with feedback',
+    })
+    .option('recording', { type: 'string', description: 'desktop recording path for promotion' })
+    .option('intent', {
+      type: 'string',
+      description: 'natural-language intent phrase for promotion',
+    })
+    .option('reviewer', { type: 'string', description: 'recording reviewer identity' })
+    .option('approve-recording', { type: 'boolean', description: 'approve a desktop recording' })
+    .option('reject-recording', { type: 'boolean', description: 'reject a desktop recording' })
+    .option('approve-intent', {
+      type: 'boolean',
+      description: 'approve the reconstructed desktop intent',
+    })
+    .option('reject-intent', {
+      type: 'boolean',
+      description: 'reject the reconstructed desktop intent',
+    })
+    .option('duration', { type: 'number', description: 'desktop recording duration in seconds' })
+    .option('fps', { type: 'number', description: 'desktop screen recording frames per second' })
+    .option('display-index', {
+      type: 'number',
+      description: 'desktop display index for screen recording',
+    })
+    .option('capture-mode', { type: 'string', choices: ['screen', 'focused_window'] })
     .option('requirements', {
       type: 'string',
       description: 'deals: show captured requirements for a deal id',
@@ -425,6 +1606,8 @@ async function main(): Promise<void> {
     })
     .option('audio', { type: 'string', description: 'deals: audio file path for --ingest-audio' })
     .parseSync();
+
+  cliLocale = resolveLocale({ explicit: argv.locale ? String(argv.locale) : undefined });
 
   const subcommand = String(argv._[0] || '');
   switch (subcommand) {
@@ -456,6 +1639,94 @@ async function main(): Promise<void> {
     case 'ask':
       await handleAskSubcommand(argv._.slice(1).map(String).join(' '), Boolean(argv.json));
       return;
+    case 'intent':
+      await handleIntentSubcommand(
+        argv._.slice(1).map(String).join(' '),
+        argv as { substrate?: string; origin?: string; json?: boolean }
+      );
+      return;
+    case 'procedure': {
+      const action = String(argv._[1] || 'list');
+      const procedureId = String(argv._[2] || '');
+      if (action === 'list') {
+        handleProcedureList(argv as { substrate?: string; json?: boolean });
+      } else if (action === 'inspect' && procedureId) {
+        await handleProcedureInspect(procedureId, Boolean(argv.json));
+      } else if (action === 'run' && procedureId) {
+        await handleProcedureRun(procedureId, {
+          inputs: argv.inputs ? String(argv.inputs) : undefined,
+          missionId: argv['mission-id'] ? String(argv['mission-id']) : undefined,
+          correlationId: argv['correlation-id'] ? String(argv['correlation-id']) : undefined,
+          origin: argv.origin ? String(argv.origin) : undefined,
+          tabId: argv['tab-id'] ? String(argv['tab-id']) : undefined,
+          cdpUrl: argv['cdp-url'] ? String(argv['cdp-url']) : undefined,
+          cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
+          recordVideo: argv['record-video'] !== false,
+          recordTrace: argv['record-trace'] !== false,
+          json: Boolean(argv.json),
+        });
+      } else if (action === 'promote' && procedureId) {
+        handleProcedurePromote({
+          procedureId,
+          substrate: argv.substrate ? String(argv.substrate) : undefined,
+          recording: argv.recording ? String(argv.recording) : undefined,
+          intent: argv.intent ? String(argv.intent) : undefined,
+          json: Boolean(argv.json),
+        });
+      } else if (action === 'repair' && procedureId) {
+        handleProcedureRepair(procedureId, Boolean(argv.json));
+      } else {
+        console.error(ui('recorder:recorder_procedure_usage'));
+        process.exitCode = 1;
+      }
+      return;
+    }
+    case 'record':
+      if (String(argv._[1] || '') !== 'desktop') {
+        console.error(ui('recorder:recorder_record_usage'));
+        process.exitCode = 1;
+        return;
+      }
+      await handleDesktopRecord({
+        duration: typeof argv.duration === 'number' ? argv.duration : undefined,
+        fps: typeof argv.fps === 'number' ? argv.fps : undefined,
+        displayIndex:
+          typeof argv['display-index'] === 'number' ? Number(argv['display-index']) : undefined,
+        captureMode: argv['capture-mode'] ? String(argv['capture-mode']) : undefined,
+        json: Boolean(argv.json),
+      });
+      return;
+    case 'recording':
+      await handleRecordingSubcommand(String(argv._[1] || ''), String(argv._[2] || ''), {
+        approve: Boolean(argv['approve-recording']),
+        reject: Boolean(argv['reject-recording']),
+        approveIntent: Boolean(argv['approve-intent']),
+        rejectIntent: Boolean(argv['reject-intent']),
+        reviewer: argv.reviewer ? String(argv.reviewer) : undefined,
+        note: argv.note ? String(argv.note) : undefined,
+        json: Boolean(argv.json),
+      });
+      return;
+    case 'feedback':
+      handleFeedbackSubcommand({
+        intentId: String(argv._[1] || ''),
+        scenarioId: argv['scenario-id'] ? String(argv['scenario-id']) : undefined,
+        outcome: argv.outcome ? String(argv.outcome) : undefined,
+        comment: argv.comment ? String(argv.comment) : undefined,
+        correction: argv.correction ? String(argv.correction) : undefined,
+        procedureId: argv['procedure-id'] ? String(argv['procedure-id']) : undefined,
+        correlationId: argv['correlation-id'] ? String(argv['correlation-id']) : undefined,
+        json: Boolean(argv.json),
+      });
+      return;
+    case 'improvements':
+      handleImprovements({
+        approve: argv.approve ? String(argv.approve) : undefined,
+        deny: argv.deny ? String(argv.deny) : undefined,
+        note: argv.note ? String(argv.note) : undefined,
+        json: Boolean(argv.json),
+      });
+      return;
     case 'help':
       printCommands();
       return;
@@ -463,7 +1734,7 @@ async function main(): Promise<void> {
       await showHome(Boolean(argv.json));
       return;
     default:
-      console.error(`unknown subcommand: ${subcommand}`);
+      console.error(ui('recorder:recorder_unknown_subcommand', { subcommand }));
       printCommands();
       process.exitCode = 1;
   }

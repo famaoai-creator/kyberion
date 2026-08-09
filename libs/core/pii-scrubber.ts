@@ -74,6 +74,15 @@ export interface PiiScanResult {
   findings: PiiFinding[];
 }
 
+/** Internal redaction coordinates. Raw matched text is intentionally absent. */
+export interface PiiSpan {
+  start: number;
+  end: number;
+  rule_id: string;
+  severity: PiiSeverity;
+  action: PiiAction;
+}
+
 export interface PiiScrubApplication {
   rule_id: string;
   count: number;
@@ -263,6 +272,29 @@ export function scanContent(text: string, options: PiiRuleOptions = {}): PiiScan
     if (finding) findings.push(finding);
   }
   return { findings };
+}
+
+/** Locate matches for a caller that can redact a corresponding visual region. */
+export function findPiiSpans(text: string, options: PiiRuleOptions = {}): PiiSpan[] {
+  const spans: PiiSpan[] = [];
+  for (const rule of loadPiiRules(options)) {
+    const regex = new RegExp(rule.pattern, 'g');
+    for (const hit of text.matchAll(regex)) {
+      const value = hit[0];
+      if (!matchIsReal(rule, value)) continue;
+      const start = hit.index ?? 0;
+      spans.push({
+        start,
+        end: start + value.length,
+        rule_id: rule.id,
+        severity: rule.severity,
+        action: rule.action,
+      });
+    }
+  }
+  return spans.sort(
+    (a, b) => a.start - b.start || a.end - b.end || a.rule_id.localeCompare(b.rule_id)
+  );
 }
 
 /**

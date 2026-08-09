@@ -1,0 +1,21 @@
+{
+  "pipeline_id": "sbi",
+  "version": "0.1.0-draft",
+  "description": "Reviewed recording-backed SBI procedure; execution is lease-gated by the browser extension.",
+  "action": "pipeline",
+  "_draft": true,
+  "_source": {
+    "kind": "browser-recording.v1",
+    "recording_id": "REC-d0062683-9918-40fd-b256-cd8c041d9728"
+  },
+  "options": { "record_trace": true },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "extension_session",
+      "params": {
+        "recording_ref": "knowledge/personal/browser-recordings/REC-d0062683-9918-40fd-b256-cd8c041d9728.json"
+      }
+    }
+  ]
+}

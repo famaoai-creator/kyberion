@@ -317,6 +317,7 @@
 - [Mission Portability Standard (MEP v0.1)](./product/orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
 - [Mission Types & Categories](./product/orchestration/mission-types.md) (public | Ecosystem Architect)
 - [Narrated Video Production Playbook](./product/orchestration/narrated-video-production-playbook.md) (public | Unknown)
+- [Native operation selection ladder](./product/orchestration/native-op-ladder.md) (public | Unknown)
 - [Negotiation Mission Protocol](./product/orchestration/negotiation-protocol.md) (public | Ecosystem Architect)
 - [Oh My OpenAgent から抽出できる clean-room ノート](./product/orchestration/oh-my-openagent-clean-room-notes.md) (public | Unknown)
 - [Orchestration Index](./product/orchestration/README.md) (public | Ecosystem Architect)

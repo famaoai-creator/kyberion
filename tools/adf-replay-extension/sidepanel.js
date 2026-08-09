@@ -4,6 +4,9 @@ const state = { current: null };
 // without feedback users double-click — spawning concurrent hosts. One action
 // at a time; the active button shows a busy spinner and label.
 let actionBusy = false;
+const builtInAiReady = new Set();
+let lastScenarioCandidate = null;
+let lastScenarioPageKey = null;
 // A failed action's message stays visible until the NEXT successful action —
 // re-renders from background broadcasts must not silently replace it with a
 // stale success notice.
@@ -23,6 +26,9 @@ function bindAction(button, handler, options = {}) {
     showNotice(options.busyNotice || '実行しています…', 'busy');
     try {
       await handler(event);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      showNotice(lastError, 'error');
     } finally {
       actionBusy = false;
       button.classList.remove('is-busy');
@@ -77,6 +83,21 @@ const elements = {
   // Intent tab
   intentInput: document.querySelector('#intent-input'),
   intentResolveButton: document.querySelector('#intent-resolve-button'),
+  aiScenarioButton: document.querySelector('#ai-scenario-button'),
+  aiScenarioStatus: document.querySelector('#ai-scenario-status'),
+  aiScenarioResult: document.querySelector('#ai-scenario-result'),
+  aiScenarioUseIntentButton: document.querySelector('#ai-scenario-use-intent-button'),
+  aiRepairButton: document.querySelector('#ai-repair-button'),
+  aiRepairStatus: document.querySelector('#ai-repair-status'),
+  aiRepairResult: document.querySelector('#ai-repair-result'),
+  aiPrepareButton: document.querySelector('#ai-prepare-button'),
+  aiPrepareStatus: document.querySelector('#ai-prepare-status'),
+  aiPageSummaryButton: document.querySelector('#ai-page-summary-button'),
+  aiPageSummaryStatus: document.querySelector('#ai-page-summary-status'),
+  aiPageSummary: document.querySelector('#ai-page-summary'),
+  aiObservationSummaryButton: document.querySelector('#ai-observation-summary-button'),
+  aiObservationSummaryStatus: document.querySelector('#ai-observation-summary-status'),
+  aiObservationSummary: document.querySelector('#ai-observation-summary'),
   intentResult: document.querySelector('#intent-result'),
   intentOutcomeLabel: document.querySelector('#intent-outcome-label'),
   intentMatchedInfo: document.querySelector('#intent-matched-info'),
@@ -348,6 +369,31 @@ bindAction(
   }
 );
 
+bindAction(elements.aiScenarioButton, extractScenarioCandidate, {
+  busyLabel: '抽出中…',
+  busyNotice: 'redaction 済みのページからシナリオ候補を抽出しています…',
+});
+bindAction(elements.aiScenarioUseIntentButton, useScenarioCandidateAsIntent, {
+  busyLabel: '設定中…',
+  busyNotice: 'シナリオ候補を intent 入力へ設定しています…',
+});
+bindAction(elements.aiRepairButton, assessRepairTarget, {
+  busyLabel: '確認中…',
+  busyNotice: '現在ページの要素候補を AI で確認しています…',
+});
+bindAction(elements.aiPrepareButton, prepareBuiltInAi, {
+  busyLabel: '準備中…',
+  busyNotice: 'Chrome 内蔵 AI のモデルを準備しています…',
+});
+bindAction(elements.aiPageSummaryButton, summarizeCurrentPage, {
+  busyLabel: '要約中…',
+  busyNotice: 'Chrome 内蔵 AI でページを要約しています…',
+});
+bindAction(elements.aiObservationSummaryButton, summarizeCurrentObservation, {
+  busyLabel: '要約中…',
+  busyNotice: 'Chrome 内蔵 AI で抽出観測を要約しています…',
+});
+
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
 });
@@ -467,6 +513,8 @@ function renderRepairStatus(state) {
 
 refresh();
 
+void refreshBuiltInAiStatus();
+
 async function refresh() {
   const response = await chrome.runtime.sendMessage({ type: 'bridge:get-state' });
   if (!response?.ok)
@@ -488,9 +536,197 @@ async function invoke(type, payload = {}) {
   }
 }
 
+function aiAdapter() {
+  const adapter = globalThis.KyberionBuiltInAI;
+  if (!adapter) throw new Error('Chrome Built-in AI adapter が読み込まれていません。');
+  return adapter;
+}
+
+function aiAvailabilityLabel(value) {
+  if (typeof value === 'string') {
+    return (
+      {
+        available: '利用可能',
+        downloadable: 'モデル取得可能',
+        downloading: 'モデル取得中',
+        unavailable: '利用不可',
+        unsupported: 'APIなし',
+      }[value] || value
+    );
+  }
+  return value?.status === 'error' ? '確認エラー' : '不明';
+}
+
+async function refreshBuiltInAiStatus() {
+  try {
+    const result = await aiAdapter().availability();
+    elements.aiScenarioStatus.textContent =
+      `Prompt API: ${aiAvailabilityLabel(result.prompt)} / ` +
+      `Summarizer API: ${aiAvailabilityLabel(result.summarizer)}`;
+  } catch (error) {
+    elements.aiScenarioStatus.textContent = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function getRedactedAiPageSource() {
+  const response = await invoke('bridge:get-ai-page-source');
+  if (!response?.source?.text) {
+    throw new Error(lastError || 'ページの redaction 済みテキストがありません。');
+  }
+  return response.source;
+}
+
+async function ensureBuiltInAiReady(preferred, statusElement) {
+  const key = preferred === 'prompt' ? 'chrome-prompt' : 'any';
+  if (
+    builtInAiReady.has(key) ||
+    (key === 'any' &&
+      (builtInAiReady.has('chrome-prompt') || builtInAiReady.has('chrome-summarizer')))
+  ) {
+    return;
+  }
+  statusElement.textContent = 'Chrome 内蔵 AI のモデルを準備しています…';
+  const result = await aiAdapter().prepare({
+    preferred,
+    onProgress: (loaded) => updateAiProgress(statusElement, loaded),
+  });
+  builtInAiReady.add(result.provider);
+}
+
+function updateAiProgress(element, loaded) {
+  if (!Number.isFinite(loaded)) return;
+  element.textContent = `Chrome 内蔵 AI のモデルを準備中… ${Math.round(loaded * 100)}%`;
+}
+
+async function prepareBuiltInAi() {
+  elements.aiPrepareStatus.textContent = 'モデルの状態を確認しています…';
+  const result = await aiAdapter().prepare({
+    onProgress: (loaded) => updateAiProgress(elements.aiPrepareStatus, loaded),
+  });
+  builtInAiReady.add(result.provider);
+  elements.aiPrepareStatus.textContent = `準備完了: ${result.provider}`;
+  await refreshBuiltInAiStatus();
+}
+
+async function summarizeCurrentPage() {
+  await ensureBuiltInAiReady('any', elements.aiPageSummaryStatus);
+  const source = await getRedactedAiPageSource();
+  elements.aiPageSummary.hidden = false;
+  elements.aiPageSummaryStatus.textContent = '要約を生成しています…';
+  const result = await aiAdapter().summarize(source.text, {
+    type: 'key-points',
+    length: 'medium',
+    onProgress: (loaded) => updateAiProgress(elements.aiPageSummaryStatus, loaded),
+  });
+  elements.aiPageSummary.textContent = result.text;
+  elements.aiPageSummaryStatus.textContent = `ローカル生成: ${result.provider}${source.truncated ? '（本文は30,000文字まで）' : ''}`;
+}
+
+async function extractScenarioCandidate() {
+  await ensureBuiltInAiReady('prompt', elements.aiScenarioStatus);
+  const source = await getRedactedAiPageSource();
+  elements.aiScenarioResult.hidden = false;
+  elements.aiScenarioStatus.textContent = 'シナリオ候補を生成しています…';
+  const result = await aiAdapter().extractScenarioCandidate({
+    text: source.text,
+    title: source.title,
+    url: source.url,
+    onProgress: (loaded) => updateAiProgress(elements.aiScenarioStatus, loaded),
+  });
+  lastScenarioCandidate = result.candidate;
+  lastScenarioPageKey = pageKey(source.url);
+  elements.aiScenarioResult.textContent = JSON.stringify(result.candidate, null, 2);
+  elements.aiScenarioUseIntentButton.hidden = !lastScenarioCandidate.goal;
+  elements.aiScenarioStatus.textContent =
+    '候補を生成しました。実行可能な ADF ではありません。Review と preflight が必要です。' +
+    (source.truncated ? ' 本文は30,000文字までです。' : '');
+}
+
+async function useScenarioCandidateAsIntent() {
+  const goal = String(lastScenarioCandidate?.goal || '').trim();
+  if (!goal) throw new Error('intent に設定できるシナリオ候補の目的がありません。');
+  elements.intentInput.value = goal.slice(0, 1_000);
+  elements.intentInput.focus();
+  showNotice('候補を intent に設定しました。内容を確認して「解決」を押してください。');
+}
+
+function pageKey(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
+async function assessRepairTarget() {
+  const target = state.current?.repairPending?.target;
+  if (!target)
+    throw new Error('失敗した step の対象情報がありません。修正操作を記録してください。');
+  await ensureBuiltInAiReady('prompt', elements.aiRepairStatus);
+  const response = await invoke('bridge:get-ai-target-candidates');
+  if (!response) throw new Error(lastError || '要素候補を取得できませんでした。');
+  const candidates = response?.candidates || [];
+  if (candidates.length === 0) throw new Error('現在ページに評価可能な要素候補がありません。');
+  elements.aiRepairResult.hidden = false;
+  elements.aiRepairStatus.textContent = '候補を評価しています…';
+  const result = await aiAdapter().assessTargetCandidates({
+    target,
+    candidates,
+    currentSnapshotHash: response.snapshot_hash,
+    onProgress: (loaded) => updateAiProgress(elements.aiRepairStatus, loaded),
+  });
+  const selected = result.candidate_index === null ? null : candidates[result.candidate_index];
+  elements.aiRepairResult.textContent = JSON.stringify(
+    { ...result, selected_candidate: selected || null, candidates },
+    null,
+    2
+  );
+  const evaluatedCount = Number.isInteger(result.evaluated_candidate_count)
+    ? result.evaluated_candidate_count
+    : candidates.length;
+  const coverage =
+    response?.truncated || result.candidate_scope_truncated
+      ? ` 候補は${evaluatedCount}/${response.candidateCount}件を評価しました。`
+      : '';
+  elements.aiRepairStatus.textContent = result.snapshot_mismatch
+    ? '現在ページのsnapshotが記録時と異なります。候補は参考情報として確認し、修正操作を記録してください。' +
+      coverage
+    : result.decision === 'match' && selected
+      ? '候補を特定しました。自動適用はせず、修正操作の記録と Review を行ってください。' + coverage
+      : result.decision === 'match'
+        ? '一致判定ですが候補 index がありません。自動操作は行いません。' + coverage
+        : '一意な候補を特定できませんでした。自動操作は行いません。' + coverage;
+}
+
+async function summarizeCurrentObservation() {
+  const observation = state.current?.execution?.observation;
+  const fields = Array.isArray(observation?.preview) ? observation.preview : [];
+  if (fields.length === 0) {
+    throw new Error('要約する抽出観測がありません。先に extract_text_ref を実行してください。');
+  }
+  await ensureBuiltInAiReady('any', elements.aiObservationSummaryStatus);
+  const text = fields.map((field) => `${field.name}: ${field.text}`).join('\n');
+  elements.aiObservationSummary.hidden = false;
+  elements.aiObservationSummaryStatus.textContent = '要約を生成しています…';
+  const result = await aiAdapter().summarize(text, {
+    type: 'key-points',
+    length: 'medium',
+    onProgress: (loaded) => updateAiProgress(elements.aiObservationSummaryStatus, loaded),
+  });
+  elements.aiObservationSummary.textContent = result.text;
+  elements.aiObservationSummaryStatus.textContent = `ローカル生成: ${result.provider}`;
+}
+
 function render(nextState) {
   state.current = nextState || { connected: null, recording: null, lastDraft: null, notice: null };
   const connected = state.current.connected;
+  if (lastScenarioPageKey && pageKey(connected?.url) !== lastScenarioPageKey) {
+    lastScenarioCandidate = null;
+    lastScenarioPageKey = null;
+    elements.aiScenarioResult.hidden = true;
+    elements.aiScenarioUseIntentButton.hidden = true;
+  }
   const recording = state.current.recording;
   const draft = state.current.lastDraft;
   const paused = Boolean(recording?.pausedReason);
@@ -530,6 +766,13 @@ function render(nextState) {
   renderHandoff(draft);
   renderRepairStatus(state.current);
   renderObservation(state.current);
+  elements.aiScenarioButton.disabled = !connected;
+  elements.aiScenarioUseIntentButton.disabled = !lastScenarioCandidate?.goal;
+  elements.aiPageSummaryButton.disabled = !connected;
+  elements.aiRepairButton.disabled = !state.current.repairPending?.target;
+  elements.aiObservationSummaryButton.disabled = !(
+    state.current.execution?.observation?.preview || []
+  ).length;
   if (lastError) {
     showNotice(lastError, 'error');
   } else if (recording?.pausedReason) {

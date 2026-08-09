@@ -1,13 +1,20 @@
 import * as path from 'node:path';
 import type { ScreenCaptureBridge, ScreenCaptureStreamRequest } from './screen-capture-bridge.js';
 import { createScreenCaptureBridge } from './screen-capture-bridge.js';
-import { writeVideoFramesToMp4, type VideoFrameArchiveOptions, type VideoFrameArchiveResult } from './video-frame-archive.js';
+import {
+  writeVideoFramesToMp4,
+  type VideoFrameArchiveOptions,
+  type VideoFrameArchiveResult,
+} from './video-frame-archive.js';
+import type { VideoFrame } from './meeting-session-types.js';
 
 export const SCREEN_RECORDING_BRIDGE_ID = 'screen-recording-bridge' as const;
 
 export interface ScreenRecordingBridgeOptions {
   capture_bridge?: ScreenCaptureBridge;
   fps?: number;
+  /** Required: raw screen frames must be sanitized before entering the archive. */
+  frame_redactor?: (frame: VideoFrame) => Promise<VideoFrame>;
 }
 
 export interface ScreenRecordingBridgeProbe {
@@ -20,7 +27,10 @@ export interface ScreenRecordingBridgeProbe {
 export interface ScreenRecordingBridge {
   readonly bridge_id: typeof SCREEN_RECORDING_BRIDGE_ID;
   probe(): Promise<ScreenRecordingBridgeProbe>;
-  recordToMp4(outputPath: string, input?: ScreenCaptureStreamRequest & VideoFrameArchiveOptions): Promise<VideoFrameArchiveResult>;
+  recordToMp4(
+    outputPath: string,
+    input?: ScreenCaptureStreamRequest & VideoFrameArchiveOptions
+  ): Promise<VideoFrameArchiveResult>;
 }
 
 export class ScreenRecordingBridgeImpl implements ScreenRecordingBridge {
@@ -44,8 +54,13 @@ export class ScreenRecordingBridgeImpl implements ScreenRecordingBridge {
 
   async recordToMp4(
     outputPath: string,
-    input: ScreenCaptureStreamRequest & VideoFrameArchiveOptions = {},
+    input: ScreenCaptureStreamRequest & VideoFrameArchiveOptions = {}
   ): Promise<VideoFrameArchiveResult> {
+    if (!this.opts.frame_redactor) {
+      throw new Error(
+        'screen recording requires a frame redactor; raw screen frames are never archived'
+      );
+    }
     const captureInput: ScreenCaptureStreamRequest = {
       display_index: input.display_index,
       capture_mode: input.capture_mode,
@@ -53,14 +68,26 @@ export class ScreenRecordingBridgeImpl implements ScreenRecordingBridge {
       max_frames: input.max_frames,
       frame_interval_ms: input.frame_interval_ms,
     };
-    return writeVideoFramesToMp4(path.resolve(outputPath), this.captureBridge.captureStream(captureInput), {
+    const redactedFrames = this.redactFrames(this.captureBridge.captureStream(captureInput));
+    return writeVideoFramesToMp4(path.resolve(outputPath), redactedFrames, {
       fps: input.fps ?? this.opts.fps,
       cleanup: input.cleanup,
       ffmpeg_bin: input.ffmpeg_bin,
     });
   }
+
+  private async *redactFrames(stream: AsyncIterable<VideoFrame>): AsyncIterable<VideoFrame> {
+    for await (const frame of stream) {
+      const redacted = await this.opts.frame_redactor!(frame);
+      if (!redacted || redacted.payload.byteLength === 0)
+        throw new Error('screen frame redactor withheld a frame');
+      yield redacted;
+    }
+  }
 }
 
-export function createScreenRecordingBridge(opts: ScreenRecordingBridgeOptions = {}): ScreenRecordingBridge {
+export function createScreenRecordingBridge(
+  opts: ScreenRecordingBridgeOptions = {}
+): ScreenRecordingBridge {
   return new ScreenRecordingBridgeImpl(opts);
 }

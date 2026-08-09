@@ -425,6 +425,11 @@ function backlinkSupersededRecord(record: PromotedMemoryRecord): void {
 }
 
 export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): PromotedMemoryRecord {
+  if (candidate.target_kind === 'procedure') {
+    throw new Error(
+      'Procedure candidates use the procedure promotion gate, not promoted-memory records'
+    );
+  }
   const tier =
     candidate.tier === 'personal' || candidate.tier === 'public' ? candidate.tier : 'confidential';
   const metadata = candidate.metadata || {};

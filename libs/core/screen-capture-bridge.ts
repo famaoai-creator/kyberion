@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { VideoFrame } from './meeting-session-types.js';
@@ -55,7 +56,7 @@ export interface ScreenCaptureBridge {
 const DEFAULT_OUTPUT_DIR = path.join('active', 'shared', 'tmp', 'screen-captures');
 const PLACEHOLDER_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7u1WQAAAAASUVORK5CYII=',
-  'base64',
+  'base64'
 );
 
 function defaultOutputPath(ext = '.png'): string {
@@ -72,27 +73,38 @@ function normalizeDisplayIndex(value: unknown): number | undefined {
   return Number.isInteger(index) && index >= 0 ? index : undefined;
 }
 
-function detectImageMimeType(payload: Uint8Array, fallbackPath: string): VideoFrame['format']['mime_type'] {
+function detectImageMimeType(
+  payload: Uint8Array,
+  fallbackPath: string
+): VideoFrame['format']['mime_type'] {
   if (
-    payload.byteLength >= 8
-    && payload[0] === 0x89
-    && payload[1] === 0x50
-    && payload[2] === 0x4E
-    && payload[3] === 0x47
-    && payload[4] === 0x0D
-    && payload[5] === 0x0A
-    && payload[6] === 0x1A
-    && payload[7] === 0x0A
+    payload.byteLength >= 8 &&
+    payload[0] === 0x89 &&
+    payload[1] === 0x50 &&
+    payload[2] === 0x4e &&
+    payload[3] === 0x47 &&
+    payload[4] === 0x0d &&
+    payload[5] === 0x0a &&
+    payload[6] === 0x1a &&
+    payload[7] === 0x0a
   ) {
     return 'image/png';
   }
-  if (payload.byteLength >= 3 && payload[0] === 0xFF && payload[1] === 0xD8 && payload[2] === 0xFF) {
+  if (
+    payload.byteLength >= 3 &&
+    payload[0] === 0xff &&
+    payload[1] === 0xd8 &&
+    payload[2] === 0xff
+  ) {
     return 'image/jpeg';
   }
   return /\.png$/i.test(fallbackPath) ? 'image/png' : 'image/jpeg';
 }
 
-async function captureViaPlatform(outputPath: string, mode: ScreenCaptureRequest['capture_mode']): Promise<void> {
+async function captureViaPlatform(
+  outputPath: string,
+  mode: ScreenCaptureRequest['capture_mode']
+): Promise<void> {
   if (mode === 'focused_window') {
     await platform.captureFocusedWindow(outputPath);
     return;
@@ -134,9 +146,11 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
     const runtimeBackend: ScreenCaptureBackendId =
       backend === 'stub'
         ? 'stub'
-        : (process.platform === 'darwin' && typeof displayIndex === 'number' && captureMode !== 'focused_window'
+        : process.platform === 'darwin' &&
+            typeof displayIndex === 'number' &&
+            captureMode !== 'focused_window'
           ? 'os-automation'
-          : 'platform');
+          : 'platform';
     safeMkdir(path.dirname(savePath), { recursive: true });
 
     if (backend === 'stub') {
@@ -152,20 +166,24 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
       };
     }
 
-    if (process.platform === 'darwin' && typeof displayIndex === 'number' && captureMode !== 'focused_window') {
+    if (
+      process.platform === 'darwin' &&
+      typeof displayIndex === 'number' &&
+      captureMode !== 'focused_window'
+    ) {
       takeScreenshot(savePath, { displayIndex });
     } else {
       await captureViaPlatform(savePath, captureMode);
     }
 
-      return {
-        bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
-        platform: process.platform,
-        backend: runtimeBackend,
-        save_path: savePath,
-        display_index: displayIndex,
-        capture_mode: captureMode,
-        subject_hint: input.subject_hint,
+    return {
+      bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
+      platform: process.platform,
+      backend: runtimeBackend,
+      save_path: savePath,
+      display_index: displayIndex,
+      capture_mode: captureMode,
+      subject_hint: input.subject_hint,
     };
   }
 
@@ -174,22 +192,27 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
     const intervalMs = Math.max(0, Number(input.frame_interval_ms || 250));
     for (let index = 0; index < frameCount; index += 1) {
       const tempPath = pathResolver.sharedTmp(
-        path.join('screen-stream', `frame-${Date.now()}-${index}.png`),
+        path.join('screen-stream', `frame-${Date.now()}-${randomUUID()}-${index}.png`)
       );
-      const result = await this.captureScreenshot({
-        save_path: tempPath,
-        display_index: input.display_index,
-        capture_mode: input.capture_mode,
-        subject_hint: input.subject_hint,
-      });
-      const payload = safeReadFile(result.save_path, { encoding: null });
-      const framePayload = Buffer.isBuffer(payload) ? new Uint8Array(payload) : new Uint8Array(Buffer.from(payload));
-      yield {
-        format: { mime_type: detectImageMimeType(framePayload, result.save_path) },
-        payload: framePayload,
-        ts_ms: index * intervalMs,
-      };
-      safeRmSync(result.save_path, { force: true });
+      try {
+        const result = await this.captureScreenshot({
+          save_path: tempPath,
+          display_index: input.display_index,
+          capture_mode: input.capture_mode,
+          subject_hint: input.subject_hint,
+        });
+        const payload = safeReadFile(result.save_path, { encoding: null });
+        const framePayload = Buffer.isBuffer(payload)
+          ? new Uint8Array(payload)
+          : new Uint8Array(Buffer.from(payload));
+        yield {
+          format: { mime_type: detectImageMimeType(framePayload, result.save_path) },
+          payload: framePayload,
+          ts_ms: index * intervalMs,
+        };
+      } finally {
+        safeRmSync(tempPath, { force: true });
+      }
       if (index < frameCount - 1 && intervalMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
@@ -201,6 +224,8 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
   }
 }
 
-export function createScreenCaptureBridge(opts: ScreenCaptureBridgeOptions = {}): ScreenCaptureBridge {
+export function createScreenCaptureBridge(
+  opts: ScreenCaptureBridgeOptions = {}
+): ScreenCaptureBridge {
   return new ScreenCaptureBridgeImpl(opts);
 }

@@ -313,6 +313,22 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | KD-08 | プロンプトキャッシュ規律契約                              | P2     | S    | KC-08/09(実装済み)    |
 | KD-09 | `{seq, epoch}` カーソル再同期契約(需要確定まで backlog)   | P3     | S    | KD-03、需要トリガー   |
 
+### Skill Recorder 概念取り込み(実演観測・意図再構成・ネイティブ op 優先の蒸留)
+
+[microsoft/skill-recorder](https://github.com/microsoft/skill-recorder) v0.4.2 の実コード分析(2026-08-09)に基づく。正本は [SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md](./SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md)(DR-01〜09 は同文書内)。同じく概念昇華方式。**新パラダイムではなく、既に凍結済みの学習→再生契約(`libs/core/procedure-types.ts`、[INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md))の desktop サブストレートと蒸留品質に対する実装参照。** 診断で判明した構造的事実: (a) `procedure-dispatcher.ts` と `desktop-recording.schema.json` の「OS automation backend が無い」という注記は**事実に反する**(`os-automation.ts` に実行プリミティブが揃っている)ため、止まっているのは再生側ではなく**観測側**; (b) 既存 desktop 設計 §6 の「`osAutomationBridge` をフックして録画」は**人間の実演では発火しない**(パターン A の前提と矛盾)ため独立ポーリング観測へ補正が必要; (c) `DistillCandidateRecord.target_kind` に実行可能成果物の選択肢が無く、成功ミッションは散文しか残せない。
+
+| ID    | タイトル                                          | 優先度 | 規模 | 依存               |
+| ----- | ------------------------------------------------- | ------ | ---- | ------------------ |
+| DR-01 | desktop 破壊操作の承認分類                        | **P0** | S    | なし(全項目の前提) |
+| DR-02 | desktop executor 結線 + 陳腐化した契約注記の是正  | **P0** | M    | DR-01              |
+| DR-03 | 人間実演レコーダ(ポーリング観測)                  | **P0** | L    | DR-04              |
+| DR-04 | 観測ソースの tier / cost 宣言                     | P1     | S    | なし               |
+| DR-05 | 意図再構成ステージ + 人間レビュー                 | **P0** | M    | DR-03              |
+| DR-06 | ネイティブ op 優先の置換(観測 → op 対応表)        | P1     | M    | DR-05、AR-02       |
+| DR-07 | フレーム redaction と egress ゲート               | **P0** | M    | なし               |
+| DR-08 | 蒸留器の eval ハーネス                            | P1     | M    | DR-06、IP-03       |
+| DR-09 | 蒸留成果物に実行可能な選択肢を与える(trace → ADF) | P2     | M    | DR-05、LC-02       |
+
 ### タスク知識配給(配置・配給・帰還の閉ループ)
 
 ミッションのタスク実行時に担当エージェントへ渡すナレッジを「必要十分で生産性が高い」状態にする計画(2026-07-25、origin/main `00485737` で実コード突合)。正本は [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07 は同文書内)。MO-04(context pack)・KM-01〜04(検索品質・昇格ガバナンス・ストア衛生)の後続ループ。**診断で判明した構造的問題: 配給3経路の装備不均一(goal-driven 経路は context pack 非添付、`delegateTask` は素文字列)、一律 top-3 で規模・役割に較正されない選定、trace `knowledgeRefs` 全空 = 帰還信号ゼロによる「量の管理」のみのメンテナンス。**

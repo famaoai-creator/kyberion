@@ -30,6 +30,7 @@ export {
   safeExistsSync,
   safeExec,
   safeExecResult,
+  safeSpawn,
   buildSafeExecEnv,
   safeReaddir,
   safeStat,
@@ -2075,6 +2076,16 @@ export * from './ingest-asset-ledger.js';
 export * from './ingest-quota.js';
 export * from './ingest-sync-cursors.js';
 export * from './pii-scrubber.js';
+export * from './frame-redaction.js';
+export * from './screen-frame-redaction.js';
+export * from './desktop-recording.js';
+export * from './desktop-recording-compiler.js';
+export * from './desktop-promotion-transaction.js';
+export * from './desktop-pipeline.js';
+export * from './desktop-event-feed.js';
+export * from './desktop-intent-reconstruction.js';
+export * from './native-op-mapping.js';
+export * from './trace-procedure-candidate.js';
 export * from './ingest-tier-gate.js';
 export * from './generation-scheduler.js';
 export * from './src/pipeline-scheduler.js';

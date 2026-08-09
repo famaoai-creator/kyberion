@@ -243,6 +243,18 @@ describe('procedure-registry', () => {
       expect(result.outcome).toBe('matched');
       expect(result.best?.procedure_id).toBe('deal.intake');
     });
+
+    it('prefers an exact phrase over a shorter containing phrase', async () => {
+      const shortPhraseEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'attendance.short',
+        intent_phrases: ['勤怠'],
+      };
+      stubCatalog([BROWSER_ENTRY, shortPhraseEntry]);
+      const result = await resolveProcedure('勤怠の承認');
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe(BROWSER_ENTRY.procedure_id);
+    });
   });
 
   // -------------------------------------------------------------------------

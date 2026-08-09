@@ -10,10 +10,13 @@ import {
   type ProcedureEntry,
   type ProcedureResolution,
 } from './procedure-types.js';
+import { isDesktopPromotionPending } from './desktop-promotion-transaction.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
-/** User-local overlay. This path is intentionally ignored by git. */
-const PERSONAL_PROCEDURES_PATH = pathResolver.knowledge('personal/browser-procedures.json');
+/** User-local substrate-neutral overlay. This path is intentionally ignored by git. */
+const PERSONAL_PROCEDURES_PATH = pathResolver.knowledge('personal/procedures.json');
+/** Backward-compatible browser-only overlay retained for existing recordings. */
+const PERSONAL_BROWSER_PROCEDURES_PATH = pathResolver.knowledge('personal/browser-procedures.json');
 
 /**
  * Allowlisted store for recordings backing procedures. A catalog entry's
@@ -52,7 +55,12 @@ export function loadProcedures(forceRefresh = false): ProcedureEntry[] {
   const sources = [
     // Personal procedures win on an ID collision: the public catalog remains
     // unchanged while a user can intentionally override a product example.
-    { label: 'personal browser-procedures.json', file: PERSONAL_PROCEDURES_PATH, optional: true },
+    { label: 'personal procedures.json', file: PERSONAL_PROCEDURES_PATH, optional: true },
+    {
+      label: 'personal browser-procedures.json',
+      file: PERSONAL_BROWSER_PROCEDURES_PATH,
+      optional: true,
+    },
     { label: 'procedures.json', file: pathResolver.rootResolve(PROCEDURES_PATH), optional: false },
   ];
   const seen = new Set<string>();
@@ -66,6 +74,17 @@ export function loadProcedures(forceRefresh = false): ProcedureEntry[] {
       const entries = Array.isArray(parsed.procedures) ? parsed.procedures : [];
       loadedAny = true;
       for (const entry of entries) {
+        if (
+          entry &&
+          typeof entry === 'object' &&
+          typeof (entry as ProcedureEntry).procedure_id === 'string' &&
+          isDesktopPromotionPending((entry as ProcedureEntry).procedure_id)
+        ) {
+          logger.warn(
+            `[procedure-registry] hiding procedure with incomplete desktop promotion transaction: ${(entry as ProcedureEntry).procedure_id}`
+          );
+          continue;
+        }
         if (!isStructurallyValid(entry)) {
           logger.warn(
             `[procedure-registry] dropping structurally-invalid entry from ${source.label}`
@@ -124,12 +143,14 @@ function normalize(s: string): string {
 
 /**
  * Score how well `phrase` matches `intent`.
- * Returns 0..0.9; full containment ≥ 0.85, token overlap < 0.75.
+ * Returns 0..1; exact matches are preferred over shorter containing phrases.
  */
 function phraseScore(phrase: string, intent: string): number {
   const normPhrase = normalize(phrase);
   const normIntent = normalize(intent);
   if (!normPhrase || !normIntent) return 0;
+
+  if (normPhrase === normIntent) return 1.0;
 
   // Direct substring containment (handles Japanese phrases well)
   if (normIntent.includes(normPhrase)) return 0.9;
@@ -161,7 +182,7 @@ function scoreEntry(
   // phrase match must not be silently demoted below auto-execute just because
   // the caller's origin is unknown/mismatched (the dispatcher re-checks origin
   // binding authoritatively before any execution) — bias, don't gate.
-  if (origin && entry.target.origins && entry.target.origins.length > 0) {
+  if (origin && best < 1 && entry.target.origins && entry.target.origins.length > 0) {
     const matched = entry.target.origins.some((o) => matchesAllowedOrigin(o, origin));
     best = matched ? Math.min(1.0, best + 0.1) : Math.max(0, best - 0.15);
   }
@@ -213,7 +234,11 @@ export async function resolveProcedure(
 
   // Clear winner: top >= autoExecute with no close second
   const runnerUp = aboveLearn[1];
-  if (top.score >= autoExecute && (!runnerUp || runnerUp.score < autoExecute - 0.05)) {
+  const exactWinner = top.score === 1 && (!runnerUp || top.score > runnerUp.score);
+  if (
+    top.score >= autoExecute &&
+    (exactWinner || !runnerUp || runnerUp.score < autoExecute - 0.05)
+  ) {
     return {
       outcome: 'matched',
       best: { procedure_id: top.entry.procedure_id, confidence: top.score },

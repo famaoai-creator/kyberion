@@ -58,6 +58,12 @@
       "missing_requirements": ["approval_confirmation"]
     },
     {
+      "id": "desktop-destructive-action",
+      "intent_ids": ["desktop:destructive_action"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    },
+    {
       "id": "customer-outbound-send",
       "intent_ids": ["customer:outbound"],
       "requires_approval": true,

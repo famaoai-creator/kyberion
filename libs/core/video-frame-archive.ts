@@ -1,5 +1,13 @@
 import * as path from 'node:path';
-import { safeExec, safeMkdir, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { randomUUID } from 'node:crypto';
+import {
+  safeExec,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { VideoFrame, VideoFormat } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
@@ -41,7 +49,9 @@ function frameFileExtension(format: VideoFormat): 'jpg' | 'png' {
 
 function resolveArchiveTempDir(prefix: string): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return pathResolver.sharedTmp(path.join('video-frame-archive', `${prefix}-${stamp}`));
+  return pathResolver.sharedTmp(
+    path.join('video-frame-archive', `${prefix}-${stamp}-${randomUUID()}`)
+  );
 }
 
 async function collectFrames(stream: AsyncIterable<VideoFrame>): Promise<VideoFrame[]> {
@@ -55,7 +65,7 @@ async function collectFrames(stream: AsyncIterable<VideoFrame>): Promise<VideoFr
 export async function writeVideoFramesToMp4(
   outputPath: string,
   framesStream: AsyncIterable<VideoFrame>,
-  options: VideoFrameArchiveOptions = {},
+  options: VideoFrameArchiveOptions = {}
 ): Promise<VideoFrameArchiveResult> {
   const frames = await collectFrames(framesStream);
   if (frames.length === 0) {
@@ -102,7 +112,7 @@ export async function writeVideoFramesToMp4(
         '+faststart',
         outputPath,
       ],
-      { env: process.env, timeoutMs: 120_000 },
+      { env: process.env, timeoutMs: 120_000 }
     );
 
     return {
@@ -120,7 +130,7 @@ export async function writeVideoFramesToMp4(
 
 export async function* readVideoFramesFromMp4(
   inputPath: string,
-  options: VideoFrameArchiveOptions = {},
+  options: VideoFrameArchiveOptions = {}
 ): AsyncIterable<VideoFrame> {
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
   const tempDir = resolveArchiveTempDir('decode');
@@ -129,18 +139,10 @@ export async function* readVideoFramesFromMp4(
 
   try {
     const outputPattern = path.join(tempDir, 'frame-%06d.jpg');
-    safeExec(
-      ffmpegBin,
-      [
-        '-y',
-        '-i',
-        inputPath,
-        '-vf',
-        `fps=${fps}`,
-        outputPattern,
-      ],
-      { env: process.env, timeoutMs: 120_000 },
-    );
+    safeExec(ffmpegBin, ['-y', '-i', inputPath, '-vf', `fps=${fps}`, outputPattern], {
+      env: process.env,
+      timeoutMs: 120_000,
+    });
 
     const files = (safeReaddir(tempDir) || [])
       .filter((entry) => /\.jpe?g$/i.test(entry) || /\.png$/i.test(entry))
@@ -168,7 +170,7 @@ export async function* readVideoFramesFromMp4(
 export async function writeVideoFrameBusToMp4(
   bus: VideoFrameBus,
   outputPath: string,
-  options: VideoFrameArchiveOptions = {},
+  options: VideoFrameArchiveOptions = {}
 ): Promise<VideoFrameArchiveResult> {
   return writeVideoFramesToMp4(outputPath, bus.frameStream(), options);
 }
@@ -176,7 +178,7 @@ export async function writeVideoFrameBusToMp4(
 export async function pipeMp4ToVideoFrameBus(
   inputPath: string,
   bus: VideoFrameBus,
-  options: VideoFrameArchiveOptions = {},
+  options: VideoFrameArchiveOptions = {}
 ): Promise<void> {
   await bus.writeFrames(readVideoFramesFromMp4(inputPath, options));
 }

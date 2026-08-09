@@ -89,6 +89,7 @@
         "scripts/",
         "pipelines/",
         "schemas/",
+        "tools/adf-replay-extension/",
         "active/missions/"
       ],
       "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],

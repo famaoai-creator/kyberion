@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { randomUUID } from 'node:crypto';
 import { enforceApprovalGate } from './approval-gate.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
@@ -22,6 +23,26 @@ import {
   type ServiceStepResult,
 } from './service-procedure-executor.js';
 import { type ProcedureEntry } from './procedure-types.js';
+import { RISKY_OPS } from './risky-op-registry.js';
+import { osAutomationBridge, type OsAutomationBridge } from './os-automation-bridge.js';
+import {
+  computeDesktopRecordingHash,
+  validateDesktopRecording,
+  type DesktopRecording,
+} from './desktop-recording.js';
+import {
+  intentDraftHash,
+  validateDesktopIntentDraft,
+  type DesktopIntentDraft,
+} from './desktop-intent-reconstruction.js';
+import {
+  loadDesktopPipeline,
+  validateDesktopPipeline,
+  type DesktopPipeline,
+} from './desktop-pipeline.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync } from './secure-io.js';
+import { redactScreenCaptureFile } from './screen-frame-redaction.js';
 
 /** Approval-gate operation id for external-effect service actions. */
 export const SERVICE_EXTERNAL_EFFECT_OP = 'service:external_effect';
@@ -39,14 +60,10 @@ export { extendLeaseForMfa } from './browser-extension-bridge.js';
  * - `lease_issued`       — browser substrate: lease ready for the extension to use.
  * - `approval_required`  — a human approval request is pending; retry after approval.
  * - `blocked`            — hard error; the procedure cannot execute.
- * - `not_implemented`    — substrate executor not yet wired up (service/desktop/media).
+ * - `not_implemented`    — a separate substrate executor is not yet wired up (currently media only).
  */
 export type DispatchStatus =
-  | 'lease_issued'
-  | 'executed'
-  | 'approval_required'
-  | 'blocked'
-  | 'not_implemented';
+  'lease_issued' | 'executed' | 'approval_required' | 'blocked' | 'not_implemented';
 
 export interface DispatchInput {
   /** The procedure to execute (from the catalog). */
@@ -72,6 +89,18 @@ export interface DispatchInput {
   serviceInputs?: Record<string, unknown>;
   /** Injected preset runner for service execution (tests). Defaults to the real engine. */
   executePreset?: ServicePresetRunner;
+  /** Human-reviewed desktop recording for the system executor. */
+  desktopRecording?: DesktopRecording;
+  /** Human-reviewed intent artifact bound to the desktop recording. */
+  desktopIntent?: DesktopIntentDraft;
+  /** Runtime inputs for variable desktop text steps; raw values are never persisted. */
+  desktopInputs?: Record<string, string>;
+  /** Injectable bridge for hermetic dispatcher tests. Defaults to the OS bridge. */
+  desktopBridge?: Partial<OsAutomationBridge>;
+  /** Injectable screenshot redactor for hermetic tests; production always redacts before returning. */
+  desktopScreenRedactor?: (inputPath: string, outputPath: string) => Promise<void>;
+  /** Injectable validated pipeline for hermetic tests; CLI loads it from pipeline_ref. */
+  desktopPipeline?: DesktopPipeline;
   /**
    * Required for `execution_substrate: 'playwright'` browser procedures. Runs
    * the compiled pipeline steps through the Playwright browser-actuator.
@@ -114,8 +143,7 @@ export interface DispatchResult {
 /**
  * Route a procedure execution request to the correct substrate executor.
  *
- * Currently implemented: `extension_session` (browser substrate).
- * Stubs: `service:preset`, `system` (desktop), `media:pipeline`.
+ * Currently implemented: browser, service:preset, and reviewed desktop system procedures.
  *
  * Agent-C (Dispatcher) in the intent-driven automation design.
  * Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §7 Layer③
@@ -139,9 +167,9 @@ export async function dispatchProcedure(input: DispatchInput): Promise<DispatchR
     case 'service:preset':
       return dispatchServiceSession(input);
     case 'system':
+      return dispatchDesktopProcedure(input);
     case 'media:pipeline':
-      // Contracts + routing exist; executors are deferred (desktop has no OS
-      // automation backend; media recipe→pipeline mapping is a separate phase).
+      // Media recipe→pipeline mapping is a separate phase.
       logger.info(`[procedure-dispatcher] executor "${executor}" is not yet implemented`);
       return {
         status: 'not_implemented',
@@ -153,6 +181,351 @@ export async function dispatchProcedure(input: DispatchInput): Promise<DispatchR
         errors: [`Unknown executor: "${executor}"`],
       };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Desktop / system executor
+// ---------------------------------------------------------------------------
+
+type DesktopStep = DesktopRecording['steps'][number];
+const DESKTOP_READ_ONLY_OPS = new Set([
+  'screenshot',
+  'get_focused_input',
+  'window_list',
+  'clipboard_read',
+  'chrome_tab_list',
+  'wait_for_element',
+]);
+const DESKTOP_NON_DESTRUCTIVE_OPS = new Set(['activate_application', 'activate_window_by_title']);
+const DESKTOP_OP_ALIASES: Record<string, string> = {
+  focus_window: 'activate_window_by_title',
+  click_element: 'mouse_click',
+  type_text: 'keyboard',
+  key_combo: 'press_key',
+  screenshot: 'screenshot',
+  click_at: 'mouse_click',
+  right_click_at: 'right_click',
+  keystroke_text: 'keyboard',
+};
+
+function desktopOperation(step: DesktopStep): string {
+  return DESKTOP_OP_ALIASES[step.op] || step.op;
+}
+
+function desktopApprovalRequired(step: DesktopStep): boolean {
+  const op = desktopOperation(step);
+  return !DESKTOP_READ_ONLY_OPS.has(op) && !DESKTOP_NON_DESTRUCTIVE_OPS.has(op);
+}
+
+function desktopTargetMatches(
+  step: DesktopStep,
+  bridge: OsAutomationBridge,
+  op: string
+): string | null {
+  const selector = step.selector || {};
+  if (selector.app && selector.window_title) {
+    const windows = bridge.getWindowList(selector.app);
+    if (
+      !windows.some(
+        (title) => title === selector.window_title || title.includes(selector.window_title!)
+      )
+    ) {
+      return `desktop target window not found: ${selector.app}/${selector.window_title}`;
+    }
+  }
+  if (
+    op !== 'activate_application' &&
+    op !== 'activate_window_by_title' &&
+    (selector.app || selector.window_title)
+  ) {
+    const focused = bridge.detectFocusedInput();
+    if (selector.app && focused.application !== selector.app)
+      return `desktop foreground app mismatch: expected ${selector.app}, got ${focused.application || 'empty'}`;
+    if (
+      selector.window_title &&
+      focused.windowTitle !== selector.window_title &&
+      !focused.windowTitle.includes(selector.window_title)
+    ) {
+      return `desktop foreground window mismatch: expected ${selector.window_title}, got ${focused.windowTitle || 'empty'}`;
+    }
+  }
+  if (selector.role || selector.description || selector.editable !== undefined) {
+    const focused = bridge.detectFocusedInput();
+    if (selector.role && focused.role !== selector.role)
+      return `desktop AX role mismatch: expected ${selector.role}, got ${focused.role || 'empty'}`;
+    if (selector.description && !focused.description.includes(selector.description))
+      return `desktop AX description mismatch: expected ${selector.description}`;
+    if (selector.editable !== undefined && focused.editable !== selector.editable)
+      return `desktop AX editable mismatch`;
+  }
+  return null;
+}
+
+function desktopApproval(
+  input: DispatchInput,
+  step: DesktopStep,
+  op: string
+): DispatchResult | null {
+  if (!desktopApprovalRequired(step)) return null;
+  // A caller-level correlation identifies the run, while each destructive
+  // desktop step needs its own approval binding. Reusing the run id directly
+  // would make approval-gate compare the next step's payload with the first
+  // step and return a permanent effect_mismatch.
+  const correlationBase =
+    input.correlationId ||
+    `procedure:${input.procedure.procedure_id}:${input.desktopRecording?.recording_id || 'desktop'}`;
+  const approval = enforceApprovalGate({
+    operationId: RISKY_OPS.DESKTOP_DESTRUCTIVE_ACTION,
+    intentId: RISKY_OPS.DESKTOP_DESTRUCTIVE_ACTION,
+    agentId: input.agentId,
+    correlationId: `${correlationBase}:step:${step.step_id}`,
+    channel: input.channel || 'desktop',
+    payload: {
+      operation: op,
+      procedure_id: input.procedure.procedure_id,
+      mission_id: input.missionId,
+      target: step.selector || {},
+      rationale: 'Desktop operations are coordinate-sensitive and may have external effects.',
+    },
+  });
+  if (approval.allowed) return null;
+  return {
+    status: 'approval_required',
+    approvalRequestId: approval.requestId,
+    errors: [approval.message || `approval required for desktop:${op}`],
+  };
+}
+
+function desktopText(step: DesktopStep, inputs: Record<string, string>): string | null {
+  const variable =
+    step.variable?.name ||
+    (typeof step.selector?.description === 'string' &&
+    step.selector.description.startsWith('{{input.')
+      ? step.selector.description.slice(8, -2)
+      : undefined);
+  return variable ? inputs[variable] || null : null;
+}
+
+function validateDesktopExecutionContract(
+  input: DispatchInput,
+  recording: DesktopRecording
+): string | null {
+  const recordingValidation = validateDesktopRecording(recording);
+  if (!recordingValidation.value) return recordingValidation.errors.join('; ');
+  const pipelineResult = input.desktopPipeline
+    ? validateDesktopPipeline(input.desktopPipeline)
+    : loadDesktopPipeline(input.procedure.pipeline_ref);
+  if (!pipelineResult.value) return pipelineResult.errors.join('; ');
+  const pipeline = pipelineResult.value;
+  if (pipeline.procedure_id !== input.procedure.procedure_id)
+    return 'desktop pipeline procedure_id mismatch';
+  if (pipeline.recording_ref !== input.procedure.adapter.recording_ref)
+    return 'desktop pipeline recording_ref mismatch';
+  if (pipeline.recording_hash !== recording.recording_hash)
+    return 'desktop pipeline recording_hash mismatch';
+  if (pipeline.steps.length !== recording.steps.length)
+    return 'desktop pipeline step count mismatch';
+  for (let index = 0; index < recording.steps.length; index += 1) {
+    const pipelineStep = pipeline.steps[index];
+    const recordingStep = recording.steps[index];
+    if (
+      pipelineStep.step_id !== recordingStep.step_id ||
+      pipelineStep.op !== `system:${recordingStep.op}`
+    ) {
+      return `desktop pipeline step mismatch at index ${index}`;
+    }
+    if (pipelineStep.native_op) {
+      return `desktop pipeline selects native operation ${pipelineStep.native_op}; native executor is required and GUI replay is blocked`;
+    }
+  }
+  if (!recording.intent_hash) return 'desktop execution requires an intent review artifact';
+  if (!input.desktopIntent) return 'desktop execution requires the reviewed intent artifact';
+  let intent: DesktopIntentDraft;
+  try {
+    intent = validateDesktopIntentDraft(input.desktopIntent);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  if (intent.source_recording_id !== recording.recording_id)
+    return 'desktop intent source_recording_id mismatch';
+  if (intent.review.status !== 'approved')
+    return 'desktop execution requires an approved intent review';
+  if (intentDraftHash(intent) !== recording.intent_hash)
+    return 'desktop intent hash mismatch; reviewed intent must match the recording';
+  return null;
+}
+
+async function dispatchDesktopProcedure(input: DispatchInput): Promise<DispatchResult> {
+  const recording = input.desktopRecording;
+  if (!recording)
+    return { status: 'blocked', errors: ['system executor requires a desktopRecording'] };
+  const contractError = validateDesktopExecutionContract(input, recording);
+  if (contractError) return { status: 'blocked', errors: [contractError] };
+  if (recording.review.status !== 'approved')
+    return {
+      status: 'blocked',
+      errors: ['desktop execution requires an approved recording review'],
+    };
+  if (recording.steps.some((step) => step.needs_semantic_resolution))
+    return {
+      status: 'blocked',
+      errors: ['desktop execution requires semantic targets to be resolved'],
+    };
+  if (recording.recording_hash !== computeDesktopRecordingHash(recording))
+    return {
+      status: 'blocked',
+      errors: ['desktop recording hash mismatch; reviewed content cannot be executed'],
+    };
+  const bridge = { ...osAutomationBridge, ...(input.desktopBridge || {}) } as OsAutomationBridge;
+  const redactScreenshot = input.desktopScreenRedactor || redactScreenCaptureFile;
+  const inputs = input.desktopInputs || {};
+  const results: unknown[] = [];
+  for (const step of recording.steps) {
+    const op = desktopOperation(step);
+    const targetError = desktopTargetMatches(step, bridge, op);
+    if (targetError)
+      return {
+        status: 'blocked',
+        errors: [targetError, 'desktop execution stopped; operator must re-target the step'],
+      };
+    const approvalError = desktopApproval(input, step, op);
+    if (approvalError) return approvalError;
+    const selector = step.selector || {};
+    const params = (step as DesktopStep & { params?: Record<string, unknown> }).params || {};
+    try {
+      let result: unknown;
+      switch (op) {
+        case 'activate_application':
+          result = bridge.activateApplication(selector.app || input.procedure.target.name);
+          break;
+        case 'activate_window_by_title':
+          result = bridge.activateWindowByTitle(
+            selector.app || input.procedure.target.name,
+            selector.window_title || ''
+          );
+          break;
+        case 'get_focused_input':
+          result = bridge.detectFocusedInput();
+          break;
+        case 'window_list':
+          result = bridge.getWindowList(selector.app || input.procedure.target.name);
+          break;
+        case 'clipboard_read':
+          result = { available: true, hash: 'withheld' };
+          bridge.clipboardRead();
+          break;
+        case 'screenshot': {
+          const recordingSegment = recording.recording_id.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const stepSegment = step.step_id.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const screenshotDir = pathResolver.sharedTmp('desktop-screenshots');
+          safeMkdir(screenshotDir, { recursive: true });
+          const finalPath = pathResolver.sharedTmp(
+            `desktop-screenshots/${recordingSegment}-${stepSegment}-${randomUUID()}.png`
+          );
+          const rawPath = pathResolver.sharedTmp(`desktop-screenshots/raw-${randomUUID()}.png`);
+          try {
+            bridge.takeScreenshot(rawPath);
+            await redactScreenshot(rawPath, finalPath);
+          } catch (error) {
+            safeRmSync(rawPath, { force: true });
+            safeRmSync(finalPath, { force: true });
+            throw error;
+          }
+          result = { path: finalPath, redacted: true };
+          break;
+        }
+        case 'mouse_click': {
+          const x = selector.x ?? params.x;
+          const y = selector.y ?? params.y;
+          const clickCount = selector.click_count ?? params.click_count ?? 1;
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isInteger(clickCount)) {
+            return {
+              status: 'blocked',
+              errors: [
+                `desktop click step ${step.step_id} contains invalid coordinates or click_count`,
+              ],
+            };
+          }
+          result = bridge.clickAt(Number(x), Number(y), Number(clickCount));
+          break;
+        }
+        case 'right_click': {
+          const x = selector.x ?? params.x;
+          const y = selector.y ?? params.y;
+          const clickCount = selector.click_count ?? params.click_count ?? 1;
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isInteger(clickCount)) {
+            return {
+              status: 'blocked',
+              errors: [
+                `desktop right_click step ${step.step_id} contains invalid coordinates or click_count`,
+              ],
+            };
+          }
+          result = bridge.rightClickAt(Number(x), Number(y), Number(clickCount));
+          break;
+        }
+        case 'keyboard': {
+          const value = desktopText(step, inputs);
+          if (value === null)
+            return {
+              status: 'blocked',
+              errors: [
+                `desktop text step ${step.step_id} requires a runtime input; raw text is never recorded`,
+              ],
+            };
+          result = bridge.keystrokeText(value);
+          break;
+        }
+        case 'paste_text': {
+          const value = desktopText(step, inputs);
+          if (value === null)
+            return {
+              status: 'blocked',
+              errors: [
+                `desktop paste step ${step.step_id} requires a runtime input; raw text is never recorded`,
+              ],
+            };
+          result = bridge.pasteText(value);
+          break;
+        }
+        case 'press_key': {
+          const keyCode = Number(params.key_code);
+          if (
+            !Number.isInteger(keyCode) ||
+            keyCode < 0 ||
+            keyCode > 65_535 ||
+            typeof bridge.pressKeyCode !== 'function'
+          ) {
+            return {
+              status: 'blocked',
+              errors: [
+                `desktop press_key step ${step.step_id} requires a validated native key_code`,
+              ],
+            };
+          }
+          result = bridge.pressKeyCode(keyCode);
+          break;
+        }
+        case 'app_quit':
+          result = bridge.quitApplication(selector.app || input.procedure.target.name);
+          break;
+        case 'system_notify':
+          result = bridge.systemNotify('Kyberion', String(params.message || step.summary));
+          break;
+        default:
+          return { status: 'blocked', errors: [`unsupported desktop op: ${op}`] };
+      }
+      results.push({ step_id: step.step_id, op, result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        status: 'blocked',
+        errors: [`desktop ${op} failed: ${message}`],
+        serviceResults: results as ServiceStepResult[],
+      };
+    }
+  }
+  return { status: 'executed', serviceResults: results as ServiceStepResult[], errors: [] };
 }
 
 // ---------------------------------------------------------------------------
