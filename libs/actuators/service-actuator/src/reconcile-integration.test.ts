@@ -46,6 +46,10 @@ vi.mock('@agent/core', () => ({
   runtimeSupervisor: mocks.runtimeSupervisor,
   pathResolver: mocks.pathResolver,
   capabilityEntry: (id: string) => `dist/${id}.js`,
+  CloudflareOsControlPlane: class {
+    enforceIntroduction() {}
+    recordObservation() {}
+  },
 }));
 
 describe('service-actuator: RECONCILE with auth check', () => {

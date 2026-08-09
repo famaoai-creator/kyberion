@@ -305,7 +305,7 @@
       "path": "libs/actuators/service-actuator",
       "d": "Unified External SaaS/API/MCP Reachability Layer",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 7,
       "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
       "contract_schema": "schemas/service-action.schema.json",

@@ -40,7 +40,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `presence-actuator`: Human Presence and Messaging Bridge (3 ops, v1.0.0, schema schemas/presence-action.schema.json)
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema schemas/process-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge (4 ops, v1.1.0, schema schemas/secret-action.schema.json)
-- `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.1.0, schema schemas/service-action.schema.json)
+- `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.2.0, schema schemas/service-action.schema.json)
 - `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (25 ops, v1.4.0, schema schemas/system-pipeline.schema.json)
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema schemas/terminal-action.schema.json)
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)

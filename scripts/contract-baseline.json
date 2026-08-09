@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-25T02:47:21.196Z",
+  "generated_at": "2026-08-09T03:16:28.796Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -103,6 +103,20 @@
       "contract_schema_sha256": "edd3f1059f6a3fd6c637a99ffba3c71c2eccb4044ef5fc5d0f7ffc6460f08f19"
     },
     {
+      "actuator_id": "ingest-actuator",
+      "version": "1.2.0",
+      "ops": [
+        "commit",
+        "dedup",
+        "normalize_card",
+        "parse_document",
+        "staleness_report",
+        "sync_source"
+      ],
+      "contract_schema": null,
+      "contract_schema_sha256": null
+    },
+    {
       "actuator_id": "ios-actuator",
       "version": "1.1.0",
       "ops": ["pipeline"],
@@ -194,14 +208,14 @@
     },
     {
       "actuator_id": "service-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
       "contract_schema": "schemas/service-action.schema.json",
-      "contract_schema_sha256": "212fa4d100dc1c8ac95610e5d5819b21f7ce69a9e28063ce3622b9a1eb689c8b"
+      "contract_schema_sha256": "5ef464a4dadb610c399540947542bbc4cb179f00bc4f80b25ec50533c4e5b478"
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "ops": [
         "audit_verify",
         "computer_interaction",
@@ -230,7 +244,7 @@
         "test_screen_stream"
       ],
       "contract_schema": "schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "ec5c941dcc391e2a4df293602dc530c818489e649fe047991bdba727272a9b99"
+      "contract_schema_sha256": "0044bcddded50306e1d5791c059a4e297462f491162498f045a1c3f7fb120dc1"
     },
     {
       "actuator_id": "terminal-actuator",
@@ -258,10 +272,10 @@
     },
     {
       "actuator_id": "vision-actuator",
-      "version": "1.3.0",
-      "ops": ["inspect_image", "ocr_image"],
+      "version": "1.4.0",
+      "ops": ["describe_image", "inspect_image", "ocr_image"],
       "contract_schema": "schemas/vision-action.schema.json",
-      "contract_schema_sha256": "c2a4b50b5d1a1264e33e09630992b246a3df6516058e241b2d8e252ff446df54"
+      "contract_schema_sha256": "475a245d9340c8e51d6f6311471f85b6717d1c8ae4bc1b7c721f35ba44341ca8"
     },
     {
       "actuator_id": "voice-actuator",

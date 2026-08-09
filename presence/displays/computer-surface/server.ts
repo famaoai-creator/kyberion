@@ -10,6 +10,13 @@ import {
   withExecutionContext,
   type A2UIMessage,
 } from '@agent/core';
+import {
+  getComputerSurfaceAccess,
+  getComputerSurfaceGuardedSurfaceUrl,
+  getComputerSurfaceOsSnapshot,
+  getComputerSurfaceTenantScope,
+  recordComputerSurfaceRead,
+} from './os-control-plane.js';
 
 type Client = express.Response;
 
@@ -20,8 +27,8 @@ interface SurfaceSnapshot {
   data: Record<string, unknown>;
 }
 
-const app = express();
-const server = createServer(app);
+export const app: express.Express = express();
+export const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/computer-surface/static');
 const PORT = Number(process.env.COMPUTER_SURFACE_PORT || 3040);
 const HOST = process.env.COMPUTER_SURFACE_HOST || '127.0.0.1';
@@ -192,6 +199,40 @@ app.get('/api/state', (req, res) => {
   res.json(state);
 });
 
+app.get('/api/os/control-plane', (req, res) => {
+  if (!authorizeSurface(req, res)) return;
+  const rawMissionId = req.query.mission_id;
+  if (Array.isArray(rawMissionId)) {
+    res.status(400).json({ ok: false, error: 'mission_id must be a single value' });
+    return;
+  }
+  try {
+    const access = getComputerSurfaceAccess();
+    const snapshot = getComputerSurfaceOsSnapshot(
+      typeof rawMissionId === 'string' ? rawMissionId : undefined,
+      undefined,
+      access
+    );
+    recordComputerSurfaceRead(access, snapshot);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json({
+      ok: true,
+      tenantScope: getComputerSurfaceTenantScope(),
+      guardedSurfaceUrl: getComputerSurfaceGuardedSurfaceUrl(),
+      ...snapshot,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')
+        ? error.message
+        : 'Unable to load the OS control-plane projection.';
+    res.status(message.startsWith('[POLICY_VIOLATION]') ? 403 : 400).json({
+      ok: false,
+      error: message,
+    });
+  }
+});
+
 app.get('/api/stream', (req, res) => {
   if (!authorizeSurface(req, res)) return;
   res.setHeader('Content-Type', 'text/event-stream');
@@ -212,12 +253,14 @@ app.post('/a2ui/dispatch', (req, res) => {
   res.json({ ok: true, applied: messages.length });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`[computer-surface] listening on http://${HOST}:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
+  server.listen(PORT, HOST, () => {
+    console.log(`[computer-surface] listening on http://${HOST}:${PORT}`);
+  });
 
-server.on('error', (error: NodeJS.ErrnoException) => {
-  const reason = error?.message || String(error);
-  console.error(`[computer-surface] failed to listen on http://${HOST}:${PORT}: ${reason}`);
-  process.exitCode = 1;
-});
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    const reason = error?.message || String(error);
+    console.error(`[computer-surface] failed to listen on http://${HOST}:${PORT}: ${reason}`);
+    process.exitCode = 1;
+  });
+}
