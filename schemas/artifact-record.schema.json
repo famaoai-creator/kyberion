@@ -7,6 +7,8 @@
   "properties": {
     "artifact_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "organization_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
     "task_session_id": { "type": "string", "minLength": 1 },
     "kind": { "type": "string", "minLength": 1 },

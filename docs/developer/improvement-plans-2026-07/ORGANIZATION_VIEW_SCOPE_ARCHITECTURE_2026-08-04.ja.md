@@ -28,9 +28,11 @@ last_updated: 2026-08-04
 WorkItem の `context` を identity とし、`labels` は検索・分類の facet に限定する。
 
 ```text
-organization_id → tenant_slug → mission_id → project_id → task_id
+tenant_slug → organization_id → project_id → mission_id → task_id → session
                                       └── work_shape
 ```
+
+包含順の正本は [`entity-scope-hierarchy.md`](../../../knowledge/product/architecture/entity-scope-hierarchy.md) である。この文書での `organization_id` 先頭表記は WorkItem のフィールド列挙順であり、包含順を表さない。
 
 `work_shape` は `solution_project`、`service_operation`、`routine_operation`、`incident_response`、`governance_cadence`、`improvement_experiment` のいずれかで、組織運営とソリューション開発を区別する。
 

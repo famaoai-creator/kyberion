@@ -11,7 +11,10 @@ import {
   enqueueOrganizationLearningCandidate,
   loadOrganizationOperatingModelCatalog,
   loadOrganizationProfile,
+  removeOrganizationEntity,
   reconcileOrganizationState,
+  retireOrganizationEntity,
+  transitionOrganizationLifecycle,
   resolveOrganizationWork,
   saveOrganizationDomain,
   saveOrganizationOperation,
@@ -64,6 +67,9 @@ type ParsedArgs = {
   executionRef?: string;
   projectId?: string;
   recordStatus?: string;
+  recordKind?: 'domain' | 'capability' | 'service' | 'operation' | 'cadence';
+  recordId?: string;
+  reason?: string;
   runbookRefs: string[];
   evidenceOutputs: string[];
 };
@@ -236,6 +242,18 @@ function parseArgs(args: string[]): ParsedArgs {
       parsed.recordStatus = args[++index];
       continue;
     }
+    if (arg === '--kind') {
+      parsed.recordKind = args[++index] as ParsedArgs['recordKind'];
+      continue;
+    }
+    if (arg === '--record-id') {
+      parsed.recordId = args[++index];
+      continue;
+    }
+    if (arg === '--reason') {
+      parsed.reason = args[++index];
+      continue;
+    }
     if (arg === '--runbook-ref') {
       parsed.runbookRefs.push(args[++index]);
       continue;
@@ -280,6 +298,9 @@ function usage(): string {
     '  pnpm organization operation add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --name <name> --operation-type <continuous|scheduled|event_driven|governance> --owner-role <role> [--service-id <id>] [--purpose <text>] [--trigger-kind <k>] [--trigger-expression <cron>] [--execution-kind <k>] [--execution-ref <ref>] [--evidence-output <ref>]...',
     '  pnpm organization project attach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
     '  pnpm organization project detach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
+    '  pnpm organization pause|resume|archive --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
+    '  pnpm organization retire --organization-id <id> --tier <tier> --kind <domain|capability|service|operation|cadence> --record-id <id> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
+    '  pnpm organization remove --organization-id <id> --tier <tier> --kind <domain|capability|service|operation|cadence> --record-id <id> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
     '',
     'Notes:',
     '  - Writes under active/organizations/ are authority-gated: run with KYBERION_PERSONA=sovereign.',
@@ -419,6 +440,69 @@ export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): 
       if (scaffold.purpose) savedPaths.push(saveOrganizationPurpose(scaffold.purpose));
     }
     emit({ mode, ...scaffold, saved_paths: savedPaths }, parsed.json);
+    return;
+  }
+  if (['pause', 'resume', 'archive'].includes(parsed.command)) {
+    if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
+    requireFlags(parsed.command, { '--tier': parsed.tier });
+    const mode = resolveWriteMode(parsed, parsed.command);
+    const next =
+      mode === 'apply'
+        ? transitionOrganizationLifecycle({
+            organizationId,
+            tier: parsed.tier!,
+            tenantSlug: parsed.tenantSlug,
+            verb: parsed.command as 'pause' | 'resume' | 'archive',
+            reason: parsed.reason,
+          })
+        : {
+            status: 'dry-run',
+            verb: parsed.command,
+            organization_id: organizationId,
+            tier: parsed.tier,
+            tenant_slug: parsed.tenantSlug,
+            reason: parsed.reason,
+          };
+    emit({ mode, state: next }, parsed.json);
+    return;
+  }
+  if (parsed.command === 'retire' || parsed.command === 'remove') {
+    if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
+    requireFlags(parsed.command, {
+      '--tier': parsed.tier,
+      '--kind': parsed.recordKind,
+      '--record-id': parsed.recordId,
+    });
+    const mode = resolveWriteMode(parsed, parsed.command);
+    const next =
+      mode === 'apply'
+        ? parsed.command === 'retire'
+          ? retireOrganizationEntity({
+              organizationId,
+              tier: parsed.tier!,
+              tenantSlug: parsed.tenantSlug,
+              kind: parsed.recordKind!,
+              recordId: parsed.recordId!,
+              reason: parsed.reason,
+            })
+          : removeOrganizationEntity({
+              organizationId,
+              tier: parsed.tier!,
+              tenantSlug: parsed.tenantSlug,
+              kind: parsed.recordKind!,
+              recordId: parsed.recordId!,
+              reason: parsed.reason,
+            })
+        : {
+            status: 'dry-run',
+            kind: parsed.recordKind,
+            record_id: parsed.recordId,
+            organization_id: organizationId,
+            tier: parsed.tier,
+            tenant_slug: parsed.tenantSlug,
+            reason: parsed.reason,
+          };
+    emit({ mode, record: next }, parsed.json);
     return;
   }
   if (parsed.command === 'purpose set') {

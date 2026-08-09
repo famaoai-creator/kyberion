@@ -8,16 +8,12 @@ import {
   safeReadFile,
   safeReaddir,
   safeWriteFile,
+  loadApprovalRequest,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 
 type Persona =
-  | 'sovereign'
-  | 'ecosystem_architect'
-  | 'mission_owner'
-  | 'worker'
-  | 'analyst'
-  | 'unknown';
+  'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 type AutonomyLevel = 'low' | 'medium' | 'high';
 
 type AuthorityRoleRecord = {
@@ -83,6 +79,7 @@ type OrgRoleCreateOptions = {
   allowedDelegateTeamRoles: string[];
   teamRoleId: string;
   dryRun: boolean;
+  approvalId?: string;
 };
 
 type OrgRolePromoteOptions = {
@@ -95,6 +92,7 @@ type OrgRolePromoteOptions = {
   allowedActuators: string[];
   tierAccess: string[];
   dryRun: boolean;
+  approvalId?: string;
 };
 
 type OrgCommand =
@@ -206,6 +204,7 @@ function helpText(): string {
     '  --autonomy <level>            low | medium | high.',
     '  --parent-team-role <role>     Escalation parent team role.',
     '  --delegate-role <role>        Repeatable allowed delegate team role.',
+    '  --approval-id <uuid>          Approved human request required for security-policy writes.',
     '  --dry-run                     Print the planned change set without writing.',
   ].join('\n');
 }
@@ -235,6 +234,7 @@ function parseArgs(argv: string[]): OrgCommand {
         else if (arg === '--scope-class') (options.scopeClasses as string[]).push(args[++i]);
         else if (arg === '--actuator') (options.allowedActuators as string[]).push(args[++i]);
         else if (arg === '--tier') (options.tierAccess as string[]).push(args[++i]);
+        else if (arg === '--approval-id') options.approvalId = args[++i];
         else if (arg === '--dry-run') options.dryRun = true;
         else if (arg === '--help' || arg === '-h') return { kind: 'help' };
         else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
@@ -279,6 +279,7 @@ function parseArgs(argv: string[]): OrgCommand {
     else if (arg === '--write-scope') (options.writeScopes as string[]).push(args[++i]);
     else if (arg === '--actuator') (options.allowedActuators as string[]).push(args[++i]);
     else if (arg === '--tier') (options.tierAccess as string[]).push(args[++i]);
+    else if (arg === '--approval-id') options.approvalId = args[++i];
     else if (arg === '--delegate-role')
       (options.allowedDelegateTeamRoles as string[]).push(args[++i]);
     else if (arg === '--dry-run') options.dryRun = true;
@@ -762,11 +763,40 @@ function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]
   writeJson(filePath, access);
 }
 
+function assertSecurityPolicyApproval(approvalId?: string): void {
+  if (!approvalId) {
+    throw new Error(
+      '[POLICY_VIOLATION] Direct security-policy writes require --approval-id for an approved human request.'
+    );
+  }
+  const approval = loadApprovalRequest('terminal', approvalId);
+  const requestedEffects = approval?.justification?.requestedEffects || [];
+  const humanApproval = approval?.workflow?.approvals?.some(
+    (entry) =>
+      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+  );
+  if (
+    !approval ||
+    !['approved', 'applied'].includes(approval.status) ||
+    approval.accountability?.finalDecision !== 'human_only' ||
+    !humanApproval ||
+    !requestedEffects.some((effect) =>
+      effect.includes('knowledge/product/governance/security-policy.json')
+    )
+  ) {
+    throw new Error(
+      `[POLICY_VIOLATION] Approval '${approvalId}' is not an authenticated human approval bound to security-policy.json.`
+    );
+  }
+}
+
 function upsertSecurityPolicy(
   rootDir: string,
   authorityRoleId: string,
-  record: AuthorityRoleRecord
+  record: AuthorityRoleRecord,
+  approvalId?: string
 ): void {
+  assertSecurityPolicyApproval(approvalId);
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
   const policy = loadSecurityPolicy(rootDir);
   policy.authority_role_permissions = policy.authority_role_permissions || {};
@@ -871,6 +901,7 @@ function promoteRoleBundle(rootDir: string, input: OrgRolePromoteOptions): Recor
   teamRoles[roleId] = updatedTeam;
 
   if (!input.dryRun) {
+    assertSecurityPolicyApproval(input.approvalId);
     writeAuthorityRoleBundle(rootDir, authorityRoleId, updatedAuthority);
     syncAuthorityRoleSnapshot(rootDir, authorityRoles);
     writeTeamRoleBundle(rootDir, roleId, updatedTeam);
@@ -879,7 +910,7 @@ function promoteRoleBundle(rootDir: string, input: OrgRolePromoteOptions): Recor
       rootDir,
       resolvePromotionRoleAuthorityEntry(roleId, authorityRoleId, input.persona)
     );
-    upsertSecurityPolicy(rootDir, authorityRoleId, updatedAuthority);
+    upsertSecurityPolicy(rootDir, authorityRoleId, updatedAuthority, input.approvalId);
     upsertRoleWriteAccess(rootDir, authorityRoleId, updatedAuthority.write_scopes);
     writePromotionNotes(rootDir, roleId, authorityRoleId, updatedAuthority, updatedTeam);
   }
@@ -933,12 +964,13 @@ export function createRoleBundle(
   teamRoles[teamRoleId] = teamRole;
 
   if (!normalizedInput.dryRun) {
+    assertSecurityPolicyApproval(normalizedInput.approvalId);
     writeAuthorityRoleBundle(rootDir, authorityRoleId, authorityRole);
     syncAuthorityRoleSnapshot(rootDir, authorityRoles);
     writeTeamRoleBundle(rootDir, teamRoleId, teamRole);
     syncTeamRoleSnapshot(rootDir, teamRoles);
     upsertRoleAuthorityMap(rootDir, resolveRoleAuthorityEntry(normalizedInput, authorityRoleId));
-    upsertSecurityPolicy(rootDir, authorityRoleId, authorityRole);
+    upsertSecurityPolicy(rootDir, authorityRoleId, authorityRole, normalizedInput.approvalId);
     upsertRoleWriteAccess(rootDir, authorityRoleId, authorityRole.write_scopes);
     writeRoleDocs(rootDir, normalizedInput, authorityRoleId, teamRole, authorityRole);
   }
@@ -997,6 +1029,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
             allowedDelegateTeamRoles: (command.options.allowedDelegateTeamRoles as string[]) || [],
             teamRoleId: normalizeRoleId(command.options.name),
             dryRun: Boolean(command.options.dryRun),
+            approvalId: command.options.approvalId as string | undefined,
           })
         )
       : withExecutionContext('ecosystem_architect', () =>
@@ -1010,6 +1043,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
             allowedActuators: (command.options.allowedActuators as string[]) || [],
             tierAccess: (command.options.tierAccess as string[]) || [],
             dryRun: Boolean(command.options.dryRun),
+            approvalId: command.options.approvalId as string | undefined,
           })
         );
   printResult(result);

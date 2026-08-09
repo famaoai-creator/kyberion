@@ -5,11 +5,14 @@ import { loadOrganizationProfile, type OrganizationProfile } from './organizatio
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { auditChain } from './audit-chain.js';
+import { resolveTenant } from './tenant-registry.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeRmSync,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -652,7 +655,18 @@ function assertRecordIdentity(record: {
       `tenant_slug is required for confidential organization records (${record.organization_id}).`
     );
   }
+  if (record.tier === 'confidential' && record.tenant_slug === 'shared') {
+    throw new Error(
+      `tenant_slug 'shared' is not a tenant for confidential organization records (${record.organization_id}).`
+    );
+  }
   recordTenant(record);
+  if (
+    record.tenant_slug &&
+    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+  ) {
+    resolveTenant(record.tenant_slug);
+  }
 }
 
 function statePath(organizationId: string, tier: OrganizationTier, tenantSlug = 'shared'): string {
@@ -1069,6 +1083,208 @@ export function saveOrganizationOperationalState(record: OrganizationOperational
     statePath(record.organization_id, record.tier, recordTenant(record)),
     'organization operational state'
   );
+}
+
+export type OrganizationLifecycleVerb = 'pause' | 'resume' | 'archive';
+
+export function transitionOrganizationLifecycle(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  verb: OrganizationLifecycleVerb;
+  reason?: string;
+}): OrganizationOperationalState {
+  const current = loadOrganizationOperationalState(input.organizationId, input);
+  if (!current) throw new Error(`Organization not found: ${input.organizationId}`);
+  const expected = input.verb === 'pause' ? 'active' : input.verb === 'resume' ? 'paused' : null;
+  if (expected && current.status !== expected) {
+    throw new Error(
+      `Organization '${input.organizationId}' is ${current.status}; expected ${expected}.`
+    );
+  }
+  if (input.verb === 'archive' && (current.active_project_ids || []).length > 0) {
+    throw new Error(
+      `Cannot archive organization with active projects: ${current.active_project_ids!.join(', ')}`
+    );
+  }
+  const next: OrganizationOperationalState = {
+    ...current,
+    status: input.verb === 'pause' ? 'paused' : input.verb === 'resume' ? 'active' : 'archived',
+    updated_at: new Date().toISOString(),
+    metadata: {
+      ...(current.metadata || {}),
+      ...(input.verb === 'archive' ? { archived_at: new Date().toISOString() } : {}),
+      ...(input.reason ? { lifecycle_reason: input.reason } : {}),
+    },
+  };
+  saveOrganizationOperationalState(next);
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    action: `organization.${input.verb}`,
+    operation: `${input.verb}:${input.organizationId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { organization_id: input.organizationId, reason: input.reason },
+  });
+  return next;
+}
+
+export type OrganizationRetireKind = 'domain' | 'capability' | 'service' | 'operation' | 'cadence';
+
+export function retireOrganizationEntity(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  kind: OrganizationRetireKind;
+  recordId: string;
+  reason?: string;
+}): Record<string, unknown> {
+  const query = {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  };
+  let record: any;
+  if (input.kind === 'domain') record = loadOrganizationDomain(input.recordId, query);
+  else if (input.kind === 'capability') record = loadOrganizationCapability(input.recordId, query);
+  else if (input.kind === 'service') record = loadOrganizationService(input.recordId, query);
+  else if (input.kind === 'operation') record = loadOrganizationOperation(input.recordId, query);
+  else
+    record = listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
+  const catalog = loadOrganizationCatalog(query);
+  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
+  if (
+    input.kind === 'domain' &&
+    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
+  ) {
+    throw new Error(`Cannot retire domain '${input.recordId}' while child records remain.`);
+  }
+  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
+    throw new Error(
+      `Cannot retire capability '${input.recordId}' while service references remain.`
+    );
+  }
+  if (
+    input.kind === 'service' &&
+    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
+  ) {
+    throw new Error(`Cannot retire service '${input.recordId}' while a domain references it.`);
+  }
+  const next = {
+    ...record,
+    status: 'retired',
+    updated_at: new Date().toISOString(),
+    metadata: {
+      ...(record.metadata || {}),
+      ...(input.reason ? { retire_reason: input.reason } : {}),
+    },
+  };
+  if (input.kind === 'domain') saveOrganizationDomain(next);
+  else if (input.kind === 'capability') saveOrganizationCapability(next);
+  else if (input.kind === 'service') saveOrganizationService(next);
+  else if (input.kind === 'operation') saveOrganizationOperation(next);
+  else saveOrganizationCadence(next);
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    action: `organization.${input.kind}.retire`,
+    operation: `retire:${input.recordId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { organization_id: input.organizationId, reason: input.reason },
+  });
+  return next;
+}
+
+/**
+ * Destructive removal is an explicit, fail-closed lifecycle verb. Callers
+ * must choose it deliberately; ordinary lifecycle transitions use retire.
+ */
+export function removeOrganizationEntity(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  kind: OrganizationRetireKind;
+  recordId: string;
+  reason?: string;
+}): { status: 'removed'; kind: OrganizationRetireKind; record_id: string } {
+  const query = {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+  };
+  const record =
+    input.kind === 'domain'
+      ? loadOrganizationDomain(input.recordId, query)
+      : input.kind === 'capability'
+        ? loadOrganizationCapability(input.recordId, query)
+        : input.kind === 'service'
+          ? loadOrganizationService(input.recordId, query)
+          : input.kind === 'operation'
+            ? loadOrganizationOperation(input.recordId, query)
+            : listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
+
+  const catalog = loadOrganizationCatalog(query);
+  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
+  if (
+    input.kind === 'domain' &&
+    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
+  ) {
+    throw new Error(`Cannot remove domain '${input.recordId}' while child records remain.`);
+  }
+  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
+    throw new Error(
+      `Cannot remove capability '${input.recordId}' while service references remain.`
+    );
+  }
+  if (
+    input.kind === 'service' &&
+    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
+  ) {
+    throw new Error(`Cannot remove service '${input.recordId}' while a domain references it.`);
+  }
+
+  const fileName =
+    input.kind === 'domain'
+      ? DOMAIN_FILE_NAME
+      : input.kind === 'capability'
+        ? CAPABILITY_FILE_NAME
+        : input.kind === 'service'
+          ? SERVICE_FILE_NAME
+          : input.kind === 'operation'
+            ? OPERATION_FILE_NAME
+            : CADENCE_FILE_NAME;
+  const kindDirectory =
+    input.kind === 'domain'
+      ? 'domains'
+      : input.kind === 'capability'
+        ? 'capabilities'
+        : input.kind === 'service'
+          ? 'services'
+          : input.kind === 'operation'
+            ? 'operations'
+            : 'cadences';
+  safeRmSync(
+    recordPath(
+      kindDirectory,
+      input.recordId,
+      fileName,
+      input.organizationId,
+      input.tier,
+      recordTenant(record)
+    ),
+    { force: true }
+  );
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    action: `organization.${input.kind}.remove`,
+    operation: `remove:${input.recordId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { organization_id: input.organizationId, reason: input.reason },
+  });
+  return { status: 'removed', kind: input.kind, record_id: input.recordId };
 }
 
 export function loadOrganizationOperationalState(

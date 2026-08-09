@@ -26,6 +26,7 @@ function fixtureCommand(): string[] {
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_SUDO = 'true'; // bypass consent in unit tests (gate tested separately)
+  safeMkdir(missionPath, { recursive: true });
   safeMkdir(missionEvidenceDir(missionId), { recursive: true });
   registerSpeechToTextBridge({
     name: 'test-fixed',

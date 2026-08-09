@@ -525,3 +525,52 @@
 | DA-06 | DONE | 2026-07-28 完了(`809f8102`): pii-scrubber 新設(pii_patterns 実効化+JP 6種 — メール/電話/口座/住所は mask、カード Luhn・マイナンバー検査数字は block)、commit ゲート配線(block/mask/override 監査・SA-03 injection wrap・transform_chain 記録)、tier 分類提案+common/public 着地は KM-03 steward 承認必須。56+85 テスト緑。氏名検出は原理的限界を文書化し steward レビューに委譲                                                      |
 | DA-07 | DONE | 2026-07-28 完了(`7981f0dd`): tenant-knowledge-retrieval(positive allowlist の単一隔離チョークポイント・strict_isolation で common も除外)、context pack にテナント corpus 併合(KP-01 バイト同一性維持・confidential ミッション限定)、knowledge-index に customer tier(fail-closed)、slice tenant/project 次元、phase 実行時供給(KP-03 未解決事項クローズ)。153 テスト緑。残注記: テナント側は lexical 検索(KM-02 ランカー統一の管轄) |
 | DA-08 | DONE | 2026-07-28 完了(`d418ad3a`): 保持カタログ v1.2.0(ingest 系4エントリ・janitor uncovered 0)、既存 offboard 儀式拡張(台帳/cursor/dedup/vault まで purge+verifyScopeOffboarded 事後検証・export に cursor 追加)、ingest-quota(200件/50MiB/日・warn0.8→block・commit 配線)、週次キュレーションに tenant_ingest 節。123 テスト緑。残注記: mesh-hub/pipeline-runs/run-graphs の未カバーは既存ギャップ(DA 外)                                |
+
+### EG(エンティティガバナンス統一)
+
+正本: [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](../improvement-plans-2026-08/ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)
+
+| ID               | 状態    | 実装状況 / 残作業                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EG-01〜10, EG-12 | PARTIAL | 2026-08-09: 正準スコープ文書/実行定数、保護プレフィックスと越境拒否監査(2対象)、audit freshness の baseline 層、path-resolver read-only 化、tenant/project/work-item/organization の作成時検証、WorkItem schema/context migration、tenant facade、organization lifecycle/retire/remove、drift checker、artifact ownership/retention/offboard query、git boundary checker を実装。13ファイル132テスト、core build/typecheck、baseline pipeline が緑。実 runtime の移送/裁定と一部追加 E2E は残。 |
+| EG-11            | PARTIAL | 2026-08-09: `entity_governance_cleanup` の mission-scoped dry-run、soft-delete、approved-by 必須、証跡 receipt を実装。登録済み workspace 不在5件は governed archive 済み。残: dry-run で検出した既存 mission/project/distill の裁定・soft-delete 適用。                                                                                                                                                                                                                                        |
+| EG-13            | DONE    | 2026-08-09: 2026-08索引と本台帳へ登録し、既存の複合/IDなし計画18件と不足ID alias(E2E-01〜06、AO-05、MO-09、RG-01、SR-01、UX-07)を STATUS の alias 台帳へ追加。`check:entity-governance` の `plan_ledger.missing` は空。                                                                                                                                                                                                                                                                         |
+
+#### EG-13 計画文書エイリアス台帳
+
+ID を持つ実装項目は上記の ID 行を正本とし、ID を持たない設計文書および複合計画は、ここで文書ファイル自体を登録する。`check:entity-governance` はこの一覧と STATUS の両方を検査する。
+
+| 計画文書                                                                                                               | 状態    | 正本/突合先                              |
+| ---------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------- |
+| [AVATAR_HOST_BRIDGE_ABSTRACTION_PLAN.ja.md](./AVATAR_HOST_BRIDGE_ABSTRACTION_PLAN.ja.md)                               | INDEXED | AVATAR 関連実装と本文の受入条件を突合    |
+| [BROWSER_ACTUATOR_BROWSER_CLI_CONCEPTS.ja.md](./BROWSER_ACTUATOR_BROWSER_CLI_CONCEPTS.ja.md)                           | INDEXED | browser actuator の capability/CLI 境界  |
+| [BROWSER_ONBOARDING_STUDIO_PLAN.ja.md](./BROWSER_ONBOARDING_STUDIO_PLAN.ja.md)                                         | INDEXED | browser onboarding の受入条件            |
+| [E2E-01_MEETING_TO_VALUE.ja.md](./E2E-01_MEETING_TO_VALUE.ja.md)                                                       | INDEXED | E2E-01                                   |
+| [E2E-02_CREATIVE_SUITE.ja.md](./E2E-02_CREATIVE_SUITE.ja.md)                                                           | INDEXED | E2E-02                                   |
+| [E2E-03_AGENT_COLLABORATION.ja.md](./E2E-03_AGENT_COLLABORATION.ja.md)                                                 | INDEXED | E2E-03                                   |
+| [E2E-04_OPERATOR_INTERFACE.ja.md](./E2E-04_OPERATOR_INTERFACE.ja.md)                                                   | INDEXED | E2E-04                                   |
+| [E2E-05_APP_LIFECYCLE.ja.md](./E2E-05_APP_LIFECYCLE.ja.md)                                                             | INDEXED | E2E-05                                   |
+| [E2E-06_CUSTOMER_DIALOGUE.ja.md](./E2E-06_CUSTOMER_DIALOGUE.ja.md)                                                     | INDEXED | E2E-06                                   |
+| [KYBERION_PEER_COLLABORATION_REFINEMENT_PLAN.ja.md](./KYBERION_PEER_COLLABORATION_REFINEMENT_PLAN.ja.md)               | INDEXED | peer collaboration の受入条件            |
+| [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)                                             | INDEXED | LC-01〜12                                |
+| [ORGANIZATION_VIEW_SCOPE_ARCHITECTURE_2026-08-04.ja.md](./ORGANIZATION_VIEW_SCOPE_ARCHITECTURE_2026-08-04.ja.md)       | INDEXED | organization view/scope の受入条件       |
+| [REALTIME_VOICE_CONVERSATION_PLAN_2026-07-20.ja.md](./REALTIME_VOICE_CONVERSATION_PLAN_2026-07-20.ja.md)               | INDEXED | realtime voice の受入条件                |
+| [SURFACE_NEUTRAL_ORCHESTRATION.ja.md](./SURFACE_NEUTRAL_ORCHESTRATION.ja.md)                                           | INDEXED | surface-neutral orchestration の受入条件 |
+| [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md) | INDEXED | DS/UX の受入条件                         |
+| [WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md](./WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md)                                   | INDEXED | wisdom ownership の受入条件              |
+| [WISDOM_AGENT_PR_SPLIT_2026-07-20.ja.md](./WISDOM_AGENT_PR_SPLIT_2026-07-20.ja.md)                                     | INDEXED | wisdom PR split の受入条件               |
+| [WORK_GRAPH_EXECUTION_UNIFICATION.ja.md](./WORK_GRAPH_EXECUTION_UNIFICATION.ja.md)                                     | INDEXED | graph/work execution の設計正本          |
+
+| ID     | 状態    | 計画文書                                                                                           |
+| ------ | ------- | -------------------------------------------------------------------------------------------------- |
+| AO-05  | INDEXED | [AO-05_AGENT_PERSONA_ORGANIZATION_MODEL.ja.md](./AO-05_AGENT_PERSONA_ORGANIZATION_MODEL.ja.md)     |
+| E2E-01 | INDEXED | [E2E-01_MEETING_TO_VALUE.ja.md](./E2E-01_MEETING_TO_VALUE.ja.md)                                   |
+| E2E-02 | INDEXED | [E2E-02_CREATIVE_SUITE.ja.md](./E2E-02_CREATIVE_SUITE.ja.md)                                       |
+| E2E-03 | INDEXED | [E2E-03_AGENT_COLLABORATION.ja.md](./E2E-03_AGENT_COLLABORATION.ja.md)                             |
+| E2E-04 | INDEXED | [E2E-04_OPERATOR_INTERFACE.ja.md](./E2E-04_OPERATOR_INTERFACE.ja.md)                               |
+| E2E-05 | INDEXED | [E2E-05_APP_LIFECYCLE.ja.md](./E2E-05_APP_LIFECYCLE.ja.md)                                         |
+| E2E-06 | INDEXED | [E2E-06_CUSTOMER_DIALOGUE.ja.md](./E2E-06_CUSTOMER_DIALOGUE.ja.md)                                 |
+| MO-09  | INDEXED | [MO-09_TASK_BOARD_RENDER_UNIFICATION.ja.md](./MO-09_TASK_BOARD_RENDER_UNIFICATION.ja.md)           |
+| RG-01  | INDEXED | [RG-01_UNIFIED_REASONING_MODEL_GOVERNANCE.ja.md](./RG-01_UNIFIED_REASONING_MODEL_GOVERNANCE.ja.md) |
+| SR-01  | INDEXED | [SR-01_SURFACE_ROLE_REDESIGN.ja.md](./SR-01_SURFACE_ROLE_REDESIGN.ja.md)                           |
+| UX-07  | INDEXED | [UX-07_AGENT_COLLABORATION_VISIBILITY.ja.md](./UX-07_AGENT_COLLABORATION_VISIBILITY.ja.md)         |
