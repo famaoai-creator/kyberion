@@ -494,6 +494,96 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
       notes:
         'The bridge accepts the current Silero VAD v6.2-compatible ONNX model through KYBERION_SILERO_VAD_MODEL.',
     },
+    {
+      tool_id: 'ollama',
+      display_name: 'Ollama Local LLM Runtime',
+      ecosystem: 'system',
+      status: 'active',
+      platforms: ['any'],
+      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+      trial_backend: {
+        kind: 'system',
+        command: 'ollama',
+        args: ['--version'],
+        description: 'Probe Ollama CLI availability without mutating workspace state.',
+      },
+      install_backend: {
+        kind: 'brew',
+        command: 'brew',
+        args: ['install', 'ollama'],
+        description: 'Install Ollama via Homebrew on macOS.',
+      },
+      install_backend_platform_overrides: {
+        win32: {
+          kind: 'winget',
+          command: 'winget',
+          args: [
+            'install',
+            '--id',
+            'Ollama.Ollama',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+          ],
+          description: 'Install Ollama through WinGet on Windows.',
+        },
+      },
+      installed_backend: {
+        kind: 'system',
+        command: 'ollama',
+        args: ['serve'],
+        description: 'Run Ollama server process.',
+      },
+      managed_env_subpath: 'tool-runtimes/ollama',
+      notes: 'Ollama local LLM server runtime.',
+    },
+    {
+      tool_id: 'llamacpp',
+      display_name: 'llama.cpp C++ LLM Engine',
+      ecosystem: 'system',
+      status: 'active',
+      platforms: ['any'],
+      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+      trial_backend: {
+        kind: 'system',
+        command: 'llama-server',
+        args: ['--version'],
+        description: 'Probe llama-server CLI availability.',
+      },
+      install_backend: {
+        kind: 'brew',
+        command: 'brew',
+        args: ['install', 'llama.cpp'],
+        description: 'Install llama.cpp binaries via Homebrew.',
+      },
+      install_backend_platform_overrides: {
+        win32: {
+          kind: 'winget',
+          command: 'winget',
+          args: [
+            'install',
+            '--id',
+            'ggml.llamacpp',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+          ],
+          description: 'Install llama.cpp through WinGet on Windows.',
+        },
+      },
+      installed_backend: {
+        kind: 'system',
+        command: 'llama-server',
+        args: ['--port', '8080'],
+        description: 'Run llama-server process.',
+      },
+      managed_env_subpath: 'tool-runtimes/llamacpp',
+      notes: 'llama.cpp server runtime for GGUF model inference.',
+    },
   ],
 };
 
@@ -521,14 +611,19 @@ function resolveInstallBackend(
 ): ToolRuntimeBackendCommand | null {
   return (
     record.install_backend_platform_overrides?.[platform as ToolRuntimePlatform] ||
+    record.install_backend_platform_overrides?.any ||
     record.install_backend ||
     null
   );
 }
 
-function backendIsAvailable(backend: ToolRuntimeBackendCommand | null | undefined): boolean {
+function backendIsAvailable(
+  backend: ToolRuntimeBackendCommand | null | undefined,
+  platform: NodeJS.Platform = process.platform
+): boolean {
   if (!backend) return false;
-  const result = safeExecResult('which', [backend.command], {
+  const resolver = platform === 'win32' ? 'where.exe' : 'which';
+  const result = safeExecResult(resolver, [backend.command], {
     timeoutMs: 5_000,
     maxOutputMB: 1,
   });
@@ -757,7 +852,7 @@ export function probeToolRuntime(
 
   const availableCommands = [record.trial_backend, installBackend, record.installed_backend]
     .filter((backend): backend is ToolRuntimeBackendCommand => Boolean(backend))
-    .filter((backend) => backendIsAvailable(backend))
+    .filter((backend) => backendIsAvailable(backend, platform))
     .map((backend) => backend.command);
 
   const installed = Boolean(state && (state.status === 'installed' || state.status === 'pinned'));
