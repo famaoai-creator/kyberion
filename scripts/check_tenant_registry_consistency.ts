@@ -38,6 +38,7 @@ import {
   safeReadFile,
   safeReaddir,
   safeStat,
+  listProjectRecords,
 } from '@agent/core';
 
 export const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
@@ -57,6 +58,8 @@ export interface TenantSystemsSnapshot {
   confidentialIndex: string[];
   /** (c) top-level customer/{slug}/ directory names. */
   customerDirs: string[];
+  /** (d) tenant slugs declared by project registry records. */
+  projectTenants: string[];
   notes: string[];
 }
 
@@ -65,6 +68,7 @@ export interface TenantConsistencyRow {
   profile: boolean;
   confidential_index: boolean;
   customer_dir: boolean;
+  project_registry: boolean;
   exception: string | null;
 }
 
@@ -123,11 +127,18 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     notes.push('(c) customer/ directory not present — treated as empty set');
   }
 
+  const projectTenants =
+    path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
+      ? listProjectRecords()
+          .map((record) => record.tenant_slug)
+          .filter((slug): slug is string => Boolean(slug && slug !== 'shared'))
+          .sort()
+      : [];
   notes.push(
-    '(d) project registry: ProjectRecord (libs/core/project-registry.ts) carries no tenant slug field — nothing to cross-check'
+    '(d) project registry tenant_slug fields are included in the tenant spine cross-check'
   );
 
-  return { profiles, confidentialIndex, customerDirs, notes };
+  return { profiles, confidentialIndex, customerDirs, projectTenants, notes };
 }
 
 export function loadTenantRegistryExceptions(options: CheckOptions = {}): {
@@ -173,13 +184,17 @@ export function evaluateTenantConsistency(
   const profileSet = new Set(systems.profiles);
   const indexSet = new Set(systems.confidentialIndex);
   const customerSet = new Set(systems.customerDirs);
-  const allSlugs = Array.from(new Set([...profileSet, ...indexSet, ...customerSet])).sort();
+  const projectSet = new Set(systems.projectTenants);
+  const allSlugs = Array.from(
+    new Set([...profileSet, ...indexSet, ...customerSet, ...projectSet])
+  ).sort();
 
   const rows: TenantConsistencyRow[] = allSlugs.map((slug) => ({
     slug,
     profile: profileSet.has(slug),
     confidential_index: indexSet.has(slug),
     customer_dir: customerSet.has(slug),
+    project_registry: projectSet.has(slug),
     exception: exceptionBySlug.get(slug) ?? null,
   }));
 
@@ -198,6 +213,7 @@ export function evaluateTenantConsistency(
         const knownTo = [
           row.confidential_index ? 'confidential index' : null,
           row.customer_dir ? 'customer/ directory' : null,
+          row.project_registry ? 'project registry' : null,
         ]
           .filter((label) => label != null)
           .join(' + ');
@@ -233,12 +249,13 @@ export function evaluateTenantConsistency(
 
 export function renderReport(report: TenantConsistencyReport): string {
   const lines: string[] = [];
-  const header = ['slug', 'profile', 'conf-index', 'customer-dir', 'status'];
+  const header = ['slug', 'profile', 'conf-index', 'customer-dir', 'project-reg', 'status'];
   const rowsAsText = report.rows.map((row) => [
     row.slug,
     row.profile ? 'yes' : '-',
     row.confidential_index ? 'yes' : '-',
     row.customer_dir ? 'yes' : '-',
+    row.project_registry ? 'yes' : '-',
     row.exception != null ? `exception: ${row.exception}` : row.profile ? 'ok' : 'DRIFT',
   ]);
   const widths = header.map((label, column) =>

@@ -38,6 +38,7 @@ import {
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
+import { listArtifactOwnershipRecordsByQuery } from './artifact-registry.js';
 import {
   appendRetentionAudit,
   repoRelativePosix,
@@ -284,6 +285,8 @@ export interface OffboardScopeResult {
   retired_identities?: number;
   /** DA-08: dedup-registry prune summary (tenant scope only). */
   dedup_registry?: OffboardDedupRegistryResult;
+  /** EG-10: registry-backed artifact ownership query for the offboarded scope. */
+  artifact_registry?: { matched: number; registry_path: string; records_retained: boolean };
   /** DA-08: automatic post-execute leftover check (execute mode only). */
   verification?: OffboardVerification;
   reason?: string;
@@ -597,6 +600,16 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
 
   try {
     result.targets = collectScopeTargets(scopeType, scopeId);
+    const ownedArtifacts = listArtifactOwnershipRecordsByQuery(
+      scopeType === 'tenant' ? { tenantSlug: scopeId } : { projectId: scopeId }
+    );
+    if (ownedArtifacts.length > 0) {
+      result.artifact_registry = {
+        matched: ownedArtifacts.length,
+        registry_path: repoRelativePosix(pathResolver.shared('runtime/artifacts/registry.jsonl')),
+        records_retained: true,
+      };
+    }
     // DA-08: dedup-registry lines are pruned in place (line-level, not a
     // tree), so they ride next to `targets`. Computed while the ledger still
     // exists — this must precede any deletion.
@@ -604,7 +617,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
       result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
     }
-    if (result.targets.length === 0 && !result.dedup_registry) {
+    if (result.targets.length === 0 && !result.dedup_registry && !result.artifact_registry) {
       result.status = 'not_found';
       result.reason = `no scope-owned trees or entries found for ${scopeType} '${scopeId}'`;
       return result;
@@ -617,6 +630,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         scope_id: scopeId,
         targets: result.targets.map((target) => target.path),
         ...(result.dedup_registry ? { dedup_registry_matched: result.dedup_registry.matched } : {}),
+        ...(result.artifact_registry
+          ? { artifact_registry_matched: result.artifact_registry.matched }
+          : {}),
         policy_ref: RETENTION_CATALOG_REPO_PATH,
         reason: 'offboarding dry run (no writes)',
       });
