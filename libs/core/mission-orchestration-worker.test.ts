@@ -2304,14 +2304,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       },
     }));
 
+    const runPrefix = `serial-parallel-${process.pid}-${Date.now()}`;
     writeFixture(1);
-    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    await dispatchMissionNextTasks('MSN-FOLLOWUP', `${runPrefix}-serial`);
     const serialSnapshot = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
 
     writeFixture(2);
-    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    await dispatchMissionNextTasks('MSN-FOLLOWUP', `${runPrefix}-parallel`);
     const parallelSnapshot = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
