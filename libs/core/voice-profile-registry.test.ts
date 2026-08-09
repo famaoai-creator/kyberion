@@ -151,6 +151,9 @@ describe('voice profile registry', () => {
       }),
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR = registryDir;
+    // Keep this directory-loader test independent from the checked-in personal
+    // overlay, which otherwise changes the default profile in CI checkouts.
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = `${tmpDir}/missing-personal-overlay.json`;
 
     const registry = getVoiceProfileRegistry();
     expect(registry.default_profile_id).toBe('operator-ja-default');
