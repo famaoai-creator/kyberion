@@ -13,6 +13,14 @@ import type {
   BrowserExtensionSessionRequest,
 } from './browser-extension-bridge.js';
 import type { ServiceRecording } from './service-recording.js';
+import { computeDesktopRecordingHash, type DesktopRecording } from './desktop-recording.js';
+import {
+  intentDraftHash,
+  reconstructDesktopIntent,
+  reviewDesktopIntent,
+  type DesktopIntentDraft,
+} from './desktop-intent-reconstruction.js';
+import type { DesktopPipeline } from './desktop-pipeline.js';
 
 const SERVICE_PROCEDURE: ProcedureEntry = {
   procedure_id: 'deal.intake.jira-slack',
@@ -105,6 +113,29 @@ const BASE_INPUT: DispatchInput = {
   session: SESSION,
 };
 
+function desktopPipeline(procedure: ProcedureEntry, recording: DesktopRecording): DesktopPipeline {
+  return {
+    schema_version: 'desktop-pipeline.v1',
+    procedure_id: procedure.procedure_id,
+    executor: 'system',
+    recording_ref: procedure.adapter.recording_ref!,
+    recording_hash: recording.recording_hash,
+    steps: recording.steps.map((step) => ({
+      step_id: step.step_id,
+      op: `system:${step.op}`,
+      risk_class: step.risk_class,
+      ...(step.selector ? { selector: step.selector } : {}),
+    })),
+  };
+}
+
+function approveDesktopIntent(recording: DesktopRecording): DesktopIntentDraft {
+  const intent = reviewDesktopIntent(reconstructDesktopIntent(recording), 'approved', 'operator');
+  recording.intent_hash = intentDraftHash(intent);
+  recording.recording_hash = computeDesktopRecordingHash(recording);
+  return intent;
+}
+
 // ---------------------------------------------------------------------------
 // dispatchProcedure — routing
 // ---------------------------------------------------------------------------
@@ -128,13 +159,248 @@ describe('dispatchProcedure', () => {
     );
   });
 
-  it('returns not_implemented for system (desktop) executor', async () => {
+  it('executes an approved desktop recording through the OS bridge', async () => {
+    const redact = vi.fn(async () => undefined);
+    const desktopRecording: DesktopRecording = {
+      schema_version: 'desktop-recording.v1',
+      recording_id: 'desktop-1',
+      source: 'desktop-capture',
+      created_at: '2026-08-09T00:00:00Z',
+      target: { name: 'Notes', platform: 'darwin' },
+      steps: [
+        {
+          step_id: 's1',
+          op: 'screenshot',
+          summary: 'observe',
+          risk_class: 'read',
+          selector: { app: 'Notes', window_title: 'Note' },
+          evidence: ['active_window:window_title'],
+        },
+      ],
+      risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+      recording_hash: '',
+      policy_version: 'v1',
+      review: { status: 'approved', reviewer: 'operator', reviewed_at: '2026-08-09T00:00:00Z' },
+    };
+    const desktopIntent = approveDesktopIntent(desktopRecording);
     const input: DispatchInput = {
       ...BASE_INPUT,
-      procedure: { ...PROCEDURE, adapter: { ...PROCEDURE.adapter, executor: 'system' } },
+      procedure: {
+        ...PROCEDURE,
+        pipeline_ref: 'pipelines/desktop/test-desktop-1.json',
+        adapter: {
+          ...PROCEDURE.adapter,
+          executor: 'system',
+          recording_ref: 'active/shared/runtime/recordings/desktop-1.json',
+        },
+      },
+      desktopRecording,
+      desktopIntent,
+      desktopPipeline: desktopPipeline(
+        {
+          ...PROCEDURE,
+          procedure_id: PROCEDURE.procedure_id,
+          pipeline_ref: 'pipelines/desktop/test-desktop-1.json',
+          adapter: {
+            ...PROCEDURE.adapter,
+            executor: 'system',
+            recording_ref: 'active/shared/runtime/recordings/desktop-1.json',
+          },
+        },
+        desktopRecording
+      ),
+      desktopBridge: {
+        getWindowList: () => ['Note'],
+        detectFocusedInput: () => ({
+          application: 'Notes',
+          windowTitle: 'Note',
+          role: '',
+          description: '',
+          editable: false,
+        }),
+        takeScreenshot: () => ({ path: 'withheld' }),
+      },
+      desktopScreenRedactor: redact,
     };
     const result = await dispatchProcedure(input);
-    expect(result.status).toBe('not_implemented');
+    expect(result.status).toBe('executed');
+    expect(redact).toHaveBeenCalledWith(
+      expect.stringContaining('/active/shared/tmp/desktop-screenshots/raw-'),
+      expect.stringContaining('/active/shared/tmp/desktop-screenshots/desktop-1-s1-')
+    );
+  });
+
+  it('requires approval before a destructive desktop operation', async () => {
+    const desktopRecording: DesktopRecording = {
+      schema_version: 'desktop-recording.v1',
+      recording_id: 'desktop-2',
+      source: 'desktop-capture',
+      created_at: '2026-08-09T00:00:00Z',
+      target: { name: 'Notes', platform: 'darwin' },
+      steps: [
+        {
+          step_id: 's1',
+          op: 'app_quit',
+          summary: 'quit',
+          risk_class: 'high',
+          selector: { app: 'Notes' },
+          evidence: ['active_window:application'],
+        },
+      ],
+      risk_summary: { requires_manual_review: true, approval_required_count: 1 },
+      recording_hash: '',
+      policy_version: 'v1',
+      review: { status: 'approved', reviewer: 'operator', reviewed_at: '2026-08-09T00:00:00Z' },
+    };
+    const desktopIntent = approveDesktopIntent(desktopRecording);
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: {
+        ...PROCEDURE,
+        pipeline_ref: 'pipelines/desktop/test-desktop-2.json',
+        adapter: {
+          ...PROCEDURE.adapter,
+          executor: 'system',
+          recording_ref: 'active/shared/runtime/recordings/desktop-2.json',
+        },
+      },
+      desktopRecording,
+      desktopIntent,
+      desktopPipeline: desktopPipeline(
+        {
+          ...PROCEDURE,
+          pipeline_ref: 'pipelines/desktop/test-desktop-2.json',
+          adapter: {
+            ...PROCEDURE.adapter,
+            executor: 'system',
+            recording_ref: 'active/shared/runtime/recordings/desktop-2.json',
+          },
+        },
+        desktopRecording
+      ),
+      desktopBridge: {
+        getWindowList: () => ['Note'],
+        detectFocusedInput: () => ({
+          application: 'Notes',
+          windowTitle: 'Note',
+          role: '',
+          description: '',
+          editable: false,
+        }),
+        quitApplication: vi.fn(),
+      },
+    });
+    expect(result.status).toBe('approval_required');
+  });
+
+  it('blocks an approved recording whose contents were changed after review', async () => {
+    const desktopRecording: DesktopRecording = {
+      schema_version: 'desktop-recording.v1',
+      recording_id: 'desktop-3',
+      source: 'desktop-capture',
+      created_at: '2026-08-09T00:00:00Z',
+      target: { name: 'Notes', platform: 'darwin' },
+      steps: [
+        {
+          step_id: 's1',
+          op: 'screenshot',
+          summary: 'observe',
+          risk_class: 'read',
+          selector: { app: 'Notes', window_title: 'Note' },
+          evidence: ['active_window:window_title'],
+        },
+      ],
+      risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+      recording_hash: 'reviewed-hash',
+      policy_version: 'v1',
+      review: { status: 'approved', reviewer: 'operator', reviewed_at: '2026-08-09T00:00:00Z' },
+    };
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: {
+        ...PROCEDURE,
+        pipeline_ref: 'pipelines/desktop/test-desktop-3.json',
+        adapter: {
+          ...PROCEDURE.adapter,
+          executor: 'system',
+          recording_ref: 'active/shared/runtime/recordings/desktop-3.json',
+        },
+      },
+      desktopRecording,
+      desktopPipeline: desktopPipeline(
+        {
+          ...PROCEDURE,
+          pipeline_ref: 'pipelines/desktop/test-desktop-3.json',
+          adapter: {
+            ...PROCEDURE.adapter,
+            executor: 'system',
+            recording_ref: 'active/shared/runtime/recordings/desktop-3.json',
+          },
+        },
+        desktopRecording
+      ),
+      desktopBridge: {
+        getWindowList: () => ['Note'],
+        detectFocusedInput: () => ({
+          application: 'Notes',
+          windowTitle: 'Note',
+          role: '',
+          description: '',
+          editable: false,
+        }),
+      },
+    });
+    expect(result).toMatchObject({
+      status: 'blocked',
+      errors: [expect.stringContaining('recording_hash')],
+    });
+  });
+
+  it('blocks a desktop procedure when its persisted pipeline does not bind the recording', async () => {
+    const desktopRecording: DesktopRecording = {
+      schema_version: 'desktop-recording.v1',
+      recording_id: 'desktop-4',
+      source: 'desktop-capture',
+      created_at: '2026-08-09T00:00:00Z',
+      target: { name: 'Notes', platform: 'darwin' },
+      steps: [
+        {
+          step_id: 's1',
+          op: 'screenshot',
+          summary: 'observe',
+          risk_class: 'read',
+          selector: { app: 'Notes' },
+          evidence: ['active_window:application'],
+        },
+      ],
+      risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+      recording_hash: '',
+      policy_version: 'v1',
+      review: { status: 'approved', reviewer: 'operator', reviewed_at: '2026-08-09T00:00:00Z' },
+    };
+    desktopRecording.recording_hash = computeDesktopRecordingHash(desktopRecording);
+    const procedure = {
+      ...PROCEDURE,
+      pipeline_ref: 'pipelines/desktop/test-desktop-4.json',
+      adapter: {
+        ...PROCEDURE.adapter,
+        executor: 'system',
+        recording_ref: 'active/shared/runtime/recordings/desktop-4.json',
+      },
+    };
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure,
+      desktopRecording,
+      desktopPipeline: {
+        ...desktopPipeline(procedure, desktopRecording),
+        recording_hash: 'a'.repeat(64),
+      },
+    });
+    expect(result).toMatchObject({
+      status: 'blocked',
+      errors: [expect.stringContaining('recording_hash')],
+    });
   });
 
   it('returns blocked for unknown executor', async () => {

@@ -2,7 +2,13 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface DistillCandidateRecord {
@@ -18,7 +24,7 @@ export interface DistillCandidateRecord {
   title: string;
   summary: string;
   status: 'proposed' | 'promoted' | 'archived';
-  target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
+  target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' | 'procedure';
   specialist_id?: string;
   locale?: string;
   work_loop?: OrganizationWorkLoopSummary;
@@ -46,11 +52,15 @@ function recordPath(candidateId: string): string {
 }
 
 export function createDistillCandidateRecord(
-  input: Omit<DistillCandidateRecord, 'candidate_id' | 'created_at' | 'updated_at'> & { candidate_id?: string },
+  input: Omit<DistillCandidateRecord, 'candidate_id' | 'created_at' | 'updated_at'> & {
+    candidate_id?: string;
+  }
 ): DistillCandidateRecord {
   const now = new Date().toISOString();
   return {
-    candidate_id: input.candidate_id || `DSC-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    candidate_id:
+      input.candidate_id ||
+      `DSC-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     created_at: now,
     updated_at: now,
     ...input,
@@ -63,7 +73,9 @@ export function validateDistillCandidateRecord(value: unknown): value is Distill
 
 export function saveDistillCandidateRecord(record: DistillCandidateRecord): string {
   if (!validateDistillCandidateRecord(record)) {
-    const errors = (ensureValidator().errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+    const errors = (ensureValidator().errors || []).map(
+      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+    );
     throw new Error(`Invalid distill candidate record: ${errors.join('; ')}`);
   }
   if (!safeExistsSync(DISTILL_DIR)) safeMkdir(DISTILL_DIR, { recursive: true });
@@ -95,7 +107,7 @@ export function listDistillCandidateRecords(): DistillCandidateRecord[] {
 
 export function updateDistillCandidateRecord(
   candidateId: string,
-  patch: Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>>,
+  patch: Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>>
 ): DistillCandidateRecord | null {
   const current = loadDistillCandidateRecord(candidateId);
   if (!current) return null;
