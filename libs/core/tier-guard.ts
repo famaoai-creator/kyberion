@@ -79,7 +79,9 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'knowledge/personal') ||
     pathStartsWith(relativePath, 'knowledge/confidential') ||
     pathStartsWith(relativePath, 'active/organizations/personal') ||
-    pathStartsWith(relativePath, 'active/organizations/confidential')
+    pathStartsWith(relativePath, 'active/organizations/confidential') ||
+    pathStartsWith(relativePath, 'active/missions/confidential') ||
+    pathStartsWith(relativePath, 'active/projects/confidential')
   );
 }
 
@@ -385,10 +387,32 @@ function checkTenantScope(
   }
 
   const persona = tenantSlug ? `tenant '${tenantSlug}'` : 'a tenant-bound persona';
-  return {
-    allowed: false,
-    reason: `[POLICY_VIOLATION] tenant.scope_violation — persona bound to ${persona} attempted to access path of tenant '${targetTenant}' ('${relativePath}').`,
-  };
+  const reason = `[POLICY_VIOLATION] tenant.scope_violation — persona bound to ${persona} attempted to access path of tenant '${targetTenant}' ('${relativePath}').`;
+  void recordTenantScopeViolation({ relativePath, tenantSlug, targetTenant, reason });
+  return { allowed: false, reason };
+}
+
+function recordTenantScopeViolation(input: {
+  relativePath: string;
+  tenantSlug?: string;
+  targetTenant: string;
+  reason: string;
+}): void {
+  import('./audit-chain.js')
+    .then(({ auditChain }) => {
+      auditChain.record({
+        agentId: 'tier-guard',
+        action: 'tenant.scope_violation',
+        operation: input.relativePath,
+        result: 'denied',
+        reason: input.reason,
+        ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+        metadata: { target_tenant: input.targetTenant },
+      });
+    })
+    .catch(() => {
+      /* best-effort audit sink; the policy decision remains denied */
+    });
 }
 
 /**

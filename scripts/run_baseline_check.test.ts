@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ProviderCapability } from '@agent/core';
+import {
+  pathResolver,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+  type ProviderCapability,
+} from '@agent/core';
 
 // XP-01: this file's top-level import below runs `run_baseline_check.ts`'s
 // `main()` for real (unconditional `main().catch(...)` at module scope — see
@@ -24,6 +30,8 @@ const {
   cronFiredWithinWindow,
   shouldEmitDailyOpsAlert,
   SCHEDULES_FIRING_WINDOW_MS,
+  readAuditLedgerFreshness,
+  AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
 } = await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
@@ -131,6 +139,33 @@ describe('run_baseline_check', () => {
       { submitted: false, pending: false, reason: null }
     );
     expect(status).toBe('needs_attention');
+  });
+
+  it('readAuditLedgerFreshness distinguishes missing, stale, and fresh audit ledgers (EG-03)', () => {
+    const auditDir = pathResolver.sharedTmp('baseline-audit-ledger-freshness-test');
+    safeRmSync(auditDir, { recursive: true, force: true });
+    safeMkdir(auditDir, { recursive: true });
+    const now = Date.parse('2026-08-09T12:00:00.000Z');
+    expect(readAuditLedgerFreshness(auditDir, now)).toMatchObject({
+      fresh: false,
+      reason: 'missing',
+    });
+    safeWriteFile(
+      `${auditDir}/audit-2026-08-09.jsonl`,
+      JSON.stringify({
+        timestamp: new Date(now - AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS - 1).toISOString(),
+      })
+    );
+    expect(readAuditLedgerFreshness(auditDir, now)).toMatchObject({
+      fresh: false,
+      reason: 'stale',
+    });
+    safeWriteFile(
+      `${auditDir}/audit-2026-08-09.jsonl`,
+      JSON.stringify({ timestamp: new Date(now - 60 * 60 * 1000).toISOString() })
+    );
+    expect(readAuditLedgerFreshness(auditDir, now)).toMatchObject({ fresh: true, reason: 'fresh' });
+    safeRmSync(auditDir, { recursive: true, force: true });
   });
 
   it('reasoningFailoverWarning returns null when no marker is present', () => {

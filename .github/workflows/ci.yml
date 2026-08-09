@@ -73,6 +73,11 @@ jobs:
       - name: Check tenant registry consistency
         run: pnpm run check:tenant-registry
 
+      # EG-09/EG-12: entity scope, workspace registry, mission hygiene, and
+      # repository tracking boundaries must not drift in a clean checkout.
+      - name: Check entity governance boundaries
+        run: pnpm run check:entity-governance
+
       # DS-01 / UX-05: prevent new operator-surface color literals and
       # dashboard status vocabulary bypasses after the generated-token gate.
       - name: Check UI/UX governance drift

@@ -13,7 +13,7 @@ import { initializeMissionTeamBindings } from './mission-team-binding.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { inferMissionOutcomeContract } from './outcome-contract.js';
-import { ensureDefaultTenantProfile } from './tenant-registry.js';
+import { ensureDefaultTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
@@ -161,6 +161,9 @@ export async function createMission(args: {
     throw new Error(
       `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
     );
+  }
+  if (tenantSlug && (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)) {
+    resolveTenant(tenantSlug, { rootDir });
   }
   withExecutionContext(
     'knowledge_steward',

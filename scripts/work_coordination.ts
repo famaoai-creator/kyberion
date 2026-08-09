@@ -12,6 +12,7 @@ import {
   listCoordinationEvents,
   listWorkCoordinationImportCatalogEntries,
   listWorkItems,
+  migrateLegacyWorkItemContexts,
   releaseWorkItem,
   renewWorkItemLease,
   updateWorkItem,
@@ -134,6 +135,11 @@ async function main(): Promise<void> {
     .command('update-status', 'Update work item fields', () => undefined)
     .command('record-event', 'Append a coordination event', () => undefined)
     .command('list-items', 'List work items', () => undefined)
+    .command(
+      'migrate-context',
+      'Backfill typed WorkItem context from legacy snapshots',
+      () => undefined
+    )
     .command('list-events', 'List coordination events', () => undefined)
     .command('list-leases', 'List active leases', () => undefined)
     .command('history <correlationId>', 'Show the integrated handoff history', () => undefined)
@@ -179,6 +185,7 @@ async function main(): Promise<void> {
     .option('note', { type: 'string' })
     .option('payload', { type: 'string' })
     .option('project', { type: 'string' })
+    .option('apply', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false });
   for (const entry of listWorkCoordinationImportCatalogEntries()) {
     yargs.command(
@@ -193,6 +200,13 @@ async function main(): Promise<void> {
   const command = String(argv._[0]);
 
   switch (command) {
+    case 'migrate-context': {
+      print({
+        quality: migrateLegacyWorkItemContexts({ apply: Boolean(argv.apply) }),
+        applied: Boolean(argv.apply),
+      });
+      break;
+    }
     case 'create-item': {
       const item = createWorkItem({
         title: String(argv.title || ''),

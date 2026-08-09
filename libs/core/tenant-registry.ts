@@ -87,6 +87,15 @@ export interface TenantGroupProfile {
   metadata?: Record<string, unknown>;
 }
 
+/** Status gate shared by every tenant-bound writer. */
+export function assertTenantOperational(profile: TenantProfile, operation = 'operation'): void {
+  if (profile.status !== 'active') {
+    throw new Error(
+      `[tenant-registry] tenant '${profile.tenant_slug}' is ${profile.status}; ${operation} requires an active tenant`
+    );
+  }
+}
+
 function assertTenantSlug(slug: string): void {
   if (!TENANT_SLUG_RE.test(slug)) {
     throw new Error(`[tenant-registry] invalid tenant slug '${slug}'`);
@@ -198,6 +207,11 @@ export function writeTenantProfile(
   const file = tenantProfilePath(normalized.tenant_slug, options);
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
+  const knowledgeRootPath = path.resolve(
+    options.rootDir ?? pathResolver.rootDir(),
+    normalized.knowledge_root!
+  );
+  if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
   return normalized;
 }
 
@@ -219,6 +233,7 @@ export function resolveTenant(
         `Register it once in the tenant profile directory — see knowledge/product/governance/tenant-onboarding-procedure.md`
     );
   }
+  assertTenantOperational(profile, 'tenant-bound operation');
   const knowledgeRoot = profile.knowledge_root ?? defaultTenantKnowledgeRoot(slug);
   const overlayDir = customerDirForSlug(slug, rootDir);
   return {

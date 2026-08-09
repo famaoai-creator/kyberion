@@ -39,6 +39,11 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { projectOperationalMissionLinkPath } from './project-operational-state-links.js';
+import { resolveTenant } from './tenant-registry.js';
+import {
+  loadOrganizationOperationalState,
+  saveOrganizationOperationalState,
+} from './organization-operating-model.js';
 
 export interface ProjectManagementView {
   project: ProjectRecord;
@@ -156,6 +161,16 @@ function normalizeId(value: string, label: string): string {
   return normalized;
 }
 
+export function assertManagedProjectId(value: string): string {
+  const normalized = normalizeId(value, 'project_id');
+  if (!/^PRJ-[A-Z0-9][A-Z0-9._-]*$/.test(normalized)) {
+    throw new Error(
+      `Invalid project_id '${value}'. Managed projects must use PRJ-<UPPER_SNAKE_OR_DASH_ID>.`
+    );
+  }
+  return normalized;
+}
+
 function projectMissions(projectId: string): MissionState[] {
   return listMissionsInSearchDirs()
     .map(({ missionId }) => loadState(missionId))
@@ -260,9 +275,21 @@ export function ensureProjectOsScaffold(
 }
 
 export function buildManagedProjectRecord(input: ManagedProjectCreateInput): ProjectRecord {
-  const projectId = normalizeId(input.project_id, 'project_id');
+  const projectId = assertManagedProjectId(input.project_id);
   if (input.tier === 'confidential' && !input.tenant_slug?.trim()) {
     throw new Error(`tenant_slug is required for confidential project records (${projectId}).`);
+  }
+  if (input.tier === 'confidential' && input.tenant_slug === 'shared') {
+    throw new Error(
+      `tenant_slug 'shared' is not a tenant for confidential project records (${projectId}).`
+    );
+  }
+  if (
+    input.tier === 'confidential' &&
+    input.tenant_slug &&
+    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+  ) {
+    resolveTenant(input.tenant_slug);
   }
   return {
     project_id: projectId,
@@ -290,16 +317,61 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
 }
 
 export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
-  const projectId = normalizeId(input.project_id, 'project_id');
+  const projectId = assertManagedProjectId(input.project_id);
   if (loadProjectRecord(projectId)) throw new Error(`Project already exists: ${projectId}`);
   const record = buildManagedProjectRecord(input);
-  saveProjectRecord(record);
+  const enforceEntityGovernance =
+    process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST;
+  const organizationState =
+    enforceEntityGovernance && input.organization_id
+      ? loadOrganizationOperationalState(input.organization_id, {
+          tier: input.tier,
+          tenantSlug: input.tenant_slug,
+        })
+      : null;
+  if (input.organization_id && enforceEntityGovernance && !organizationState) {
+    throw new Error(`Organization not found for project '${projectId}': ${input.organization_id}`);
+  }
+  if (organizationState && organizationState.status !== 'active' && record.status !== 'archived') {
+    throw new Error(
+      `Organization '${input.organization_id}' is ${organizationState.status}; project creation is denied.`
+    );
+  }
+  if (
+    organizationState &&
+    input.tenant_slug &&
+    organizationState.tenant_slug &&
+    input.tenant_slug !== organizationState.tenant_slug
+  ) {
+    throw new Error(
+      `Project '${projectId}' and organization '${input.organization_id}' belong to different tenants.`
+    );
+  }
+  const projectPath = saveProjectRecord(record);
+  if (organizationState) {
+    try {
+      saveOrganizationOperationalState({
+        ...organizationState,
+        active_project_ids: [
+          ...new Set([...(organizationState.active_project_ids || []), projectId]),
+        ].sort(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      safeUnlinkSync(projectPath);
+      throw error;
+    }
+  }
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'project_controller',
     action: 'project.created',
     operation: `create:${projectId}`,
     result: 'completed',
-    metadata: { project_id: projectId, tier: record.tier },
+    metadata: {
+      project_id: projectId,
+      tier: record.tier,
+      ...(input.organization_id ? { organization_id: input.organization_id } : {}),
+    },
   });
   return record;
 }

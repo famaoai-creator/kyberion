@@ -282,6 +282,24 @@
       "note": "Work-item claim/coordination state (work-coordination.ts) — deleting live claims breaks the write-exclusion contract."
     },
     {
+      "path": "active/shared/runtime/mesh-hub",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding."
+    },
+    {
+      "path": "active/shared/runtime/pipeline-runs",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Pipeline run records are evidence-linked and must be retained until the owning mission closes."
+    },
+    {
+      "path": "active/shared/runtime/run-graphs",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Execution graph records are load-bearing lineage and require scope-linked cleanup."
+    },
+    {
       "path": "active/shared/exports",
       "artifact_class": "export",
       "action": "review_required",

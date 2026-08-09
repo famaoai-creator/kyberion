@@ -1,4 +1,5 @@
 import * as crypto from 'node:crypto';
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { slugify } from './text-utils.js';
 
 import { withExecutionContext } from './authority.js';
@@ -12,6 +13,10 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
+import { auditChain } from './audit-chain.js';
+import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { resolveTenant } from './tenant-registry.js';
 
 export type WorkItemStatus =
   'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived';
@@ -33,6 +38,20 @@ export interface WorkItemContext {
     | 'incident_response'
     | 'governance_cadence'
     | 'improvement_experiment';
+}
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const workItemAjv = new Ajv({ allErrors: true });
+const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve('schemas/work-item.schema.json');
+let workItemValidator: ValidateFunction | null = null;
+
+function validateWorkItem(value: unknown): void {
+  workItemValidator ??= compileSchemaFromPath(workItemAjv, WORK_ITEM_SCHEMA_PATH);
+  if (workItemValidator(value)) return;
+  const errors = (workItemValidator.errors || [])
+    .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+    .join('; ');
+  throw new WorkCoordinationError('validation_error', `work-item schema violation: ${errors}`);
 }
 
 export interface WorkItem {
@@ -340,6 +359,20 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function normalizeWorkItemContext(
+  input: WorkItemContext,
+  fallbackProjectId?: string
+): WorkItemContext {
+  const context: WorkItemContext = {};
+  if (input.tenant_slug) context.tenant_slug = input.tenant_slug;
+  if (input.organization_id) context.organization_id = input.organization_id;
+  context.project_id = input.project_id || fallbackProjectId || 'default';
+  if (input.mission_id) context.mission_id = input.mission_id;
+  if (input.task_id) context.task_id = input.task_id;
+  context.work_shape = input.work_shape || 'routine_operation';
+  return context;
+}
+
 function randomId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 }
@@ -565,6 +598,7 @@ function appendWorkItemAttemptEvent(
 }
 
 function appendItemSnapshot(item: WorkItem): WorkItem {
+  validateWorkItem(item);
   appendJsonl(itemsPath(), item);
   return item;
 }
@@ -672,12 +706,7 @@ function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkIt
   return items.filter((item) => {
     const tenantSlugs = filter.tenantSlugs || filter.tenant_slugs;
     if (tenantSlugs) {
-      const tenantSlug =
-        typeof item.context?.tenant_slug === 'string'
-          ? item.context.tenant_slug
-          : typeof item.metadata?.tenant_slug === 'string'
-            ? item.metadata.tenant_slug
-            : undefined;
+      const tenantSlug = item.context?.tenant_slug;
       if (!tenantSlug || !tenantSlugs.includes(tenantSlug)) return false;
     }
     if (
@@ -748,6 +777,49 @@ export function getWorkItem(itemId: string): WorkItem | null {
   return currentWorkItem(itemId);
 }
 
+/**
+ * One-time governed migration for snapshots created before EG-06. New writes
+ * never call this adapter; after it reports zero legacy items the old label /
+ * metadata representation has no execution path in the core writer.
+ */
+export function migrateLegacyWorkItemContexts(options: { apply?: boolean } = {}): {
+  migrated: string[];
+  remaining: string[];
+  migrated_context: number;
+} {
+  const migrated: string[] = [];
+  const remaining: string[] = [];
+  for (const item of currentWorkItems()) {
+    const metadata = item.metadata || {};
+    const missionLabel = item.labels.find((label) => label.startsWith('mission:'));
+    const hasTypedContext = Boolean(item.context?.project_id && item.context?.work_shape);
+    if (hasTypedContext) continue;
+    const context = normalizeWorkItemContext(
+      {
+        ...(item.context || {}),
+        ...(typeof metadata.organization_id === 'string'
+          ? { organization_id: metadata.organization_id }
+          : {}),
+        ...(typeof metadata.tenant_slug === 'string' ? { tenant_slug: metadata.tenant_slug } : {}),
+        ...(typeof metadata.mission_id === 'string'
+          ? { mission_id: metadata.mission_id }
+          : missionLabel
+            ? { mission_id: missionLabel.slice('mission:'.length) }
+            : {}),
+        ...(typeof metadata.task_id === 'string' ? { task_id: metadata.task_id } : {}),
+      },
+      item.project_id
+    );
+    if (!options.apply) {
+      remaining.push(item.item_id);
+      continue;
+    }
+    updateWorkItem({ itemId: item.item_id, context });
+    migrated.push(item.item_id);
+  }
+  return { migrated, remaining, migrated_context: remaining.length };
+}
+
 export function listWorkItemAttempts(itemId: string): WorkItemAttempt[] {
   const item = currentWorkItem(itemId);
   if (!item) return [];
@@ -764,36 +836,13 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
     throw new WorkCoordinationError('validation_error', 'description is required');
   }
   const now = nowIso();
-  const metadata = input.metadata || {};
-  const missionLabel = (input.labels || []).find((label) => label.startsWith('mission:'));
-  const context: WorkItemContext = {
-    ...(input.context || {}),
-    ...(input.context?.project_id || input.projectId
-      ? { project_id: input.context?.project_id || input.projectId }
-      : { project_id: 'default' }),
-    ...(input.context?.mission_id || metadata.mission_id || missionLabel
-      ? {
-          mission_id:
-            input.context?.mission_id ||
-            String(metadata.mission_id || missionLabel?.slice('mission:'.length)),
-        }
-      : {}),
-    ...(input.context?.tenant_slug || metadata.tenant_slug
-      ? { tenant_slug: input.context?.tenant_slug || String(metadata.tenant_slug) }
-      : {}),
-    ...(input.context?.organization_id || metadata.organization_id
-      ? { organization_id: input.context?.organization_id || String(metadata.organization_id) }
-      : {}),
-    ...(input.context?.task_id || metadata.task_id
-      ? { task_id: input.context?.task_id || String(metadata.task_id) }
-      : {}),
-    ...(input.context?.work_shape || metadata.work_shape
-      ? {
-          work_shape:
-            input.context?.work_shape || (metadata.work_shape as WorkItemContext['work_shape']),
-        }
-      : {}),
-  };
+  const context = normalizeWorkItemContext(input.context || {}, input.projectId);
+  if (
+    context.tenant_slug &&
+    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+  ) {
+    resolveTenant(context.tenant_slug);
+  }
   const item: WorkItem = {
     item_id: input.itemId || randomId('witem'),
     title,
@@ -822,6 +871,14 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
     status: item.status,
     note: `created ${item.title}`,
     payload: { project_id: item.project_id, priority: item.priority, source: item.source },
+  });
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'work-coordination',
+    action: 'work_item.created',
+    operation: `create:${item.item_id}`,
+    result: 'completed',
+    ...(item.context?.tenant_slug ? { tenantSlug: item.context.tenant_slug } : {}),
+    metadata: { context: item.context, project_id: item.project_id },
   });
   return item;
 }

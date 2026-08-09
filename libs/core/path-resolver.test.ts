@@ -8,6 +8,7 @@ import {
   resolve,
   toRepoRelative,
   normalizeStoredPath,
+  missionDir,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -26,7 +27,9 @@ describe('path-resolver core', () => {
 
   it('should resolve built capability entry path', () => {
     const entry = capabilityEntry('system-actuator');
-    expect(entry).toContain(path.join('dist', 'libs', 'actuators', 'system-actuator', 'src', 'index.js'));
+    expect(entry).toContain(
+      path.join('dist', 'libs', 'actuators', 'system-actuator', 'src', 'index.js')
+    );
     expect(path.isAbsolute(entry)).toBe(true);
   });
 
@@ -86,7 +89,10 @@ describe('path-resolver portability helpers', () => {
 
   it('normalizeStoredPath relativizes an in-repo absolute path and flags nothing', () => {
     const abs = path.join(rootDir(), 'scripts', 'run.ts');
-    expect(normalizeStoredPath(abs)).toEqual({ path: path.join('scripts', 'run.ts'), foreign: false });
+    expect(normalizeStoredPath(abs)).toEqual({
+      path: path.join('scripts', 'run.ts'),
+      foreign: false,
+    });
   });
 
   it('normalizeStoredPath flags a foreign absolute path without rewriting it', () => {
@@ -95,6 +101,13 @@ describe('path-resolver portability helpers', () => {
   });
 
   it('normalizeStoredPath passes relative paths through unflagged', () => {
-    expect(normalizeStoredPath('active/shared/x.json')).toEqual({ path: 'active/shared/x.json', foreign: false });
+    expect(normalizeStoredPath('active/shared/x.json')).toEqual({
+      path: 'active/shared/x.json',
+      foreign: false,
+    });
+  });
+
+  it('rejects flag-shaped mission ids without creating a directory', () => {
+    expect(() => missionDir('--ID')).toThrow(/invalid mission id/i);
   });
 });

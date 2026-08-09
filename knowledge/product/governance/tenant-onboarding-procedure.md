@@ -3,7 +3,7 @@ title: テナント追加手順 — 登録は1系統、検証は check:tenant-re
 category: Governance
 tags: [governance, tenant, onboarding, da-01, tenant-registry]
 importance: 8
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 kind: governance
 scope: repository
 authority: standard
@@ -19,21 +19,13 @@ authority: standard
 
 ## 手順
 
-1. **プロファイルを1件登録する。**
-   `knowledge/personal/tenants/{slug}.json` を作成する
-   (スキーマ: `knowledge/product/schemas/tenant-profile.schema.json`。
-   slug は `^[a-z][a-z0-9-]{1,30}$`)。
+1. **facade から dry-run を実行する。** 手動 JSON 編集は禁止する。
+   `pnpm tenant create example-co --display-name "Example Co."` を実行し、
+   出力された profile path と knowledge root を確認する。
 
-   ```json
-   {
-     "tenant_slug": "example-co",
-     "tenant_id": "example-co",
-     "display_name": "Example Co.",
-     "status": "active",
-     "assigned_role": "advisor",
-     "isolation_policy": { "strict_isolation": true, "allow_cross_distillation": true },
-     "ingest_sources": [{ "source_system": "confluence", "enabled": true }]
-   }
+   ```bash
+   pnpm tenant create example-co --display-name "Example Co." --assigned-role advisor --apply
+   pnpm tenant show example-co --json
    ```
 
    - `knowledge_root` は省略時 `knowledge/confidential/{slug}` に解決される(明示も可)。
@@ -50,8 +42,9 @@ authority: standard
    CI でも同名ゲートが常時実行される。
 
 3. **解決を確認する。**
-   `resolveTenant(slug)`(`@agent/core`)がプロファイル・`knowledge_root`・
+   `resolveTenant(slug)`(`@agent/core`)が active プロファイル・`knowledge_root`・
    customer overlay(`customer/{slug}/` が存在する場合)を一意に返せば完了。
+   `suspended`/`archived` は tenant-bound write を fail-closed で拒否する。
 
 ## 意図的な非対称(例外)の扱い
 
@@ -64,7 +57,7 @@ authority: standard
 
 - confidential index や `customer/{slug}/` への「登録だけ」でテナントを増やすこと
   (プロファイルなしの slug はドリフトとして CI が落とす)。
-- 既存データの削除によるドリフト解消(登録追加 or 例外登録で解消する)。
+- facade を経由しない profile JSON の直接編集。
 - 例外ファイルの理由なしエントリ。
 
 関連: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../../../docs/developer/improvement-plans-2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) DA-01
