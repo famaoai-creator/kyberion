@@ -22,14 +22,7 @@ import { getAdapterDefault } from './adapter-default-preferences.js';
 export type ToolRuntimeStatus = 'active' | 'shadow' | 'disabled';
 export type ToolRuntimePlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type ToolRuntimeBackendKind =
-  | 'uvx'
-  | 'uv'
-  | 'pipx'
-  | 'npx'
-  | 'npm'
-  | 'pnpm'
-  | 'brew'
-  | 'system';
+  'uvx' | 'uv' | 'pipx' | 'npx' | 'npm' | 'pnpm' | 'brew' | 'winget' | 'system';
 export type ToolRuntimeAction = 'run_trial' | 'run_installed' | 'install' | 'pin';
 
 export interface ToolRuntimeBackendCommand {
@@ -48,6 +41,9 @@ export interface ToolRuntimeRecord {
   supported_modes: ToolRuntimeMode[];
   trial_backend: ToolRuntimeBackendCommand;
   install_backend?: ToolRuntimeBackendCommand;
+  install_backend_platform_overrides?: Partial<
+    Record<ToolRuntimePlatform, ToolRuntimeBackendCommand>
+  >;
   installed_backend?: ToolRuntimeBackendCommand;
   fallback_tool_id?: string;
   managed_env_subpath?: string;
@@ -96,12 +92,7 @@ export interface ToolRuntimeResolution {
 }
 
 export type ToolRuntimeLifecycleStage =
-  | 'trial'
-  | 'approved_install'
-  | 'installed'
-  | 'pinned'
-  | 'install_required'
-  | 'unsupported';
+  'trial' | 'approved_install' | 'installed' | 'pinned' | 'install_required' | 'unsupported';
 
 export interface ToolRuntimeInventoryItem {
   tool: ToolRuntimeRecord;
@@ -215,6 +206,23 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         args: ['install', 'ffmpeg'],
         description: 'Install FFmpeg through Homebrew on macOS.',
       },
+      install_backend_platform_overrides: {
+        win32: {
+          kind: 'winget',
+          command: 'winget',
+          args: [
+            'install',
+            '--id',
+            'Gyan.FFmpeg',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+          ],
+          description: 'Install ffmpeg through WinGet on Windows.',
+        },
+      },
       installed_backend: {
         kind: 'system',
         command: 'ffmpeg',
@@ -243,6 +251,23 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         args: ['install', 'sox'],
         description: 'Install SoX through Homebrew on macOS.',
       },
+      install_backend_platform_overrides: {
+        win32: {
+          kind: 'winget',
+          command: 'winget',
+          args: [
+            'install',
+            '--id',
+            'ChrisBagwell.SoX',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+          ],
+          description: 'Install sox through WinGet on Windows.',
+        },
+      },
       installed_backend: {
         kind: 'system',
         command: 'sox',
@@ -270,6 +295,23 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         command: 'brew',
         args: ['install', 'tesseract'],
         description: 'Install Tesseract through Homebrew on macOS.',
+      },
+      install_backend_platform_overrides: {
+        win32: {
+          kind: 'winget',
+          command: 'winget',
+          args: [
+            'install',
+            '--id',
+            'tesseract-ocr.tesseract',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-source-agreements',
+            '--accept-package-agreements',
+          ],
+          description: 'Install tesseract through WinGet on Windows.',
+        },
       },
       installed_backend: {
         kind: 'system',
@@ -470,6 +512,17 @@ function loadRegistryFromPath(registryPath: string): ToolRuntimeRegistry {
 function isSupportedPlatform(record: ToolRuntimeRecord, platform: NodeJS.Platform): boolean {
   return (
     record.platforms.includes('any') || record.platforms.includes(platform as ToolRuntimePlatform)
+  );
+}
+
+function resolveInstallBackend(
+  record: ToolRuntimeRecord,
+  platform: NodeJS.Platform
+): ToolRuntimeBackendCommand | null {
+  return (
+    record.install_backend_platform_overrides?.[platform as ToolRuntimePlatform] ||
+    record.install_backend ||
+    null
   );
 }
 
@@ -675,15 +728,16 @@ export function probeToolRuntime(
 ): ToolRuntimeResolution {
   const record = getToolRuntimeRecord(toolId);
   const state = readToolRuntimeState(record.tool_id);
+  const installBackend = resolveInstallBackend(record, platform);
   if (!isSupportedPlatform(record, platform)) {
     return {
       tool: record,
       state,
       requested_mode: requestedMode,
       selected_action: 'install',
-      selected_backend: record.install_backend || null,
+      selected_backend: installBackend,
       trial_backend: record.trial_backend,
-      install_backend: record.install_backend || null,
+      install_backend: installBackend,
       installed_backend: record.installed_backend || null,
       installed: false,
       requires_install: true,
@@ -699,9 +753,9 @@ export function probeToolRuntime(
   if (selectedAction === 'run_installed')
     selectedBackend = record.installed_backend || record.trial_backend;
   if (selectedAction === 'run_trial') selectedBackend = record.trial_backend;
-  if (selectedAction === 'install') selectedBackend = record.install_backend || null;
+  if (selectedAction === 'install') selectedBackend = installBackend;
 
-  const availableCommands = [record.trial_backend, record.install_backend, record.installed_backend]
+  const availableCommands = [record.trial_backend, installBackend, record.installed_backend]
     .filter((backend): backend is ToolRuntimeBackendCommand => Boolean(backend))
     .filter((backend) => backendIsAvailable(backend))
     .map((backend) => backend.command);
@@ -724,7 +778,7 @@ export function probeToolRuntime(
     selected_action: selectedAction,
     selected_backend: selectedBackend,
     trial_backend: record.trial_backend,
-    install_backend: record.install_backend || null,
+    install_backend: installBackend,
     installed_backend: record.installed_backend || null,
     installed,
     requires_install: requiresInstall,
