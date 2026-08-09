@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { rawExistsSync, rawMkdirp, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)
@@ -65,7 +65,6 @@ export function shared(subPath = '') {
 }
 export function sharedTmp(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
@@ -113,7 +112,6 @@ export function volatile(
     }
     case 'personal': {
       const personalBase = path.join(ACTIVE_ROOT, 'personal');
-      if (!rawExistsSync(personalBase)) rawMkdirp(personalBase);
       if (cadence === 'daily' && opts.periodKey) {
         return path.join(personalBase, 'journal', opts.periodKey + '.md');
       }
@@ -138,31 +136,26 @@ export function volatile(
 }
 export function sharedExports(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'exports');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
 export function sharedLogsAudit(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'audit');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
 export function sharedLogsProcess(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'process');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
 export function sharedLogsSurfaces(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'surfaces');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
 export function sharedLogsTraces(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'traces');
-  if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
 
@@ -209,6 +202,7 @@ export function missionDir(
   missionId: string,
   tier: 'personal' | 'confidential' | 'public' = 'confidential'
 ) {
+  assertMissionIdArgument(missionId);
   const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   let subPath = 'active/missions';
 
@@ -222,8 +216,20 @@ export function missionDir(
   }
 
   const dir = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
+}
+
+/**
+ * Validate identifiers before they become filesystem segments. In particular,
+ * CLI flags such as `--HELP` must never materialize as mission directories.
+ * This resolver is intentionally read-only; writers must create the returned
+ * parent through secure-io after their own authority check.
+ */
+export function assertMissionIdArgument(missionId: string): void {
+  const value = String(missionId || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/.test(value) || value.startsWith('--')) {
+    throw new Error(`[path-resolver] invalid mission id '${missionId}'`);
+  }
 }
 
 function normalizePathSegment(value: string, fallback = 'shared') {
@@ -252,7 +258,6 @@ export function projectWorkspaceDir(
     normalizePathSegment(tenantSlug, 'shared'),
     normalizePathSegment(projectId, 'project')
   );
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -266,7 +271,6 @@ export function projectOsDir(
   tenantSlug = 'shared'
 ): string {
   const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'project-os');
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -280,7 +284,6 @@ export function projectStateDir(
   tenantSlug = 'shared'
 ): string {
   const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'state');
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -300,7 +303,6 @@ export function organizationWorkspaceDir(
     normalizePathSegment(tenantSlug, 'shared'),
     normalizePathSegment(organizationId, 'organization')
   );
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -314,7 +316,6 @@ export function organizationStateDir(
   tenantSlug = 'shared'
 ): string {
   const dir = path.join(organizationWorkspaceDir(organizationId, tier, tenantSlug), 'state');
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -328,7 +329,6 @@ export function missionAuditDir(
   const missionPath =
     findMissionPath(missionId) ?? path.join(ACTIVE_ROOT, 'missions', tier, missionId);
   const dir = path.join(missionPath, 'audit');
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -339,7 +339,6 @@ export function missionEvidenceDir(missionId: string) {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return null;
   const dir = path.join(missionPath, 'evidence');
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -365,8 +364,14 @@ export function tenantMissionDir(
     }
   }
   const dir = path.join(PROJECT_ROOT_DIR, subPath, tenantSlug, missionId);
-  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
+}
+
+function currentTenantSlug(): string | undefined {
+  const value = String(process.env.KYBERION_TENANT || '')
+    .trim()
+    .toLowerCase();
+  return /^[a-z][a-z0-9-]{1,30}$/.test(value) ? value : undefined;
 }
 
 /**
@@ -383,6 +388,11 @@ export function findMissionPath(missionId: string): string | null {
       for (const tier of tiers) {
         const subPath = config.directories?.[tier];
         if (subPath) {
+          const tenant = currentTenantSlug();
+          if (tenant) {
+            const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
+            if (rawExistsSync(scopedPath)) return scopedPath;
+          }
           const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
           if (rawExistsSync(fullPath)) return fullPath;
         }
@@ -469,6 +479,7 @@ export const pathResolver = {
   capabilityDir,
   skillDir,
   missionDir,
+  assertMissionIdArgument,
   projectWorkspaceDir,
   projectOsDir,
   projectStateDir,

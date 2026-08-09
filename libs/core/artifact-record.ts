@@ -23,6 +23,8 @@ import {
 
 export interface ArtifactRecord {
   artifact_id: string;
+  tenant_slug?: string;
+  organization_id?: string;
   project_id?: string;
   track_id?: string;
   track_name?: string;
@@ -105,6 +107,8 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
   appendArtifactOwnershipRecord(
     createArtifactOwnershipRecord({
       artifact_id: record.artifact_id,
+      tenant_slug: record.tenant_slug,
+      organization_id: record.organization_id,
       project_id: record.project_id,
       mission_id: record.mission_id,
       task_session_id: record.task_session_id,

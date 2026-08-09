@@ -32,6 +32,26 @@
     {
       "slug": "demo-org",
       "reason": "Demo organization fixture (organization-profile.json only) — not an operating tenant."
+    },
+    {
+      "slug": "e2e-onboard-1",
+      "reason": "Ephemeral onboarding E2E customer fixture; retained outside the tenant spine and not an operating tenant."
+    },
+    {
+      "slug": "ops-org",
+      "reason": "Operations E2E customer fixture; retained outside the tenant spine and not an operating tenant."
+    },
+    {
+      "slug": "story-demo",
+      "reason": "Story/demo fixture; retained outside the tenant spine and not an operating tenant."
+    },
+    {
+      "slug": "story-e2e-1",
+      "reason": "Story E2E fixture; retained outside the tenant spine and not an operating tenant."
+    },
+    {
+      "slug": "story-migrate",
+      "reason": "Migration story fixture; retained outside the tenant spine and not an operating tenant."
     }
   ]
 }

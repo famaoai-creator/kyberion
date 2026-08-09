@@ -42,7 +42,9 @@
     "protected_prefixes": [
       "knowledge/confidential/",
       "active/organizations/personal/",
-      "active/organizations/confidential/"
+      "active/organizations/confidential/",
+      "active/missions/confidential/",
+      "active/projects/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",

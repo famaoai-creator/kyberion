@@ -65,6 +65,9 @@ jobs:
         run: pnpm run format:check:ci
 
       - name: Run core tests
+        env:
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
         run: pnpm run test:core
 
       - name: Run actuator tests

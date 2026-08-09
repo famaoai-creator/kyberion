@@ -313,6 +313,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/entity-scope-hierarchy.md",
+      "tier": "public",
+      "size": 1980,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/event-driven-sovereignty.md",
       "tier": "public",
       "size": 1733,
@@ -1051,6 +1057,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/audit-ledger-recovery.md",
+      "tier": "public",
+      "size": 1374,
+      "type": "md"
+    },
+    {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
       "size": 9312,
@@ -1279,9 +1291,15 @@
       "type": "json"
     },
     {
+      "path": "product/governance/entity-governance-implementation-evidence.md",
+      "tier": "public",
+      "size": 1865,
+      "type": "md"
+    },
+    {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 79071,
+      "size": 79257,
       "type": "json"
     },
     {
@@ -2163,7 +2181,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19852,
+      "size": 19930,
       "type": "json"
     },
     {
@@ -2205,7 +2223,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 12400,
+      "size": 12627,
       "type": "json"
     },
     {
@@ -2271,7 +2289,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 13793,
+      "size": 14515,
       "type": "json"
     },
     {
@@ -2451,7 +2469,7 @@
     {
       "path": "product/governance/tenant-onboarding-procedure.md",
       "tier": "public",
-      "size": 3095,
+      "size": 2952,
       "type": "md"
     },
     {
@@ -2463,7 +2481,7 @@
     {
       "path": "product/governance/tenant-registry-exceptions.json",
       "tier": "public",
-      "size": 1909,
+      "size": 2663,
       "type": "json"
     },
     {
@@ -6117,7 +6135,7 @@
     {
       "path": "product/schemas/artifact-record.schema.json",
       "tier": "public",
-      "size": 1450,
+      "size": 1589,
       "type": "json"
     },
     {

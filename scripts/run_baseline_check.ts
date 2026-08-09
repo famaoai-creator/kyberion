@@ -5,6 +5,7 @@ import {
   pathResolver,
   resolveActiveProfileRoot,
   safeExistsSync,
+  safeReaddir,
   safeReadFile,
   safeWriteFile,
   logger,
@@ -58,6 +59,67 @@ const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 // re-submission; a marker missing or older than 48h means the janitor is not
 // actually running and the baseline must degrade to needs_attention (L8).
 export const JANITOR_FRESHNESS_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+// EG-03: an active system with a silent audit ledger is not healthy.
+export const AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+export interface AuditLedgerFreshness {
+  fresh: boolean;
+  last_entry_ms: number | null;
+  age_ms: number | null;
+  reason: string;
+}
+
+export function readAuditLedgerFreshness(
+  auditDir = pathResolver.sharedLogsAudit(),
+  nowMs = Date.now()
+): AuditLedgerFreshness {
+  try {
+    if (!safeExistsSync(auditDir)) {
+      return { fresh: false, last_entry_ms: null, age_ms: null, reason: 'missing' };
+    }
+    const files = safeReaddir(auditDir)
+      .filter((entry) => /^audit-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(entry))
+      .sort();
+    let lastEntryMs: number | null = null;
+    for (const file of files) {
+      const raw = String(safeReadFile(path.join(auditDir, file), { encoding: 'utf8' }) || '');
+      for (const line of raw.split(/\r?\n/u).reverse()) {
+        if (!line.trim()) continue;
+        try {
+          const timestamp = Date.parse(
+            String((JSON.parse(line) as { timestamp?: unknown }).timestamp || '')
+          );
+          if (Number.isFinite(timestamp)) {
+            lastEntryMs = Math.max(lastEntryMs ?? 0, timestamp);
+            break;
+          }
+        } catch {
+          // audit:verify owns corruption classification; freshness remains observable.
+        }
+      }
+    }
+    const ageMs = lastEntryMs === null ? null : Math.max(0, nowMs - lastEntryMs);
+    return {
+      fresh: ageMs !== null && ageMs <= AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
+      last_entry_ms: lastEntryMs,
+      age_ms: ageMs,
+      reason:
+        lastEntryMs === null
+          ? 'missing'
+          : ageMs! <= AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS
+            ? 'fresh'
+            : 'stale',
+    };
+  } catch (error) {
+    return {
+      fresh: false,
+      last_entry_ms: null,
+      age_ms: null,
+      reason: `audit freshness check failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
 
 /**
  * Pure freshness predicate for the janitor last-run marker
@@ -768,6 +830,10 @@ async function main() {
     schedulerHealth = schedulerHealthEvaluationFailure(reason);
     logger.warn(`[BASELINE] scheduler health evaluation failed (non-fatal): ${reason}`);
   }
+  const auditLedger = readAuditLedgerFreshness(
+    pathResolver.sharedLogsAudit(),
+    schedulerNow.getTime()
+  );
 
   // LC-01b/LC-01c: escalate via ops alerts with day-level dedup (the baseline
   // runs hourly; one alert per class per UTC day). Hard-gated under vitest so
@@ -925,6 +991,9 @@ async function main() {
   // enabled schedules passes.
   sentinel.registerLayer('L10', async () => schedulerHealth.healthy);
 
+  // EG-03: audit continuity is a first-class health layer.
+  sentinel.registerLayer('L11', async () => auditLedger.fresh);
+
   const result = await sentinel.run();
   const state = sentinel.getState();
 
@@ -967,6 +1036,10 @@ async function main() {
         scheduler_alive: schedulerAlerts.scheduler_alive?.id ?? null,
         failed_schedules: schedulerAlerts.failed_schedules?.id ?? null,
       },
+    },
+    audit_ledger: {
+      ...auditLedger,
+      freshness_max_age_ms: AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
     },
     // XP-01: population job output — never consulted by deriveBaselineStatus,
     // purely observational (acceptance criterion 3: probe results surfaced

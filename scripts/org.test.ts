@@ -47,12 +47,40 @@ function makeTempRoot(): string {
   return root;
 }
 
+function seedSecurityPolicyApproval(root: string, id: string): void {
+  const requestDir = path.join(
+    root,
+    'active',
+    'shared',
+    'coordination',
+    'channels',
+    'terminal',
+    'approvals',
+    'requests'
+  );
+  fs.mkdirSync(requestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(requestDir, `${id}.json`),
+    JSON.stringify({
+      id,
+      status: 'approved',
+      accountability: { finalDecision: 'human_only' },
+      justification: { requestedEffects: ['knowledge/product/governance/security-policy.json'] },
+      workflow: {
+        approvals: [{ status: 'approved', decidedByType: 'human', authenticated: true }],
+      },
+    })
+  );
+}
+
 describe('org role create', () => {
   it('creates aligned authority, team, policy, and role docs', () => {
     const tempRoot = makeTempRoot();
     const repoRoot = process.cwd();
     const scriptPath = path.join(repoRoot, 'scripts', 'org.ts');
     const loaderPath = path.join(repoRoot, 'scripts', 'ts-loader.mjs');
+    const approvalId = '00000000-0000-4000-8000-000000000001';
+    seedSecurityPolicyApproval(tempRoot, approvalId);
 
     try {
       const stdout = execFileSync(
@@ -89,6 +117,8 @@ describe('org role create', () => {
           'public',
           '--tier',
           'confidential',
+          '--approval-id',
+          approvalId,
           '--autonomy',
           'medium',
           '--parent-team-role',
@@ -198,6 +228,8 @@ describe('org role create', () => {
     const repoRoot = process.cwd();
     const scriptPath = path.join(repoRoot, 'scripts', 'org.ts');
     const loaderPath = path.join(repoRoot, 'scripts', 'ts-loader.mjs');
+    const approvalId = '00000000-0000-4000-8000-000000000002';
+    seedSecurityPolicyApproval(tempRoot, approvalId);
 
     try {
       execFileSync(
@@ -216,6 +248,8 @@ describe('org role create', () => {
           'strategic_sales',
           '--persona',
           'analyst',
+          '--approval-id',
+          approvalId,
         ],
         {
           cwd: tempRoot,
@@ -250,6 +284,8 @@ describe('org role create', () => {
           'artifact-actuator',
           '--tier',
           'confidential',
+          '--approval-id',
+          approvalId,
         ],
         {
           cwd: tempRoot,
