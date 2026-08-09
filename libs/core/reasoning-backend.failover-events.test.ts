@@ -38,6 +38,12 @@ describe('FailoverReasoningBackend — XP-05 switch surfacing + provenance', () 
     tmpRoot = path.join(os.tmpdir(), `kyberion-reasoning-failover-events-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const rulesPath = path.join(tmpRoot, 'knowledge/product/governance/knowledge-sync-rules.json');
+    fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+    fs.copyFileSync(
+      path.join(process.cwd(), 'knowledge/product/governance/knowledge-sync-rules.json'),
+      rulesPath
+    );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
   });

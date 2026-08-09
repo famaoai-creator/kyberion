@@ -20,6 +20,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/codex-cli-query.ts',
   'libs/core/deployment-adapter.ts',
   'libs/core/deployment-adapters/mobile-beta.ts',
+  'libs/core/desktop-event-feed.ts',
   'libs/core/in-room-meeting-driver.ts',
   'libs/core/in-room-minutes-recorder.ts',
   'libs/core/mic-capture.ts',
