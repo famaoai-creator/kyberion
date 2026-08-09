@@ -5,19 +5,23 @@
  * may describe historical drift, while operator-facing guidance must not
  * reintroduce the retired Rule 7 / five-condition gate.
  */
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import * as path from 'node:path';
 
-export const MISSION_GATE_DOCUMENTS = [
-  'AGENTS.md',
-  'knowledge/product/governance/phases/alignment.md',
-  'knowledge/product/architecture/kyberion-intent-catalog.md',
-  'knowledge/public/procedures/system/developer-onboarding.md',
-  'docs/developer/PRODUCTION_GOAL_INSTRUCTIONS.ja.md',
-  'docs/PRODUCTIZATION_ROADMAP.md',
-  'knowledge/product/governance/multi-agent-development-sop.md',
-  'knowledge/product/orchestration/adf-pipeline-validation-plan.md',
-  'docs/OPERATOR_UX_GUIDE.md',
-] as const;
+// Do not traverse tenant/personal knowledge tiers: the checker is a public
+// repository-governance lint and those paths are intentionally role-scoped.
+export const MISSION_GATE_SCAN_ROOTS = ['docs', 'knowledge/product', 'knowledge/public'] as const;
+
+/** Historical analysis, policy-source, and domain-specific documents may quote these terms. */
+export const MISSION_GATE_DOCUMENT_EXCLUSIONS = new Set([
+  'docs/developer/improvement-plans-2026-07/STATUS.ja.md',
+  'docs/developer/improvement-plans-2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md',
+  'knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md',
+  'knowledge/product/architecture/agent-communication-layer-model.md',
+  'knowledge/product/incidents/distill_msn-jgb-retrofit-20260422_2026_04_22.md',
+  'knowledge/product/governance/working-philosophy.md',
+  'knowledge/public/procedures/media/theme-and-design-system-reference.md',
+]);
 
 const RETIRED_GATE_MARKERS = [
   /\bRule\s*7\b/i,
@@ -44,9 +48,35 @@ export function collectMissionGateDocViolations(documents: Record<string, string
   return violations;
 }
 
+export function collectMissionGateDocumentPaths(): string[] {
+  const documents: string[] = [];
+  const visit = (relativePath: string): void => {
+    if (
+      MISSION_GATE_DOCUMENT_EXCLUSIONS.has(relativePath) ||
+      [...MISSION_GATE_DOCUMENT_EXCLUSIONS].some((excluded) =>
+        relativePath.startsWith(`${excluded}/`)
+      )
+    ) {
+      return;
+    }
+    const absolutePath = pathResolver.rootResolve(relativePath);
+    if (!safeExistsSync(absolutePath)) return;
+    if (safeLstat(absolutePath).isDirectory()) {
+      for (const entry of safeReaddir(absolutePath).sort()) {
+        visit(path.join(relativePath, entry));
+      }
+      return;
+    }
+    if (relativePath.endsWith('.md')) documents.push(relativePath);
+  };
+
+  for (const root of MISSION_GATE_SCAN_ROOTS) visit(root);
+  return documents.sort();
+}
+
 function loadMissionGateDocuments(): Record<string, string> {
   return Object.fromEntries(
-    MISSION_GATE_DOCUMENTS.map((relativePath) => [
+    collectMissionGateDocumentPaths().map((relativePath) => [
       relativePath,
       String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || ''),
     ])
@@ -61,7 +91,7 @@ export function main(): void {
     return;
   }
   console.log(
-    `[check:mission-gate-docs] OK — ${MISSION_GATE_DOCUMENTS.length} canonical documents checked`
+    `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
   );
 }
 

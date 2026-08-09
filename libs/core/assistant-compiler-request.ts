@@ -9,6 +9,7 @@ import {
 } from './intent-contract.js';
 import {
   buildOrganizationWorkLoopSummary,
+  overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
 import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
@@ -440,8 +441,6 @@ function normalizeWorkLoopFromRaw(
   contract: IntentContract,
   rawWorkLoop: unknown
 ): OrganizationWorkLoopSummary {
-  if (validateWorkLoop(rawWorkLoop)) return rawWorkLoop;
-
   const normalized = buildOrganizationWorkLoopSummary({
     intentId: contract.intent_id,
     taskType: contract.resolution.task_type,
@@ -458,6 +457,10 @@ function normalizeWorkLoopFromRaw(
     ...resolveWorkScopeSignalOptions(request.context.runtime_context),
     requiresApproval: contract.approval.requires_approval,
   });
+
+  if (validateWorkLoop(rawWorkLoop)) {
+    return overlayCanonicalWorkScopeDecision(rawWorkLoop, normalized);
+  }
 
   if (Array.isArray(rawWorkLoop)) {
     const planOutline = rawWorkLoop.map(String).filter(Boolean);

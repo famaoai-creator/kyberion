@@ -22,19 +22,19 @@ Kyberion は **「組織のワークループ・エンジン（organization work
 
 ## 2. 技術スタック
 
-| 項目 | 内容 |
-|---|---|
-| 言語 | TypeScript（Node.js >= 24） |
-| パッケージ管理 | pnpm workspace（モノレポ） |
-| 規模 | TS/TSX 約 1,905 ファイル / 約 291,000 行 |
-| テスト | Vitest、Playwright、fast-check（プロパティテスト）、c8/coverage |
+| 項目               | 内容                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 言語               | TypeScript（Node.js >= 24）                                                                                                                                  |
+| パッケージ管理     | pnpm workspace（モノレポ）                                                                                                                                   |
+| 規模               | TS/TSX 約 1,905 ファイル / 約 291,000 行                                                                                                                     |
+| テスト             | Vitest、Playwright、fast-check（プロパティテスト）、c8/coverage                                                                                              |
 | 主要ランタイム依存 | `@anthropic-ai/claude-agent-sdk`、`@anthropic-ai/claude-code`、`@anthropic-ai/sdk`、`@openai/codex`、`@modelcontextprotocol/sdk`、`@agentclientprotocol/sdk` |
-| ブラウザ自動化 | Playwright、Puppeteer |
-| メディア/Office | exceljs、pptxgenjs、html-to-docx、mammoth、pdf-parse、jimp、tesseract.js（OCR）、gif-encoder-2 |
-| 連携 | googleapis、@slack/bolt・web-api、express、ws、axios |
-| スキーマ/検証 | ajv、zod、json-schema-to-typescript |
-| ネイティブ | Swift ファイル（OCR / 仮想カメラ / 仮想オーディオ）も同梱 — macOS 連携を含む |
-| 配布 | Dockerfile / docker-compose、CI（GitHub Actions） |
+| ブラウザ自動化     | Playwright、Puppeteer                                                                                                                                        |
+| メディア/Office    | exceljs、pptxgenjs、html-to-docx、mammoth、pdf-parse、jimp、tesseract.js（OCR）、gif-encoder-2                                                               |
+| 連携               | googleapis、@slack/bolt・web-api、express、ws、axios                                                                                                         |
+| スキーマ/検証      | ajv、zod、json-schema-to-typescript                                                                                                                          |
+| ネイティブ         | Swift ファイル（OCR / 仮想カメラ / 仮想オーディオ）も同梱 — macOS 連携を含む                                                                                 |
+| 配布               | Dockerfile / docker-compose、CI（GitHub Actions）                                                                                                            |
 
 LLM バックエンドは Claude CLI / Anthropic API / Codex / Gemini CLI / OpenRouter / OpenAI 互換など複数を切替可能（`KYBERION_REASONING_BACKEND`）。ローカル `claude` CLI 認証時は API キー不要の `claude-cli` を優先する設計です。
 
@@ -69,13 +69,13 @@ kyberion/
 
 Kyberion は概念を 5 つの層に分けると理解しやすい構成です。
 
-| 層 | 役割 | 代表的な構成要素 |
-|---|---|---|
-| **Intent（意図）** | 人間の要求・明確化・次アクション | intent-compiler、contextual-intent-*、operator interaction packet |
-| **Control（制御）** | ミッション・プロジェクト・フェーズ・ゲート・台帳 | mission-controller、approval-gate、authority、ledger |
-| **Knowledge（知識）** | 手順・スキーマ・テンプレ・ポリシー・カタログ | `knowledge/`、`schemas/`、各種 policy |
-| **Execution（実行）** | アクチュエータ・パイプライン・配信 | `libs/actuators/*`、`pipelines/`、pipeline-engine |
-| **Memory（記憶）** | 証跡・実行レポート・蒸留・知見 | trace、evidence-chain、audit-chain、distill |
+| 層                    | 役割                                             | 代表的な構成要素                                                  |
+| --------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
+| **Intent（意図）**    | 人間の要求・明確化・次アクション                 | intent-compiler、contextual-intent-*、operator interaction packet |
+| **Control（制御）**   | ミッション・プロジェクト・フェーズ・ゲート・台帳 | mission-controller、approval-gate、authority、ledger              |
+| **Knowledge（知識）** | 手順・スキーマ・テンプレ・ポリシー・カタログ     | `knowledge/`、`schemas/`、各種 policy                             |
+| **Execution（実行）** | アクチュエータ・パイプライン・配信               | `libs/actuators/*`、`pipelines/`、pipeline-engine                 |
+| **Memory（記憶）**    | 証跡・実行レポート・蒸留・知見                   | trace、evidence-chain、audit-chain、distill                       |
 
 データの流れ:
 
@@ -92,6 +92,7 @@ Sovereign intent
 ```
 
 ### 主要な永続コンテナ
+
 - **Project** — 意味の長期コンテナ（リポジトリ・ミッション・サービスバインディング・成果物を所有）
 - **Mission** — 自前の Git リポジトリを持つ実行＋監査単位（24時間以上の連続実行に耐える設計）
 - **Task Session** — 会話的で軽量な実行契約（文書生成・サービス検査など）
@@ -119,9 +120,10 @@ agent / approval / artifact / blockchain / browser / calendar / code / daemon / 
 4. **検証済み ADF 契約のみ実行**（`draft → preflight → auto-repair → commit → execute`、失敗時はリトライせず分類・修復）。
 5. **3層データ隔離の徹底**（personal → confidential → public への漏洩禁止）。
 6. **1ミッション1オーナー**（ワーカーはタスク契約経由で協調）。
-7. **実質的な作業はミッション化**（5条件のうち2つを満たせばパイプライン経由。顧客に「Kyberion 製ガバナンスの証拠」として出すものは必ずミッション経由＝dog-food ルール）。
+7. **実質的な作業は正本ポリシーで判定**（必須トリガー1つ、または蓄積トリガー2つでミッション化。顧客に「Kyberion 製ガバナンスの証拠」として出すものは必ずミッション経由＝dog-food ルール）。
 
 ### 5フェーズ・ライフサイクル
+
 セッション開始時に `pnpm pipeline --input pipelines/baseline-check.json` を実行し、status により遷移：
 ① Onboarding → ② Recovery → ③ Alignment（意図解釈・目標合意、コード変更前）→ ④ Execution（一度に一つ変更し即テスト）→ ⑤ Review（成功/失敗から知見を `knowledge/` に蒸留、フィードバックループ生成）
 
@@ -129,15 +131,16 @@ agent / approval / artifact / blockchain / browser / calendar / code / daemon / 
 
 ## 7. 差別化ポイント（README「How It Compares」より）
 
-| 比較対象 | Kyberion の付加価値 |
-|---|---|
-| ChatGPT / Claude.ai | ステートフルなミッション、ガバナンス実行、アクチュエータ群、監査チェーン、実行をまたぐ再利用記憶 |
-| Cursor | コードは多数のアクチュエータの一つ。作業単位は単発チャットでなく永続状態を持つ長期ミッション |
-| Computer Use / ブラウザエージェント | ミッションスコープの状態、層隔離された知識、顧客アグリゲーション。ブラウザは基盤でなく一ツール |
-| Zapier / n8n / RPA | 脆いルール連鎖を意図駆動の計画に置換。Trace 由来の再利用ヒントでサイト変更にも耐える |
-| AI Ops / agent SaaS | OSS・セルフホスト・顧客データはローカル維持。中央サーバ不要、FDE 対応 |
+| 比較対象                            | Kyberion の付加価値                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| ChatGPT / Claude.ai                 | ステートフルなミッション、ガバナンス実行、アクチュエータ群、監査チェーン、実行をまたぐ再利用記憶 |
+| Cursor                              | コードは多数のアクチュエータの一つ。作業単位は単発チャットでなく永続状態を持つ長期ミッション     |
+| Computer Use / ブラウザエージェント | ミッションスコープの状態、層隔離された知識、顧客アグリゲーション。ブラウザは基盤でなく一ツール   |
+| Zapier / n8n / RPA                  | 脆いルール連鎖を意図駆動の計画に置換。Trace 由来の再利用ヒントでサイト変更にも耐える             |
+| AI Ops / agent SaaS                 | OSS・セルフホスト・顧客データはローカル維持。中央サーバ不要、FDE 対応                            |
 
 固有の仕組み:
+
 - **ADF パイプライン形式** — 宣言的・スキーマ検証済み・サブパイプライン合成可能、`on_error` リカバリ付き
 - **ミッション・ライフサイクル** — 各作業が独自 Git リポジトリ・状態・証跡を持つ
 - **3層知識隔離** — ファイル I/O 境界で強制
@@ -170,6 +173,7 @@ Kyberion は単なるエージェント・ラッパーではなく、**「意図
 ---
 
 ### 主要参照ファイル
+
 - `README.md` / `AGENTS.md`（ガバナンス憲章）
 - `docs/WHY.md`（思想）・`docs/GLOSSARY.md`（用語）・`docs/COMPONENT_MAP.md`（構造）
 - `docs/PRODUCTIZATION_ROADMAP.md`（ロードマップ）

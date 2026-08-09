@@ -1413,6 +1413,73 @@ async function handleGovernedExecutionHint(
   const routingDecisionArgs = context.compiledFlow?.routingDecision
     ? ['--routing-decision', JSON.stringify(context.compiledFlow.routingDecision)]
     : [];
+  const promoteToMission = async (): Promise<SurfaceConversationResult> => {
+    const governancePayload = buildWorkScopeGovernancePayload(context);
+    const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
+    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
+    let output = '';
+    try {
+      output = safeExec(
+        'node',
+        [
+          'dist/scripts/mission_controller.js',
+          'create',
+          missionId,
+          'public',
+          ...buildIntentGoalHandoffArgs(context, missionId),
+          ...(governancePayload ? ['--routing-decision', JSON.stringify(governancePayload)] : []),
+        ],
+        {
+          cwd: pathResolver.rootDir(),
+        }
+      );
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: true,
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+    } catch (error: any) {
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      throw error;
+    }
+    return emptySurfaceResult(
+      [
+        `承認と記録が必要なためミッションとして進めます。ミッションID: ${missionId}`,
+        '',
+        formatExecutionReceipt({
+          intentId: resolved.intentId,
+          shape: 'mission',
+          command,
+          status: 'ok',
+          candidateSelection: candidates,
+          governance: buildWorkScopeGovernanceReceipt(context),
+        }),
+        '',
+        output.trim() || '(no output)',
+      ].join('\n')
+    );
+  };
+  if (shouldPromoteToMission(context)) return promoteToMission();
+
   const direct = directIntentCommand(resolved.intentId);
   if (direct) {
     const command = `${direct.command} ${direct.args.join(' ')}`;
@@ -1515,72 +1582,6 @@ async function handleGovernedExecutionHint(
         formatExecutionReceipt({
           intentId: resolved.intentId,
           shape: resolved.shape,
-          command,
-          status: 'ok',
-          candidateSelection: candidates,
-          governance: buildWorkScopeGovernanceReceipt(context),
-        }),
-        '',
-        output.trim() || '(no output)',
-      ].join('\n')
-    );
-  }
-
-  if (shouldPromoteToMission(context)) {
-    const governancePayload = buildWorkScopeGovernancePayload(context);
-    const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
-    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
-    let output = '';
-    try {
-      output = safeExec(
-        'node',
-        [
-          'dist/scripts/mission_controller.js',
-          'create',
-          missionId,
-          'public',
-          ...buildIntentGoalHandoffArgs(context, missionId),
-          ...(governancePayload ? ['--routing-decision', JSON.stringify(governancePayload)] : []),
-        ],
-        {
-          cwd: pathResolver.rootDir(),
-        }
-      );
-      if (intentId) {
-        recordLearningOutcomeSafely({
-          intent_id: intentId,
-          execution_shape: 'mission',
-          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
-          success: true,
-          context_fingerprint: {
-            execution_shape: resolved.shape,
-            surface: context.input.surface || 'unknown',
-          },
-        });
-      }
-    } catch (error: any) {
-      if (intentId) {
-        recordLearningOutcomeSafely({
-          intent_id: intentId,
-          execution_shape: 'mission',
-          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
-          success: false,
-          error: error?.message || String(error),
-          context_fingerprint: {
-            execution_shape: resolved.shape,
-            surface: context.input.surface || 'unknown',
-          },
-        });
-      }
-      throw error;
-    }
-    return emptySurfaceResult(
-      [
-        `承認と記録が必要なためミッションとして進めます。ミッションID: ${missionId}`,
-        '',
-        formatExecutionReceipt({
-          intentId: resolved.intentId,
-          shape: 'mission',
           command,
           status: 'ok',
           candidateSelection: candidates,
