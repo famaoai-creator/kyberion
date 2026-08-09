@@ -644,6 +644,10 @@ async function cancelMission(id: string, note?: string) {
   return missionSystem.cancelMission(id, note);
 }
 
+async function repairLegacyMissionState(id: string, note?: string) {
+  return missionSystem.repairLegacyMissionState(id, note);
+}
+
 async function recordTask(missionId: string, description: string, details: any = {}) {
   return missionSystem.recordTask(missionId, description, details);
 }
@@ -1394,6 +1398,7 @@ Lifecycle Commands:
   resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
   pause    <ID> [--note <TEXT>]  Pause an active mission without losing state
   cancel   <ID> [--note <TEXT>]  Cancel a mission and mark it failed for follow-up
+  repair   <ID> [--note <TEXT>]  Repair legacy mission state via the governed controller
   dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
                                  --ticket-targets workitem,github,jira
                                  --live-ticket-targets github,jira
@@ -1978,6 +1983,7 @@ export async function main() {
     resumeMission,
     pauseMission,
     cancelMission,
+    repairLegacyMissionState,
     recordTask,
     recordEvidence,
     recordArtifactReview,

@@ -1065,7 +1065,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 9351,
+      "size": 9394,
       "type": "json"
     },
     {
@@ -1125,7 +1125,7 @@
     {
       "path": "product/governance/authority-roles/mission_controller.json",
       "tier": "public",
-      "size": 814,
+      "size": 801,
       "type": "json"
     },
     {
@@ -1911,7 +1911,7 @@
     {
       "path": "product/governance/path-scope-policy.json",
       "tier": "public",
-      "size": 2677,
+      "size": 2720,
       "type": "json"
     },
     {
@@ -2181,7 +2181,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19969,
+      "size": 20055,
       "type": "json"
     },
     {
