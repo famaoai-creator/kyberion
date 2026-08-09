@@ -996,6 +996,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ENTITY_GOVERNANCE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
       "category": "runtime",
       "type": "string",
