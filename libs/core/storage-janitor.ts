@@ -2,6 +2,7 @@ import * as nodePath from 'node:path';
 import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
   safeReaddir,
+  safeExecResult,
   safeReadFile,
   safeLstat,
   safeStat,
@@ -22,7 +23,10 @@ import {
   retentionEntryForPath,
   reviewRequiredCatalogPaths,
   runtimeRetentionRules,
+  eventStoreRetentionRules,
+  coveredEventStoreDirs,
   coveredRuntimeSubdirs,
+  EVENT_STORE_PREFIXES,
   BUILTIN_RETENTION_DEFAULTS,
   RETENTION_CATALOG_REPO_PATH,
   RETENTION_DAY_MS,
@@ -119,6 +123,8 @@ export interface DelegationChildRecord {
   startedAt: string;
   deadlineAt: string;
   budgetMs: number;
+  /** OS process start time, used to prevent PID-reuse kills after a restart. */
+  pidStartedAt?: string;
 }
 
 /**
@@ -136,6 +142,8 @@ export interface SweepDelegationChildrenOptions {
   now?: () => number;
   /** Injectable kill seam — production defaults to `process.kill`. Tests MUST inject a fake; never touch real processes. */
   killFn?: (pid: number, signal: NodeJS.Signals) => void;
+  /** Test seam and platform adapter for the recorded OS process start time. */
+  processStartTimeFn?: (pid: number) => string | undefined;
 }
 
 export interface SweepDelegationChildrenResult {
@@ -153,6 +161,9 @@ export interface JanitorReport {
   deletedDataVault: number;
   expiredRuntime: number;
   deletedRuntime: number;
+  /** EV-06: append-only event-store files expired / deleted this run. */
+  expiredEventStores: number;
+  deletedEventStores: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
   /**
@@ -161,6 +172,11 @@ export interface JanitorReport {
    * them (reported, never deleted).
    */
   uncoveredRuntimeDirs: string[];
+  /**
+   * EV-06: event-store directories on disk with no catalog entry. Same
+   * contract as `uncoveredRuntimeDirs` — reported, never deleted.
+   */
+  uncoveredEventStoreDirs: string[];
   /**
    * AL-04: repo-relative directories declared `action: review_required` in
    * the catalog that exist on disk — never deleted, never counted as
@@ -546,6 +562,89 @@ export function scanRuntime(opts: {
 }
 
 /**
+ * EV-06: expire declared event-store files.
+ *
+ * Structurally the same walk as {@link scanRuntime}, but rooted at repo paths
+ * rather than `active/shared/runtime/<subdir>`, because the event stores sit in
+ * three different trees (`observability/`, `coordination/orchestration/events/`,
+ * `presence/bridge/runtime/`). Adding a new event stream therefore needs only a
+ * catalog entry, not another scan function.
+ */
+export function scanEventStores(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  const now = Date.now();
+  const expired: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const rules = eventStoreRetentionRules(catalog);
+  for (const rule of rules) {
+    const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
+    for (const filePath of collectFiles(dir)) {
+      try {
+        const repoRelative = nodePath.relative(rootDir(), filePath).split(nodePath.sep).join('/');
+        // collectFiles recurses, so a residual parent rule would otherwise also
+        // claim files that a more specific child entry governs — applying the
+        // wrong TTL and audit flag, and double-counting them in the report.
+        // The catalog's contract is longest-prefix; honour it per file.
+        const owning = retentionEntryForPath(catalog, repoRelative);
+        if (owning && owning !== rule.entry) continue;
+
+        const stat = safeStat(filePath);
+        if (now - stat.mtimeMs > rule.ttlMs) {
+          expired.push(filePath);
+          if (!opts.dryRun) {
+            expireFilePerPolicy(filePath, rule.entry, outcome);
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+}
+
+/**
+ * EV-06: event-store directories present on disk with no catalog entry.
+ *
+ * The counterpart of {@link listUncoveredRuntimeDirs} for the event-store
+ * trees. Reported, never deleted — an undeclared event stream must be visible
+ * rather than silently retained forever.
+ */
+export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): string[] {
+  const covered = coveredEventStoreDirs(catalog ?? loadRetentionCatalog());
+  const uncovered: string[] = [];
+
+  for (const prefix of EVENT_STORE_PREFIXES) {
+    const root = nodePath.join(rootDir(), prefix);
+    if (!safeExistsSync(root)) continue;
+    // A covering entry on the prefix itself governs everything beneath it.
+    if (covered.has(prefix)) continue;
+    let entries: string[];
+    try {
+      entries = safeReaddir(root);
+    } catch {
+      continue;
+    }
+    for (const name of [...entries].sort()) {
+      const repoRelative = `${prefix}/${name}`;
+      try {
+        const stat = safeLstat(nodePath.join(root, name));
+        if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+      } catch {
+        continue;
+      }
+      if (!covered.has(repoRelative)) uncovered.push(repoRelative);
+    }
+  }
+  return uncovered.sort();
+}
+
+/**
  * AL-04 trash sweep: purge `active/archive/.trash/` files whose soft-delete
  * grace elapsed. The grace per file is the `soft_delete_days` of the catalog
  * entry that covers the file's ORIGINAL repo-relative path (its path inside
@@ -662,6 +761,33 @@ function writeDelegationChildrenRegistry(records: DelegationChildRecord[]): void
   safeWriteFile(shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH), JSON.stringify(records, null, 2));
 }
 
+function resolveProcessStartTime(pid: number): string | undefined {
+  try {
+    const result = safeExecResult('ps', ['-p', String(pid), '-o', 'lstart='], {
+      timeoutMs: 1000,
+      maxOutputMB: 1,
+    });
+    const parsed = Date.parse(result.stdout.trim());
+    return result.status === 0 && Number.isFinite(parsed)
+      ? new Date(parsed).toISOString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function sameProcessIdentity(
+  record: DelegationChildRecord,
+  processStartTimeFn: (pid: number) => string | undefined
+): boolean {
+  if (!Number.isInteger(record.pid) || (record.pid as number) <= 0) return false;
+  if (!record.pidStartedAt) return false;
+  const current = processStartTimeFn(record.pid as number);
+  const expectedMs = Date.parse(record.pidStartedAt);
+  const currentMs = current ? Date.parse(current) : Number.NaN;
+  return Number.isFinite(expectedMs) && Number.isFinite(currentMs) && expectedMs === currentMs;
+}
+
 /**
  * XP-06 zombie sweep: reap orphaned CLI child processes whose wall-clock
  * budget (`delegation-concurrency.ts` `withWallClockBudget`) expired without
@@ -684,6 +810,7 @@ export function sweepDelegationChildren(
   const now = opts.now ?? Date.now;
   const killFn =
     opts.killFn ?? ((pid: number, signal: NodeJS.Signals) => process.kill(pid, signal));
+  const processStartTimeFn = opts.processStartTimeFn ?? resolveProcessStartTime;
   const errors: string[] = [];
 
   let records: DelegationChildRecord[] = [];
@@ -703,7 +830,12 @@ export function sweepDelegationChildren(
   const killed: DelegationChildRecord[] = [];
   if (!opts.dryRun && stale.length > 0) {
     for (const record of stale) {
-      if (typeof record.pid !== 'number') continue;
+      if (!sameProcessIdentity(record, processStartTimeFn)) {
+        errors.push(
+          `pid ${String(record.pid)}: process identity unavailable or changed; refusing to kill`
+        );
+        continue;
+      }
       try {
         killFn(record.pid, 'SIGKILL');
         killed.push(record);
@@ -772,6 +904,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
 
+  let eventStoreResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  try {
+    eventStoreResult = scanEventStores({ dryRun: opts.dryRun, catalog });
+  } catch (err: any) {
+    errors.push(`event-stores: ${err?.message ?? String(err)}`);
+  }
+
   let trashResult: SweepTrashResult = { expired: [], purged: [] };
   try {
     trashResult = sweepTrash({ dryRun: opts.dryRun, catalog });
@@ -784,6 +923,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     uncoveredRuntimeDirs = listUncoveredRuntimeDirs(catalog);
   } catch (err: any) {
     errors.push(`uncovered-runtime: ${err?.message ?? String(err)}`);
+  }
+
+  let uncoveredEventStoreDirs: string[] = [];
+  try {
+    uncoveredEventStoreDirs = listUncoveredEventStoreDirs(catalog);
+  } catch (err: any) {
+    errors.push(`uncovered-event-stores: ${err?.message ?? String(err)}`);
   }
 
   let reviewRequiredDirs: string[] = [];
@@ -814,14 +960,18 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedDataVault: vaultResult.deleted.length,
     expiredRuntime: runtimeResult.expired.length,
     deletedRuntime: runtimeResult.deleted.length,
+    expiredEventStores: eventStoreResult.expired.length,
+    deletedEventStores: eventStoreResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
     uncoveredRuntimeDirs,
+    uncoveredEventStoreDirs,
     reviewRequiredDirs,
     softDeleted:
       tmpResult.softDeleted.length +
       logResult.softDeleted.length +
-      runtimeResult.softDeleted.length,
+      runtimeResult.softDeleted.length +
+      eventStoreResult.softDeleted.length,
     expiredTrash: trashResult.expired.length,
     purgedTrash: trashResult.purged.length,
     retentionCatalogSource: catalog.source,

@@ -423,13 +423,18 @@ describe('delegation-concurrency', () => {
         startedAt: new Date(Date.now() - 120000).toISOString(),
         deadlineAt: new Date(Date.now() - 60000).toISOString(), // budget expired 1min ago
         budgetMs: 60000,
+        pidStartedAt: new Date(Date.now() - 120000).toISOString(),
       };
       const registryPath = path.join(tmpDir, 'runtime', 'delegation-children.json');
       fs.mkdirSync(path.dirname(registryPath), { recursive: true });
       fs.writeFileSync(registryPath, JSON.stringify([staleRecord], null, 2));
 
       const killFn = vi.fn();
-      const result = sweepDelegationChildren({ dryRun: false, killFn });
+      const result = sweepDelegationChildren({
+        dryRun: false,
+        killFn,
+        processStartTimeFn: () => staleRecord.pidStartedAt,
+      });
 
       expect(result.stale).toHaveLength(1);
       expect(result.stale[0]).toMatchObject({ id: 'crashed-run-1', pid: 9999 });

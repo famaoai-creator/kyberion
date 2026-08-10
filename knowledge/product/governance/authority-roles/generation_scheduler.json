@@ -1,0 +1,15 @@
+{
+  "role": "generation_scheduler",
+  "description": "EV-01: media-generation schedule daemon authority. Owns the generation schedule registry and its trigger deliveries; deliberately narrower than chronos_gateway, which has no write scope over media-generation state.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/media-generation/",
+    "active/shared/runtime/trigger-deliveries.jsonl",
+    "active/shared/runtime/heartbeats/",
+    "active/shared/observability/",
+    "active/audit/"
+  ],
+  "scope_classes": ["operations_runtime", "observability", "audit"],
+  "allowed_actuators": ["media-generation-actuator", "artifact-actuator"],
+  "tier_access": ["public", "confidential"]
+}
