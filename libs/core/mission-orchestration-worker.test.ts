@@ -131,7 +131,9 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
       await import('./work-coordination.js');
     const { safeMkdir, safeWriteFile } = await import('./secure-io.js');
-    setWorkCoordinationNamespace('mission-orchestration-worker-test');
+    setWorkCoordinationNamespace(
+      `mission-orchestration-worker-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
     clearWorkCoordinationStore();
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     safeMkdir(missionPath, { recursive: true });
@@ -2201,11 +2203,9 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
     const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
-    const { clearWorkCoordinationStore } = await import('./work-coordination.js');
 
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     const writeFixture = (maxParallelMembers: number) => {
-      clearWorkCoordinationStore();
       mocks.route.mockReset();
       mocks.resolveMissionTeamPlan.mockReset();
       mocks.resolveMissionTeamPlan.mockReturnValue({
