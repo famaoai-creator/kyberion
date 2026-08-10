@@ -39,35 +39,35 @@ Internally, Kyberion maps each Request through:
 
 ### 3.1 Software delivery
 
-| Use case | Mission class | Primary pipeline(s) |
-|---|---|---|
-| Implement feature / fix bug / refactor | `code_change` | `implementation-plan` → `execute-task-plan` → `code-review-cycle` |
-| Cut a release | `operations_and_release` | `release-package` → `deploy-release` |
-| Review a contract / spec | `research_and_absorption` | `contract-review` |
-| Review plain text / approval copy | `decision_support` | `review-text` |
+| Use case                               | Mission class             | Primary pipeline(s)                                               |
+| -------------------------------------- | ------------------------- | ----------------------------------------------------------------- |
+| Implement feature / fix bug / refactor | `code_change`             | `implementation-plan` → `execute-task-plan` → `code-review-cycle` |
+| Cut a release                          | `operations_and_release`  | `release-package` → `deploy-release`                              |
+| Review a contract / spec               | `research_and_absorption` | `contract-review`                                                 |
+| Review plain text / approval copy      | `decision_support`        | `review-text`                                                     |
 
 ### 3.2 Customer-facing requirements to delivery
 
-| Use case | Mission class | Pipeline |
-|---|---|---|
-| Customer interview → requirements draft (text) | `customer_engagement` | `requirements-elicitation` |
-| Customer interview → requirements draft (audio) | `customer_engagement` | `audio-to-requirements` |
-| Requirements → design spec | `customer_engagement` | `design-from-requirements` |
-| Requirements + design → test plan | `customer_engagement` | `test-plan-from-requirements` |
-| Plan → tasks → execution | `customer_engagement` | `execute-task-plan` |
+| Use case                                        | Mission class         | Pipeline                      |
+| ----------------------------------------------- | --------------------- | ----------------------------- |
+| Customer interview → requirements draft (text)  | `customer_engagement` | `requirements-elicitation`    |
+| Customer interview → requirements draft (audio) | `customer_engagement` | `audio-to-requirements`       |
+| Requirements → design spec                      | `customer_engagement` | `design-from-requirements`    |
+| Requirements + design → test plan               | `customer_engagement` | `test-plan-from-requirements` |
+| Plan → tasks → execution                        | `customer_engagement` | `execute-task-plan`           |
 
 Review gates fire at each transition (`REQUIREMENTS_COMPLETENESS`,
 `ARCHITECTURE_READY`, `QA_READY`, `CUSTOMER_SIGNOFF`, etc.).
 
 ### 3.3 Strategic decision support
 
-| Use case | Mission class | Pipeline |
-|---|---|---|
-| Generate divergent hypotheses + cross-critique | `decision_support` | `hypothesis-tree` |
-| Run counterfactual simulations of branches | `decision_support` | `counterfactual-branch` |
-| Capture / formalize an intuition | `decision_support` | `intuition-capture` |
-| Strategic executive report | `decision_support` | `ceo-strategic-report` |
-| Daily summary | — | `daily-summary` |
+| Use case                                       | Mission class      | Pipeline                |
+| ---------------------------------------------- | ------------------ | ----------------------- |
+| Generate divergent hypotheses + cross-critique | `decision_support` | `hypothesis-tree`       |
+| Run counterfactual simulations of branches     | `decision_support` | `counterfactual-branch` |
+| Capture / formalize an intuition               | `decision_support` | `intuition-capture`     |
+| Strategic executive report                     | `decision_support` | `ceo-strategic-report`  |
+| Daily summary                                  | —                  | `daily-summary`         |
 
 The `hypothesis-tree` pipeline now produces a human-readable Markdown report
 via `wisdom:render_hypothesis_report` in addition to the structured JSON.
@@ -83,12 +83,12 @@ The `counterfactual-branch` pipeline emits two artifacts per run:
 
 ### 3.4 Conversation orchestration
 
-| Use case | Mission class | Primary intent |
-|---|---|---|
-| Ask for missing context or narrow a vague request | `customer_engagement` | `clarify-user-request` |
-| Continue an active thread without resetting context | `customer_engagement` | `continue-conversation` |
-| Summarize a discussion into decisions and next steps | `research_and_absorption` | `summarize-conversation` |
-| Turn a thread into a governed mission brief | `decision_support` | `conversation-to-mission` |
+| Use case                                             | Mission class             | Primary intent            |
+| ---------------------------------------------------- | ------------------------- | ------------------------- |
+| Ask for missing context or narrow a vague request    | `customer_engagement`     | `clarify-user-request`    |
+| Continue an active thread without resetting context  | `customer_engagement`     | `continue-conversation`   |
+| Summarize a discussion into decisions and next steps | `research_and_absorption` | `summarize-conversation`  |
+| Turn a thread into a governed mission brief          | `decision_support`        | `conversation-to-mission` |
 
 These intents make human/LLM exchange explicit instead of treating it as an
 undifferentiated direct-reply fallback. The key design choice is that the
@@ -97,8 +97,8 @@ an explicit outcome rather than an implicit side effect.
 
 ### 3.4b Schedule coordination
 
-| Use case | Mission class | Primary intent |
-|---|---|---|
+| Use case                                              | Mission class         | Primary intent          |
+| ----------------------------------------------------- | --------------------- | ----------------------- |
 | Adjust, reschedule, or reconcile calendar constraints | `customer_engagement` | `schedule-coordination` |
 
 Schedule coordination is treated as a governed umbrella over calendar edits
@@ -107,24 +107,24 @@ hand off to `meeting-operations` after the schedule boundary is clarified.
 
 ### 3.5 CEO / CTO operator harness
 
-| Use case | Mission class | Primary intent |
-|---|---|---|
-| Compare strategy options and recommend one path | `decision_support` | `executive-strategy-brief` |
-| Reduce executive focus to priorities and explicit non-priorities | `decision_support` | `executive-prioritization` |
-| Produce executive KPI or management-meeting summaries | `decision_support` | `executive-reporting` |
-| Draft stakeholder-facing communication | `customer_engagement` | `stakeholder-communication` |
-| Prepare customer or account strategy | `customer_engagement` | `sales-account-strategy` |
-| Write a CTO-style technical decision memo | `decision_support` | `technical-decision-memo` |
-| Select LLM/provider/model policy for a use case | `environment_and_recovery` | `llm-provider-selection` |
-| Plan agent runtime latency, cost, or capacity tuning | `operations_and_release` | `agent-runtime-tuning` |
-| Bootstrap or verify the Kyberion runtime | `platform_onboarding` | `bootstrap-kyberion-runtime` / `verify-environment-readiness` |
-| Configure reasoning backend or register a new actuator | `platform_onboarding` | `configure-reasoning-backend` / `register-actuator-adapter` |
-| Start a first-run onboarding wizard | `platform_onboarding` | `launch-first-run-onboarding` |
-| Configure organization-specific toolchain or save presentation preferences | `platform_onboarding` | `configure-organization-toolchain` / `register-presentation-preference-profile` |
-| Inspect Kyberion system health or runtime supervisor | `operations_and_release` | `check-kyberion-baseline` / `check-kyberion-vital` / `diagnose-kyberion-system` / `inspect-runtime-supervisor` |
-| Start or stop a governed service | `operations_and_release` | `start-service` / `stop-service` |
-| Assess release readiness and go/no-go conditions | `operations_and_release` | `release-readiness-review` |
-| Extract operator-specific preference learning | `research_and_absorption` | `operator-profile-learning` |
+| Use case                                                                   | Mission class              | Primary intent                                                                                                 |
+| -------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Compare strategy options and recommend one path                            | `decision_support`         | `executive-strategy-brief`                                                                                     |
+| Reduce executive focus to priorities and explicit non-priorities           | `decision_support`         | `executive-prioritization`                                                                                     |
+| Produce executive KPI or management-meeting summaries                      | `decision_support`         | `executive-reporting`                                                                                          |
+| Draft stakeholder-facing communication                                     | `customer_engagement`      | `stakeholder-communication`                                                                                    |
+| Prepare customer or account strategy                                       | `customer_engagement`      | `sales-account-strategy`                                                                                       |
+| Write a CTO-style technical decision memo                                  | `decision_support`         | `technical-decision-memo`                                                                                      |
+| Select LLM/provider/model policy for a use case                            | `environment_and_recovery` | `llm-provider-selection`                                                                                       |
+| Plan agent runtime latency, cost, or capacity tuning                       | `operations_and_release`   | `agent-runtime-tuning`                                                                                         |
+| Bootstrap or verify the Kyberion runtime                                   | `platform_onboarding`      | `bootstrap-kyberion-runtime` / `verify-environment-readiness`                                                  |
+| Configure reasoning backend or register a new actuator                     | `platform_onboarding`      | `configure-reasoning-backend` / `register-actuator-adapter`                                                    |
+| Start a first-run onboarding wizard                                        | `platform_onboarding`      | `launch-first-run-onboarding`                                                                                  |
+| Configure organization-specific toolchain or save presentation preferences | `platform_onboarding`      | `configure-organization-toolchain` / `register-presentation-preference-profile`                                |
+| Inspect Kyberion system health or runtime supervisor                       | `operations_and_release`   | `check-kyberion-baseline` / `check-kyberion-vital` / `diagnose-kyberion-system` / `inspect-runtime-supervisor` |
+| Start or stop a governed service                                           | `operations_and_release`   | `start-service` / `stop-service`                                                                               |
+| Assess release readiness and go/no-go conditions                           | `operations_and_release`   | `release-readiness-review`                                                                                     |
+| Extract operator-specific preference learning                              | `research_and_absorption`  | `operator-profile-learning`                                                                                    |
 
 These intents are optimized for an operator who alternates between CEO and CTO
 roles. They let Kyberion treat high-leverage executive and technical requests
@@ -133,31 +133,31 @@ learning proposals.
 
 ### 3.6 Stakeholder / negotiation work
 
-| Use case | Pipeline |
-|---|---|
-| Rehearse a negotiation against a synthetic counterparty persona | `negotiation-rehearsal` |
-| Orchestrate stakeholder consensus building | `stakeholder-consensus-orchestrator` |
+| Use case                                                        | Pipeline                             |
+| --------------------------------------------------------------- | ------------------------------------ |
+| Rehearse a negotiation against a synthetic counterparty persona | `negotiation-rehearsal`              |
+| Orchestrate stakeholder consensus building                      | `stakeholder-consensus-orchestrator` |
 
 Built on the relationship-graph + dissent-log protocols.
 
 ### 3.7 Content / media
 
-| Use case | Mission class | Pipeline |
-|---|---|---|
-| Marketing strategy distillation | `content_and_media` | `marketing-strategy` |
-| Marketing copy generation | `content_and_media` | `marketing-content` |
-| Re-execute marketing iteration | `content_and_media` | `marketing-re-execute` |
-| PPTX from a template (ownership-aware) | `content_and_media` | `pptx-template-inherit` |
-| PPTX design/theme import | `content_and_media` | `import-brand-from-pptx` |
-| Website/HTML design/theme import | `content_and_media` | `import-brand-from-html` |
-| Brand theme extraction from PPTX or Web | `content_and_media` | `extract-brand-theme` |
-| Web concept build from design theme | `product_delivery` | `build-web-concept` |
+| Use case                                | Mission class       | Pipeline                 |
+| --------------------------------------- | ------------------- | ------------------------ |
+| Marketing strategy distillation         | `content_and_media` | `marketing-strategy`     |
+| Marketing copy generation               | `content_and_media` | `marketing-content`      |
+| Re-execute marketing iteration          | `content_and_media` | `marketing-re-execute`   |
+| PPTX from a template (ownership-aware)  | `content_and_media` | `pptx-template-inherit`  |
+| PPTX design/theme import                | `content_and_media` | `import-brand-from-pptx` |
+| Website/HTML design/theme import        | `content_and_media` | `import-brand-from-html` |
+| Brand theme extraction from PPTX or Web | `content_and_media` | `extract-brand-theme`    |
+| Web concept build from design theme     | `product_delivery`  | `build-web-concept`      |
 
 ### 3.8 Platform / API extension
 
-| Use case | Pipeline |
-|---|---|
-| Add a new FaaS API by conversation | `faas-add-api` |
+| Use case                           | Pipeline              |
+| ---------------------------------- | --------------------- |
+| Add a new FaaS API by conversation | `faas-add-api`        |
 | Ingest a GitHub issue as a mission | `github-issue-ingest` |
 
 ## 4. Environment Integration Intents — adapt Kyberion to your environment
@@ -214,30 +214,30 @@ Mission distillation and other structured reasoning workflows are policy-driven 
 
 Use this policy surface to select profiles and adapters without hardcoding provider branches in mission scripts.
 
-| Setting | Env var(s) |
-|---|---|
-| Mode | `KYBERION_REASONING_BACKEND={claude-cli\|claude-agent\|anthropic\|gemini-cli\|codex-cli\|nemotron-api\|local\|stub}` |
-| Claude CLI | `KYBERION_CLAUDE_CLI_BIN`, `KYBERION_CLAUDE_CLI_MODEL`, `KYBERION_CLAUDE_CLI_TIMEOUT_MS`, `KYBERION_CLAUDE_CLI_EXTRA_ARGS` |
-| Gemini CLI | `KYBERION_GEMINI_CLI_BIN`, `KYBERION_GEMINI_CLI_MODEL` |
-| Codex CLI | `KYBERION_CODEX_CLI_BIN`, `KYBERION_CODEX_CLI_MODEL`, `KYBERION_CODEX_MODE`, `KYBERION_CODEX_APPROVAL`, `KYBERION_CODEX_MODEL_PROVIDER` |
-| Anthropic SDK direct | `ANTHROPIC_API_KEY` |
-| Gemini API direct | `GEMINI_API_KEY` |
-| Nemotron OpenAI-compatible API | `KYBERION_NEMOTRON_URL`, `KYBERION_NEMOTRON_KEY`, `KYBERION_NEMOTRON_MODEL` |
-| Local OpenAI-compatible API | `KYBERION_LOCAL_LLM_URL`, `KYBERION_LOCAL_LLM_KEY`, `KYBERION_LOCAL_LLM_MODEL` |
+| Setting                        | Env var(s)                                                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Mode                           | `KYBERION_REASONING_BACKEND={claude-cli\|claude-agent\|anthropic\|gemini-cli\|codex-cli\|nemotron-api\|local\|stub}`                    |
+| Claude CLI                     | `KYBERION_CLAUDE_CLI_BIN`, `KYBERION_CLAUDE_CLI_MODEL`, `KYBERION_CLAUDE_CLI_TIMEOUT_MS`, `KYBERION_CLAUDE_CLI_EXTRA_ARGS`              |
+| Gemini CLI                     | `KYBERION_GEMINI_CLI_BIN`, `KYBERION_GEMINI_CLI_MODEL`                                                                                  |
+| Codex CLI                      | `KYBERION_CODEX_CLI_BIN`, `KYBERION_CODEX_CLI_MODEL`, `KYBERION_CODEX_MODE`, `KYBERION_CODEX_APPROVAL`, `KYBERION_CODEX_MODEL_PROVIDER` |
+| Anthropic SDK direct           | `ANTHROPIC_API_KEY`                                                                                                                     |
+| Gemini API direct              | `GEMINI_API_KEY`                                                                                                                        |
+| Nemotron OpenAI-compatible API | `KYBERION_NEMOTRON_URL`, `KYBERION_NEMOTRON_KEY`, `KYBERION_NEMOTRON_MODEL`                                                             |
+| Local OpenAI-compatible API    | `KYBERION_LOCAL_LLM_URL`, `KYBERION_LOCAL_LLM_KEY`, `KYBERION_LOCAL_LLM_MODEL`                                                          |
 
 Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_REASONING_BACKEND` is set. Distillation policy selection is handled separately by `wisdom-policy.json`.
 
 ### 4.3 Voice / audio (record → STT/TTS → profile)
 
-| Capability | Configuration |
-|---|---|
-| Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` |
-| TTS engine catalog | `knowledge/product/governance/voice-engines/*.json` + `voice-engine-registry.json` snapshot |
-| Voice profile catalog | `knowledge/product/governance/voice-profiles/*.json` canonical, runtime store `active/shared/runtime/voice-profiles/`, `voice-profile-registry.json` compatibility snapshot |
-| Profile lifecycle policy | `voice-runtime-policy.ts` (record → collect → promote) |
-| Profile promotion procedure | `knowledge/public/procedures/media/promote-voice-profile.md` |
-| STT bridge | `SpeechToTextBridge` contract; shell impl driven by `KYBERION_STT_COMMAND` |
-| Audio → requirements | `audio-to-requirements` pipeline |
+| Capability                  | Configuration                                                                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Microphone capture          | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder`                                                                                                                   |
+| TTS engine catalog          | `knowledge/product/governance/voice-engines/*.json` + `voice-engine-registry.json` snapshot                                                                                 |
+| Voice profile catalog       | `knowledge/product/governance/voice-profiles/*.json` canonical, runtime store `active/shared/runtime/voice-profiles/`, `voice-profile-registry.json` compatibility snapshot |
+| Profile lifecycle policy    | `voice-runtime-policy.ts` (record → collect → promote)                                                                                                                      |
+| Profile promotion procedure | `knowledge/public/procedures/media/promote-voice-profile.md`                                                                                                                |
+| STT bridge                  | `SpeechToTextBridge` contract; shell impl driven by `KYBERION_STT_COMMAND`                                                                                                  |
+| Audio → requirements        | `audio-to-requirements` pipeline                                                                                                                                            |
 
 Sample collection and promotion are themselves missions, so every voice profile
 change carries an audit trail.
@@ -287,25 +287,25 @@ adapter wiring for the current environment.
 
 ### 4.8 System self-upgrade
 
-| Pipeline | Use |
-|---|---|
-| `system-upgrade-check` | Diagnose whether an upgrade is safe to attempt |
-| `system-upgrade-execute` | Apply the upgrade |
+| Pipeline                 | Use                                            |
+| ------------------------ | ---------------------------------------------- |
+| `system-upgrade-check`   | Diagnose whether an upgrade is safe to attempt |
+| `system-upgrade-execute` | Apply the upgrade                              |
 
 ## 5. Audit / Operations Intents — observe what is running
 
 ### 5.1 Health and diagnostics
 
-| Pipeline | What it surfaces |
-|---|---|
-| `baseline-check` | Session-start gate: needs_recovery / needs_onboarding / needs_attention / all_clear / fatal_error |
-| `vital-check` | Critical metrics snapshot |
-| `full-health-report` | Full-stack health |
-| `system-diagnostics` | Detailed diagnostics |
-| `dev-productivity-audit` | Engineering productivity signals |
-| `agent-provider-check` | Reasoning provider connectivity |
-| `ceo-strategic-report` | Executive dashboard aggregation; prefer direct ADF capture/transform/write composition |
-| `daily-summary` | Today's activity rollup |
+| Pipeline                 | What it surfaces                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `baseline-check`         | Session-start gate: needs_recovery / needs_onboarding / needs_attention / all_clear / fatal_error |
+| `vital-check`            | Critical metrics snapshot                                                                         |
+| `full-health-report`     | Full-stack health                                                                                 |
+| `system-diagnostics`     | Detailed diagnostics                                                                              |
+| `dev-productivity-audit` | Engineering productivity signals                                                                  |
+| `agent-provider-check`   | Reasoning provider connectivity                                                                   |
+| `ceo-strategic-report`   | Executive dashboard aggregation; prefer direct ADF capture/transform/write composition            |
+| `daily-summary`          | Today's activity rollup                                                                           |
 
 ### 5.2 Mission and knowledge auditing
 
@@ -318,25 +318,25 @@ adapter wiring for the current environment.
 
 ### 5.3 Contract and tier validation
 
-| Command | Purpose |
-|---|---|
+| Command                           | Purpose                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------ |
 | `pnpm run check:contract-schemas` | All declared contracts validate against their JSON Schemas (CI-required) |
-| `pnpm run check:tier-hygiene` | No org-specific names / URLs leaked into the public tier |
-| `pnpm run check:governance-rules` | Governance JSONs satisfy their schemas |
-| `pnpm run check:catalogs` | Capability catalogs are well-formed |
-| `pnpm run check:esm` | ESM import integrity |
-| `pnpm run typecheck` | TypeScript correctness |
-| `pnpm run validate` | All of the above |
+| `pnpm run check:tier-hygiene`     | No org-specific names / URLs leaked into the public tier                 |
+| `pnpm run check:governance-rules` | Governance JSONs satisfy their schemas                                   |
+| `pnpm run check:catalogs`         | Capability catalogs are well-formed                                      |
+| `pnpm run check:esm`              | ESM import integrity                                                     |
+| `pnpm run typecheck`              | TypeScript correctness                                                   |
+| `pnpm run validate`               | All of the above                                                         |
 
 ### 5.4 Memory and learning
 
-| Capability | Trigger |
-|---|---|
-| Distill a completed mission into structured knowledge | `mission_controller distill <ID>` |
-| List memory promotion candidates | `mission_controller memory-list` |
-| Approve / reject a candidate | `mission_controller memory-approve <ID>` |
-| Promote candidate into `knowledge/` | `mission_controller memory-promote <ID>` |
-| Post-release retrospective | `post-release-retrospective` pipeline |
+| Capability                                            | Trigger                                  |
+| ----------------------------------------------------- | ---------------------------------------- |
+| Distill a completed mission into structured knowledge | `mission_controller distill <ID>`        |
+| List memory promotion candidates                      | `mission_controller memory-list`         |
+| Approve / reject a candidate                          | `mission_controller memory-approve <ID>` |
+| Promote candidate into `knowledge/`                   | `mission_controller memory-promote <ID>` |
+| Post-release retrospective                            | `post-release-retrospective` pipeline    |
 
 Distilled knowledge lands in `knowledge/product/evolution/` for mission
 distills, with legacy compatibility reads still covering older
@@ -367,11 +367,11 @@ Review gates per class are in
 
 ## 7. Cross-Device / Handoff Intents
 
-| Use case | Pipeline |
-|---|---|
+| Use case                                | Pipeline                                |
+| --------------------------------------- | --------------------------------------- |
 | Hand off mobile webview state (Android) | `mobile-webview-handoff-runner-android` |
-| Hand off mobile webview state (iOS) | `mobile-webview-handoff-runner-ios` |
-| Hand off web session state | `web-session-handoff-runner` |
+| Hand off mobile webview state (iOS)     | `mobile-webview-handoff-runner-ios`     |
+| Hand off web session state              | `web-session-handoff-runner`            |
 
 The handoff envelope is canonicalized in
 [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json)
@@ -425,45 +425,37 @@ User utterance flows through:
 5. `team-role-index` — auto-assemble 5+ roles
 6. Pipeline execution begins; each phase has its own gate
 
-## 9. When to Mission vs One-shot
+## 9. Execution shape selection
 
-Per `AGENTS.md` Rule 7, mission the work when **any 2** of the following hold:
-
-1. 5+ artifacts will be produced
-2. External / regulatory audience for the deliverable
-3. Re-execution / variant exploration is likely
-4. Same pattern will recur ≥5 times
-5. Multiple legitimate viewpoints would improve quality
-
-Otherwise a one-shot pipeline is fine.
+Use the canonical two-dimensional gate in [`work-scope-policy.json`](../governance/work-scope-policy.json): one mandatory trigger promotes the work to `mission`; absent a mandatory trigger, two accumulation triggers do so. If neither applies, retain the catalog’s minimum execution shape and choose the lowest suitable rung, including `direct_reply` or a one-shot pipeline where appropriate. This section is explanatory only; the policy file is the executable source of truth.
 
 ## 10. Coverage Snapshot (2026-04-27)
 
-| Layer | State |
-|---|---|
-| Intent intake (text / audio / photo / email) | All four routes implemented |
-| Reasoning backends (Claude / Gemini / Codex / Anthropic / Nemotron / local / stub) | 8 modes, swappable |
-| Mission lifecycle | create → start → checkpoint → verify → distill → finish |
-| Pipeline runner (wisdom dispatch + tier-aware paths) | End-to-end |
-| Persona divergence + cross-critique | Verified with stub and `claude-cli` |
-| Markdown report rendering | `wisdom:render_hypothesis_report` |
-| Audit chain (keyed HMAC tamper-detectable) | Local + SIEM forwarder |
-| Knowledge distill / memory promotion | + human approval queue |
-| Voice profile registry | Active |
-| Contract schema validator | Active, CI-required |
-| Cross-device handoff | Envelope schema v1.0.0 + operator runbook |
-| Multi-tenant operations | Playbook + scope policy specified (runtime tenant_slug enforcement is future work) |
-| Counterfactual quality rubric | 6 deterministic checks, severity `ok / warn / poor`, runs after every `simulate_all` |
-| Operator surface strategy | CLI-first + read-only Web fixed; MOS MVP spec'd |
+| Layer                                                                              | State                                                                                |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Intent intake (text / audio / photo / email)                                       | All four routes implemented                                                          |
+| Reasoning backends (Claude / Gemini / Codex / Anthropic / Nemotron / local / stub) | 8 modes, swappable                                                                   |
+| Mission lifecycle                                                                  | create → start → checkpoint → verify → distill → finish                              |
+| Pipeline runner (wisdom dispatch + tier-aware paths)                               | End-to-end                                                                           |
+| Persona divergence + cross-critique                                                | Verified with stub and `claude-cli`                                                  |
+| Markdown report rendering                                                          | `wisdom:render_hypothesis_report`                                                    |
+| Audit chain (keyed HMAC tamper-detectable)                                         | Local + SIEM forwarder                                                               |
+| Knowledge distill / memory promotion                                               | + human approval queue                                                               |
+| Voice profile registry                                                             | Active                                                                               |
+| Contract schema validator                                                          | Active, CI-required                                                                  |
+| Cross-device handoff                                                               | Envelope schema v1.0.0 + operator runbook                                            |
+| Multi-tenant operations                                                            | Playbook + scope policy specified (runtime tenant_slug enforcement is future work)   |
+| Counterfactual quality rubric                                                      | 6 deterministic checks, severity `ok / warn / poor`, runs after every `simulate_all` |
+| Operator surface strategy                                                          | CLI-first + read-only Web fixed; MOS MVP spec'd                                      |
 
 ## 11. Known Gaps (and how they are now addressed)
 
-| Gap | Status | Reference |
-|---|---|---|
-| Cross-device UX (mobile / browser handoff) | **Documented** — handoff envelope schema + operations runbook published | [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md) |
-| Multi-tenant operations | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant | [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md) |
-| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](libs/actuators/wisdom-actuator/src/decision-ops.ts) |
-| GUI / Web UI for operators | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria | [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md) |
+| Gap                                                     | Status                                                                                                                                                                                                                              | Reference                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cross-device UX (mobile / browser handoff)              | **Documented** — handoff envelope schema + operations runbook published                                                                                                                                                             | [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md) |
+| Multi-tenant operations                                 | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant                                                                                                      | [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)                                                                                                                                  |
+| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](libs/actuators/wisdom-actuator/src/decision-ops.ts)                                                                                                                 |
+| GUI / Web UI for operators                              | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria                                                                                           | [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md)                                                                                                                              |
 
 Remaining genuine gaps:
 
@@ -547,7 +539,7 @@ Remaining genuine gaps:
   — human boundary contract
 - [`../../../docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
   — six-stage intent loop reference
-- [`../../../AGENTS.md`](AGENTS.md) — operator rules (Rule 7 = mission threshold)
+- [`../../../AGENTS.md`](../../../AGENTS.md) — operator rules and the mission-gate policy summary
 - [`../governance/mission-classification-policy.json`](knowledge/product/governance/mission-classification-policy.json)
   — class assignment rules
 - [`../governance/mission-workflow-catalog.json`](knowledge/product/governance/mission-workflow-catalog.json)

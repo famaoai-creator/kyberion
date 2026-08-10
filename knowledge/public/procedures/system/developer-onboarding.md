@@ -33,7 +33,7 @@ This is a procedure (not architecture). Architecture lives under
    pnpm build
    ```
 2. Read in this order, ≤ 5 minutes each:
-   - [`AGENTS.md`](AGENTS.md) — operator rules (especially Rule 7)
+   - [`AGENTS.md`](AGENTS.md) — operator rules, especially the canonical work-scope policy
    - [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
    - [`knowledge/product/architecture/kyberion-canonical-concept-index.md`](knowledge/product/architecture/kyberion-canonical-concept-index.md)
    - [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
@@ -127,14 +127,14 @@ work you actually do.
 
 ### Anti-patterns to recognize and avoid
 
-| Anti-pattern | Why it bites | What to do instead |
-|---|---|---|
-| Direct `node:fs` write in a new module | tier-guard / audit-chain bypassed | Use `safeWriteFile` from `@agent/core/secure-io` |
-| `auditChain.record` in MOS source | violates §9.1; CI fails | Route through `presence/displays/operator-surface/src/lib/audit-mos.ts` |
-| Hardcoding org names in `knowledge/public/` | `pnpm run check:tier-hygiene` fails | Move to `knowledge/confidential/{tenant}/` and use placeholders |
-| Skipping mission for "small" changes | Rule 7's 5-condition threshold | Start with mission for anything touching ≥2 conditions |
-| Writing pipelines that bypass `wisdom:*` ops | inconsistent reasoning backend usage | Add the new op to `decision-ops.ts` and wire it through `dispatchDecisionOp` |
-| Creating a new tier without updating policies | governance / hygiene checks miss it | Update `path-scope-policy.json`, `tier-hygiene-policy.json`, and `mission-classification-policy.json` together |
+| Anti-pattern                                       | Why it bites                          | What to do instead                                                                                                       |
+| -------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Direct `node:fs` write in a new module             | tier-guard / audit-chain bypassed     | Use `safeWriteFile` from `@agent/core/secure-io`                                                                         |
+| `auditChain.record` in MOS source                  | violates §9.1; CI fails               | Route through `presence/displays/operator-surface/src/lib/audit-mos.ts`                                                  |
+| Hardcoding org names in `knowledge/public/`        | `pnpm run check:tier-hygiene` fails   | Move to `knowledge/confidential/{tenant}/` and use placeholders                                                          |
+| Skipping the mission gate for a substantive change | The two-dimensional work-scope policy | Check mandatory triggers first, then accumulation triggers; use the lowest suitable execution shape when neither applies |
+| Writing pipelines that bypass `wisdom:*` ops       | inconsistent reasoning backend usage  | Add the new op to `decision-ops.ts` and wire it through `dispatchDecisionOp`                                             |
+| Creating a new tier without updating policies      | governance / hygiene checks miss it   | Update `path-scope-policy.json`, `tier-hygiene-policy.json`, and `mission-classification-policy.json` together           |
 
 ## When you get stuck
 
@@ -156,7 +156,7 @@ wasn't, the rule of thumb: **add the test before fixing the bug.**
 - Touch `tier-guard.ts` or `secure-io.ts` without explicit pairing
   with someone who has merged a change there before.
 - Add a new top-level directory under `knowledge/` or `active/`.
-- Edit `AGENTS.md` Rule 7 without a documented rationale and dog-food
+- Edit the mission-gate policy summary in `AGENTS.md` without a documented rationale and dog-food
   evidence.
 - Push secrets — even test secrets — to public-tier files.
   `pnpm run check:tier-hygiene` will catch this, but the rule comes

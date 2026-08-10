@@ -524,6 +524,29 @@ describe('mission existing work reconciliation', () => {
     expect(safeExistsSync(nodePath.join(missionPath, tasks[1].artifact_review_receipt))).toBe(true);
   });
 
+  it('uses the manifest receipt when an existing mission-local review profile is stale', async () => {
+    const manifest = prepareReviewReconciliationFixture();
+    const tasks = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
+    );
+    tasks[1].artifact_review_profile = {
+      artifact_kind: 'doc',
+      artifact_path: pathResolver.toRepoRelative(
+        nodePath.join(missionPath, 'evidence', 'implementation-report.md')
+      ),
+      artifact_sha256: '0'.repeat(64),
+      required_reviewer_roles: [],
+      independence_required: true,
+      implementer_agent_ids: ['implementation-agent'],
+    };
+    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(tasks, null, 2));
+    writeManifest(manifest);
+
+    const result = await reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true });
+
+    expect(result.reconciled_task_ids).toEqual(['review-content']);
+  });
+
   it('rejects a reconciled review whose receipt hash does not match the committed artifact', async () => {
     const manifest = prepareReviewReconciliationFixture({ receiptHash: '0'.repeat(64) });
     writeManifest(manifest);

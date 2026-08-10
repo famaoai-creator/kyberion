@@ -287,7 +287,7 @@ P0 の 2 件(OS-01/02)が本計画の背骨 — 「止めない承認」は oper
 本節は本計画を実行する codex CLI エージェントへの拘束事項。**着手前に必ず repo ルートの `AGENTS.md`(= `CLAUDE.md`)と `knowledge/product/governance/kyberion-development-practices.md` を読むこと。**
 
 1. **セッション開始**: `pnpm pipeline --input pipelines/baseline-check.json` を実行し、report の `status` に従って分岐(`AGENTS.md` §3)。
-2. **mission ゲート**: 本計画は「5+ 成果物・再実行あり・同パターン反復」を満たすため**必ず mission 化**する。`scripts/mission_controller.ts` で start(命名例: `MSN-OS-ADOPTION-<YYYYMMDD>`)し、OS-XX 単位を work item として claim。mission 全体状態を worker から直接変更しない。
+2. **mission ゲート**: 必須トリガーが1つ以上、または蓄積トリガーが2つ以上なら**必ず mission 化**する。`work-scope-policy.json` を正本とし、`scripts/mission_controller.ts` で start(命名例: `MSN-OS-ADOPTION-<YYYYMMDD>`)し、OS-XX 単位を work item として claim。mission 全体状態を worker から直接変更しない。
 3. **不変条件**: ファイル I/O は `@agent/core/secure-io` のみ(`node:fs` 直接呼び出し禁止 — cloudflare-os から移植するコード断片にも適用)。一時ファイルは `active/shared/tmp/`。plugin 設定 `.kyberion-plugins.json` の直接編集禁止。tier 逆流禁止。
 4. **1 変更 1 検証**: 変更のたびに対象テストを個別実行。仮説を変えずに同一リトライをしない。「done」は証跡(テスト出力・trace)必須。
 5. **検証コマンドの罠**: ルート tsc は `libs/actuators` を型検査しない — actuator を触ったら **`pnpm build:actuators` を必ず実行**。`surface-coordination-store` の replay テストは並列 full-suite で flake することがある(単独再実行で確認してから判断)。
