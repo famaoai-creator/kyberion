@@ -135,7 +135,7 @@ status: active
 
 ### FD-00: 語彙と共有レール(P0)
 
-1. `front_desk` 語彙ドメインを追加(5 メニュー、役割 3 種、判断カードのラベル、ボタン)。`check:catalogs` / pseudo-locale を通す。
+1. `front_desk` 語彙ドメインを追加(5 メニュー、役割 3 種、判断カードのラベル、ボタン)。`pnpm check -- --only catalogs` と pseudo-locale の生成を通す。
 2. `libs/core/front-desk-nav.ts`: メニュー定義(id / href / 担当サーフェス / 所要役割)。相棒用静的レンダラと秘書室用 React コンポーネントは同じ定義を読む。
 3. 両サーフェスのヘッダを新レールに置換。クロスサーフェス遷移は同タブ(`target="_blank"` 廃止)。ポート番号は `active-surfaces.json` から解決し、ハードコードを消す。
 
@@ -185,7 +185,7 @@ status: active
 
 ### FD-09: 品質ゲート(各フェーズに並走)
 
-契約テスト(権限 / narrowing / 内部語なし / i18n 全ラベル `t()` 経由)、Playwright スクリーンショットの固定、`pnpm check:catalogs`、CI 全緑。最終レビューで [ceo-ux.md](../../../knowledge/product/architecture/ceo-ux.md) §3 の「見せないもの」が人の画面に 0 件であることを確認。
+契約テスト(権限 / narrowing / 内部語なし / i18n 全ラベル `t()` 経由)、Playwright スクリーンショットの固定、`pnpm check -- --only catalogs`、CI 全緑。最終レビューで [ceo-ux.md](../../../knowledge/product/architecture/ceo-ux.md) §3 の「見せないもの」が人の画面に 0 件であることを確認。
 
 ### FD-10: アクター語彙の統一と NHI 連結(P2、FD-07 の後に直列)
 
