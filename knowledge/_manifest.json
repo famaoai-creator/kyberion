@@ -123,7 +123,7 @@
     {
       "path": "product/architecture/agent-mission-control-model.md",
       "tier": "public",
-      "size": 10903,
+      "size": 11520,
       "type": "md"
     },
     {
@@ -453,7 +453,7 @@
     {
       "path": "product/architecture/kyberion-intent-catalog.md",
       "tier": "public",
-      "size": 28948,
+      "size": 40088,
       "type": "md"
     },
     {
@@ -981,7 +981,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 6631,
+      "size": 8312,
       "type": "md"
     },
     {
@@ -1473,7 +1473,7 @@
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31378,
+      "size": 31763,
       "type": "json"
     },
     {
@@ -1737,7 +1737,7 @@
     {
       "path": "product/governance/mission-task-classification-scenarios.json",
       "tier": "public",
-      "size": 21623,
+      "size": 24948,
       "type": "json"
     },
     {
@@ -1785,7 +1785,7 @@
     {
       "path": "product/governance/multi-agent-development-sop.md",
       "tier": "public",
-      "size": 8248,
+      "size": 8266,
       "type": "md"
     },
     {
@@ -1917,7 +1917,7 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 2296,
+      "size": 2784,
       "type": "md"
     },
     {
@@ -3147,7 +3147,7 @@
     {
       "path": "product/orchestration/adf-pipeline-validation-plan.md",
       "tier": "public",
-      "size": 4136,
+      "size": 4371,
       "type": "md"
     },
     {
@@ -6927,7 +6927,7 @@
     {
       "path": "product/schemas/mission-task-classification-scenarios.schema.json",
       "tier": "public",
-      "size": 5785,
+      "size": 5844,
       "type": "json"
     },
     {
@@ -9747,7 +9747,7 @@
     {
       "path": "public/procedures/system/developer-onboarding.md",
       "tier": "public",
-      "size": 7287,
+      "size": 8095,
       "type": "md"
     },
     {

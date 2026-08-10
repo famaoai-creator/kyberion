@@ -142,7 +142,11 @@ describe('intent-contract compiler', () => {
     ];
 
     const flow = await compileUserIntentFlow(
-      { text: '提案資料を作って', correlationId: 'corr-intent-contract-001' },
+      {
+        text: '提案資料を作って',
+        correlationId: 'corr-intent-contract-001',
+        runtimeContext: { work_scope_signals: { high_stakes_action: true } },
+      },
       {
         askFn: async () => responses.shift() || '',
       }
@@ -154,6 +158,9 @@ describe('intent-contract compiler', () => {
     expect(flow.intentContract.correlation_id).toBe('corr-intent-contract-001');
     expect(flow.correlationId).toBe('corr-intent-contract-001');
     expect(flow.workLoop.resolution.task_type).toBe('presentation_deck');
+    expect(flow.workLoop.work_scope_decision?.promotion_required).toBe(true);
+    expect(flow.workLoop.work_scope_decision?.mandatory_triggers).toContain('high_stakes_action');
+    expect(flow.workLoop.resolution.recommended_execution_shape).toBe('mission');
     expect(flow.routingDecision?.mode).toBe('subagent');
     expect(flow.routingDecision?.owner).toBe('document-specialist');
     expect(flow.routingDecision?.delegates).toContain('nerve-agent');

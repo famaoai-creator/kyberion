@@ -10,8 +10,10 @@ import { isInjectionSuspected } from './untrusted-content.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
   buildOrganizationWorkLoopSummary,
+  overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
+import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -1250,7 +1252,8 @@ async function compileWorkLoopWithLlm(
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;
   const result = validateWorkLoop(parsed);
-  return result.valid ? result.value! : null;
+  if (!result.valid) return null;
+  return overlayCanonicalWorkScopeDecision(result.value!, buildFallbackWorkLoop(input, contract));
 }
 
 function buildFallbackWorkLoop(
@@ -1270,6 +1273,7 @@ function buildFallbackWorkLoop(
     trackName: input.trackName,
     locale: input.locale,
     serviceBindings: input.serviceBindings,
+    ...resolveWorkScopeSignalOptions(input.runtimeContext),
     requiresApproval: contract.approval.requires_approval,
   });
 }

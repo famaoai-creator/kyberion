@@ -25,11 +25,60 @@ export interface WorkScopeDecisionInput {
   approvalRequired?: boolean;
   crossSystemMutation?: boolean;
   expectedContinuationBeyondSession?: boolean;
+  highStakesAction?: boolean;
   highStakesOrDogfoodEvidence?: boolean;
   customerSignoff?: boolean;
   productionRelease?: boolean;
   missionHandoff?: boolean;
   securitySensitiveCrossSystemChange?: boolean;
+}
+
+export interface WorkScopeSignalOptions {
+  externalAudience?: boolean;
+  expectedContinuationBeyondSession?: boolean;
+  crossSystemMutation?: boolean;
+  replayOrVariantLikelihood?: boolean;
+  highStakesAction?: boolean;
+}
+
+function readBooleanSignal(
+  source: Record<string, unknown>,
+  ...keys: string[]
+): boolean | undefined {
+  for (const key of keys) {
+    if (typeof source[key] === 'boolean') return source[key] as boolean;
+  }
+  return undefined;
+}
+
+/**
+ * Read only explicit, already-known work-scope facts from runtime context.
+ * Heuristic inference from free text belongs to intent resolution, not here.
+ */
+export function resolveWorkScopeSignalOptions(
+  runtimeContext?: Record<string, unknown>
+): WorkScopeSignalOptions {
+  const root = runtimeContext || {};
+  const nested =
+    root.work_scope_signals && typeof root.work_scope_signals === 'object'
+      ? (root.work_scope_signals as Record<string, unknown>)
+      : {};
+  const source = { ...root, ...nested };
+  return {
+    externalAudience: readBooleanSignal(source, 'externalAudience', 'external_audience'),
+    expectedContinuationBeyondSession: readBooleanSignal(
+      source,
+      'expectedContinuationBeyondSession',
+      'expected_continuation_beyond_session'
+    ),
+    crossSystemMutation: readBooleanSignal(source, 'crossSystemMutation', 'cross_system_mutation'),
+    replayOrVariantLikelihood: readBooleanSignal(
+      source,
+      'replayOrVariantLikelihood',
+      'replay_or_variant_likelihood'
+    ),
+    highStakesAction: readBooleanSignal(source, 'highStakesAction', 'high_stakes_action'),
+  };
 }
 
 export interface WorkScopeDecision {
@@ -74,7 +123,9 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 export function loadWorkScopePolicy(): WorkScopePolicy {
-  const value = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string) as WorkScopePolicy;
+  const value = JSON.parse(
+    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
+  ) as WorkScopePolicy;
   const validate = ensurePolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])
@@ -93,32 +144,57 @@ function normalizeCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
+type MandatoryTriggerEmitter = (input: WorkScopeDecisionInput) => boolean;
+
+/**
+ * The checker must inspect the same emitters used by the decision layer.
+ * Keeping the policy ids and their predicates together prevents a second,
+ * stale list from claiming that a trigger is reachable.
+ */
+export const MANDATORY_TRIGGER_EMITTERS: Record<string, MandatoryTriggerEmitter> = {
+  external_regulatory_evidence: (input) =>
+    normalizeBoolean(input.externalAudience) || normalizeBoolean(input.regulatoryAudience),
+  high_stakes_action: (input) => normalizeBoolean(input.highStakesAction),
+  high_stakes_or_dogfood_evidence: (input) => normalizeBoolean(input.highStakesOrDogfoodEvidence),
+  customer_signoff: (input) => normalizeBoolean(input.customerSignoff),
+  production_release: (input) => normalizeBoolean(input.productionRelease),
+  mission_handoff: (input) => normalizeBoolean(input.missionHandoff),
+  security_sensitive_cross_system_change: (input) =>
+    normalizeBoolean(input.securitySensitiveCrossSystemChange) ||
+    (normalizeBoolean(input.crossSystemMutation) &&
+      normalizeBoolean(input.highStakesOrDogfoodEvidence)),
+};
+
+export const DERIVABLE_MANDATORY_TRIGGER_IDS = Object.keys(MANDATORY_TRIGGER_EMITTERS);
+
 function deriveMandatoryTriggers(input: WorkScopeDecisionInput, policy: WorkScopePolicy): string[] {
-  const triggers: string[] = [];
-  if (normalizeBoolean(input.externalAudience)) triggers.push('external_regulatory_evidence');
-  if (normalizeBoolean(input.regulatoryAudience)) triggers.push('external_regulatory_evidence');
-  if (normalizeBoolean(input.highStakesOrDogfoodEvidence)) triggers.push('high_stakes_or_dogfood_evidence');
-  if (normalizeBoolean(input.customerSignoff)) triggers.push('customer_signoff');
-  if (normalizeBoolean(input.productionRelease)) triggers.push('production_release');
-  if (normalizeBoolean(input.missionHandoff)) triggers.push('mission_handoff');
-  if (normalizeBoolean(input.securitySensitiveCrossSystemChange)) triggers.push('security_sensitive_cross_system_change');
-  if (normalizeBoolean(input.crossSystemMutation) && normalizeBoolean(input.highStakesOrDogfoodEvidence)) {
-    triggers.push('security_sensitive_cross_system_change');
-  }
-  return Array.from(new Set(triggers.filter((trigger) => policy.mandatory_triggers.includes(trigger))));
+  const triggers = Object.entries(MANDATORY_TRIGGER_EMITTERS)
+    .filter(([, emitter]) => emitter(input))
+    .map(([trigger]) => trigger);
+  return Array.from(
+    new Set(triggers.filter((trigger) => policy.mandatory_triggers.includes(trigger)))
+  );
 }
 
-function deriveAccumulationTriggers(input: WorkScopeDecisionInput, policy: WorkScopePolicy): string[] {
+function deriveAccumulationTriggers(
+  input: WorkScopeDecisionInput,
+  policy: WorkScopePolicy
+): string[] {
   const triggers: string[] = [];
   if (normalizeCount(input.artifactEstimate) >= 5) triggers.push('artifact_estimate_5plus');
-  if (normalizeBoolean(input.replayOrVariantLikelihood)) triggers.push('replay_or_variant_likelihood');
+  if (normalizeBoolean(input.replayOrVariantLikelihood))
+    triggers.push('replay_or_variant_likelihood');
   if (normalizeCount(input.repetitionEstimate) >= 5) triggers.push('repetition_5plus');
-  if (normalizeBoolean(input.multipleLegitimateViewpoints)) triggers.push('multiple_legitimate_viewpoints');
+  if (normalizeBoolean(input.multipleLegitimateViewpoints))
+    triggers.push('multiple_legitimate_viewpoints');
   if (normalizeCount(input.stakeholderCount) >= 3) triggers.push('stakeholder_count_3plus');
   if (normalizeBoolean(input.approvalRequired)) triggers.push('approval_required');
   if (normalizeBoolean(input.crossSystemMutation)) triggers.push('cross_system_mutation');
-  if (normalizeBoolean(input.expectedContinuationBeyondSession)) triggers.push('expected_continuation_beyond_session');
-  return Array.from(new Set(triggers.filter((trigger) => policy.accumulation_triggers.includes(trigger))));
+  if (normalizeBoolean(input.expectedContinuationBeyondSession))
+    triggers.push('expected_continuation_beyond_session');
+  return Array.from(
+    new Set(triggers.filter((trigger) => policy.accumulation_triggers.includes(trigger)))
+  );
 }
 
 function shouldPromoteToMission(input: {
@@ -127,7 +203,10 @@ function shouldPromoteToMission(input: {
   accumulationTriggers: string[];
   policy: WorkScopePolicy;
 }): boolean {
-  if (input.minimumCatalogShape === 'mission' || input.minimumCatalogShape === 'project_bootstrap') {
+  if (
+    input.minimumCatalogShape === 'mission' ||
+    input.minimumCatalogShape === 'project_bootstrap'
+  ) {
     return true;
   }
   if (input.mandatoryTriggers.length > 0) return true;
@@ -146,17 +225,21 @@ function pickRuleIds(input: {
     const minimumCatalogShapes = rule.when?.minimum_catalog_shapes || [];
     const mandatoryTriggerPresent = rule.when?.mandatory_trigger_present;
     const accumulationTriggerCountAtLeast = rule.when?.accumulation_trigger_count_at_least;
-    const minimumCatalogShapeMatches = minimumCatalogShapes.length === 0 || minimumCatalogShapes.includes(input.minimumCatalogShape);
+    const minimumCatalogShapeMatches =
+      minimumCatalogShapes.length === 0 || minimumCatalogShapes.includes(input.minimumCatalogShape);
     const mandatoryMatches =
       typeof mandatoryTriggerPresent !== 'boolean' ||
-      mandatoryTriggerPresent === (input.mandatoryTriggers.length > 0);
+      mandatoryTriggerPresent === input.mandatoryTriggers.length > 0;
     const accumulationMatches =
       typeof accumulationTriggerCountAtLeast !== 'number' ||
       input.accumulationTriggers.length >= accumulationTriggerCountAtLeast;
     return minimumCatalogShapeMatches && mandatoryMatches && accumulationMatches;
   });
 
-  if (input.minimumCatalogShape === 'mission' || input.minimumCatalogShape === 'project_bootstrap') {
+  if (
+    input.minimumCatalogShape === 'mission' ||
+    input.minimumCatalogShape === 'project_bootstrap'
+  ) {
     matchedRuleIds.push('catalog-floor');
   }
   if (input.mandatoryTriggers.length > 0) {
@@ -183,7 +266,7 @@ function pickRuleIds(input: {
 
 export function resolveWorkScopeDecision(
   input: WorkScopeDecisionInput,
-  policy: WorkScopePolicy = loadWorkScopePolicy(),
+  policy: WorkScopePolicy = loadWorkScopePolicy()
 ): WorkScopeDecision {
   const minimumCatalogShape = normalizeExecutionShape(input.catalogMinimumShape);
   const mandatoryTriggers = deriveMandatoryTriggers(input, policy);
@@ -195,7 +278,9 @@ export function resolveWorkScopeDecision(
     policy,
   });
   const executionShape = promotionRequired
-    ? projectExecutionShapeToWorkflowShape(minimumCatalogShape === 'project_bootstrap' ? 'project_bootstrap' : 'mission')
+    ? projectExecutionShapeToWorkflowShape(
+        minimumCatalogShape === 'project_bootstrap' ? 'project_bootstrap' : 'mission'
+      )
     : minimumCatalogShape;
   const ruleSelection = pickRuleIds({
     minimumCatalogShape,

@@ -37,7 +37,7 @@
         "scripts/check_governance_rules.ts",
         "libs/core/mission-task-classification-scenarios.test.ts"
       ],
-      "expected_counts": { "scenarios": 22 }
+      "expected_counts": { "scenarios": 26 }
     },
     {
       "id": "mission-playbooks",
