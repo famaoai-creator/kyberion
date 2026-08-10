@@ -23,6 +23,10 @@ Kyberion does not execute "free-floating agents." It executes **missions** throu
 - A **lock** is only a short-lived mutex.
 - A **lease** is a durable authority grant with scope, owner, and expiry.
 
+The mission gate and the authority model answer different questions. The gate selects the work's `execution_shape` (for example, direct reply, task session, pipeline, or mission) regardless of the process's authority mode. A write outside a mission is governed by `AUTHORITY_MODEL.md`'s `ExecutionMode` (`system` or `sovereign`); that authority boundary does not bypass the mission gate when the work itself is mission-shaped.
+
+See [`AUTHORITY_MODEL.md`](../governance/AUTHORITY_MODEL.md) for the authority boundary and [`work-scope-policy.json`](../governance/work-scope-policy.json) for execution-shape selection.
+
 ## 3. Ownership Model
 
 ### 3.1 Mission Ownership

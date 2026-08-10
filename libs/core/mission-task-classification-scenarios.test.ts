@@ -32,6 +32,7 @@ type ScenarioPack = {
       approval_required?: boolean;
       cross_system_mutation?: boolean;
       expected_continuation_beyond_session?: boolean;
+      high_stakes_action?: boolean;
       high_stakes_or_dogfood_evidence?: boolean;
       customer_signoff?: boolean;
       production_release?: boolean;
@@ -58,8 +59,8 @@ function loadScenarioPack(): ScenarioPack {
   return JSON.parse(
     safeReadFile(
       pathResolver.knowledge('product/governance/mission-task-classification-scenarios.json'),
-      { encoding: 'utf8' },
-    ) as string,
+      { encoding: 'utf8' }
+    ) as string
   ) as ScenarioPack;
 }
 
@@ -67,12 +68,14 @@ function readSchema() {
   const ajv = new Ajv({ allErrors: true });
   const validate = compileSchemaFromPath(
     ajv,
-    pathResolver.knowledge('product/schemas/mission-task-classification-scenarios.schema.json'),
+    pathResolver.knowledge('product/schemas/mission-task-classification-scenarios.schema.json')
   );
   return validate;
 }
 
-function toWorkScopeDecisionInput(input: NonNullable<NonNullable<ScenarioPack['scenarios']>[number]['work_scope_input']>) {
+function toWorkScopeDecisionInput(
+  input: NonNullable<NonNullable<ScenarioPack['scenarios']>[number]['work_scope_input']>
+) {
   return {
     catalogMinimumShape: input.catalog_minimum_shape as
       | 'direct_reply'
@@ -92,6 +95,7 @@ function toWorkScopeDecisionInput(input: NonNullable<NonNullable<ScenarioPack['s
     approvalRequired: input.approval_required,
     crossSystemMutation: input.cross_system_mutation,
     expectedContinuationBeyondSession: input.expected_continuation_beyond_session,
+    highStakesAction: input.high_stakes_action,
     highStakesOrDogfoodEvidence: input.high_stakes_or_dogfood_evidence,
     customerSignoff: input.customer_signoff,
     productionRelease: input.production_release,
@@ -116,10 +120,10 @@ describe('mission-task-classification scenarios', () => {
       const packet = resolveIntentResolutionPacket(utterance);
 
       expect(packet.selected_intent_id, `intent mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.intent_id,
+        scenario.expected?.intent_id
       );
       expect(packet.selected_resolution?.shape, `shape mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.execution_shape,
+        scenario.expected?.execution_shape
       );
 
       const classification = resolveMissionClassification({
@@ -131,17 +135,19 @@ describe('mission-task-classification scenarios', () => {
         artifactPaths: scenario.classification_input?.artifact_paths,
       });
 
-      expect(classification.mission_class, `mission class mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.mission_class,
-      );
-      expect(classification.delivery_shape, `delivery shape mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.delivery_shape,
-      );
+      expect(
+        classification.mission_class,
+        `mission class mismatch for ${scenario.scenario_id}`
+      ).toBe(scenario.expected?.mission_class);
+      expect(
+        classification.delivery_shape,
+        `delivery shape mismatch for ${scenario.scenario_id}`
+      ).toBe(scenario.expected?.delivery_shape);
       expect(classification.risk_profile, `risk profile mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.risk_profile,
+        scenario.expected?.risk_profile
       );
       expect(classification.stage, `stage mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.stage,
+        scenario.expected?.stage
       );
 
       const workflow = resolveMissionWorkflowDesign({
@@ -155,10 +161,10 @@ describe('mission-task-classification scenarios', () => {
       });
 
       expect(workflow.workflow_id, `workflow mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.workflow_id,
+        scenario.expected?.workflow_id
       );
       expect(workflow.pattern, `workflow pattern mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.workflow_pattern,
+        scenario.expected?.workflow_pattern
       );
 
       const review = resolveMissionReviewDesign({
@@ -170,30 +176,33 @@ describe('mission-task-classification scenarios', () => {
       });
 
       expect(review.review_mode, `review mode mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.review_mode,
+        scenario.expected?.review_mode
       );
-      expect(review.required_gate_ids, `required gates mismatch for ${scenario.scenario_id}`).toEqual(
-        scenario.expected?.required_gate_ids,
-      );
+      expect(
+        review.required_gate_ids,
+        `required gates mismatch for ${scenario.scenario_id}`
+      ).toEqual(scenario.expected?.required_gate_ids);
 
       const workScope = resolveWorkScopeDecision(
-        toWorkScopeDecisionInput(scenario.work_scope_input || { catalog_minimum_shape: 'task_session' }),
+        toWorkScopeDecisionInput(
+          scenario.work_scope_input || { catalog_minimum_shape: 'task_session' }
+        )
       );
 
       expect(workScope.promotion_required, `promotion mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.promotion_required,
+        scenario.expected?.promotion_required
       );
       if (scenario.work_scope_input?.catalog_minimum_shape === 'project_bootstrap') {
         expect(workScope.execution_shape, `scope shape mismatch for ${scenario.scenario_id}`).toBe(
-          'project_bootstrap',
+          'project_bootstrap'
         );
       } else if (scenario.expected?.promotion_required) {
         expect(workScope.execution_shape, `scope shape mismatch for ${scenario.scenario_id}`).toBe(
-          'mission',
+          'mission'
         );
       } else {
         expect(workScope.execution_shape, `scope shape mismatch for ${scenario.scenario_id}`).toBe(
-          scenario.work_scope_input?.catalog_minimum_shape,
+          scenario.work_scope_input?.catalog_minimum_shape
         );
       }
     }

@@ -9,7 +9,7 @@ runtime_stages: [intake, classification, planning]
 
 ## Goal
 
-Interpret the Sovereign's intent and define Victory Conditions to initiate a mission.
+Interpret the Sovereign's intent, define Victory Conditions, and resolve the execution shape using the canonical work-scope policy. Alignment may select a mission, task-session, pipeline, direct reply, or another catalog rung; it does not itself imply mission creation.
 
 ## Directives
 
@@ -27,7 +27,7 @@ Interpret the Sovereign's intent and define Victory Conditions to initiate a mis
 
 ## Physical Enforcement
 
-Once Alignment is reached, the agent MUST execute the following command to set the mission to "Active".
+When the resolved execution shape is `mission`, the agent MUST execute the following command to set the mission to "Active". When the resolved shape is below `mission`, continue through the selected `direct_reply`, `task_session`, or `pipeline` path and do not call `mission_controller start`.
 
 - **Command**: `node dist/scripts/mission_controller.js start <MISSION_ID> --persona <PERSONA> --tier <TIER>`
 - **Validation**:
@@ -48,4 +48,4 @@ Project and track relationships must be passed as named options such as:
 
 ---
 
-_Status: Mandated by AGENTS.md_
+_Status: Mandated by AGENTS.md for mission-shaped work; the shape decision is governed by `knowledge/product/governance/work-scope-policy.json`._

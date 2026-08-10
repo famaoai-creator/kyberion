@@ -261,6 +261,32 @@ export interface OrganizationWorkLoopSummary {
   work_scope_decision?: WorkScopeDecision;
 }
 
+/**
+ * Preserve an LLM-authored work-loop plan while replacing policy-controlled
+ * fields with the deterministic compiler result.
+ */
+export function overlayCanonicalWorkScopeDecision(
+  workLoop: OrganizationWorkLoopSummary,
+  canonical: OrganizationWorkLoopSummary
+): OrganizationWorkLoopSummary {
+  return {
+    ...workLoop,
+    resolution: {
+      ...workLoop.resolution,
+      execution_shape: canonical.resolution.execution_shape,
+      selected_execution_shape: canonical.resolution.selected_execution_shape,
+      recommended_execution_shape: canonical.resolution.recommended_execution_shape,
+      mismatch_reason: canonical.resolution.mismatch_reason,
+      task_type: canonical.resolution.task_type,
+    },
+    authority: {
+      ...workLoop.authority,
+      requires_approval: canonical.authority.requires_approval,
+    },
+    work_scope_decision: canonical.work_scope_decision,
+  };
+}
+
 function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | 'public' {
   return value === 'personal' || value === 'public' ? value : 'confidential';
 }
@@ -618,6 +644,7 @@ export function buildOrganizationWorkLoopSummary(input: {
   approvalRequired?: boolean;
   crossSystemMutation?: boolean;
   expectedContinuationBeyondSession?: boolean;
+  highStakesAction?: boolean;
   highStakesOrDogfoodEvidence?: boolean;
   customerSignoff?: boolean;
   productionRelease?: boolean;
@@ -663,6 +690,7 @@ export function buildOrganizationWorkLoopSummary(input: {
     approvalRequired: input.approvalRequired ?? input.requiresApproval,
     crossSystemMutation: input.crossSystemMutation,
     expectedContinuationBeyondSession: input.expectedContinuationBeyondSession,
+    highStakesAction: input.highStakesAction,
     highStakesOrDogfoodEvidence: input.highStakesOrDogfoodEvidence,
     customerSignoff: input.customerSignoff,
     productionRelease: input.productionRelease,
