@@ -2038,6 +2038,7 @@ export * from './analysis-impact-bands.js';
 export * from './analysis-findings.js';
 export * from './analysis-execution-contract.js';
 export * from './work-design.js';
+export * from './work-scope-decision.js';
 export * from './productivity-task-plan.js';
 export * from './booking-preference-profile.js';
 export * from './presentation-preference-profile.js';
