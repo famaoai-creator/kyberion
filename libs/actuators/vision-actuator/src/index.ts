@@ -90,6 +90,8 @@ async function ocrImage(params: any) {
     confidence: result.confidence,
     lines: result.lines,
     provider: result.provider,
+    // Where the image actually went. Pass mode: 'local_only' to require 'none'.
+    provider_data_egress: result.providerDataEgress,
   };
 }
 

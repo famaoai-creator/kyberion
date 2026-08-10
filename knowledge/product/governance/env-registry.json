@@ -1580,6 +1580,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MEET_EXTENSION_TOKEN",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_MEMORY_AUTOPROMOTE",
       "category": "runtime",
       "type": "string",

@@ -5,7 +5,7 @@
  */
 
 import { NerveMessage } from './nerve-bridge.js';
-import { appendStimulus, loadRecentStimuli } from './stimuli-journal.js';
+import { appendStimulus, isStimulusExpired, loadRecentStimuli } from './stimuli-journal.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('sensory-memory');
 
@@ -42,12 +42,27 @@ export class SensoryMemory {
     appendStimulus(stimulus);
   }
 
-  public getLatestByIntent(intent: string): NerveMessage | undefined {
+  /**
+   * EV-04: `timeWindowMs` is required, not optional.
+   *
+   * This previously searched the whole buffer with no time bound, so a single
+   * historical stimulus made the intent "present" forever. Its only production
+   * caller is the dynamic permission guard, which decides whether to open a
+   * temporary write grant — an unbounded lookup there means a grant that never
+   * closes. A window the caller must state is the whole point of the lookup.
+   */
+  public getLatestByIntent(intent: string, timeWindowMs: number): NerveMessage | undefined {
     this.hydrate();
+    const cutoff = Date.now() - timeWindowMs;
     return this.buffer
       .slice()
       .reverse()
-      .find((m) => m.intent === intent || (m as any).signal?.intent === intent);
+      .find((m) => {
+        if (m.intent !== intent && (m as any).signal?.intent !== intent) return false;
+        if (isStimulusExpired(m)) return false;
+        const ts = new Date(m.ts).getTime();
+        return Number.isFinite(ts) && ts >= cutoff;
+      });
   }
 
   public hasActiveContext(keyword: string, timeWindowMs: number): boolean {
@@ -55,7 +70,10 @@ export class SensoryMemory {
     const cutoff = Date.now() - timeWindowMs;
     return this.buffer.some((msg) => {
       const ts = new Date(msg.ts).getTime();
-      if (ts < cutoff) return false;
+      if (!Number.isFinite(ts) || ts < cutoff) return false;
+      // A stimulus past its own declared TTL must not keep a context "active",
+      // regardless of how wide a window the caller asks for.
+      if (isStimulusExpired(msg)) return false;
 
       // Extract payload from any known format
       const payload = msg.payload || (msg as any).signal?.payload || '';

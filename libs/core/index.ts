@@ -182,7 +182,9 @@ export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
 export * from './managed-process.js';
+export * from './trigger-correlation.js';
 export * from './trigger-runner.js';
+export * from './jsonl-tail.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
@@ -795,6 +797,8 @@ export {
   softDeleteToTrash,
   restoreFromTrash,
   listReviewRequiredDirs,
+  scanEventStores,
+  listUncoveredEventStoreDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
   DEFAULT_TRASH_GRACE_DAYS,
@@ -1998,6 +2002,7 @@ export * from './surface-mission-proposals.js';
 export * from './slack-approval-ui.js';
 export * from './slack-onboarding.js';
 export * from './agent-activity-board.js';
+export * from './event-vocabulary.js';
 export * from './agent-collaboration-events.js';
 export * from './agent-collaboration-projection.js';
 export * from './native-subagent-adopter.js';

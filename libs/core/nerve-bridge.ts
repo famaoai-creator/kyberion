@@ -7,16 +7,10 @@
  * with Distributed Node Identification (Nerve Cluster Foundation).
  */
 
-import * as path from 'node:path';
 import * as os from 'node:os';
-import {
-  logger,
-  pathResolver,
-  safeReadFile,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeStat,
-} from './index.js';
+import { logger, pathResolver, safeAppendFileSync } from './index.js';
+import { subscribeJsonl } from './jsonl-tail.js';
+import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;
@@ -66,6 +60,7 @@ export function sendNerveMessage(input: {
 
   try {
     safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
+    rotateStimuliJournalIfNeeded();
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
   } catch (err) {
     logger.warn(`[nerve-bridge] suppressed error in sendNerveMessage: ${err}`);
@@ -74,40 +69,53 @@ export function sendNerveMessage(input: {
   return msg.id;
 }
 
+export interface ListenToNerveOptions {
+  intervalMs?: number;
+  /** Deliver stimuli already in the journal. Default false: only new ones. */
+  fromBeginning?: boolean;
+  /** Deliver stimuli past their declared TTL. Default false. */
+  deliverExpired?: boolean;
+  signal?: AbortSignal;
+}
+
 /**
- * Polling / Listening logic for a specific nerve
+ * Follow the stimuli journal and deliver messages addressed to `nerveId`.
+ *
+ * EV-04/EV-08: this used to track a byte offset and compare it against the file
+ * size, which silently stopped delivering for good once the journal was rotated
+ * or truncated (the recorded offset then permanently exceeded the real size).
+ * `subscribeJsonl` owns rotation detection and partial-line handling now, so
+ * this function is only routing policy: loopback suppression, addressing, TTL.
+ *
+ * Returns an unsubscribe function.
  */
-export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) => void) {
+export function listenToNerve(
+  nerveId: string,
+  onMessage: (msg: NerveMessage) => void,
+  options: ListenToNerveOptions = {}
+): () => void {
   logger.info(`👂 [BRIDGE:${NODE_ID}] Nerve '${nerveId}' started listening...`);
 
-  let lastSize = 0;
-  if (safeExistsSync(STIMULI_PATH)) {
-    lastSize = safeStat(STIMULI_PATH).size;
-  }
-
-  const timer = setInterval(() => {
-    if (!safeExistsSync(STIMULI_PATH)) return;
-
-    const stats = safeStat(STIMULI_PATH);
-    if (stats.size > lastSize) {
-      const content = safeReadFile(STIMULI_PATH, { encoding: null }) as Buffer;
-      const appended = content.subarray(lastSize).toString('utf8');
-      const newLines = appended.trim().split('\n');
-
-      newLines.forEach((line) => {
-        if (!line) return;
-        try {
-          const msg = JSON.parse(line) as NerveMessage;
-          // Accept if broadcast or targeted to us, and not from the same node process
-          if ((msg.to === nerveId || msg.to === 'broadcast') && msg.node_id !== NODE_ID) {
-            onMessage(msg);
-          }
-        } catch (err) {
-          logger.warn(`[nerve-bridge] suppressed error in listenToNerve: ${err}`);
-        }
-      });
-      lastSize = stats.size;
+  return subscribeJsonl<NerveMessage>(
+    STIMULI_PATH,
+    (msg) => {
+      // Not addressed to us, or emitted by this very process (loopback).
+      if (msg.to !== nerveId && msg.to !== 'broadcast') return;
+      if (msg.node_id === NODE_ID) return;
+      if (!options.deliverExpired && isStimulusExpired(msg)) {
+        logger.info(`[nerve-bridge] dropping expired stimulus ${msg.id} (intent=${msg.intent})`);
+        return;
+      }
+      onMessage(msg);
+    },
+    {
+      intervalMs: options.intervalMs ?? 1000,
+      fromBeginning: options.fromBeginning ?? false,
+      ...(options.signal ? { signal: options.signal } : {}),
+      onMalformed: (line, err) =>
+        logger.warn(
+          `[nerve-bridge] unparseable stimulus line skipped: ${err instanceof Error ? err.message : String(err)} (${line.slice(0, 120)})`
+        ),
     }
-  }, 1000);
-  timer.unref?.();
+  );
 }

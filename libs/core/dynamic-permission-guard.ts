@@ -63,9 +63,14 @@ class DynamicPermissionGuard {
       const pathMatch = policy.grant.allow_paths.some((p) => relativePath.startsWith(p));
       if (!pathMatch) continue;
 
+      // EV-04: both branches are bounded by lookback_ms. The intent-only branch
+      // used to ignore it entirely, so one historical stimulus kept the grant
+      // open permanently — the opposite of a time-boxed emergency grant.
       const isContextActive = policy.condition.keyword
         ? sensoryMemory.hasActiveContext(policy.condition.keyword, policy.condition.lookback_ms)
-        : !!sensoryMemory.getLatestByIntent(policy.condition.intent);
+        : Boolean(
+            sensoryMemory.getLatestByIntent(policy.condition.intent, policy.condition.lookback_ms)
+          );
 
       if (isContextActive) {
         return { allowed: true, reason: `Contextual grant via ${policy.id}` };

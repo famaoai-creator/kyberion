@@ -156,6 +156,7 @@
         "satellites/",
         "plugins/",
         "tools/adf-replay-extension/",
+        "tools/meet-copilot-extension/",
         "docs/developer/",
         "package.json",
         "pnpm-lock.yaml",

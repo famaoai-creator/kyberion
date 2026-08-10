@@ -1,0 +1,16 @@
+{
+  "role": "nexus_daemon",
+  "description": "EV-03: KANS nerve daemon authority. Routes stimuli, dispatches terminal work, and raises governed reflex wake triggers. Already declared in security-policy.json for secure-io write scopes; registered here so its reflex triggers carry an authority snapshot the trigger gate can verify (an unregistered role is rejected outright).",
+  "default_persona": "sovereign",
+  "write_scopes": [
+    "presence/bridge/runtime/",
+    "active/shared/runtime/terminal/",
+    "active/shared/runtime/trigger-deliveries.jsonl",
+    "active/shared/logs/",
+    "active/missions/MSN-SYSTEM-NERVE/",
+    "active/audit/"
+  ],
+  "scope_classes": ["coordination_runtime", "operations_runtime", "audit"],
+  "allowed_actuators": ["service-actuator", "presence-actuator"],
+  "tier_access": ["public", "confidential"]
+}
