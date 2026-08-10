@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeStat, safeUnlinkSync, safeWriteFile } from './secure-io.js';
-import { TriggerRunner, assertNoEscalation, runWakeTrigger } from './trigger-runner.js';
+import {
+  TriggerRunner,
+  assertNoEscalation,
+  resolveCurrentTriggerAuthority,
+  runWakeTrigger,
+} from './trigger-runner.js';
 import { auditChain } from './audit-chain.js';
 
 describe('QM-02 trigger runner', () => {
@@ -91,6 +96,25 @@ describe('QM-02 trigger runner', () => {
         async () => 'should-not-deliver'
       );
       expect(result.status).toBe('rejected');
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
+  });
+
+  it('preserves tenant scope when deriving the current trigger authority', () => {
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'chronos_gateway';
+    try {
+      const snapshot = resolveCurrentTriggerAuthority('tenant-a');
+      expect(snapshot).toMatchObject({ tenant_slug: 'tenant-a' });
+      expect(() =>
+        assertNoEscalation(snapshot, {
+          authority_role: snapshot.authority_role,
+          level: snapshot.level,
+          tenant_slug: 'tenant-b',
+        })
+      ).toThrow(/tenant scope escalation denied/);
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;

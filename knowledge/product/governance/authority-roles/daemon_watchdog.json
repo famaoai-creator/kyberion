@@ -1,0 +1,14 @@
+{
+  "role": "daemon_watchdog",
+  "description": "EV-02: heartbeat watchdog authority. Observes daemon liveness and raises governed recovery wake triggers. Deliberately has no write scope over daemon state or repo config — it reports and requests, it does not reconfigure.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/trigger-deliveries.jsonl",
+    "active/shared/runtime/heartbeats/",
+    "active/shared/observability/",
+    "active/audit/"
+  ],
+  "scope_classes": ["operations_runtime", "observability", "audit"],
+  "allowed_actuators": ["process-actuator"],
+  "tier_access": ["public"]
+}

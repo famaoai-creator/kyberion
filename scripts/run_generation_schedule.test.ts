@@ -1,43 +1,47 @@
-import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/**
+ * EV-01: this script used to carry a second copy of the whole tick pipeline
+ * (reconcile → dependencies → due → submit), and because the daemon runs
+ * `dist/scripts/run_generation_schedule.js --action tick`, that copy was the
+ * code that actually fired — ungoverned, while the library gained the trigger
+ * gate. The duplicate is gone.
+ *
+ * So the tick behaviour is no longer this file's to test; it lives in
+ * `libs/core/generation-scheduler.tick.test.ts`. What remains here is the CLI's
+ * own contract: `register` stays under surface_runtime, and `list`/`tick`
+ * delegate to the governed implementation under the generation_scheduler role.
+ */
 const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
-  safeCopyFileSync: vi.fn(),
-  safeMkdir: vi.fn(),
-  buildExecutionEnv: vi.fn(() => ({})),
-  withExecutionContext: vi.fn(async (_role: string, fn: () => Promise<unknown>) => fn()),
-  listGenerationSchedules: vi.fn(),
+  buildExecutionEnv: vi.fn((env: NodeJS.ProcessEnv, role?: string) => ({
+    ...env,
+    MISSION_ROLE: role,
+  })),
+  withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
   registerGenerationSchedule: vi.fn(),
-  readGenerationSchedule: vi.fn(),
-  markGenerationScheduleSubmitted: vi.fn((schedule: any, jobId: string) => ({ ...schedule, last_job_id: jobId })),
-  markGenerationScheduleReconciled: vi.fn((schedule: any, updates: Record<string, unknown>) => ({ ...schedule, ...updates })),
-  isGenerationScheduleDue: vi.fn(),
-  handleMediaGenerationAction: vi.fn(),
+  runGovernedGenerationScheduleAction: vi.fn(),
 }));
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeExistsSync: mocks.safeExistsSync,
-    safeCopyFileSync: mocks.safeCopyFileSync,
-    safeMkdir: mocks.safeMkdir,
-    buildExecutionEnv: mocks.buildExecutionEnv,
-    withExecutionContext: mocks.withExecutionContext,
-    listGenerationSchedules: mocks.listGenerationSchedules,
     registerGenerationSchedule: mocks.registerGenerationSchedule,
-    readGenerationSchedule: mocks.readGenerationSchedule,
-    markGenerationScheduleSubmitted: mocks.markGenerationScheduleSubmitted,
-    markGenerationScheduleReconciled: mocks.markGenerationScheduleReconciled,
-    isGenerationScheduleDue: mocks.isGenerationScheduleDue,
+    runGenerationScheduleAction: mocks.runGovernedGenerationScheduleAction,
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock('../libs/actuators/media-generation-actuator/src/index.js', () => ({
-  handleAction: mocks.handleMediaGenerationAction,
-}));
+vi.mock('@agent/core/governance', async () => {
+  const actual = (await vi.importActual('@agent/core/governance')) as any;
+  return {
+    ...actual,
+    buildExecutionEnv: mocks.buildExecutionEnv,
+    withExecutionContext: mocks.withExecutionContext,
+  };
+});
 
 describe('run_generation_schedule', () => {
   beforeEach(() => {
@@ -46,134 +50,73 @@ describe('run_generation_schedule', () => {
     mocks.safeExistsSync.mockReturnValue(true);
   });
 
-  it('registers a schedule from an input path', async () => {
+  it('registers a schedule from an input path under surface_runtime', async () => {
     mocks.registerGenerationSchedule.mockReturnValue({ schedule_id: 'demo' });
 
     const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
     const result = await runGenerationScheduleAction({
       action: 'register',
-      input: 'libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json',
+      input:
+        'libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json',
     });
 
     expect(mocks.registerGenerationSchedule).toHaveBeenCalled();
+    expect(mocks.withExecutionContext).toHaveBeenCalledWith(
+      'surface_runtime',
+      expect.any(Function)
+    );
     expect(result).toEqual({ schedule_id: 'demo' });
   });
 
-  it('skips a due schedule until dependencies have succeeded', async () => {
-    const schedule = {
-      schedule_id: 'video-after-music',
-      enabled: true,
-      trigger: { type: 'interval', interval_ms: 1000 },
-      job_template: { action: 'generate_video', params: {} },
-      execution_policy: { depends_on: ['music-seed'] },
-      last_job_id: null,
-    };
-    mocks.listGenerationSchedules.mockReturnValue([schedule]);
-    mocks.readGenerationSchedule.mockReturnValue({ schedule_id: 'music-seed', last_job_status: 'running' });
-    mocks.isGenerationScheduleDue.mockReturnValue(true);
-
+  it('rejects register without an input path', async () => {
     const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
-    const result = await runGenerationScheduleAction({ action: 'tick' });
-
-    expect(result).toEqual({
-      status: 'completed',
-      results: [
-        expect.objectContaining({
-          schedule_id: 'video-after-music',
-          status: 'skipped',
-          reason: 'dependencies are not yet satisfied',
-        }),
-      ],
-    });
-    expect(mocks.handleMediaGenerationAction).not.toHaveBeenCalledWith(expect.objectContaining({
-      action: 'submit_generation',
-    }));
-  });
-
-  it('reconciles a succeeded job and updates the latest alias before skipping as not due', async () => {
-    const schedule = {
-      schedule_id: 'music-monthly',
-      enabled: true,
-      trigger: { type: 'cron', cron: '0 7 1 * *', timezone: 'Asia/Tokyo' },
-      job_template: { action: 'generate_music', params: {} },
-      execution_policy: { concurrency: 'skip_if_running' },
-      delivery_policy: { latest_alias_path: 'active/shared/exports/latest.mp3' },
-      last_job_id: 'genjob-1',
-      last_job_status: 'submitted',
-    };
-    mocks.listGenerationSchedules.mockReturnValue([schedule]);
-    mocks.handleMediaGenerationAction.mockResolvedValueOnce({
-      status: 'succeeded',
-      completed_at: '2026-03-22T00:10:00.000Z',
-      request: { target_path: 'active/shared/exports/song.mp3' },
-    });
-    mocks.isGenerationScheduleDue.mockReturnValue(false);
-
-    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
-    const result = await runGenerationScheduleAction({ action: 'tick' });
-
-    expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
-      path.resolve('active/shared/exports/song.mp3'),
-      path.resolve('active/shared/exports/latest.mp3'),
+    await expect(runGenerationScheduleAction({ action: 'register' })).rejects.toThrow(
+      /requires --input/
     );
-    expect(result).toEqual({
-      status: 'completed',
-      results: [
-        expect.objectContaining({
-          schedule_id: 'music-monthly',
-          status: 'skipped',
-          reason: 'schedule is not due',
-          reconciliation: expect.objectContaining({
-            alias_updated: true,
-            latest_alias_path: path.resolve('active/shared/exports/latest.mp3'),
-            artifact_dir: null,
-            workdir: path.resolve('active/shared/exports'),
-          }),
-        }),
-      ],
-    });
   });
 
-  it('submits a due schedule as a generation job', async () => {
-    const schedule = {
-      schedule_id: 'music-monthly',
-      enabled: true,
-      trigger: { type: 'interval', interval_ms: 1000 },
-      job_template: {
-        action: 'generate_music',
-        params: { music_adf: { kind: 'music-generation-adf', version: '1.0.0' } },
-      },
-      execution_policy: { concurrency: 'skip_if_running', retry_policy: { max_attempts: 2, backoff_seconds: 30 } },
-    };
-    mocks.listGenerationSchedules.mockReturnValue([schedule]);
-    mocks.isGenerationScheduleDue.mockReturnValue(true);
-    mocks.handleMediaGenerationAction.mockResolvedValue({
-      job_id: 'genjob-2',
-      provider: { prompt_id: 'prompt-2' },
+  it('delegates tick to the governed library implementation', async () => {
+    mocks.runGovernedGenerationScheduleAction.mockResolvedValue({
+      status: 'completed',
+      results: [],
     });
 
     const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
-    const result = await runGenerationScheduleAction({ action: 'tick' });
+    const result = await runGenerationScheduleAction({ action: 'tick', schedule: 'music-monthly' });
 
-    expect(mocks.handleMediaGenerationAction).toHaveBeenCalledWith({
-      action: 'submit_generation',
-      params: {
-        action: 'generate_music',
-        params: { music_adf: { kind: 'music-generation-adf', version: '1.0.0' } },
-        retry_policy: { max_attempts: 2, backoff_seconds: 30 },
-      },
+    expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({
+      action: 'tick',
+      schedule: 'music-monthly',
     });
-    expect(mocks.markGenerationScheduleSubmitted).toHaveBeenCalledWith(schedule, 'genjob-2');
-    expect(result).toEqual({
+    expect(result).toEqual({ status: 'completed', results: [] });
+  });
+
+  it('seeds the generation_scheduler role before delegating', async () => {
+    mocks.runGovernedGenerationScheduleAction.mockResolvedValue({
       status: 'completed',
-      results: [
-        expect.objectContaining({
-          schedule_id: 'music-monthly',
-          status: 'submitted',
-          job_id: 'genjob-2',
-          provider_prompt_id: 'prompt-2',
-        }),
-      ],
+      results: [],
     });
+
+    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
+    await runGenerationScheduleAction({ action: 'tick' });
+
+    // A child process spawned mid-tick must inherit the same authority.
+    expect(mocks.buildExecutionEnv).toHaveBeenCalledWith(process.env, 'generation_scheduler');
+  });
+
+  it('delegates list as well', async () => {
+    mocks.runGovernedGenerationScheduleAction.mockResolvedValue([]);
+
+    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
+    await runGenerationScheduleAction({ action: 'list' });
+
+    expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({ action: 'list' });
+  });
+
+  it('rejects an unsupported action', async () => {
+    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
+    await expect(runGenerationScheduleAction({ action: 'nope' })).rejects.toThrow(
+      /Unsupported action/
+    );
   });
 });

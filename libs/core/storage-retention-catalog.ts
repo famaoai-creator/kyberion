@@ -307,6 +307,60 @@ export function runtimeRetentionRules(
     }));
 }
 
+/**
+ * EV-06: append-only event stores that live OUTSIDE `active/shared/runtime/`.
+ *
+ * The janitor's scan functions were rooted at tmp / logs / data-vault / runtime
+ * / trash, so these trees were neither TTL-governed nor reported as uncovered —
+ * an undeclared path under `runtime/` at least shows up in the janitor report,
+ * while a path outside every scan root is invisible. That invisibility is how
+ * the event stores grew without bound in silence.
+ */
+export const EVENT_STORE_PREFIXES = [
+  'active/shared/observability',
+  'active/shared/coordination/orchestration/events',
+  'presence/bridge/runtime',
+] as const;
+
+function isEventStorePath(repoRelativePath: string): boolean {
+  return EVENT_STORE_PREFIXES.some(
+    (prefix) => repoRelativePath === prefix || repoRelativePath.startsWith(`${prefix}/`)
+  );
+}
+
+/**
+ * TTL rules for declared event-store directories. Same contract as
+ * {@link runtimeRetentionRules}: only entries carrying a `ttl_days`
+ * participate, and `review_required` never becomes a deletion rule.
+ */
+export function eventStoreRetentionRules(
+  catalog: LoadedRetentionCatalog
+): Array<{ repoRelativeDir: string; ttlMs: number; entry: RetentionCatalogEntry }> {
+  return catalog.entries
+    .filter(
+      (e) => isEventStorePath(e.path) && e.ttl_days !== undefined && e.action !== 'review_required'
+    )
+    .map((e) => ({
+      repoRelativeDir: e.path,
+      ttlMs: (e.ttl_days as number) * RETENTION_DAY_MS,
+      entry: e,
+    }));
+}
+
+/**
+ * Immediate subdirectories of each event-store prefix that the catalog covers.
+ * The janitor reports the rest, so a newly added event stream cannot quietly
+ * inherit forever-retention.
+ */
+export function coveredEventStoreDirs(catalog: LoadedRetentionCatalog): Set<string> {
+  const covered = new Set<string>();
+  for (const entry of catalog.entries) {
+    if (!isEventStorePath(entry.path)) continue;
+    covered.add(entry.path);
+  }
+  return covered;
+}
+
 /** Exact-path catalog entry lookup (repo-relative directory). */
 export function retentionEntryForExactPath(
   catalog: LoadedRetentionCatalog,

@@ -1,4 +1,5 @@
 import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
+import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import {
   logger,
   safeReadFile,
@@ -2624,6 +2625,39 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         last_design_protocol_kind: compiled.protocolKind,
       };
     }
+    case 'deck_from_html': {
+      // Convention-based HTML → editable PptxDesignProtocol. Source is an HTML
+      // string from a ctx channel (`from`), an inline `html` param, or a file
+      // (`path`). Produces `last_pptx_design` for a downstream pptx_render.
+      let html: unknown = typeof params.html === 'string' ? params.html : undefined;
+      if (html === undefined && params.path) {
+        const p = path.resolve(rootDir, resolve(params.path));
+        // Keep file-backed input bounded at the same gate as inline input;
+        // otherwise safeReadFile may allocate its 100MB default before the
+        // parser rejects the 8MiB protocol limit.
+        html = safeReadFile(p, {
+          encoding: 'utf8',
+          maxSizeMB: 8,
+          label: 'deck_from_html input',
+        }) as string;
+      }
+      if (html === undefined) html = ctx[resolve(params.from) || 'last_html'];
+      if (typeof html !== 'string' || !html.trim()) {
+        throw new Error(
+          'deck_from_html requires HTML via params.html, params.path, or a ctx channel (params.from)'
+        );
+      }
+      const { protocol, slideCount } = htmlToDeckProtocol(html);
+      const exportKey = params.export_as || 'last_pptx_design';
+      return {
+        ...ctx,
+        [exportKey]: protocol,
+        last_pptx_design: protocol,
+        last_design_protocol: protocol,
+        last_design_protocol_kind: 'pptx',
+        deck_from_html_slide_count: slideCount,
+      };
+    }
     case 'pptx_layout_preflight': {
       const fromKey = resolve(params.from) || 'last_pptx_design';
       const protocol = ctx[fromKey];
@@ -2728,10 +2762,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             ? path.join('active', 'missions', tier, missionId, 'visual-review')
             : undefined;
       const artifactKind = String(resolve(params.artifact_kind) || 'pptx') as
-        | 'pptx'
-        | 'doc'
-        | 'video-scenes'
-        | 'web';
+        'pptx' | 'doc' | 'video-scenes' | 'web';
       const label = String(params.label || params.path || 'media-review').replace(
         /[^a-zA-Z0-9._-]/g,
         '-'

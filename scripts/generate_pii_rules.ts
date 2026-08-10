@@ -5,7 +5,13 @@ import { withExecutionContext } from '@agent/core/governance';
 type SourceRule = { id?: string; name?: string; regex?: string };
 
 const sourcePath = pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
-const outputPath = pathResolver.rootResolve('tools/adf-replay-extension/pii-rules.generated.js');
+// Every extension that sends observed content to an on-device model shares the
+// same redaction boundary; each one gets its own copy because MV3 extensions
+// cannot load scripts from outside their own directory.
+const outputPaths = [
+  pathResolver.rootResolve('tools/adf-replay-extension/pii-rules.generated.js'),
+  pathResolver.rootResolve('tools/meet-copilot-extension/pii-rules.generated.js'),
+];
 
 function loadRules(): Array<{ id: string; regex: string }> {
   const source = JSON.parse(String(safeReadFile(sourcePath, { encoding: 'utf8' }))) as {
@@ -32,18 +38,25 @@ function render(): string {
 
 const expected = render();
 if (process.argv.includes('--check')) {
-  const actual = String(safeReadFile(outputPath, { encoding: 'utf8' }));
-  if (actual !== expected) {
-    console.error(`[check:pii-rules] generated file is stale: ${outputPath}`);
-    process.exitCode = 1;
-  } else {
-    console.log('[check:pii-rules] OK');
+  let stale = false;
+  for (const outputPath of outputPaths) {
+    const actual = String(safeReadFile(outputPath, { encoding: 'utf8' }));
+    if (actual !== expected) {
+      console.error(`[check:pii-rules] generated file is stale: ${outputPath}`);
+      stale = true;
+    }
   }
+  if (stale) process.exitCode = 1;
+  else console.log('[check:pii-rules] OK');
 } else {
   withExecutionContext(
     'ecosystem_architect',
-    () => safeWriteFile(outputPath, expected, { encoding: 'utf8' }),
+    () => {
+      for (const outputPath of outputPaths) {
+        safeWriteFile(outputPath, expected, { encoding: 'utf8' });
+      }
+    },
     'ecosystem_architect'
   );
-  console.log(`[generate:pii-rules] wrote ${outputPath}`);
+  for (const outputPath of outputPaths) console.log(`[generate:pii-rules] wrote ${outputPath}`);
 }

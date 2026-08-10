@@ -1,0 +1,226 @@
+/* Palette shared with tools/adf-replay-extension/sidepanel.css so the two
+   Kyberion panels read as one product. */
+:root {
+  --ink: #1c2b24;
+  --muted: #4f5c55;
+  --paper: #f5f0e6;
+  --panel: #fffdf8;
+  --line: #d6d0c3;
+  --forest: #174b3b;
+  --lime: #c6eb72;
+  --orange: #dc7b34;
+  --red: #a93636;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 0 24px;
+  color: var(--ink);
+  background: radial-gradient(circle at 100% 0%, #d9e8b5 0, transparent 35%), var(--paper);
+  font-family: Georgia, 'Hiragino Mincho ProN', serif;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell-header {
+  padding: 20px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.subtitle,
+.hint,
+.ai-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+.subtitle {
+  margin: 0;
+}
+
+.notice {
+  margin: 0;
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.notice.is-error {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.card {
+  margin: 12px 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 8px;
+}
+.status-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.status-grid dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+button.primary,
+button.secondary,
+button.text-button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+button.primary {
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: #fffdf8;
+}
+button.secondary {
+  border: 1px solid var(--forest);
+  background: transparent;
+  color: var(--forest);
+}
+button.text-button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.field,
+.inline-field {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+.field {
+  flex-direction: column;
+}
+.field span,
+.inline-field span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.inline-field {
+  align-items: center;
+}
+.field input {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+.inline-field input {
+  width: 68px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.output,
+.output-block {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.output-block h3 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-family: Georgia, 'Hiragino Mincho ProN', serif;
+}
+.output-block h3:first-child {
+  margin-top: 0;
+}
+.output-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.output-block .empty {
+  color: var(--muted);
+}
+
+.suggestions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.suggestions li {
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+}
+.suggestions .kind {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+}
+.suggestions .text {
+  margin: 0 0 4px;
+}
+.suggestions .why {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+}

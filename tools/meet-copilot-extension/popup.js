@@ -22,6 +22,17 @@ async function init() {
   setInterval(refresh, 1500);
 }
 
+// sidePanel.open() must run inside a user gesture, so it is called here in the
+// popup rather than relayed through the service worker.
+$('panel').addEventListener('click', async () => {
+  try {
+    const win = await chrome.windows.getCurrent();
+    await chrome.sidePanel.open({ windowId: win.id });
+    window.close();
+  } catch (err) {
+    $('err').textContent = 'panel open failed: ' + (err && err.message ? err.message : err);
+  }
+});
 $('save').addEventListener('click', async () => {
   await send('popup:set-port', { port: Number($('port').value) });
   await refresh();

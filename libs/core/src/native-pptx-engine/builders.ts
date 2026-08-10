@@ -5,6 +5,28 @@ function inToEmu(inches: number): number {
   return Math.round(inches * 914400);
 }
 
+/**
+ * Preset-geometry adjust guide value (e.g. roundRect corner). MUST be an
+ * integer in guide units where 50000 = 50% (the max useful corner). Callers may
+ * pass a fraction (0<r<=1, the intuitive "8% corner") or raw guide units (>1).
+ * Always returns a clamped integer so a stray float cannot corrupt the file.
+ */
+function cornerRadiusGuideValue(r: number): number {
+  const guide = r > 0 && r <= 1 ? r * 100000 : r;
+  return Math.max(0, Math.min(50000, Math.round(guide)));
+}
+
+/**
+ * Paragraph line-spacing as an <a:spcPct> value (1000ths of a percent; 100000 =
+ * 100%). Accepts both the multiplier form (1.3 → 130%) and the percent form
+ * (135 → 135%) that appear across existing protocols. Values <= 10 are treated
+ * as a multiplier, otherwise as a percent.
+ */
+function lineSpacingPctValue(ls: number): number {
+  const pct = ls <= 10 ? ls * 100000 : ls * 1000;
+  return Math.max(1000, Math.round(pct));
+}
+
 function sanitizeXmlText(input: string): string {
   return String(input || '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
@@ -343,7 +365,7 @@ export function buildShape(
     // regardless of which of these blocks happens to run first \u2014 see the
     // PPR_CHILD_ORDER comment above for why call-order was never safe to rely on.
     if (el.style?.lineSpacing && !finalPPr.includes('<a:lnSpc>')) {
-      const spcXml = `<a:lnSpc><a:spcPct val="${Math.round(el.style.lineSpacing * 1000)}"/></a:lnSpc>`;
+      const spcXml = `<a:lnSpc><a:spcPct val="${lineSpacingPctValue(el.style.lineSpacing)}"/></a:lnSpc>`;
       finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:lnSpc', PPR_CHILD_ORDER);
     }
     if (el.style?.spaceBefore && !finalPPr.includes('<a:spcBef>')) {
@@ -419,8 +441,13 @@ export function buildShape(
       .replace(/(<a:ext[^>]*?\s)cy="[^"]*"/, `$1cy="${cy}"`);
   } else {
     const rotAttr = el.style?.rotate ? ` rot="${Math.round(el.style.rotate * 60000)}"` : '';
+    // A preset-geometry adjust guide value MUST be an integer in guide units
+    // (roundRect adj: 50000 = 50% = max). PowerPoint rejects a non-integer
+    // (e.g. `val 0.08`) and reports the file as corrupt. Accept either a
+    // fraction (0<r<=1 → r*100000, the intuitive "8% corner" form) or raw guide
+    // units (>1), then round and clamp so a stray float can never corrupt.
     const avLst = el.style?.cornerRadius
-      ? `<a:avLst><a:gd name="adj" fmla="val ${el.style.cornerRadius}"/></a:avLst>`
+      ? `<a:avLst><a:gd name="adj" fmla="val ${cornerRadiusGuideValue(el.style.cornerRadius)}"/></a:avLst>`
       : '<a:avLst/>';
 
     let fillXml = '';

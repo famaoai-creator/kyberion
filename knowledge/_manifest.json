@@ -1017,7 +1017,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16347,
+      "size": 16373,
       "type": "json"
     },
     {
@@ -1065,7 +1065,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 9394,
+      "size": 11755,
       "type": "json"
     },
     {
@@ -1105,6 +1105,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/authority-roles/daemon_watchdog.json",
+      "tier": "public",
+      "size": 627,
+      "type": "json"
+    },
+    {
       "path": "product/governance/authority-roles/designer.json",
       "tier": "public",
       "size": 383,
@@ -1113,7 +1119,13 @@
     {
       "path": "product/governance/authority-roles/ecosystem_architect.json",
       "tier": "public",
-      "size": 546,
+      "size": 583,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/generation_scheduler.json",
+      "tier": "public",
+      "size": 715,
       "type": "json"
     },
     {
@@ -1126,6 +1138,12 @@
       "path": "product/governance/authority-roles/mission_controller.json",
       "tier": "public",
       "size": 801,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/nexus_daemon.json",
+      "tier": "public",
+      "size": 837,
       "type": "json"
     },
     {
@@ -1173,7 +1191,7 @@
     {
       "path": "product/governance/autonomous-ops-policy.json",
       "tier": "public",
-      "size": 1825,
+      "size": 2381,
       "type": "json"
     },
     {
@@ -1299,7 +1317,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 79257,
+      "size": 79445,
       "type": "json"
     },
     {
@@ -2181,7 +2199,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20055,
+      "size": 20096,
       "type": "json"
     },
     {
@@ -2289,7 +2307,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 14515,
+      "size": 17537,
       "type": "json"
     },
     {
@@ -3099,7 +3117,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 90579,
+      "size": 90664,
       "type": "json"
     },
     {

@@ -82,7 +82,13 @@ import * as path from 'node:path';
 import { Semaphore } from './semaphore.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeExecResult,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 
 const DEFAULT_GLOBAL_MAX_CONCURRENCY = 4;
 const DEFAULT_PROVIDER_MAX_CONCURRENCY = 2;
@@ -274,6 +280,8 @@ export interface DelegationChildRecord {
   startedAt: string;
   deadlineAt: string;
   budgetMs: number;
+  /** OS process start time, used to prevent PID-reuse kills after a restart. */
+  pidStartedAt?: string;
 }
 
 interface ActiveChildEntry {
@@ -310,6 +318,24 @@ function writePersistedRegistry(records: DelegationChildRecord[]): void {
     logger.warn(
       `[delegation-concurrency] failed to persist active-child registry (non-fatal): ${err instanceof Error ? err.message : String(err)}`
     );
+  }
+}
+
+function resolveProcessStartTime(pid: number | undefined): string | undefined {
+  if (!Number.isInteger(pid) || (pid as number) <= 0) return undefined;
+  try {
+    const result = safeExecResult('ps', ['-p', String(pid), '-o', 'lstart='], {
+      timeoutMs: 1000,
+      maxOutputMB: 1,
+    });
+    const parsed = Date.parse(result.stdout.trim());
+    return result.status === 0 && Number.isFinite(parsed)
+      ? new Date(parsed).toISOString()
+      : undefined;
+  } catch {
+    // If process identity cannot be established, the janitor will fail closed
+    // and leave the record visible for a later sweep.
+    return undefined;
   }
 }
 
@@ -425,6 +451,7 @@ export async function withWallClockBudget<T>(
 
   if (opts.child) {
     const now = Date.now();
+    const pidStartedAt = resolveProcessStartTime(opts.child.pid);
     registerActiveChild(
       {
         id,
@@ -433,6 +460,7 @@ export async function withWallClockBudget<T>(
         startedAt: new Date(now).toISOString(),
         deadlineAt: new Date(now + budgetMs).toISOString(),
         budgetMs,
+        ...(pidStartedAt ? { pidStartedAt } : {}),
       },
       opts.child
     );

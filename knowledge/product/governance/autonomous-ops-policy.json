@@ -65,6 +65,17 @@
         "confidence": 1
       },
       "budget_cap_tokens": 1000
+    },
+    "daemon_restart": {
+      "title": "Daemon restart",
+      "description": "Restart an unhealthy long-lived daemon (scheduler, supervisor) detected by the heartbeat watchdog. Scored to land on 'approve': the restart runs a platform service-manager command outside the repo sandbox, and a scheduler restarted mid-firing can duplicate or drop work, so it is not an unattended action.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 2,
+        "sensitivity": 2,
+        "confidence": 1
+      },
+      "budget_cap_tokens": 1000
     }
   }
 }

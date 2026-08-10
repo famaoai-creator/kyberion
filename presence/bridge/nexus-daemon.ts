@@ -256,7 +256,14 @@ async function nexusLoop() {
 
   ensureSystemMission();
 
-  // Initialize Reflex Engine with a generic dispatcher
+  // Initialize Reflex Engine with a generic dispatcher.
+  //
+  // EV-03: the engine gates every reaction before this runs — the actuator must
+  // be reflex-allowlisted, params placeholders are substituted structurally
+  // (never by editing JSON text), and dispatch goes through TriggerRunner so the
+  // same stimulus cannot fire the same reflex twice and each reaction leaves an
+  // audit receipt. An actuator this dispatcher does not handle is now a load-time
+  // rejection rather than a silent no-op here.
   reflexEngine.setDispatcher(async (actuator, action, params) => {
     logger.info(`⚡ [Nexus:Reflex] Executing autonomic reaction: ${actuator}.${action}`);
     if (actuator === 'service-actuator') {
@@ -267,7 +274,9 @@ async function nexusLoop() {
         params: params,
         auth: 'secret-guard',
       });
+      return;
     }
+    throw new Error(`[REFLEX] Nexus dispatcher cannot drive actuator "${actuator}"`);
   });
 
   while (true) {

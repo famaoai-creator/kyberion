@@ -15,6 +15,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type AiDlcPhase = 'alignment' | 'execution' | 'test' | 'self_review' | 'complete';
 
@@ -73,6 +74,43 @@ function nextPhase(current: AiDlcPhase): AiDlcPhase | null {
   return index >= 0 && index < PHASE_ORDER.length - 1 ? PHASE_ORDER[index + 1] : null;
 }
 
+/** Phases whose transition is guarded by a pass/approve gate. */
+const GATED_PHASES = new Set(['test', 'self_review']);
+
+function emitAiDlcPhaseEvents(
+  state: AiDlcPhaseState,
+  input: { phase: AiDlcPhase; result: AiDlcPhaseResult },
+  failedGate: boolean,
+  now: string
+): void {
+  try {
+    const stream = getDefaultWorkerEventStream();
+    const source = { mission_id: state.mission_id };
+    stream.emit('phase_end', { phase: state.phase, at: now }, source);
+    if (GATED_PHASES.has(input.phase)) {
+      stream.emit(
+        'gate_evaluated',
+        {
+          phase: input.phase,
+          outcome: failedGate ? 'failed' : 'passed',
+          summary: input.result.summary,
+          at: now,
+        },
+        source
+      );
+    }
+    // A failed gate keeps the mission in its current phase and trips the
+    // breaker back to alignment, so the phase that begins is not `input.phase`.
+    stream.emit(
+      'phase_begin',
+      { phase: failedGate ? 'alignment' : input.phase, at: now, after_failed_gate: failedGate },
+      source
+    );
+  } catch {
+    // Observability must never turn a valid transition into a failed one.
+  }
+}
+
 /**
  * Advance to the next phase, attaching that phase's structured result to the
  * state so the successor receives it as data (not by re-deriving diffs).
@@ -96,6 +134,15 @@ export function advanceAiDlcPhase(
   const failedGate =
     (input.phase === 'test' && !input.result.passed) ||
     (input.phase === 'self_review' && !input.result.approved);
+
+  // EV-07: `phase_begin` / `phase_end` / `gate_evaluated` were declared in
+  // WORKER_EVENT_TYPES but never emitted, so a consumer could not tell "no phase
+  // transition happened" from "phase events are not implemented". This is the
+  // one place that decides a transition — including the failed-gate case, which
+  // a persistence-time hook could not distinguish, since the phase does not
+  // change. Emission is a deliberate observability side effect on a fail-open
+  // stream: a listener failure never propagates (see worker-event-stream).
+  emitAiDlcPhaseEvents(state, input, failedGate, now);
 
   const next: AiDlcPhaseState = {
     ...state,

@@ -1,4 +1,5 @@
 # Kyberion Autonomy System Guide
+
 ## 🧠 究極の抽象化：自律神経系の運用ガイド
 
 本ドキュメントでは、Kyberionが「生命」として自律的に思考・反応・進化するための4つのコア機能（AUTONOMY層）について解説します。
@@ -10,7 +11,9 @@
 システム全体の「今」を共有するメモリ空間です。
 
 #### 活用方法
+
 プログラムから現在の文脈（Context）を問い合わせることができます。
+
 ```typescript
 import { sensoryMemory } from '@agent/core';
 
@@ -24,7 +27,10 @@ const isUnderAttack = sensoryMemory.hasActiveContext('SECURITY_ALERT', 600000);
 
 特定の刺激（Stimulus）に対する「無意識の反応」をコードなしで定義します。
 
+反射の実行主体は常駐 surface の `nexus-daemon` です（`presence/bridge/nexus-daemon.ts`）。pending stimulus ごとに `reflexEngine.evaluate()` が走ります。**定義ディレクトリが存在しない場合、反射は 1 件も発火しません**（これが既定の状態です）。
+
 #### 反射の定義 (`knowledge/procedures/reflexes/*.adf.json`)
+
 ```json
 {
   "id": "auto-notifier",
@@ -37,8 +43,25 @@ const isUnderAttack = sensoryMemory.hasActiveContext('SECURITY_ALERT', 600000);
 }
 ```
 
+利用可能なプレースホルダは `{{payload}}` `{{intent}}` `{{stimulus_id}}` `{{source}}` です。
+
+#### 反射に掛かるガバナンス（EV-03）
+
+刺激は Slack など未信頼チャネル由来のことがあるため、反応は以下の関門を通ります。
+
+| 関門                     | 内容                                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| actuator 許可リスト      | `REFLEX_ALLOWED_ACTUATORS`（現在 `service-actuator` のみ）以外は**ロード時に拒否**。許可外の反射は登録されません                                                                            |
+| 構造的プレースホルダ置換 | `params` をパース済み構造として走査し、プレースホルダ節点を値で差し替えます。JSON テキストへの文字列置換ではないため、引用符や波括弧を含む payload が params の構造を変えることはできません |
+| 冪等性                   | `TriggerRunner` の `wake` トリガとして `reflex:{reflex_id}:{stimulus_id}` をキーに発火。同一刺激が同一反射を二度発火させません                                                              |
+| 監査                     | トリガ配信レシートが監査チェーンに記録されます                                                                                                                                              |
+
+プレースホルダが**文字列全体**の場合は元の値（オブジェクトならオブジェクト）がそのまま渡り、文中に埋め込まれた場合のみ文字列化されます。
+
 #### 反射の活性化
+
 反射を常駐化する場合は `knowledge/product/governance/surfaces/*.json` に surface を宣言し、`surface-runtime` で反映します。`active-surfaces.json` は互換 snapshot です。単発実行なら `process-actuator` か governed pipeline を使います。
+
 ```bash
 pnpm surfaces:reconcile
 pnpm surfaces:status
@@ -51,6 +74,7 @@ pnpm surfaces:status
 「異常事態」や「特定のミッション中」のみ、安全に権限を一時開放する仕組みです。
 
 #### ポリシーの定義 (`knowledge/governance/dynamic-policies.json`)
+
 ```json
 {
   "policies": [
@@ -62,6 +86,7 @@ pnpm surfaces:status
   ]
 }
 ```
+
 ※ `safe-io` 経由のファイル操作時に、バックグラウンドで自動的に評価されます。
 
 ---
@@ -82,4 +107,5 @@ pnpm surfaces:status
 3.  **Governance-Aware**: 動的権限を利用する際は、必ず `lookback_ms` を最小限に設定し、権限の「出しっぱなし」を防いでください。
 
 ---
-*Created by Ecosystem Architect for the Kyberion Sovereign Ecosystem.*
+
+_Created by Ecosystem Architect for the Kyberion Sovereign Ecosystem._

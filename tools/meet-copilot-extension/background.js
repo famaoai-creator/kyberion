@@ -8,21 +8,136 @@
  *
  * Control is DRIVER-initiated (inverted vs the native-messaging browser-bridge):
  * the driver is the WS server; this worker is the client.
+ *
+ * The worker also buffers the live caption stream so the AI side panel can
+ * attach mid-meeting, and relays the panel's on-device AI output to the driver
+ * as ai_* events. It never runs the model itself: Prompt/Summarizer are document
+ * APIs, and keeping generation out of the worker keeps "observe" separate from
+ * "act" — nothing the model produces reaches the meeting without a panel click.
  */
+
+// MV3 keeps this worker as a classic script so the governed PII rule bundle can
+// be shared with the side panel. If the bundle is absent, caption forwarding
+// fails closed rather than persisting raw speech.
+if (typeof importScripts === 'function') importScripts('pii-rules.generated.js');
 
 const DEFAULT_PORT = 8779;
 const DEFAULT_HOST = '127.0.0.1';
 let ws = null;
 let keepaliveTimer = null;
 let reconnectTimer = null;
+let controlToken = '';
 // Observability state surfaced to the popup.
-const uiState = { wsConnected: false, phase: 'idle', captions: 0, lastError: '' };
+const uiState = {
+  wsConnected: false,
+  phase: 'idle',
+  captions: 0,
+  lastError: '',
+  lastAiAt: '',
+};
+
+// Live caption ring buffer. MV3 can evict this worker at any time, so it is
+// mirrored into chrome.storage.session (debounced) and restored on startup —
+// otherwise reopening the panel after an eviction would show an empty meeting.
+const MAX_TRANSCRIPT_LINES = 1200;
+const TRANSCRIPT_KEY = 'meetCopilotTranscript';
+const AI_EVENTS = { summary: 'ai_summary', insights: 'ai_insights', suggestions: 'ai_suggestions' };
+let transcript = [];
+let persistTimer = null;
+
+function sessionStore() {
+  // chrome.storage.session is unavailable on older Chrome and in tests.
+  return chrome.storage && chrome.storage.session ? chrome.storage.session : null;
+}
+
+function persistTranscriptSoon() {
+  const store = sessionStore();
+  if (!store || persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      store.set({ [TRANSCRIPT_KEY]: transcript });
+    } catch {
+      /* eviction-time best effort */
+    }
+  }, 2000);
+}
+
+async function restoreTranscript() {
+  const store = sessionStore();
+  if (!store) return;
+  try {
+    const stored = await store.get([TRANSCRIPT_KEY]);
+    const lines = stored && stored[TRANSCRIPT_KEY];
+    if (Array.isArray(lines) && transcript.length === 0) {
+      transcript = lines
+        .slice(-MAX_TRANSCRIPT_LINES)
+        .map((entry) => ({
+          ...entry,
+          text: redactText(entry && entry.text),
+        }))
+        .filter((entry) => entry.text);
+      uiState.captions = transcript.length;
+    }
+  } catch {
+    /* start from an empty buffer */
+  }
+}
+
+function recordCaption(payload) {
+  // The event boundary redacts before calling this persistence helper. Avoid
+  // applying the rule set twice because generated placeholders may themselves
+  // match broad PII patterns.
+  const text = String((payload && payload.text) || '').trim();
+  if (!text) return null;
+  const entry = {
+    text,
+    at: new Date().toISOString(),
+    platform: (payload && payload.platform) || '',
+  };
+  transcript.push(entry);
+  if (transcript.length > MAX_TRANSCRIPT_LINES) {
+    transcript.splice(0, transcript.length - MAX_TRANSCRIPT_LINES);
+  }
+  persistTranscriptSoon();
+  return entry;
+}
+
+function redactText(value) {
+  const scrub = globalThis.__kyberionPiiScrub;
+  if (typeof scrub !== 'function') {
+    uiState.lastError = 'PII scrubber unavailable; caption withheld';
+    return '';
+  }
+  try {
+    return String(scrub(String(value || ''))).trim();
+  } catch {
+    uiState.lastError = 'PII scrubber failed; caption withheld';
+    return '';
+  }
+}
+
+// Fire-and-forget notification to an open side panel. No receiver is the normal
+// case (the panel is usually closed), so the error is swallowed deliberately.
+function notifyPanel(message) {
+  try {
+    const result = chrome.runtime.sendMessage(message);
+    if (result && typeof result.catch === 'function') result.catch(() => undefined);
+  } catch {
+    /* no panel listening */
+  }
+}
 
 async function getConfig() {
-  const cfg = await chrome.storage.local.get(['meetCopilotHost', 'meetCopilotPort']);
+  const cfg = await chrome.storage.local.get([
+    'meetCopilotHost',
+    'meetCopilotPort',
+    'meetCopilotAuthToken',
+  ]);
   return {
     host: cfg.meetCopilotHost || DEFAULT_HOST,
     port: cfg.meetCopilotPort || DEFAULT_PORT,
+    authToken: cfg.meetCopilotAuthToken || '',
   };
 }
 
@@ -81,7 +196,9 @@ async function ensureInjected(tabId) {
 }
 
 function sendEvent(evt) {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(evt));
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(controlToken ? { ...evt, control_token: controlToken } : evt));
+  }
 }
 
 async function relayToContent(tabId, message) {
@@ -98,7 +215,14 @@ async function relayToContent(tabId, message) {
 
 async function handleCommand(msg) {
   try {
+    if (msg.cmd === 'session') {
+      if (typeof msg.control_token !== 'string' || msg.control_token.length < 32) return;
+      controlToken = msg.control_token;
+      return;
+    }
     if (msg.cmd === 'join') {
+      if (typeof msg.control_token !== 'string' || msg.control_token.length < 32) return;
+      controlToken = msg.control_token;
       const tab = await ensureMeetTab(msg.url);
       if (!tab) {
         sendEvent({ event: 'error', message: 'no Meet tab and no url provided' });
@@ -119,6 +243,7 @@ async function handleCommand(msg) {
       }
       return;
     }
+    if (!controlToken || msg.control_token !== controlToken) return;
     const tab = await findMeetTab();
     if (!tab) {
       sendEvent({ event: 'error', message: `no Meet tab for cmd '${msg.cmd}'` });
@@ -143,7 +268,12 @@ async function connect() {
   // Guard against multiple concurrent sockets (onInstalled + onStartup +
   // top-level all call connect(); the SW may also be restarted by MV3).
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-  const { host, port } = await getConfig();
+  const { host, port, authToken } = await getConfig();
+  if (typeof authToken !== 'string' || authToken.length < 32) {
+    uiState.lastError =
+      'Meet extension auth is not configured; set meetCopilotAuthToken in Chrome storage.';
+    return;
+  }
   try {
     ws = new WebSocket(`ws://${host}:${port}`);
   } catch (err) {
@@ -153,7 +283,14 @@ async function connect() {
   ws.onopen = () => {
     uiState.wsConnected = true;
     uiState.lastError = '';
-    sendEvent({ event: 'ready', ext: 'meet-copilot', version: '0.1.0' });
+    ws.send(
+      JSON.stringify({
+        event: 'hello',
+        auth_token: authToken,
+        ext: 'meet-copilot',
+        version: '0.1.0',
+      })
+    );
     if (keepaliveTimer) clearInterval(keepaliveTimer);
     keepaliveTimer = setInterval(() => sendEvent({ event: 'ping', t: Date.now() }), 20000);
   };
@@ -189,9 +326,22 @@ function scheduleReconnect() {
 // popup queries/controls come in on the same channel.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message && message.type === 'meet:event') {
-    const p = message.payload || {};
-    if (p.event === 'caption') uiState.captions += 1;
-    else if (p.event === 'status') uiState.phase = p.phase || uiState.phase;
+    let p = message.payload || {};
+    if (p.event === 'caption') {
+      const text = redactText(p.text);
+      if (!text) {
+        sendResponse({ ok: false, error: 'caption withheld because PII scrubber is unavailable' });
+        return true;
+      }
+      p = {
+        ...p,
+        text,
+        ...(typeof p.speaker === 'string' ? { speaker: redactText(p.speaker) } : {}),
+      };
+      uiState.captions += 1;
+      const entry = recordCaption(p);
+      if (entry) notifyPanel({ type: 'panel:caption', entry });
+    } else if (p.event === 'status') uiState.phase = p.phase || uiState.phase;
     else if (p.event === 'joined') uiState.phase = 'in_call';
     else if (p.event === 'left') uiState.phase = 'left';
     else if (p.event === 'error') uiState.lastError = p.message || '';
@@ -215,6 +365,56 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+  if (message && message.type === 'panel:get-state') {
+    sendResponse({ ...uiState, transcript: transcript.slice(-MAX_TRANSCRIPT_LINES) });
+    return true;
+  }
+  // AI output produced in the side panel document. The worker validates the
+  // envelope and forwards it to the driver, which persists it; it never feeds
+  // this back into the meeting.
+  if (message && message.type === 'panel:ai-result') {
+    const event = AI_EVENTS[message.kind];
+    if (!event) {
+      sendResponse({ ok: false, error: `unknown ai result kind '${message.kind}'` });
+      return true;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      sendResponse({ ok: false, error: 'control channel is not connected' });
+      return true;
+    }
+    uiState.lastAiAt = new Date().toISOString();
+    // Envelope fields win over the payload: the worker decides what event this
+    // is, the panel only supplies its content.
+    sendEvent({
+      ...(message.payload || {}),
+      event,
+      provider: message.provider || 'unknown',
+      at: uiState.lastAiAt,
+      transcript_lines: transcript.length,
+    });
+    sendResponse({ ok: true, event });
+    return true;
+  }
+  // A suggested utterance only reaches the meeting through this path, and only
+  // after the operator clicked it in the panel.
+  if (message && message.type === 'panel:send-chat') {
+    (async () => {
+      const text = String(message.text || '').trim();
+      if (!text) {
+        sendResponse({ ok: false, error: 'empty chat text' });
+        return;
+      }
+      const tab = await findMeetTab();
+      if (!tab) {
+        sendResponse({ ok: false, error: 'no Meet tab' });
+        return;
+      }
+      await ensureInjected(tab.id);
+      const resp = await relayToContent(tab.id, { type: 'meet:chat', text });
+      sendResponse(resp);
+    })();
+    return true;
+  }
   if (message && (message.type === 'popup:diagnose' || message.type === 'popup:leave')) {
     (async () => {
       const tab = await findMeetTab();
@@ -236,4 +436,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // Kick the connection on install and on worker startup.
 chrome.runtime.onInstalled.addListener(connect);
 chrome.runtime.onStartup.addListener(connect);
+restoreTranscript();
 connect();

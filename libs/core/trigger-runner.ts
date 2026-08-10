@@ -28,6 +28,7 @@ import {
   type ManagedProcessWatchHandle,
   type ManagedProcessWatchOptions,
 } from './managed-process.js';
+import { withTriggerCorrelation } from './trigger-correlation.js';
 
 const logger = createLogger('trigger-runner');
 
@@ -183,6 +184,35 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
     throw new Error('[AUTHORITY_UNBOUND] Trigger execution requires an active MISSION_ROLE.');
   }
   return normalized;
+}
+
+/**
+ * EV-02: the authority snapshot of the currently active execution role.
+ *
+ * Callers that run under a varying role (a provider session booted by whichever
+ * role asked for it) cannot hardcode `{authority_role, level}` — and a hardcoded
+ * level that drifts from the role registry is rejected outright. Derive both
+ * from the registry instead, so the snapshot is true by construction.
+ *
+ * Throws when no role is bound, because an unattributable trigger must not run.
+ */
+export function resolveCurrentTriggerAuthority(tenantSlug?: string): TriggerAuthoritySnapshot {
+  const activeRole = process.env.MISSION_ROLE?.trim() || resolveRole();
+  if (!activeRole) {
+    throw new Error('[AUTHORITY_UNBOUND] Trigger execution requires an active MISSION_ROLE.');
+  }
+  assertCanonicalAuthorityRole(activeRole);
+  const level = governedTriggerLevel(activeRole);
+  if (level === undefined) {
+    throw new Error(
+      `[POLICY_VIOLATION] Trigger authority role has no governed level: ${activeRole}`
+    );
+  }
+  return {
+    authority_role: activeRole,
+    level,
+    ...(tenantSlug?.trim() ? { tenant_slug: tenantSlug.trim() } : {}),
+  } as TriggerAuthoritySnapshot;
 }
 
 /** Reject a trigger whose requested authority exceeds its creator snapshot. */
@@ -405,14 +435,21 @@ export class TriggerRunner {
     const { claimed } = claim;
 
     try {
+      // EV-09: everything this delivery causes runs inside the correlation
+      // scope, so worker events and operator notifications can attribute
+      // themselves to this firing without a threaded parameter.
       const deliveryId =
-        (await deliver({
-          ...request,
-          idempotencyKey,
-          createdBy: claimed.createdBy,
-          requestedAuthority: claimed.requestedAuthority,
-          deliveryId: idempotencyKey,
-        })) || idempotencyKey;
+        (await withTriggerCorrelation(
+          { deliveryId: idempotencyKey, source: request.source, idempotencyKey },
+          () =>
+            deliver({
+              ...request,
+              idempotencyKey,
+              createdBy: claimed.createdBy,
+              requestedAuthority: claimed.requestedAuthority,
+              deliveryId: idempotencyKey,
+            })
+        )) || idempotencyKey;
       const delivered: TriggerRecord = {
         ...claimed,
         status: 'delivered',

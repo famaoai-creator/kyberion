@@ -39,6 +39,8 @@ vi.mock('./media-ocr.js', () => ({
 }));
 
 import { handleAction } from './index.js';
+import type { MediaAction } from './media-pipeline-helpers.js';
+import type { PptxDesignProtocol, PptxElement } from '@agent/core';
 
 function decodeXmlEntities(value: string): string {
   return value
@@ -2993,5 +2995,96 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
     });
     expect(res.status).toBe('failed');
     expect(res.results[0].error).toContain('path must stay under the Kyberion project root');
+  });
+});
+
+describe('media:deck_from_html', () => {
+  const REPORT_HTML = `<!doctype html><html><head><style>
+    :root{--bg:#F6F7F9;--accent:#1F3A5F;--accent2:#2F5C9E;--crit:#B3123B;--crit-bg:#FDEAEF;--high:#C8471B;--high-bg:#FCECE3;--med:#B8860B;--med-bg:#FBF3DD;--low:#2F7D5B;--low-bg:#E7F4EC;--good:#1F7A4D;--good-bg:#E6F5EC;--ink:#1A1F29;--muted:#5B6472;--line:#E3E7EE;--panel:#FFFFFF;--soft:#EEF3FB;}
+  </style></head><body>
+    <div class="confbar">社外秘 / CONFIDENTIAL</div>
+    <header class="hero"><h1>テストデッキ</h1><div class="sub">サブタイトル</div><div class="meta">2026-08-06</div></header>
+    <div class="wrap">
+      <h2>比較</h2>
+      <p>これは段落テキストです。</p>
+      <div class="callout good"><b>結論</b> ここが要点。</div>
+      <div class="tblwrap"><table>
+        <thead><tr><th>項目</th><th>重大度</th></tr></thead>
+        <tbody>
+          <tr><td>TLS無効化</td><td><span class="chip c-high">高</span></td></tr>
+          <tr><td>口座IDOR</td><td><span class="sev s-crit">緊急</span></td></tr>
+        </tbody>
+      </table></div>
+      <ul><li>箇条書き1</li><li>箇条書き2</li></ul>
+    </div>
+  </body></html>`;
+
+  it('converts report HTML into an editable pptx protocol on last_pptx_design', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: { last_html: REPORT_HTML },
+      steps: [
+        {
+          type: 'transform',
+          op: 'deck_from_html',
+          params: { from: 'last_html', export_as: 'compiled' },
+        },
+      ],
+    } as MediaAction);
+
+    expect(result.status).toBe('succeeded');
+    const proto = result.context.compiled as PptxDesignProtocol;
+    expect(proto).toBeTruthy();
+    // hero + at least one content slide
+    expect(Array.isArray(proto.slides)).toBe(true);
+    expect(proto.slides.length).toBeGreaterThanOrEqual(2);
+    expect(result.context.last_pptx_design).toBe(proto);
+    expect(result.context.last_design_protocol_kind).toBe('pptx');
+    // hero inherits the HTML --accent token as the navy background
+    expect(String(proto.slides[0].backgroundFill).toUpperCase()).toBe('#1F3A5F');
+    // severity chips became colored roundRect shapes somewhere in the deck
+    const allEls: PptxElement[] = proto.slides.flatMap((s) => s.elements ?? []);
+    const chipFills = allEls
+      .filter((e) => e.type === 'shape' && e.shapeType === 'roundRect')
+      .map((e) => String((e.style || {}).fill).toUpperCase());
+    expect(chipFills).toContain('#FCECE3'); // high chip bg
+    expect(chipFills).toContain('#FDEAEF'); // crit chip bg
+    // chip labels survived as text
+    const texts = allEls.filter((e) => e.type === 'text').map((e) => e.text);
+    expect(texts).toContain('高');
+    expect(texts).toContain('緊急');
+  });
+
+  it('accepts inline html and rejects empty input', async () => {
+    const ok = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'transform',
+          op: 'deck_from_html',
+          params: { html: '<body><div class="wrap"><h2>X</h2><p>y</p></div></body>' },
+        },
+      ],
+    } as MediaAction);
+    expect(ok.status).toBe('succeeded');
+    expect(ok.context.last_pptx_design.slides.length).toBeGreaterThanOrEqual(1);
+
+    const bad = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'transform', op: 'deck_from_html', params: { html: '   ' } }],
+    } as MediaAction);
+    expect(bad.status).toBe('failed');
+    expect(bad.results[0].error).toContain('deck_from_html');
+  });
+
+  it('rejects oversized inline HTML before parsing', async () => {
+    const oversized = '<body>' + 'x'.repeat(8 * 1024 * 1024 + 1) + '</body>';
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'transform', op: 'deck_from_html', params: { html: oversized } }],
+    } as MediaAction);
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0].error).toContain('exceeds');
   });
 });

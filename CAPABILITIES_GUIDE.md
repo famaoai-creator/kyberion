@@ -179,6 +179,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `apply_theme`                        | media                                       |
 | `array_count`                        | wisdom                                      |
 | `brief_to_design_protocol`           | media                                       |
+| `deck_from_html`                     | media                                       |
 | `compile_narrated_video_brief`       | video-composition                           |
 | `compile_video_content_brief`        | video-composition                           |
 | `dedup`                              | ingest                                      |

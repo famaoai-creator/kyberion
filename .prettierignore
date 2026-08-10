@@ -7,6 +7,9 @@ package-lock.json
 # Scaffold fixtures are source TEMPLATES: prettier rewrites {{VAR}} into
 # "{ { VAR } }" (YAML flow mapping) and breaks placeholder substitution.
 knowledge/product/scaffolds/
+# Generated redaction boundary: `pnpm check:pii-rules` compares the file byte
+# for byte against the generator output, so prettier must not reformat it.
+tools/*/pii-rules.generated.js
 # Parallel-session / external-tool debris
 .worktrees/
 .tmp-mulmoclaude/
