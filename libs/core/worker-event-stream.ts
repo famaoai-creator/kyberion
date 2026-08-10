@@ -14,6 +14,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { safeAppendFileSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { currentTriggerDeliveryId } from './trigger-correlation.js';
 
 export const WORKER_EVENT_TYPES = [
   // turn/run lifecycle
@@ -93,6 +94,12 @@ export const workerEventSourceSchema = z
     task_id: z.string().optional(),
     agent_id: z.string().optional(),
     pipeline_id: z.string().optional(),
+    /**
+     * EV-09: the trigger delivery that caused this event, when the emitter runs
+     * inside one. Filled in automatically from the ambient correlation scope so
+     * every emitter does not have to thread it through.
+     */
+    trigger_delivery_id: z.string().optional(),
   })
   .strict();
 
@@ -142,9 +149,16 @@ export class WorkerEventStream {
     payload: WorkerEventPayloadMap[K] = {} as WorkerEventPayloadMap[K],
     source?: WorkerEventSource
   ): WorkerEventEnvelope<K> {
+    // EV-09: an explicit source wins; the ambient trigger scope only fills a
+    // gap, so a caller can always attribute an event deliberately.
+    const triggerDeliveryId = currentTriggerDeliveryId();
     const mergedSource =
-      this.defaultSource || source
-        ? { ...(this.defaultSource ?? {}), ...(source ?? {}) }
+      this.defaultSource || source || triggerDeliveryId
+        ? {
+            ...(triggerDeliveryId ? { trigger_delivery_id: triggerDeliveryId } : {}),
+            ...(this.defaultSource ?? {}),
+            ...(source ?? {}),
+          }
         : undefined;
     const envelope = workerEventEnvelopeSchema.parse({
       type,

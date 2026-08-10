@@ -10,7 +10,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (35)
+## secret (36)
 
 | Variable                                  | Type   | Required | Description                                                                                                                                                            |
 | ----------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -31,6 +31,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_LOCALADMIN_TOKEN`               | string | no       | Bearer token for the chronos localadmin control surface.                                                                                                               |
 | `KYBERION_LOCALAI_KEY`                    | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_MANIFEST_SIGNING_KEY`           | string | no       | HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign. |
+| `KYBERION_MEET_EXTENSION_TOKEN`           | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_MESH_SHARED_SECRET`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_MINIMAX_VIDEO_API_KEY`          | string | no       | API key used by the explicit MiniMax Hailuo video-generation backend.                                                                                                  |
 | `KYBERION_MLX_KEY`                        | string | no       | _undocumented_                                                                                                                                                         |

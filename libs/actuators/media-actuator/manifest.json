@@ -96,6 +96,10 @@
         "note": "Compile a canonical media brief into a render-ready design protocol."
       },
       {
+        "op": "deck_from_html",
+        "note": "Convert Kyberion report HTML (hero/h2/h3/p/.callout/table/.chip|.sev/ul/.kpis/.grpttl) into an editable last_pptx_design protocol, inheriting the HTML's :root design tokens. Source via params.html, params.path, or ctx channel (params.from). Pair with pptx_render."
+      },
+      {
         "op": "pptx_layout_preflight",
         "note": "Validate compiled PPTX layout diagnostics before any render; overflow requires explicit review-only opt-in."
       },

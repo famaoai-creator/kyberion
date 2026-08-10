@@ -299,6 +299,7 @@ describe('storage-janitor', () => {
       startedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
       deadlineAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // past — stale
       budgetMs: 600000,
+      pidStartedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
     };
     const freshRecord: DelegationChildRecord = {
       id: 'codex-1',
@@ -307,7 +308,14 @@ describe('storage-janitor', () => {
       startedAt: new Date().toISOString(),
       deadlineAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // future — not stale
       budgetMs: 600000,
+      pidStartedAt: new Date().toISOString(),
     };
+    const processStartTimeFn = (pid: number): string | undefined =>
+      pid === staleRecord.pid
+        ? staleRecord.pidStartedAt
+        : pid === freshRecord.pid
+          ? freshRecord.pidStartedAt
+          : undefined;
 
     it('returns an empty result when the registry file does not exist', () => {
       const result = sweepDelegationChildren({ dryRun: true, killFn: vi.fn() });
@@ -318,7 +326,7 @@ describe('storage-janitor', () => {
       writeRegistry([staleRecord, freshRecord]);
       const killFn = vi.fn();
 
-      const result = sweepDelegationChildren({ dryRun: true, killFn });
+      const result = sweepDelegationChildren({ dryRun: true, killFn, processStartTimeFn });
 
       expect(result.stale.map((r) => r.id)).toEqual(['claude-1']);
       expect(result.killed).toHaveLength(0);
@@ -330,7 +338,7 @@ describe('storage-janitor', () => {
       writeRegistry([staleRecord, freshRecord]);
       const killFn = vi.fn();
 
-      const result = sweepDelegationChildren({ dryRun: false, killFn });
+      const result = sweepDelegationChildren({ dryRun: false, killFn, processStartTimeFn });
 
       expect(result.killed.map((r) => r.id)).toEqual(['claude-1']);
       expect(killFn).toHaveBeenCalledTimes(1);
@@ -345,7 +353,7 @@ describe('storage-janitor', () => {
       writeRegistry([freshRecord]);
       const killFn = vi.fn();
 
-      const result = sweepDelegationChildren({ dryRun: false, killFn });
+      const result = sweepDelegationChildren({ dryRun: false, killFn, processStartTimeFn });
 
       expect(result.stale).toHaveLength(0);
       expect(killFn).not.toHaveBeenCalled();
@@ -358,7 +366,7 @@ describe('storage-janitor', () => {
         throw new Error('ESRCH: no such process');
       });
 
-      const result = sweepDelegationChildren({ dryRun: false, killFn });
+      const result = sweepDelegationChildren({ dryRun: false, killFn, processStartTimeFn });
 
       expect(result.killed).toHaveLength(0);
       expect(result.errors[0]).toContain('ESRCH');
@@ -370,10 +378,47 @@ describe('storage-janitor', () => {
       writeRegistry([noPidRecord]);
       const killFn = vi.fn();
 
-      const result = sweepDelegationChildren({ dryRun: false, killFn });
+      const result = sweepDelegationChildren({ dryRun: false, killFn, processStartTimeFn });
 
       expect(killFn).not.toHaveBeenCalled();
       expect(result.stale.map((r) => r.id)).toEqual(['no-pid']);
+      expect(readRegistryRaw()).toHaveLength(0);
+    });
+
+    it('refuses to kill when the PID is reused or its start identity is unavailable', () => {
+      writeRegistry([staleRecord]);
+      const killFn = vi.fn();
+
+      const result = sweepDelegationChildren({
+        dryRun: false,
+        killFn,
+        processStartTimeFn: () => new Date().toISOString(),
+      });
+
+      expect(killFn).not.toHaveBeenCalled();
+      expect(result.killed).toHaveLength(0);
+      expect(result.errors.join('\n')).toContain('process identity unavailable or changed');
+      expect(readRegistryRaw()).toHaveLength(0);
+    });
+
+    it('refuses zero, fractional, and non-finite PIDs', () => {
+      const killFn = vi.fn();
+      const records = [0, 1.5, Number.NaN].map((pid, index) => ({
+        ...staleRecord,
+        id: `invalid-pid-${index}`,
+        pid,
+      }));
+      writeRegistry(records);
+
+      const result = sweepDelegationChildren({
+        dryRun: false,
+        killFn,
+        processStartTimeFn: () => staleRecord.pidStartedAt,
+      });
+
+      expect(killFn).not.toHaveBeenCalled();
+      expect(result.killed).toHaveLength(0);
+      expect(result.errors).toHaveLength(3);
       expect(readRegistryRaw()).toHaveLength(0);
     });
   });

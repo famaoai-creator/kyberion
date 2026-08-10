@@ -28,7 +28,19 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
 
   if (!safeExistsSync(LOCK_ROOT)) safeMkdir(LOCK_ROOT, { recursive: true });
 
-  while (Date.now() - startTime < timeoutMs) {
+  // EV-02: always attempt acquisition at least once.
+  //
+  // This was `while (elapsed < timeoutMs)`, which meant a caller using a
+  // deliberately non-blocking timeout — `withTriggerLeaderLease` passes 1ms to
+  // express "do not wait for another leader" — could spend its whole budget in
+  // the safeExistsSync/safeMkdir preamble above and return false without ever
+  // touching the lock file. The caller then reads that as "another leader owns
+  // this tick" and skips, so on a busy machine a scheduler tick was dropped
+  // while nothing was actually holding the lease. Returning false must mean "the
+  // lock is genuinely held", never "we ran out of time before trying".
+  let stalePurges = 0;
+  const MAX_STALE_PURGES = 3;
+  for (;;) {
     try {
       safeCreateExclusiveFileSync(
         lockFile,
@@ -40,22 +52,21 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
       );
       return true;
     } catch (err: any) {
-      if (err.code === 'EEXIST') {
-        // Lock held by another process, check if it's stale
-        if (_isLockStale(lockFile)) {
-          logger.warn(`⚠️ [LockUtils] Found stale lock for ${resourceId}. Purging...`);
-          safeUnlinkSync(lockFile);
-          continue; // Retry immediately
-        }
-        // Wait a bit before retrying (exponential backoff or simple delay)
-        await new Promise((res) => setTimeout(res, 100 + Math.random() * 200));
-      } else {
-        throw err;
+      if (err.code !== 'EEXIST') throw err;
+
+      // Lock held by another process, check if it's stale
+      if (_isLockStale(lockFile) && stalePurges < MAX_STALE_PURGES) {
+        stalePurges++;
+        logger.warn(`⚠️ [LockUtils] Found stale lock for ${resourceId}. Purging...`);
+        safeUnlinkSync(lockFile);
+        continue; // Retry immediately
       }
+      // The lock is really held: honour the caller's waiting budget.
+      if (Date.now() - startTime >= timeoutMs) return false;
+      // Wait a bit before retrying (exponential backoff or simple delay)
+      await new Promise((res) => setTimeout(res, 100 + Math.random() * 200));
     }
   }
-
-  return false;
 }
 
 /**

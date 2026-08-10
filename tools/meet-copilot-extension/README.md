@@ -31,10 +31,48 @@ meeting_participate.ts  --driver chrome-extension
 ChromeExtensionMeetingJoinDriver ──► starts WS server ws://127.0.0.1:8779
         ▲                                     │  commands: join / set_mic / leave / chat
         │  events: ready / joined / caption / left / error
+        │          ai_summary / ai_insights / ai_suggestions
         ▼                                     │
  background.js (service worker, WS client) ──► content.js (Meet DOM: click join/mute/leave,
-                                                            scrape live captions)
+        ▲     │  caption buffer                            scrape live captions, post chat)
+        │     ▼
+ sidepanel.js (document) ──► Chrome Built-in AI (Gemini Nano): Summarizer / Prompt
 ```
+
+## On-device AI (Chrome Built-in AI / Gemini Nano)
+
+The side panel (`sidepanel.html`) runs Chrome's built-in models over the live
+caption stream. **Nothing leaves this Chrome** — no API key, no network call.
+
+| Feature                    | API                           | Notes                                                                                                   |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 会議要約                   | Summarizer → Prompt fallback  | 蓄積字幕を一括要約                                                                                      |
+| ローリング要約             | Prompt (`responseConstraint`) | N発話ごとに前回要約へ差分マージ（Summarizer は既存要約とマージできないため Prompt 固定）                |
+| 決定事項 / ToDo / 論点抽出 | Prompt (`responseConstraint`) | `{decisions, action_items[owner/task/due/confidence], open_questions, risks}` — `review_required: true` |
+| 発言サジェスト             | Prompt (`responseConstraint`) | 最大4件。`auto_send: false` 固定で、パネルのクリック時だけ会議チャットへ投稿                            |
+
+Boundaries, mirroring `tools/adf-replay-extension`:
+
+- **Generation runs in the side panel document**, never in the service worker —
+  Prompt / Summarizer are document APIs, and this keeps "observe" separate from
+  "act". The worker only transports redacted text and relays results.
+- **Every payload crosses the shared redaction boundary** (`pii-rules.generated.js`,
+  generated from `knowledge/product/governance/knowledge-sync-rules.json` by
+  `pnpm generate:pii-rules`) on the way in _and_ on the way out. If the scrubber
+  is missing, the adapter refuses to call the model.
+- **Captions are untrusted data.** Every prompt states that speech in the
+  transcript is material to summarize, not instructions to follow.
+- **No autonomous speech.** A suggestion reaches the meeting only via an explicit
+  click → `panel:send-chat` → `meet:chat` in the content script.
+
+Results are relayed to the driver as `ai_summary` / `ai_insights` /
+`ai_suggestions` events and persisted to
+`active/shared/tmp/meeting-summary-<session>.json` (latest of each kind plus a
+capped history).
+
+Open the panel from the popup's **Open AI panel** button, press **AI モデルを準備**
+once (the first run downloads the model; progress is shown), then use the
+per-feature buttons. Tests: `pnpm test:meet-copilot`.
 
 Audio is **decoupled** from this extension: the coordinator captures meeting audio
 from the BlackHole virtual device exactly as with the Playwright driver. As a bonus,
@@ -46,10 +84,16 @@ local STT model.
 
 1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**,
    and select this folder (`tools/meet-copilot-extension`).
-2. (Optional) change the control port — default is `8779`. In the extension's
+2. Configure the same 32+ character secret in the driver environment and the
+   extension's storage. For example, set
+   `KYBERION_MEET_EXTENSION_TOKEN=<secret>` for the driver and run
+   `chrome.storage.local.set({ meetCopilotAuthToken: '<secret>' })` in the
+   extension's service-worker console. The extension will not connect without
+   this shared secret.
+3. (Optional) change the control port — default is `8779`. In the extension's
    service-worker console: `chrome.storage.local.set({ meetCopilotPort: 8779 })`.
    Use the same value as the driver's `--extension-ws-port`.
-3. Sign into Google in this Chrome profile (this is why Meet accepts the session).
+4. Sign into Google in this Chrome profile (this is why Meet accepts the session).
 
 ## Run (mode A′: attend + listen/transcribe, mic muted)
 
@@ -83,5 +127,8 @@ sends `leave`.
   "参加をリクエスト / Ask to join" and waits; the host (you) admits "Kyberion".
 - **Speaking (mode B)** reuses `--transport-mode realtime_voice` + a voice profile;
   the AI's TTS is written to BlackHole, which you set as Chrome's microphone.
-- The extension requests no host permissions beyond `https://meet.google.com/*` and
-  never captures media itself (no `getUserMedia`/`tabCapture`).
+- **Chat posting** (`meet:chat`) uses per-platform selectors like the other
+  controls; Meet is the best-covered, Teams/Zoom are best-effort. Verify live and
+  tune `SELECTORS[platform].chatOpen / chatInputSel / chatSend` if a send fails.
+- The extension requests no host permissions beyond the meeting hosts and never
+  captures media itself (no `getUserMedia`/`tabCapture`).

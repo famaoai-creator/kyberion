@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.2.0",
-  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered.",
+  "version": "1.3.0",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams.",
   "entries": [
     {
       "path": "active/shared/tmp",
@@ -323,6 +323,50 @@
       "action": "review_required",
       "audit": true,
       "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm cli offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered."
+    },
+    {
+      "path": "active/shared/observability/mission-control",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "audit": true,
+      "note": "EV-06: cross-mission task-events.jsonl / orchestration-events.jsonl. Aligned with audit retention (90d) because agent-collaboration-projection reads these as the operator-visible history. The mission-local copy under active/missions/**/coordination/events/ is the durable record; this is the shared projection source."
+    },
+    {
+      "path": "active/shared/observability/channels",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "EV-06: per-surface decision/why/policy_used streams written by emitChannelSurfaceEvent. Same 30d floor as active/shared/logs — conversational surface traffic, not governance evidence."
+    },
+    {
+      "path": "active/shared/observability/chronos",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "EV-06: Chronos surface event streams (emitChronosSurfaceEvent)."
+    },
+    {
+      "path": "active/shared/observability",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "EV-06: residual rule for observability files not covered by a more specific entry below — notably ops-alerts.jsonl, the sink for sendOpsAlert and for operator-notifications' undelivered-notification record of last resort. 90d so a missed alert is still discoverable at a quarterly review. scanEventStores resolves each file's owning entry by longest prefix, so channels/ and chronos/ keep their own 30d rule rather than inheriting this one.",
+      "audit": true
+    },
+    {
+      "path": "active/shared/coordination/orchestration/events",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "EV-06: one JSON file per enqueued mission-orchestration event. The durable record is the orchestration journal (appendMissionOrchestrationJournalEntry), so the queue file is a work ticket, not evidence — 14d covers replay of a stalled worker without unbounded growth."
+    },
+    {
+      "path": "presence/bridge/runtime",
+      "artifact_class": "cache",
+      "ttl_days": 7,
+      "action": "delete",
+      "note": "EV-06: the KANS stimuli journal (stimuli.jsonl) and bridge scratch state. Stimuli carry TTLs measured in seconds-to-hours and readers only consult a recent window, so 7d is already far beyond usefulness. stimuli-journal.ts additionally self-rotates at 5MB (STIMULI_MAX_BYTES) so a burst cannot outrun the daily janitor."
     }
   ]
 }

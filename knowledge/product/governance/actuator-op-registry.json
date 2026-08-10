@@ -290,6 +290,7 @@
         "apply_pattern",
         "apply_theme",
         "brief_to_design_protocol",
+        "deck_from_html",
         "find_slides_by_owner",
         "lock_media_brief",
         "merge_content",
