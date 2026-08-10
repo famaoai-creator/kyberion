@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { matchesCron, getZonedDateParts } from './cron-utils.js';
+import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './cron-utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,34 +81,6 @@ function runLockActive(
   const expiresAt = new Date(lock.expiresAt).getTime();
   if (!Number.isFinite(acquiredAt) || !Number.isFinite(expiresAt)) return false;
   return expiresAt > now.getTime() && now.getTime() - acquiredAt < ttlMs;
-}
-
-function sameZonedMinute(a: Date, b: Date, timezone?: string): boolean {
-  const aParts = getZonedDateParts(a, timezone);
-  const bParts = getZonedDateParts(b, timezone);
-  return (
-    aParts.year === bParts.year &&
-    aParts.month === bParts.month &&
-    aParts.day === bParts.day &&
-    aParts.hour === bParts.hour &&
-    aParts.minute === bParts.minute
-  );
-}
-
-function hasMissedCronOccurrence(
-  cron: string,
-  lastRun: Date,
-  now: Date,
-  timezone?: string
-): boolean {
-  const cursor = new Date(now.getTime());
-  cursor.setSeconds(0, 0);
-  const floor = lastRun.getTime();
-  while (cursor.getTime() > floor) {
-    if (matchesCron(cron, cursor, timezone)) return true;
-    cursor.setMinutes(cursor.getMinutes() - 1);
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------------------

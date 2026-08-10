@@ -503,6 +503,47 @@ describe('Native PPTX Engine', () => {
         expect(xml).toContain('<a:endParaRPr lang="ja-JP"/>');
       });
 
+      it('emits an INTEGER roundRect adjust guide (fractional cornerRadius must not corrupt)', () => {
+        // Regression: cornerRadius 0.08 previously produced fmla="val 0.08",
+        // a non-integer guide value that PowerPoint rejects as file corruption.
+        const el: PptxElement = {
+          type: 'shape',
+          shapeType: 'roundRect',
+          pos: { x: 0, y: 0, w: 2, h: 1 },
+          style: { fill: '#123456', cornerRadius: 0.08 },
+        };
+        const xml = buildShape(el, 10);
+        const m = /fmla="val (-?\d+(?:\.\d+)?)"/.exec(xml);
+        expect(m, 'roundRect should emit an adjust guide').toBeTruthy();
+        expect(Number.isInteger(Number(m![1]))).toBe(true);
+        expect(xml).toContain('fmla="val 8000"'); // 0.08 fraction -> 8% guide units
+        // raw guide units pass through, clamped to the 50000 max
+        const el2: PptxElement = {
+          type: 'shape',
+          shapeType: 'roundRect',
+          pos: { x: 0, y: 0, w: 2, h: 1 },
+          style: { fill: '#123456', cornerRadius: 40000 },
+        };
+        expect(buildShape(el2, 11)).toContain('fmla="val 40000"');
+      });
+
+      it('emits correct line-spacing percent for both multiplier and percent forms', () => {
+        const mult: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 4, h: 1 },
+          text: 'x',
+          style: { lineSpacing: 1.3 },
+        };
+        expect(buildShape(mult, 12)).toContain('<a:spcPct val="130000"/>'); // 1.3 -> 130%
+        const pct: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 4, h: 1 },
+          text: 'x',
+          style: { lineSpacing: 135 },
+        };
+        expect(buildShape(pct, 13)).toContain('<a:spcPct val="135000"/>'); // 135 -> 135%
+      });
+
       it('should apply valign as anchor attribute on bodyPr', () => {
         const el: PptxElement = {
           type: 'text',
@@ -650,7 +691,7 @@ describe('Native PPTX Engine', () => {
           (xml.match(/<\/a:pPr>/g) || []).length
         );
         expect(xml).toContain('<a:buChar char="■"/>');
-        expect(xml).toContain('<a:lnSpc><a:spcPct val="1350"/></a:lnSpc>');
+        expect(xml).toContain('<a:lnSpc><a:spcPct val="135000"/></a:lnSpc>');
         expect(xml).toContain('<a:spcBef><a:spcPts val="800"/></a:spcBef>');
         expect(xml).toContain('<a:spcAft><a:spcPts val="800"/></a:spcAft>');
         // ECMA-376 CT_TextParagraphProperties requires lnSpc/spcBef/spcAft to

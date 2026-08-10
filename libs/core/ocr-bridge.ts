@@ -5,7 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
-import { OcrRequest, OcrResult, OcrProvider } from './ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,
@@ -13,6 +13,7 @@ import {
 
 export class WindowsNativeOcrProvider implements OcrProvider {
   readonly id = 'windows_native';
+  readonly dataEgress = 'none' as const; // Windows OCR API, in-process
 
   async isAvailable(): Promise<boolean> {
     return probeWindowsNativeImageRecognition().ocr;
@@ -52,6 +53,7 @@ function getMimeType(filePath: string): string {
 
 export class TesseractOcrProvider implements OcrProvider {
   readonly id = 'tesseract';
+  readonly dataEgress = 'none' as const; // tesseract.js, in-process
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -119,6 +121,7 @@ export class TesseractOcrProvider implements OcrProvider {
 
 export class AppleVisionOcrProvider implements OcrProvider {
   readonly id = 'apple_vision';
+  readonly dataEgress = 'none' as const; // macOS Vision framework, on-device
 
   async isAvailable(): Promise<boolean> {
     return process.platform === 'darwin';
@@ -221,6 +224,7 @@ export class AppleVisionOcrProvider implements OcrProvider {
 
 export class LlmApiOcrProvider implements OcrProvider {
   readonly id = 'llm_api';
+  readonly dataEgress = 'external' as const; // uploads the image to a vendor API
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
@@ -405,16 +409,32 @@ export class LlmApiOcrProvider implements OcrProvider {
   }
 }
 
+/** Loopback hosts, i.e. a service running on this same machine. */
+function isLoopbackEndpoint(endpoint: string): boolean {
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0';
+  } catch {
+    return false;
+  }
+}
+
 export class LocalVlmOcrProvider implements OcrProvider {
   readonly id = 'local_vlm';
   private readonly endpoint: string;
   private readonly model: string;
+  /**
+   * "local" only as long as OLLAMA_HOST actually points at this machine — the
+   * name is not evidence, the resolved endpoint is.
+   */
+  readonly dataEgress: OcrDataEgress;
 
   constructor(endpoint = 'http://localhost:11434/api/generate', model = 'llama3-vision') {
     this.endpoint = process.env.OLLAMA_HOST
       ? `${process.env.OLLAMA_HOST.replace(/\/$/, '')}/api/generate`
       : endpoint;
     this.model = process.env.OLLAMA_VLM_MODEL || model;
+    this.dataEgress = isLoopbackEndpoint(this.endpoint) ? 'loopback' : 'external';
   }
 
   async isAvailable(): Promise<boolean> {
@@ -473,6 +493,17 @@ export class AdaptivePolicyRouter {
     }
   }
 
+  /**
+   * Egress a mode is allowed to use. This is the enforcement point: it also
+   * constrains providerPreference, so a preference can reorder the chain but
+   * can never widen it past what the mode permits.
+   */
+  private allowedEgress(mode: OcrRoutingMode): ReadonlySet<OcrDataEgress> {
+    if (mode === 'local_only') return new Set<OcrDataEgress>(['none']);
+    if (mode === 'privacy_first') return new Set<OcrDataEgress>(['none', 'loopback']);
+    return new Set<OcrDataEgress>(['none', 'loopback', 'external']);
+  }
+
   private getProviderIds(request: OcrRequest): string[] {
     const preferred =
       request.providerPreference && request.providerPreference.length > 0
@@ -480,18 +511,18 @@ export class AdaptivePolicyRouter {
         : [];
     const mode = request.mode || 'balanced';
 
-    let defaultChain: string[] = [];
-    if (mode === 'local_only') {
-      defaultChain = ['windows_native', 'apple_vision', 'tesseract'];
-    } else if (mode === 'privacy_first') {
-      defaultChain = ['windows_native', 'local_vlm', 'apple_vision', 'tesseract'];
-    } else if (mode === 'accurate') {
-      defaultChain = ['windows_native', 'llm_api', 'local_vlm', 'apple_vision', 'tesseract'];
-    } else {
-      defaultChain = ['windows_native', 'apple_vision', 'llm_api', 'tesseract'];
-    }
+    // Ordering preference only. Membership is decided by the egress filter in
+    // resolveCandidates(), derived from what each provider declares about itself.
+    const defaultChain =
+      mode === 'accurate'
+        ? ['windows_native', 'llm_api', 'local_vlm', 'apple_vision', 'tesseract']
+        : mode === 'privacy_first'
+          ? ['windows_native', 'local_vlm', 'apple_vision', 'tesseract']
+          : mode === 'local_only'
+            ? ['windows_native', 'apple_vision', 'tesseract']
+            : ['windows_native', 'apple_vision', 'llm_api', 'tesseract'];
 
-    const merged = [...preferred, ...defaultChain];
+    const merged = [...preferred, ...defaultChain, ...this.providers.keys()];
     const seen = new Set<string>();
     return merged.filter((id) => {
       if (seen.has(id)) return false;
@@ -501,12 +532,18 @@ export class AdaptivePolicyRouter {
   }
 
   async resolveCandidates(request: OcrRequest): Promise<OcrProvider[]> {
+    const allowed = this.allowedEgress(request.mode || 'balanced');
     const candidates: OcrProvider[] = [];
     for (const id of this.getProviderIds(request)) {
       const provider = this.providers.get(id);
-      if (provider && (await provider.isAvailable())) {
-        candidates.push(provider);
+      if (!provider) continue;
+      if (!allowed.has(provider.dataEgress)) {
+        logger.info(
+          `[ocr_bridge] provider ${provider.id} excluded: dataEgress='${provider.dataEgress}' not permitted by mode='${request.mode || 'balanced'}'`
+        );
+        continue;
       }
+      if (await provider.isAvailable()) candidates.push(provider);
     }
     return candidates;
   }
@@ -555,7 +592,9 @@ export async function ocrImageWithRouter(
     try {
       const result = await provider.recognize(request);
       if (result.status === 'succeeded') {
-        return result;
+        // Stamp the served egress so callers can assert what actually happened
+        // instead of trusting the mode they asked for.
+        return { ...result, providerDataEgress: provider.dataEgress };
       }
       lastError = new Error(result.error || `${provider.id}_ocr_failed`);
       logger.warn(

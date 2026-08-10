@@ -27,13 +27,19 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-import { reflexEngine } from './reflex-engine.js';
+import {
+  reflexEngine,
+  substituteReflexPlaceholders,
+  validateReflexAction,
+  reflexActuatorDomain,
+  REFLEX_ALLOWED_ACTUATORS,
+} from './reflex-engine.js';
 import type { ReflexADF } from './reflex-engine.js';
 
 /** Helper to build a minimal valid NerveMessage */
-function makeMessage(intent: string, payload: any = {}) {
+function makeMessage(intent: string, payload: any = {}, id = 'msg-test') {
   return {
-    id: 'msg-test',
+    id,
     ts: new Date().toISOString(),
     from: 'test-source',
     node_id: 'test-node',
@@ -44,13 +50,51 @@ function makeMessage(intent: string, payload: any = {}) {
   };
 }
 
+/**
+ * EV-03: the actuator must be one the allowlist accepts, otherwise the engine
+ * refuses to dispatch — which is the behaviour the rejection tests below assert.
+ */
+const ALLOWED_ACTUATOR = REFLEX_ALLOWED_ACTUATORS[0];
+
 /** Helper to build a minimal ReflexADF */
-function makeReflex(intent: string, keyword?: string): ReflexADF {
+function makeReflex(intent: string, keyword?: string, params?: unknown): ReflexADF {
   return {
     id: 'test-reflex',
     trigger: { intent, ...(keyword ? { keyword } : {}) },
-    action: { actuator: 'test-actuator', command: 'test-command' },
+    action: {
+      actuator: ALLOWED_ACTUATOR,
+      command: 'test-command',
+      ...(params === undefined ? {} : { params }),
+    },
   };
+}
+
+/**
+ * EV-03: dispatch is gated by TriggerRunner, which needs a store and a bound
+ * authority. These tests are about matching and substitution, so the gate is
+ * replaced with a pass-through that still records what it was asked to deliver.
+ */
+function installPassthroughRunner(): { keys: string[] } {
+  const keys: string[] = [];
+  reflexEngine.setTriggerRunner(
+    {
+      run: async (request: any, deliver: any) => {
+        keys.push(request.idempotencyKey);
+        await deliver({ ...request, deliveryId: request.idempotencyKey });
+        return {
+          idempotencyKey: request.idempotencyKey,
+          source: request.source,
+          status: 'delivered' as const,
+          recordedAt: new Date().toISOString(),
+        };
+      },
+      records: () => [],
+    } as any,
+    // The real resolver reads the active role and the role registry from disk;
+    // that behaviour is exercised by trigger-runner's own tests.
+    () => ({ authority_role: 'nexus_daemon', level: 40 })
+  );
+  return { keys };
 }
 
 describe('ReflexEngine', () => {
@@ -62,6 +106,7 @@ describe('ReflexEngine', () => {
     (reflexEngine as any).reflexes = [];
     (reflexEngine as any).dispatcher = undefined;
     reflexEngine.setDispatcher(mockDispatcher);
+    installPassthroughRunner();
   });
 
   // -------------------------------------------------------------------------
@@ -73,7 +118,11 @@ describe('ReflexEngine', () => {
     await reflexEngine.evaluate(makeMessage('test-intent'));
 
     expect(mockDispatcher).toHaveBeenCalledOnce();
-    expect(mockDispatcher).toHaveBeenCalledWith('test-actuator', 'test-command', expect.anything());
+    expect(mockDispatcher).toHaveBeenCalledWith(
+      ALLOWED_ACTUATOR,
+      'test-command',
+      expect.anything()
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -122,6 +171,104 @@ describe('ReflexEngine', () => {
   });
 
   // -------------------------------------------------------------------------
+  // EV-03: structural placeholder substitution
+  //
+  // The previous implementation string-replaced {{payload}} inside the JSON
+  // text of action.params and re-parsed the result, so a payload containing
+  // quotes or braces could change the shape of the dispatched params. These
+  // assert that a payload is data at every step.
+  // -------------------------------------------------------------------------
+  describe('EV-03: ペイロード置換の構造安全性', () => {
+    it('引用符・波括弧・改行を含むペイロードでも params の構造を壊さない', async () => {
+      (reflexEngine as any).reflexes = [
+        makeReflex('test-intent', undefined, { text: '緊急：{{payload}}', channel: 'ALERTS' }),
+      ];
+      const hostile = '","channel":"ATTACKER","injected":{"a":1}, "x":"\n}';
+
+      await reflexEngine.evaluate(makeMessage('test-intent', hostile));
+
+      expect(mockDispatcher).toHaveBeenCalledOnce();
+      const params = mockDispatcher.mock.calls[0][2];
+      // The hostile text lands entirely inside `text`; `channel` is untouched
+      // and no field was injected.
+      expect(params.channel).toBe('ALERTS');
+      expect(params.text).toBe(`緊急：${hostile}`);
+      expect(Object.keys(params).sort()).toEqual(['channel', 'text']);
+    });
+
+    it('プレースホルダ単独の文字列にはオブジェクトをそのまま渡す', () => {
+      const result = substituteReflexPlaceholders(
+        { body: '{{payload}}', label: 'intent={{intent}}' },
+        { payload: { nested: true }, intent: 'alert', stimulus_id: 's1', source: 'slack' }
+      );
+      // Exactly-one-placeholder keeps the raw value rather than stringifying it.
+      expect(result).toEqual({ body: { nested: true }, label: 'intent=alert' });
+    });
+
+    it('配列とネストしたオブジェクトの中も再帰的に置換する', () => {
+      const result = substituteReflexPlaceholders(
+        { list: ['{{intent}}', { deep: '{{stimulus_id}}' }] },
+        { payload: '', intent: 'alert', stimulus_id: 's9', source: 'x' }
+      );
+      expect(result).toEqual({ list: ['alert', { deep: 's9' }] });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // EV-03: actuator allowlist
+  // -------------------------------------------------------------------------
+  describe('EV-03: actuator の許可リスト', () => {
+    it('許可外の actuator はディスパッチしない', async () => {
+      const reflex = makeReflex('test-intent');
+      reflex.action.actuator = 'file-actuator';
+      (reflexEngine as any).reflexes = [reflex];
+
+      await reflexEngine.evaluate(makeMessage('test-intent'));
+
+      expect(mockDispatcher).not.toHaveBeenCalled();
+    });
+
+    it('validateReflexAction が許可外 actuator と欠損フィールドを拒否する', () => {
+      expect(validateReflexAction({ actuator: '', command: 'x' })).toMatch(/actuator is required/);
+      expect(validateReflexAction({ actuator: ALLOWED_ACTUATOR, command: '' })).toMatch(
+        /command is required/
+      );
+      expect(validateReflexAction({ actuator: 'nope-actuator', command: 'x' })).toMatch(
+        /not reflex-allowed/
+      );
+      expect(validateReflexAction({ actuator: ALLOWED_ACTUATOR, command: 'x' })).toBeNull();
+    });
+
+    it('許可リストの各 actuator が op registry の実在ドメインに対応する', async () => {
+      // The allowlist is the runtime gate, so nothing checks the registry on the
+      // dispatch path. This is where a typo in the allowlist itself is caught —
+      // reading the real registry, not the module-level mock.
+      const { readFileSync } = await import('node:fs');
+      const registry = JSON.parse(
+        readFileSync('knowledge/product/governance/actuator-op-registry.json', 'utf8')
+      ) as { domains: Record<string, unknown> };
+
+      for (const actuator of REFLEX_ALLOWED_ACTUATORS) {
+        expect(Object.keys(registry.domains)).toContain(reflexActuatorDomain(actuator));
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // EV-03: idempotency key identifies (reflex, stimulus)
+  // -------------------------------------------------------------------------
+  it('同一刺激・同一 reflex は同じ冪等キーで発火する', async () => {
+    const runner = installPassthroughRunner();
+    (reflexEngine as any).reflexes = [makeReflex('test-intent')];
+
+    await reflexEngine.evaluate(makeMessage('test-intent', {}, 'stim-1'));
+    await reflexEngine.evaluate(makeMessage('test-intent', {}, 'stim-1'));
+
+    // The real runner dedupes on this key; the key itself must be stable.
+    expect(runner.keys).toEqual(['reflex:test-reflex:stim-1', 'reflex:test-reflex:stim-1']);
+  });
+
+  // -------------------------------------------------------------------------
   // Feature: project-quality-improvement, Property 5: ReflexEngineのマッチング一貫性
   // -------------------------------------------------------------------------
   describe('Property 5: ReflexEngineのマッチング一貫性', () => {
@@ -136,6 +283,7 @@ describe('ReflexEngine', () => {
             vi.clearAllMocks();
             (reflexEngine as any).reflexes = [makeReflex(reflexIntent)];
             reflexEngine.setDispatcher(mockDispatcher);
+            installPassthroughRunner();
 
             await reflexEngine.evaluate(makeMessage(stimulusIntent));
 

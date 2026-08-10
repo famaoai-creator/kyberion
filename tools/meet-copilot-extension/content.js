@@ -37,6 +37,9 @@
       leave: { aria: [/通話から退出/i, /通話を退出/i, /退出/i, /leave call/i] },
       captionsOn: { aria: [/字幕をオン/i, /turn on captions/i, /字幕を表示/i] },
       captionSel: ['[aria-label*="字幕"] [jsname]', 'div[jsname][aria-live="polite"]'],
+      chatOpen: { aria: [/全員とチャット/i, /chat with everyone/i, /^チャット$/i] },
+      chatInputSel: ['textarea[aria-label*="メッセージ"]', 'textarea[aria-label*="message" i]'],
+      chatSend: { aria: [/メッセージを送信/i, /send a message/i, /send message/i] },
     },
     teams: {
       joinNow: {
@@ -60,6 +63,16 @@
         '[data-tid*="closed-caption"]',
         '[data-tid*="caption"]',
       ],
+      chatOpen: { aria: [/^チャット$/i, /^chat$/i], sel: ['[data-tid="chat-button"]'] },
+      chatInputSel: [
+        '[data-tid="ckeditor"]',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"]',
+      ],
+      chatSend: {
+        aria: [/送信/i, /\bsend\b/i],
+        sel: ['[data-tid="newMessageCommandBar-send"]', 'button[name="send"]'],
+      },
     },
     zoom: {
       joinNow: {
@@ -81,6 +94,14 @@
         aria: [/字幕を表示/i, /show captions/i, /closed caption/i, /ライブ文字起こし/i],
       },
       captionSel: ['[class*="live-transcription-subtitle"]', '[class*="caption"]'],
+      chatOpen: { aria: [/^チャット$/i, /^chat$/i, /チャットを開く/i, /open chat/i] },
+      chatInputSel: [
+        'textarea.chat-rtf-box__editor',
+        'div.chat-rtf-box__editor[contenteditable="true"]',
+        'textarea[aria-label*="チャット"]',
+        'div[contenteditable="true"]',
+      ],
+      chatSend: { aria: [/送信/i, /\bsend\b/i] },
     },
   };
 
@@ -228,6 +249,62 @@
     }
   }
 
+  // Chat posting for operator-approved utterances. The AI never reaches this
+  // path on its own: the side panel requires an explicit click per message.
+  function setFieldText(el, text) {
+    if (el.isContentEditable) {
+      el.focus();
+      el.textContent = text;
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
+      return true;
+    }
+    const proto =
+      el.tagName === 'TEXTAREA'
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (!setter) return false;
+    el.focus();
+    setter.call(el, text);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  function pressEnter(el) {
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      el.dispatchEvent(
+        new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true })
+      );
+    }
+  }
+
+  async function sendChat(text) {
+    const message = String(text || '').trim();
+    if (!message) return { ok: false, error: 'empty chat text' };
+
+    let input = findBySel(S.chatInputSel);
+    if (!input) {
+      const opener = find(S.chatOpen);
+      if (!opener) return { ok: false, error: `chat panel not found on ${PLATFORM}` };
+      opener.click();
+      const deadline = Date.now() + 5000;
+      while (!input && Date.now() < deadline) {
+        await sleep(250);
+        input = findBySel(S.chatInputSel);
+      }
+    }
+    if (!input) return { ok: false, error: `chat input not found on ${PLATFORM}` };
+    if (!setFieldText(input, message)) {
+      return { ok: false, error: `could not set chat text on ${PLATFORM}` };
+    }
+    await sleep(150);
+    const sendBtn = find(S.chatSend);
+    if (sendBtn && isVisible(sendBtn)) sendBtn.click();
+    else pressEnter(input);
+    return { ok: true, detail: { platform: PLATFORM, sent_via: sendBtn ? 'button' : 'enter' } };
+  }
+
   let captionObserver = null;
   const seenCaptions = new Set();
 
@@ -293,22 +370,105 @@
     });
   }
 
+  // Caption regions are a CUMULATIVE, LIVE-REVISED block, not a stream of
+  // utterances: every mutation re-renders the whole visible block, and live ASR
+  // keeps rewriting its tail as it refines the current sentence. Measured on a
+  // real Teams call: 453 mutations carrying 258k chars for ~19k chars of speech.
+  //
+  // So treat the longest common prefix between two consecutive blocks as the
+  // FINALIZED text (a revision can only change the tail) and emit only the part
+  // of it we have not emitted yet. The block also scrolls, dropping finalized
+  // lines off the top, which shrinks that prefix — re-anchor on the tail of what
+  // we already emitted when that happens.
+  const MAX_CAPTION_OVERLAP = 2000;
+
+  function commonPrefixLength(a, b) {
+    const max = Math.min(a.length, b.length);
+    let i = 0;
+    while (i < max && a[i] === b[i]) i += 1;
+    return i;
+  }
+
+  function createCaptionExtractor() {
+    let block = '';
+    let committed = 0;
+    let emittedTail = '';
+    return (next) => {
+      if (!next || next === block) return '';
+      const stable = commonPrefixLength(block, next);
+      if (stable < committed) {
+        // Scrolled: the block now starts partway into text we already emitted.
+        // Re-anchor on the longest head of the new block that our emitted tail
+        // ends with — that head is exactly the part already sent.
+        let anchor = 0;
+        const max = Math.min(emittedTail.length, next.length, MAX_CAPTION_OVERLAP);
+        for (let i = max; i > 0; i -= 1) {
+          if (emittedTail.endsWith(next.slice(0, i))) {
+            anchor = i;
+            break;
+          }
+        }
+        block = next;
+        committed = anchor;
+        return '';
+      }
+      block = next;
+      if (stable <= committed) return '';
+      // Keep the raw slice (separators included) in the tail: the re-anchor
+      // above matches against the block's own text, which is not trimmed.
+      const raw = next.slice(committed, stable);
+      committed = stable;
+      emittedTail = (emittedTail + raw).slice(-MAX_CAPTION_OVERLAP);
+      return raw.trim();
+    };
+  }
+
+  // ASR commits a couple of characters at a time, so finalized fragments are
+  // buffered into utterance-sized events instead of being pushed one by one.
+  const CAPTION_FLUSH_CHARS = 120;
+  const CAPTION_IDLE_MS = 2000;
+  const SENTENCE_END = /[。．！？!?]$/;
+  let captionBuffer = '';
+  let captionFlushTimer = null;
+
+  function flushCaptionBuffer() {
+    if (captionFlushTimer) {
+      clearTimeout(captionFlushTimer);
+      captionFlushTimer = null;
+    }
+    const text = captionBuffer.trim();
+    captionBuffer = '';
+    if (!text) return;
+    const key = text.slice(-200);
+    if (seenCaptions.has(key)) return;
+    seenCaptions.add(key);
+    if (seenCaptions.size > 500) seenCaptions.clear();
+    pushEvent({ event: 'caption', text, platform: PLATFORM });
+  }
+
+  function appendCaptionFragment(fragment) {
+    captionBuffer += fragment;
+    if (SENTENCE_END.test(captionBuffer) || captionBuffer.length >= CAPTION_FLUSH_CHARS) {
+      flushCaptionBuffer();
+      return;
+    }
+    if (captionFlushTimer) clearTimeout(captionFlushTimer);
+    captionFlushTimer = setTimeout(flushCaptionBuffer, CAPTION_IDLE_MS);
+  }
+
   function startCaptions() {
     const on = find(S.captionsOn);
     if (on) on.click();
     if (captionObserver) return;
+    const extractCaption = createCaptionExtractor();
     captionObserver = new MutationObserver(() => {
       let best = '';
       for (const region of captionRegions()) {
         const cleaned = cleanCaptionText(region.textContent || '');
         if (cleaned.length > best.length) best = cleaned;
       }
-      if (!best) return;
-      const key = best.slice(-200);
-      if (seenCaptions.has(key)) return;
-      seenCaptions.add(key);
-      if (seenCaptions.size > 500) seenCaptions.clear();
-      pushEvent({ event: 'caption', text: best, platform: PLATFORM });
+      const fragment = extractCaption(best);
+      if (fragment) appendCaptionFragment(fragment);
     });
     captionObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
@@ -371,6 +531,8 @@
       captionObserver.disconnect();
       captionObserver = null;
     }
+    // Don't lose the last, still-buffered sentence on the way out.
+    flushCaptionBuffer();
     return { ok: true };
   }
 
@@ -406,9 +568,9 @@
           const data = collectDiagnostics();
           pushEvent({ event: 'diagnostics', data });
           sendResponse({ ok: true, data });
-        } else if (message.type === 'meet:chat')
-          sendResponse({ ok: false, error: 'chat not implemented' });
-        else sendResponse({ ok: false, error: `unknown message ${message.type}` });
+        } else if (message.type === 'meet:chat') {
+          sendResponse(await sendChat(message.text));
+        } else sendResponse({ ok: false, error: `unknown message ${message.type}` });
       } catch (err) {
         sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });
       }

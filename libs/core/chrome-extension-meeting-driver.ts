@@ -22,8 +22,10 @@
  */
 
 import type { AudioBus } from './audio-bus.js';
+import { randomBytes } from 'node:crypto';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
+import { scrubContent } from './pii-scrubber.js';
 import { safeAppendFileSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import { registerMeetingJoinDriver } from './meeting-join-driver.js';
@@ -48,11 +50,16 @@ export interface ChromeExtensionMeetingDriverOptions {
   startMuted?: boolean;
   /** Start with camera off. Default true. */
   cameraOff?: boolean;
+  /** Pre-shared extension credential. Falls back to KYBERION_MEET_EXTENSION_TOKEN. */
+  wsAuthToken?: string;
 }
 
 const DEFAULT_PORT = 8779;
 const DEFAULT_HOST = '127.0.0.1';
 const logger = createLogger('meet-ext');
+const AI_PROVIDERS = new Set(['chrome-summarizer', 'chrome-prompt']);
+const AI_MODES = new Set(['full', 'rolling']);
+const MAX_AI_TEXT = 12_000;
 
 interface ExtensionEvent {
   event: string;
@@ -68,6 +75,50 @@ interface WsLike {
 interface WsServerLike {
   on(event: string, cb: (...args: unknown[]) => void): void;
   close(cb?: () => void): void;
+}
+
+function resolveExtensionAuthToken(options: ChromeExtensionMeetingDriverOptions): string {
+  const token = options.wsAuthToken?.trim() || process.env.KYBERION_MEET_EXTENSION_TOKEN?.trim();
+  if (!token || token.length < 32) {
+    throw new Error(
+      'Meet extension authentication is not configured. Set KYBERION_MEET_EXTENSION_TOKEN (32+ characters) and the same meetCopilotAuthToken in Chrome storage.'
+    );
+  }
+  return token;
+}
+
+function redactMeetingText(value: unknown): string {
+  try {
+    return scrubContent(String(value ?? '')).scrubbed_text.trim();
+  } catch {
+    return '[REDACTED:pii-scrubber-unavailable]';
+  }
+}
+
+function validAiEvent(event: ExtensionEvent): boolean {
+  if (!AI_PROVIDERS.has(String(event.provider || ''))) return false;
+  if (event.event === 'ai_summary') {
+    return (
+      typeof event.text === 'string' &&
+      event.text.length <= MAX_AI_TEXT &&
+      AI_MODES.has(String(event.mode || ''))
+    );
+  }
+  if (event.event === 'ai_insights') {
+    return (
+      event.insights !== null &&
+      typeof event.insights === 'object' &&
+      JSON.stringify(event.insights).length <= 32_000
+    );
+  }
+  if (event.event === 'ai_suggestions') {
+    return (
+      Array.isArray(event.suggestions) &&
+      event.suggestions.length <= 4 &&
+      JSON.stringify(event.suggestions).length <= 8_000
+    );
+  }
+  return false;
 }
 
 export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
@@ -94,6 +145,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     const joinTimeoutMs = (this.options.joinTimeoutSec ?? 120) * 1000;
     const startMuted = this.options.startMuted !== false;
     const cameraOff = this.options.cameraOff !== false;
+    const authToken = resolveExtensionAuthToken(this.options);
 
     const { WebSocketServer } = (await import('ws')) as unknown as {
       WebSocketServer: new (opts: { host: string; port: number }) => WsServerLike;
@@ -104,6 +156,47 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     const sessionId = `meet-ext-${Date.now().toString(36)}`;
     const captionsPath = pathResolver.shared(`tmp/meeting-captions-${sessionId}.jsonl`);
     const diagnosticsPath = pathResolver.shared(`tmp/meeting-diagnostics-${sessionId}.json`);
+    const summaryPath = pathResolver.shared(`tmp/meeting-summary-${sessionId}.json`);
+    const controlToken = randomBytes(32).toString('hex');
+
+    // On-device (Gemini Nano) output produced in the extension's side panel.
+    // The driver only persists it: it is a review artifact, never an input to
+    // the meeting, and the model never ran on this side of the channel.
+    const AI_EVENT_KINDS: Record<string, 'summary' | 'insights' | 'suggestions'> = {
+      ai_summary: 'summary',
+      ai_insights: 'insights',
+      ai_suggestions: 'suggestions',
+    };
+    const MAX_AI_HISTORY = 100;
+    const aiDocument: {
+      session_id: string;
+      source: string;
+      updated_at: string;
+      summary: Record<string, unknown> | null;
+      insights: Record<string, unknown> | null;
+      suggestions: Record<string, unknown> | null;
+      history: Array<Record<string, unknown>>;
+    } = {
+      session_id: sessionId,
+      source: 'chrome-built-in-ai',
+      updated_at: new Date().toISOString(),
+      summary: null,
+      insights: null,
+      suggestions: null,
+      history: [],
+    };
+    const recordAiEvent = (kind: 'summary' | 'insights' | 'suggestions', e: ExtensionEvent) => {
+      const { event: _event, control_token: _token, ...payload } = e;
+      const entry = { kind, ...payload, received_at: new Date().toISOString() };
+      aiDocument[kind] = entry;
+      aiDocument.history.push(entry);
+      if (aiDocument.history.length > MAX_AI_HISTORY) {
+        aiDocument.history.splice(0, aiDocument.history.length - MAX_AI_HISTORY);
+      }
+      aiDocument.updated_at = entry.received_at;
+      safeWriteFile(summaryPath, `${JSON.stringify(aiDocument, null, 2)}\n`);
+      logger.info(`on-device AI ${kind} recorded → ${summaryPath}`);
+    };
 
     const state: MeetingSessionState = {
       session_id: sessionId,
@@ -180,6 +273,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       mic: startMuted ? 'off' : 'on',
       camera: cameraOff ? 'off' : 'on',
       captions: true,
+      control_token: controlToken,
     };
 
     let joinAcked = false;
@@ -198,26 +292,63 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       // operator can reload the extension before joining — but we never re-issue
       // join once in-call (repeated joins destabilize the Meet session).
       wss.on('connection', (...args: unknown[]) => {
-        socket = args[0] as WsLike;
-        clearTimeout(timer);
-        socket.on('message', (...margs: unknown[]) => {
+        const candidate = args[0] as WsLike;
+        let authenticated = false;
+        candidate.on('message', (...margs: unknown[]) => {
           try {
             const parsed = JSON.parse(String(margs[0])) as ExtensionEvent;
+            if (!authenticated) {
+              if (parsed.event !== 'hello' || parsed.auth_token !== authToken) {
+                candidate.close();
+                return;
+              }
+              authenticated = true;
+              socket = candidate;
+              clearTimeout(timer);
+              if (joinAcked) {
+                // Rehydrate a restarted MV3 worker without re-running the
+                // meeting join flow, which can destabilize an active call.
+                candidate.send(JSON.stringify({ cmd: 'session', control_token: controlToken }));
+              } else {
+                logger.info(`authenticated Meet extension on ws://${host}:${port}; issuing join`);
+                candidate.send(JSON.stringify(joinCmd));
+              }
+              resolve();
+              return;
+            }
+            if (candidate !== socket) return;
+            if (parsed.control_token !== controlToken) return;
+            if (parsed.event?.startsWith('ai_') && !validAiEvent(parsed)) {
+              logger.warn(`ignored invalid AI event from extension: ${String(parsed.event)}`);
+              return;
+            }
             if (parsed.event === 'joined') joinAcked = true;
             if (parsed.event === 'caption') {
+              const { control_token: _token, ...caption } = parsed;
+              const safeCaption = {
+                ...caption,
+                ...(typeof parsed.text === 'string'
+                  ? { text: redactMeetingText(parsed.text) }
+                  : {}),
+                ...(typeof parsed.speaker === 'string'
+                  ? { speaker: redactMeetingText(parsed.speaker) }
+                  : {}),
+              };
               safeAppendFileSync(
                 captionsPath,
-                `${JSON.stringify({ ...parsed, ts: new Date().toISOString() })}\n`
+                `${JSON.stringify({ ...safeCaption, ts: new Date().toISOString() })}\n`
               );
               pushCaption(
-                typeof parsed.text === 'string' ? parsed.text : '',
-                typeof parsed.speaker === 'string' ? parsed.speaker : undefined
+                typeof safeCaption.text === 'string' ? safeCaption.text : '',
+                typeof safeCaption.speaker === 'string' ? safeCaption.speaker : undefined
               );
             }
             if (parsed.event === 'diagnostics') {
               safeWriteFile(diagnosticsPath, `${JSON.stringify(parsed.data ?? parsed, null, 2)}\n`);
               logger.info(`DOM diagnostics captured → ${diagnosticsPath}`);
             }
+            const aiKind = AI_EVENT_KINDS[parsed.event];
+            if (aiKind) recordAiEvent(aiKind, parsed);
             if (parsed.event === 'status') {
               logger.info(
                 `meeting status: ${String(parsed.phase ?? '')} ${JSON.stringify(parsed.detail ?? {})}`
@@ -231,22 +362,9 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
             /* ignore malformed frames */
           }
         });
-        socket.on('close', () => {
-          state.status = state.status === 'ended' ? 'ended' : 'error';
+        candidate.on('close', () => {
+          if (candidate === socket) state.status = state.status === 'ended' ? 'ended' : 'error';
         });
-        if (!joinAcked) {
-          logger.info(`extension connected on ws://${host}:${port}; issuing join`);
-          try {
-            socket.send(JSON.stringify(joinCmd));
-          } catch {
-            /* will retry on next connection */
-          }
-        } else {
-          logger.info(
-            `extension reconnected on ws://${host}:${port}; already joined (no re-issue)`
-          );
-        }
-        resolve();
       });
       wss.on('error', (...eargs: unknown[]) => {
         clearTimeout(timer);

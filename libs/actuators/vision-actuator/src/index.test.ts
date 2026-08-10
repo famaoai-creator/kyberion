@@ -109,6 +109,9 @@ describe('vision-actuator legacy facade', () => {
       confidence: 93,
       lines: undefined,
       provider: 'tesseract',
+      // Stamped by the router from the provider's own declaration, so a caller
+      // that asked for a local-only read can verify the image stayed here.
+      provider_data_egress: 'none',
     });
   });
 
