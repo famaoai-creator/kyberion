@@ -10,6 +10,7 @@ import {
 import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { sendIMessage } from './imessage-bridge.js';
+import { currentTriggerDeliveryId } from './trigger-correlation.js';
 
 /**
  * E2E-04 Task 2: the return path (Kyberion → operator).
@@ -208,13 +209,18 @@ export function notifyOperatorSync(
       recordUndeliveredNotification(event, payload, 'no_channel_configured');
       return false;
     }
-    const dedupeKey = `${event}:${payload.correlation_id || payload.title}`;
+    // EV-09: when this notification is a consequence of a trigger firing,
+    // inherit that delivery id so the operator can trace the notification back
+    // to its cause in one hop. An explicit correlation_id still wins.
+    const correlationId =
+      payload.correlation_id ||
+      currentTriggerDeliveryId() ||
+      `notify:${event}:${Date.now().toString(36)}`;
+    // Dedupe on the resolved correlation: two notifications from one firing are
+    // the same event, which the title-only fallback could not express.
+    const dedupeKey = `${event}:${payload.correlation_id || currentTriggerDeliveryId() || payload.title}`;
     if (!shouldNotifyOperator(dedupeKey)) return false;
-    deliver(
-      route,
-      formatNotificationText(event, payload),
-      payload.correlation_id || `notify:${event}:${Date.now().toString(36)}`
-    );
+    deliver(route, formatNotificationText(event, payload), correlationId);
     return true;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

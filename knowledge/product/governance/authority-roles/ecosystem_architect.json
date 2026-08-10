@@ -10,6 +10,7 @@
     "pipelines/",
     "schemas/",
     "tools/adf-replay-extension/",
+    "tools/meet-copilot-extension/",
     "active/missions/"
   ],
   "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],

@@ -2015,6 +2015,10 @@
           "kind": "transform"
         },
         {
+          "op": "deck_from_html",
+          "kind": "transform"
+        },
+        {
           "op": "find_slides_by_owner",
           "kind": "transform"
         },

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolveCollaborationKind } from './event-vocabulary.js';
 
 export const AGENT_COLLABORATION_SCHEMA_VERSION = 'agent-collaboration-event.v1' as const;
 
@@ -127,25 +128,15 @@ export function createAgentCollaborationEvent(
   };
 }
 
+/**
+ * EV-07: resolve an event name to a collaboration kind.
+ *
+ * The mapping lives in `event-vocabulary.ts`, which holds an exhaustive
+ * per-vocabulary table (so adding a worker/orchestration/task event type fails
+ * the build until its meaning is declared) plus anchored inference for the
+ * open-ended `decision` strings. This function stays as the projection's entry
+ * point; it is a re-export in behaviour, kept for call-site stability.
+ */
 export function collaborationKindFromEventType(eventType: unknown): CollaborationKind {
-  const type = String(eventType || '').toLowerCase();
-  if (type.includes('subagent_unavailable')) return 'failure';
-  if (type.includes('subagent')) return 'spawn';
-  if (type.includes('dispatch') || type.includes('issue')) return 'dispatch';
-  if (type.includes('claim') || type.includes('lease')) return 'claim';
-  if (type.includes('spawn') || type.includes('prewarm') || type.includes('runtime'))
-    return 'spawn';
-  if (type.includes('submit') || type.includes('artifact')) return 'artifact';
-  if (type.includes('review') || type.includes('accept')) return 'review';
-  if (type.includes('approval')) return 'approval';
-  if (type.includes('handoff')) return 'handoff';
-  if (type.includes('retry') || type.includes('reconcile')) return 'retry';
-  if (type.includes('fail') || type.includes('error')) return 'failure';
-  if (type.includes('complete') || type.includes('finish') || type.includes('success'))
-    return 'completion';
-  if (type.includes('wait') || type.includes('pending')) return 'waiting';
-  if (type.includes('block')) return 'blocked';
-  if (type.includes('step') || type.includes('progress') || type.includes('turn'))
-    return 'progress';
-  return 'unknown';
+  return resolveCollaborationKind(eventType);
 }

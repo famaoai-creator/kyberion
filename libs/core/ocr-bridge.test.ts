@@ -55,11 +55,13 @@ describe('AdaptivePolicyRouter', () => {
   beforeEach(() => {
     mockTesseract = {
       id: 'tesseract',
+      dataEgress: 'none' as const,
       isAvailable: vi.fn().mockResolvedValue(true),
       recognize: vi.fn(),
     };
     mockAppleVision = {
       id: 'apple_vision',
+      dataEgress: 'none' as const,
       isAvailable: vi.fn().mockResolvedValue(true),
       recognize: vi.fn(),
     };
@@ -107,11 +109,13 @@ describe('AdaptivePolicyRouter', () => {
   it('keeps later providers available for recognition-time fallback', async () => {
     const failingProvider: OcrProvider = {
       id: 'apple_vision',
+      dataEgress: 'none' as const,
       isAvailable: vi.fn().mockResolvedValue(true),
       recognize: vi.fn().mockRejectedValue(new Error('vision failed')),
     };
     const succeedingProvider: OcrProvider = {
       id: 'tesseract',
+      dataEgress: 'none' as const,
       isAvailable: vi.fn().mockResolvedValue(true),
       recognize: vi.fn().mockResolvedValue({
         status: 'succeeded',
@@ -343,5 +347,104 @@ describe('LocalVlmOcrProvider', () => {
         kyberion_allow_local_network: true,
       })
     );
+  });
+});
+
+describe('OCR egress capability routing', () => {
+  const local = (id: string): OcrProvider => ({
+    id,
+    dataEgress: 'none',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    recognize: vi.fn().mockResolvedValue({
+      status: 'succeeded',
+      provider: id,
+      text: 'ok',
+      confidence: 90,
+      elapsedMs: 1,
+    }),
+  });
+  const cloud = (id: string): OcrProvider => ({
+    id,
+    dataEgress: 'external',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    recognize: vi.fn().mockResolvedValue({
+      status: 'succeeded',
+      provider: id,
+      text: 'ok',
+      confidence: 99,
+      elapsedMs: 1,
+    }),
+  });
+  const loopback = (id: string): OcrProvider => ({
+    id,
+    dataEgress: 'loopback',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    recognize: vi.fn().mockResolvedValue({
+      status: 'succeeded',
+      provider: id,
+      text: 'ok',
+      confidence: 80,
+      elapsedMs: 1,
+    }),
+  });
+
+  it('excludes an external provider under local_only even when it is preferred', async () => {
+    const router = new AdaptivePolicyRouter([cloud('llm_api'), local('apple_vision')]);
+
+    const candidates = await router.resolveCandidates({
+      path: 'test.png',
+      mode: 'local_only',
+      providerPreference: ['llm_api'],
+    });
+
+    expect(candidates.map((p) => p.id)).toEqual(['apple_vision']);
+  });
+
+  it('excludes a loopback provider under local_only but allows it under privacy_first', async () => {
+    const router = new AdaptivePolicyRouter([loopback('local_vlm'), local('tesseract')]);
+
+    const strict = await router.resolveCandidates({ path: 'test.png', mode: 'local_only' });
+    const privacy = await router.resolveCandidates({ path: 'test.png', mode: 'privacy_first' });
+
+    expect(strict.map((p) => p.id)).toEqual(['tesseract']);
+    expect(privacy.map((p) => p.id)).toContain('local_vlm');
+  });
+
+  it('routes to an unlisted local provider rather than falling back to an external one', async () => {
+    // A provider added later without being written into any hand-kept chain.
+    const router = new AdaptivePolicyRouter([cloud('llm_api'), local('some_new_os_ocr')]);
+
+    const candidates = await router.resolveCandidates({ path: 'test.png', mode: 'local_only' });
+
+    expect(candidates.map((p) => p.id)).toEqual(['some_new_os_ocr']);
+  });
+
+  it('fails closed when no local provider is available under local_only', async () => {
+    const router = new AdaptivePolicyRouter([cloud('llm_api')]);
+
+    await expect(
+      ocrImageWithRouter({ path: 'test.png', mode: 'local_only' }, router)
+    ).rejects.toThrow('No available OCR provider');
+  });
+
+  it('stamps the served egress on the result so callers can assert it', async () => {
+    const router = new AdaptivePolicyRouter([local('apple_vision')]);
+
+    const result = await ocrImageWithRouter({ path: 'test.png', mode: 'local_only' }, router);
+
+    expect(result.providerDataEgress).toBe('none');
+  });
+
+  it('classifies the local VLM by its resolved endpoint, not by its name', async () => {
+    const previous = process.env.OLLAMA_HOST;
+    try {
+      process.env.OLLAMA_HOST = 'http://gpu-box.internal:11434';
+      expect(new LocalVlmOcrProvider().dataEgress).toBe('external');
+      process.env.OLLAMA_HOST = 'http://127.0.0.1:11434';
+      expect(new LocalVlmOcrProvider().dataEgress).toBe('loopback');
+    } finally {
+      if (previous === undefined) delete process.env.OLLAMA_HOST;
+      else process.env.OLLAMA_HOST = previous;
+    }
   });
 });

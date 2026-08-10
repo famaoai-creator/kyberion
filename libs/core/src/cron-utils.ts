@@ -61,7 +61,13 @@ export function getZonedDateParts(date: Date, timezone?: string): ZonedDateParts
   const parts = formatter.formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value || '';
   const weekdayMap: Record<string, number> = {
-    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
   };
   return {
     year: Number(get('year')),
@@ -73,7 +79,56 @@ export function getZonedDateParts(date: Date, timezone?: string): ZonedDateParts
   };
 }
 
-export function matchesCron(cronExpression: string, date: Date = new Date(), timezone?: string): boolean {
+/** Same zoned minute — used to suppress a second firing inside one cron minute. */
+export function sameZonedMinute(a: Date, b: Date, timezone?: string): boolean {
+  const aParts = getZonedDateParts(a, timezone);
+  const bParts = getZonedDateParts(b, timezone);
+  return (
+    aParts.year === bParts.year &&
+    aParts.month === bParts.month &&
+    aParts.day === bParts.day &&
+    aParts.hour === bParts.hour &&
+    aParts.minute === bParts.minute
+  );
+}
+
+/**
+ * EV-01: did a cron occurrence pass between `lastRun` and `now`?
+ *
+ * A scheduler that only asks "does the current minute match?" loses every
+ * firing that fell inside a downtime window — the daemon comes back up, the
+ * minute no longer matches, and the run is gone for good. This walks back
+ * minute by minute so a missed occurrence is recovered on the next tick.
+ *
+ * Previously private to pipeline-scheduler; the generation scheduler had no
+ * equivalent and silently dropped firings. Shared here so both schedulers make
+ * the same promise, and `maxLookbackMinutes` bounds the walk after a long
+ * outage (a week of downtime must not become a week-long loop).
+ */
+export function hasMissedCronOccurrence(
+  cron: string,
+  lastRun: Date,
+  now: Date,
+  timezone?: string,
+  maxLookbackMinutes = 7 * 24 * 60
+): boolean {
+  const floor = lastRun.getTime();
+  if (!Number.isFinite(floor)) return false;
+  const cursor = new Date(now.getTime());
+  cursor.setSeconds(0, 0);
+  for (let step = 0; step < maxLookbackMinutes; step++) {
+    if (cursor.getTime() <= floor) return false;
+    if (matchesCron(cron, cursor, timezone)) return true;
+    cursor.setMinutes(cursor.getMinutes() - 1);
+  }
+  return false;
+}
+
+export function matchesCron(
+  cronExpression: string,
+  date: Date = new Date(),
+  timezone?: string
+): boolean {
   const fields = cronExpression.trim().split(/\s+/);
   if (fields.length !== 5) return false;
   const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;

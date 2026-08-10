@@ -2,7 +2,13 @@ import { logger } from './core.js';
 import { ptyEngine } from './pty-engine.js';
 import { dispatchA2UI } from './a2ui.js';
 import { getAgentManifest, isActuatorAllowed } from './agent-manifest.js';
-import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './managed-process.js';
+import {
+  touchManagedProcess,
+  spawnManagedProcess,
+  stopManagedProcess,
+  type ManagedProcessWatchHandle,
+} from './managed-process.js';
+import { armTriggerWatch, resolveCurrentTriggerAuthority } from './trigger-runner.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import { pathResolver } from './path-resolver.js';
@@ -84,6 +90,15 @@ export interface ACPMediatorOptions {
     exitCode?: number | null;
     signal?: NodeJS.Signals | null;
   }) => void | Promise<void>;
+  /**
+   * EV-02: emit a governed `watch` trigger when the provider session produces
+   * no output for this long. A crash is already observed via the child's `exit`
+   * event, but a provider CLI that stays alive and goes silent was invisible —
+   * the turn simply hung until its own timeout. Set 0 to disable.
+   */
+  stallWatchMs?: number;
+  /** Called when the stall watch fires. Receives the watch event kind. */
+  onStall?: (info: { agentId: string; kind: string; tail?: string }) => void | Promise<void>;
 }
 
 export interface ProviderUsageSummary {
@@ -161,9 +176,58 @@ export class ACPMediator {
   private pendingAsk: PendingAsk | null = null;
   private crashState: CrashState | null = null;
   private shuttingDown = false;
+  private stallWatch: ManagedProcessWatchHandle | null = null;
 
   constructor(private options: ACPMediatorOptions) {
     this.runtimeResourceId = `acp:${options.threadId}`;
+  }
+
+  /**
+   * EV-02: route provider-session stalls through the governed trigger path.
+   *
+   * `armTriggerWatch` gives this the same guarantees cron firings get: one
+   * delivery per (session, event kind, timestamp) idempotency key, an authority
+   * snapshot checked against the role registry, and an audit record. The watch
+   * itself already rate-limits, so a wedged provider produces one governed
+   * event per quiet window rather than a stream of them.
+   *
+   * Failing to arm must never stop a boot — a session without stall detection
+   * is degraded, a session that refuses to start is broken. The reason is
+   * logged rather than swallowed.
+   */
+  private armStallWatch(): void {
+    const stallWatchMs = this.options.stallWatchMs ?? 0;
+    if (stallWatchMs <= 0) return;
+
+    try {
+      this.stallWatch = armTriggerWatch(this.runtimeResourceId, {
+        quietMs: stallWatchMs,
+        // One governed event per quiet window at most.
+        minTriggerIntervalMs: stallWatchMs,
+        idempotencyPrefix: `acp-stall:${this.options.threadId}`,
+        createdBy: resolveCurrentTriggerAuthority(),
+        deliver: async ({ payload }) => {
+          const kind = String((payload as { event?: unknown } | undefined)?.event ?? 'quiet');
+          const tail = (payload as { tail?: string } | undefined)?.tail;
+          this.log(
+            'runtime_stalled',
+            `provider produced no output for ${stallWatchMs}ms (${kind})`
+          );
+          logger.warn(
+            `[ACP_MEDIATOR] provider session ${this.options.threadId} stalled (${kind}); no output for ${stallWatchMs}ms`
+          );
+          await this.options.onStall?.({
+            agentId: this.options.threadId,
+            kind,
+            ...(tail ? { tail } : {}),
+          });
+        },
+      });
+    } catch (error: any) {
+      logger.warn(
+        `[ACP_MEDIATOR] stall watch not armed for ${this.options.threadId}: ${error?.message || error}`
+      );
+    }
   }
 
   private log(type: string, content: string): void {
@@ -321,6 +385,8 @@ export class ACPMediator {
         });
       }
     });
+
+    this.armStallWatch();
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -601,6 +667,10 @@ export class ACPMediator {
       this.pendingAsk.reject(new Error('ACP session shut down while the ask was in flight'));
       this.pendingAsk = null;
     }
+    // Stop the stall watch before killing the child, so a deliberate shutdown
+    // does not register as a stall (and leave a timer behind).
+    this.stallWatch?.stop();
+    this.stallWatch = null;
     if (this.child) {
       this.shuttingDown = true;
       stopManagedProcess(this.runtimeResourceId, this.child);

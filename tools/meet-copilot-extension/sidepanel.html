@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kyberion Meeting Copilot</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="shell-header">
+      <h1>Meeting Copilot</h1>
+      <p class="subtitle">端末内 AI（Gemini Nano）。字幕はこの Chrome の外に出ません。</p>
+    </header>
+
+    <p id="notice" class="notice" aria-live="polite"></p>
+
+    <section class="card" aria-labelledby="status-heading">
+      <h2 id="status-heading">状態</h2>
+      <dl class="status-grid">
+        <dt>制御チャネル</dt>
+        <dd id="status-ws">…</dd>
+        <dt>会議フェーズ</dt>
+        <dd id="status-phase">…</dd>
+        <dt>取得済み字幕</dt>
+        <dd id="status-captions">0</dd>
+      </dl>
+      <p id="ai-availability" class="ai-status" aria-live="polite"></p>
+      <div class="actions">
+        <button id="ai-prepare-button" class="secondary" type="button">AI モデルを準備</button>
+      </div>
+      <p id="ai-prepare-status" class="ai-status" aria-live="polite"></p>
+    </section>
+
+    <section class="card" aria-labelledby="summary-heading">
+      <h2 id="summary-heading">会議要約</h2>
+      <div class="actions">
+        <button id="summary-button" class="primary" type="button">いま要約する</button>
+        <label class="toggle">
+          <input id="rolling-toggle" type="checkbox" />
+          <span>ローリング要約</span>
+        </label>
+        <label class="inline-field">
+          <span>更新間隔（発話数）</span>
+          <input id="rolling-interval" type="number" min="5" max="200" step="5" value="20" />
+        </label>
+      </div>
+      <p id="summary-status" class="ai-status" aria-live="polite"></p>
+      <pre id="summary-output" class="output" aria-label="会議要約" hidden></pre>
+    </section>
+
+    <section class="card" aria-labelledby="insights-heading">
+      <h2 id="insights-heading">決定事項・ToDo</h2>
+      <div class="actions">
+        <button id="insights-button" class="primary" type="button">抽出する</button>
+      </div>
+      <p id="insights-status" class="ai-status" aria-live="polite"></p>
+      <div id="insights-output" class="output-block" hidden></div>
+    </section>
+
+    <section class="card" aria-labelledby="suggest-heading">
+      <h2 id="suggest-heading">発言サジェスト</h2>
+      <label class="field">
+        <span>あなたの立場</span>
+        <input id="suggest-role" type="text" placeholder="例: 提案側のプリセールス" />
+      </label>
+      <label class="field">
+        <span>この会議での狙い</span>
+        <input id="suggest-goal" type="text" placeholder="例: 次回PoCの合意を取る" />
+      </label>
+      <div class="actions">
+        <button id="suggest-button" class="primary" type="button">候補を出す</button>
+      </div>
+      <p id="suggest-status" class="ai-status" aria-live="polite"></p>
+      <p class="hint">
+        候補は自動送信されません。「チャットに送信」を押したときだけ会議に投稿されます。
+      </p>
+      <ul id="suggest-output" class="suggestions" hidden></ul>
+    </section>
+
+    <section class="card" aria-labelledby="transcript-heading">
+      <h2 id="transcript-heading">字幕（直近）</h2>
+      <pre id="transcript-output" class="output" aria-label="直近の字幕"></pre>
+    </section>
+
+    <script src="pii-rules.generated.js"></script>
+    <script src="meeting-ai.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
