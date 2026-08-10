@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { collectWorkScopePolicyViolations } from './check_work_scope_policy.js';
-import { loadWorkScopePolicy } from '../libs/core/work-scope-decision.js';
+import { loadWorkScopePolicy } from '@agent/core';
 
 describe('check_work_scope_policy', () => {
   it('accepts the bundled policy when every mandatory trigger is reachable', () => {

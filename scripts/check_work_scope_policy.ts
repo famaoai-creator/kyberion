@@ -9,7 +9,7 @@ import {
   DERIVABLE_MANDATORY_TRIGGER_IDS,
   loadWorkScopePolicy,
   type WorkScopePolicy,
-} from '../libs/core/work-scope-decision.js';
+} from '@agent/core';
 
 export function collectWorkScopePolicyViolations(policy: WorkScopePolicy): string[] {
   const derivable = new Set<string>(DERIVABLE_MANDATORY_TRIGGER_IDS);
