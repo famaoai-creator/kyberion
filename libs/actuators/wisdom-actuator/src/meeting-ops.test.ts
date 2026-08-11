@@ -13,6 +13,9 @@ import {
   resetReasoningBackend,
   stubReasoningBackend,
   summarizeActionItemLifecycle,
+  createWorkItem,
+  clearWorkCoordinationStore,
+  setWorkCoordinationNamespace,
 } from '@agent/core';
 import {
   applyRestrictedActionGate,
@@ -24,6 +27,24 @@ import {
 const FIX_MISSION = 'MSN-MTG-OPS-FIXTURE-001';
 const ROOT = pathResolver.rootDir();
 const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', FIX_MISSION);
+const WORK_ITEM_CONTEXT = {
+  organization_id: 'org-meeting-ops',
+  tenant_slug: 'tenant-meeting-ops',
+  mission_id: FIX_MISSION,
+  project_id: 'project-meeting-ops',
+  task_id: 'meeting-follow-up',
+};
+
+function createFixtureWorkItem(itemId: string) {
+  return createWorkItem({
+    itemId,
+    title: 'meeting follow-up reasoning',
+    description: 'test work item for governed meeting follow-up',
+    projectId: 'project-meeting-ops',
+    status: 'ready',
+    context: WORK_ITEM_CONTEXT,
+  });
+}
 
 function basePolicy(overrides: Partial<MeetingFacilitatorPolicy> = {}): MeetingFacilitatorPolicy {
   return {
@@ -112,6 +133,8 @@ describe('applyRestrictedActionGate', () => {
 
 describe('action-item follow-up ops', () => {
   beforeEach(() => {
+    setWorkCoordinationNamespace(`meeting-ops-test-${process.pid}`);
+    clearWorkCoordinationStore();
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
@@ -140,6 +163,8 @@ describe('action-item follow-up ops', () => {
   });
 
   afterEach(() => {
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
     resetReasoningBackend();
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
@@ -162,6 +187,7 @@ describe('action-item follow-up ops', () => {
 
     const report = await executeSelfActionItemsOp({
       mission_id: FIX_MISSION,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF').item_id,
       policy: basePolicy(),
     });
     const items = listActionItems(FIX_MISSION);
@@ -226,10 +252,12 @@ describe('action-item follow-up ops', () => {
 
     const first = await trackPendingActionItemsOp({
       mission_id: FIX_MISSION,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-1').item_id,
       policy: basePolicy(),
     });
     const second = await trackPendingActionItemsOp({
       mission_id: FIX_MISSION,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-2').item_id,
       policy: basePolicy(),
     });
     const items = listActionItems(FIX_MISSION);
