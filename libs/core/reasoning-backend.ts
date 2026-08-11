@@ -447,6 +447,8 @@ export interface ReasoningCallOptions {
    * policy. Absent = backend default.
    */
   model_tier?: 'fast' | 'standard' | 'deep';
+  /** Explicit provider model selected by governed task routing. */
+  model?: string;
   /** Cancellation propagated by delegateTaskHandle to killable providers. */
   signal?: AbortSignal;
   /** CE-11: this call is advice-only and must never produce a tool call. */
@@ -837,6 +839,15 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       return true;
     });
     return matches[0] || peers[0] || null;
+  }
+
+  /** Expose the primary provider's native subagent surface to the dispatcher. */
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    return this.candidates[0]?.backend.getNativeSubagentAdopter?.() ?? null;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return this.candidates[0]?.backend.requiresNativeSubagent?.() ?? false;
   }
 
   /**
@@ -1283,6 +1294,14 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
       .toLowerCase()
       .replace(/[-\s]+/g, '_');
     return (role && this.roleBackends.get(role)) || this.defaultBackend;
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    return this.defaultBackend.getNativeSubagentAdopter?.() ?? null;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return this.defaultBackend.requiresNativeSubagent?.() ?? false;
   }
   /** QM-06: forward session resets to every wrapped backend, best-effort. */
   async resetSession(): Promise<void> {

@@ -6,6 +6,11 @@ import {
   appendArtifactOwnershipRecord,
   createArtifactOwnershipRecord,
 } from './artifact-registry.js';
+import { HarnessSubagentDispatcher } from './agent-dispatch.js';
+import {
+  CodexCliReasoningBackend,
+  type CodexHarnessSession,
+} from './codex-cli-reasoning-backend.js';
 import {
   clearWorkCoordinationStore,
   createWorkItem,
@@ -15,10 +20,25 @@ import {
 } from './work-coordination.js';
 import { hashArtifactForReview, loadArtifactReviewReceipt } from './artifact-review.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
+import { buildMissionHandoffPacket } from './handoff-packet.js';
+import { projectWorkGraphToNextTasks } from './work-graph-projection.js';
+import {
+  claimWorkItem,
+  handoffWorkItem,
+  listCoordinationEvents,
+  releaseWorkItem,
+} from './work-coordination.js';
 
 const missionId = 'MSN-WORKITEM-DISPATCH-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -174,6 +194,16 @@ describe('mission work item dispatch', () => {
       )
     );
     createWorkItem({
+      title: `${missionId}: Completed prerequisite`,
+      description: 'Completed canonical prerequisite for dependency selection.',
+      status: 'done',
+      source: 'local',
+      sourceRef: `mission:${missionId}:completed-prerequisite`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'completed-prerequisite' },
+    });
+    createWorkItem({
       title: `${missionId}: Review the reconciled implementation`,
       description:
         'Review the reconciled implementation for correctness, security, regressions, and acceptance evidence.',
@@ -299,6 +329,16 @@ describe('mission work item dispatch', () => {
         2
       )
     );
+    createWorkItem({
+      title: `${missionId}: Completed prerequisite for canonical selection`,
+      description: 'Completed canonical prerequisite for dependency selection.',
+      status: 'done',
+      source: 'local',
+      sourceRef: `mission:${missionId}:completed-prerequisite-canonical-selection`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'completed-prerequisite' },
+    });
     for (const [taskId, title, dependencies] of [
       ['ready-task', 'Ready task', ['completed-prerequisite']],
       ['delivery-task', 'Delivery task', ['ready-task']],
@@ -347,6 +387,233 @@ describe('mission work item dispatch', () => {
     expect(tasks.find((task) => task.task_id === 'ready-task')?.status).toBe('completed');
     expect(tasks.find((task) => task.task_id === 'delivery-task')?.status).toBe('planned');
     expect(tasks.find((task) => task.task_id === 'retrospective-task')?.status).toBe('planned');
+  });
+
+  it('prefers canonical WorkItem dependencies over a stale NEXT_TASKS projection', async () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'completed-prerequisite', status: 'completed' },
+          { task_id: 'blocked-prerequisite', status: 'blocked' },
+          {
+            task_id: 'canonical-dependency-task',
+            status: 'planned',
+            dependencies: ['blocked-prerequisite'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    createWorkItem({
+      title: `${missionId}: Completed prerequisite`,
+      description: 'Provide the completed canonical prerequisite for the dependency test.',
+      status: 'done',
+      source: 'local',
+      sourceRef: `mission:${missionId}:completed-prerequisite`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'completed-prerequisite' },
+    });
+    createWorkItem({
+      title: `${missionId}: Blocked stale prerequisite`,
+      description: 'Represent the stale projection dependency that must not gate execution.',
+      status: 'blocked',
+      source: 'local',
+      sourceRef: `mission:${missionId}:blocked-prerequisite`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'blocked-prerequisite' },
+    });
+    createWorkItem({
+      title: `${missionId}: Use canonical dependency`,
+      description: 'Execute after the canonical WorkItem prerequisite has completed.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:canonical-dependency-task`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-architect',
+      dependencies: ['completed-prerequisite'],
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        task_id: 'canonical-dependency-task',
+        team_role: 'implementer',
+        deliverable: 'evidence/canonical-dependency-task.md',
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Completed using the canonical WorkItem dependency.',
+        artifacts: [{ path: 'evidence/canonical-dependency-task.md', kind: 'markdown' }],
+        verification_done: ['Verified WorkItem dependency precedence.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', limit: 1, statuses: ['ready'], finalStatus: 'done' },
+      { delegateTask }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(manifest.records[0]?.title).toContain('Use canonical dependency');
+  });
+
+  it('does not dispatch a projection-only task when its canonical dependency is missing', async () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'projection-only-task',
+            status: 'planned',
+            dependencies: ['missing-canonical-item'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    createWorkItem({
+      title: `${missionId}: Projection-only task`,
+      description: 'Remain undispatched while its canonical dependency is absent.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:projection-only-task`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-architect',
+      dependencies: ['missing-canonical-item'],
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        task_id: 'projection-only-task',
+        team_role: 'implementer',
+        deliverable: 'evidence/projection-only-task.md',
+      },
+    });
+
+    const delegateTask = vi.fn();
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', limit: 1, statuses: ['ready'], finalStatus: 'done' },
+      { delegateTask }
+    );
+
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(manifest.records).toHaveLength(0);
+    expect(
+      listWorkItems({ projectId: missionId }).find(
+        (item) => String(item.metadata?.task_id || '') === 'projection-only-task'
+      )?.status
+    ).toBe('ready');
+  });
+
+  it('resolves canonical witem dependencies when NEXT_TASKS uses another task namespace', async () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'projected-ready-task', status: 'planned' }], null, 2)
+    );
+    const completedPrerequisite = createWorkItem({
+      title: `${missionId}: Canonical prerequisite`,
+      description: 'Complete the canonical prerequisite for the namespace regression test.',
+      status: 'done',
+      source: 'local',
+      sourceRef: `mission:${missionId}:canonical-prerequisite`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'canonical-prerequisite' },
+    });
+    createWorkItem({
+      title: `${missionId}: Projected namespace task`,
+      description: 'Run after the canonical WorkItem prerequisite has reached terminal status.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:projected-ready-task`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-architect',
+      dependencies: [completedPrerequisite.item_id],
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        task_id: 'projected-ready-task',
+        team_role: 'implementer',
+        deliverable: 'evidence/projected-ready-task.md',
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Completed after resolving the canonical WorkItem dependency.',
+        artifacts: [{ path: 'evidence/projected-ready-task.md', kind: 'markdown' }],
+        verification_done: ['Verified canonical witem dependency resolution.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', limit: 1, statuses: ['ready'], finalStatus: 'done' },
+      { delegateTask }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(manifest.records[0]?.title).toContain('Projected namespace task');
+  });
+
+  it('treats an archived canonical WorkItem dependency as terminal', async () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'projected-archived-dependent', status: 'planned' }], null, 2)
+    );
+    const archivedPrerequisite = createWorkItem({
+      title: `${missionId}: Archived prerequisite`,
+      description: 'Provide an archived canonical prerequisite for the terminal status test.',
+      status: 'archived',
+      source: 'local',
+      sourceRef: `mission:${missionId}:archived-prerequisite`,
+      projectId: missionId,
+      labels: [`mission:${missionId}`, 'ticket:workitem'],
+      metadata: { mission_id: missionId, task_id: 'archived-prerequisite' },
+    });
+    createWorkItem({
+      title: `${missionId}: Archived dependency consumer`,
+      description: 'Run after the archived canonical WorkItem prerequisite is terminal.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:projected-archived-dependent`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-architect',
+      dependencies: [archivedPrerequisite.item_id],
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        task_id: 'projected-archived-dependent',
+        team_role: 'implementer',
+        deliverable: 'evidence/projected-archived-dependent.md',
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Completed after resolving the archived canonical dependency.',
+        artifacts: [{ path: 'evidence/projected-archived-dependent.md', kind: 'markdown' }],
+        verification_done: ['Verified archived WorkItem terminal status.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', limit: 1, statuses: ['ready'], finalStatus: 'done' },
+      { delegateTask }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(manifest.records[0]?.title).toContain('Archived dependency consumer');
   });
 
   it('routes a work item to the assigned agent and records the response', async () => {
@@ -881,6 +1148,7 @@ describe('mission work item dispatch', () => {
         acceptance_criteria: ['mention the reviewer sign-off'],
         risk: 'high_stakes',
         estimated_scope: 'L',
+        reviewer_agent_id: 'reviewer-agent',
       },
     });
 
@@ -915,6 +1183,7 @@ describe('mission work item dispatch', () => {
     );
 
     expect(delegateTask).toHaveBeenCalledTimes(2);
+    expect(String(delegateTask.mock.calls[1]?.[1] || '')).toContain('agent=reviewer-agent');
     expect(manifest.records[0]).toMatchObject({
       reviewer_status: 'refuted',
       reflection_status: 'review',
@@ -947,6 +1216,464 @@ describe('mission work item dispatch', () => {
       'Mission context pack (scoped, minimal, role-specific).'
     );
     expect(responseArtifact.response_text).toContain('implementation complete');
+  });
+
+  it('routes implementation and independent review surfaces through agent-runtime when requested', async () => {
+    createWorkItem({
+      title: `${missionId}: Route runtime-backed work`,
+      description:
+        'Route implementation and independent review through the managed runtime surface.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-runtime-surface`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-agent',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/runtime-surface.md',
+        target_path: 'deliverables/runtime-surface.md',
+        risk: 'high_stakes',
+        execution_surface: 'agent_runtime',
+        review_execution_surface: 'agent_runtime',
+        reviewer_agent_id: 'reviewer-agent',
+      },
+    });
+
+    const routeA2A = vi.fn(async (envelope: any) => ({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `RES-${envelope.header.receiver}`,
+        sender: envelope.header.receiver,
+        receiver: 'kyberion:workitem-dispatcher',
+        performative: 'result' as const,
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        runtime_id: `${envelope.header.receiver}-runtime`,
+        text:
+          envelope.header.receiver === 'reviewer-agent'
+            ? JSON.stringify({
+                approved: true,
+                refuted: false,
+                findings: [],
+                rationale: 'Independent runtime reviewer approved the result.',
+              })
+            : makeTaskResultText({
+                summary: 'Runtime-backed implementation completed.',
+                artifacts: [{ path: 'deliverables/runtime-surface.md', kind: 'markdown' }],
+                verification_done: ['Verified the runtime execution surface metadata.'],
+                gaps: [],
+                needs: [],
+              }),
+      },
+    }));
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'done' },
+      { routeA2A }
+    );
+
+    expect(routeA2A).toHaveBeenCalledTimes(2);
+    expect(routeA2A.mock.calls[0]?.[0]?.payload?.context).toMatchObject({
+      security_scope: expect.objectContaining({ mission_id: missionId }),
+    });
+    expect(manifest.records[0]).toMatchObject({
+      execution_surface: 'agent_runtime',
+      execution_surface_used: 'agent_runtime',
+      review_execution_surface: 'agent_runtime',
+      review_execution_surface_used: 'agent_runtime',
+      reviewer_status: 'approved',
+      attempt_id: expect.any(String),
+      runtime_id: expect.any(String),
+      output_ref: expect.any(String),
+      executor_agent_id: 'implementation-agent',
+      reviewer_agent_id: 'reviewer-agent',
+      review_attempt_id: expect.any(String),
+      review_runtime_id: expect.any(String),
+      review_output_ref: expect.any(String),
+    });
+    const coordinatedItem = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    expect(coordinatedItem.status).toBe('done');
+    expect(coordinatedItem).not.toHaveProperty('lease_id');
+    expect(coordinatedItem).not.toHaveProperty('current_attempt_id');
+    expect(coordinatedItem.attempts?.map((attempt) => attempt.status)).toEqual([
+      'released',
+      'completed',
+    ]);
+    expect(coordinatedItem.attempts?.map((attempt) => attempt.actor_peer_id)).toEqual([
+      'implementation-agent',
+      'reviewer-agent',
+    ]);
+    expect(coordinatedItem.metadata).toMatchObject({
+      attempt_id: expect.any(String),
+      runtime_id: expect.any(String),
+      output_ref: expect.any(String),
+      last_dispatch_attempt_id: manifest.records[0].attempt_id,
+      last_dispatch_runtime_id: manifest.records[0].runtime_id,
+      last_dispatch_output_ref: manifest.records[0].output_ref,
+      last_dispatch_executor_agent_id: 'implementation-agent',
+      last_reviewer_agent_id: 'reviewer-agent',
+      last_review_attempt_id: manifest.records[0].review_attempt_id,
+      last_review_runtime_id: manifest.records[0].review_runtime_id,
+      last_review_output_ref: manifest.records[0].review_output_ref,
+    });
+    const responseArtifact = JSON.parse(
+      safeReadFile(
+        `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`,
+        { encoding: 'utf8' }
+      ) as string
+    );
+    expect(responseArtifact).toMatchObject({
+      attempt_id: manifest.records[0].attempt_id,
+      runtime_id: manifest.records[0].runtime_id,
+      output_ref: manifest.records[0].output_ref,
+      executor_agent_id: 'implementation-agent',
+      reviewer_agent_id: 'reviewer-agent',
+      review_attempt_id: manifest.records[0].review_attempt_id,
+      review_runtime_id: manifest.records[0].review_runtime_id,
+      review_output_ref: manifest.records[0].review_output_ref,
+    });
+  });
+
+  it('keeps one WorkItem linked across projection, handoff, CLI execution, runtime review, and durable replay', async () => {
+    const item = createWorkItem({
+      title: `${missionId}: Cross-surface recovery path`,
+      description: 'Exercise the canonical Work Graph across handoff, execution, and review.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:cross-surface-recovery`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-agent',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      context: {
+        mission_id: missionId,
+        task_id: 'cross-surface-recovery',
+        work_shape: 'improvement_experiment',
+      },
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/cross-surface.md',
+        target_path: 'deliverables/cross-surface.md',
+        acceptance_criteria: ['preserve the WorkItem identity across every execution surface'],
+        risk: 'high_stakes',
+        execution_surface: 'hybrid',
+        review_execution_surface: 'agent_runtime',
+        reviewer_agent_id: 'reviewer-agent',
+        model_id: 'openai:gpt-5.6-luna',
+      },
+    });
+
+    const projection = projectWorkGraphToNextTasks({
+      missionId,
+      projectId: missionId,
+      missionPath,
+      apply: true,
+    });
+    expect(projection.projected_tasks).toEqual(
+      expect.arrayContaining([expect.objectContaining({ work_item_id: item.item_id })])
+    );
+
+    const firstClaim = claimWorkItem({
+      itemId: item.item_id,
+      actorPeerId: 'handoff-agent',
+      purpose: 'mission handoff',
+      idempotencyKey: 'cross-surface-handoff',
+    });
+    const handedOff = handoffWorkItem({
+      itemId: item.item_id,
+      fromPeerId: 'handoff-agent',
+      toPeerId: 'implementation-agent',
+      fromLeaseId: firstClaim.lease.lease_id,
+      expectedVersion: firstClaim.item.version,
+      purpose: 'execute the WorkItem',
+      handoffPacket: buildMissionHandoffPacket({
+        missionId,
+        previousPersona: 'coordinator',
+        nextPersona: 'worker',
+        correlationId: item.item_id,
+        note: 'resume the durable WorkItem execution',
+      }),
+    });
+    expect(handedOff.item.item_id).toBe(item.item_id);
+    expect(handedOff.item.metadata?.handoff_packet).toMatchObject({ work_item_id: item.item_id });
+    releaseWorkItem({
+      itemId: item.item_id,
+      leaseId: handedOff.toLease.lease_id,
+      actorPeerId: 'implementation-agent',
+      expectedVersion: handedOff.item.version,
+      nextStatus: 'ready',
+      summary: 'simulated runtime restart before dispatch resume',
+    });
+
+    const nativeSession: CodexHarnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({
+        text: makeTaskResultText({
+          summary: 'Native CLI subagent completed the implementation.',
+          artifacts: [{ path: 'deliverables/cross-surface.md', kind: 'markdown' }],
+          verification_done: ['Recorded native CLI provider and model proof.'],
+          gaps: [],
+          needs: [],
+        }),
+        stopReason: 'completed',
+        metadata: {
+          nativeSubagent: {
+            provider: 'codex',
+            model: 'gpt-5.6-luna',
+            threadId: 'thread-cross-surface-native',
+            turnId: 'turn-cross-surface-native',
+            mode: 'native-subagent',
+          },
+        },
+      })),
+    };
+    const nativeBackend = new CodexCliReasoningBackend({
+      model: 'openai:gpt-5.6-luna',
+      harnessSession: nativeSession,
+    });
+    const nativeDispatcher = new HarnessSubagentDispatcher();
+    const nativeSubagentTask = vi.fn(async (prompt: string, context?: string, options?: any) => {
+      const text = await nativeDispatcher.dispatch(prompt, context, nativeBackend, {
+        ...options,
+        profile: 'implementer',
+        role: 'implementer',
+        model: 'gpt-5.6-luna',
+      });
+      return {
+        text,
+        nativeSubagent: nativeBackend.getNativeSubagentAdopter?.().getInfo?.(),
+      };
+    });
+    const routeA2A = vi.fn(async (envelope: any) => ({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `RES-${envelope.header.receiver}`,
+        sender: envelope.header.receiver,
+        receiver: 'kyberion:workitem-dispatcher',
+        performative: 'result' as const,
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        runtime_id: 'runtime-restarted-review',
+        text: JSON.stringify({
+          approved: true,
+          refuted: false,
+          findings: [],
+          rationale: 'approved',
+        }),
+      },
+    }));
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'auto', finalStatus: 'done' },
+      { nativeSubagentTask, routeA2A }
+    );
+    expect(nativeSubagentTask).toHaveBeenCalledOnce();
+    expect(nativeSession.askNativeSubagent).toHaveBeenCalledOnce();
+    expect(nativeSession.ask).not.toHaveBeenCalled();
+    const durable = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    expect(manifest.records[0]).toMatchObject({
+      item_id: item.item_id,
+      execution_surface: 'hybrid',
+      execution_surface_used: 'cli_subagent',
+      review_execution_surface_used: 'agent_runtime',
+      reviewer_status: 'approved',
+      provider: expect.any(String),
+      model_id: 'openai:gpt-5.6-luna',
+      native_subagent: expect.objectContaining({
+        provider: 'codex',
+        model: 'gpt-5.6-luna',
+        mode: 'native-subagent',
+      }),
+      attempt_id: expect.any(String),
+      output_ref: `${item.item_id}:result`,
+      review_output_ref: expect.any(String),
+      review_runtime_id: 'runtime-restarted-review',
+    });
+    expect(durable).toMatchObject({ item_id: item.item_id, status: 'review' });
+    expect(durable.lease_id).toBeUndefined();
+    expect(durable.attempts).toHaveLength(4);
+    expect(durable.attempts?.every((attempt) => attempt.status === 'released')).toBe(true);
+    expect(
+      durable.attempts
+        ?.filter((attempt) => attempt.metadata?.work_item_id)
+        .map((attempt) => attempt.metadata?.work_item_id)
+    ).toEqual(expect.arrayContaining([item.item_id]));
+    const rehydrated = JSON.parse(
+      safeExec(
+        process.execPath,
+        [
+          '--import',
+          pathResolver.rootResolve('scripts/ts-loader.mjs'),
+          '--input-type=module',
+          '-e',
+          "import {getWorkItem} from './libs/core/work-coordination.ts'; console.log(JSON.stringify(getWorkItem(process.env.KYBERION_REHYDRATE_ITEM)))",
+        ],
+        {
+          cwd: pathResolver.rootDir(),
+          env: {
+            KYBERION_WORK_COORDINATION_NAMESPACE: 'mission-workitem-dispatch-test',
+            KYBERION_REHYDRATE_ITEM: item.item_id,
+          },
+        }
+      )
+    );
+    expect(rehydrated).toMatchObject({ item_id: item.item_id, status: 'review' });
+    expect(rehydrated.attempts).toHaveLength(4);
+    const responseArtifact = JSON.parse(
+      safeReadFile(`${missionPath}/evidence/workitem-dispatch-${item.item_id}.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(responseArtifact).toMatchObject({
+      item_id: item.item_id,
+      attempt_id: manifest.records[0].attempt_id,
+      output_ref: manifest.records[0].output_ref,
+      review_output_ref: manifest.records[0].review_output_ref,
+    });
+    expect(listCoordinationEvents(item.item_id).map((event) => event.event_type)).toEqual(
+      expect.arrayContaining(['handoff_written', 'handoff_consumed'])
+    );
+  });
+
+  it('keeps an explicitly hybrid WorkItem on CLI subagent for its initial attempt', async () => {
+    createWorkItem({
+      title: `${missionId}: Start hybrid work`,
+      description: 'Start a bounded hybrid work item on the lightweight execution surface.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-hybrid-surface`,
+      projectId: missionId,
+      assigneePeerId: 'hybrid-capable-agent',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/hybrid-surface.md',
+        target_path: 'deliverables/hybrid-surface.md',
+        execution_surface: 'hybrid',
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Hybrid work started on the CLI subagent surface.',
+        artifacts: [{ path: 'deliverables/hybrid-surface.md', kind: 'markdown' }],
+        verification_done: ['Recorded the initial hybrid surface.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const routeA2A = vi.fn();
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'auto', finalStatus: 'done' },
+      { delegateTask, routeA2A }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(routeA2A).not.toHaveBeenCalled();
+    expect(manifest.records[0]).toMatchObject({
+      execution_surface: 'hybrid',
+      execution_surface_used: 'cli_subagent',
+      attempt_id: expect.any(String),
+      executor_agent_id: 'hybrid-capable-agent',
+    });
+    const coordinatedItem = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    expect(coordinatedItem.attempts?.map((attempt) => attempt.status)).toEqual(['completed']);
+    expect(coordinatedItem.attempts?.[0]?.actor_peer_id).toBe('hybrid-capable-agent');
+    expect(coordinatedItem.lease_id).toBeUndefined();
+  });
+
+  it('defaults an unconfigured auto WorkItem with an assignee to CLI subagent', async () => {
+    createWorkItem({
+      title: `${missionId}: Use the default surface`,
+      description: 'Keep the terminal default on the lightweight CLI subagent surface.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-default-surface`,
+      projectId: missionId,
+      assigneePeerId: 'assigned-agent',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/default-surface.md',
+        target_path: 'deliverables/default-surface.md',
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Completed on the default CLI subagent surface.',
+        artifacts: [{ path: 'deliverables/default-surface.md', kind: 'markdown' }],
+        verification_done: ['Verified the default surface routing.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const routeA2A = vi.fn();
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'auto', finalStatus: 'done' },
+      { delegateTask, routeA2A }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(routeA2A).not.toHaveBeenCalled();
+    expect(manifest.records[0]).toMatchObject({
+      execution_surface: 'cli_subagent',
+      execution_surface_used: 'cli_subagent',
+    });
+  });
+
+  it('applies rubric-selected surfaces before legacy dispatch-mode defaults', async () => {
+    createWorkItem({
+      title: `${missionId}: Resolve rubric surface`,
+      description: 'Use the rubric to keep a score-two work item on the hybrid initial surface.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-rubric-surface`,
+      projectId: missionId,
+      assigneePeerId: 'legacy-agent',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/rubric-surface.md',
+        target_path: 'deliverables/rubric-surface.md',
+        execution_surface_signals: { recovery_requirement: 2 },
+      },
+    });
+
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Rubric-selected hybrid work completed on the CLI subagent surface.',
+        artifacts: [{ path: 'deliverables/rubric-surface.md', kind: 'markdown' }],
+        verification_done: ['Verified rubric precedence over legacy auto routing.'],
+        gaps: [],
+        needs: [],
+      })
+    );
+    const routeA2A = vi.fn();
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'auto', finalStatus: 'done' },
+      { delegateTask, routeA2A }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(routeA2A).not.toHaveBeenCalled();
+    expect(manifest.records[0]).toMatchObject({
+      execution_surface: 'hybrid',
+      execution_surface_used: 'cli_subagent',
+    });
   });
 
   it('injects reusable artifact hints into the dispatched prompt', async () => {

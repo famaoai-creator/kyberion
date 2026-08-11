@@ -1,6 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgyAdapter, ClaudeAdapter, CodexAppServerAdapter } from './agent-adapter.js';
 import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+
+const codexMocks = vi.hoisted(() => ({
+  resolveCodexBinary: vi.fn(),
+  safeExecResult: vi.fn(),
+  spawnManagedProcess: vi.fn(),
+  touchManagedProcess: vi.fn(),
+  stopManagedProcess: vi.fn(),
+}));
+
+vi.mock('./codex-cli-query.js', () => ({ resolveCodexBinary: codexMocks.resolveCodexBinary }));
+vi.mock('./secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return { ...actual, safeExecResult: codexMocks.safeExecResult };
+});
+vi.mock('./managed-process.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./managed-process.js')>('./managed-process.js');
+  return {
+    ...actual,
+    spawnManagedProcess: codexMocks.spawnManagedProcess,
+    touchManagedProcess: codexMocks.touchManagedProcess,
+    stopManagedProcess: codexMocks.stopManagedProcess,
+  };
+});
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -164,6 +190,62 @@ describe('AgyAdapter', () => {
 });
 
 describe('CodexAppServerAdapter', () => {
+  it('boots with the injected resolved binary and preserves startup diagnostics', async () => {
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const child = Object.assign(new EventEmitter(), {
+      pid: 42,
+      stdin: {
+        writable: true,
+        write(payload: string) {
+          const request = JSON.parse(payload);
+          const result =
+            request.method === 'initialize'
+              ? { capabilities: {} }
+              : { thread: { id: 'thread-boot' } };
+          setTimeout(
+            () => child.stdout.write(`${JSON.stringify({ id: request.id, result })}\n`),
+            0
+          );
+          return true;
+        },
+      },
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+    });
+    codexMocks.resolveCodexBinary.mockReturnValue('codex-from-fixture');
+    codexMocks.safeExecResult.mockReturnValue({ stdout: 'codex 9.9.9\n', stderr: '', status: 0 });
+    codexMocks.spawnManagedProcess.mockReturnValue({ child });
+    const adapter = new CodexAppServerAdapter({ cwd: 'fixture/project', timeoutMs: 1000 });
+
+    await adapter.boot();
+    child.stderr.write('codex_models_manager: cache unavailable');
+    child.stderr.write('unexpected startup detail');
+
+    expect(codexMocks.spawnManagedProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'codex-from-fixture',
+        args: ['app-server', '--listen', 'stdio://'],
+      })
+    );
+    expect(adapter.getRuntimeInfo()).toMatchObject({
+      codexBinary: 'codex-from-fixture',
+      codexVersion: 'codex 9.9.9',
+      threadId: 'thread-boot',
+    });
+    expect(stderrWrite.mock.calls.map(([line]) => String(line))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          '[UAA_CODEX_MODEL_CACHE_WARN] codex_models_manager: cache unavailable'
+        ),
+        expect.stringContaining('[UAA_CODEX_ERR] unexpected startup detail'),
+      ])
+    );
+    expect(stderrWrite.mock.calls.map(([line]) => String(line)).join(' ')).not.toContain(
+      '[UAA_CODEX_ERR] codex_models_manager'
+    );
+    stderrWrite.mockRestore();
+  });
+
   it('projects subagent turns onto configurable medium effort without spawning another process', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
     const requests: any[] = [];

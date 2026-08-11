@@ -1406,6 +1406,8 @@ Lifecycle Commands:
                                  --jira-domain <DOMAIN> --jira-project-key <KEY>
   dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
                                  --dispatch-mode auto|agent|subagent
+                                 --dispatch-execution-surface cli_subagent|agent_runtime|hybrid
+                                 --dispatch-review-execution-surface cli_subagent|agent_runtime|hybrid
                                  --dispatch-statuses ready,backlog
                                  --dispatch-rounds N (auto-retry blocked items, bounded)
                                  --dispatch-sources local,github,jira

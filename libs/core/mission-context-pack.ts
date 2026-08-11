@@ -55,12 +55,7 @@ type MissionStatus =
   | 'failed'
   | 'archived';
 type MissionContextRecipientKind =
-  | 'agent'
-  | 'subagent'
-  | 'reviewer'
-  | 'operator'
-  | 'planner'
-  | 'tester';
+  'agent' | 'subagent' | 'reviewer' | 'operator' | 'planner' | 'tester';
 type MissionContextDeliveryMode = 'prompt' | 'artifact';
 
 export interface MissionStateSummary {
@@ -891,6 +886,40 @@ function missionSources(input: {
       summary: `Work item ${input.workItemId}`,
       captured_at: new Date().toISOString(),
     });
+
+    const metadata = input.workItem.metadata as Record<string, unknown> | undefined;
+    const targetPaths = Array.isArray(metadata?.target_paths)
+      ? metadata.target_paths.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    for (const targetPath of targetPaths.slice(0, 24)) {
+      sources.push({
+        kind: 'other',
+        ref: `work-item-evidence:${targetPath}`,
+        path: targetPath,
+        summary: `Scoped review artifact for ${input.workItemId}: ${targetPath}`,
+        captured_at: new Date().toISOString(),
+      });
+    }
+    const verificationDone = Array.isArray(metadata?.verification_done)
+      ? metadata.verification_done.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    for (const verification of verificationDone.slice(0, 16)) {
+      sources.push({
+        kind: 'other',
+        ref: `work-item-verification:${input.workItemId}:${sources.length + 1}`,
+        summary: `Scoped verification: ${verification}`,
+        captured_at: new Date().toISOString(),
+      });
+    }
+    const criterionEvidence = metadata?.criterion_evidence;
+    if (criterionEvidence && typeof criterionEvidence === 'object') {
+      sources.push({
+        kind: 'other',
+        ref: `work-item-criterion-evidence:${input.workItemId}`,
+        summary: `Scoped criterion evidence: ${JSON.stringify(criterionEvidence).slice(0, 2200)}`,
+        captured_at: new Date().toISOString(),
+      });
+    }
   }
 
   for (const hint of input.knowledgeHints || []) {

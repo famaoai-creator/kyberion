@@ -33,6 +33,8 @@ export interface AgentExecutionReceipt {
   runtime_id?: string;
   provider?: string;
   model_id?: string;
+  /** Provider-native execution proof, when the task used a native subagent surface. */
+  native_subagent?: Record<string, unknown>;
   status: 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
   started_at?: string;
   completed_at?: string;

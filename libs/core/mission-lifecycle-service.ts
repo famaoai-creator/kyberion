@@ -32,6 +32,7 @@ import type { MissionStatusView, MissionSummary } from './mission-read-model.js'
 import { releaseOrchestratorSessionForMissionBestEffort } from './orchestrator-session.js';
 import { archiveMissionById } from './mission-maintenance.js';
 import type { ArchiveMissionByIdResult, PurgeMissionsResult } from './mission-maintenance.js';
+import type { MissionExecutionSurface } from './mission-execution-surface.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -124,6 +125,8 @@ export interface MissionLifecycleStartOptions extends MissionLifecycleCreateOpti
 
 export interface MissionLifecycleDispatchOptions extends MissionLifecycleVerbOptions {
   mode?: 'auto' | 'agent' | 'subagent';
+  executionSurface?: MissionExecutionSurface;
+  reviewExecutionSurface?: MissionExecutionSurface;
   limit?: number;
   statuses?: Array<
     'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
@@ -305,6 +308,8 @@ export function buildMissionLifecycleService(
       return runGovernedVerb('dispatch', normalizeMissionId(id), options, () =>
         resolveSystem(explicitSystem).dispatchMissionWorkItems(id, {
           mode: options?.mode,
+          executionSurface: options?.executionSurface,
+          reviewExecutionSurface: options?.reviewExecutionSurface,
           limit: options?.limit,
           statuses: options?.statuses,
           sources: options?.sources,

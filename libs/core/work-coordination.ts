@@ -145,6 +145,8 @@ export type WorkCoordinationEventType =
   | 'item_claimed'
   | 'item_released'
   | 'item_handed_off'
+  | 'handoff_written'
+  | 'handoff_consumed'
   | 'item_blocked'
   | 'item_unblocked'
   | 'item_attempt_started'
@@ -1280,6 +1282,7 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
     status: input.nextStatus || 'ready',
     version: current.version + 1,
     updated_at: now,
+    ...(input.metadata ? { metadata: { ...(current.metadata || {}), ...input.metadata } } : {}),
     lease_id: undefined,
     claimed_at: undefined,
     released_at: now,
@@ -1522,7 +1525,10 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
   // unclaimed (the inner claimWorkItem would reject only after the release).
   enforceNhiActorPolicy(input.toPeerId, 'work-coordination.handoffWorkItem');
   const current = currentWorkItem(input.itemId);
-  const packet =
+  const currentAttemptId = current?.attempts?.find(
+    (attempt) => attempt.run_id === current.current_attempt_id
+  )?.attempt_id;
+  const basePacket =
     input.handoffPacket ??
     buildWorkItemHandoffPacket({
       itemId: input.itemId,
@@ -1531,11 +1537,17 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
       fromPeerId: input.fromPeerId,
       toPeerId: input.toPeerId,
       correlationId: input.correlationId ?? input.traceId ?? input.idempotencyKey ?? input.itemId,
+      attemptId: currentAttemptId,
       metadata: {
         ...(current?.metadata || {}),
         ...(input.metadata || {}),
       },
     });
+  const packet: HandoffPacket = {
+    ...basePacket,
+    work_item_id: input.itemId,
+    ...(currentAttemptId ? { attempt_id: currentAttemptId } : {}),
+  };
   const nextMetadata = {
     ...(input.metadata || {}),
     handoff_packet: packet,
@@ -1550,6 +1562,14 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
     traceId: input.traceId,
     metadata: nextMetadata,
   });
+  appendEvent({
+    eventType: 'handoff_written',
+    itemId: input.itemId,
+    leaseId: released.lease.lease_id,
+    actorPeerId: input.fromPeerId,
+    note: `handoff packet written for ${input.itemId}`,
+    payload: { handoff_packet: packet, next_status: 'ready' },
+  });
   const claimed = claimWorkItem({
     itemId: input.itemId,
     actorPeerId: input.toPeerId,
@@ -1560,6 +1580,14 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
     idempotencyKey: input.idempotencyKey,
     traceId: input.traceId,
     metadata: nextMetadata,
+  });
+  appendEvent({
+    eventType: 'handoff_consumed',
+    itemId: input.itemId,
+    leaseId: claimed.lease.lease_id,
+    actorPeerId: input.toPeerId,
+    note: `handoff packet consumed by ${input.toPeerId}`,
+    payload: { handoff_packet: packet, from_lease_id: released.lease.lease_id },
   });
   appendEvent({
     eventType: 'item_handed_off',

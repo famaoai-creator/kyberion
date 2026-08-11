@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
   const refreshAgentRuntime = vi.fn();
   const restartAgentRuntime = vi.fn();
   const getAgentExecutionPort = vi.fn();
+  const delegateCoordinatedAgentTask = vi.fn();
 
   return {
     resolveMissionTeamPlan,
@@ -49,6 +50,7 @@ const mocks = vi.hoisted(() => {
     refreshAgentRuntime,
     restartAgentRuntime,
     getAgentExecutionPort,
+    delegateCoordinatedAgentTask,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -97,6 +99,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     refreshAgentRuntime: mocks.refreshAgentRuntime,
     restartAgentRuntime: mocks.restartAgentRuntime,
     getAgentExecutionPort: mocks.getAgentExecutionPort,
+    delegateCoordinatedAgentTask: mocks.delegateCoordinatedAgentTask,
     shutdownAllAgentRuntimes: vi.fn(),
     safeReadFile: vi.fn(),
   };
@@ -169,6 +172,69 @@ describe('agent-actuator team composition actions', () => {
 
     expect(delegate).toHaveBeenCalledWith(task);
     expect(result).toEqual({ status: 'succeeded', execution_kind: 'agent_delegation', receipt });
+  });
+
+  it('routes work-item task envelopes through the coordinated execution port', async () => {
+    const receipt = {
+      execution_kind: 'agent_delegation',
+      task_id: 'TASK-COORDINATED',
+      agent_id: 'agent-1',
+      work_item_id: 'witem-1',
+      attempt_id: 'attempt-1',
+      status: 'succeeded',
+    };
+    mocks.delegateCoordinatedAgentTask.mockResolvedValue(receipt);
+
+    const task = {
+      task_id: 'TASK-COORDINATED',
+      mission_id: 'MSN-TEAM',
+      agent_id: 'agent-1',
+      work_item_id: 'witem-1',
+      success_status: 'done',
+      security_scope: {
+        tenant_id: 'tenant-a',
+        mission_id: 'MSN-TEAM',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'test',
+      },
+      instruction: 'Implement the coordinated task.',
+      idempotency_key: 'idempotency-coordinated-1',
+    } satisfies CoordinatedAgentTaskEnvelope;
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'delegate',
+      params: { task },
+    } as AgentAction);
+
+    expect(mocks.delegateCoordinatedAgentTask).toHaveBeenCalledWith(task);
+    expect(mocks.getAgentExecutionPort).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'succeeded', execution_kind: 'agent_delegation', receipt });
+  });
+
+  it('propagates coordinated execution failures for WorkItem closure', async () => {
+    mocks.delegateCoordinatedAgentTask.mockRejectedValue(new Error('coordinated failure'));
+    const task = {
+      task_id: 'TASK-COORDINATED-FAILURE',
+      mission_id: 'MSN-TEAM',
+      agent_id: 'agent-1',
+      work_item_id: 'witem-failure',
+      security_scope: {
+        tenant_id: 'tenant-a',
+        mission_id: 'MSN-TEAM',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'test',
+      },
+      instruction: 'Fail the coordinated task.',
+      idempotency_key: 'idempotency-coordinated-failure',
+    } satisfies CoordinatedAgentTaskEnvelope;
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'delegate', params: { task } } as AgentAction)
+    ).rejects.toThrow('coordinated failure');
   });
 
   it('returns a resolved assignment for team_role', async () => {

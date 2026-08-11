@@ -1,7 +1,7 @@
 ---
 title: Work Graph and Execution Surface Unification
 tags: [work-graph, work-item, agent-runtime, subagent, handoff, next-tasks]
-last_updated: 2026-08-02
+last_updated: 2026-08-11
 role_affinity: [orchestrator, planner, mission_controller, implementer]
 phase_affinity: [alignment, execution, review]
 ---
@@ -69,6 +69,18 @@ Mission
 - dispatch、reconciliation、dashboardの読み取りをWork Graphへ移行する。
 - `NEXT_TASKS.json` は互換projectionとしてのみ維持する。
 - projection driftを検出する整合性チェックを追加する。
+
+## 2026-08-11 実装記録
+
+Phase 1 の dispatcher 接続スライスを実装した。
+
+- 明示された `agent_runtime` は A2A メッセージ形式を維持したまま、`CoordinatedAgentExecutionPort` を通して WorkItem の claim、attempt、lease 終端、結果記録を行う。
+- CLI subagent の標準 backend と差し替え delegate の双方を同じ ExecutionPort 境界へ集約した。
+- 実装と独立レビューが同じ WorkItem を使う場合も、実装の `released` とレビューの `completed` が attempt 履歴に残ることを契約テストで固定した。
+- `attempt_id`、`runtime_id`、`output_ref`、provider、実行者を manifest・response artifact・dispatch event・WorkItem metadata まで引き継ぎ、実装と独立レビューの receipt を混同しないようにした。
+- 旧 `--dispatch-mode agent` の暗黙 runtime→CLI fallback は後方互換性のため従来経路を維持している。明示 `agent_runtime` の利用不能時は fallback せず blocked/failed とする。
+
+完了: actuator 経路、handoff packet の共通ポート接続、`NEXT_TASKS.json` への canonical Work Graph additive projection を実装した。`NEXT_TASKS.json` は既存 lifecycle task を保持する互換 projection とし、WorkItem由来 task の drift を検出できる。subagent 応答待ちは既定10分へ延長し、LLM egress の実プローブ成功、Work Coordination テストの namespace 隔離も確認した。
 
 ## 完了条件
 
