@@ -1051,6 +1051,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/approval-gate-design.md",
+      "tier": "public",
+      "size": 2633,
+      "type": "md"
+    },
+    {
       "path": "product/governance/approval-policy.json",
       "tier": "public",
       "size": 2911,
@@ -1449,7 +1455,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6610,
+      "size": 6535,
       "type": "json"
     },
     {
@@ -1737,7 +1743,7 @@
     {
       "path": "product/governance/mission-orchestration-scenario-pack.json",
       "tier": "public",
-      "size": 14863,
+      "size": 15533,
       "type": "json"
     },
     {
@@ -1767,7 +1773,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 199811,
+      "size": 208799,
       "type": "json"
     },
     {
@@ -1935,7 +1941,7 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 2784,
+      "size": 5123,
       "type": "md"
     },
     {
@@ -2199,7 +2205,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20096,
+      "size": 20314,
       "type": "json"
     },
     {
@@ -4737,7 +4743,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 322687,
+      "size": 361876,
       "type": "json"
     },
     {
@@ -6915,7 +6921,7 @@
     {
       "path": "product/schemas/mission-orchestration-scenario-pack.schema.json",
       "tier": "public",
-      "size": 1347,
+      "size": 1419,
       "type": "json"
     },
     {
@@ -8104,6 +8110,12 @@
       "path": "product/schemas/workforce-resource-ref.schema.json",
       "tier": "public",
       "size": 2037,
+      "type": "json"
+    },
+    {
+      "path": "product/task-scenarios/aws-cost-estimate-from-vendor-docs.json",
+      "tier": "public",
+      "size": 2592,
       "type": "json"
     },
     {

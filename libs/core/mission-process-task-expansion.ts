@@ -7,6 +7,8 @@
 
 import * as nodePath from 'node:path';
 
+import { pathResolver } from './path-resolver.js';
+
 import type {
   MissionWorkflowDesign,
   WorkflowPhaseGate,
@@ -49,7 +51,9 @@ export interface ExpandProcessTemplateInput {
 }
 
 function substitutePlaceholders(value: string, missionId: string): string {
-  return value.replaceAll('{MISSION_ID}', missionId);
+  return value
+    .replaceAll('{MISSION_ID}', missionId)
+    .replaceAll('{REPO_ROOT}', pathResolver.rootDir());
 }
 
 function substituteDeep<T>(value: T, missionId: string): T {

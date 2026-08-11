@@ -131,7 +131,18 @@ function effectiveRole(element: BrowserSnapshotElement): string {
 function matchesTarget(element: BrowserSnapshotElement, target: RecordedRefTarget): boolean {
   if (!element.visible) return false;
   if (target.role && effectiveRole(element) !== normalize(target.role)) return false;
-  if (target.name && normalize(element.name) !== normalize(target.name)) return false;
+  if (target.name) {
+    const elName = normalize(element.name);
+    const tgName = normalize(target.name);
+    if (elName !== tgName) {
+      // Fuzzy matching for dynamic badge/count suffixes (e.g. "承認・確認 3" vs "承認・確認 5" or "承認・確認")
+      const tgStem = tgName.replace(/\s*\d+\s*$/, '').trim();
+      const elStem = elName.replace(/\s*\d+\s*$/, '').trim();
+      if (!tgStem || tgStem !== elStem) {
+        return false;
+      }
+    }
+  }
   return Boolean(target.role || target.name);
 }
 

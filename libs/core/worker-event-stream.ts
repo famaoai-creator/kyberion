@@ -69,7 +69,7 @@ export interface WorkerEventPayloadMap {
     title: string;
     summary: string;
     severity: 'low' | 'medium' | 'high';
-    kind: 'channel-approval' | 'secret_mutation';
+    kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
     expires_at?: string;
   };
   approval_response: {

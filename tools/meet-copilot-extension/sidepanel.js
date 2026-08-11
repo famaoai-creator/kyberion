@@ -29,6 +29,12 @@ const elements = {
   suggestButton: document.querySelector('#suggest-button'),
   suggestStatus: document.querySelector('#suggest-status'),
   suggestOutput: document.querySelector('#suggest-output'),
+  captureButton: document.querySelector('#capture-button'),
+  captureStatus: document.querySelector('#capture-status'),
+  screenContext: document.querySelector('#screen-context'),
+  resolveButton: document.querySelector('#resolve-button'),
+  resolveStatus: document.querySelector('#resolve-status'),
+  resolveOutput: document.querySelector('#resolve-output'),
   transcriptOutput: document.querySelector('#transcript-output'),
 };
 
@@ -36,6 +42,7 @@ const state = {
   transcript: [],
   summary: '',
   summarizedLines: 0,
+  screenContext: '',
   busy: false,
 };
 const aiReady = new Set();
@@ -290,9 +297,55 @@ async function runSuggestions() {
       : `ローカル生成: ${result.provider} — ${relayStatus} / 送信は手動です。`;
 }
 
+/**
+ * Ask for one shared-screen frame. The panel never sees the image: the worker
+ * hands it to the driver, which OCRs it on-device and pushes back redacted text
+ * as a panel:screen-context message.
+ */
+async function captureScreen() {
+  elements.captureStatus.textContent = '画面を取り込んでいます…';
+  const response = await send('panel:capture-frame');
+  if (!response?.ok) throw new Error(response?.error || '画面を取り込めませんでした。');
+  // The picker cannot distinguish a shared screen from a large camera tile,
+  // so show what it actually grabbed.
+  elements.captureStatus.textContent =
+    `${response.source_kind || '?'} ${response.source_size || ''} を取り込みました` +
+    `（候補${response.candidate_count ?? '?'}件）。端末内でOCR中…`;
+}
+
+async function resolveReferences() {
+  if (!state.screenContext) {
+    throw new Error(
+      '画面のテキストがまだ届いていません。「画面を取り込む」を先に実行してください。'
+    );
+  }
+  await ensureAiReady('prompt', elements.resolveStatus);
+  elements.resolveStatus.textContent = '指示語を解決しています…';
+  const result = await aiAdapter().resolveReferences({
+    transcript: transcriptText(),
+    screenContext: state.screenContext,
+    onProgress: (loaded) => updateAiProgress(elements.resolveStatus, loaded),
+  });
+  elements.resolveOutput.hidden = false;
+  elements.resolveOutput.innerHTML = result.references.length
+    ? listBlock(
+        '指示語の対応',
+        result.references.map(
+          (ref) =>
+            `「${ref.expression}」→ ${ref.refers_to}（確度: ${ref.confidence}／根拠: ${ref.evidence}）`
+        )
+      )
+    : '<p class="empty">画面テキストと対応づけられる指示語は見つかりませんでした。</p>';
+  elements.resolveStatus.textContent = `ローカル生成: ${result.provider}`;
+}
+
 // Serializes AI work: Gemini Nano sessions are expensive and a rolling update
 // firing on top of a manual run would interleave two summaries of the same text.
 function bindAction(button, handler, statusElement) {
+  // A control the current HTML does not have must not take the whole panel down
+  // with it: an unbound button is a missing feature, a thrown error at load time
+  // is every feature missing.
+  if (!button) return;
   button.addEventListener('click', async () => {
     if (state.busy) {
       showNotice('別の AI 処理を実行中です。', 'error');
@@ -318,6 +371,8 @@ bindAction(elements.aiPrepareButton, prepareAi, elements.aiPrepareStatus);
 bindAction(elements.summaryButton, () => runSummary({ rolling: false }), elements.summaryStatus);
 bindAction(elements.insightsButton, runInsights, elements.insightsStatus);
 bindAction(elements.suggestButton, runSuggestions, elements.suggestStatus);
+bindAction(elements.captureButton, captureScreen, elements.captureStatus);
+bindAction(elements.resolveButton, resolveReferences, elements.resolveStatus);
 
 function rollingInterval() {
   const value = Number(elements.rollingInterval.value);
@@ -345,6 +400,17 @@ chrome.runtime.onMessage.addListener((message) => {
     elements.statusCaptions.textContent = String(state.transcript.length);
     renderTranscript();
     maybeRollingSummary();
+    return;
+  }
+  // Redacted OCR text coming back from the driver after a frame capture.
+  if (message && message.type === 'panel:screen-context') {
+    state.screenContext = String(message.text || '');
+    if (!elements.screenContext || !elements.captureStatus) return;
+    elements.screenContext.hidden = !state.screenContext;
+    elements.screenContext.textContent = state.screenContext || '';
+    elements.captureStatus.textContent = state.screenContext
+      ? `画面テキストを取得しました（${state.screenContext.length}文字、PII除去済み・${message.provider || 'local'}）`
+      : '画面から読み取れるテキストがありませんでした。';
   }
 });
 

@@ -164,6 +164,7 @@
 ## 📁 product/governance
 - [Active Inquiry Protocol: The Power of Questioning](./product/governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Adapter-First Extension Policy](./product/governance/adapter-first-extension-policy.md) (public | Unknown)
+- [Approval Gate Design: Store First, Surface as Renderer](./product/governance/approval-gate-design.md) (public | Unknown)
 - [Audit ledger recovery and canonical location](./product/governance/audit-ledger-recovery.md) (public | Unknown)
 - [Authority, Role & Persona Model (v3.0)](./product/governance/AUTHORITY_MODEL.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
