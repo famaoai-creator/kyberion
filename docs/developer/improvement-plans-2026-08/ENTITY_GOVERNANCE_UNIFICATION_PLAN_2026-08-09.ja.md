@@ -169,4 +169,5 @@ Kyberion はミッションを中核に進化してきた。その結果、ミ�
 ## 8. 実装状況
 
 - 2026-08-09: 計画起草(read-only 監査 3 系統に基づく)。
-- 2026-08-09: Phase 1〜3 の実装基盤を追加。正準スコープ実行定数、tenant/project/work-item/organization 境界、tenant facade、組織 lifecycle、artifact/retention、drift checker、cleanup mission、git boundary を実コードへ接続。13ファイル132テスト、core build/typecheck、baseline pipeline、WorkItem migration の `quality.migrated_context = 0`、計画台帳の `missing = []` を確認。登録済み workspace 不在5件は archive 済み。現存 runtime の mission/project/distill 裁定・soft-delete 適用と追加の組合せ E2E は、人間承認を要する残作業とする。
+- 2026-08-09: Phase 1〜3 の実装基盤を追加。正準スコープ実行定数、tenant/project/work-item/organization 境界、tenant facade、組織 lifecycle、artifact/retention、drift checker、cleanup mission、git boundary を実コードへ接続。13ファイル132テスト、core build/typecheck、baseline pipeline、WorkItem migration の `quality.migrated_context = 0`、計画台帳の `missing = []` を確認。登録済み workspace 不在5件は archive 済み。
+- 2026-08-11: EG-11 の cleanup apply を approval-store の `mission_gate` に接続。対象 findings の payload hash、effect binding、認証済み human workflow、dry-run/fixture apply をテストで固定。実ツリーの mission/project/distill 裁定・soft-delete 適用は、引き続き個別の人間承認を要する。

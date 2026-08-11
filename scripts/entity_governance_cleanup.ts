@@ -2,6 +2,10 @@
  * explicitly approved, soft-delete-only operation with an evidence receipt. */
 import * as path from 'node:path';
 import {
+  computeApprovalPayloadHash,
+  createApprovalRequest,
+  listApprovalRequests,
+  loadApprovalRequest,
   missionEvidenceDir,
   pathResolver,
   safeExistsSync,
@@ -11,8 +15,13 @@ import {
   safeStat,
   safeWriteFile,
   listProjectRecords,
+  validateHumanFinalDecision,
   withExecutionContext,
+  type ApprovalRequestRecord,
 } from '@agent/core';
+
+export const CLEANUP_APPROVAL_CHANNEL = 'terminal';
+export const CLEANUP_EFFECT_BINDING = 'entity-governance-cleanup:soft-delete';
 
 export interface CleanupFinding {
   kind: string;
@@ -25,10 +34,20 @@ export interface CleanupReceipt {
   mission_id: string;
   mode: 'dry-run' | 'apply';
   approved_by?: string;
+  approval_request_id?: string;
   generated_at: string;
   findings: CleanupFinding[];
   moved: Array<{ from: string; to: string }>;
   receipt_path?: string;
+}
+
+export interface OpenCleanupApprovalResult {
+  missionId: string;
+  created: boolean;
+  requestId?: string;
+  payloadHash?: string;
+  findings: CleanupFinding[];
+  reason?: string;
 }
 
 function dirs(root: string): string[] {
@@ -108,21 +127,164 @@ export function collectCleanupFindings(rootDir = pathResolver.rootDir()): Cleanu
   return findings.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+export function buildCleanupApprovalPayload(
+  missionId: string,
+  findings: CleanupFinding[]
+): Record<string, unknown> {
+  return {
+    mission_id: missionId.trim().toUpperCase(),
+    findings: findings.map((finding) => ({ ...finding })),
+    effect: CLEANUP_EFFECT_BINDING,
+  };
+}
+
+export function computeCleanupApprovalPayloadHash(
+  missionId: string,
+  findings: CleanupFinding[]
+): string {
+  return computeApprovalPayloadHash(buildCleanupApprovalPayload(missionId, findings));
+}
+
+/** Open the EG-11 human approval without performing any cleanup. */
+export function openCleanupApproval(input: {
+  missionId: string;
+  requestedBy?: string;
+  rootDir?: string;
+}): OpenCleanupApprovalResult {
+  const missionId = input.missionId.trim().toUpperCase();
+  const findings = collectCleanupFindings(input.rootDir || pathResolver.rootDir());
+  const payloadHash = computeCleanupApprovalPayloadHash(missionId, findings);
+  const existing = listApprovalRequests({
+    storageChannels: [CLEANUP_APPROVAL_CHANNEL],
+    kind: 'mission_gate',
+    status: 'pending',
+  }).find((record) => record.source?.missionId?.toUpperCase() === missionId);
+
+  if (existing) {
+    if (existing.accountability?.payloadHash === payloadHash) {
+      return { missionId, created: false, requestId: existing.id, payloadHash, findings };
+    }
+    return {
+      missionId,
+      created: false,
+      requestId: existing.id,
+      payloadHash,
+      findings,
+      reason:
+        `A pending EG-11 approval (${existing.id}) is bound to a different findings set. ` +
+        'Cancel it before requesting approval for the changed cleanup scope.',
+    };
+  }
+
+  const record = createApprovalRequest('mission_controller', {
+    channel: CLEANUP_APPROVAL_CHANNEL,
+    storageChannel: CLEANUP_APPROVAL_CHANNEL,
+    threadTs: missionId,
+    correlationId: `entity-governance-cleanup-${missionId}`,
+    requestedBy: input.requestedBy || 'entity-governance-controller',
+    kind: 'mission_gate',
+    draft: {
+      title: `EG-11 cleanup approval: ${missionId}`,
+      summary: 'Approve the reviewed entity-governance cleanup findings.',
+      details: JSON.stringify(findings, null, 2),
+      severity: 'high',
+    },
+    source: { missionId },
+    requestedByContext: {
+      surface: 'terminal',
+      actorId: input.requestedBy || 'entity-governance-controller',
+      actorRole: 'mission_controller',
+      missionId,
+    },
+    justification: {
+      reason: 'EG-11 one-time cleanup of findings produced by the governed checker.',
+      impactSummary: 'Only recoverable archive moves and governed evolution moves are permitted.',
+      requestedEffects: [CLEANUP_EFFECT_BINDING],
+    },
+    risk: {
+      level: 'critical',
+      restartScope: 'manual',
+      requiresStrongAuth: true,
+      policyId: 'EG-11',
+    },
+    workflow: {
+      workflowId: `eg-11-${missionId}`,
+      mode: 'all_required',
+      requiredRoles: ['sovereign'],
+      stages: [],
+      approvals: [{ role: 'sovereign', status: 'pending' }],
+    },
+    accountability: {
+      finalDecision: 'human_only',
+      payloadHash,
+      effectBinding: CLEANUP_EFFECT_BINDING,
+    },
+  });
+
+  return { missionId, created: true, requestId: record.id, payloadHash, findings };
+}
+
+function assertCleanupApproval(
+  approvalRequestId: string,
+  missionId: string,
+  findings: CleanupFinding[]
+): ApprovalRequestRecord {
+  const approval = loadApprovalRequest(CLEANUP_APPROVAL_CHANNEL, approvalRequestId);
+  const humanApproval = approval?.workflow?.approvals?.find(
+    (entry) =>
+      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+  );
+  if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
+    throw new Error(
+      `[POLICY_VIOLATION] EG-11 requires an approved mission_gate request: ${approvalRequestId}`
+    );
+  }
+  if (approval.source?.missionId?.toUpperCase() !== missionId.trim().toUpperCase()) {
+    throw new Error('[POLICY_VIOLATION] EG-11 approval is bound to a different mission');
+  }
+  if (approval.accountability?.effectBinding !== CLEANUP_EFFECT_BINDING) {
+    throw new Error('[POLICY_VIOLATION] EG-11 approval is not bound to the cleanup effect');
+  }
+  if (
+    approval.accountability?.payloadHash !== computeCleanupApprovalPayloadHash(missionId, findings)
+  ) {
+    throw new Error('[POLICY_VIOLATION] EG-11 approval is bound to a different findings set');
+  }
+  if (!humanApproval) {
+    throw new Error('[POLICY_VIOLATION] EG-11 requires an authenticated human workflow approval');
+  }
+  validateHumanFinalDecision({
+    accountability: approval.accountability,
+    decidedByType: humanApproval.decidedByType,
+    authenticated: humanApproval.authenticated,
+    authMethod: humanApproval.authMethod,
+    payloadHash: humanApproval.payloadHash,
+    effectBinding: humanApproval.effectBinding,
+  });
+  return approval;
+}
+
 export function runCleanup(input: {
   missionId: string;
   apply?: boolean;
-  approvedBy?: string;
+  approvalRequestId?: string;
   rootDir?: string;
 }): CleanupReceipt {
-  if (input.apply && !input.approvedBy?.trim())
-    throw new Error('--approved-by is required with --apply');
   const rootDir = input.rootDir || pathResolver.rootDir();
   const findings = collectCleanupFindings(rootDir);
+  const approval = input.apply
+    ? input.approvalRequestId
+      ? assertCleanupApproval(input.approvalRequestId, input.missionId, findings)
+      : (() => {
+          throw new Error('--approval-request-id is required with --apply');
+        })()
+    : undefined;
   const moved: CleanupReceipt['moved'] = [];
   const receipt: CleanupReceipt = {
     mission_id: input.missionId,
     mode: input.apply ? 'apply' : 'dry-run',
-    ...(input.approvedBy ? { approved_by: input.approvedBy } : {}),
+    ...(approval?.decidedBy ? { approved_by: approval.decidedBy } : {}),
+    ...(approval ? { approval_request_id: approval.id } : {}),
     generated_at: new Date().toISOString(),
     findings,
     moved,
@@ -170,7 +332,9 @@ export function runCleanup(input: {
           });
         }
         const evidenceDir =
-          missionEvidenceDir(input.missionId) ||
+          (path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
+            ? missionEvidenceDir(input.missionId)
+            : undefined) ||
           path.join(rootDir, 'active/missions/confidential', input.missionId, 'evidence');
         safeMkdir(evidenceDir, { recursive: true });
         const receiptPath = path.join(evidenceDir, 'entity-governance-cleanup-receipt.json');
@@ -192,11 +356,20 @@ export function runCleanup(input: {
 
 export function main(argv = process.argv.slice(2)): void {
   const missionIndex = argv.indexOf('--mission-id');
-  const approvalIndex = argv.indexOf('--approved-by');
   const missionId = missionIndex >= 0 ? argv[missionIndex + 1] : 'MSN-EG-20260809B';
   const apply = argv.includes('--apply');
-  const approvedBy = approvalIndex >= 0 ? argv[approvalIndex + 1] : undefined;
-  const receipt = runCleanup({ missionId, apply, approvedBy });
+  const requestApproval = argv.includes('--request-approval');
+  const approvalIndex = argv.indexOf('--approval-request-id');
+  const approvalRequestId = approvalIndex >= 0 ? argv[approvalIndex + 1] : undefined;
+  const requestedByIndex = argv.indexOf('--requested-by');
+  const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
+  if (requestApproval) {
+    const result = openCleanupApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
+    console.log(JSON.stringify(result, null, 2));
+    if (result.reason) process.exitCode = 1;
+    return;
+  }
+  const receipt = runCleanup({ missionId, apply, approvalRequestId });
   console.log(JSON.stringify(receipt, null, 2));
 }
 
