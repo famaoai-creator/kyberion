@@ -1953,7 +1953,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 5190,
+      "size": 5648,
       "type": "md"
     },
     {
@@ -3831,7 +3831,7 @@
     {
       "path": "product/orchestration/onboarding-protocol.md",
       "tier": "public",
-      "size": 4904,
+      "size": 5827,
       "type": "md"
     },
     {
@@ -4743,7 +4743,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 361876,
+      "size": 368987,
       "type": "json"
     },
     {
@@ -7087,6 +7087,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/onboarding-context-binding.schema.json",
+      "tier": "public",
+      "size": 1628,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/onboarding-first-work.schema.json",
+      "tier": "public",
+      "size": 1793,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/onboarding-flow-policy.schema.json",
       "tier": "public",
       "size": 1888,
@@ -7251,7 +7263,7 @@
     {
       "path": "product/schemas/organization-profile.schema.json",
       "tier": "public",
-      "size": 3454,
+      "size": 3732,
       "type": "json"
     },
     {
