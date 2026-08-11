@@ -57,6 +57,14 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/.worktrees/**',
+      // Provider state dirs hold full repo checkouts (`.claude/worktrees/`).
+      // Discovering their test copies runs two instances of the same suite
+      // concurrently against the SAME shared fixture paths (e.g.
+      // knowledge/confidential/client-a/design/), so they delete each other's
+      // temp files — surfacing as spurious ENOENT/ENOTEMPTY failures that look
+      // like real regressions. Same root cause as the eslint ignore.
+      '**/.claude/**',
+      '**/.codex/**',
       '**/vault/**',
       '**/active/**',
       '**/docs/**',

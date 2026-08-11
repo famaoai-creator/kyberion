@@ -3,6 +3,7 @@ import {
   expandProcessTemplateTasks,
   processTemplateGateDefinitions,
 } from './mission-process-task-expansion.js';
+import { pathResolver } from './path-resolver.js';
 import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
 
 const PRESENTATION_LIKE_PHASES: WorkflowPhaseSpec[] = [
@@ -192,10 +193,21 @@ describe('mission-process-task-expansion', () => {
           entry_gate: {
             id: 'CONTENT_READY',
             checks: [
-              { kind: 'evidence_exists', params: { path: 'evidence/{MISSION_ID}-brief.json' } },
+              {
+                kind: 'evidence_exists',
+                params: { path: 'evidence/{MISSION_ID}-brief.json' },
+              },
             ],
           },
-          exit_gate: { id: 'DELIVERY_APPROVED', checks: [{ kind: 'human_override' }] },
+          exit_gate: {
+            id: 'DELIVERY_APPROVED',
+            checks: [
+              {
+                kind: 'command_succeeds',
+                params: { cwd: '{REPO_ROOT}', args: ['{MISSION_ID}'] },
+              },
+            ],
+          },
         },
       ],
     });
@@ -205,6 +217,8 @@ describe('mission-process-task-expansion', () => {
       'production:exit:DELIVERY_APPROVED',
     ]);
     expect(gates[0]?.gate.checks[0]?.params?.path).toBe('evidence/MSN-TEST-007-brief.json');
+    expect(gates[1]?.gate.checks[0]?.params?.cwd).toBe(pathResolver.rootDir());
+    expect(gates[1]?.gate.checks[0]?.params?.args).toEqual(['MSN-TEST-007']);
   });
 
   it('returns no tasks for designs without phase specs', () => {

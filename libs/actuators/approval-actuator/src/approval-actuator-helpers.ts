@@ -72,7 +72,7 @@ export interface ApprovalAction {
     note?: string;
     /** LC-10: closed-vocabulary rejection reason (rejection-reason.ts). */
     reasonCategory?: string;
-    requestKind?: 'channel-approval' | 'secret_mutation';
+    requestKind?: 'channel-approval' | 'secret_mutation' | 'mission_gate';
     expiresAt?: string;
     requestedByContext?: ApprovalRequesterContext;
     target?: ApprovalTargetDescriptor;

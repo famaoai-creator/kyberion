@@ -477,7 +477,7 @@ interface ArtifactRecordSummary {
 
 interface PendingApprovalSummary {
   id: string;
-  kind: 'channel-approval' | 'secret_mutation';
+  kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
   channel: string;
   storageChannel: string;
   requestedAt: string;

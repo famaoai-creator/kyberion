@@ -269,6 +269,13 @@ export async function parseDocument(input: ParseDocumentInput): Promise<IngestIr
       throw new Error(`ingest:parse_document — unsupported format: ${String(input.format)}`);
   }
 
+  // xlsx/text never contain an H1 to extract a title from (xlsx headings are
+  // per-sheet `##`), so fall back to the source file name — otherwise
+  // ingest:normalize_card rejects the card for a missing required title.
+  if (title === undefined && input.source_path) {
+    title = path.basename(input.source_path, path.extname(input.source_path));
+  }
+
   const sections = extractSections(textMarkdown);
   return {
     ...(title !== undefined ? { title } : {}),

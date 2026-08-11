@@ -76,6 +76,21 @@
       <ul id="suggest-output" class="suggestions" hidden></ul>
     </section>
 
+    <section class="card" aria-labelledby="screen-heading">
+      <h2 id="screen-heading">共有画面と指示語</h2>
+      <div class="actions">
+        <button id="capture-button" class="secondary" type="button">画面を取り込む</button>
+        <button id="resolve-button" class="primary" type="button">指示語を解決</button>
+      </div>
+      <p id="capture-status" class="ai-status" aria-live="polite"></p>
+      <p class="hint">
+        フレームは端末内でOCRされ、PII除去後のテキストだけがこのパネルに戻ります。画像はセッション終了時に破棄されます。
+      </p>
+      <pre id="screen-context" class="output" aria-label="画面から抽出したテキスト" hidden></pre>
+      <p id="resolve-status" class="ai-status" aria-live="polite"></p>
+      <div id="resolve-output" class="output-block" hidden></div>
+    </section>
+
     <section class="card" aria-labelledby="transcript-heading">
       <h2 id="transcript-heading">字幕（直近）</h2>
       <pre id="transcript-output" class="output" aria-label="直近の字幕"></pre>

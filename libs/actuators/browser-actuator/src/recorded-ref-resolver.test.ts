@@ -57,6 +57,14 @@ describe('resolveRecordedRefSelector', () => {
     expect(result).toEqual({ selector: 'button#submit', strategy: 'role_name' });
   });
 
+  it('resolves dynamic badge fluctuation via stem fuzzy matching on role+name', async () => {
+    const page = fakePage([
+      element({ tag: 'a', role: 'button', name: '承認・確認 5', selector: 'a#shonin' }),
+    ]);
+    const result = await resolveRecordedRefSelector(page, { role: 'button', name: '承認・確認 3' });
+    expect(result).toEqual({ selector: 'a#shonin', strategy: 'role_name' });
+  });
+
   it('resolves native elements with no explicit role attribute via the implicit-role table', async () => {
     const page = fakePage([
       element({ tag: 'button', role: null, name: 'Submit', selector: 'button:nth-of-type(1)' }),

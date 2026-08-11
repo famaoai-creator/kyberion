@@ -14,11 +14,16 @@
  */
 
 import {
+  installAppleSpeechFileToTextBridgeIfAvailable,
+  installAppleSpeechToTextBridgeIfAvailable,
+  installFluidAudioSpeechToTextBridgeIfAvailable,
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
   logger,
   probeMicCapture,
   startInRoomMinutesSession,
 } from '@agent/core';
+import { t as catalogT } from '@agent/core/t';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -40,15 +45,39 @@ async function main(): Promise<number> {
 
   const probe = probeMicCapture();
   if (!probe.available) {
-    logger.error(`❌ マイクキャプチャを開始できません: ${probe.reason}`);
+    logger.error(`❌ ${catalogT('minutes_record:mic_capture_failed', { reason: probe.reason })}`);
     return 1;
   }
-  installShellSpeechToTextBridgeIfAvailable();
+  // Register every on-device STT backend, not just the shell one. Each
+  // installer no-ops when a higher-priority backend is already configured, so
+  // this is ordered best-first. Recording a whole meeting only to find the stub
+  // was in charge is the expensive failure here, so say which one won up front.
+  const sttBackend = installShellSpeechToTextBridgeIfAvailable()
+    ? 'shell (KYBERION_STT_COMMAND)'
+    : installFluidAudioSpeechToTextBridgeIfAvailable()
+      ? 'fluid-audio-parakeet'
+      : installManagedMlxWhisperSpeechToTextBridgeIfAvailable()
+        ? 'mlx_whisper'
+        : // Apple's on-device recognizers need no install and no model
+          // download. SpeechAnalyzer first (better output, macOS 26+), then
+          // SFSpeechRecognizer, which covers every macOS back to 10.15.
+          (await installAppleSpeechToTextBridgeIfAvailable())
+          ? 'apple-speech'
+          : installAppleSpeechFileToTextBridgeIfAvailable()
+            ? 'apple-speech-file'
+            : null;
+  if (!sttBackend) {
+    logger.warn(`⚠️  ${catalogT('minutes_record:stt_unavailable')}`);
+  }
 
   logger.info(
-    `🎙️  録音を開始します (mission: ${missionId.toUpperCase()}, backend: ${probe.backend})`
+    `🎙️  ${catalogT('minutes_record:recording_started', {
+      missionId: missionId.toUpperCase(),
+      backend: probe.backend,
+      stt: sttBackend ?? 'none (stub)',
+    })}`
   );
-  logger.info('   Ctrl-C で録音を終了し、議事録を生成します。');
+  logger.info('   Ctrl-C to stop recording and generate minutes.');
 
   const session = await startInRoomMinutesSession({
     missionId,
@@ -64,14 +93,18 @@ async function main(): Promise<number> {
   const finish = async () => {
     if (stopping) return;
     stopping = true;
-    logger.info('⏹  録音を終了し、議事録を生成しています…');
+    logger.info(`⏹  ${catalogT('minutes_record:recording_stopping')}`);
     try {
       const result = await session.stop();
+      const minutes = result.minutesPath
+        ? catalogT('minutes_record:recording_minutes_path', { path: result.minutesPath })
+        : catalogT('minutes_record:recording_short');
       logger.success(
-        `✅ 完了: セグメント${result.segments}件 → transcript: ${result.transcriptPath}` +
-          (result.minutesPath
-            ? ` / 議事録: ${result.minutesPath}`
-            : ' （音声が短すぎたため議事録は未生成）')
+        `✅ ${catalogT('minutes_record:recording_complete', {
+          segments: result.segments,
+          transcript: result.transcriptPath,
+          minutes,
+        })}`
       );
       process.exit(0);
     } catch (error) {

@@ -6,6 +6,7 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
   annotateApprovalRejectionReason,
+  type ApprovalRecord,
   type ApprovalRequestDraft,
   type ApprovalRequestRecord,
 } from './approval-store.js';
@@ -15,7 +16,8 @@ import {
   type RejectionReasonCategory,
 } from './rejection-reason.js';
 
-export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence';
+/** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
+export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence' | 'brief';
 export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
 
@@ -242,6 +244,16 @@ export function applySurfaceApprovalDecision(params: {
   threadTs: string;
   decidedBy: string;
   storageChannel?: string;
+  /**
+   * MO-11 S-3: how the decider was authenticated on this surface. Defaults to
+   * the surface's own strength, so callers that already trust their transport
+   * keep working unchanged.
+   */
+  authMethod?: ApprovalRecord['authMethod'];
+  /** Free-text rationale, carried into the event stream. */
+  note?: string;
+  /** LC-10 closed vocabulary — the same set every surface uses. */
+  reasonCategory?: RejectionReasonCategory;
 }): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.surface;
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -263,9 +275,27 @@ export function applySurfaceApprovalDecision(params: {
     decidedBy: params.decidedBy,
     decidedByType: 'human',
     authenticated: true,
+    authMethod: params.authMethod ?? defaultSurfaceAuthMethod(params.surface),
     payloadHash: record.accountability?.payloadHash,
     effectBinding: record.accountability?.effectBinding,
+    ...(params.note ? { note: params.note } : {}),
+    ...(params.reasonCategory ? { reasonCategory: params.reasonCategory } : {}),
   });
+}
+
+/**
+ * MO-11 S-3: only claim an authentication strength that the surface actually
+ * has. `brief` is a loopback page gated by a per-launch token — possession, not
+ * identity — so it is recorded as `local_token` and must never be logged as
+ * `surface_session`.
+ *
+ * Every other surface keeps its prior behaviour of recording nothing: asserting
+ * `surface_session` for all of them would be the same dishonesty in the other
+ * direction (`presence` is a local server too). Callers that know their own
+ * strength pass `authMethod` explicitly.
+ */
+function defaultSurfaceAuthMethod(surface: SurfaceApproval): ApprovalRecord['authMethod'] {
+  return surface === 'brief' ? 'local_token' : undefined;
 }
 
 export interface SurfaceApprovalReply {
