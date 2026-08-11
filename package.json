@@ -109,6 +109,7 @@
     "pipeline:dry-run": "node --import ./scripts/ts-loader.mjs scripts/run_pipeline_dry_run.ts",
     "company:bootstrap": "node --import ./scripts/ts-loader.mjs scripts/company_bootstrap.ts",
     "company:onboard": "node --import ./scripts/ts-loader.mjs scripts/company_onboarding.ts",
+    "onboarding:context": "node --import ./scripts/ts-loader.mjs scripts/onboarding_context.ts",
     "quality:report": "node --import ./scripts/ts-loader.mjs scripts/software_quality_report.ts",
     "minutes:record": "node --import ./scripts/ts-loader.mjs scripts/minutes_record.ts",
     "check:reference-drift": "vitest run tests/reference-drift-contract.test.ts",

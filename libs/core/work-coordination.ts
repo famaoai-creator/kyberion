@@ -1,4 +1,5 @@
 import * as crypto from 'node:crypto';
+import * as path from 'node:path';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { slugify } from './text-utils.js';
 
@@ -197,6 +198,7 @@ export interface CreateWorkItemInput {
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
   context?: WorkItemContext;
+  rootDir?: string;
 }
 
 export interface UpdateWorkItemInput {
@@ -215,6 +217,7 @@ export interface UpdateWorkItemInput {
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
   context?: WorkItemContext;
+  rootDir?: string;
 }
 
 export interface CreateBoardInput {
@@ -348,6 +351,7 @@ const PRIORITY_RANK: Record<WorkItemPriority, number> = {
   low: 3,
 };
 let coordinationNamespaceOverride: string | null = null;
+let coordinationRootOverride: string | null = null;
 
 export function setWorkCoordinationNamespace(namespace: string | null | undefined): void {
   coordinationNamespaceOverride = namespace ? String(namespace).trim() : null;
@@ -355,6 +359,16 @@ export function setWorkCoordinationNamespace(namespace: string | null | undefine
 
 export function clearWorkCoordinationNamespace(): void {
   coordinationNamespaceOverride = null;
+}
+
+function withCoordinationRoot<T>(rootDir: string | undefined, fn: () => T): T {
+  const previousRoot = coordinationRootOverride;
+  coordinationRootOverride = rootDir ? path.resolve(rootDir) : null;
+  try {
+    return fn();
+  } finally {
+    coordinationRootOverride = previousRoot;
+  }
 }
 
 function nowIso(): string {
@@ -388,12 +402,14 @@ function coordinationNamespace(): string {
 
 function runtimeRoot(): string {
   const namespace = coordinationNamespace();
-  return namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT;
+  const base = coordinationRootOverride || pathResolver.rootDir();
+  return path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT);
 }
 
 function observabilityRoot(): string {
   const namespace = coordinationNamespace();
-  return namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT;
+  const base = coordinationRootOverride || pathResolver.rootDir();
+  return path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT);
 }
 
 function itemsPath(): string {
@@ -775,8 +791,8 @@ export function listWorkItems(filter: WorkItemFilter = {}): WorkItem[] {
   return sortItems(items, 'updated_at');
 }
 
-export function getWorkItem(itemId: string): WorkItem | null {
-  return currentWorkItem(itemId);
+export function getWorkItem(itemId: string, options: { rootDir?: string } = {}): WorkItem | null {
+  return withCoordinationRoot(options.rootDir, () => currentWorkItem(itemId));
 }
 
 /**
@@ -829,6 +845,10 @@ export function listWorkItemAttempts(itemId: string): WorkItemAttempt[] {
 }
 
 export function createWorkItem(input: CreateWorkItemInput): WorkItem {
+  return withCoordinationRoot(input.rootDir, () => createWorkItemInternal(input));
+}
+
+function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
   const title = String(input.title || '').trim();
   const description = String(input.description || '').trim();
   if (!title) {
@@ -843,7 +863,10 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
     context.tenant_slug &&
     (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
   ) {
-    resolveTenant(context.tenant_slug);
+    resolveTenant(context.tenant_slug, {
+      rootDir: coordinationRootOverride || undefined,
+      env: process.env,
+    });
   }
   const item: WorkItem = {
     item_id: input.itemId || randomId('witem'),
@@ -933,6 +956,10 @@ function updateItemSnapshot(
 }
 
 export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
+  return withCoordinationRoot(input.rootDir, () => updateWorkItemInternal(input));
+}
+
+function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
   const current = currentWorkItem(input.itemId);
   if (!current) {
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);

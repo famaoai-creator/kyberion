@@ -30,6 +30,7 @@ import {
   saveOrganizationLearningCandidate,
   saveOrganizationIncident,
   saveOrganizationDecision,
+  t,
   type OrganizationCapabilityRecord,
   type OrganizationDomainRecord,
   type OrganizationOperationalState,
@@ -111,6 +112,50 @@ describe('organization operating model', () => {
     expect(view.readiness.pending_human_decisions).toBe(1);
     expect(view.control_plane.accounting.active_projects).toBe(0);
     expect(view.control_plane.accounting.pending_decisions).toBe(1);
+  });
+
+  it('keeps the organization management view inside its supplied root', () => {
+    const rootDir = pathResolver.sharedTmp('organization-root-isolation-test');
+    const isolatedOrganizationId = 'org-root-isolation-test';
+    const isolatedTenant = 'tenant-root-isolation';
+    safeRmSync(rootDir, { recursive: true, force: true });
+    try {
+      const state: OrganizationOperationalState = {
+        organization_id: isolatedOrganizationId,
+        name: 'Root Isolated Organization',
+        tier: 'confidential',
+        tenant_slug: isolatedTenant,
+        status: 'active',
+        updated_at: '2026-08-03T00:00:00.000Z',
+      };
+      saveOrganizationOperationalState(state, { rootDir });
+      saveOrganizationPurpose(
+        {
+          version: '1.0.0',
+          organization_id: isolatedOrganizationId,
+          name: state.name,
+          purpose: 'Verify root-aware management views.',
+          tier: 'confidential',
+          tenant_slug: isolatedTenant,
+          owner_role: 'operator',
+          approval_state: 'approved',
+          updated_at: state.updated_at,
+        },
+        { rootDir }
+      );
+
+      const view = buildOrganizationManagementView({
+        organizationId: isolatedOrganizationId,
+        tier: 'confidential',
+        tenantSlug: isolatedTenant,
+        rootDir,
+      });
+
+      expect(view.operational_state?.organization_id).toBe(isolatedOrganizationId);
+      expect(view.purpose?.purpose).toBe('Verify root-aware management views.');
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+    }
   });
 
   it('fails closed when a different tenant reads confidential organization state', () => {
@@ -360,6 +405,7 @@ describe('organization operating model', () => {
       organizationId,
       tier: 'confidential',
       tenantSlug,
+      locale: 'ja',
     });
     expect(routine).toMatchObject({
       work_shape: 'routine_operation',
@@ -368,7 +414,9 @@ describe('organization operating model', () => {
       human_decision: 'pending',
       dry_run: true,
     });
-    expect(routine.next_questions).toContain('operation_id を指定しますか？');
+    expect(routine.next_questions).toContain(
+      t('organization:organization_resolution_parent_question', { parent: 'operation_id' }, 'ja')
+    );
 
     const incident = resolveOrganizationWork({
       utterance: '本番障害を収束させる',
