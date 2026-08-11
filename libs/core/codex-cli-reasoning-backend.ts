@@ -48,6 +48,7 @@ export interface CodexHarnessSession {
   boot(): Promise<void>;
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  refreshContext?(): Promise<{ mode: 'soft' | 'restart' | 'stateless'; threadId?: string | null }>;
   getRuntimeInfo?(): Record<string, unknown>;
 }
 
@@ -64,6 +65,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   private harnessBoot?: Promise<void>;
   private harnessQueue: Promise<void> = Promise.resolve();
   private harnessModel?: string;
+  private harnessHasDelegatedTask = false;
   private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
   private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
@@ -184,6 +186,15 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
       const session = await this.getHarnessSession(permission.args, options?.model);
       if (!this.harnessBoot) this.harnessBoot = session.boot();
       await this.harnessBoot;
+      const shouldRefreshContext =
+        options?.context_mode === 'fresh' && this.harnessHasDelegatedTask;
+      // Mark the session as used before refresh/ask. A timed-out or failed
+      // native turn may still have mutated provider-side context, so the next
+      // fresh task must not inherit it silently.
+      this.harnessHasDelegatedTask = true;
+      if (shouldRefreshContext) {
+        await session.refreshContext?.();
+      }
       const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
       const response = await ask(
         [
@@ -244,6 +255,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     const session = this.harnessSession;
     this.harnessSession = undefined;
     this.harnessBoot = undefined;
+    this.harnessHasDelegatedTask = false;
     if (!session || session === this.injectedHarnessSession) return;
     const shutdown = (session as { shutdown?: () => Promise<void> }).shutdown;
     if (shutdown) {
@@ -261,6 +273,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
       if (shutdown) await shutdown.call(this.harnessSession).catch(() => undefined);
       this.harnessSession = undefined;
       this.harnessBoot = undefined;
+      this.harnessHasDelegatedTask = false;
     }
     if (this.harnessSession) return this.harnessSession;
     if (this.injectedHarnessSession) {

@@ -6,6 +6,7 @@
 import * as nodePath from 'node:path';
 import { a2aBridge, type A2AMessage } from './a2a-bridge.js';
 import type { AgentExecutionPort, AgentExecutionReceipt } from './agent-execution-port.js';
+import type { AgentContextMode } from './context-boundary.js';
 import {
   buildArtifactReviewReceipt,
   hashArtifactForReview,
@@ -854,6 +855,7 @@ async function runIndependentReviewerReview(input: {
       defaultExecutionSurface: input.reviewExecutionSurface,
       adapters: input.adapters,
       signal,
+      contextMode: 'fresh',
     })
   );
   const reviewerResponseText = reviewerResponse.responseText;
@@ -930,6 +932,7 @@ async function delegateSubagentTask(input: {
   notes: string[];
   signal: AbortSignal;
   securityScope: ContextSecurityScope;
+  contextMode: AgentContextMode;
   purpose?: 'implementation' | 'review';
 }): Promise<WorkItemExecutionOutcome> {
   const delegationContext = input.purpose === 'review' ? 'workitem-review' : 'workitem';
@@ -955,6 +958,7 @@ async function delegateSubagentTask(input: {
             delegationContextRef,
             {
               ...input.routingOptions,
+              context_mode: input.contextMode,
               signal: input.signal,
             }
           );
@@ -963,11 +967,13 @@ async function delegateSubagentTask(input: {
         }
         if (input.adapters.delegateTask) {
           return input.adapters.delegateTask(input.prompt, delegationContextRef, {
+            context_mode: input.contextMode,
             signal: input.signal,
           });
         }
         return nativeDispatcher.dispatch(input.prompt, delegationContextRef, backend, {
           ...input.routingOptions,
+          context_mode: input.contextMode,
           profile: input.purpose === 'review' ? 'explorer' : 'implementer',
           role: input.purpose === 'review' ? 'reviewer' : 'implementer',
           signal: input.signal,
@@ -1024,6 +1030,7 @@ async function delegateSubagentTask(input: {
         ...(missionId ? { mission_id: missionId } : {}),
         ...(delegationIdentity ? { agent_id: delegationIdentity } : {}),
         security_scope: input.securityScope,
+        context_mode: input.contextMode,
         success_status:
           input.purpose === 'review' || isIndependentReviewRequired(input.item) ? 'review' : 'done',
         instruction: input.prompt,
@@ -2129,6 +2136,7 @@ async function routeToAgentOrSubagent(input: {
   securityScope: ContextSecurityScope;
   adapters: WorkItemDispatchAdapters;
   signal: AbortSignal;
+  contextMode: AgentContextMode;
 }): Promise<
   {
     executionMode: 'agent' | 'subagent';
@@ -2196,6 +2204,7 @@ async function routeToAgentOrSubagent(input: {
       notes,
       signal: input.signal,
       securityScope: input.securityScope,
+      contextMode: input.contextMode,
       purpose: surfacePurpose,
     });
     return {
@@ -2222,6 +2231,7 @@ async function routeToAgentOrSubagent(input: {
       notes,
       signal: input.signal,
       securityScope: input.securityScope,
+      contextMode: input.contextMode,
       purpose: surfacePurpose,
     });
     return {
@@ -2280,6 +2290,7 @@ async function routeToAgentOrSubagent(input: {
                 execution_mode: 'workitem',
                 task_model_hint: input.taskModelHint,
                 security_scope: input.securityScope,
+                context_mode: input.contextMode,
               },
             },
           });
@@ -2318,6 +2329,7 @@ async function routeToAgentOrSubagent(input: {
         mission_id: input.missionId,
         agent_id: input.assigneePeerId,
         security_scope: input.securityScope,
+        context_mode: input.contextMode,
         success_status:
           surfacePurpose === 'review' || isIndependentReviewRequired(input.item)
             ? 'review'
@@ -2378,6 +2390,7 @@ async function routeToAgentOrSubagent(input: {
               execution_mode: 'workitem',
               task_model_hint: input.taskModelHint,
               security_scope: input.securityScope,
+              context_mode: input.contextMode,
             },
           },
         })
@@ -2412,6 +2425,7 @@ async function routeToAgentOrSubagent(input: {
               execution_mode: 'workitem',
               task_model_hint: input.taskModelHint,
               security_scope: input.securityScope,
+              context_mode: input.contextMode,
             },
           },
         });
@@ -2432,12 +2446,14 @@ async function routeToAgentOrSubagent(input: {
     const nativeDispatcher = new HarnessSubagentDispatcher();
     const responseText = input.adapters.delegateTask
       ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`, {
+          context_mode: input.contextMode,
           signal: input.signal,
         })
       : await nativeDispatcher.dispatch(prompt, `workitem:${input.item.item_id}`, backend, {
           model: input.taskModelHint.model_id,
           effort: input.taskModelHint.effort,
           profile: 'implementer',
+          context_mode: input.contextMode,
           role: 'implementer',
           signal: input.signal,
         });
@@ -2471,7 +2487,7 @@ async function obtainTaskResultResponse(input: {
   let attemptPrompt = input.prompt;
   const notes: string[] = [];
   let retried = false;
-  const route = (prompt: string) =>
+  const route = (prompt: string, contextMode: AgentContextMode) =>
     runWithWorkItemResponseDeadline((signal) =>
       routeToAgentOrSubagent({
         missionId: input.missionId,
@@ -2485,9 +2501,10 @@ async function obtainTaskResultResponse(input: {
         securityScope: input.securityScope,
         adapters: input.adapters,
         signal,
+        contextMode,
       })
     );
-  let response = await route(attemptPrompt);
+  let response = await route(attemptPrompt, 'fresh');
   let parsed = parseTaskResultResponse(response.responseText);
   let taskResult = parsed.taskResult;
   let parseErrors = parsed.parseErrors;
@@ -2514,7 +2531,7 @@ async function obtainTaskResultResponse(input: {
         ...parseErrors,
       ],
     });
-    response = await route(attemptPrompt);
+    response = await route(attemptPrompt, 'continue');
     parsed = parseTaskResultResponse(response.responseText);
     taskResult = parsed.taskResult;
     parseErrors = parsed.parseErrors;

@@ -40,15 +40,18 @@ import {
   askAgentRuntime,
   ensureAgentRuntime,
   getAgentRuntimeHandle,
+  refreshAgentRuntime,
   stopAgentRuntime,
 } from './agent-runtime-supervisor.js';
 import {
   askAgentRuntimeViaDaemon,
   createSupervisorBackedAgentHandle,
   ensureAgentRuntimeViaDaemon,
+  refreshAgentRuntimeViaDaemon,
   shutdownAgentRuntimeViaDaemon,
   toSupervisorEnsurePayload,
 } from './agent-runtime-supervisor-client.js';
+import { normalizeAgentContextMode, type AgentContextMode } from './context-boundary.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
 import {
   validateContextSecurityScope,
@@ -337,13 +340,17 @@ class A2ABridgeImpl {
     // Security: Only spawn agents that have a manifest (whitelist)
     const runtimeContextKey = this.getRuntimeContextKey(envelope.payload);
     const handle = await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
+    const conversationId = envelope.header.conversation_id;
+    const contextMode = this.extractContextMode(envelope.payload, Boolean(conversationId));
+    if (contextMode === 'fresh') {
+      await this.resetAgentContext(agentId);
+    }
 
     // Extract prompt from payload
     const rawPrompt = this.buildPromptFromPayload(envelope.payload);
     let runtimePrompt = rawPrompt;
     let rehydrated = false;
 
-    const conversationId = envelope.header.conversation_id;
     const storageConversationId = conversationId
       ? this.scopeConversationId(conversationId, securityScope)
       : undefined;
@@ -354,7 +361,7 @@ class A2ABridgeImpl {
 
     if (storageConversationId) {
       const history = readConversationHistory(storageConversationId);
-      if (history && history.length > 0) {
+      if (contextMode !== 'fresh' && history && history.length > 0) {
         const lastTurn = history[history.length - 1];
         const currentSessionId =
           typeof handle?.getRecord === 'function' ? handle.getRecord()?.sessionId || null : null;
@@ -789,6 +796,24 @@ class A2ABridgeImpl {
     return handle;
   }
 
+  private async resetAgentContext(agentId: string): Promise<void> {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_context_reset_requested',
+      agent_id: agentId,
+      requested_by: 'a2a_bridge',
+    });
+    try {
+      await refreshAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
+    } catch (_) {
+      await refreshAgentRuntime(agentId, 'a2a_bridge');
+    }
+    appendSupervisorEvent({
+      decision: 'agent_runtime_context_reset_completed',
+      agent_id: agentId,
+      requested_by: 'a2a_bridge',
+    });
+  }
+
   private syncCachedHandle(agentId: string): void {
     const supervisorHandle = getAgentRuntimeHandle(agentId);
     if (!supervisorHandle) {
@@ -934,6 +959,14 @@ class A2ABridgeImpl {
     if (!context || typeof context !== 'object') return undefined;
     const value = (context as Record<string, unknown>).dispatch_timeout_ms;
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+  }
+
+  private extractContextMode(payload: unknown, hasConversation = false): AgentContextMode {
+    const fallback: AgentContextMode = hasConversation ? 'continue' : 'fresh';
+    if (!payload || typeof payload !== 'object') return fallback;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return fallback;
+    return normalizeAgentContextMode((context as Record<string, unknown>).context_mode, fallback);
   }
 
   private validateTaskContractPayload(payload: unknown): { valid: boolean; errors: string[] } {

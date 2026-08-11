@@ -87,7 +87,7 @@ describe('codex-cli-query', () => {
     vi.clearAllMocks();
   });
 
-  it('prefers a real codex executable over the repo-local shim', () => {
+  it('defers binary discovery when no explicit override is provided', () => {
     const options = buildCodexCliQueryOptionsFromEnv({
       PATH: [
         'fake/system',
@@ -97,7 +97,8 @@ describe('codex-cli-query', () => {
       ].join(':'),
     } as NodeJS.ProcessEnv);
 
-    expect(options.bin).toBe('fake/system/codex');
+    expect(options.bin).toBeUndefined();
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
   });
 
   it('keeps an explicit override when provided', () => {

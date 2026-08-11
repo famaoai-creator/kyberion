@@ -1,8 +1,10 @@
 import type { AgentProvider } from './agent-registry.js';
+import type { AgentContextMode } from './context-boundary.js';
 import {
   askAgentRuntime,
   ensureAgentRuntime,
   getAgentRuntimeSnapshot,
+  refreshAgentRuntime,
 } from './agent-runtime-supervisor.js';
 import {
   validateContextSecurityScope,
@@ -22,6 +24,7 @@ export interface AgentTaskEnvelope {
   capabilities?: string[];
   timeout_ms?: number;
   idempotency_key: string;
+  context_mode?: AgentContextMode;
   provider?: AgentProvider;
   model_id?: string;
 }
@@ -77,6 +80,9 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
           authority_role_id: request.authority_role_id,
         },
       });
+      if (request.context_mode === 'fresh') {
+        await refreshAgentRuntime(agentId, 'agent_execution_port');
+      }
       const response = await askAgentRuntime(agentId, request.instruction, 'agent_execution_port', {
         timeoutMs: request.timeout_ms,
         correlationId: request.idempotency_key,
