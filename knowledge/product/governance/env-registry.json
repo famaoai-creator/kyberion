@@ -2314,6 +2314,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_REHYDRATE_ITEM",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_REMINDER_CC_AFTER_N",
       "category": "runtime",
       "type": "string",

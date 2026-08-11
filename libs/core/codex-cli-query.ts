@@ -331,11 +331,14 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
-    `[codex-cli] query helper ready (bin=${bin ?? resolveCodexBinary(env)}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
+    `[codex-cli] query helper ready (bin=${bin ?? '<deferred>'}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
   );
 
   return {
-    ...(bin ? { bin } : { bin: resolveCodexBinary(env) }),
+    // Keep binary discovery lazy. Building a reasoning backend is safe during
+    // CI/bootstrap even when Codex is not installed; the actual query
+    // constructor resolves the binary immediately before spawning it.
+    ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),

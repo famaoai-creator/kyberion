@@ -26,6 +26,7 @@ describe('a2a-task-contract schema', () => {
         team_role: 'mission-controller',
         execution_mode: 'task',
         channel: 'slack',
+        context_mode: 'fresh',
       },
     };
 
@@ -78,6 +79,21 @@ describe('a2a-task-contract schema', () => {
 
     expect(result.valid).toBe(true);
     expect(result.value?.context.correlation_id).toBe('corr-1');
+  });
+
+  it('accepts the Kyberion context-mode extension', () => {
+    const result = validateA2ATaskContract({
+      intent: 'request_mission_work',
+      text: 'execute the work item',
+      context: {
+        mission_id: 'MSN-schema-1',
+        team_role: 'worker',
+        context_mode: 'continue',
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.value?.context.context_mode).toBe('continue');
   });
 
   it('rejects malformed task contract payloads through the helper', () => {

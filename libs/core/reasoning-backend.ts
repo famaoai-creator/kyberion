@@ -451,6 +451,8 @@ export interface ReasoningCallOptions {
   model?: string;
   /** Cancellation propagated by delegateTaskHandle to killable providers. */
   signal?: AbortSignal;
+  /** Whether this call starts a fresh task context or continues the current one. */
+  context_mode?: import('./context-boundary.js').AgentContextMode;
   /** CE-11: this call is advice-only and must never produce a tool call. */
   advisory?: boolean;
 }
