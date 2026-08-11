@@ -4,6 +4,7 @@ import { PassThrough } from 'node:stream';
 import { z } from 'zod';
 import { pathResolver } from '@agent/core';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
+import { AgySdkAdapter } from './agy-sdk-adapter.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -133,6 +134,48 @@ describe('agy-cli-backend', () => {
     await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
       '[SUBAGENT_UNAVAILABLE] AGY SDK returned no native subagent metadata.'
     );
+  });
+
+  it('resets harness session on resetSession (QM-06)', async () => {
+    const shutdownMock = vi.fn(async () => {});
+    const fakeHarness = {
+      boot: vi.fn(async () => {}),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async () => ({ text: 'res', metadata: { nativeSubagent: {} } })),
+      shutdown: shutdownMock,
+    };
+    const backend = new AgyCliBackend({ harnessSession: fakeHarness });
+    await backend.resetSession();
+    expect(shutdownMock).not.toHaveBeenCalled(); // Injected harness session is not shut down
+
+    // Non-injected harness session shutdown test
+    const customBackend = new AgyCliBackend({ bin: 'agy' });
+    (customBackend as any).harnessSession = { shutdown: shutdownMock };
+    await customBackend.resetSession();
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets harnessBoot cache on boot rejection to allow subsequent retries', async () => {
+    let bootCount = 0;
+    const fakeHarness = {
+      boot: vi.fn(async () => {
+        bootCount++;
+        if (bootCount === 1) throw new Error('transient boot error');
+      }),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async () => ({
+        text: 'recovered',
+        metadata: { nativeSubagent: { provider: 'agy' } },
+      })),
+    };
+    const backend = new AgyCliBackend({ harnessSession: fakeHarness });
+    const adopter = backend.getNativeSubagentAdopter();
+
+    await expect(adopter.dispatch('task 1')).rejects.toThrow('transient boot error');
+    // Second attempt should re-try boot() instead of re-awaiting cached rejection
+    const result = await adopter.dispatch('task 2');
+    expect(result).toBe('recovered');
+    expect(fakeHarness.boot).toHaveBeenCalledTimes(2);
   });
 
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
@@ -288,6 +331,40 @@ describe('agy-cli-backend', () => {
       expect(argv).not.toContain('--dangerously-skip-permissions');
     });
 
+    it('reviewer team role: resolves to explorer capability tier (sandbox, no skip-permissions)', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello', { role: 'reviewer' });
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--sandbox');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+    });
+
+    it('unknown role or profile: resolves to default explorer capability tier instead of full skip-permissions', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello', { role: 'unknown_custom_role' });
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--sandbox');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+    });
+
     it('planner profile: typed refusal, no spawn attempted', async () => {
       const backend = new AgyCliBackend({
         bin: 'agy',
@@ -346,6 +423,194 @@ describe('agy-cli-backend', () => {
       expect(opts.signal).toBe(controller.signal);
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
+    });
+  });
+
+  describe('AgySdkAdapter lifecycle resilience (P1 & P2 fixes)', () => {
+    it('clears bootPromise on failure to allow subsequent boot retries', async () => {
+      let attempts = 0;
+      const fakeSpawn = vi.fn(() => {
+        attempts++;
+        const child = new EventEmitter() as any;
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.stdin = new PassThrough();
+        child.killed = false;
+        child.exitCode = null;
+        child.kill = vi.fn(() => {
+          child.killed = true;
+          child.exitCode = 1;
+          child.emit('close', 1, null);
+        });
+
+        queueMicrotask(() => {
+          if (attempts === 1) {
+            child.emit('error', new Error('boot process error'));
+          } else {
+            child.stdout.write(JSON.stringify({ event: 'ready' }) + '\n');
+          }
+        });
+        return child;
+      });
+
+      const adapter = new AgySdkAdapter({ spawnProcess: fakeSpawn as any });
+
+      await expect(adapter.boot()).rejects.toThrow('boot process error');
+
+      // Second attempt should re-trigger boot() rather than returning rejected Promise
+      await expect(adapter.boot()).resolves.toBeUndefined();
+      expect(fakeSpawn).toHaveBeenCalledTimes(2);
+    });
+
+    it('resets bootPromise and process state after a booted bridge process exits, enabling automatic re-spawning on subsequent boot()', async () => {
+      let attempts = 0;
+      let activeChild: any;
+      const fakeSpawn = vi.fn(() => {
+        attempts++;
+        const child = new EventEmitter() as any;
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.stdin = new PassThrough();
+        child.killed = false;
+        child.exitCode = null;
+        activeChild = child;
+
+        queueMicrotask(() => {
+          child.stdout.write(JSON.stringify({ event: 'ready' }) + '\n');
+        });
+        return child;
+      });
+
+      const adapter = new AgySdkAdapter({ spawnProcess: fakeSpawn as any });
+
+      // First boot succeeds
+      await adapter.boot();
+      expect(fakeSpawn).toHaveBeenCalledTimes(1);
+
+      // Simulate bridge process exiting abnormally
+      activeChild.exitCode = 1;
+      activeChild.emit('close', 1, null);
+
+      // Subsequent boot must spawn a new bridge process (spawnCount: 2)
+      await adapter.boot();
+      expect(fakeSpawn).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not reject pending requests of a new bridge process when a stale bridge process emits a delayed close event', async () => {
+      let attempts = 0;
+      let firstChild: any;
+      let secondChild: any;
+
+      const fakeSpawn = vi.fn(() => {
+        attempts++;
+        const child = new EventEmitter() as any;
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.stdin = new PassThrough();
+        child.killed = false;
+        child.exitCode = null;
+
+        if (attempts === 1) {
+          firstChild = child;
+        } else {
+          secondChild = child;
+        }
+
+        queueMicrotask(() => {
+          child.stdout.write(JSON.stringify({ event: 'ready' }) + '\n');
+        });
+        return child;
+      });
+
+      const adapter = new AgySdkAdapter({ spawnProcess: fakeSpawn as any });
+
+      // First boot
+      await adapter.boot();
+
+      // First bridge process exits
+      firstChild.exitCode = 1;
+      firstChild.emit('close', 1, null);
+
+      // Re-boot spawns second bridge
+      await adapter.boot();
+      expect(fakeSpawn).toHaveBeenCalledTimes(2);
+
+      // Start an askNativeSubagent request on second bridge
+      const askPromise = adapter.askNativeSubagent('test prompt');
+
+      // Stale firstChild now emits a delayed close event
+      firstChild.emit('close', 1, null);
+
+      queueMicrotask(() => {
+        secondChild.stdout.write(
+          JSON.stringify({ id: 'agy-sdk-1', ok: true, text: 'success response' }) + '\n'
+        );
+      });
+
+      // The request on secondChild should resolve cleanly without being rejected by firstChild close
+      const res = await askPromise;
+      expect(res.text).toBe('success response');
+    });
+
+    it('shutdown closes stdin and awaits process exit cleanly', async () => {
+      const child = new EventEmitter() as any;
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.stdin = new PassThrough();
+      child.killed = false;
+      child.exitCode = null;
+      const originalEnd = child.stdin.end.bind(child.stdin);
+      child.stdin.end = vi.fn((...args: any[]) => {
+        originalEnd(...args);
+        child.killed = true;
+        child.exitCode = 0;
+        queueMicrotask(() => child.emit('close', 0, null));
+      });
+      child.kill = vi.fn(() => {
+        child.killed = true;
+        child.exitCode = 0;
+        child.emit('close', 0, null);
+      });
+
+      const fakeSpawn = vi.fn(() => child);
+      const adapter = new AgySdkAdapter({ spawnProcess: fakeSpawn as any });
+
+      queueMicrotask(() => {
+        child.stdout.write(JSON.stringify({ event: 'ready' }) + '\n');
+      });
+      await adapter.boot();
+
+      await adapter.shutdown();
+
+      expect(child.stdin.end).toHaveBeenCalled();
+    });
+
+    it('rejects an in-flight boot when shutdown is requested before readiness', async () => {
+      const child = new EventEmitter() as any;
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.stdin = new PassThrough();
+      child.exitCode = null;
+      child.signalCode = null;
+      child.kill = vi.fn(() => {
+        child.exitCode = 1;
+        child.emit('close', 1, null);
+      });
+
+      const adapter = new AgySdkAdapter({ spawnProcess: vi.fn(() => child) as any });
+      const boot = adapter.boot();
+      const shutdown = adapter.shutdown();
+
+      const result = await Promise.race([
+        boot.then(
+          () => 'fulfilled',
+          (error) => error.message
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve('still-pending'), 100)),
+      ]);
+
+      expect(result).toContain('shut down during boot');
+      await shutdown;
     });
   });
 });

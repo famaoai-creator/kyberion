@@ -11,6 +11,7 @@ import {
   CodexCliReasoningBackend,
   type CodexHarnessSession,
 } from './codex-cli-reasoning-backend.js';
+import { AgyCliBackend, type AgyHarnessSession } from './agy-cli-backend.js';
 import {
   clearWorkCoordinationStore,
   createWorkItem,
@@ -1540,6 +1541,112 @@ describe('mission work item dispatch', () => {
     expect(listCoordinationEvents(item.item_id).map((event) => event.event_type)).toEqual(
       expect.arrayContaining(['handoff_written', 'handoff_consumed'])
     );
+  });
+
+  it('dispatches work item to native AGY subagent via HarnessSubagentDispatcher during mission execution', async () => {
+    const item = createWorkItem({
+      title: `${missionId}: Implement native AGY task`,
+      description: 'Implement a bounded feature using native AGY subagent.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-agy-native`,
+      projectId: missionId,
+      assigneePeerId: 'agy-implementer',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/agy-output.md',
+        target_path: 'deliverables/agy-output.md',
+        acceptance_criteria: ['implement feature using AGY native subagent'],
+        execution_surface: 'hybrid',
+      },
+    });
+
+    projectWorkGraphToNextTasks({
+      missionId,
+      projectId: missionId,
+      missionPath,
+      apply: true,
+    });
+
+    const agySession: AgyHarnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({
+        text: makeTaskResultText({
+          summary: 'Native AGY subagent completed the implementation.',
+          artifacts: [{ path: 'deliverables/agy-output.md', kind: 'markdown' }],
+          verification_done: ['Recorded native AGY provider and model proof.'],
+          gaps: [],
+          needs: [],
+        }),
+        stopReason: 'completed',
+        metadata: {
+          nativeSubagent: {
+            provider: 'agy',
+            threadId: 'thread-agy-mission-native',
+            turnId: 'turn-agy-mission-native',
+            mode: 'agy-subagent-adopter',
+          },
+        },
+      })),
+    };
+
+    const agyBackend = new AgyCliBackend({
+      bin: 'agy',
+      model: 'agy',
+      harnessSession: agySession,
+    });
+    const dispatcher = new HarnessSubagentDispatcher();
+    const nativeSubagentTask = vi.fn(async (prompt: string, context?: string, options?: any) => {
+      const text = await dispatcher.dispatch(prompt, context, agyBackend, {
+        ...options,
+        profile: 'implementer',
+        role: 'implementer',
+      });
+      return {
+        text,
+        nativeSubagent: agyBackend.getNativeSubagentAdopter?.().getInfo?.(),
+      };
+    });
+
+    const routeA2A = vi.fn(async (envelope: any) => ({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `RES-${envelope.header.receiver}`,
+        sender: envelope.header.receiver,
+        receiver: 'kyberion:workitem-dispatcher',
+        performative: 'result' as const,
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        runtime_id: 'runtime-agy-review',
+        text: JSON.stringify({
+          approved: true,
+          refuted: false,
+          findings: [],
+          rationale: 'approved',
+        }),
+      },
+    }));
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'auto', finalStatus: 'done' },
+      { nativeSubagentTask, routeA2A }
+    );
+
+    expect(nativeSubagentTask).toHaveBeenCalledOnce();
+    expect(agySession.boot).toHaveBeenCalledOnce();
+    expect(agySession.askNativeSubagent).toHaveBeenCalledOnce();
+    expect(manifest.records[0]).toMatchObject({
+      item_id: item.item_id,
+      native_subagent: expect.objectContaining({
+        provider: 'agy',
+        mode: 'agy-subagent-adopter',
+      }),
+    });
   });
 
   it('keeps an explicitly hybrid WorkItem on CLI subagent for its initial attempt', async () => {

@@ -40,7 +40,11 @@ import type {
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { AgySdkAdapter } from './agy-sdk-adapter.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
-import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import {
+  getSubagentCapabilityProfile,
+  resolveCapabilityProfileForTeamRole,
+  type SubagentCapabilityProfile,
+} from './subagent-capability-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
 export interface AgyHarnessSession {
@@ -48,6 +52,12 @@ export interface AgyHarnessSession {
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   getRuntimeInfo?(): Record<string, unknown>;
+  /**
+   * Optional shutdown contract. Executed by resetSession() for backend-owned
+   * sessions to ensure underlying bridge processes are completely terminated.
+   * Explicitly injected harness sessions are owned by the caller.
+   */
+  shutdown?(): Promise<void>;
 }
 
 export interface AgyCliBackendOptions {
@@ -222,7 +232,12 @@ export class AgyCliBackend implements ReasoningBackend {
       if (!session.askNativeSubagent) {
         throw new Error('[SUBAGENT_UNAVAILABLE] AGY session has no native subagent operation.');
       }
-      if (!this.harnessBoot) this.harnessBoot = session.boot();
+      if (!this.harnessBoot) {
+        this.harnessBoot = session.boot().catch((err) => {
+          this.harnessBoot = undefined;
+          throw err;
+        });
+      }
       await this.harnessBoot;
       const response = await session.askNativeSubagent(
         [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
@@ -259,6 +274,21 @@ export class AgyCliBackend implements ReasoningBackend {
 
   requiresNativeSubagent(): boolean {
     return true;
+  }
+
+  /**
+   * QM-06: drop the active AGY harness session on a failover switch.
+   */
+  async resetSession(): Promise<void> {
+    const session = this.harnessSession;
+    this.harnessSession = undefined;
+    this.harnessBoot = undefined;
+    this.lastHarnessSubagentInfo = null;
+    if (!session || session === this.injectedHarnessSession) return;
+    const shutdown = (session as { shutdown?: () => Promise<void> }).shutdown;
+    if (shutdown) {
+      await shutdown.call(session).catch(() => undefined);
+    }
   }
 
   private getHarnessSession(): AgyHarnessSession {
@@ -427,11 +457,15 @@ export class AgyCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: { profile?: ProviderPermissionProfileName; signal?: AbortSignal }
+    options?: ReasoningCallOptions
   ): Promise<string> {
+    if (this.injectedHarnessSession || this.harnessSession) {
+      return this.dispatchNativeSubagent(instruction, context, options);
+    }
+    const profileName = resolvePermissionProfileName(options);
     return this.runPrompt(
       [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n'),
-      options?.profile,
+      profileName,
       options?.signal
     );
   }
@@ -469,8 +503,7 @@ export class AgyCliBackend implements ReasoningBackend {
     const args = [
       '--log-file',
       this.logFile,
-      '--model',
-      this.model,
+      ...this.resolveModelArgs(),
       ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(params.profile),
       '-p',
@@ -525,8 +558,7 @@ export class AgyCliBackend implements ReasoningBackend {
     const args = [
       '--log-file',
       this.logFile,
-      '--model',
-      this.model,
+      ...this.resolveModelArgs(),
       ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(profile),
       '-p',
@@ -546,6 +578,18 @@ export class AgyCliBackend implements ReasoningBackend {
       if (err.message.startsWith('[agy-cli]')) throw err;
       return stdout.trim();
     }
+  }
+
+  /**
+   * Omit `--model agy` in live non-test runs so the host agy CLI uses its active
+   * configured default model, while preserving test-argv expectations.
+   */
+  private resolveModelArgs(): string[] {
+    if (!this.model) return [];
+    if (this.model === 'agy' && process.env.NODE_ENV !== 'test') {
+      return [];
+    }
+    return ['--model', this.model];
   }
 
   /**
@@ -585,6 +629,7 @@ export class AgyCliBackend implements ReasoningBackend {
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
   private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const child = spawn(this.bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       // XP-02: minimal allowlisted env, scoped to agy's own required vars.
@@ -659,9 +704,27 @@ export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promis
   });
 }
 
-function resolveAgySubagentProfile(options?: ReasoningCallOptions) {
+function resolveAgySubagentProfile(options?: ReasoningCallOptions): SubagentCapabilityProfile {
   const requested = options?.profile || options?.role || 'implementer';
-  return getSubagentCapabilityProfile(requested);
+  try {
+    return getSubagentCapabilityProfile(requested);
+  } catch {
+    const mapped = resolveCapabilityProfileForTeamRole(requested);
+    return getSubagentCapabilityProfile(mapped);
+  }
+}
+
+function resolvePermissionProfileName(
+  options?: ReasoningCallOptions
+): ProviderPermissionProfileName | undefined {
+  const requested = options?.profile || options?.role;
+  if (!requested) return undefined;
+  try {
+    return getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+  } catch {
+    const mapped = resolveCapabilityProfileForTeamRole(requested);
+    return getSubagentCapabilityProfile(mapped).name as ProviderPermissionProfileName;
+  }
 }
 
 function extractJsonPayload(raw: string): string {
