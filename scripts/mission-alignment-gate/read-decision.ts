@@ -58,7 +58,7 @@ if (decision === 'approved') {
     'If the strict check passes, use mission_controller gate-pass ALIGNMENT_APPROVED; do not run start from this output.'
   );
   process.exitCode = 2;
-} else if (decision === 'changes') {
+} else if (decision === 'changes' || decision === 'rejected') {
   console.log(`\n=== ${catalogT('mission_alignment:decision_changes')} ===`);
 } else {
   console.log(`\n=== ${catalogT('mission_alignment:decision_pending')} ===`);

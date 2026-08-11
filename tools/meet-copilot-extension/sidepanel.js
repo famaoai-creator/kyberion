@@ -8,6 +8,8 @@
  * explicit click on a suggestion.
  */
 
+const meetT = globalThis.KyberionMeetLocale?.t || ((key) => key);
+
 const elements = {
   notice: document.querySelector('#notice'),
   statusWs: document.querySelector('#status-ws'),
@@ -303,24 +305,24 @@ async function runSuggestions() {
  * as a panel:screen-context message.
  */
 async function captureScreen() {
-  elements.captureStatus.textContent = '画面を取り込んでいます…';
+  elements.captureStatus.textContent = meetT('screen.capturePending');
   const response = await send('panel:capture-frame');
-  if (!response?.ok) throw new Error(response?.error || '画面を取り込めませんでした。');
+  if (!response?.ok) throw new Error(response?.error || meetT('screen.captureFailed'));
   // The picker cannot distinguish a shared screen from a large camera tile,
   // so show what it actually grabbed.
-  elements.captureStatus.textContent =
-    `${response.source_kind || '?'} ${response.source_size || ''} を取り込みました` +
-    `（候補${response.candidate_count ?? '?'}件）。端末内でOCR中…`;
+  elements.captureStatus.textContent = meetT('screen.captureDone', {
+    kind: response.source_kind || '?',
+    size: response.source_size || '',
+    count: response.candidate_count ?? '?',
+  });
 }
 
 async function resolveReferences() {
   if (!state.screenContext) {
-    throw new Error(
-      '画面のテキストがまだ届いていません。「画面を取り込む」を先に実行してください。'
-    );
+    throw new Error(meetT('screen.resolveMissing'));
   }
   await ensureAiReady('prompt', elements.resolveStatus);
-  elements.resolveStatus.textContent = '指示語を解決しています…';
+  elements.resolveStatus.textContent = meetT('screen.resolvePending');
   const result = await aiAdapter().resolveReferences({
     transcript: transcriptText(),
     screenContext: state.screenContext,
@@ -329,14 +331,20 @@ async function resolveReferences() {
   elements.resolveOutput.hidden = false;
   elements.resolveOutput.innerHTML = result.references.length
     ? listBlock(
-        '指示語の対応',
-        result.references.map(
-          (ref) =>
-            `「${ref.expression}」→ ${ref.refers_to}（確度: ${ref.confidence}／根拠: ${ref.evidence}）`
+        meetT('screen.resolveTitle'),
+        result.references.map((ref) =>
+          meetT('screen.referenceItem', {
+            expression: ref.expression,
+            refersTo: ref.refers_to,
+            confidence: ref.confidence,
+            evidence: ref.evidence,
+          })
         )
       )
-    : '<p class="empty">画面テキストと対応づけられる指示語は見つかりませんでした。</p>';
-  elements.resolveStatus.textContent = `ローカル生成: ${result.provider}`;
+    : `<p class="empty">${meetT('screen.resolveEmpty')}</p>`;
+  elements.resolveStatus.textContent = meetT('screen.localGenerated', {
+    provider: result.provider,
+  });
 }
 
 // Serializes AI work: Gemini Nano sessions are expensive and a rolling update
@@ -409,8 +417,11 @@ chrome.runtime.onMessage.addListener((message) => {
     elements.screenContext.hidden = !state.screenContext;
     elements.screenContext.textContent = state.screenContext || '';
     elements.captureStatus.textContent = state.screenContext
-      ? `画面テキストを取得しました（${state.screenContext.length}文字、PII除去済み・${message.provider || 'local'}）`
-      : '画面から読み取れるテキストがありませんでした。';
+      ? meetT('screen.contextReceived', {
+          count: state.screenContext.length,
+          provider: message.provider || 'local',
+        })
+      : meetT('screen.contextEmpty');
   }
 });
 
