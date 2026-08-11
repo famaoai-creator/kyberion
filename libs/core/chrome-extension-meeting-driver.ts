@@ -24,9 +24,10 @@
 import type { AudioBus } from './audio-bus.js';
 import { randomBytes } from 'node:crypto';
 import { createLogger } from './logger.js';
+import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { scrubContent } from './pii-scrubber.js';
-import { safeAppendFileSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeAppendFileSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import { registerMeetingJoinDriver } from './meeting-join-driver.js';
 import type {
@@ -176,6 +177,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       insights: Record<string, unknown> | null;
       suggestions: Record<string, unknown> | null;
       history: Array<Record<string, unknown>>;
+      screen_context: Array<Record<string, unknown>>;
     } = {
       session_id: sessionId,
       source: 'chrome-built-in-ai',
@@ -184,7 +186,21 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       insights: null,
       suggestions: null,
       history: [],
+      screen_context: [],
     };
+    const writeAiDocument = (at?: string): void => {
+      aiDocument.updated_at = at ?? new Date().toISOString();
+      safeWriteFile(summaryPath, `${JSON.stringify(aiDocument, null, 2)}\n`);
+    };
+    // Shared-screen frames. A frame bypasses the text PII scrubber entirely, so
+    // it is never sent anywhere: it is written locally, read by an OCR provider
+    // pinned to `local_only` (declared dataEgress 'none'), and the extracted
+    // text is scrubbed before it is stored or handed back to the extension. The
+    // frames themselves are deleted when the session ends.
+    const framesDir = `tmp/meeting-frames-${sessionId}`;
+    let frameSeq = 0;
+    const MAX_SCREEN_CONTEXT = 40;
+
     const recordAiEvent = (kind: 'summary' | 'insights' | 'suggestions', e: ExtensionEvent) => {
       const { event: _event, control_token: _token, ...payload } = e;
       const entry = { kind, ...payload, received_at: new Date().toISOString() };
@@ -193,9 +209,61 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
       if (aiDocument.history.length > MAX_AI_HISTORY) {
         aiDocument.history.splice(0, aiDocument.history.length - MAX_AI_HISTORY);
       }
-      aiDocument.updated_at = entry.received_at;
-      safeWriteFile(summaryPath, `${JSON.stringify(aiDocument, null, 2)}\n`);
+      writeAiDocument(entry.received_at);
       logger.info(`on-device AI ${kind} recorded → ${summaryPath}`);
+    };
+
+    /**
+     * Read one shared-screen frame locally and return only redacted text.
+     * Fails closed: if no on-device OCR provider is available, or the one that
+     * served the request does not declare zero egress, the frame is dropped
+     * rather than read by anything that could ship it off the machine.
+     */
+    const readFrameLocally = async (
+      e: ExtensionEvent
+    ): Promise<{ text: string; provider: string } | null> => {
+      const dataUrl = typeof e.data_url === 'string' ? e.data_url : '';
+      const parsed = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+      if (!parsed) {
+        logger.warn('frame event ignored: not a base64 png/jpeg data URL');
+        return null;
+      }
+      safeMkdir(pathResolver.shared(framesDir), { recursive: true });
+      frameSeq += 1;
+      const frameFile = `${framesDir}/frame-${String(frameSeq).padStart(4, '0')}.${
+        parsed[1] === 'png' ? 'png' : 'jpg'
+      }`;
+      safeWriteFile(pathResolver.shared(frameFile), Buffer.from(parsed[2], 'base64'));
+
+      const ocr = await ocrImage({
+        path: pathResolver.shared(frameFile),
+        language: 'ja-JP',
+        mode: 'local_only',
+      });
+      if (ocr.providerDataEgress !== 'none') {
+        throw new Error(
+          `OCR provider '${ocr.provider}' served a meeting frame with egress '${ocr.providerDataEgress}'`
+        );
+      }
+      const text = scrubContent(ocr.text || '').scrubbed_text.trim();
+      aiDocument.screen_context.push({
+        at: new Date().toISOString(),
+        frame: frameFile,
+        provider: ocr.provider,
+        provider_data_egress: ocr.providerDataEgress,
+        confidence: ocr.confidence,
+        text,
+      });
+      if (aiDocument.screen_context.length > MAX_SCREEN_CONTEXT) {
+        aiDocument.screen_context.splice(0, aiDocument.screen_context.length - MAX_SCREEN_CONTEXT);
+      }
+      // No recorded event to borrow a timestamp from here: the frame read is its
+      // own occurrence, so wall-clock now is the honest updated_at.
+      writeAiDocument();
+      logger.info(
+        `screen frame read on-device (provider=${ocr.provider}, ${text.length} chars after redaction)`
+      );
+      return { text, provider: ocr.provider };
     };
 
     const state: MeetingSessionState = {
@@ -349,6 +417,16 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
             }
             const aiKind = AI_EVENT_KINDS[parsed.event];
             if (aiKind) recordAiEvent(aiKind, parsed);
+            if (parsed.event === 'frame') {
+              // OCR takes ~a second; never block the control channel on it.
+              void readFrameLocally(parsed)
+                .then((read) => {
+                  if (read) send({ cmd: 'screen_context', ...read });
+                })
+                .catch((err: unknown) => {
+                  logger.warn(`screen frame read failed: ${(err as Error).message}`);
+                });
+            }
             if (parsed.event === 'status') {
               logger.info(
                 `meeting status: ${String(parsed.phase ?? '')} ${JSON.stringify(parsed.detail ?? {})}`
@@ -454,6 +532,16 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
         } finally {
           state.status = 'ended';
           state.left_at = new Date().toISOString();
+          // Raw frames are working material for the OCR step only. What survives
+          // the session is the redacted text in the summary document.
+          if (frameSeq > 0) {
+            try {
+              safeRmSync(pathResolver.shared(framesDir));
+              logger.info(`discarded ${frameSeq} shared-screen frame(s)`);
+            } catch (err) {
+              logger.warn(`could not discard shared-screen frames: ${(err as Error).message}`);
+            }
+          }
           try {
             socket?.close();
           } catch {

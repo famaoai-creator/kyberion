@@ -1859,6 +1859,51 @@
       },
       "phases": [
         {
+          "id": "alignment",
+          "title": "ミッション整合・承認",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "mission-brief",
+              "team_role": "planner",
+              "description": "ミッションの目的・成功条件・制約・実行方針を evidence/mission-brief.json に整理し、同じ brief に束縛した承認リクエストを作成する",
+              "acceptance_criteria": [
+                "目的・成功条件・制約・実行方針が brief に記載されている",
+                "mission_alignment_request が同じ brief のハッシュで作成されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "approval_required",
+              "deliverable": "evidence/mission-brief.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "ALIGNMENT_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/mission-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "dist/scripts/mission_alignment_decision.js",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--strict"
+                  ],
+                  "timeoutMs": 30000,
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
           "id": "question_definition",
           "title": "リサーチクエスチョン定義",
           "kind": "judgment",
@@ -3238,6 +3283,51 @@
       "phases": [
         "intake",
         "planning",
+        {
+          "id": "alignment",
+          "title": "ミッション整合・承認",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "mission-brief",
+              "team_role": "planner",
+              "description": "ミッションの目的・成功条件・制約・実行方針を evidence/mission-brief.json に整理し、同じ brief に束縛した承認リクエストを作成する",
+              "acceptance_criteria": [
+                "目的・成功条件・制約・実行方針が brief に記載されている",
+                "mission_alignment_request が同じ brief のハッシュで作成されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "approval_required",
+              "deliverable": "evidence/mission-brief.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "ALIGNMENT_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/mission-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "dist/scripts/mission_alignment_decision.js",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--strict"
+                  ],
+                  "timeoutMs": 30000,
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
         "contract_authoring",
         "preflight",
         "execution",
@@ -3251,6 +3341,15 @@
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "Use exploration before deterministic governed execution; this is the pre-pipeline crystallization path.",
       "match": {
+        "mission_classes": [
+          "product_delivery",
+          "code_change",
+          "research_and_absorption",
+          "content_and_media",
+          "operations_and_release",
+          "environment_and_recovery",
+          "platform_onboarding"
+        ],
         "delivery_shapes": ["interactive_exploration"]
       },
       "phases": [
@@ -3299,6 +3398,51 @@
         "intake",
         "classification",
         "planning",
+        {
+          "id": "alignment",
+          "title": "ミッション整合・承認",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "mission-brief",
+              "team_role": "planner",
+              "description": "ミッションの目的・成功条件・制約・実行方針を evidence/mission-brief.json に整理し、同じ brief に束縛した承認リクエストを作成する",
+              "acceptance_criteria": [
+                "目的・成功条件・制約・実行方針が brief に記載されている",
+                "mission_alignment_request が同じ brief のハッシュで作成されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "approval_required",
+              "deliverable": "evidence/mission-brief.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "ALIGNMENT_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/mission-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "dist/scripts/mission_alignment_decision.js",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--strict"
+                  ],
+                  "timeoutMs": 30000,
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
         "normalization",
         "contract_authoring",
         "verification",
@@ -3355,6 +3499,15 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Cross-system work requiring a coordinated owner and delegated specialists.",
       "match": {
+        "mission_classes": [
+          "product_delivery",
+          "code_change",
+          "research_and_absorption",
+          "content_and_media",
+          "operations_and_release",
+          "environment_and_recovery",
+          "platform_onboarding"
+        ],
         "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
         "execution_shapes": ["mission", "project_bootstrap", "task_session"]
       },
@@ -3380,6 +3533,51 @@
         "intake",
         "classification",
         "planning",
+        {
+          "id": "alignment",
+          "title": "ミッション整合・承認",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "mission-brief",
+              "team_role": "planner",
+              "description": "ミッションの目的・成功条件・制約・実行方針を evidence/mission-brief.json に整理し、同じ brief に束縛した承認リクエストを作成する",
+              "acceptance_criteria": [
+                "目的・成功条件・制約・実行方針が brief に記載されている",
+                "mission_alignment_request が同じ brief のハッシュで作成されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "approval_required",
+              "deliverable": "evidence/mission-brief.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "ALIGNMENT_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/mission-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "dist/scripts/mission_alignment_decision.js",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--strict"
+                  ],
+                  "timeoutMs": 30000,
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
         "execution",
         "verification",
         "delivery",
@@ -3397,6 +3595,51 @@
         "intake",
         "classification",
         "planning",
+        {
+          "id": "alignment",
+          "title": "ミッション整合・承認",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "mission-brief",
+              "team_role": "planner",
+              "description": "ミッションの目的・成功条件・制約・実行方針を evidence/mission-brief.json に整理し、同じ brief に束縛した承認リクエストを作成する",
+              "acceptance_criteria": [
+                "目的・成功条件・制約・実行方針が brief に記載されている",
+                "mission_alignment_request が同じ brief のハッシュで作成されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "approval_required",
+              "deliverable": "evidence/mission-brief.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "ALIGNMENT_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/mission-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "dist/scripts/mission_alignment_decision.js",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--strict"
+                  ],
+                  "timeoutMs": 30000,
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
         "contract_authoring",
         "execution",
         "verification",
