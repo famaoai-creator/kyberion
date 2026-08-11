@@ -18,6 +18,9 @@ const allowedManagedProcessConsumers = [
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
+  // Adapter tests replace the managed-process owner with a hermetic test
+  // double; keep the boundary inventory aligned with that explicit mock.
+  'libs/core/agent-adapter.test.ts',
   'libs/core/agent-runtime-supervisor-client.ts',
   'libs/core/agent-runtime-supervisor.test.ts',
   'libs/core/agent-runtime-supervisor.ts',
