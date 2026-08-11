@@ -1,9 +1,10 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeExecResult, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { resolveCodexBinary } from './codex-cli-query.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
@@ -1079,6 +1080,7 @@ export interface CodexAppServerAdapterOptions {
 
 export interface CodexNativeSubagentInfo {
   provider: 'codex';
+  model?: string;
   parentThreadId: string;
   threadId: string;
   turnId?: string;
@@ -1125,6 +1127,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private lastNativeSubagentInfo: CodexNativeSubagentInfo | null = null;
   private activeApprovalMode: 'strict' | 'relaxed' | undefined;
   private enhancers: AgentEnhancer[] = [];
+  private codexBinary: string | null = null;
+  private codexVersion = 'unknown';
 
   constructor(options?: CodexAppServerAdapterOptions) {
     this.options = options || {};
@@ -1177,13 +1181,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
     logger.info(`[UAA] Codex App Server booting (cwd: ${cwd})`);
 
     this.runtimeResourceId = `codex-app-server:${cwd}`;
+    this.codexBinary = resolveCodexBinary(process.env);
+    const versionResult = safeExecResult(this.codexBinary, ['--version'], {
+      env: safeEnv(),
+      cwd,
+      timeoutMs: 5000,
+    });
+    this.codexVersion =
+      (versionResult.stdout || versionResult.stderr).trim().split(/\r?\n/u)[0] || 'unknown';
     const managed = spawnManagedProcess({
       resourceId: this.runtimeResourceId,
       kind: 'agent',
       ownerId: cwd,
       ownerType: 'agent-adapter',
-      command: 'npx',
-      args: ['codex', 'app-server', '--listen', 'stdio://'],
+      command: this.codexBinary,
+      args: ['app-server', '--listen', 'stdio://'],
       shutdownPolicy: 'manual',
       spawnOptions: {
         cwd,
@@ -1197,7 +1209,12 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.child.stdout?.on('data', (chunk) => this.handleStdout(chunk));
     this.child.stderr?.on('data', (chunk) => {
       const msg = chunk.toString().trim();
-      if (msg) logger.warn(`[UAA_CODEX_ERR] ${msg}`);
+      if (msg) {
+        const kind = /codex_models_manager|base_instructions/i.test(msg)
+          ? 'UAA_CODEX_MODEL_CACHE_WARN'
+          : 'UAA_CODEX_ERR';
+        logger.warn(`[${kind}] ${msg}`);
+      }
       if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
     });
     this.child.on('exit', (code, signal) => {
@@ -1301,6 +1318,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     );
     const info: CodexNativeSubagentInfo = {
       provider: 'codex',
+      ...(this.options.model ? { model: this.options.model } : {}),
       parentThreadId,
       threadId: targetThreadId,
       ...(this.currentTurnId ? { turnId: this.currentTurnId } : {}),
@@ -1418,6 +1436,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
   public getRuntimeInfo(): Record<string, unknown> {
     return {
       pid: this.child?.pid,
+      codexBinary: this.codexBinary,
+      codexVersion: this.codexVersion,
       threadId: this.threadId,
       activeThreadId: this.activeThreadId,
       usage: this.usageSummary,

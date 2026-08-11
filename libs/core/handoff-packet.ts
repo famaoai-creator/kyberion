@@ -3,6 +3,8 @@ export type HandoffPacketKind = 'work_item' | 'mission';
 export interface HandoffPacket {
   kind: HandoffPacketKind;
   correlation_id: string;
+  work_item_id?: string;
+  attempt_id?: string;
   outgoing_summary: string;
   open_decisions: string[];
   partial_artifacts: string[];
@@ -28,6 +30,8 @@ function firstString(...values: unknown[]): string | undefined {
 export function buildHandoffPacket(input: {
   kind: HandoffPacketKind;
   correlationId: string;
+  workItemId?: string;
+  attemptId?: string;
   outgoingSummary: string;
   rationale?: string;
   openDecisions?: unknown;
@@ -39,6 +43,8 @@ export function buildHandoffPacket(input: {
   return {
     kind: input.kind,
     correlation_id: input.correlationId,
+    ...(input.workItemId ? { work_item_id: input.workItemId } : {}),
+    ...(input.attemptId ? { attempt_id: input.attemptId } : {}),
     outgoing_summary: input.outgoingSummary.trim(),
     open_decisions: asStringList(input.openDecisions),
     partial_artifacts: asStringList(input.partialArtifacts),
@@ -82,6 +88,7 @@ export function buildWorkItemHandoffPacket(input: {
   fromPeerId: string;
   toPeerId: string;
   correlationId: string;
+  attemptId?: string;
   metadata?: Record<string, unknown>;
 }): HandoffPacket {
   const summary = firstString(
@@ -92,6 +99,8 @@ export function buildWorkItemHandoffPacket(input: {
   return buildHandoffPacket({
     kind: 'work_item',
     correlationId: input.correlationId,
+    workItemId: input.itemId,
+    ...(input.attemptId ? { attemptId: input.attemptId } : {}),
     outgoingSummary: summary ?? '',
     rationale:
       extractTextMetadata(input.metadata, ['rationale', 'handoff_rationale']) ??

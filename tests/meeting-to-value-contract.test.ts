@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import {
+  clearWorkCoordinationStore,
   clearSlackOutboxMessage,
+  createWorkItem,
   listSlackOutboxMessages,
   pathResolver,
   registerReasoningBackend,
@@ -10,12 +12,14 @@ import {
   safeReadFile,
   safeRmSync,
   safeWriteFile,
+  setWorkCoordinationNamespace,
   stubReasoningBackend,
 } from '@agent/core';
 import { extractActionItemsOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js';
 
 const MISSION_ID = 'MSN-MEETING-FOLLOWUP-001';
+const WORK_ITEM_ID = 'WITEM-MEETING-FOLLOWUP-001';
 const MISSION_DIR = path.join(pathResolver.rootDir(), 'active/missions/confidential', MISSION_ID);
 const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcript-sample.md');
 const REPORT_PATH = pathResolver.rootResolve(
@@ -45,6 +49,22 @@ describe('meeting-to-value contract', () => {
     process.env.MISSION_ID = MISSION_ID;
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    setWorkCoordinationNamespace(`meeting-to-value-contract-${process.pid}`);
+    clearWorkCoordinationStore();
+    createWorkItem({
+      itemId: WORK_ITEM_ID,
+      title: 'Extract meeting action items',
+      description: 'Extract and govern action items from the meeting transcript.',
+      projectId: MISSION_ID,
+      status: 'in_progress',
+      context: {
+        organization_id: 'meeting-followup',
+        tenant_slug: 'meeting-followup',
+        mission_id: MISSION_ID,
+        project_id: MISSION_ID,
+        task_id: 'extract-action-items',
+      },
+    });
     safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
     safeWriteFile(
       path.join(MISSION_DIR, 'mission-state.json'),
@@ -71,6 +91,8 @@ describe('meeting-to-value contract', () => {
 
   afterEach(() => {
     resetReasoningBackend();
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
     vi.restoreAllMocks();
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
@@ -118,6 +140,7 @@ describe('meeting-to-value contract', () => {
     expect(
       pipeline.steps?.find((step) => step.id === 'extract_action_items')?.params
     ).toMatchObject({
+      work_item_id: '{{work_item_id}}',
       output_path: 'active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl',
     });
   });
@@ -178,6 +201,7 @@ describe('meeting-to-value contract', () => {
     const transcript = safeReadFile(TRANSCRIPT_PATH, { encoding: 'utf8' }) as string;
     const extraction = await extractActionItemsOp({
       mission_id: MISSION_ID,
+      work_item_id: WORK_ITEM_ID,
       transcript,
       attendees: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Operator' }],
       operator_label: 'Operator',

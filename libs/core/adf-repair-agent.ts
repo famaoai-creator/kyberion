@@ -27,11 +27,16 @@ import {
   highestTierForPaths,
   providerIdForReasoningIdentifier,
 } from './provider-egress-gate.js';
+import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
+import { getWorkItem } from './work-coordination.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
   errors?: string[];
   report?: string;
+}
+export interface AdfRepairOptions {
+  workItemId?: string;
 }
 
 /**
@@ -41,7 +46,8 @@ export interface AdfRepairResult {
  */
 export async function validateAndRepairAdf(
   adfPath: string,
-  schemaName: string
+  schemaName: string,
+  options: AdfRepairOptions = {}
 ): Promise<AdfRepairResult> {
   const content = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
   let parsed: any;
@@ -59,7 +65,13 @@ export async function validateAndRepairAdf(
       parsed = lightweight;
     } else {
       logger.error(`[adf-repair] Failed to parse JSON at ${adfPath}: ${err.message}`);
-      return attemptSubagentRepair(adfPath, schemaName, `JSON parse error: ${err.message}`, []);
+      return attemptSubagentRepair(
+        adfPath,
+        schemaName,
+        `JSON parse error: ${err.message}`,
+        [],
+        options
+      );
     }
   }
 
@@ -82,7 +94,7 @@ export async function validateAndRepairAdf(
       }
       return { repaired: false };
     } catch (err: any) {
-      return attemptSubagentRepair(adfPath, schemaName, '', [err.message]);
+      return attemptSubagentRepair(adfPath, schemaName, '', [err.message], options);
     }
   }
 
@@ -99,7 +111,8 @@ export async function validateAndRepairAdf(
     adfPath,
     schemaName,
     '',
-    validation.errors.map((e) => `${e.field}: ${e.message}`)
+    validation.errors.map((e) => `${e.field}: ${e.message}`),
+    options
   );
 }
 
@@ -206,7 +219,8 @@ async function attemptSubagentRepair(
   adfPath: string,
   schemaName: string,
   parseError: string,
-  validationErrors: string[]
+  validationErrors: string[],
+  options: AdfRepairOptions = {}
 ): Promise<AdfRepairResult> {
   const backend = getReasoningBackend();
   const errorSummary = parseError || validationErrors.join('; ');
@@ -267,9 +281,29 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     const repairContext = await gaps.measure('knowledge_slice', () =>
       buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
     );
-    const report = await gaps.measure('backend_dispatch', () =>
-      backend.delegateTask(instruction, repairContext)
-    );
+    const report = await gaps.measure('backend_dispatch', async () => {
+      if (!options.workItemId) return backend.delegateTask(instruction, repairContext);
+      const workItem = getWorkItem(options.workItemId);
+      const scope = workItem?.context;
+      const receipt = await delegateWorkItemWithReasoningBackend(backend, {
+        work_item_id: options.workItemId,
+        task_id: options.workItemId,
+        instruction,
+        security_scope: {
+          tenant_id: scope?.tenant_slug || 'public',
+          organization_id: scope?.organization_id,
+          project_id: scope?.project_id,
+          mission_id: scope?.mission_id || options.workItemId,
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'adf repair',
+        },
+        context_refs: [repairContext],
+        success_status: 'done',
+        idempotency_key: `adf-repair:${options.workItemId}:${adfPath}`,
+      });
+      return receipt.output || '';
+    });
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
 
     // Re-verify after repair

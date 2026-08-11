@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { z } from 'zod';
-import { buildCodexCliQueryOptionsFromEnv, runCodexCliQuery } from './codex-cli-query.js';
+import {
+  buildCodexCliQueryOptionsFromEnv,
+  resolveCodexBinary,
+  runCodexCliQuery,
+} from './codex-cli-query.js';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
@@ -69,7 +73,7 @@ describe('codex-cli-query', () => {
       value: 'linux',
     });
     mocks.safeExecResult.mockReturnValue({
-      stdout: '/usr/local/bin/codex\n/Users/famao/kyberion/node_modules/.bin/codex',
+      stdout: 'fake/system/codex\nfake/project/node_modules/.bin/codex',
       stderr: '',
       status: 0,
     });
@@ -83,26 +87,106 @@ describe('codex-cli-query', () => {
     vi.clearAllMocks();
   });
 
-  it('prefers a real codex executable over the repo-local shim', () => {
+  it('defers binary discovery when no explicit override is provided', () => {
     const options = buildCodexCliQueryOptionsFromEnv({
       PATH: [
-        '/usr/bin',
-        '/bin',
-        '/Users/famao/kyberion/node_modules/.bin',
-        '/opt/homebrew/bin',
+        'fake/system',
+        'fake/fallback',
+        'fake/project/node_modules/.bin',
+        'fake/alternate',
       ].join(':'),
     } as NodeJS.ProcessEnv);
 
-    expect(options.bin).toBe('/usr/local/bin/codex');
+    expect(options.bin).toBeUndefined();
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
   });
 
   it('keeps an explicit override when provided', () => {
     const options = buildCodexCliQueryOptionsFromEnv({
-      PATH: '/usr/bin:/bin:/Users/famao/kyberion/node_modules/.bin:/opt/homebrew/bin',
-      KYBERION_CODEX_CLI_BIN: '/custom/bin/codex',
+      PATH: 'fake/system:fake/project/node_modules/.bin:fake/other',
+      KYBERION_CODEX_CLI_BIN: 'fake/custom/codex',
     } as NodeJS.ProcessEnv);
 
-    expect(options.bin).toBe('/custom/bin/codex');
+    expect(options.bin).toBe('fake/custom/codex');
+  });
+
+  it('resolves the first non-project-local Codex binary from PATH candidates', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout:
+        'fake/repo/node_modules/.bin/codex\nfake/user/.codex/tmp/arg0/codex\nfake/system/codex',
+      stderr: '',
+      status: 0,
+    });
+
+    expect(
+      resolveCodexBinary({ PATH: 'fake/repo/node_modules/.bin:fake/system' } as NodeJS.ProcessEnv)
+    ).toBe('fake/system/codex');
+  });
+
+  it('fails closed when every PATH candidate is a pnpm project-local shim', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout:
+        'fake/repo/node_modules/.pnpm/@openai+codex@0.146.0/node_modules/@openai/codex/bin/codex',
+      stderr: '',
+      status: 0,
+    });
+
+    expect(() =>
+      resolveCodexBinary({ PATH: 'fake/repo/node_modules/.bin' } as NodeJS.ProcessEnv)
+    ).toThrow(/KYBERION_CODEX_CLI_BIN/);
+  });
+
+  it('rejects Windows-style project-local shims without host paths', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout: [
+        String.raw`C:\repo\node_modules\.bin\codex`,
+        String.raw`C:\repo\node_modules\@openai\codex\bin\codex`,
+      ].join('\n'),
+      stderr: '',
+      status: 0,
+    });
+    expect(() =>
+      resolveCodexBinary({ PATH: String.raw`C:\repo\node_modules\.bin` } as NodeJS.ProcessEnv)
+    ).toThrow(/no acceptable Codex binary/);
+  });
+
+  it('rejects direct node_modules @openai/codex shims', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout: 'fake/repo/node_modules/@openai/codex/bin/codex\nfake/system/codex',
+      stderr: '',
+      status: 0,
+    });
+
+    expect(
+      resolveCodexBinary({ PATH: 'fake/repo/node_modules/.bin:fake/system' } as NodeJS.ProcessEnv)
+    ).toBe('fake/system/codex');
+  });
+
+  it('normalizes mixed-case POSIX and Windows shim paths before matching', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout: [
+        'FAKE/REPO/Node_Modules/.BIN/COdEx',
+        String.raw`C:\Fake\Repo\NODE_MODULES\@OPENAI\CODEX\BIN\CODEX`,
+      ].join('\n'),
+      stderr: '',
+      status: 0,
+    });
+
+    expect(() =>
+      resolveCodexBinary({ PATH: 'fake/repo/node_modules/.bin' } as NodeJS.ProcessEnv)
+    ).toThrow(/no acceptable Codex binary/);
+  });
+
+  it('fails closed when stdout contains only shims even if resolver stderr is non-empty', () => {
+    mocks.safeExecResult.mockReturnValue({
+      stdout: 'fake/repo/node_modules/.bin/codex\n',
+      stderr: 'which: codex: command not found\n/usr/local/bin/codex: diagnostic',
+      status: 1,
+    });
+
+    expect(() =>
+      resolveCodexBinary({ PATH: 'fake/repo/node_modules/.bin' } as NodeJS.ProcessEnv)
+    ).toThrow(/Set KYBERION_CODEX_CLI_BIN to an explicit executable/);
   });
 
   describe('spawnCli env allowlisting (XP-02)', () => {
@@ -158,7 +242,7 @@ describe('codex-cli-query', () => {
         systemPrompt: 'sys',
         userPrompt: 'usr',
         schema: z.object({ ok: z.boolean() }),
-        options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+        options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace' },
       });
 
       expect(mocks.spawnMock).toHaveBeenCalledTimes(1);
@@ -175,7 +259,7 @@ describe('codex-cli-query', () => {
         userPrompt: 'usr',
         schema: z.object({ ok: z.boolean() }),
         profile: 'explorer',
-        options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+        options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace' },
       });
 
       expect(mocks.spawnMock).toHaveBeenCalledTimes(1);
@@ -191,7 +275,7 @@ describe('codex-cli-query', () => {
           userPrompt: 'usr',
           schema: z.object({ ok: z.boolean() }),
           profile: 'planner',
-          options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+          options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace' },
         })
       ).rejects.toThrow(/permission profile "planner" refused/);
 
@@ -216,7 +300,7 @@ describe('codex-cli-query', () => {
         systemPrompt: 'sys',
         userPrompt: 'usr',
         schema: z.object({ ok: z.boolean() }),
-        options: { bin: 'codex', model: 'codex-default', cwd: '/repo', timeoutMs: 54321 },
+        options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace', timeoutMs: 54321 },
       });
 
       expect(mocks.withWallClockBudgetMock).toHaveBeenCalledTimes(1);

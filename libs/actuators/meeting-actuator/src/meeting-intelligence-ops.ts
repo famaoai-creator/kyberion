@@ -23,6 +23,7 @@ import {
 import { safeExistsSync, safeMkdir, safeWriteFile, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { delegateWorkItemWithReasoningBackend, getWorkItem } from '@agent/core';
 
 function writeJSON(rel: string, data: unknown): string {
   const abs = pathResolver.rootResolve(rel);
@@ -40,6 +41,56 @@ function deriveReasoningMode(backendName: string, synthetic = false): 'placehold
   if (synthetic) return 'placeholder';
   const normalized = String(backendName || '').toLowerCase();
   return normalized === 'stub' || normalized.endsWith('-stub') ? 'placeholder' : 'model';
+}
+
+export async function delegateMeetingReasoning(input: {
+  backend: ReturnType<typeof getReasoningBackend>;
+  prompt: string;
+  context: string;
+  mission_id?: string;
+  work_item_id?: string;
+  task_id: string;
+}): Promise<string> {
+  if (!input.work_item_id) {
+    if (input.mission_id) {
+      throw new Error(
+        '[MEETING_WORK_ITEM_REQUIRED] mission-scoped meeting reasoning requires a canonical WorkItem'
+      );
+    }
+    return input.backend.delegateTask(input.prompt, input.context);
+  }
+  const workItem = getWorkItem(input.work_item_id);
+  if (!workItem) throw new Error(`[WORK_ITEM_NOT_FOUND] ${input.work_item_id}`);
+  const context = workItem.context;
+  const missionId = context?.mission_id ?? input.mission_id;
+  const tenantId = context?.tenant_slug;
+  if (!tenantId || !missionId) {
+    throw new Error(
+      '[MEETING_SCOPE_REQUIRED] canonical WorkItem tenant and mission scope are required'
+    );
+  }
+  if (input.mission_id && context?.mission_id && input.mission_id !== context.mission_id) {
+    throw new Error('[MEETING_SCOPE_MISMATCH] mission scope does not match the canonical WorkItem');
+  }
+  const receipt = await delegateWorkItemWithReasoningBackend(input.backend, {
+    work_item_id: input.work_item_id,
+    task_id: input.task_id,
+    mission_id: missionId,
+    instruction: input.prompt,
+    context_refs: [input.context],
+    idempotency_key: `meeting-reasoning:${input.work_item_id}:${input.task_id}`,
+    security_scope: {
+      tenant_id: tenantId,
+      organization_id: context.organization_id,
+      project_id: context.project_id,
+      mission_id: missionId,
+      read_tiers: ['public'],
+      write_tier: 'public',
+      purpose: 'meeting intelligence delegation',
+    },
+  });
+  if (receipt.status !== 'succeeded') throw new Error(receipt.error ?? 'meeting reasoning blocked');
+  return receipt.output ?? '';
 }
 
 export async function conduct1on1(input: {
@@ -75,9 +126,8 @@ export async function conduct1on1(input: {
 // Meeting facilitation ops (G6 / new use case)
 //
 // extract_action_items / generate_facilitation_script / generate_reminder_message
-// drive the AI-runs-meetings flow. They use `backend.delegateTask` (which
-// every reasoning backend implements) so they work uniformly across stub /
-// claude-cli / claude-agent / anthropic / gemini-cli / codex-cli.
+// drive the AI-runs-meetings flow. Ephemeral calls use backend.delegateTask;
+// mission-scoped calls require a canonical WorkItem and use the governed port.
 // ---------------------------------------------------------------------------
 
 function extractFirstJsonBlock(text: string): unknown {
@@ -103,6 +153,7 @@ function extractFirstJsonBlock(text: string): unknown {
 
 export async function extractActionItemsOp(input: {
   mission_id: string;
+  work_item_id?: string;
   transcript: string;
   attendees?: Array<{
     name: string;
@@ -185,7 +236,14 @@ export async function extractActionItemsOp(input: {
     `Language hint: ${language}.`,
   ].join('\n');
   const extractedAt = nowIso();
-  const raw = await backend.delegateTask(prompt, `mission=${input.mission_id}`);
+  const raw = await delegateMeetingReasoning({
+    backend,
+    prompt,
+    context: `mission=${input.mission_id}`,
+    mission_id: input.mission_id,
+    work_item_id: input.work_item_id,
+    task_id: 'extract-action-items',
+  });
   let parsed: any[];
   try {
     parsed = extractFirstJsonBlock(raw) as any[];
@@ -325,6 +383,8 @@ export async function extractActionItemsOp(input: {
 }
 
 export async function generateFacilitationScriptOp(input: {
+  mission_id?: string;
+  work_item_id?: string;
   agenda?: string[];
   current_topic?: string;
   recent_transcript_chunk?: string;
@@ -360,6 +420,35 @@ export async function generateFacilitationScriptOp(input: {
     speech_text: z.string(),
     next_action: z.enum(['continue_listen', 'transition_topic', 'wrap_up', 'pause']),
   });
+  if (input.mission_id && !input.work_item_id) {
+    throw new Error(
+      '[MEETING_WORK_ITEM_REQUIRED] mission-scoped meeting reasoning requires a canonical WorkItem'
+    );
+  }
+  if (input.work_item_id) {
+    const raw = await delegateMeetingReasoning({
+      backend,
+      prompt,
+      context: 'meeting-facilitation',
+      mission_id: input.mission_id,
+      work_item_id: input.work_item_id,
+      task_id: 'facilitation-script',
+    });
+    try {
+      const parsed = extractFirstJsonBlock(raw) as any;
+      return {
+        speech_text: typeof parsed.speech_text === 'string' ? parsed.speech_text : '',
+        next_action:
+          parsed.next_action &&
+          ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
+            ? parsed.next_action
+            : 'continue_listen',
+      };
+    } catch (parseErr: any) {
+      logger.warn(`[generate_facilitation_script] parse failed: ${parseErr?.message ?? parseErr}`);
+      return { speech_text: '', next_action: 'continue_listen' };
+    }
+  }
   try {
     const result = await delegateBestOf(backend, prompt, facilitationSchema, {
       context: 'meeting-facilitation',
@@ -370,7 +459,14 @@ export async function generateFacilitationScriptOp(input: {
     return result.winner;
   } catch (err: any) {
     logger.warn(`[generate_facilitation_script] best-of failed: ${err?.message ?? err}`);
-    const raw = await backend.delegateTask(prompt, 'meeting-facilitation');
+    const raw = await delegateMeetingReasoning({
+      backend,
+      prompt,
+      context: 'meeting-facilitation',
+      mission_id: input.mission_id,
+      work_item_id: input.work_item_id,
+      task_id: 'facilitation-script',
+    });
     try {
       const parsed = extractFirstJsonBlock(raw) as any;
       const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
@@ -436,6 +532,7 @@ export function applyRestrictedActionGate(
  */
 export async function executeSelfActionItemsOp(input: {
   mission_id: string;
+  work_item_id?: string;
   language?: string;
   policy?: MeetingFacilitatorPolicy;
 }): Promise<{
@@ -476,8 +573,9 @@ export async function executeSelfActionItemsOp(input: {
     });
     let plan = '';
     try {
-      plan = await backend.delegateTask(
-        [
+      plan = await delegateMeetingReasoning({
+        backend,
+        prompt: [
           `You are dispatching an action item to the operator. Output ONLY a JSON object: { "plan": str (≤ 5 sentences), "completion_summary": str (≤ 3 sentences) }.`,
           `No prose, no code fence. Language: ${language}.`,
           `Action item title: "${item.title}".`,
@@ -486,8 +584,11 @@ export async function executeSelfActionItemsOp(input: {
         ]
           .filter(Boolean)
           .join('\n'),
-        `self-exec:${item.item_id}`
-      );
+        context: `self-exec:${item.item_id}`,
+        mission_id: input.mission_id,
+        work_item_id: input.work_item_id,
+        task_id: `self-exec-${item.item_id}`,
+      });
       let summary = '';
       try {
         const parsed = extractFirstJsonBlock(plan) as any;
@@ -536,6 +637,7 @@ export async function executeSelfActionItemsOp(input: {
  */
 export async function trackPendingActionItemsOp(input: {
   mission_id: string;
+  work_item_id?: string;
   tone?: 'friendly' | 'formal' | 'urgent';
   language?: string;
   max_items?: number;
@@ -574,6 +676,8 @@ export async function trackPendingActionItemsOp(input: {
       tone,
       language,
       policy,
+      mission_id: input.mission_id,
+      work_item_id: input.work_item_id,
     });
     appendReminder({
       mission_id: input.mission_id,
@@ -695,6 +799,8 @@ export function auditSpeakerFairnessOp(input: {
 
 export async function generateReminderMessageOp(input: {
   item: ActionItem;
+  mission_id?: string;
+  work_item_id?: string;
   days_overdue?: number;
   tone?: 'friendly' | 'formal' | 'urgent';
   language?: string;
@@ -717,7 +823,14 @@ export async function generateReminderMessageOp(input: {
     overdue > 0 ? `Days overdue: ${overdue}.` : 'Not yet overdue, this is a check-in.',
     'Do not threaten escalation. Do not invent context. Suggest one concrete next step.',
   ].join('\n');
-  const raw = await backend.delegateTask(prompt, `reminder:${input.item.item_id}`);
+  const raw = await delegateMeetingReasoning({
+    backend,
+    prompt,
+    context: `reminder:${input.item.item_id}`,
+    mission_id: input.mission_id,
+    work_item_id: input.work_item_id,
+    task_id: `reminder-${input.item.item_id}`,
+  });
   let text = '';
   try {
     const parsed = extractFirstJsonBlock(raw) as any;

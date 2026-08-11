@@ -19,6 +19,7 @@ import {
   resolveOperatorLocale,
   resolveTimeZone,
   isServiceConnectionReady,
+  readCanonicalWorkGraph,
 } from '@agent/core';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
@@ -689,10 +690,13 @@ function drawMissions() {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
           const missionPath = path.join(dir, item);
           const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
-          const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
-          const nextTaskCount = safeExistsSync(nextTasksPath)
-            ? readJsonFile<any[]>(nextTasksPath)?.length || 0
-            : 0;
+          const nextTaskCount = (() => {
+            try {
+              return readCanonicalWorkGraph(state.mission_id).items.length;
+            } catch {
+              return 0;
+            }
+          })();
           const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
           console.log(
             `  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green(renderStatus('mission', state.status, 'en').toUpperCase())}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`

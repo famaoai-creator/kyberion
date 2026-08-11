@@ -47,6 +47,7 @@ export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } fr
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
+export * from './context-boundary.js';
 export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 export * as customerResolver from './customer-resolver.js';
 
@@ -1047,6 +1048,7 @@ export type {
 } from './agent-execution-port.js';
 export {
   CoordinatedAgentExecutionPort,
+  delegateCoordinatedCliSubagentTask,
   delegateCoordinatedAgentTask,
   getCoordinatedAgentExecutionPort,
 } from './coordinated-agent-execution-port.js';
@@ -1054,6 +1056,17 @@ export type {
   CoordinatedAgentExecutionReceipt,
   CoordinatedAgentTaskEnvelope,
 } from './coordinated-agent-execution-port.js';
+export {
+  readCanonicalWorkGraph,
+  readCanonicalWorkGraphTasks,
+  projectWorkGraphToNextTasks,
+} from './work-graph-projection.js';
+export type {
+  CanonicalWorkGraphRead,
+  WorkGraphProjectionDrift,
+  WorkGraphProjectionOptions,
+  WorkGraphProjectionResult,
+} from './work-graph-projection.js';
 export {
   getActuatorForwardingPort,
   registerActuatorForwardingPort,
@@ -2045,6 +2058,7 @@ export * from './analysis-findings.js';
 export * from './analysis-execution-contract.js';
 export * from './work-design.js';
 export * from './work-scope-decision.js';
+export * from './mission-execution-surface.js';
 export * from './productivity-task-plan.js';
 export * from './booking-preference-profile.js';
 export * from './presentation-preference-profile.js';
