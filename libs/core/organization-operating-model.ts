@@ -4,6 +4,9 @@ import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
+import { loadState } from './mission-state.js';
+import { t } from './t.js';
+import type { SupportedLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
@@ -395,6 +398,7 @@ export interface QueueOrganizationLearningCandidateInput {
   tier: OrganizationTier;
   tenantSlug?: string;
   metadata?: Record<string, unknown>;
+  rootDir?: string;
 }
 
 export interface OrganizationCatalog {
@@ -543,6 +547,7 @@ export interface ResolveOrganizationWorkInput {
   tier?: OrganizationTier;
   tenantSlug?: string;
   contextRefs?: OrganizationWorkResolution['context_refs'];
+  locale?: SupportedLocale;
 }
 
 const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
@@ -644,11 +649,14 @@ function recordTenant(record: { tenant_slug?: string }): string {
   return tenantSlug;
 }
 
-function assertRecordIdentity(record: {
-  organization_id: string;
-  tier?: OrganizationTier;
-  tenant_slug?: string;
-}): void {
+function assertRecordIdentity(
+  record: {
+    organization_id: string;
+    tier?: OrganizationTier;
+    tenant_slug?: string;
+  },
+  rootDir?: string
+): void {
   assertOrganizationId(record.organization_id);
   if (record.tier === 'confidential' && !record.tenant_slug?.trim()) {
     throw new Error(
@@ -665,15 +673,20 @@ function assertRecordIdentity(record: {
     record.tenant_slug &&
     (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
   ) {
-    resolveTenant(record.tenant_slug);
+    resolveTenant(record.tenant_slug, { rootDir });
   }
 }
 
-function statePath(organizationId: string, tier: OrganizationTier, tenantSlug = 'shared'): string {
+function statePath(
+  organizationId: string,
+  tier: OrganizationTier,
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
+): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
   return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug),
+    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
     STATE_FILE_NAME
   );
 }
@@ -681,12 +694,13 @@ function statePath(organizationId: string, tier: OrganizationTier, tenantSlug = 
 function purposePath(
   organizationId: string,
   tier: OrganizationTier,
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
   return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug),
+    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
     PURPOSE_FILE_NAME
   );
 }
@@ -707,13 +721,14 @@ function recordPath(
   fileName: string,
   organizationId: string,
   tier: OrganizationTier,
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
   assertOrganizationId(recordId);
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
   return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug),
+    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
     kind,
     recordId,
     fileName
@@ -835,7 +850,7 @@ function classifyOrganizationWork(
   workShape: OrganizationWorkShape;
   managementUnit: Exclude<OrganizationManagementUnit, 'task_session'>;
   confidence: number;
-  reason: string;
+  reasonKey: string;
 } {
   const normalized = utterance.toLocaleLowerCase();
   const rules: Array<{
@@ -843,23 +858,21 @@ function classifyOrganizationWork(
     managementUnit: Exclude<OrganizationManagementUnit, 'task_session'>;
     confidence: number;
     pattern: RegExp;
-    reason: string;
+    reasonKey: string;
   }> = [
     {
       workShape: 'incident_response',
       managementUnit: 'incident',
       confidence: 0.93,
       pattern: /障害|インシデント|緊急|停止|エラー|outage|incident|emergency|down/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '障害・緊急対応を示す語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_incident',
     },
     {
       workShape: 'governance_cadence',
       managementUnit: 'cadence',
       confidence: 0.9,
       pattern: /経営会議|レビュー|承認|決裁|監査|予算|方針|governance|review|approval|audit|budget/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '組織判断・承認・定例会議に関する語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_governance',
     },
     {
       workShape: 'routine_operation',
@@ -867,32 +880,28 @@ function classifyOrganizationWork(
       confidence: 0.88,
       pattern:
         /月次|週次|毎日|定期|定常|請求|レポート|監視|daily|weekly|monthly|routine|scheduled|report|monitor/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '反復・定期運用を示す語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_routine',
     },
     {
       workShape: 'service_operation',
       managementUnit: 'service',
       confidence: 0.84,
       pattern: /サービス|窓口|運用|顧客対応|サポート|support|service|customer/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: 'サービス提供・継続運用を示す語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_service',
     },
     {
       workShape: 'improvement_experiment',
       managementUnit: 'experiment',
       confidence: 0.82,
       pattern: /改善|試す|実験|パイロット|pilot|experiment|optimize|improve/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '改善・実験を示す語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_experiment',
     },
     {
       workShape: 'solution_project',
       managementUnit: 'project',
       confidence: 0.8,
       pattern: /作る|開発|構築|導入|新しい|project|build|develop|implement|launch/,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '成果物の構築・導入を示す語が含まれています。',
+      reasonKey: 'organization:organization_resolution_reason_project',
     },
   ];
   const matched = rules.find((rule) => rule.pattern.test(normalized));
@@ -902,8 +911,7 @@ function classifyOrganizationWork(
       workShape: 'solution_project',
       managementUnit: 'project',
       confidence: 0.62,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '標準インテントがプロジェクト開始系として解決されました。',
+      reasonKey: 'organization:organization_resolution_reason_fallback_project',
     };
   }
   if (selectedTaskKind === 'task_session') {
@@ -911,16 +919,14 @@ function classifyOrganizationWork(
       workShape: 'service_operation',
       managementUnit: 'service',
       confidence: 0.58,
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      reason: '標準インテントがタスク実行系として解決されました。',
+      reasonKey: 'organization:organization_resolution_reason_fallback_service',
     };
   }
   return {
     workShape: 'routine_operation',
     managementUnit: 'operation',
     confidence: 0.4,
-    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-    reason: '明確な分類語がないため、定常運用候補として仮置きしました。',
+    reasonKey: 'organization:organization_resolution_reason_fallback_routine',
   };
 }
 
@@ -972,16 +978,25 @@ export function resolveOrganizationWork(
       cadence: 'cadence_id',
       experiment: 'experiment_id',
     }[classification.managementUnit];
-    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-    if (parentLabel) nextQuestions.push(`${parentLabel} を指定しますか？`);
+    if (parentLabel) {
+      nextQuestions.push(
+        t(
+          'organization:organization_resolution_parent_question',
+          { parent: parentLabel },
+          input.locale
+        )
+      );
+    }
   }
   if (classification.confidence < 0.7) {
-    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-    nextQuestions.push('この分類を人間が確認・修正しますか？');
+    nextQuestions.push(
+      t('organization:organization_resolution_confirmation_question', undefined, input.locale)
+    );
   }
   if (authorityClass === 'high' || authorityClass === 'approval_required') {
-    // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-    nextQuestions.push('実行前に責任者の承認を取得しますか？');
+    nextQuestions.push(
+      t('organization:organization_resolution_approval_question', undefined, input.locale)
+    );
   }
   const result: OrganizationWorkResolution = {
     kind: 'organization_work_resolution',
@@ -1000,22 +1015,24 @@ export function resolveOrganizationWork(
       kind: classification.managementUnit,
       ...(parentId ? { id: parentId } : {}),
       reason: parentId
-        ? // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-          '入力されたコンテキストを親候補として採用しました。'
-        : classification.reason,
+        ? t('organization:organization_resolution_context_adopted', undefined, input.locale)
+        : t(classification.reasonKey as Parameters<typeof t>[0], undefined, input.locale),
     },
     confidence: classification.confidence,
     authority_class: authorityClass,
     human_decision: 'pending',
     reasons: [
-      classification.reason,
+      t(classification.reasonKey as Parameters<typeof t>[0], undefined, input.locale),
       ...(packet.selected_intent_id
-        ? // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-          [`標準インテント ${packet.selected_intent_id} を参照しました。`]
-        : // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-          ['標準インテントの確定候補はありません。']),
-      // i18n-exempt: organization work-resolution messages remain Japanese until I18N-04 migration.
-      'この結果は組織の管理単位を提案するだけで、実行や状態変更は行いません。',
+        ? [
+            t(
+              'organization:organization_resolution_standard_intent',
+              { intent: packet.selected_intent_id },
+              input.locale
+            ),
+          ]
+        : [t('organization:organization_resolution_no_standard_intent', undefined, input.locale)]),
+      t('organization:organization_resolution_proposal_notice', undefined, input.locale),
     ],
     next_questions: nextQuestions,
     dry_run: true,
@@ -1031,32 +1048,37 @@ export function resolveOrganizationWork(
 export function organizationPurposePath(
   organizationId: string,
   tier: OrganizationTier,
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
-  return purposePath(organizationId, tier, tenantSlug);
+  return purposePath(organizationId, tier, tenantSlug, rootDir);
 }
 
 export function organizationOperationalStatePath(
   organizationId: string,
   tier: OrganizationTier,
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
-  return statePath(organizationId, tier, tenantSlug);
+  return statePath(organizationId, tier, tenantSlug, rootDir);
 }
 
-export function saveOrganizationPurpose(record: OrganizationPurposeRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationPurpose(
+  record: OrganizationPurposeRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     PURPOSE_SCHEMA_PATH,
-    purposePath(record.organization_id, record.tier, recordTenant(record)),
+    purposePath(record.organization_id, record.tier, recordTenant(record), options.rootDir),
     'organization purpose'
   );
 }
 
 export function loadOrganizationPurpose(
   organizationId: string,
-  query: { tier?: OrganizationTier; tenantSlug?: string } = {}
+  query: { tier?: OrganizationTier; tenantSlug?: string; rootDir?: string } = {}
 ): OrganizationPurposeRecord | null {
   assertOrganizationId(organizationId);
   const tiers: OrganizationTier[] = query.tier
@@ -1066,7 +1088,7 @@ export function loadOrganizationPurpose(
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {
     const record = readJsonRecord<OrganizationPurposeRecord>(
-      purposePath(organizationId, tier, tenantSlug),
+      purposePath(organizationId, tier, tenantSlug, query.rootDir),
       'organization purpose'
     );
     if (record && validateOrganizationPurpose(record) && record.organization_id === organizationId)
@@ -1075,12 +1097,15 @@ export function loadOrganizationPurpose(
   return null;
 }
 
-export function saveOrganizationOperationalState(record: OrganizationOperationalState): string {
-  assertRecordIdentity(record);
+export function saveOrganizationOperationalState(
+  record: OrganizationOperationalState,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     STATE_SCHEMA_PATH,
-    statePath(record.organization_id, record.tier, recordTenant(record)),
+    statePath(record.organization_id, record.tier, recordTenant(record), options.rootDir),
     'organization operational state'
   );
 }
@@ -1091,6 +1116,7 @@ export function transitionOrganizationLifecycle(input: {
   organizationId: string;
   tier: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
   verb: OrganizationLifecycleVerb;
   reason?: string;
 }): OrganizationOperationalState {
@@ -1117,7 +1143,7 @@ export function transitionOrganizationLifecycle(input: {
       ...(input.reason ? { lifecycle_reason: input.reason } : {}),
     },
   };
-  saveOrganizationOperationalState(next);
+  saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'organization_controller',
     action: `organization.${input.verb}`,
@@ -1135,6 +1161,7 @@ export function retireOrganizationEntity(input: {
   organizationId: string;
   tier: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
   kind: OrganizationRetireKind;
   recordId: string;
   reason?: string;
@@ -1143,6 +1170,7 @@ export function retireOrganizationEntity(input: {
     organizationId: input.organizationId,
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   };
   let record: any;
   if (input.kind === 'domain') record = loadOrganizationDomain(input.recordId, query);
@@ -1180,11 +1208,12 @@ export function retireOrganizationEntity(input: {
       ...(input.reason ? { retire_reason: input.reason } : {}),
     },
   };
-  if (input.kind === 'domain') saveOrganizationDomain(next);
-  else if (input.kind === 'capability') saveOrganizationCapability(next);
-  else if (input.kind === 'service') saveOrganizationService(next);
-  else if (input.kind === 'operation') saveOrganizationOperation(next);
-  else saveOrganizationCadence(next);
+  if (input.kind === 'domain') saveOrganizationDomain(next, { rootDir: input.rootDir });
+  else if (input.kind === 'capability')
+    saveOrganizationCapability(next, { rootDir: input.rootDir });
+  else if (input.kind === 'service') saveOrganizationService(next, { rootDir: input.rootDir });
+  else if (input.kind === 'operation') saveOrganizationOperation(next, { rootDir: input.rootDir });
+  else saveOrganizationCadence(next, { rootDir: input.rootDir });
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'organization_controller',
     action: `organization.${input.kind}.retire`,
@@ -1204,6 +1233,7 @@ export function removeOrganizationEntity(input: {
   organizationId: string;
   tier: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
   kind: OrganizationRetireKind;
   recordId: string;
   reason?: string;
@@ -1212,6 +1242,7 @@ export function removeOrganizationEntity(input: {
     organizationId: input.organizationId,
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   };
   const record =
     input.kind === 'domain'
@@ -1272,7 +1303,8 @@ export function removeOrganizationEntity(input: {
       fileName,
       input.organizationId,
       input.tier,
-      recordTenant(record)
+      recordTenant(record),
+      input.rootDir
     ),
     { force: true }
   );
@@ -1289,7 +1321,7 @@ export function removeOrganizationEntity(input: {
 
 export function loadOrganizationOperationalState(
   organizationId: string,
-  query: { tier?: OrganizationTier; tenantSlug?: string } = {}
+  query: { tier?: OrganizationTier; tenantSlug?: string; rootDir?: string } = {}
 ): OrganizationOperationalState | null {
   assertOrganizationId(organizationId);
   const tiers: OrganizationTier[] = query.tier
@@ -1299,7 +1331,7 @@ export function loadOrganizationOperationalState(
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {
     const record = readJsonRecord<OrganizationOperationalState>(
-      statePath(organizationId, tier, tenantSlug),
+      statePath(organizationId, tier, tenantSlug, query.rootDir),
       'organization operational state'
     );
     if (
@@ -1312,8 +1344,11 @@ export function loadOrganizationOperationalState(
   return null;
 }
 
-export function saveOrganizationDomain(record: OrganizationDomainRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationDomain(
+  record: OrganizationDomainRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     DOMAIN_SCHEMA_PATH,
@@ -1323,14 +1358,18 @@ export function saveOrganizationDomain(record: OrganizationDomainRecord): string
       DOMAIN_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization domain'
   );
 }
 
-export function saveOrganizationCapability(record: OrganizationCapabilityRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationCapability(
+  record: OrganizationCapabilityRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     CAPABILITY_SCHEMA_PATH,
@@ -1340,14 +1379,18 @@ export function saveOrganizationCapability(record: OrganizationCapabilityRecord)
       CAPABILITY_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization capability'
   );
 }
 
-export function saveOrganizationService(record: OrganizationServiceRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationService(
+  record: OrganizationServiceRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     SERVICE_SCHEMA_PATH,
@@ -1357,14 +1400,18 @@ export function saveOrganizationService(record: OrganizationServiceRecord): stri
       SERVICE_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization service'
   );
 }
 
-export function saveOrganizationServiceState(record: OrganizationServiceState): string {
-  assertRecordIdentity(record);
+export function saveOrganizationServiceState(
+  record: OrganizationServiceState,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     SERVICE_STATE_SCHEMA_PATH,
@@ -1374,7 +1421,8 @@ export function saveOrganizationServiceState(record: OrganizationServiceState): 
       SERVICE_STATE_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization service state'
   );
@@ -1382,14 +1430,22 @@ export function saveOrganizationServiceState(record: OrganizationServiceState): 
 
 export function loadOrganizationDomain(
   domainId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationDomainRecord | null {
   assertOrganizationId(domainId);
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
     const record = readJsonRecord<OrganizationDomainRecord>(
-      recordPath('domains', domainId, DOMAIN_FILE_NAME, query.organizationId, tier, tenantSlug),
+      recordPath(
+        'domains',
+        domainId,
+        DOMAIN_FILE_NAME,
+        query.organizationId,
+        tier,
+        tenantSlug,
+        query.rootDir
+      ),
       'organization domain'
     );
     if (record && validateOrganizationDomain(record) && record.domain_id === domainId)
@@ -1400,7 +1456,7 @@ export function loadOrganizationDomain(
 
 export function loadOrganizationCapability(
   capabilityId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationCapabilityRecord | null {
   assertOrganizationId(capabilityId);
   assertOrganizationId(query.organizationId);
@@ -1413,7 +1469,8 @@ export function loadOrganizationCapability(
         CAPABILITY_FILE_NAME,
         query.organizationId,
         tier,
-        tenantSlug
+        tenantSlug,
+        query.rootDir
       ),
       'organization capability'
     );
@@ -1425,17 +1482,32 @@ export function loadOrganizationCapability(
 
 export function loadOrganizationService(
   serviceId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationServiceRecord | null {
   assertOrganizationId(serviceId);
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
     const record = readJsonRecord<OrganizationServiceRecord>(
-      recordPath('services', serviceId, SERVICE_FILE_NAME, query.organizationId, tier, tenantSlug),
+      recordPath(
+        'services',
+        serviceId,
+        SERVICE_FILE_NAME,
+        query.organizationId,
+        tier,
+        tenantSlug,
+        query.rootDir
+      ),
       'organization service'
     );
-    if (record && validateOrganizationService(record) && record.service_id === serviceId)
+    if (
+      record &&
+      validateOrganizationService(record) &&
+      record.service_id === serviceId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
       return record;
   }
   return null;
@@ -1443,7 +1515,7 @@ export function loadOrganizationService(
 
 export function loadOrganizationServiceState(
   serviceId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationServiceState | null {
   assertOrganizationId(serviceId);
   assertOrganizationId(query.organizationId);
@@ -1456,11 +1528,19 @@ export function loadOrganizationServiceState(
         SERVICE_STATE_FILE_NAME,
         query.organizationId,
         tier,
-        tenantSlug
+        tenantSlug,
+        query.rootDir
       ),
       'organization service state'
     );
-    if (record && validateOrganizationServiceState(record) && record.service_id === serviceId)
+    if (
+      record &&
+      validateOrganizationServiceState(record) &&
+      record.service_id === serviceId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
       return record;
   }
   return null;
@@ -1470,15 +1550,27 @@ function operationDirectory(
   operationId: string,
   organizationId: string,
   tier: OrganizationTier,
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
   return path.dirname(
-    recordPath('operations', operationId, OPERATION_FILE_NAME, organizationId, tier, tenantSlug)
+    recordPath(
+      'operations',
+      operationId,
+      OPERATION_FILE_NAME,
+      organizationId,
+      tier,
+      tenantSlug,
+      rootDir
+    )
   );
 }
 
-export function saveOrganizationOperation(record: OrganizationOperationRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationOperation(
+  record: OrganizationOperationRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     OPERATION_SCHEMA_PATH,
@@ -1488,14 +1580,18 @@ export function saveOrganizationOperation(record: OrganizationOperationRecord): 
       OPERATION_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization operation'
   );
 }
 
-export function saveOrganizationOperationState(record: OrganizationOperationState): string {
-  assertRecordIdentity(record);
+export function saveOrganizationOperationState(
+  record: OrganizationOperationState,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     OPERATION_STATE_SCHEMA_PATH,
@@ -1504,7 +1600,8 @@ export function saveOrganizationOperationState(record: OrganizationOperationStat
         record.operation_id,
         record.organization_id,
         record.tier,
-        recordTenant(record)
+        recordTenant(record),
+        options.rootDir
       ),
       OPERATION_STATE_FILE_NAME
     ),
@@ -1512,8 +1609,11 @@ export function saveOrganizationOperationState(record: OrganizationOperationStat
   );
 }
 
-export function saveOrganizationOperationRun(record: OrganizationOperationRun): string {
-  assertRecordIdentity(record);
+export function saveOrganizationOperationRun(
+  record: OrganizationOperationRun,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   assertOrganizationId(record.run_id);
   return saveValidated(
     record,
@@ -1523,7 +1623,8 @@ export function saveOrganizationOperationRun(record: OrganizationOperationRun): 
         record.operation_id,
         record.organization_id,
         record.tier,
-        recordTenant(record)
+        recordTenant(record),
+        options.rootDir
       ),
       'runs',
       record.run_id,
@@ -1535,7 +1636,7 @@ export function saveOrganizationOperationRun(record: OrganizationOperationRun): 
 
 export function loadOrganizationOperation(
   operationId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationOperationRecord | null {
   assertOrganizationId(operationId);
   assertOrganizationId(query.organizationId);
@@ -1548,11 +1649,19 @@ export function loadOrganizationOperation(
         OPERATION_FILE_NAME,
         query.organizationId,
         tier,
-        tenantSlug
+        tenantSlug,
+        query.rootDir
       ),
       'organization operation'
     );
-    if (record && validateOrganizationOperation(record) && record.operation_id === operationId)
+    if (
+      record &&
+      validateOrganizationOperation(record) &&
+      record.operation_id === operationId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
       return record;
   }
   return null;
@@ -1560,7 +1669,7 @@ export function loadOrganizationOperation(
 
 export function loadOrganizationOperationState(
   operationId: string,
-  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): OrganizationOperationState | null {
   assertOrganizationId(operationId);
   assertOrganizationId(query.organizationId);
@@ -1568,12 +1677,19 @@ export function loadOrganizationOperationState(
   for (const tier of recordQueryTiers(query.tier)) {
     const record = readJsonRecord<OrganizationOperationState>(
       path.join(
-        operationDirectory(operationId, query.organizationId, tier, tenantSlug),
+        operationDirectory(operationId, query.organizationId, tier, tenantSlug, query.rootDir),
         OPERATION_STATE_FILE_NAME
       ),
       'organization operation state'
     );
-    if (record && validateOrganizationOperationState(record) && record.operation_id === operationId)
+    if (
+      record &&
+      validateOrganizationOperationState(record) &&
+      record.operation_id === operationId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
       return record;
   }
   return null;
@@ -1584,6 +1700,7 @@ export function listOrganizationOperations(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
     status?: OrganizationOperationRecord['status'];
   } = {}
 ): OrganizationOperationRecord[] {
@@ -1603,6 +1720,7 @@ export function listOrganizationOperationStates(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationOperationState[] {
   return listOrganizationRecordFiles('operations', OPERATION_STATE_FILE_NAME, query)
@@ -1620,6 +1738,7 @@ export function listOrganizationOperationRuns(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationOperationRun[] {
   return listOrganizationRecordFiles('operations', OPERATION_RUN_FILE_NAME, query)
@@ -1632,8 +1751,11 @@ export function listOrganizationOperationRuns(
     .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
 }
 
-export function saveOrganizationIncident(record: OrganizationIncidentRecord): string {
-  assertRecordIdentity(record);
+export function saveOrganizationIncident(
+  record: OrganizationIncidentRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     INCIDENT_SCHEMA_PATH,
@@ -1643,14 +1765,51 @@ export function saveOrganizationIncident(record: OrganizationIncidentRecord): st
       INCIDENT_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization incident'
   );
 }
 
-export function saveOrganizationCadence(record: OrganizationCadenceRecord): string {
-  assertRecordIdentity(record);
+export function loadOrganizationIncident(
+  incidentId: string,
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
+): OrganizationIncidentRecord | null {
+  assertOrganizationId(incidentId);
+  assertOrganizationId(query.organizationId);
+  const tenantSlug = recordQueryTenant(query.tenantSlug);
+  for (const tier of recordQueryTiers(query.tier)) {
+    const record = readJsonRecord<OrganizationIncidentRecord>(
+      recordPath(
+        'incidents',
+        incidentId,
+        INCIDENT_FILE_NAME,
+        query.organizationId,
+        tier,
+        tenantSlug,
+        query.rootDir
+      ),
+      'organization incident'
+    );
+    if (
+      record &&
+      validateOrganizationIncident(record) &&
+      record.incident_id === incidentId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
+      return record;
+  }
+  return null;
+}
+
+export function saveOrganizationCadence(
+  record: OrganizationCadenceRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     CADENCE_SCHEMA_PATH,
@@ -1660,14 +1819,51 @@ export function saveOrganizationCadence(record: OrganizationCadenceRecord): stri
       CADENCE_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization cadence'
   );
 }
 
-export function saveOrganizationDecision(record: OrganizationDecisionRecord): string {
-  assertRecordIdentity(record);
+export function loadOrganizationCadence(
+  cadenceId: string,
+  query: { organizationId: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
+): OrganizationCadenceRecord | null {
+  assertOrganizationId(cadenceId);
+  assertOrganizationId(query.organizationId);
+  const tenantSlug = recordQueryTenant(query.tenantSlug);
+  for (const tier of recordQueryTiers(query.tier)) {
+    const record = readJsonRecord<OrganizationCadenceRecord>(
+      recordPath(
+        'cadences',
+        cadenceId,
+        CADENCE_FILE_NAME,
+        query.organizationId,
+        tier,
+        tenantSlug,
+        query.rootDir
+      ),
+      'organization cadence'
+    );
+    if (
+      record &&
+      validateOrganizationCadence(record) &&
+      record.cadence_id === cadenceId &&
+      record.organization_id === query.organizationId &&
+      record.tier === tier &&
+      recordTenant(record) === tenantSlug
+    )
+      return record;
+  }
+  return null;
+}
+
+export function saveOrganizationDecision(
+  record: OrganizationDecisionRecord,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     DECISION_SCHEMA_PATH,
@@ -1677,14 +1873,18 @@ export function saveOrganizationDecision(record: OrganizationDecisionRecord): st
       DECISION_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization decision'
   );
 }
 
-export function saveOrganizationLearningCandidate(record: OrganizationLearningCandidate): string {
-  assertRecordIdentity(record);
+export function saveOrganizationLearningCandidate(
+  record: OrganizationLearningCandidate,
+  options: { rootDir?: string } = {}
+): string {
+  assertRecordIdentity(record, options.rootDir);
   return saveValidated(
     record,
     LEARNING_SCHEMA_PATH,
@@ -1694,7 +1894,8 @@ export function saveOrganizationLearningCandidate(record: OrganizationLearningCa
       LEARNING_FILE_NAME,
       record.organization_id,
       record.tier,
-      recordTenant(record)
+      recordTenant(record),
+      options.rootDir
     ),
     'organization learning candidate'
   );
@@ -1721,7 +1922,7 @@ export function buildOrganizationLearningCandidate(
     updated_at: now,
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
-  assertRecordIdentity(record);
+  assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationLearningCandidate(record)) {
     throw new Error(
       `Invalid organization learning candidate: ${validationErrors(validatorFor(LEARNING_SCHEMA_PATH))}`
@@ -1734,7 +1935,7 @@ export function enqueueOrganizationLearningCandidate(
   input: QueueOrganizationLearningCandidateInput
 ): OrganizationLearningCandidate {
   const record = buildOrganizationLearningCandidate(input);
-  saveOrganizationLearningCandidate(record);
+  saveOrganizationLearningCandidate(record, { rootDir: input.rootDir });
   return record;
 }
 
@@ -1746,6 +1947,7 @@ export interface BuildOrganizationScaffoldInput {
   purpose?: string;
   principles?: string[];
   ownerRole?: string;
+  rootDir?: string;
 }
 
 export interface OrganizationScaffold {
@@ -1761,6 +1963,7 @@ export function buildOrganizationScaffold(
   const existing = loadOrganizationOperationalState(input.organizationId, {
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   });
   if (existing) {
     throw new Error(
@@ -1779,7 +1982,7 @@ export function buildOrganizationScaffold(
     pending_decision_ids: [],
     updated_at: now,
   };
-  assertRecordIdentity(state);
+  assertRecordIdentity(state, input.rootDir);
   if (!validateOrganizationOperationalState(state)) {
     throw new Error(
       `Invalid organization operational state: ${validationErrors(validatorFor(STATE_SCHEMA_PATH))}`
@@ -1796,6 +1999,7 @@ export function buildOrganizationScaffold(
         purpose: input.purpose,
         principles: input.principles,
         ownerRole: input.ownerRole || 'operator',
+        rootDir: input.rootDir,
       },
       now
     );
@@ -1812,6 +2016,7 @@ export interface BuildOrganizationPurposeInput {
   principles?: string[];
   ownerRole: string;
   approvalState?: OrganizationPurposeRecord['approval_state'];
+  rootDir?: string;
 }
 
 export function buildOrganizationPurposeRecord(
@@ -1821,6 +2026,7 @@ export function buildOrganizationPurposeRecord(
   const existing = loadOrganizationPurpose(input.organizationId, {
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   });
   const record: OrganizationPurposeRecord = {
     version: '1.0.0',
@@ -1839,7 +2045,7 @@ export function buildOrganizationPurposeRecord(
     approval_state: input.approvalState || existing?.approval_state || 'draft',
     updated_at: now,
   };
-  assertRecordIdentity(record);
+  assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationPurpose(record)) {
     throw new Error(
       `Invalid organization purpose: ${validationErrors(validatorFor(PURPOSE_SCHEMA_PATH))}`
@@ -1853,6 +2059,7 @@ export interface BuildOrganizationObjectiveInput {
   tier: OrganizationTier;
   tenantSlug?: string;
   objective: OrganizationPurposeObjective;
+  rootDir?: string;
 }
 
 export function buildOrganizationObjectiveAddition(
@@ -1862,6 +2069,7 @@ export function buildOrganizationObjectiveAddition(
   const existing = loadOrganizationPurpose(input.organizationId, {
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   });
   if (!existing) {
     throw new Error(
@@ -1895,6 +2103,7 @@ export interface BuildOrganizationDomainInput {
   tier: OrganizationTier;
   tenantSlug?: string;
   purpose?: string;
+  rootDir?: string;
 }
 
 export function buildOrganizationDomainRecord(
@@ -1915,7 +2124,7 @@ export function buildOrganizationDomainRecord(
     status: 'active',
     updated_at: now,
   };
-  assertRecordIdentity(record);
+  assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationDomain(record)) {
     throw new Error(
       `Invalid organization domain: ${validationErrors(validatorFor(DOMAIN_SCHEMA_PATH))}`
@@ -1938,6 +2147,7 @@ export interface BuildOrganizationServiceInput {
   sloWindow?: string;
   runbookRefs?: string[];
   status?: OrganizationServiceRecord['status'];
+  rootDir?: string;
 }
 
 export interface OrganizationServiceAddition {
@@ -1956,6 +2166,7 @@ export function buildOrganizationServiceAddition(
     organizationId: input.organizationId,
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   });
   if (!domain) {
     throw new Error(
@@ -1991,7 +2202,7 @@ export function buildOrganizationServiceAddition(
     status: input.status || 'active',
     updated_at: now,
   };
-  assertRecordIdentity(service);
+  assertRecordIdentity(service, input.rootDir);
   if (!validateOrganizationService(service)) {
     throw new Error(
       `Invalid organization service: ${validationErrors(validatorFor(SERVICE_SCHEMA_PATH))}`
@@ -2018,6 +2229,7 @@ export interface BuildOrganizationOperationInput {
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   evidenceOutputs?: string[];
+  rootDir?: string;
 }
 
 export function buildOrganizationOperationRecord(
@@ -2055,7 +2267,7 @@ export function buildOrganizationOperationRecord(
     status: 'active',
     updated_at: now,
   };
-  assertRecordIdentity(record);
+  assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationOperation(record)) {
     throw new Error(
       `Invalid organization operation: ${validationErrors(validatorFor(OPERATION_SCHEMA_PATH))}`
@@ -2070,6 +2282,7 @@ export interface BuildOrganizationProjectLinkInput {
   tier?: OrganizationTier;
   tenantSlug?: string;
   detach?: boolean;
+  rootDir?: string;
 }
 
 export function buildOrganizationProjectLink(
@@ -2079,13 +2292,14 @@ export function buildOrganizationProjectLink(
   const state = loadOrganizationOperationalState(input.organizationId, {
     tier: input.tier,
     tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
   });
   if (!state) {
     throw new Error(
       `Organization state not found for '${input.organizationId}'. Run 'init' first.`
     );
   }
-  if (!input.detach && !loadProjectRecord(input.projectId)) {
+  if (!input.detach && !loadProjectRecord(input.projectId, { rootDir: input.rootDir })) {
     throw new Error(
       `Project '${input.projectId}' not found in the project registry. Create it via 'pnpm project create' first.`
     );
@@ -2116,7 +2330,12 @@ export function buildOrganizationProjectLink(
 }
 
 export function listOrganizationIncidents(
-  query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string } = {}
+  query: {
+    organizationId?: string;
+    tier?: OrganizationTier;
+    tenantSlug?: string;
+    rootDir?: string;
+  } = {}
 ): OrganizationIncidentRecord[] {
   return listOrganizationRecordFiles('incidents', INCIDENT_FILE_NAME, query)
     .map((filePath) =>
@@ -2129,7 +2348,12 @@ export function listOrganizationIncidents(
 }
 
 export function listOrganizationCadences(
-  query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string } = {}
+  query: {
+    organizationId?: string;
+    tier?: OrganizationTier;
+    tenantSlug?: string;
+    rootDir?: string;
+  } = {}
 ): OrganizationCadenceRecord[] {
   return listOrganizationRecordFiles('cadences', CADENCE_FILE_NAME, query)
     .map((filePath) => readJsonRecord<OrganizationCadenceRecord>(filePath, 'organization cadence'))
@@ -2144,6 +2368,7 @@ export function listOrganizationDecisions(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
     status?: OrganizationDecisionRecord['status'];
   } = {}
 ): OrganizationDecisionRecord[] {
@@ -2163,6 +2388,7 @@ export function listOrganizationLearningCandidates(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
     status?: OrganizationLearningCandidate['status'];
   } = {}
 ): OrganizationLearningCandidate[] {
@@ -2193,13 +2419,18 @@ function organizationRecordFiles(rootDir: string, fileName: string): string[] {
 function listOrganizationRecordFiles(
   kind: OrganizationRecordKind,
   fileName: string,
-  query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string }
+  query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): string[] {
   if (query.organizationId) assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug || process.env.KYBERION_TENANT);
   const tiers = recordQueryTiers(query.tier);
   return tiers.flatMap((tier) => {
-    const organizationRoot = pathResolver.active(path.join('organizations', tier, tenantSlug));
+    const organizationRoot = path.resolve(
+      query.rootDir || pathResolver.rootDir(),
+      'active/organizations',
+      tier,
+      tenantSlug
+    );
     return organizationRecordFiles(organizationRoot, fileName).filter((filePath) =>
       query.organizationId ? filePath.includes(`/${query.organizationId}/`) : true
     );
@@ -2211,6 +2442,7 @@ export function listOrganizationDomains(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationDomainRecord[] {
   return listOrganizationRecordFiles('domains', DOMAIN_FILE_NAME, query)
@@ -2226,6 +2458,7 @@ export function listOrganizationCapabilities(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationCapabilityRecord[] {
   return listOrganizationRecordFiles('capabilities', CAPABILITY_FILE_NAME, query)
@@ -2243,6 +2476,7 @@ export function listOrganizationServices(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationServiceRecord[] {
   return listOrganizationRecordFiles('services', SERVICE_FILE_NAME, query)
@@ -2258,6 +2492,7 @@ export function listOrganizationServiceStates(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationServiceState[] {
   return listOrganizationRecordFiles('services', SERVICE_STATE_FILE_NAME, query)
@@ -2274,6 +2509,7 @@ export function loadOrganizationCatalog(query: {
   organizationId: string;
   tier?: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
 }): OrganizationCatalog {
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   const tier = query.tier || 'confidential';
@@ -2292,6 +2528,7 @@ export function reconcileOrganizationCatalog(query: {
   organizationId: string;
   tier?: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
 }): OrganizationCatalogReconciliation {
   const catalog = loadOrganizationCatalog(query);
   const capabilitiesById = new Map(
@@ -2360,13 +2597,13 @@ export function reconcileOrganizationCatalog(query: {
       return [`${entry.operation_id}:execution_target`];
     }
     if (!ref) return [];
-    if (entry.execution_target.kind === 'mission' && !pathResolver.findMissionPath(ref)) {
+    if (entry.execution_target.kind === 'mission' && !loadState(ref, { rootDir: query.rootDir })) {
       return [`${entry.operation_id}:${ref}`];
     }
     if (
       entry.execution_target.kind === 'pipeline' &&
       (ref.startsWith('pipelines/') || ref.startsWith('knowledge/')) &&
-      !safeExistsSync(pathResolver.rootResolve(ref))
+      !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
     ) {
       return [`${entry.operation_id}:${ref}`];
     }
@@ -2376,13 +2613,17 @@ export function reconcileOrganizationCatalog(query: {
     ...operationStates.flatMap((entry) =>
       (entry.last_evidence_refs || [])
         .filter((ref) => ref.startsWith('knowledge/') || ref.startsWith('active/'))
-        .filter((ref) => !safeExistsSync(pathResolver.rootResolve(ref)))
+        .filter(
+          (ref) => !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
+        )
         .map((ref) => `${entry.operation_id}:${ref}`)
     ),
     ...operationRuns.flatMap((entry) =>
       (entry.evidence_refs || [])
         .filter((ref) => ref.startsWith('knowledge/') || ref.startsWith('active/'))
-        .filter((ref) => !safeExistsSync(pathResolver.rootResolve(ref)))
+        .filter(
+          (ref) => !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
+        )
         .map((ref) => `${entry.operation_id}:${ref}`)
     ),
   ];
@@ -2406,9 +2647,10 @@ export function reconcileOrganizationCatalog(query: {
   const operationalState = loadOrganizationOperationalState(query.organizationId, {
     tier: query.tier,
     tenantSlug: query.tenantSlug,
+    rootDir: query.rootDir,
   });
   const projectRefs = operationalState?.active_project_ids || [];
-  const projects = listProjectRecords();
+  const projects = listProjectRecords(query.rootDir || pathResolver.rootDir());
   const projectIds = new Set(
     projects
       .filter((project) => !query.tier || project.tier === query.tier)
@@ -2418,7 +2660,9 @@ export function reconcileOrganizationCatalog(query: {
   const invalidRunbookRefs = catalog.services.flatMap((entry) =>
     entry.runbook_refs
       .filter(
-        (ref) => ref.startsWith('knowledge/') && !safeExistsSync(pathResolver.rootResolve(ref))
+        (ref) =>
+          ref.startsWith('knowledge/') &&
+          !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
       )
       .map((ref) => `${entry.service_id}:${ref}`)
   );
@@ -2466,6 +2710,7 @@ export function reconcileOrganizationState(query: {
   organizationId: string;
   tier?: OrganizationTier;
   tenantSlug?: string;
+  rootDir?: string;
   apply?: boolean;
 }): OrganizationReconciliationResult {
   assertOrganizationId(query.organizationId);
@@ -2473,6 +2718,7 @@ export function reconcileOrganizationState(query: {
   const state = loadOrganizationOperationalState(query.organizationId, {
     tier: query.tier,
     tenantSlug: query.tenantSlug,
+    rootDir: query.rootDir,
   });
   const services = listOrganizationServiceStates(query);
   const operations = listOrganizationOperations(query);
@@ -2492,7 +2738,8 @@ export function reconcileOrganizationState(query: {
       target: organizationOperationalStatePath(
         state.organization_id,
         state.tier,
-        state.tenant_slug || 'shared'
+        state.tenant_slug || 'shared',
+        query.rootDir
       ),
     });
     if (query.apply) {
@@ -2517,7 +2764,7 @@ export function reconcileOrganizationState(query: {
         last_reconciled_at: now,
         updated_at: now,
       };
-      updatedPaths.push(saveOrganizationOperationalState(nextState));
+      updatedPaths.push(saveOrganizationOperationalState(nextState, { rootDir: query.rootDir }));
     }
   } else {
     blockedIssues.push('organization_state:missing');
@@ -2534,10 +2781,11 @@ export function reconcileOrganizationState(query: {
 function buildOrganizationProjectLineage(
   organizationId: string,
   tier: OrganizationTier | undefined,
-  operationalState: OrganizationOperationalState | null
+  operationalState: OrganizationOperationalState | null,
+  rootDir?: string
 ): OrganizationProjectLineage[] {
   const referencedProjectIds = new Set(operationalState?.active_project_ids || []);
-  return listProjectRecords()
+  return listProjectRecords(rootDir || pathResolver.rootDir())
     .filter((project) => !tier || project.tier === tier)
     .filter(
       (project) =>
@@ -2667,13 +2915,21 @@ export function listOrganizationOperationalStates(
     organizationId?: string;
     tier?: OrganizationTier;
     tenantSlug?: string;
+    rootDir?: string;
   } = {}
 ): OrganizationOperationalState[] {
   if (query.organizationId) assertOrganizationId(query.organizationId);
   if (query.tenantSlug) assertTenantSlug(query.tenantSlug);
   const tenantSlug = recordQueryTenant(query.tenantSlug || process.env.KYBERION_TENANT);
   const files = recordQueryTiers(query.tier).flatMap((tier) =>
-    organizationStateFiles(pathResolver.active(path.join('organizations', tier, tenantSlug)))
+    organizationStateFiles(
+      path.resolve(
+        query.rootDir || pathResolver.rootDir(),
+        'active/organizations',
+        tier,
+        tenantSlug
+      )
+    )
   );
   return files
     .map((filePath) =>
@@ -2701,15 +2957,18 @@ export function buildOrganizationManagementView(input: {
   const purpose = loadOrganizationPurpose(input.organizationId, {
     tier: input.tier,
     tenantSlug,
+    rootDir: input.rootDir,
   });
   const operationalState = loadOrganizationOperationalState(input.organizationId, {
     tier: input.tier,
     tenantSlug,
+    rootDir: input.rootDir,
   });
   const organizationQuery = {
     organizationId: input.organizationId,
     tier: input.tier,
     tenantSlug,
+    rootDir: input.rootDir,
   };
   const domains = listOrganizationDomains(organizationQuery);
   const capabilities = listOrganizationCapabilities(organizationQuery);
@@ -2724,7 +2983,8 @@ export function buildOrganizationManagementView(input: {
   const solutionProjects = buildOrganizationProjectLineage(
     input.organizationId,
     input.tier,
-    operationalState
+    operationalState,
+    input.rootDir
   );
   const lineage = buildOrganizationLineage({
     organizationId: input.organizationId,

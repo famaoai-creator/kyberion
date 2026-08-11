@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
+import {
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  writeTenantProfile,
+} from '@agent/core';
 import { onboardAiCompany } from './company_onboarding.js';
 
 const rootDir = pathResolver.sharedTmp('company-onboarding-test');
@@ -47,5 +54,35 @@ describe('AI company onboarding', () => {
     expect(safeReadFile(result.firstWorkPath, { encoding: 'utf8' })).toContain(
       'Define the first customer outcome'
     );
+  });
+
+  it('restores company files when tenant binding is rejected', () => {
+    safeMkdir(`${rootDir}/customer/acme-ai`, { recursive: true });
+    writeTenantProfile(
+      {
+        tenant_slug: 'acme-prod',
+        tenant_id: 'acme-prod',
+        display_name: 'Another Company',
+        status: 'active',
+        assigned_role: 'owner',
+      },
+      { rootDir, env: { KYBERION_CUSTOMER: 'acme-ai' } }
+    );
+
+    expect(() =>
+      onboardAiCompany({
+        vertical: 'saas-product-company',
+        slug: 'acme-ai',
+        companyName: 'ACME AI',
+        firstWork: 'Define the first customer outcome and launch plan',
+        tenantSlug: 'acme-prod',
+        rootDir,
+      })
+    ).toThrow("Tenant 'acme-prod' already belongs to 'Another Company'");
+    expect(safeExistsSync(`${rootDir}/customer/acme-ai/organization-profile.json`)).toBe(false);
+    expect(safeExistsSync(`${rootDir}/customer/acme-ai/onboarding/ai-company-readiness.json`)).toBe(
+      false
+    );
+    expect(safeExistsSync(`${rootDir}/customer/acme-ai/onboarding/first-work-plan.md`)).toBe(false);
   });
 });

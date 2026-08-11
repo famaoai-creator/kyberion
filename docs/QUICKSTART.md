@@ -57,7 +57,14 @@ pnpm company:onboard --vertical saas-product-company --slug acme-ai \
   --goal "Define the first customer outcome and launch plan"
 ```
 
-The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review.
+The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding.
+
+Before starting the first work, review its management unit:
+
+```bash
+pnpm onboarding:context first-work --customer-slug acme-ai \
+  --intent "Define the first customer outcome and launch plan" --dry-run --json
+```
 
 If you already have an onboarding payload, use Path B instead of the wizard:
 

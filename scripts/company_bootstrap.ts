@@ -10,7 +10,7 @@
  * 参照するためコピー不要。
  *
  * Usage:
- *   pnpm company:bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--force]
+ *   pnpm company:bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--root-dir <path>] [--force]
  */
 
 import * as path from 'node:path';
@@ -133,6 +133,7 @@ function main(): number {
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');
   const companyName = getFlag(argv, '--name');
+  const rootDir = getFlag(argv, '--root-dir');
   const force = argv.includes('--force');
 
   if (argv.includes('--list') || (!vertical && !slug)) {
@@ -140,18 +141,24 @@ function main(): number {
     console.log('Available company verticals:');
     for (const entry of verticals) console.log(`  - ${entry}`);
     console.log(
-      '\nUsage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--force]'
+      '\nUsage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
     );
     return vertical || slug ? 1 : 0;
   }
   if (!vertical || !slug) {
     logger.error(
-      'Usage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--force]'
+      'Usage: pnpm company:bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
     );
     return 1;
   }
 
-  const result = bootstrapCompany({ vertical, slug, companyName, force });
+  const result = bootstrapCompany({
+    vertical,
+    slug,
+    companyName,
+    rootDir: rootDir ? path.resolve(rootDir) : undefined,
+    force,
+  });
   logger.success(`🏢 Company '${slug}' bootstrapped from vertical '${vertical}'.`);
   logger.info(`   Customer dir: ${result.customerDir}`);
   logger.info(`   Team template catalog: ${result.catalogId}`);
