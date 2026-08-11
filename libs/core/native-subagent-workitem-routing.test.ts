@@ -5,6 +5,7 @@ import {
   CodexCliReasoningBackend,
   type CodexHarnessSession,
 } from './codex-cli-reasoning-backend.js';
+import { AgyCliBackend, type AgyHarnessSession } from './agy-cli-backend.js';
 
 describe('native Codex Luna WorkItem routing', () => {
   it('selects the native adopter, routes gpt-5.6-luna, and records execution proof', async () => {
@@ -56,6 +57,49 @@ describe('native Codex Luna WorkItem routing', () => {
       threadId: 'thread-workitem-native-luna',
       turnId: 'turn-workitem-native-luna',
       mode: 'native-subagent',
+    });
+  });
+});
+
+describe('native AGY WorkItem routing', () => {
+  it('selects the native AGY adopter, routes native subagent, and records execution proof', async () => {
+    const session: AgyHarnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async (_prompt, options) => ({
+        text: 'native-agy-workitem-result',
+        stopReason: 'completed',
+        metadata: {
+          nativeSubagent: {
+            provider: 'agy',
+            threadId: 'thread-workitem-native-agy',
+            mode: 'agy-subagent-adopter',
+            profile: options?.profile,
+          },
+        },
+      })),
+    };
+    const backend = new AgyCliBackend({
+      bin: 'agy',
+      model: 'agy',
+      harnessSession: session,
+    });
+    const dispatcher = new HarnessSubagentDispatcher();
+
+    const result = await dispatcher.dispatch(
+      'Execute the native AGY WorkItem task.',
+      'workitem:witem-native-agy-01',
+      backend,
+      { profile: 'implementer' }
+    );
+
+    expect(result).toBe('native-agy-workitem-result');
+    expect(session.boot).toHaveBeenCalledOnce();
+    expect(session.askNativeSubagent).toHaveBeenCalledOnce();
+    expect(backend.getNativeSubagentAdopter?.().getInfo?.()).toMatchObject({
+      provider: 'agy',
+      threadId: 'thread-workitem-native-agy',
+      mode: 'agy-subagent-adopter',
     });
   });
 });
