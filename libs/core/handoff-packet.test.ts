@@ -27,6 +27,7 @@ describe('handoff-packet', () => {
       rationale: 'Prevent lossy handoffs.',
       source_ref: 'peer:peer-a',
       target_ref: 'peer:peer-b',
+      work_item_id: 'item-1',
     });
     expect(packet.outgoing_summary).toContain('item-1');
   });

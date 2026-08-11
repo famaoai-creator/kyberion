@@ -39,6 +39,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeWriteFile,
+  readCanonicalWorkGraph,
 } from '@agent/core';
 
 // ---------- data collection ----------
@@ -311,8 +312,21 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       archivedRecent.push({ id: state.mission_id, mtime: 0 });
       continue;
     }
-    const rawTasks =
-      readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+    const rawTasks = (() => {
+      try {
+        return readCanonicalWorkGraph(state.mission_id).items.map((item) => ({
+          task_id: item.context?.task_id || item.item_id,
+          status: item.status,
+          assigned_to: {
+            agent_id: item.assignee_peer_id,
+            role: item.metadata?.team_role,
+          },
+          description: item.description,
+        }));
+      } catch {
+        return [];
+      }
+    })();
     const tasks: OfficeTask[] = rawTasks.map((task) => ({
       task_id: String(task.task_id || '?'),
       status: String(task.status || 'planned'),

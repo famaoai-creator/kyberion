@@ -2,6 +2,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { validateAndRepairAdf } from './adf-repair-agent.js';
+import { runBackgroundReviewFork } from './background-review-runner.js';
 import {
   registerReasoningBackend,
   resetReasoningBackend,
@@ -19,6 +20,12 @@ import {
 } from './secure-io.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { knowledgeDeliveryLogDir } from './src/knowledge-feedback-loop.js';
+import {
+  clearWorkCoordinationStore,
+  createWorkItem,
+  getWorkItem,
+  setWorkCoordinationNamespace,
+} from './work-coordination.js';
 
 vi.mock('./delegated-task-observability.js', () => ({
   startDelegatedTaskTrace: vi.fn(() => ({ traceId: 'test-trace' })),
@@ -62,6 +69,29 @@ function registerFakeRepairBackend(delegateTask: ReasoningBackend['delegateTask'
   registerReasoningBackend(backend);
 }
 
+function registerNativeWorkItemBackend(delegateTask: ReasoningBackend['delegateTask']) {
+  registerReasoningBackend({
+    ...stubReasoningBackend,
+    name: 'legacy-test-backend',
+    model: 'legacy-test-model',
+    delegateTask,
+    getNativeSubagentAdopter: () => ({
+      id: 'test-native-adopter',
+      dispatch: vi.fn(async (instruction: string) =>
+        instruction.includes('background review')
+          ? JSON.stringify({ action: 'no_action' })
+          : JSON.stringify({ capability: 'demo', action: 'run' })
+      ),
+      getInfo: () => ({
+        provider: 'test-native-provider',
+        model: 'test-native-model',
+        threadId: 'thread-caller-routing',
+        turnId: 'turn-caller-routing',
+      }),
+    }),
+  });
+}
+
 describe('validateAndRepairAdf', () => {
   beforeEach(() => {
     safeMkdir(tmpRoot, { recursive: true });
@@ -70,15 +100,173 @@ describe('validateAndRepairAdf', () => {
     vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
     process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = knowledgeDeliveryDirOverride;
     safeRmSync(knowledgeDeliveryDirOverride, { recursive: true, force: true });
+    setWorkCoordinationNamespace(`adf-repair-agent-caller-tests-${process.pid}`);
+    clearWorkCoordinationStore();
   });
 
   afterEach(() => {
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
     resetReasoningBackend();
     if (safeExistsSync(tmpRoot)) safeRmSync(tmpRoot, { recursive: true, force: true });
     safeRmSync(knowledgeDeliveryDirOverride, { recursive: true, force: true });
     if (originalKnowledgeDeliveryDir === undefined)
       delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
     else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;
+  });
+
+  it('routes work-item ADF repair through the coordinated native path', async () => {
+    const delegateTask = vi.fn(async () => {
+      throw new Error('legacy delegateTask must not be called');
+    });
+    registerNativeWorkItemBackend(delegateTask);
+    const item = createWorkItem({
+      itemId: 'WI-ADF-CALLER-ROUTING',
+      title: 'ADF caller routing',
+      description: 'test coordinated ADF repair',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: {
+        organization_id: 'org-canonical',
+        tenant_slug: 'tenant-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        task_id: 'task-canonical',
+      },
+    });
+    const filePath = writeFixture(
+      'caller-routing-adf.json',
+      JSON.stringify({ capability: 'demo' })
+    );
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input', {
+      workItemId: item.item_id,
+    });
+    const stored = getWorkItem(item.item_id)!;
+    const attempt = stored.attempts?.[0];
+    if (!attempt) throw new Error('expected ADF repair attempt to be recorded');
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(stored.status).toBe('done');
+    expect(attempt).toMatchObject({
+      attempt_id: expect.any(String),
+      status: 'released',
+      ended_at: expect.any(String),
+    });
+    expect(stored.item_id).toBe(item.item_id);
+    expect(stored.metadata).toMatchObject({
+      attempt_id: expect.any(String),
+      work_item_id: item.item_id,
+      provider: 'test-native-provider',
+      model_id: 'test-native-model',
+      native_subagent: expect.objectContaining({ adopter_id: 'test-native-adopter' }),
+      lease_status: 'released',
+      result: expect.objectContaining({ status: 'succeeded' }),
+      security_scope: expect.objectContaining({
+        tenant_id: 'tenant-canonical',
+        organization_id: 'org-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        read_tiers: ['public'],
+        write_tier: 'public',
+      }),
+    });
+    expect(attempt.metadata).toMatchObject({
+      work_item_id: item.item_id,
+      security_scope: expect.objectContaining({
+        tenant_id: 'tenant-canonical',
+        organization_id: 'org-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        read_tiers: ['public'],
+        write_tier: 'public',
+      }),
+    });
+    expect(stored.context).toMatchObject({
+      tenant_slug: 'tenant-canonical',
+      organization_id: 'org-canonical',
+      mission_id: 'mission-canonical',
+      project_id: 'project-canonical',
+      task_id: 'task-canonical',
+    });
+  });
+
+  it('routes work-item background review through the coordinated native path', async () => {
+    const delegateTask = vi.fn(async () => {
+      throw new Error('legacy delegateTask must not be called');
+    });
+    registerNativeWorkItemBackend(delegateTask);
+    const item = createWorkItem({
+      itemId: 'WI-REVIEW-CALLER-ROUTING',
+      title: 'Review caller routing',
+      description: 'test coordinated background review',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: {
+        organization_id: 'org-canonical',
+        tenant_slug: 'tenant-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        task_id: 'task-canonical',
+      },
+    });
+
+    const result = await runBackgroundReviewFork({
+      sessionId: 'caller-routing-review',
+      surface: 'slack',
+      snapshot: 'review snapshot',
+      workItemId: item.item_id,
+      backend: { delegateTask },
+    });
+    const stored = getWorkItem(item.item_id)!;
+    const attempt = stored.attempts?.[0];
+    if (!attempt) throw new Error('expected background review attempt to be recorded');
+
+    expect(result).toMatchObject({ status: 'no_action', action: 'no_action' });
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(stored.status).toBe('review');
+    expect(attempt).toMatchObject({
+      attempt_id: expect.any(String),
+      status: 'released',
+      ended_at: expect.any(String),
+    });
+    expect(stored.item_id).toBe(item.item_id);
+    expect(stored.metadata).toMatchObject({
+      attempt_id: expect.any(String),
+      work_item_id: item.item_id,
+      provider: 'test-native-provider',
+      model_id: 'test-native-model',
+      native_subagent: expect.objectContaining({ adopter_id: 'test-native-adopter' }),
+      lease_status: 'released',
+      result: expect.objectContaining({ status: 'succeeded' }),
+      security_scope: expect.objectContaining({
+        tenant_id: 'tenant-canonical',
+        organization_id: 'org-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        read_tiers: ['public'],
+        write_tier: 'public',
+      }),
+    });
+    expect(attempt.metadata).toMatchObject({
+      work_item_id: item.item_id,
+      security_scope: expect.objectContaining({
+        tenant_id: 'tenant-canonical',
+        organization_id: 'org-canonical',
+        mission_id: 'mission-canonical',
+        project_id: 'project-canonical',
+        read_tiers: ['public'],
+        write_tier: 'public',
+      }),
+    });
+    expect(stored.context).toMatchObject({
+      tenant_slug: 'tenant-canonical',
+      organization_id: 'org-canonical',
+      mission_id: 'mission-canonical',
+      project_id: 'project-canonical',
+      task_id: 'task-canonical',
+    });
   });
 
   it('passes valid ADF input through without repair', async () => {

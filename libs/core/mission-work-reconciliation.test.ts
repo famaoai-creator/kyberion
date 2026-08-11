@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Ajv } from 'ajv';
 import {
   clearWorkCoordinationNamespace,
+  createWorkItem,
   getWorkItem,
   importExternalWorkItem,
+  listWorkItems,
+  updateWorkItem,
   setWorkCoordinationNamespace,
 } from './work-coordination.js';
 import { compileSchemaFromPath } from './schema-loader.js';
@@ -74,29 +77,95 @@ function prepareMission(tasks?: Array<Record<string, unknown>>): void {
       2
     )
   );
+  const plannedTasks = tasks || [
+    {
+      task_id: 'implementation',
+      status: 'planned',
+      description: 'Implement the reconciliation command.',
+      acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+      dependencies: [],
+    },
+    {
+      task_id: 'repair-finish-exit',
+      status: 'planned',
+      description: 'Repair the finish exit gate.',
+      acceptance_criteria: ['All pending tasks are resolved.'],
+      dependencies: ['implementation'],
+    },
+  ];
   safeWriteFile(
     nodePath.join(missionPath, 'NEXT_TASKS.json'),
-    JSON.stringify(
-      tasks || [
-        {
-          task_id: 'implementation',
-          status: 'planned',
-          description: 'Implement the reconciliation command.',
-          acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
-          dependencies: [],
-        },
-        {
-          task_id: 'repair-finish-exit',
-          status: 'planned',
-          description: 'Repair the finish exit gate.',
-          acceptance_criteria: ['All pending tasks are resolved.'],
-          dependencies: ['implementation'],
-        },
-      ],
-      null,
-      2
-    )
+    JSON.stringify(plannedTasks, null, 2)
   );
+  const existing = listWorkItems({ projectId: missionId });
+  for (const task of plannedTasks) {
+    const taskId = String(task.task_id || '').trim();
+    if (!taskId || existing.some((item) => String(item.metadata?.task_id || '') === taskId))
+      continue;
+    const rawStatus = String(task.status || 'planned').toLowerCase();
+    createWorkItem({
+      itemId: `witem-reconciliation-${taskId}`,
+      title: String(task.description || taskId),
+      description: String(task.description || taskId),
+      status: ['completed', 'done', 'accepted', 'reviewed'].includes(rawStatus) ? 'done' : 'ready',
+      projectId: missionId,
+      assigneePeerId:
+        task.assigned_to && typeof task.assigned_to === 'object'
+          ? String((task.assigned_to as Record<string, unknown>).agent_id || '') || undefined
+          : undefined,
+      dependencies: Array.isArray(task.dependencies) ? task.dependencies.map(String) : [],
+      context: {
+        mission_id: missionId,
+        project_id: missionId,
+        task_id: taskId,
+        tenant_slug: 'public',
+      },
+      metadata: {
+        task_id: taskId,
+        ...(task.assigned_to && typeof task.assigned_to === 'object'
+          ? { team_role: String((task.assigned_to as Record<string, unknown>).role || '') }
+          : {}),
+        acceptance_criteria: Array.isArray(task.acceptance_criteria)
+          ? task.acceptance_criteria.map(String)
+          : [],
+        ...(task.review_target ? { review_target: String(task.review_target) } : {}),
+        ...(task.artifact_review_profile
+          ? { artifact_review_profile: task.artifact_review_profile }
+          : {}),
+      },
+    });
+  }
+  for (const task of plannedTasks) {
+    const taskId = String(task.task_id || '').trim();
+    const existingItem = listWorkItems({ projectId: missionId }).find(
+      (item) => String(item.metadata?.task_id || '') === taskId
+    );
+    if (!existingItem) continue;
+    updateWorkItem({
+      itemId: existingItem.item_id,
+      expectedVersion: existingItem.version,
+      context: existingItem.context || {
+        mission_id: missionId,
+        project_id: missionId,
+        task_id: taskId,
+        tenant_slug: 'public',
+      },
+      assigneePeerId:
+        task.assigned_to && typeof task.assigned_to === 'object'
+          ? String((task.assigned_to as Record<string, unknown>).agent_id || '') || undefined
+          : undefined,
+      metadata: {
+        ...(existingItem.metadata || {}),
+        acceptance_criteria: Array.isArray(task.acceptance_criteria)
+          ? task.acceptance_criteria.map(String)
+          : [],
+        ...(task.review_target ? { review_target: String(task.review_target) } : {}),
+        ...(task.artifact_review_profile
+          ? { artifact_review_profile: task.artifact_review_profile }
+          : {}),
+      },
+    });
+  }
 }
 
 function buildManifest(
@@ -321,6 +390,39 @@ describe('mission existing work reconciliation', () => {
     expect(safeExistsSync(manifestPath)).toBe(true);
     safeRmSync(manifestPath);
   });
+
+  it('rejects a projection-only task when no canonical WorkItem exists', async () => {
+    prepareMission();
+    const manifest = buildManifest({
+      tasks: [
+        {
+          task_id: 'projection-only-task',
+          evidence: [
+            { path: artifactPath, sha256: fileHash(artifactPath), kind: 'artifact' },
+            { path: verificationPath, sha256: fileHash(verificationPath), kind: 'test_report' },
+          ],
+          criteria: [
+            {
+              criterion: 'The reconciliation command updates only verified tasks.',
+              evidence_refs: [artifactPath],
+            },
+          ],
+          verification: {
+            command: 'pnpm vitest run scripts/refactor/mission-work-reconciliation.test.ts',
+            status: 'passed',
+            exit_code: 0,
+            evidence_refs: [verificationPath],
+          },
+        },
+      ],
+    });
+    writeManifest(manifest);
+
+    await expect(reconcileMissionExistingWork({ missionId, manifestPath })).rejects.toThrow(
+      'not found in canonical WorkItems'
+    );
+  });
+
   it('validates the canonical manifest example against the schema', () => {
     const ajv = new Ajv({ allErrors: true, strict: false });
     const validate = compileSchemaFromPath(

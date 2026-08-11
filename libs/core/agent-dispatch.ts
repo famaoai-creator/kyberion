@@ -684,6 +684,14 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     await this.base.resetSession?.();
   }
 
+  getNativeSubagentAdopter() {
+    return this.base.getNativeSubagentAdopter?.() ?? null;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return this.base.requiresNativeSubagent?.() ?? false;
+  }
+
   delegateTask(
     instruction: string,
     context?: string,

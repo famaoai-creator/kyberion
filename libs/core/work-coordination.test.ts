@@ -208,6 +208,8 @@ describe('work coordination', () => {
     expect(listCoordinationEvents().some((event) => event.event_type === 'item_handed_off')).toBe(
       true
     );
+    expect(listCoordinationEvents({ event_type: 'handoff_written' })).toHaveLength(1);
+    expect(listCoordinationEvents({ event_type: 'handoff_consumed' })).toHaveLength(1);
     expect(listWorkItemAttempts(item.item_id)).toHaveLength(2);
     expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
       status: 'released',
@@ -219,6 +221,7 @@ describe('work coordination', () => {
       metadata: expect.objectContaining({
         handoff_packet: expect.objectContaining({
           kind: 'work_item',
+          work_item_id: item.item_id,
           correlation_id: 'handoff-1',
           source_ref: 'peer:peer-a',
           target_ref: 'peer:peer-b',

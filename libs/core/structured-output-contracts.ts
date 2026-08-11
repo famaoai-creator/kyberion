@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AGENT_CONTEXT_MODES } from './context-boundary.js';
 import type {
   A2ATaskContract,
   A2ATaskContext,
@@ -121,6 +122,7 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     provider_model_id: z.string().min(1).optional(),
     task_id: z.string().optional(),
     dispatch_timeout_ms: z.number().int().positive().optional(),
+    context_mode: z.enum(AGENT_CONTEXT_MODES).optional(),
     security_scope: z.record(z.string(), z.unknown()).optional(),
     // NI-03: delegation chain (see A2ATaskContext doc comment) — loose here,
     // deep-validated by delegation-chain.ts where the chain is consumed.

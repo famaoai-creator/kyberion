@@ -21,6 +21,7 @@ import {
   discoverProviders,
   discoverReasoningEndpoints,
   getInstalledReasoningMode,
+  getReasoningBackend,
   installReasoningBackends,
   customerResolver,
   listMemoryPromotionCandidates,
@@ -189,11 +190,21 @@ async function dispatchMissionTickets(id: string): Promise<void> {
 }
 
 async function dispatchMissionWorkItems(id: string): Promise<void> {
-  const result = await missionLifecycleService.dispatch(
-    id,
-    resolveMissionWorkItemDispatchOptionsFromArgv()
-  );
-  console.log(JSON.stringify(result, null, 2));
+  try {
+    const result = await missionLifecycleService.dispatch(
+      id,
+      resolveMissionWorkItemDispatchOptionsFromArgv()
+    );
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    try {
+      await getReasoningBackend().resetSession?.();
+    } catch (error) {
+      logger.warn(
+        `[MISSION] reasoning backend session cleanup failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 /**
@@ -1406,6 +1417,8 @@ Lifecycle Commands:
                                  --jira-domain <DOMAIN> --jira-project-key <KEY>
   dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
                                  --dispatch-mode auto|agent|subagent
+                                 --dispatch-execution-surface cli_subagent|agent_runtime|hybrid
+                                 --dispatch-review-execution-surface cli_subagent|agent_runtime|hybrid
                                  --dispatch-statuses ready,backlog
                                  --dispatch-rounds N (auto-retry blocked items, bounded)
                                  --dispatch-sources local,github,jira

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
   const getAgentRuntimeHandle = vi.fn();
   const askAgentRuntime = vi.fn();
   const stopAgentRuntime = vi.fn();
+  const refreshAgentRuntime = vi.fn();
   const ensureAgentRuntimeViaDaemon = vi.fn();
   const createSupervisorBackedAgentHandle = vi.fn();
   const askAgentRuntimeViaDaemon = vi.fn();
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => {
     getAgentRuntimeHandle,
     askAgentRuntime,
     stopAgentRuntime,
+    refreshAgentRuntime,
     ensureAgentRuntimeViaDaemon,
     createSupervisorBackedAgentHandle,
     askAgentRuntimeViaDaemon,
@@ -72,6 +74,7 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
   getAgentRuntimeHandle: mocks.getAgentRuntimeHandle,
   askAgentRuntime: mocks.askAgentRuntime,
   stopAgentRuntime: mocks.stopAgentRuntime,
+  refreshAgentRuntime: mocks.refreshAgentRuntime,
   appendSupervisorEvent: mocks.appendSupervisorEvent,
 }));
 

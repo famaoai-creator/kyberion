@@ -345,7 +345,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### CLI サブエージェント・チーム(単一プロバイダ CLI 内のチーム構成・連携)
 
-単一 LLM プロバイダの CLI(Claude Code / Codex app-server 等)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜05 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への provider adapter 追加)として実現する。Claude は governed Agent SDK path、Codex は既存 app-server 内の logical subagent/thread を使い、タスクごとの新規 CLI spawn は行わない。agent-runtime(A2A)の置き換えではなく代替実行面。
+単一 LLM プロバイダの CLI(Claude Code / Codex app-server 等)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜06 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への provider adapter 追加)として実現する。Claude は governed Agent SDK path、Codex は既存 app-server 内の logical subagent/thread を使い、タスクごとの新規 CLI spawn は行わない。agent-runtime(A2A)の置き換えではなく代替実行面。CT-06では、mission WorkItemごとにCLI subagent / agent-runtime / hybridを選択し、実装・独立レビューの双方へ同じ契約を適用する。
 
 | ID    | タイトル                                                  | 優先度 | 規模 | 依存                       |
 | ----- | --------------------------------------------------------- | ------ | ---- | -------------------------- |
@@ -354,6 +354,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | CT-03 | ファイル契約によるチーム連携の実証(E2E)                   | P2     | M    | CT-02                      |
 | CT-04 | 実行面の使い分け基準と文書化                              | P2     | S    | CT-02                      |
 | CT-05 | Codex app-server 内の spawn-less subagent 委譲            | P1     | M〜L | CT-01・CT-02・XP-01・XP-02 |
+| CT-06 | Mission WorkItemごとの実行面選択と独立レビュー配線        | P1     | M    | CT-03・CT-04・CT-05・MO-08 |
 
 ### クロスプロバイダ実行(複数 LLM プロバイダ CLI の併走規約)
 

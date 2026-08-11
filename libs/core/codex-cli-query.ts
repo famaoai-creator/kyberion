@@ -331,11 +331,14 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
-    `[codex-cli] query helper ready (bin=${bin ?? resolveCodexBinary(env)}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
+    `[codex-cli] query helper ready (bin=${bin ?? '<deferred>'}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
   );
 
   return {
-    ...(bin ? { bin } : { bin: resolveCodexBinary(env) }),
+    // Keep binary discovery lazy. Building a reasoning backend is safe during
+    // CI/bootstrap even when Codex is not installed; the actual query
+    // constructor resolves the binary immediately before spawning it.
+    ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
@@ -348,7 +351,7 @@ export function buildCodexCliQueryOptionsFromEnv(
 // `withWallClockBudget`. Nothing to register or kill mid-flight from the
 // same thread; this function has already returned by the time any caller
 // could try.
-function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
   if (explicit) return explicit;
 
@@ -363,19 +366,31 @@ function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
     cwd: repoRoot,
     timeoutMs: 5000,
   });
-  const candidates = [...whichResult.stdout.split(/\r?\n/u), ...whichResult.stderr.split(/\r?\n/u)]
+  const candidates = whichResult.stdout
+    .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean);
 
   for (const candidate of candidates) {
-    // Keep POSIX-looking paths intact when tests or a POSIX-compatible shim
-    // provide them on Windows; native `where` output is already drive-based.
-    const normalized = candidate.startsWith('/') ? candidate : path.resolve(candidate);
-    if (normalized.startsWith(path.join(repoRoot, 'node_modules', '.bin'))) continue;
-    if (normalized.includes(`${path.sep}.codex${path.sep}tmp${path.sep}arg0${path.sep}`)) continue;
-    if (normalized.includes(`${path.sep}.pnpm${path.sep}@openai+codex`)) continue;
-    return normalized;
+    // Use a separator-independent abstract path for resolver output. This
+    // keeps Windows-style `C:\\...` candidates testable on POSIX and avoids
+    // host-specific path resolution in the policy itself.
+    const normalized = candidate.replaceAll('\\', '/');
+    if (isProjectLocalCodexShim(normalized)) continue;
+    return candidate;
   }
 
-  return 'codex';
+  throw new Error(
+    '[codex-cli] no acceptable Codex binary found on PATH; all discovered candidates were project-local shims. Set KYBERION_CODEX_CLI_BIN to an explicit executable.'
+  );
+}
+
+function isProjectLocalCodexShim(candidate: string): boolean {
+  const normalized = candidate.replaceAll('\\', '/').toLocaleLowerCase('en-US');
+  return (
+    normalized.includes('/node_modules/.bin/codex') ||
+    normalized.includes('/.codex/tmp/arg0/codex') ||
+    normalized.includes('/.pnpm/@openai+codex') ||
+    normalized.includes('/node_modules/@openai/codex/')
+  );
 }

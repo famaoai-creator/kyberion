@@ -35,6 +35,7 @@ import {
 import { sha256 } from './marketing-workload.js';
 import { withLock } from './src/lock-utils.js';
 import { loadState, saveState } from './mission-state.js';
+import { readCanonicalWorkGraphTasks } from './work-graph-projection.js';
 
 const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
 const ADOPTABLE_TASK_STATUSES = new Set([
@@ -132,6 +133,7 @@ interface PlannedTask extends Record<string, unknown> {
   };
   artifact_review_receipt?: string;
   ticket_dispatch?: { work_item_id?: string };
+  work_item_id?: string;
   reconciliation?: Record<string, unknown>;
 }
 
@@ -562,8 +564,12 @@ function assertDependenciesResolved(
   }
 }
 
-function updateLinkedWorkItem(task: PlannedTask, receiptPath: string): string | null {
-  const itemId = task.ticket_dispatch?.work_item_id;
+function updateLinkedWorkItem(
+  task: PlannedTask,
+  receiptPath: string,
+  manifestHash: string
+): string | null {
+  const itemId = task.ticket_dispatch?.work_item_id || task.work_item_id;
   if (!itemId) return null;
   const workItem = getWorkItem(itemId);
   if (!workItem || ['done', 'archived'].includes(workItem.status)) return null;
@@ -575,16 +581,17 @@ function updateLinkedWorkItem(task: PlannedTask, receiptPath: string): string | 
       ...(workItem.metadata || {}),
       completion_source: 'mission_work_reconciliation',
       reconciliation_receipt: receiptPath,
+      reconciliation: { manifest_sha256: manifestHash },
       summary: `Adopted verified existing work for ${task.task_id}`,
     },
   });
   return itemId;
 }
 
-function readPlannedTasks(missionPath: string): PlannedTask[] {
-  const tasks = readJson<unknown>(nodePath.join(missionPath, 'NEXT_TASKS.json'), 'NEXT_TASKS.json');
-  if (!Array.isArray(tasks)) throw new Error('NEXT_TASKS.json must contain an array');
-  return tasks.filter((entry): entry is PlannedTask => Boolean(entry && typeof entry === 'object'));
+function readPlannedTasks(missionId: string): PlannedTask[] {
+  return readCanonicalWorkGraphTasks(missionId).filter((entry): entry is PlannedTask =>
+    Boolean(entry && typeof entry === 'object')
+  );
 }
 
 /**
@@ -635,7 +642,7 @@ export function generateMissionWorkReconciliationScaffold(input: {
     process.env.GITHUB_SHA?.trim() ||
     '';
   if (!branch || !commit) throw new Error('Unable to resolve repository branch and commit');
-  const tasks = readPlannedTasks(missionPath);
+  const tasks = readPlannedTasks(missionId);
   const scaffold: MissionWorkReconciliationScaffold = {
     kind: 'mission-work-reconciliation-scaffold',
     version: '1.0.0',
@@ -705,7 +712,7 @@ export async function reconcileMissionExistingWork(input: {
   }
 
   return withLock(`mission-${missionId}`, async () => {
-    const tasks = readPlannedTasks(missionPath);
+    const tasks = readPlannedTasks(missionId);
     const taskById = new Map<string, PlannedTask>();
     for (const task of tasks) {
       const taskId = String(task.task_id || '');
@@ -727,7 +734,7 @@ export async function reconcileMissionExistingWork(input: {
     for (const manifestTask of manifest.tasks) {
       const plannedTask = taskById.get(manifestTask.task_id);
       if (!plannedTask)
-        throw new Error(`Task ${manifestTask.task_id} not found in NEXT_TASKS.json`);
+        throw new Error(`Task ${manifestTask.task_id} not found in canonical WorkItems`);
       const status = String(plannedTask.status || 'planned').toLowerCase();
       const previousManifestHash = String(plannedTask.reconciliation?.manifest_sha256 || '');
       if (TERMINAL_TASK_STATUSES.has(status)) {
@@ -845,8 +852,30 @@ export async function reconcileMissionExistingWork(input: {
     const receiptPath = nodePath.join(receiptDir, `${manifestHash}.json`);
     const receiptRelative = pathResolver.toRepoRelative(receiptPath);
     for (const manifestTask of manifest.tasks) {
-      const itemId = updateLinkedWorkItem(taskById.get(manifestTask.task_id)!, receiptRelative);
+      const itemId = updateLinkedWorkItem(
+        taskById.get(manifestTask.task_id)!,
+        receiptRelative,
+        manifestHash
+      );
       if (itemId) resultBase.work_item_ids_updated.push(itemId);
+    }
+    for (const repairTaskId of resultBase.auto_completed_repair_task_ids) {
+      const repairTask = taskById.get(repairTaskId);
+      const repairItemId = repairTask?.work_item_id;
+      if (!repairItemId) continue;
+      const repairItem = getWorkItem(repairItemId);
+      if (!repairItem || ['done', 'archived'].includes(repairItem.status)) continue;
+      updateWorkItem({
+        itemId: repairItemId,
+        expectedVersion: repairItem.version,
+        status: 'done',
+        metadata: {
+          ...(repairItem.metadata || {}),
+          completion_source: 'mission_work_reconciliation_repair',
+          reconciliation: { manifest_sha256: manifestHash },
+          summary: 'All finish-exit repair dependencies were satisfied by reconciled work.',
+        },
+      });
     }
 
     const hasMutation =
