@@ -3,7 +3,20 @@
   "$id": "https://kyberion.local/schemas/organization-work-loop.schema.json",
   "title": "Organization Work Loop Summary",
   "type": "object",
-  "required": ["intent", "context", "resolution", "workflow_design", "review_design", "outcome_design", "process_design", "runtime_design", "execution_boundary", "teaming", "authority", "learning"],
+  "required": [
+    "intent",
+    "context",
+    "resolution",
+    "workflow_design",
+    "review_design",
+    "outcome_design",
+    "process_design",
+    "runtime_design",
+    "execution_boundary",
+    "teaming",
+    "authority",
+    "learning"
+  ],
   "properties": {
     "intent": {
       "type": "object",
@@ -79,6 +92,12 @@
         "phases": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "phase_specs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/phaseSpec"
+          }
         },
         "rationale": { "type": "string" }
       },
@@ -273,11 +292,27 @@
       "properties": {
         "execution_shape": {
           "type": "string",
-          "enum": ["direct_reply", "actuator_action", "browser_session", "task_session", "pipeline", "mission", "project_bootstrap"]
+          "enum": [
+            "direct_reply",
+            "actuator_action",
+            "browser_session",
+            "task_session",
+            "pipeline",
+            "mission",
+            "project_bootstrap"
+          ]
         },
         "minimum_catalog_shape": {
           "type": "string",
-          "enum": ["direct_reply", "actuator_action", "browser_session", "task_session", "pipeline", "mission", "project_bootstrap"]
+          "enum": [
+            "direct_reply",
+            "actuator_action",
+            "browser_session",
+            "task_session",
+            "pipeline",
+            "mission",
+            "project_bootstrap"
+          ]
         },
         "promotion_required": { "type": "boolean" },
         "mandatory_triggers": {
@@ -296,6 +331,82 @@
         "rationale": { "type": "string" }
       },
       "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "phaseSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "kind": { "enum": ["judgment", "deterministic", "review", "approval"] },
+        "pipeline_ref": { "type": "string", "minLength": 1 },
+        "brief_ref": { "type": "string", "minLength": 1 },
+        "entry_gate": { "$ref": "#/definitions/phaseGate" },
+        "exit_gate": { "$ref": "#/definitions/phaseGate" },
+        "default_tasks": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/phaseTaskSpec" }
+        }
+      }
+    },
+    "phaseGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "checks"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "evidence_exists",
+                  "schema_valid",
+                  "command_succeeds",
+                  "reviewer_approved",
+                  "human_override",
+                  "deliverable_quality",
+                  "llm_review",
+                  "custom"
+                ]
+              },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "phaseTaskSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id_suffix", "description"],
+      "properties": {
+        "task_id_suffix": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "team_role": { "type": "string", "minLength": 1 },
+        "phase_kind": { "enum": ["implement", "review"] },
+        "deliverable": { "type": "string", "minLength": 1 },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "risk": { "enum": ["low", "medium", "high", "approval_required", "high_stakes"] },
+        "estimated_scope": { "enum": ["S", "M", "L"] },
+        "expected_output_format": { "enum": ["text", "files", "structured"] },
+        "review_target_suffix": { "type": "string", "minLength": 1 },
+        "deliverable_kind": { "enum": ["doc", "deck", "code", "media"] },
+        "pipeline_ref": { "type": "string", "minLength": 1 }
+      }
     }
   },
   "additionalProperties": false

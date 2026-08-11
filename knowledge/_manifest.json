@@ -1761,7 +1761,7 @@
     {
       "path": "product/governance/mission-task-classification-scenarios.json",
       "tier": "public",
-      "size": 24948,
+      "size": 25524,
       "type": "json"
     },
     {
@@ -7293,7 +7293,7 @@
     {
       "path": "product/schemas/organization-work-loop.schema.json",
       "tier": "public",
-      "size": 9084,
+      "size": 12158,
       "type": "json"
     },
     {
@@ -7809,7 +7809,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 13988,
+      "size": 14172,
       "type": "json"
     },
     {
