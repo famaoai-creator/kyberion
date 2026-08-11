@@ -13,6 +13,8 @@
 (function installKyberionMeetingAi(global) {
   'use strict';
 
+  const meetT = global.KyberionMeetLocale?.t || ((key) => key);
+
   const MAX_INPUT_CHARS = 30_000;
   const PROMPT_INPUTS = [{ type: 'text', languages: ['en', 'ja'] }];
   const PROMPT_OUTPUTS = [{ type: 'text', languages: ['ja'] }];
@@ -417,12 +419,89 @@
     }
   }
 
+  const REFERENCE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      references: {
+        type: 'array',
+        maxItems: 8,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            expression: { type: 'string' },
+            refers_to: { type: 'string' },
+            confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+            evidence: { type: 'string' },
+          },
+          required: ['expression', 'refers_to', 'confidence', 'evidence'],
+        },
+      },
+    },
+    required: ['references'],
+  };
+
+  /**
+   * Resolve demonstratives ("これ", "それ", "ここ") against what is on the shared
+   * screen. `screenContext` is OCR text the driver already redacted — the frame
+   * itself never reaches this side.
+   */
+  async function resolveReferences({ transcript, screenContext, onProgress } = {}) {
+    const source = normalizeTranscript(transcript, 12_000);
+    if (!source.text) throw new Error(meetT('ai.referenceInputMissing'));
+    const screen = scrubInput(screenContext, 8_000);
+    if (!screen) {
+      throw new Error(meetT('ai.referenceScreenMissing'));
+    }
+    const session = await createPromptSession(onProgress);
+    if (!session) throw unavailableError('Prompt API');
+
+    try {
+      const response = await session.prompt(
+        [
+          meetT('ai.referencePrompt1'),
+          meetT('ai.referencePrompt2'),
+          meetT('ai.referencePrompt3'),
+          UNTRUSTED_NOTE,
+          '<screen-text>',
+          screen,
+          '</screen-text>',
+          '<meeting-transcript>',
+          source.text,
+          '</meeting-transcript>',
+        ].join('\n'),
+        { responseConstraint: REFERENCE_SCHEMA }
+      );
+      const parsed = parseJsonResponse(response, meetT('ai.referenceParseLabel'));
+      return {
+        provider: 'chrome-prompt',
+        references: Array.isArray(parsed.references)
+          ? parsed.references
+              .slice(0, 8)
+              .map((item) => ({
+                expression: scrubOutput(item?.expression, 60),
+                refers_to: scrubOutput(item?.refers_to, 300),
+                confidence: ['high', 'medium', 'low'].includes(item?.confidence)
+                  ? item.confidence
+                  : 'low',
+                evidence: scrubOutput(item?.evidence, 300),
+              }))
+              .filter((item) => item.expression && item.refers_to)
+          : [],
+      };
+    } finally {
+      session.destroy?.();
+    }
+  }
+
   global.KyberionMeetingAI = {
     availability,
     prepare,
     summarizeMeeting,
     extractInsights,
     suggestUtterances,
+    resolveReferences,
     normalizeTranscript,
   };
 })(globalThis);

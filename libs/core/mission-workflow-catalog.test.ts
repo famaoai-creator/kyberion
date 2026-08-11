@@ -21,6 +21,73 @@ describe('mission-workflow-catalog', () => {
     expect(workflow.phases).toContain('preflight');
   });
 
+  it('adds the hash-bound alignment gate to the AG-03 rollout templates', () => {
+    const cases = [
+      {
+        missionClass: 'operations_and_release' as const,
+        deliveryShape: 'cross_system_change' as const,
+        riskProfile: 'high_stakes' as const,
+        executionShape: 'mission' as const,
+        intentId: 'incident-informed-review',
+        expectedWorkflow: 'stage-gated-high-stakes',
+      },
+      {
+        missionClass: 'decision_support' as const,
+        deliveryShape: 'interactive_exploration' as const,
+        riskProfile: 'review_required' as const,
+        executionShape: 'mission' as const,
+        intentId: 'decision-support',
+        expectedWorkflow: 'crystallize-then-freeze',
+      },
+      {
+        missionClass: 'customer_engagement' as const,
+        deliveryShape: 'multi_artifact_pipeline' as const,
+        riskProfile: 'review_required' as const,
+        executionShape: 'mission' as const,
+        intentId: 'customer-discovery',
+        expectedWorkflow: 'customer-engagement-stage-gated',
+      },
+      {
+        missionClass: 'research_and_absorption' as const,
+        deliveryShape: 'interactive_exploration' as const,
+        riskProfile: 'review_required' as const,
+        executionShape: 'mission' as const,
+        intentId: 'research-report',
+        expectedWorkflow: 'research-report',
+      },
+    ];
+
+    for (const input of cases) {
+      const workflow = resolveMissionWorkflowDesign({
+        ...input,
+        stage: 'planning',
+      });
+      expect(workflow.workflow_id).toBe(input.expectedWorkflow);
+      const alignment = workflow.phase_specs?.find((phase) => phase.id === 'alignment');
+      expect(alignment?.kind).toBe('judgment');
+      expect(alignment?.default_tasks?.[0]?.deliverable).toBe('evidence/mission-brief.json');
+      expect(alignment?.exit_gate?.id).toBe('ALIGNMENT_APPROVED');
+      expect(alignment?.exit_gate?.checks).toEqual(
+        expect.arrayContaining([
+          { kind: 'evidence_exists', params: { path: 'evidence/mission-brief.json' } },
+          expect.objectContaining({
+            kind: 'command_succeeds',
+            params: expect.objectContaining({
+              command: 'node',
+              args: [
+                'dist/scripts/mission_alignment_decision.js',
+                '--mission',
+                '{MISSION_ID}',
+                '--strict',
+              ],
+              cwd: '{REPO_ROOT}',
+            }),
+          }),
+        ])
+      );
+    }
+  });
+
   it('falls back to single-track workflow when no specific rule matches', () => {
     const workflow = resolveMissionWorkflowDesign({
       missionClass: 'code_change',

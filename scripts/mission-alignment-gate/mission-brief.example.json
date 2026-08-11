@@ -1,0 +1,64 @@
+{
+  "missionId": "MSN-EXAMPLE",
+  "title": "（例）顧客ドキュメントからの見積り自動化パイプライン整備",
+  "persona": "ecosystem_architect",
+  "tier": "confidential",
+  "sovereignSwitch": "governance-first",
+  "intent": "同種の見積り作業が繰り返し発生しているため、決定的な手順をpipeline化して再実行・追跡可能にする。まずアラインメントで合意を取ってから着手する。",
+  "victoryConditions": [
+    "入力ドキュメント→見積りJSONを生成するpipelineが1本、再実行で同一出力になること",
+    "サンプル3件で人手見積りと±10%以内で一致すること",
+    "生成物・トレースが confidential ティアに残ること"
+  ],
+  "scope": {
+    "in": ["見積りロジックのpipeline化", "サンプル3件での検証", "READMEとトレース"],
+    "out": ["UI開発", "本番課金連携", "他テナントへの横展開（次段）"]
+  },
+  "flow": [
+    {
+      "step": 1,
+      "title": "既存資産の確認",
+      "detail": "pipelines/ と actuator を確認し再利用可能なものを特定",
+      "pipeline": ""
+    },
+    {
+      "step": 2,
+      "title": "見積りpipelineのドラフト",
+      "detail": "抽出→正規化→見積り→検証の4段",
+      "pipeline": "pipelines/estimate-from-docs.json"
+    },
+    {
+      "step": 3,
+      "title": "サンプル検証",
+      "detail": "3件で人手見積りと突合、誤差を記録",
+      "pipeline": ""
+    },
+    {
+      "step": 4,
+      "title": "レビュー・確定",
+      "detail": "誤差と再現性を確認し、knowledgeへ学びを蓄積",
+      "pipeline": ""
+    }
+  ],
+  "roles": [
+    { "who": "オーナー", "role": "ミッション統括・確定判定" },
+    { "who": "実担当", "role": "pipeline実装・検証" }
+  ],
+  "deliverables": ["estimate-from-docs.json（pipeline）", "検証レポート", "README"],
+  "risks": [
+    {
+      "risk": "ドキュメント様式のばらつきで抽出が不安定",
+      "level": 3,
+      "mitigation": "様式別の前処理を段として分離"
+    },
+    { "risk": "見積りロジックの妥当性", "level": 3, "mitigation": "サンプル検証を必須ゲートにする" }
+  ],
+  "openItems": ["対象ドキュメント様式の最終リスト", "許容誤差の合意（暫定±10%）"],
+  "gate": { "sudoGate": false, "riskLevel": 3, "approvalRequired": true },
+  "estimate": { "effort": "約2〜3営業日", "cost": "中（サンプル検証のモデル呼び出し中心）" },
+  "projectId": "PRJ-EXAMPLE",
+  "projectPath": "active/projects/example",
+  "trackId": "TRK-EXAMPLE",
+  "trackType": "delivery",
+  "lifecycleModel": "standard"
+}

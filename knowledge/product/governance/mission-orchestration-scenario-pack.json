@@ -79,6 +79,23 @@
       "notes": "Variant=nemawashi expected. Facilitator + relationship_curator delegation."
     },
     {
+      "scenario_id": "golden-alignment-gated-high-stakes",
+      "scenario_class": "golden",
+      "mission_class": "product_delivery",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "stage_gated_delivery",
+      "expected_workflow_id": "stage-gated-high-stakes",
+      "prompt": "research reportを作って",
+      "expected_signals": [
+        "classification",
+        "alignment_brief_created",
+        "alignment_approval_required",
+        "execution_started",
+        "delivery_ready"
+      ],
+      "notes": "The high-stakes workflow must stop after alignment until the hash-bound mission_gate approval is satisfied."
+    },
+    {
       "scenario_id": "golden-decision-hypothesis-divergence",
       "scenario_class": "golden",
       "mission_class": "decision_support",

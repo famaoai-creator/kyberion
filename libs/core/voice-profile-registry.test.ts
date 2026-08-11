@@ -59,7 +59,7 @@ describe('voice profile registry', () => {
             status: 'shadow',
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
 
@@ -86,7 +86,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       overlayPath,
@@ -104,7 +104,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
@@ -131,7 +131,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       `${registryDir}/operator-ja-default.json`,
@@ -148,7 +148,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR = registryDir;
     // Keep this directory-loader test independent from the checked-in personal
@@ -179,7 +179,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       overlayPath,
@@ -197,7 +197,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     mocks.customerRoot.mockReturnValue(customerOverlayPath);
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
@@ -227,7 +227,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
 
@@ -255,7 +255,7 @@ describe('voice profile registry', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
 
@@ -263,6 +263,8 @@ describe('voice profile registry', () => {
     expect(writable.registryPath).toBe(overlayPath);
     expect(writable.registry.default_profile_id).toBe('me-ja');
     expect(writable.registry.profiles.map((profile) => profile.profile_id)).toEqual(['me-ja']);
-    expect(writable.registry.profiles.some((profile) => profile.profile_id === 'operator-ja-default')).toBe(false);
+    expect(
+      writable.registry.profiles.some((profile) => profile.profile_id === 'operator-ja-default')
+    ).toBe(false);
   });
 });

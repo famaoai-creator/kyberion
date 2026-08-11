@@ -8,6 +8,13 @@ export default [
       '.tmp-mulmoclaude/**',
       '.pnpm-store/**',
       '.worktrees/**',
+      // Provider state dirs are gitignored and regenerated via generation
+      // ceremonies (AGENTS.md §1). `.claude/worktrees/` holds full repo
+      // checkouts, so linting into them makes typescript-eslint see multiple
+      // candidate tsconfigRootDirs and fail across the whole repo. Only .md and
+      // .json are tracked under .claude/, so nothing lintable is lost.
+      '.claude/**',
+      '.codex/**',
       '.tmp-agency-agents/**',
       'node_modules/**',
       '**/node_modules/**',
@@ -56,6 +63,21 @@ export default [
       'no-unused-vars': 'off',
       'no-console': 'off',
       'no-undef': 'error',
+    },
+  },
+  {
+    // Playwright operation scripts: the driver half runs in Node, but the
+    // callbacks passed to page.evaluate() are serialized and run inside the
+    // browser, where `document` and friends genuinely exist. Without this the
+    // browser half reads as undefined globals. (These errors predate the
+    // .claude/** ignore above — they were masked while the parser failed
+    // repo-wide.)
+    files: ['knowledge/**/operations/scripts/**/*.cjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
     },
   },
   {

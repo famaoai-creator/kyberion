@@ -8,6 +8,8 @@
  * explicit click on a suggestion.
  */
 
+const meetT = globalThis.KyberionMeetLocale?.t || ((key) => key);
+
 const elements = {
   notice: document.querySelector('#notice'),
   statusWs: document.querySelector('#status-ws'),
@@ -29,6 +31,12 @@ const elements = {
   suggestButton: document.querySelector('#suggest-button'),
   suggestStatus: document.querySelector('#suggest-status'),
   suggestOutput: document.querySelector('#suggest-output'),
+  captureButton: document.querySelector('#capture-button'),
+  captureStatus: document.querySelector('#capture-status'),
+  screenContext: document.querySelector('#screen-context'),
+  resolveButton: document.querySelector('#resolve-button'),
+  resolveStatus: document.querySelector('#resolve-status'),
+  resolveOutput: document.querySelector('#resolve-output'),
   transcriptOutput: document.querySelector('#transcript-output'),
 };
 
@@ -36,6 +44,7 @@ const state = {
   transcript: [],
   summary: '',
   summarizedLines: 0,
+  screenContext: '',
   busy: false,
 };
 const aiReady = new Set();
@@ -290,9 +299,61 @@ async function runSuggestions() {
       : `ローカル生成: ${result.provider} — ${relayStatus} / 送信は手動です。`;
 }
 
+/**
+ * Ask for one shared-screen frame. The panel never sees the image: the worker
+ * hands it to the driver, which OCRs it on-device and pushes back redacted text
+ * as a panel:screen-context message.
+ */
+async function captureScreen() {
+  elements.captureStatus.textContent = meetT('screen.capturePending');
+  const response = await send('panel:capture-frame');
+  if (!response?.ok) throw new Error(response?.error || meetT('screen.captureFailed'));
+  // The picker cannot distinguish a shared screen from a large camera tile,
+  // so show what it actually grabbed.
+  elements.captureStatus.textContent = meetT('screen.captureDone', {
+    kind: response.source_kind || '?',
+    size: response.source_size || '',
+    count: response.candidate_count ?? '?',
+  });
+}
+
+async function resolveReferences() {
+  if (!state.screenContext) {
+    throw new Error(meetT('screen.resolveMissing'));
+  }
+  await ensureAiReady('prompt', elements.resolveStatus);
+  elements.resolveStatus.textContent = meetT('screen.resolvePending');
+  const result = await aiAdapter().resolveReferences({
+    transcript: transcriptText(),
+    screenContext: state.screenContext,
+    onProgress: (loaded) => updateAiProgress(elements.resolveStatus, loaded),
+  });
+  elements.resolveOutput.hidden = false;
+  elements.resolveOutput.innerHTML = result.references.length
+    ? listBlock(
+        meetT('screen.resolveTitle'),
+        result.references.map((ref) =>
+          meetT('screen.referenceItem', {
+            expression: ref.expression,
+            refersTo: ref.refers_to,
+            confidence: ref.confidence,
+            evidence: ref.evidence,
+          })
+        )
+      )
+    : `<p class="empty">${meetT('screen.resolveEmpty')}</p>`;
+  elements.resolveStatus.textContent = meetT('screen.localGenerated', {
+    provider: result.provider,
+  });
+}
+
 // Serializes AI work: Gemini Nano sessions are expensive and a rolling update
 // firing on top of a manual run would interleave two summaries of the same text.
 function bindAction(button, handler, statusElement) {
+  // A control the current HTML does not have must not take the whole panel down
+  // with it: an unbound button is a missing feature, a thrown error at load time
+  // is every feature missing.
+  if (!button) return;
   button.addEventListener('click', async () => {
     if (state.busy) {
       showNotice('別の AI 処理を実行中です。', 'error');
@@ -318,6 +379,8 @@ bindAction(elements.aiPrepareButton, prepareAi, elements.aiPrepareStatus);
 bindAction(elements.summaryButton, () => runSummary({ rolling: false }), elements.summaryStatus);
 bindAction(elements.insightsButton, runInsights, elements.insightsStatus);
 bindAction(elements.suggestButton, runSuggestions, elements.suggestStatus);
+bindAction(elements.captureButton, captureScreen, elements.captureStatus);
+bindAction(elements.resolveButton, resolveReferences, elements.resolveStatus);
 
 function rollingInterval() {
   const value = Number(elements.rollingInterval.value);
@@ -345,6 +408,20 @@ chrome.runtime.onMessage.addListener((message) => {
     elements.statusCaptions.textContent = String(state.transcript.length);
     renderTranscript();
     maybeRollingSummary();
+    return;
+  }
+  // Redacted OCR text coming back from the driver after a frame capture.
+  if (message && message.type === 'panel:screen-context') {
+    state.screenContext = String(message.text || '');
+    if (!elements.screenContext || !elements.captureStatus) return;
+    elements.screenContext.hidden = !state.screenContext;
+    elements.screenContext.textContent = state.screenContext || '';
+    elements.captureStatus.textContent = state.screenContext
+      ? meetT('screen.contextReceived', {
+          count: state.screenContext.length,
+          provider: message.provider || 'local',
+        })
+      : meetT('screen.contextEmpty');
   }
 });
 
