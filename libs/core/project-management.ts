@@ -3,22 +3,25 @@ import {
   buildProjectBootstrapWorkItems,
   listProjectRecords,
   loadProjectRecord,
+  projectRecordPath,
   saveProjectRecord,
   type ProjectBootstrapWorkItem,
   type ProjectRecord,
 } from './project-registry.js';
 import {
   listProjectOperationalStates,
+  projectOperationalStatePath,
   saveProjectOperationalState,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
 import { listProjectTracksForProject, loadProjectTrackRecord } from './project-track-registry.js';
-import { saveMissionSeedRecord } from './mission-seed-registry.js';
+import { missionSeedRecordPath, saveMissionSeedRecord } from './mission-seed-registry.js';
 import {
   createTaskSession,
   loadTaskSession,
   listTaskSessions,
   saveTaskSession,
+  taskSessionPath,
   type TaskSession,
 } from './task-session.js';
 import { listMissionsInSearchDirs, loadState, saveState } from './mission-state.js';
@@ -35,6 +38,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeRmSync,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -121,6 +125,7 @@ export interface ManagedProjectCreateInput {
   project_path?: string;
   metadata?: Record<string, unknown>;
   pipeline_refs?: string[];
+  rootDir?: string;
 }
 
 export interface ProjectBootstrapInput extends ManagedProjectCreateInput {
@@ -128,6 +133,8 @@ export interface ProjectBootstrapInput extends ManagedProjectCreateInput {
   track_id?: string;
   track_name?: string;
   service_bindings?: string[];
+  onCommit?: (result: ProjectBootstrapResult) => void;
+  onRollback?: (result: ProjectBootstrapResult, error: unknown) => void;
 }
 
 export interface ProjectBootstrapResult {
@@ -171,15 +178,18 @@ export function assertManagedProjectId(value: string): string {
   return normalized;
 }
 
-function projectMissions(projectId: string): MissionState[] {
-  return listMissionsInSearchDirs()
-    .map(({ missionId }) => loadState(missionId))
+function projectMissions(projectId: string, rootDir = pathResolver.rootDir()): MissionState[] {
+  const missionOptions = { rootDir };
+  return listMissionsInSearchDirs(missionOptions)
+    .map(({ missionId }) => loadState(missionId, missionOptions))
     .filter((state): state is MissionState => Boolean(state))
     .filter((state) => state.relationships?.project?.project_id === projectId);
 }
 
-function projectSessions(projectId: string): TaskSession[] {
-  return listTaskSessions().filter((session) => session.project_context?.project_id === projectId);
+function projectSessions(projectId: string, rootDir = pathResolver.rootDir()): TaskSession[] {
+  return listTaskSessions(undefined, { rootDir }).filter(
+    (session) => session.project_context?.project_id === projectId
+  );
 }
 
 function scopeKey(tier: ProjectRecord['tier'], tenantSlug?: string): string {
@@ -240,9 +250,11 @@ const PROJECT_OS_PHASE_DIRS: Record<string, string> = {
 export function ensureProjectOsScaffold(
   projectId: string,
   projectName: string,
-  tier: ProjectRecord['tier']
+  tier: ProjectRecord['tier'],
+  tenantSlug = 'shared',
+  rootDir = pathResolver.rootDir()
 ): string {
-  const targetDir = pathResolver.projectOsDir(projectId, tier, 'shared');
+  const targetDir = pathResolver.projectOsDir(projectId, tier, tenantSlug, rootDir);
   const artifactMap = JSON.parse(
     safeReadFile(
       pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'),
@@ -289,7 +301,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
     input.tenant_slug &&
     (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
   ) {
-    resolveTenant(input.tenant_slug);
+    resolveTenant(input.tenant_slug, { rootDir: input.rootDir });
   }
   return {
     project_id: projectId,
@@ -317,8 +329,16 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
 }
 
 export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
+  return createManagedProjectInternal(input, false);
+}
+
+function createManagedProjectInternal(
+  input: ManagedProjectCreateInput,
+  deferAudit: boolean
+): ProjectRecord {
   const projectId = assertManagedProjectId(input.project_id);
-  if (loadProjectRecord(projectId)) throw new Error(`Project already exists: ${projectId}`);
+  if (loadProjectRecord(projectId, { rootDir: input.rootDir }))
+    throw new Error(`Project already exists: ${projectId}`);
   const record = buildManagedProjectRecord(input);
   const enforceEntityGovernance =
     process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST;
@@ -327,6 +347,7 @@ export function createManagedProject(input: ManagedProjectCreateInput): ProjectR
       ? loadOrganizationOperationalState(input.organization_id, {
           tier: input.tier,
           tenantSlug: input.tenant_slug,
+          rootDir: input.rootDir,
         })
       : null;
   if (input.organization_id && enforceEntityGovernance && !organizationState) {
@@ -347,32 +368,37 @@ export function createManagedProject(input: ManagedProjectCreateInput): ProjectR
       `Project '${projectId}' and organization '${input.organization_id}' belong to different tenants.`
     );
   }
-  const projectPath = saveProjectRecord(record);
+  const projectPath = saveProjectRecord(record, { rootDir: input.rootDir });
   if (organizationState) {
     try {
-      saveOrganizationOperationalState({
-        ...organizationState,
-        active_project_ids: [
-          ...new Set([...(organizationState.active_project_ids || []), projectId]),
-        ].sort(),
-        updated_at: new Date().toISOString(),
-      });
+      saveOrganizationOperationalState(
+        {
+          ...organizationState,
+          active_project_ids: [
+            ...new Set([...(organizationState.active_project_ids || []), projectId]),
+          ].sort(),
+          updated_at: new Date().toISOString(),
+        },
+        { rootDir: input.rootDir }
+      );
     } catch (error) {
       safeUnlinkSync(projectPath);
       throw error;
     }
   }
-  auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'project_controller',
-    action: 'project.created',
-    operation: `create:${projectId}`,
-    result: 'completed',
-    metadata: {
-      project_id: projectId,
-      tier: record.tier,
-      ...(input.organization_id ? { organization_id: input.organization_id } : {}),
-    },
-  });
+  if (!deferAudit) {
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      action: 'project.created',
+      operation: `create:${projectId}`,
+      result: 'completed',
+      metadata: {
+        project_id: projectId,
+        tier: record.tier,
+        ...(input.organization_id ? { organization_id: input.organization_id } : {}),
+      },
+    });
+  }
   return record;
 }
 
@@ -431,13 +457,16 @@ export function archiveManagedProject(
   return closed;
 }
 
-export function getProjectManagementView(projectId: string): ProjectManagementView {
-  const project = loadProjectRecord(normalizeId(projectId, 'project_id'));
+export function getProjectManagementView(
+  projectId: string,
+  rootDir = pathResolver.rootDir()
+): ProjectManagementView {
+  const project = loadProjectRecord(normalizeId(projectId, 'project_id'), { rootDir });
   if (!project) throw new Error(`Project not found: ${projectId}`);
-  const tracks = listProjectTracksForProject(project.project_id);
+  const tracks = listProjectTracksForProject(project.project_id, { rootDir });
   const tasks = project.bootstrap_work_items || [];
-  const missions = projectMissions(project.project_id);
-  const taskSessions = projectSessions(project.project_id);
+  const missions = projectMissions(project.project_id, rootDir);
+  const taskSessions = projectSessions(project.project_id, rootDir);
   const pipelineRefs = Array.isArray(project.pipeline_refs)
     ? project.pipeline_refs
     : Array.isArray(project.metadata?.pipeline_refs)
@@ -449,7 +478,7 @@ export function getProjectManagementView(projectId: string): ProjectManagementVi
     tasks,
     missions,
     task_sessions: taskSessions,
-    operational_states: listProjectOperationalStates({ projectId: project.project_id }),
+    operational_states: listProjectOperationalStates({ projectId: project.project_id, rootDir }),
     lineage: {
       project: { project_id: project.project_id, name: project.name, role: 'durable_context' },
       tracks: tracks.map((track) => ({
@@ -827,130 +856,237 @@ export async function reassignMissionToProject(input: {
 
 export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBootstrapResult {
   const projectId = normalizeId(input.project_id, 'project_id');
-  if (loadProjectRecord(projectId)) throw new Error(`Project already exists: ${projectId}`);
-  const projectOsPath = ensureProjectOsScaffold(projectId, input.name, input.tier);
-  const workItems = buildProjectBootstrapWorkItems({
+  const rootDir = input.rootDir || pathResolver.rootDir();
+  if (loadProjectRecord(projectId, { rootDir }))
+    throw new Error(`Project already exists: ${projectId}`);
+  const previousOrganizationState = input.organization_id
+    ? loadOrganizationOperationalState(input.organization_id, {
+        tier: input.tier,
+        tenantSlug: input.tenant_slug,
+        rootDir,
+      })
+    : null;
+  const candidateProjectOsPath = pathResolver.projectOsDir(
     projectId,
-    projectName: input.name,
-    utterance: input.utterance,
-  });
-  const kickoffWork = workItems.find((item) => item.kind === 'task_session');
-  if (!kickoffWork) throw new Error('Project bootstrap requires a kickoff task session work item');
-  const kickoffId = `TSK-${kickoffWork.work_id.replace(/^WRK-/, '')}`;
-  if (loadTaskSession(kickoffId))
-    throw new Error(`Kickoff task session already exists: ${kickoffId}`);
-  const kickoff = createTaskSession({
-    sessionId: kickoffId,
-    surface: 'project-controller',
-    taskType: 'analysis',
-    status: 'collecting_requirements',
-    mode: 'interactive',
-    intentId: 'bootstrap-project',
-    shape: 'project_bootstrap',
-    goal: { summary: kickoffWork.title, success_condition: kickoffWork.summary },
-    projectContext: {
-      project_id: projectId,
-      project_name: input.name,
-      ...(input.track_id ? { track_id: input.track_id } : {}),
-      ...(input.track_name ? { track_name: input.track_name } : {}),
-      tier: input.tier,
-      ...(input.primary_locale ? { locale: input.primary_locale } : {}),
-      ...(input.service_bindings ? { service_bindings: input.service_bindings } : {}),
-    },
-    requirements: { missing: ['project_brief'], collected: {} },
-    payload: {
-      bootstrap_kind: 'project_bootstrap',
-      bootstrap_work_ids: workItems.map((item) => item.work_id),
-    },
-  });
-  saveTaskSession(kickoff);
-  const missionSeedIds = workItems
-    .filter((item) => item.kind === 'mission_seed')
-    .map((item) => `MSD-${item.work_id.replace(/^WRK-/, '')}`);
-  const project = createManagedProject({
-    ...input,
-    status: input.status || 'active',
-    metadata: { ...(input.metadata || {}), created_from: 'project-management-facade' },
-  });
-  const nextProject: ProjectRecord = {
-    ...project,
-    ...(input.track_id
-      ? { default_track_id: input.track_id, active_tracks: [input.track_id] }
-      : {}),
-    ...(input.service_bindings ? { service_bindings: input.service_bindings } : {}),
-    ...(input.pipeline_refs ? { pipeline_refs: sortedUnique(input.pipeline_refs) } : {}),
-    project_os_path: projectOsPath,
-    active_missions: [],
-    active_task_sessions: [kickoff.session_id],
-    bootstrap_work_items: workItems,
-    kickoff_task_session_id: kickoff.session_id,
-    proposed_mission_ids: missionSeedIds,
-  };
-  saveProjectRecord(nextProject);
-  const now = new Date().toISOString();
-  for (const item of workItems.filter((candidate) => candidate.kind === 'mission_seed')) {
-    const seedId = `MSD-${item.work_id.replace(/^WRK-/, '')}`;
-    saveMissionSeedRecord({
-      seed_id: seedId,
-      project_id: projectId,
-      ...(input.track_id ? { track_id: input.track_id } : {}),
-      ...(input.track_name ? { track_name: input.track_name } : {}),
-      source_task_session_id: kickoff.session_id,
-      source_work_id: item.work_id,
-      title: item.title,
-      summary: item.summary,
-      status: 'ready',
-      specialist_id: item.specialist_id,
-      ...(item.outcome_id ? { outcome_id: item.outcome_id } : {}),
-      mission_type_hint: 'general',
-      ...(input.primary_locale ? { locale: input.primary_locale } : {}),
-      created_at: now,
-      updated_at: now,
-      metadata: { bootstrap_source: 'project-management-facade' },
+    input.tier,
+    input.tenant_slug,
+    rootDir
+  );
+  const projectOsExisted = safeExistsSync(candidateProjectOsPath);
+  let projectOsPath: string | undefined;
+  let kickoffId: string | undefined;
+  let kickoffExisted = false;
+  let missionSeedIds: string[] = [];
+  const existingSeedPaths = new Set<string>();
+  const projectStatePath = projectOperationalStatePath(
+    projectId,
+    input.tier,
+    input.tenant_slug,
+    rootDir
+  );
+  const projectStateExisted = safeExistsSync(projectStatePath);
+  let committedResult: ProjectBootstrapResult | undefined;
+  let commitCallbackStarted = false;
+  let commitCompleted = false;
+  try {
+    projectOsPath = ensureProjectOsScaffold(
+      projectId,
+      input.name,
+      input.tier,
+      input.tenant_slug,
+      rootDir
+    );
+    const workItems = buildProjectBootstrapWorkItems({
+      projectId,
+      projectName: input.name,
+      utterance: input.utterance,
     });
-  }
-  saveProjectOperationalState({
-    project_id: projectId,
-    name: nextProject.name,
-    summary: nextProject.summary,
-    status: nextProject.status,
-    tier: nextProject.tier,
-    ...(input.project_path ? { project_path: input.project_path } : {}),
-    active_track_ids: input.track_id ? [input.track_id] : [],
-    active_mission_ids: [],
-    active_task_session_ids: [kickoff.session_id],
-    source_refs: [`project:${projectId}`, `task_session:${kickoff.session_id}`],
-    sources: [
-      {
-        kind: 'task_session',
-        ref: `task_session:${kickoff.session_id}`,
-        summary: kickoffWork.title,
-        captured_at: now,
+    const kickoffWork = workItems.find((item) => item.kind === 'task_session');
+    if (!kickoffWork)
+      throw new Error('Project bootstrap requires a kickoff task session work item');
+    kickoffId = `TSK-${kickoffWork.work_id.replace(/^WRK-/, '')}`;
+    kickoffExisted = safeExistsSync(taskSessionPath(kickoffId, rootDir));
+    if (loadTaskSession(kickoffId, { rootDir }))
+      throw new Error(`Kickoff task session already exists: ${kickoffId}`);
+    const kickoff = createTaskSession({
+      sessionId: kickoffId,
+      surface: 'project-controller',
+      taskType: 'analysis',
+      status: 'collecting_requirements',
+      mode: 'interactive',
+      intentId: 'bootstrap-project',
+      shape: 'project_bootstrap',
+      goal: { summary: kickoffWork.title, success_condition: kickoffWork.summary },
+      projectContext: {
+        project_id: projectId,
+        project_name: input.name,
+        ...(input.track_id ? { track_id: input.track_id } : {}),
+        ...(input.track_name ? { track_name: input.track_name } : {}),
+        tier: input.tier,
+        ...(input.primary_locale ? { locale: input.primary_locale } : {}),
+        ...(input.service_bindings ? { service_bindings: input.service_bindings } : {}),
       },
-    ],
-    distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
-    knowledge_refs: [],
-    updated_at: now,
-  });
-  auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'project_controller',
-    action: 'project.bootstrap_created',
-    operation: `bootstrap:${projectId}`,
-    result: 'completed',
-    metadata: {
-      project_id: projectId,
+      requirements: { missing: ['project_brief'], collected: {} },
+      payload: {
+        bootstrap_kind: 'project_bootstrap',
+        bootstrap_work_ids: workItems.map((item) => item.work_id),
+      },
+    });
+    saveTaskSession(kickoff, { rootDir });
+    missionSeedIds = workItems
+      .filter((item) => item.kind === 'mission_seed')
+      .map((item) => `MSD-${item.work_id.replace(/^WRK-/, '')}`);
+    for (const seedId of missionSeedIds) {
+      const seedPath = missionSeedRecordPath(seedId, rootDir);
+      if (safeExistsSync(seedPath)) existingSeedPaths.add(seedPath);
+    }
+    const project = createManagedProjectInternal(
+      {
+        ...input,
+        rootDir,
+        status: input.status || 'active',
+        metadata: { ...(input.metadata || {}), created_from: 'project-management-facade' },
+      },
+      true
+    );
+    const nextProject: ProjectRecord = {
+      ...project,
+      ...(input.track_id
+        ? { default_track_id: input.track_id, active_tracks: [input.track_id] }
+        : {}),
+      ...(input.service_bindings ? { service_bindings: input.service_bindings } : {}),
+      ...(input.pipeline_refs ? { pipeline_refs: sortedUnique(input.pipeline_refs) } : {}),
+      project_os_path: projectOsPath,
+      active_missions: [],
+      active_task_sessions: [kickoff.session_id],
+      bootstrap_work_items: workItems,
       kickoff_task_session_id: kickoff.session_id,
+      proposed_mission_ids: missionSeedIds,
+    };
+    saveProjectRecord(nextProject, { rootDir });
+    const now = new Date().toISOString();
+    for (const item of workItems.filter((candidate) => candidate.kind === 'mission_seed')) {
+      const seedId = `MSD-${item.work_id.replace(/^WRK-/, '')}`;
+      saveMissionSeedRecord(
+        {
+          seed_id: seedId,
+          project_id: projectId,
+          ...(input.track_id ? { track_id: input.track_id } : {}),
+          ...(input.track_name ? { track_name: input.track_name } : {}),
+          source_task_session_id: kickoff.session_id,
+          source_work_id: item.work_id,
+          title: item.title,
+          summary: item.summary,
+          status: 'ready',
+          specialist_id: item.specialist_id,
+          ...(item.outcome_id ? { outcome_id: item.outcome_id } : {}),
+          mission_type_hint: 'general',
+          ...(input.primary_locale ? { locale: input.primary_locale } : {}),
+          created_at: now,
+          updated_at: now,
+          metadata: { bootstrap_source: 'project-management-facade' },
+        },
+        { rootDir }
+      );
+    }
+    saveProjectOperationalState(
+      {
+        project_id: projectId,
+        name: nextProject.name,
+        summary: nextProject.summary,
+        status: nextProject.status,
+        tier: nextProject.tier,
+        ...(input.project_path ? { project_path: input.project_path } : {}),
+        active_track_ids: input.track_id ? [input.track_id] : [],
+        active_mission_ids: [],
+        active_task_session_ids: [kickoff.session_id],
+        source_refs: [`project:${projectId}`, `task_session:${kickoff.session_id}`],
+        sources: [
+          {
+            kind: 'task_session',
+            ref: `task_session:${kickoff.session_id}`,
+            summary: kickoffWork.title,
+            captured_at: now,
+          },
+        ],
+        distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
+        knowledge_refs: [],
+        updated_at: now,
+      },
+      { rootDir }
+    );
+    const result = {
+      project: nextProject,
+      kickoff_task_session: kickoff,
       mission_seed_ids: missionSeedIds,
-    },
-  });
-  return {
-    project: nextProject,
-    kickoff_task_session: kickoff,
-    mission_seed_ids: missionSeedIds,
-    work_items: workItems,
-  };
+      work_items: workItems,
+    };
+    committedResult = result;
+    if (input.onCommit) {
+      commitCallbackStarted = true;
+      input.onCommit(result);
+    }
+    commitCompleted = true;
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      action: 'project.created',
+      operation: `create:${projectId}`,
+      result: 'completed',
+      metadata: {
+        project_id: projectId,
+        tier: project.tier,
+        ...(project.organization_id ? { organization_id: project.organization_id } : {}),
+      },
+    });
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      action: 'project.bootstrap_created',
+      operation: `bootstrap:${projectId}`,
+      result: 'completed',
+      metadata: {
+        project_id: projectId,
+        kickoff_task_session_id: kickoff.session_id,
+        mission_seed_ids: missionSeedIds,
+      },
+    });
+    return result;
+  } catch (error) {
+    safeUnlinkSync(projectRecordPath(projectId, rootDir));
+    if (kickoffId && !kickoffExisted) safeUnlinkSync(taskSessionPath(kickoffId, rootDir));
+    for (const seedId of missionSeedIds) {
+      const seedPath = missionSeedRecordPath(seedId, rootDir);
+      if (!existingSeedPaths.has(seedPath)) safeUnlinkSync(seedPath);
+    }
+    if (!projectStateExisted) safeUnlinkSync(projectStatePath);
+    if (projectOsPath && !projectOsExisted)
+      safeRmSync(projectOsPath, { recursive: true, force: true });
+    if (previousOrganizationState) {
+      saveOrganizationOperationalState(previousOrganizationState, { rootDir });
+    }
+    if (commitCallbackStarted || commitCompleted) {
+      try {
+        if (committedResult) input.onRollback?.(committedResult, error);
+      } catch {
+        // Preserve the original bootstrap failure after best-effort commit compensation.
+      }
+    }
+    try {
+      auditChain.record({
+        agentId: process.env.KYBERION_PERSONA || 'project_controller',
+        action: 'project.bootstrap_rollback',
+        operation: `rollback:${projectId}`,
+        result: 'completed',
+        metadata: { project_id: projectId, reason: String(error) },
+      });
+    } catch {
+      // Audit failure must not hide the original bootstrap failure.
+    }
+    throw error;
+  }
 }
 
-export function listManagedProjects(): ProjectManagementView[] {
-  return listProjectRecords().map((project) => getProjectManagementView(project.project_id));
+export function listManagedProjects(rootDir = pathResolver.rootDir()): ProjectManagementView[] {
+  return listProjectRecords(rootDir).map((project) =>
+    getProjectManagementView(project.project_id, rootDir)
+  );
 }

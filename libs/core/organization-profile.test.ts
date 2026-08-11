@@ -173,6 +173,12 @@ describe('organization-profile', () => {
     expect(profile?.mission_defaults?.default_agent_profile).toBe('review-agent');
   });
 
+  it('does not fall back to the active repository when a root is explicitly provided', () => {
+    process.env.KYBERION_CUSTOMER = 'missing-from-fixture';
+
+    expect(loadOrganizationProfile(alternateRoot)).toBeNull();
+  });
+
   it('lists the public organization team template catalogs', () => {
     const catalogs = listOrganizationMissionTeamTemplateCatalogSummaries();
 

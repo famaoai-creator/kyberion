@@ -249,10 +249,11 @@ function normalizePathSegment(value: string, fallback = 'shared') {
 export function projectWorkspaceDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = PROJECT_ROOT_DIR
 ): string {
   const dir = path.join(
-    ACTIVE_ROOT,
+    path.resolve(rootDir, 'active'),
     'projects',
     tier,
     normalizePathSegment(tenantSlug, 'shared'),
@@ -268,9 +269,10 @@ export function projectWorkspaceDir(
 export function projectOsDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = PROJECT_ROOT_DIR
 ): string {
-  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'project-os');
+  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug, rootDir), 'project-os');
   return dir;
 }
 
@@ -281,9 +283,10 @@ export function projectOsDir(
 export function projectStateDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = PROJECT_ROOT_DIR
 ): string {
-  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'state');
+  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug, rootDir), 'state');
   return dir;
 }
 
@@ -294,10 +297,11 @@ export function projectStateDir(
 export function organizationWorkspaceDir(
   organizationId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = PROJECT_ROOT_DIR
 ): string {
   const dir = path.join(
-    ACTIVE_ROOT,
+    path.resolve(rootDir, 'active'),
     'organizations',
     tier,
     normalizePathSegment(tenantSlug, 'shared'),
@@ -313,9 +317,13 @@ export function organizationWorkspaceDir(
 export function organizationStateDir(
   organizationId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared'
+  tenantSlug = 'shared',
+  rootDir = PROJECT_ROOT_DIR
 ): string {
-  const dir = path.join(organizationWorkspaceDir(organizationId, tier, tenantSlug), 'state');
+  const dir = path.join(
+    organizationWorkspaceDir(organizationId, tier, tenantSlug, rootDir),
+    'state'
+  );
   return dir;
 }
 

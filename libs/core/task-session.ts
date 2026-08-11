@@ -1,4 +1,5 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
@@ -163,7 +164,6 @@ const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
 const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
 const SURFACE_MANIFEST_DIR = pathResolver.knowledge('product/governance/surfaces');
 const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
-const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
 let taskSessionPolicyValidateFn: ValidateFunction | null = null;
@@ -224,8 +224,12 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
-function taskSessionPath(sessionId: string): string {
-  return `${TASK_SESSION_DIR}/${sessionId}.json`;
+function taskSessionDir(rootDir = pathResolver.rootDir()): string {
+  return path.resolve(rootDir, 'active/shared/runtime/task-sessions');
+}
+
+export function taskSessionPath(sessionId: string, rootDir = pathResolver.rootDir()): string {
+  return `${taskSessionDir(rootDir)}/${sessionId}.json`;
 }
 
 function collectTaskSessionEvidenceRefs(session: TaskSession): string[] {
@@ -1136,7 +1140,7 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
   };
 }
 
-export function saveTaskSession(session: TaskSession): string {
+export function saveTaskSession(session: TaskSession, options: { rootDir?: string } = {}): string {
   if (session.status === 'completed') {
     const evidenceRefs = collectTaskSessionEvidenceRefs(session);
     const evidenceTexts = collectTaskSessionEvidenceTexts(session);
@@ -1176,8 +1180,10 @@ export function saveTaskSession(session: TaskSession): string {
   if (!result.valid) {
     throw new Error(`Invalid task session: ${result.errors.join('; ')}`);
   }
-  if (!safeExistsSync(TASK_SESSION_DIR)) safeMkdir(TASK_SESSION_DIR, { recursive: true });
-  const filePath = taskSessionPath(session.session_id);
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  const directory = taskSessionDir(rootDir);
+  if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
+  const filePath = taskSessionPath(session.session_id, rootDir);
   safeWriteFile(filePath, JSON.stringify(session, null, 2));
   if (session.status === 'completed') {
     recordTaskSessionCompletionLearning(session);
@@ -1185,8 +1191,11 @@ export function saveTaskSession(session: TaskSession): string {
   return filePath;
 }
 
-export function loadTaskSession(sessionId: string): TaskSession | null {
-  const filePath = taskSessionPath(sessionId);
+export function loadTaskSession(
+  sessionId: string,
+  options: { rootDir?: string } = {}
+): TaskSession | null {
+  const filePath = taskSessionPath(sessionId, options.rootDir || pathResolver.rootDir());
   if (!safeExistsSync(filePath)) return null;
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw) as TaskSession;
@@ -1198,19 +1207,26 @@ export function loadTaskSession(sessionId: string): TaskSession | null {
   return parsed;
 }
 
-export function listTaskSessions(surface?: TaskSessionSurface): TaskSession[] {
-  if (!safeExistsSync(TASK_SESSION_DIR)) return [];
-  return safeReaddir(TASK_SESSION_DIR)
+export function listTaskSessions(
+  surface?: TaskSessionSurface,
+  options: { rootDir?: string } = {}
+): TaskSession[] {
+  const directory = taskSessionDir(options.rootDir || pathResolver.rootDir());
+  if (!safeExistsSync(directory)) return [];
+  return safeReaddir(directory)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => loadTaskSession(entry.replace(/\.json$/, '')))
+    .map((entry) => loadTaskSession(entry.replace(/\.json$/, ''), options))
     .filter((session): session is TaskSession => Boolean(session))
     .filter((session) => (surface ? session.surface === surface : true))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
-export function getActiveTaskSession(surface?: TaskSessionSurface): TaskSession | null {
+export function getActiveTaskSession(
+  surface?: TaskSessionSurface,
+  options: { rootDir?: string } = {}
+): TaskSession | null {
   return (
-    listTaskSessions(surface).find(
+    listTaskSessions(surface, options).find(
       (session) => !['completed', 'failed', 'released'].includes(session.status)
     ) || null
   );
@@ -1218,10 +1234,11 @@ export function getActiveTaskSession(surface?: TaskSessionSurface): TaskSession 
 
 export function getLatestCompletedTaskSession(
   surface?: TaskSessionSurface,
-  correlationId?: string
+  correlationId?: string,
+  options: { rootDir?: string } = {}
 ): TaskSession | null {
   return (
-    listTaskSessions(surface).find((session) => {
+    listTaskSessions(surface, options).find((session) => {
       if (session.status !== 'completed') return false;
       if (!correlationId) return true;
       return session.correlation_id === correlationId;
