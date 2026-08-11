@@ -26,6 +26,7 @@ import {
   buildIntegratedHandoffHistory,
   formatIntegratedHandoffHistory,
   loadAiDlcPhaseState,
+  projectWorkGraphToNextTasks,
   pathResolver,
   safeExistsSync,
   safeReaddir,
@@ -136,6 +137,11 @@ async function main(): Promise<void> {
     .command('record-event', 'Append a coordination event', () => undefined)
     .command('list-items', 'List work items', () => undefined)
     .command(
+      'project-next-tasks',
+      'Project canonical Work Graph into NEXT_TASKS.json',
+      () => undefined
+    )
+    .command(
       'migrate-context',
       'Backfill typed WorkItem context from legacy snapshots',
       () => undefined
@@ -209,6 +215,7 @@ async function main(): Promise<void> {
     }
     case 'create-item': {
       const item = createWorkItem({
+        itemId: argv['item-id'] ? String(argv['item-id']) : undefined,
         title: String(argv.title || ''),
         description: String(argv.description || ''),
         status: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
@@ -219,8 +226,8 @@ async function main(): Promise<void> {
         context: context(argv as Record<string, unknown>),
         assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
-        labels: csv(argv.labels),
-        dependencies: csv(argv.dependencies),
+        labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
+        dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
         metadata: json(argv.metadata),
       });
       print(item);
@@ -255,6 +262,18 @@ async function main(): Promise<void> {
     case 'list-items':
       print({ items: listWorkItems() });
       break;
+    case 'project-next-tasks': {
+      const missionId = String(argv['mission-id'] || argv['project-id'] || '').trim();
+      if (!missionId) throw new Error('project-next-tasks requires --mission-id');
+      print(
+        projectWorkGraphToNextTasks({
+          missionId,
+          projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+          apply: argv.apply === true,
+        })
+      );
+      break;
+    }
     case 'claim-item': {
       const result = claimWorkItem({
         itemId: String(argv['item-id'] || ''),
@@ -316,8 +335,8 @@ async function main(): Promise<void> {
         context: context(argv as Record<string, unknown>),
         assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
-        labels: csv(argv.labels),
-        dependencies: csv(argv.dependencies),
+        labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
+        dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
         metadata: json(argv.metadata),
       });
       print(item);

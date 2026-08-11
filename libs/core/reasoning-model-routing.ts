@@ -71,6 +71,8 @@ export interface TaskModelHintInput {
   phase_kind: TaskModelPhaseKind;
   risk?: string;
   estimated_scope?: string;
+  /** Optional governed per-WorkItem override; must resolve to an eligible registry model. */
+  model_id?: string;
 }
 
 let validateFn: ValidateFunction | null = null;
@@ -359,6 +361,20 @@ export function resolveTaskModelHint(
   options: { registry?: ModelRegistryFile } = {}
 ): TaskModelHint {
   const registry = options.registry ?? loadModelRegistry();
+  const explicitModelId = input.model_id?.trim();
+  if (explicitModelId) {
+    const explicitModel = registry.models.find((model) => model.model_id === explicitModelId);
+    if (explicitModel && isEligibleTaskModel(explicitModel)) {
+      const tier = resolveTaskModelRegistryTier(explicitModel);
+      return {
+        tier,
+        execution_tier: tierToExecutionTier(tier),
+        effort: tierToEffort(tier),
+        model_id: explicitModel.model_id,
+        route_reason: `explicit model_id=${explicitModel.model_id} -> ${tier}/${tierToEffort(tier)}`,
+      };
+    }
+  }
   const routing = loadReasoningLevelPolicy().task_model_routing;
   if (!routing) {
     const scopeTier = normalizeScopeTier(input.estimated_scope);

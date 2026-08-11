@@ -1323,7 +1323,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 79445,
+      "size": 79628,
       "type": "json"
     },
     {
@@ -6093,7 +6093,7 @@
     {
       "path": "product/schemas/a2a-task-contract.schema.json",
       "tier": "public",
-      "size": 1248,
+      "size": 1325,
       "type": "json"
     },
     {

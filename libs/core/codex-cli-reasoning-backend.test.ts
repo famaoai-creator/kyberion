@@ -85,9 +85,11 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     expect(arg.userPrompt).toContain('Task: do it');
   });
 
-  it('native adopter reuses one injected app-server session for multiple tasks', async () => {
+  it('native adopter reuses one session while fresh tasks reset its context', async () => {
+    const refreshContext = vi.fn(async () => ({ mode: 'soft' as const, threadId: 'thread-fresh' }));
     const session: CodexHarnessSession = {
       boot: vi.fn(async () => undefined),
+      refreshContext,
       ask: vi.fn(),
       askNativeSubagent: vi.fn(async (prompt, options) => ({
         text: `native:${prompt}`,
@@ -99,15 +101,25 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     const adopter = backend.getNativeSubagentAdopter?.();
     expect(adopter?.id).toBe('codex-app-server');
 
-    const results = await Promise.all([
-      adopter!.dispatch('task-a', 'ctx-a', { profile: 'implementer' }),
-      adopter!.dispatch('task-b', 'ctx-b', { profile: 'explorer' }),
-    ]);
+    const first = await adopter!.dispatch('task-a', 'ctx-a', {
+      profile: 'implementer',
+      context_mode: 'fresh',
+    });
+    const continued = await adopter!.dispatch('task-b', 'ctx-b', {
+      profile: 'explorer',
+      context_mode: 'continue',
+    });
+    const fresh = await adopter!.dispatch('task-c', 'ctx-c', {
+      profile: 'explorer',
+      context_mode: 'fresh',
+    });
 
-    expect(results[0]).toContain('task-a');
-    expect(results[1]).toContain('task-b');
+    expect(first).toContain('task-a');
+    expect(continued).toContain('task-b');
+    expect(fresh).toContain('task-c');
     expect(session.boot).toHaveBeenCalledOnce();
-    expect(session.askNativeSubagent).toHaveBeenCalledTimes(2);
+    expect(refreshContext).toHaveBeenCalledOnce();
+    expect(session.askNativeSubagent).toHaveBeenCalledTimes(3);
     expect(session.ask).not.toHaveBeenCalled();
     expect((session.askNativeSubagent as any).mock.calls[0][1]).toMatchObject({
       profile: 'implementer',
@@ -136,5 +148,32 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     ).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
     expect(session.boot).not.toHaveBeenCalled();
     expect(session.ask).not.toHaveBeenCalled();
+  });
+
+  it('refreshes after a failed native turn before the next fresh task', async () => {
+    let attempts = 0;
+    const refreshContext = vi.fn(async () => ({ mode: 'soft' as const }));
+    const session: CodexHarnessSession = {
+      boot: vi.fn(async () => undefined),
+      refreshContext,
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('native turn timed out');
+        return { text: 'recovered', stopReason: 'completed' };
+      }),
+    };
+    const backend = new CodexCliReasoningBackend({ harnessSession: session });
+    const adopter = backend.getNativeSubagentAdopter?.();
+    if (!adopter) throw new Error('native subagent adopter is required for this test');
+
+    await expect(
+      adopter.dispatch('first task', undefined, { profile: 'implementer', context_mode: 'fresh' })
+    ).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
+    await expect(
+      adopter.dispatch('second task', undefined, { profile: 'implementer', context_mode: 'fresh' })
+    ).resolves.toBe('recovered');
+
+    expect(refreshContext).toHaveBeenCalledOnce();
   });
 });

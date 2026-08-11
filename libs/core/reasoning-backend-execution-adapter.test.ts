@@ -1,11 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   delegateWorkItemWithReasoningBackend,
   ReasoningBackendExecutionAdapter,
 } from './reasoning-backend-execution-adapter.js';
-import { clearWorkCoordinationStore, createWorkItem, getWorkItem } from './work-coordination.js';
+import {
+  clearWorkCoordinationStore,
+  createWorkItem,
+  getWorkItem,
+  setWorkCoordinationNamespace,
+} from './work-coordination.js';
 
 describe('ReasoningBackendExecutionAdapter', () => {
+  beforeEach(() => {
+    setWorkCoordinationNamespace(`reasoning-backend-execution-adapter-test-${process.pid}`);
+    clearWorkCoordinationStore();
+  });
+
+  afterEach(() => {
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
+  });
+
   it('maps text delegation to a typed receipt', async () => {
     const adapter = new ReasoningBackendExecutionAdapter({
       name: 'test-backend',
@@ -27,6 +42,91 @@ describe('ReasoningBackendExecutionAdapter', () => {
       status: 'succeeded',
       output: 'done:run adapter',
       provider: 'test-backend',
+    });
+  });
+
+  it('preserves native adopter proof and explicit model identity without legacy delegation', async () => {
+    const delegateTask = async () => {
+      throw new Error('legacy delegateTask must not be called');
+    };
+    const adapter = new ReasoningBackendExecutionAdapter({
+      name: 'backend-name',
+      model: 'backend-model',
+      delegateTask,
+      getNativeSubagentAdopter: () => ({
+        id: 'native-adopter',
+        dispatch: async () => 'native-output',
+        getInfo: () => ({
+          provider: 'native-provider',
+          model: 'native-model',
+          threadId: 'thread-1',
+        }),
+      }),
+    } as never);
+    const receipt = await adapter.delegate({
+      task_id: 'native-task',
+      model_id: 'explicit-model',
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: 'M-NATIVE',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'native adapter test',
+      },
+      instruction: 'run native',
+      idempotency_key: 'native-1',
+    });
+    expect(receipt).toMatchObject({
+      status: 'succeeded',
+      output: 'native-output',
+      provider: 'native-provider',
+      model_id: 'explicit-model',
+      native_subagent: {
+        adopter_id: 'native-adopter',
+        threadId: 'thread-1',
+      },
+    });
+  });
+
+  it('captures provider-native identity published after dispatch', async () => {
+    let dispatched = false;
+    const adapter = new ReasoningBackendExecutionAdapter({
+      name: 'backend-name',
+      delegateTask: async () => 'legacy-output',
+      getNativeSubagentAdopter: () => ({
+        id: 'late-native-adopter',
+        dispatch: async () => {
+          dispatched = true;
+          return 'native-output';
+        },
+        getInfo: () =>
+          dispatched
+            ? {
+                provider: 'native-provider',
+                model: 'native-model',
+                threadId: 'thread-after-dispatch',
+              }
+            : null,
+      }),
+    } as never);
+
+    const receipt = await adapter.delegate({
+      task_id: 'late-native-task',
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: 'M-LATE-NATIVE',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'late native adapter test',
+      },
+      instruction: 'run late native',
+      idempotency_key: 'late-native-1',
+    });
+
+    expect(receipt).toMatchObject({
+      provider: 'native-provider',
+      model_id: 'native-model',
+      native_subagent: { adopter_id: 'late-native-adopter', threadId: 'thread-after-dispatch' },
     });
   });
 

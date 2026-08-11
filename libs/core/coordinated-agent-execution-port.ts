@@ -11,6 +11,7 @@ import type {
   AgentExecutionReceipt,
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
+import type { ContextSecurityScope } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent-execution-port.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
@@ -51,6 +52,8 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       metadata: {
         mission_id: request.mission_id,
         execution_kind: 'agent_delegation',
+        work_item_id: request.work_item_id,
+        security_scope: request.security_scope,
       },
     });
 
@@ -60,7 +63,15 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       receipt = await this.delegatePort.delegate(request);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      closeWorkItem(claimed.item, this.actorPeerId, 'blocked', message, attemptId);
+      closeWorkItem(
+        claimed.item,
+        this.actorPeerId,
+        'blocked',
+        message,
+        attemptId,
+        undefined,
+        request.security_scope
+      );
       throw error;
     }
 
@@ -72,7 +83,8 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       terminalStatus,
       receipt.error || receipt.output || `agent execution ${receipt.status}`,
       attemptId,
-      receipt
+      receipt,
+      request.security_scope
     );
     return {
       ...receipt,
@@ -99,14 +111,34 @@ export async function delegateCoordinatedAgentTask(
   )) as CoordinatedAgentExecutionReceipt;
 }
 
+/**
+ * Explicit CLI-subagent entry point for the same claim/attempt/lease contract.
+ * Keeping this boundary named prevents text-only delegation from accidentally
+ * bypassing Work Coordination when the execution surface changes.
+ */
+export async function delegateCoordinatedCliSubagentTask(
+  request: CoordinatedAgentTaskEnvelope,
+  execute: () => Promise<AgentExecutionReceipt>,
+  actorPeerId?: string
+): Promise<CoordinatedAgentExecutionReceipt> {
+  return delegateCoordinatedAgentTask(request, { delegate: async () => execute() }, actorPeerId);
+}
+
 function closeWorkItem(
   item: WorkItem,
   actorPeerId: string,
   status: 'done' | 'review' | 'blocked',
   summary: string,
   attemptId?: string,
-  receipt?: AgentExecutionReceipt
+  receipt?: AgentExecutionReceipt,
+  securityScope?: ContextSecurityScope
 ): void {
+  const executionStatus = receipt?.status || status;
+  const resultMetadata = {
+    status: executionStatus,
+    ...(receipt?.output_ref ? { output_ref: receipt.output_ref } : {}),
+    ...(receipt?.error ? { error: receipt.error } : {}),
+  };
   if (item.lease_id) {
     releaseWorkItem({
       itemId: item.item_id,
@@ -117,11 +149,18 @@ function closeWorkItem(
       summary,
       metadata: {
         ...(item.metadata || {}),
+        work_item_id: item.item_id,
         ...(attemptId ? { attempt_id: attemptId } : {}),
         ...(receipt?.runtime_id ? { runtime_id: receipt.runtime_id } : {}),
         ...(receipt?.output_ref ? { output_ref: receipt.output_ref } : {}),
+        ...(receipt?.model_id ? { model_id: receipt.model_id } : {}),
+        ...(receipt?.native_subagent ? { native_subagent: receipt.native_subagent } : {}),
+        ...(receipt?.provider ? { provider: receipt.provider } : {}),
+        ...(securityScope ? { security_scope: securityScope } : {}),
         summary,
-        execution_status: receipt?.status || status,
+        lease_status: 'released',
+        execution_status: executionStatus,
+        result: resultMetadata,
       },
     });
     return;
@@ -132,11 +171,18 @@ function closeWorkItem(
     status,
     metadata: {
       ...(item.metadata || {}),
+      work_item_id: item.item_id,
       ...(attemptId ? { attempt_id: attemptId } : {}),
       ...(receipt?.runtime_id ? { runtime_id: receipt.runtime_id } : {}),
       ...(receipt?.output_ref ? { output_ref: receipt.output_ref } : {}),
+      ...(receipt?.model_id ? { model_id: receipt.model_id } : {}),
+      ...(receipt?.native_subagent ? { native_subagent: receipt.native_subagent } : {}),
+      ...(receipt?.provider ? { provider: receipt.provider } : {}),
+      ...(securityScope ? { security_scope: securityScope } : {}),
       summary,
-      execution_status: receipt?.status || status,
+      lease_status: 'released',
+      execution_status: executionStatus,
+      result: resultMetadata,
     },
   });
 }

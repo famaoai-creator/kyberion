@@ -3,8 +3,10 @@ import {
   loadProjectRecord,
   loadProjectTrackRecord,
   pathResolver,
+  resolveMissionExecutionSurface,
   validateWritePermission,
 } from '@agent/core';
+import type { MissionExecutionSurface } from '@agent/core';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -153,6 +155,8 @@ export function resolveMissionTicketDispatchOptionsFromArgv(argv: string[] = pro
 
 export function resolveMissionWorkItemDispatchOptionsFromArgv(argv: string[] = process.argv): {
   mode: 'auto' | 'agent' | 'subagent';
+  executionSurface?: MissionExecutionSurface;
+  reviewExecutionSurface?: MissionExecutionSurface;
   limit?: number;
   statuses: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
   sources: Array<'local' | 'github' | 'jira' | 'peer'>;
@@ -160,16 +164,25 @@ export function resolveMissionWorkItemDispatchOptionsFromArgv(argv: string[] = p
   rounds?: number;
 } {
   const mode = (getOptionValue('--dispatch-mode', argv) || 'auto') as 'auto' | 'agent' | 'subagent';
+  const executionSurfaceRaw = getOptionValue('--dispatch-execution-surface', argv);
+  const reviewExecutionSurfaceRaw = getOptionValue('--dispatch-review-execution-surface', argv);
+  const executionSurface = executionSurfaceRaw
+    ? resolveMissionExecutionSurface({ requested: executionSurfaceRaw }).surface
+    : undefined;
+  const reviewExecutionSurface = reviewExecutionSurfaceRaw
+    ? resolveMissionExecutionSurface({ requested: reviewExecutionSurfaceRaw }).surface
+    : undefined;
   const limitRaw = getOptionValue('--dispatch-limit', argv);
   const statusesRaw = parseCsvOption('--dispatch-statuses', argv) || ['ready'];
   const sourcesRaw = parseCsvOption('--dispatch-sources', argv) || ['local'];
   const finalStatus = (getOptionValue('--dispatch-final-status', argv) || 'review') as
-    | 'review'
-    | 'done';
+    'review' | 'done';
   const roundsRaw = getOptionValue('--dispatch-rounds', argv);
 
   return {
     mode,
+    ...(executionSurface ? { executionSurface } : {}),
+    ...(reviewExecutionSurface ? { reviewExecutionSurface } : {}),
     ...(roundsRaw ? { rounds: Number(roundsRaw) } : {}),
     ...(limitRaw ? { limit: Number(limitRaw) } : {}),
     statuses: statusesRaw as Array<

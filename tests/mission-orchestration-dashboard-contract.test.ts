@@ -28,7 +28,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(dashboard).toContain('RUNTIME LEASE DOCTOR');
     expect(dashboard).toContain('SURFACE OUTBOX');
     expect(dashboard).toContain('PLAN READY');
-    expect(dashboard).toContain('NEXT_TASKS.json');
+    expect(dashboard).toContain('readCanonicalWorkGraph');
   });
 
   it('renders the company overview section in once mode', () => {

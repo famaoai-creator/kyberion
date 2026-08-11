@@ -8,6 +8,7 @@ import type { ApprovalRequestDraft, ApprovalRequestRecord } from './approval-sto
 import type { GovernedArtifactRole } from './artifact-store.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import type { A2UIMessage } from './a2ui.js';
+import type { AgentContextMode } from './context-boundary.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
 import type {
   ExecutionFeedbackInput,
@@ -252,6 +253,9 @@ export interface A2ATaskContext {
   // This prevents the transport timeout from expiring before the task's own
   // dispatch budget and starting a duplicate fallback ask.
   dispatch_timeout_ms?: number;
+  // Kyberion task-contract extension: controls provider-session reuse. The
+  // standard A2A contextId remains the conversation continuity identifier.
+  context_mode?: AgentContextMode;
   // ContextSecurityScope object from the mission context pack; the a2a bridge
   // uses it to fingerprint conversation storage and validate egress.
   security_scope?: Record<string, unknown>;
