@@ -46,6 +46,10 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
   ['tests/task-scenario-meeting-action-items-contract.test.ts', ['../libs/core/schema-loader.js']],
   ['tests/task-scenario-meeting-participation-contract.test.ts', ['../libs/core/schema-loader.js']],
   [
+    'tests/task-scenario-aws-cost-estimate-from-vendor-docs-contract.test.ts',
+    ['../libs/core/schema-loader.js'],
+  ],
+  [
     'tests/task-scenario-meeting-to-proposal-pptx-contract.test.ts',
     ['../libs/core/schema-loader.js'],
   ],
