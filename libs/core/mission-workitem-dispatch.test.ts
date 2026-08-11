@@ -1513,7 +1513,7 @@ describe('mission work item dispatch', () => {
           pathResolver.rootResolve('scripts/ts-loader.mjs'),
           '--input-type=module',
           '-e',
-          "import {getWorkItem} from './libs/core/work-coordination.ts'; console.log(JSON.stringify(getWorkItem(process.env.KYBERION_REHYDRATE_ITEM)))",
+          "import {getWorkItem} from '@agent/core/work-coordination'; console.log(JSON.stringify(getWorkItem(process.env.KYBERION_REHYDRATE_ITEM)))",
         ],
         {
           cwd: pathResolver.rootDir(),
