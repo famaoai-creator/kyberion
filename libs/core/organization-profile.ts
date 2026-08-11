@@ -68,16 +68,18 @@ export function loadOrganizationProfile(rootDir?: string): OrganizationProfile |
     rootDir && customerSlug
       ? path.join(rootDir, 'customer', customerSlug, 'organization-profile.json')
       : null;
-  const activeCustomerPath = customerSlug
-    ? customerResolver.customerRoot('organization-profile.json')
-    : null;
+  const activeCustomerPath = rootDir
+    ? null
+    : customerSlug
+      ? customerResolver.customerRoot('organization-profile.json')
+      : null;
   const candidatePaths = [
     rootScopedCustomerPath,
     activeCustomerPath,
     rootDir
       ? path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json')
       : null,
-    ORGANIZATION_PROFILE_PATH,
+    rootDir ? null : ORGANIZATION_PROFILE_PATH,
   ].filter((entry): entry is string => Boolean(entry));
 
   for (const profilePath of candidatePaths) {

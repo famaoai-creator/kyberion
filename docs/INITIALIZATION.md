@@ -236,6 +236,26 @@ dry-runで書き込み範囲を確認してから同じコマンドを実行し�
   - `customer/{slug}/tenants/*.json` が 1 件ずつ生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/*.json` になります。
   - `customer/{slug}/onboarding/tutorial-plan.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/tutorial-plan.md` になります。
 
+### Stage 12: 運用コンテキストの確定
+
+会社・顧客オンボーディング後は、最初の仕事を作る前に customer・tenant・organization の対応を確認します。
+
+```bash
+pnpm onboarding:context bind \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --dry-run --json
+pnpm onboarding:context bind \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --apply --json
+pnpm onboarding:context first-work \
+  --customer-slug <customer-slug> \
+  --intent "<最初の依頼>" --dry-run --json
+```
+
+`solution_project` の依頼だけが Project Bootstrap 候補になり、定常運用・サービス運用・インシデント・ガバナンスは対応する管理単位へ振り分けられます。
+
 ---
 
 ## 🩺 健全性確認 (Vital Check)

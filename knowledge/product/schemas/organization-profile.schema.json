@@ -84,7 +84,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "mode": { "type": "string", "minLength": 1 },
         "accountable_owner_id": { "type": "string", "minLength": 1 },
+        "accountable_human_resource_id": { "type": "string", "minLength": 1 },
+        "default_approval_holder": { "type": "string", "minLength": 1 },
+        "default_budget_posture": { "type": "string", "minLength": 1 },
         "resource_catalog_id": { "type": "string", "minLength": 1 },
         "default_resource_status": {
           "type": "string",

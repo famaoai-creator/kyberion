@@ -113,4 +113,26 @@ describe('check_type_ratchet', () => {
     expect(report.violations).toEqual([]);
     expect(refreshed.counts.src.files).toBe(1);
   });
+
+  it('ignores generated TypeScript output from the ratchet scan', () => {
+    const baselinePath = writeFixture(
+      'baseline.json',
+      JSON.stringify({
+        version: 1,
+        generated_at: '2026-07-01T00:00:00.000Z',
+        counts: {
+          src: { any_keywords: 0, as_any: 0, ts_ignore: 0, files: 0 },
+          test: { any_keywords: 0, as_any: 0, ts_ignore: 0, files: 0 },
+        },
+      })
+    );
+    writeFixture('.next/types/generated.ts', 'export const value: any = 1;');
+
+    const report = checkTypeRatchet({
+      baselinePath,
+      scanRoots: [pathResolver.sharedTmp('check-type-ratchet')],
+    });
+
+    expect(report.violations).toEqual([]);
+  });
 });

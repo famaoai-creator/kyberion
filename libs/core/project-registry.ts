@@ -1,4 +1,5 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
@@ -54,7 +55,6 @@ export interface ProjectBootstrapWorkItem {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const PROJECT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-record.schema.json');
-const PROJECT_DIR = pathResolver.shared('runtime/projects');
 let projectValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
@@ -64,40 +64,53 @@ function ensureValidator(): ValidateFunction {
   return projectValidateFn!;
 }
 
-function projectPath(projectId: string): string {
-  return `${PROJECT_DIR}/${projectId}.json`;
+export function projectRecordPath(projectId: string, rootDir = pathResolver.rootDir()): string {
+  const projectDir = path.resolve(rootDir, 'active/shared/runtime/projects');
+  return `${projectDir}/${projectId}.json`;
 }
 
 export function validateProjectRecord(value: unknown): value is ProjectRecord {
   return Boolean(ensureValidator()(value));
 }
 
-export function saveProjectRecord(record: ProjectRecord): string {
+export function saveProjectRecord(
+  record: ProjectRecord,
+  options: { rootDir?: string } = {}
+): string {
   if (!validateProjectRecord(record)) {
     const errors = (ensureValidator().errors || []).map(
       (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
     );
     throw new Error(`Invalid project record: ${errors.join('; ')}`);
   }
-  if (!safeExistsSync(PROJECT_DIR)) safeMkdir(PROJECT_DIR, { recursive: true });
-  const filePath = projectPath(record.project_id);
+  const projectDir = path.dirname(projectRecordPath(record.project_id, options.rootDir));
+  if (!safeExistsSync(projectDir)) safeMkdir(projectDir, { recursive: true });
+  const filePath = projectRecordPath(record.project_id, options.rootDir);
   safeWriteFile(filePath, JSON.stringify(record, null, 2));
   return filePath;
 }
 
-export function loadProjectRecord(projectId: string): ProjectRecord | null {
-  const filePath = projectPath(projectId);
+export function loadProjectRecord(
+  projectId: string,
+  options: { rootDir?: string } = {}
+): ProjectRecord | null {
+  const filePath = projectRecordPath(projectId, options.rootDir);
   if (!safeExistsSync(filePath)) return null;
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw) as ProjectRecord;
   return validateProjectRecord(parsed) ? parsed : null;
 }
 
-export function listProjectRecords(): ProjectRecord[] {
-  if (!safeExistsSync(PROJECT_DIR)) return [];
-  return safeReaddir(PROJECT_DIR)
+export function listProjectRecords(rootDir = pathResolver.rootDir()): ProjectRecord[] {
+  return listProjectRecordsAtRoot(rootDir);
+}
+
+export function listProjectRecordsAtRoot(rootDir = pathResolver.rootDir()): ProjectRecord[] {
+  const projectDir = path.dirname(projectRecordPath('placeholder', rootDir));
+  if (!safeExistsSync(projectDir)) return [];
+  return safeReaddir(projectDir)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => loadProjectRecord(entry.replace(/\.json$/, '')))
+    .map((entry) => loadProjectRecord(entry.replace(/\.json$/, ''), { rootDir }))
     .filter((record): record is ProjectRecord => Boolean(record))
     .sort((a, b) => a.project_id.localeCompare(b.project_id));
 }

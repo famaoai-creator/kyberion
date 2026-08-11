@@ -15,6 +15,7 @@ import { AgyCliBackend, type AgyHarnessSession } from './agy-cli-backend.js';
 import {
   clearWorkCoordinationStore,
   createWorkItem,
+  getWorkItem,
   listWorkItems,
   setWorkCoordinationNamespace,
   updateWorkItem,
@@ -42,6 +43,7 @@ import {
 } from './work-coordination.js';
 
 const missionId = 'MSN-WORKITEM-DISPATCH-001';
+const workCoordinationNamespace = `mission-workitem-dispatch-test-${process.pid}`;
 const missionPath = pathResolver.missionDir(missionId, 'public');
 const artifactRegistryPath = artifactOwnershipRegistryPath();
 let originalArtifactRegistryRaw: string | null = null;
@@ -146,7 +148,7 @@ function makeTaskResultText(input: {
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
-  setWorkCoordinationNamespace('mission-workitem-dispatch-test');
+  setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
 });
@@ -1519,7 +1521,7 @@ describe('mission work item dispatch', () => {
         {
           cwd: pathResolver.rootDir(),
           env: {
-            KYBERION_WORK_COORDINATION_NAMESPACE: 'mission-workitem-dispatch-test',
+            KYBERION_WORK_COORDINATION_NAMESPACE: workCoordinationNamespace,
             KYBERION_REHYDRATE_ITEM: item.item_id,
           },
         }
@@ -1933,7 +1935,7 @@ describe('mission work item dispatch', () => {
   });
 
   it('blocks repeated identical dispatch outcomes and marks needs_attention', async () => {
-    createWorkItem({
+    const driftWorkItem = createWorkItem({
       title: `${missionId}: Repeat the same output until stopped`,
       description:
         'Repeat the same result three times so the drift watchdog can detect a loop and stop the mission work item.',
@@ -1967,7 +1969,8 @@ describe('mission work item dispatch', () => {
       { mode: 'subagent', finalStatus: 'review' },
       { delegateTask }
     );
-    let current = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    let current = getWorkItem(driftWorkItem.item_id);
+    if (!current) throw new Error(`Drift watchdog fixture disappeared: ${driftWorkItem.item_id}`);
     updateWorkItem({
       itemId: current.item_id,
       status: 'ready',
@@ -1982,7 +1985,8 @@ describe('mission work item dispatch', () => {
       { mode: 'subagent', finalStatus: 'review' },
       { delegateTask }
     );
-    current = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    current = getWorkItem(driftWorkItem.item_id);
+    if (!current) throw new Error(`Drift watchdog fixture disappeared: ${driftWorkItem.item_id}`);
     updateWorkItem({
       itemId: current.item_id,
       status: 'ready',
@@ -2009,8 +2013,7 @@ describe('mission work item dispatch', () => {
       }),
     });
 
-    const items = listWorkItems({ projectId: missionId, source: 'local' });
-    expect(items[0]).toMatchObject({ status: 'blocked' });
+    expect(getWorkItem(driftWorkItem.item_id)).toMatchObject({ status: 'blocked' });
 
     const responseFile = `${missionPath}/evidence/workitem-dispatch-${third.records[0].item_id}.json`;
     const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);

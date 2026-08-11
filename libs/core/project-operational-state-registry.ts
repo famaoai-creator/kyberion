@@ -2,7 +2,14 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeStat, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   projectOperationalMissionLinkPath,
   projectOperationalTrackStatePath,
@@ -18,7 +25,15 @@ export {
 } from './project-operational-state-links.js';
 
 export interface ProjectOperationalStateSource {
-  kind: 'mission' | 'track' | 'task_session' | 'artifact' | 'service_binding' | 'surface_event' | 'manual_note' | 'other';
+  kind:
+    | 'mission'
+    | 'track'
+    | 'task_session'
+    | 'artifact'
+    | 'service_binding'
+    | 'surface_event'
+    | 'manual_note'
+    | 'other';
   ref: string;
   summary?: string;
   captured_at?: string;
@@ -32,7 +47,8 @@ export interface ProjectOperationalState {
   tier: 'personal' | 'confidential' | 'public';
   tenant_slug?: string;
   project_path?: string;
-  current_phase?: 'initiate' | 'define' | 'design' | 'build' | 'validate' | 'transfer_run' | 'run' | 'unknown';
+  current_phase?:
+    'initiate' | 'define' | 'design' | 'build' | 'validate' | 'transfer_run' | 'run' | 'unknown';
   active_track_ids?: string[];
   active_mission_ids?: string[];
   active_task_session_ids?: string[];
@@ -49,6 +65,7 @@ export interface ProjectOperationalStateQuery {
   projectId?: string;
   tier?: 'personal' | 'confidential' | 'public';
   tenantSlug?: string;
+  rootDir?: string;
 }
 
 export interface ProjectOperationalStateMissionContext {
@@ -95,7 +112,9 @@ export interface ProjectOperationalStateMissionContext {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const STATE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-operational-state.schema.json');
+const STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-operational-state.schema.json'
+);
 const STATE_ROOT = pathResolver.active('projects');
 const STATE_FILE_NAME = 'project-state.json';
 let stateValidateFn: ValidateFunction | null = null;
@@ -107,7 +126,9 @@ function ensureValidator(): ValidateFunction {
   return stateValidateFn!;
 }
 
-function missionStatusToPhase(status: string): NonNullable<ProjectOperationalState['current_phase']> {
+function missionStatusToPhase(
+  status: string
+): NonNullable<ProjectOperationalState['current_phase']> {
   switch (status) {
     case 'planned':
       return 'initiate';
@@ -128,19 +149,37 @@ function missionStatusToPhase(status: string): NonNullable<ProjectOperationalSta
   }
 }
 
-export function projectOperationalStateDir(projectId: string, tier: ProjectOperationalState['tier'], tenantSlug?: string): string {
-  return path.join(pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug || 'shared'), 'state');
+export function projectOperationalStateDir(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string,
+  rootDir = pathResolver.rootDir()
+): string {
+  return path.join(
+    pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug || 'shared', rootDir),
+    'state'
+  );
 }
 
-export function projectOperationalStatePath(projectId: string, tier: ProjectOperationalState['tier'], tenantSlug?: string): string {
-  return path.join(projectOperationalStateDir(projectId, tier, tenantSlug), STATE_FILE_NAME);
+export function projectOperationalStatePath(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string,
+  rootDir = pathResolver.rootDir()
+): string {
+  return path.join(
+    projectOperationalStateDir(projectId, tier, tenantSlug, rootDir),
+    STATE_FILE_NAME
+  );
 }
 
 export function validateProjectOperationalState(value: unknown): value is ProjectOperationalState {
   return Boolean(ensureValidator()(value));
 }
 
-function normalizeProjectOperationalState(record: ProjectOperationalState): ProjectOperationalState {
+function normalizeProjectOperationalState(
+  record: ProjectOperationalState
+): ProjectOperationalState {
   return {
     ...record,
     tenant_slug: record.tenant_slug?.trim() || undefined,
@@ -155,7 +194,10 @@ function normalizeProjectOperationalState(record: ProjectOperationalState): Proj
   };
 }
 
-function stateRecordMatchesQuery(record: ProjectOperationalState, query: ProjectOperationalStateQuery): boolean {
+function stateRecordMatchesQuery(
+  record: ProjectOperationalState,
+  query: ProjectOperationalStateQuery
+): boolean {
   if (query.projectId && record.project_id !== query.projectId) return false;
   if (query.tier && record.tier !== query.tier) return false;
   if (query.tenantSlug && (record.tenant_slug || 'shared') !== query.tenantSlug) return false;
@@ -181,45 +223,73 @@ function recursiveProjectStateFiles(dir: string): string[] {
 
 function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): string[] {
   if (query.projectId && query.tier) {
-    const pathHint = projectOperationalStatePath(query.projectId, query.tier, query.tenantSlug);
+    const pathHint = projectOperationalStatePath(
+      query.projectId,
+      query.tier,
+      query.tenantSlug,
+      query.rootDir
+    );
     if (safeExistsSync(pathHint)) return [pathHint];
   }
   if (query.projectId && query.tenantSlug && !query.tier) {
     const tiers: Array<ProjectOperationalState['tier']> = ['personal', 'confidential', 'public'];
     const direct = tiers
-      .map((tier) => projectOperationalStatePath(query.projectId!, tier, query.tenantSlug))
+      .map((tier) =>
+        projectOperationalStatePath(query.projectId!, tier, query.tenantSlug, query.rootDir)
+      )
       .filter((candidate) => safeExistsSync(candidate));
     if (direct.length > 0) return direct;
   }
-  return recursiveProjectStateFiles(STATE_ROOT);
+  return recursiveProjectStateFiles(
+    path.resolve(query.rootDir || pathResolver.rootDir(), 'active/projects')
+  );
 }
 
-export function saveProjectOperationalState(record: ProjectOperationalState): string {
+export function saveProjectOperationalState(
+  record: ProjectOperationalState,
+  options: { rootDir?: string } = {}
+): string {
   const normalized = normalizeProjectOperationalState(record);
   if (!validateProjectOperationalState(normalized)) {
-    const errors = (ensureValidator().errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+    const errors = (ensureValidator().errors || []).map(
+      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+    );
     throw new Error(`Invalid project operational state: ${errors.join('; ')}`);
   }
-  const filePath = projectOperationalStatePath(normalized.project_id, normalized.tier, normalized.tenant_slug);
+  const filePath = projectOperationalStatePath(
+    normalized.project_id,
+    normalized.tier,
+    normalized.tenant_slug,
+    options.rootDir
+  );
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(filePath, JSON.stringify(normalized, null, 2));
   return filePath;
 }
 
-export function loadProjectOperationalState(projectId: string, query: Omit<ProjectOperationalStateQuery, 'projectId'> = {}): ProjectOperationalState | null {
+export function loadProjectOperationalState(
+  projectId: string,
+  query: Omit<ProjectOperationalStateQuery, 'projectId'> = {}
+): ProjectOperationalState | null {
   const files = projectStateFilesForQuery({ projectId, ...query });
   for (const filePath of files) {
     const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
     const parsed = JSON.parse(raw) as ProjectOperationalState;
-    if (validateProjectOperationalState(parsed) && parsed.project_id === projectId && stateRecordMatchesQuery(parsed, { projectId, ...query })) {
+    if (
+      validateProjectOperationalState(parsed) &&
+      parsed.project_id === projectId &&
+      stateRecordMatchesQuery(parsed, { projectId, ...query })
+    ) {
       return parsed;
     }
   }
   return null;
 }
 
-export function listProjectOperationalStates(query: ProjectOperationalStateQuery = {}): ProjectOperationalState[] {
+export function listProjectOperationalStates(
+  query: ProjectOperationalStateQuery = {}
+): ProjectOperationalState[] {
   const files = projectStateFilesForQuery(query);
   const states: ProjectOperationalState[] = [];
   for (const filePath of files) {
@@ -240,12 +310,17 @@ export function listProjectOperationalStates(query: ProjectOperationalStateQuery
   });
 }
 
-export function listProjectOperationalStatePaths(query: ProjectOperationalStateQuery = {}): string[] {
+export function listProjectOperationalStatePaths(
+  query: ProjectOperationalStateQuery = {}
+): string[] {
   return projectStateFilesForQuery(query).sort();
 }
 
-
-function readProjectStateIfExists(projectId: string, tier: ProjectOperationalState['tier'], tenantSlug?: string): ProjectOperationalState | null {
+function readProjectStateIfExists(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string
+): ProjectOperationalState | null {
   const statePath = projectOperationalStatePath(projectId, tier, tenantSlug);
   if (!safeExistsSync(statePath)) return null;
   try {
@@ -274,9 +349,19 @@ function listProjectStateFiles(rootDir: string): string[] {
   return files;
 }
 
-function loadAllProjectStateRecords(projectId: string): Array<{ tier: ProjectOperationalState['tier']; tenant_slug?: string; record: ProjectOperationalState }> {
+function loadAllProjectStateRecords(
+  projectId: string
+): Array<{
+  tier: ProjectOperationalState['tier'];
+  tenant_slug?: string;
+  record: ProjectOperationalState;
+}> {
   const files = listProjectStateFiles(STATE_ROOT);
-  const records: Array<{ tier: ProjectOperationalState['tier']; tenant_slug?: string; record: ProjectOperationalState }> = [];
+  const records: Array<{
+    tier: ProjectOperationalState['tier'];
+    tenant_slug?: string;
+    record: ProjectOperationalState;
+  }> = [];
   for (const filePath of files) {
     try {
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
@@ -293,15 +378,21 @@ function loadAllProjectStateRecords(projectId: string): Array<{ tier: ProjectOpe
 function collectSourceRefs(input: ProjectOperationalStateMissionContext): string[] {
   const refs = new Set<string>();
   refs.add(`mission:${input.mission_id}`);
-  if (input.relationships?.project?.project_id) refs.add(`project:${input.relationships.project.project_id}`);
-  if (input.relationships?.project?.project_path) refs.add(`project_path:${input.relationships.project.project_path}`);
+  if (input.relationships?.project?.project_id)
+    refs.add(`project:${input.relationships.project.project_id}`);
+  if (input.relationships?.project?.project_path)
+    refs.add(`project_path:${input.relationships.project.project_path}`);
   if (input.relationships?.track?.track_id) refs.add(`track:${input.relationships.track.track_id}`);
-  if (input.context?.mission_finish_trace_persisted_path) refs.add(`trace:${input.context.mission_finish_trace_persisted_path}`);
-  if (input.context?.distill_output_path) refs.add(`knowledge:${input.context.distill_output_path}`);
+  if (input.context?.mission_finish_trace_persisted_path)
+    refs.add(`trace:${input.context.mission_finish_trace_persisted_path}`);
+  if (input.context?.distill_output_path)
+    refs.add(`knowledge:${input.context.distill_output_path}`);
   return [...refs];
 }
 
-function dedupeSources(sources: ProjectOperationalState['sources'] = []): ProjectOperationalState['sources'] {
+function dedupeSources(
+  sources: ProjectOperationalState['sources'] = []
+): ProjectOperationalState['sources'] {
   const seen = new Set<string>();
   const next: NonNullable<ProjectOperationalState['sources']> = [];
   for (const source of sources) {
@@ -312,7 +403,9 @@ function dedupeSources(sources: ProjectOperationalState['sources'] = []): Projec
   return next;
 }
 
-export function syncProjectOperationalStateFromMission(input: ProjectOperationalStateMissionContext): string | null {
+export function syncProjectOperationalStateFromMission(
+  input: ProjectOperationalStateMissionContext
+): string | null {
   const projectId = input.relationships?.project?.project_id?.trim();
   if (!projectId) return null;
   const tenantSlug = (input.tenant_slug || input.tenant_id || 'shared').trim() || 'shared';
@@ -320,23 +413,29 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
   const projectPath = input.relationships?.project?.project_path?.trim();
   const relationships = input.relationships || {};
 
-  const projectState = readProjectStateIfExists(projectId, input.tier, tenantSlug) || {
-    project_id: projectId,
-    name: existingProject?.name || projectId,
-    summary: existingProject?.summary || relationships.project?.note || input.outcome_contract?.requested_result || `Operational state for ${projectId}`,
-    status: 'active',
-    tier: input.tier,
-    tenant_slug: tenantSlug,
-    project_path: projectPath,
-    active_track_ids: [],
-    active_mission_ids: [],
-    active_task_session_ids: [],
-    source_refs: [],
-    sources: [],
-    distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
-    knowledge_refs: [],
-    updated_at: new Date().toISOString(),
-  } satisfies ProjectOperationalState;
+  const projectState =
+    readProjectStateIfExists(projectId, input.tier, tenantSlug) ||
+    ({
+      project_id: projectId,
+      name: existingProject?.name || projectId,
+      summary:
+        existingProject?.summary ||
+        relationships.project?.note ||
+        input.outcome_contract?.requested_result ||
+        `Operational state for ${projectId}`,
+      status: 'active',
+      tier: input.tier,
+      tenant_slug: tenantSlug,
+      project_path: projectPath,
+      active_track_ids: [],
+      active_mission_ids: [],
+      active_task_session_ids: [],
+      source_refs: [],
+      sources: [],
+      distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
+      knowledge_refs: [],
+      updated_at: new Date().toISOString(),
+    } satisfies ProjectOperationalState);
 
   const missionLinkPath = saveProjectMissionLink({
     project_id: projectId,
@@ -344,9 +443,15 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
     tenant_slug: tenantSlug,
     mission_id: input.mission_id,
     relationship_type: relationships.project?.relationship_type || 'independent',
-    summary: relationships.project?.note || input.outcome_contract?.requested_result || input.mission_type || 'mission',
+    summary:
+      relationships.project?.note ||
+      input.outcome_contract?.requested_result ||
+      input.mission_type ||
+      'mission',
     status: input.status,
-    evidence_refs: input.context?.mission_finish_trace_persisted_path ? [input.context.mission_finish_trace_persisted_path] : [],
+    evidence_refs: input.context?.mission_finish_trace_persisted_path
+      ? [input.context.mission_finish_trace_persisted_path]
+      : [],
   });
 
   const trackId = relationships.track?.track_id?.trim();
@@ -358,14 +463,23 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
       track_id: trackId,
       name: relationships.track?.track_name || trackId,
       summary: relationships.track?.note || relationships.track?.track_name || trackId,
-      status: input.status === 'archived' ? 'archived' : input.status === 'completed' ? 'completed' : input.status === 'paused' ? 'paused' : 'active',
+      status:
+        input.status === 'archived'
+          ? 'archived'
+          : input.status === 'completed'
+            ? 'completed'
+            : input.status === 'paused'
+              ? 'paused'
+              : 'active',
       lifecycle_model: relationships.track?.lifecycle_model,
       required_artifacts: [],
       active_mission_ids: input.status === 'archived' ? [] : [input.mission_id],
     });
   }
 
-  const allStates = loadAllProjectStateRecords(projectId).filter((entry) => entry.record.tenant_slug === tenantSlug && entry.tier === input.tier);
+  const allStates = loadAllProjectStateRecords(projectId).filter(
+    (entry) => entry.record.tenant_slug === tenantSlug && entry.tier === input.tier
+  );
   const projectStateDirPath = projectOperationalStateDir(projectId, input.tier, tenantSlug);
   const missionStates: Array<{ record: ProjectOperationalState }> = allStates;
   const activeMissionIds = new Set<string>();
@@ -392,13 +506,14 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
   const knowledgeRefs = new Set<string>(projectState.knowledge_refs || []);
   const distillTarget = `knowledge/product/evolution/projects/${projectId}/project-state.md`;
   const distillTargets = new Set<string>(projectState.distill_targets || [distillTarget]);
-  if (input.context?.mission_finish_trace_persisted_path) knowledgeRefs.add(input.context.mission_finish_trace_persisted_path);
+  if (input.context?.mission_finish_trace_persisted_path)
+    knowledgeRefs.add(input.context.mission_finish_trace_persisted_path);
   if (input.context?.distill_output_path) knowledgeRefs.add(input.context.distill_output_path);
 
   const nextStatus: ProjectOperationalState['status'] =
     activeMissionIds.size > 0
       ? 'active'
-      : (existingProject?.status || projectState.status || 'paused');
+      : existingProject?.status || projectState.status || 'paused';
 
   const nextState: ProjectOperationalState = {
     ...projectState,
@@ -414,29 +529,50 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
     active_task_session_ids: projectState.active_task_session_ids || [],
     source_refs: [...sourceRefs].sort(),
     sources: dedupeSources([
-      ...(projectState.sources || []).filter((entry) => entry.ref !== `mission:${input.mission_id}` && entry.ref !== `track:${trackId || ''}`),
+      ...(projectState.sources || []).filter(
+        (entry) =>
+          entry.ref !== `mission:${input.mission_id}` && entry.ref !== `track:${trackId || ''}`
+      ),
       {
         kind: 'mission' as const,
         ref: `mission:${input.mission_id}`,
-        summary: input.relationships?.project?.note || input.outcome_contract?.requested_result || input.mission_type || 'mission',
+        summary:
+          input.relationships?.project?.note ||
+          input.outcome_contract?.requested_result ||
+          input.mission_type ||
+          'mission',
         captured_at: new Date().toISOString(),
       },
-      ...(trackId ? [{
-        kind: 'track' as const,
-        ref: `track:${trackId}`,
-        summary: input.relationships?.track?.note || input.relationships?.track?.track_name || trackId,
-        captured_at: new Date().toISOString(),
-      }] : []),
-      ...(input.context?.distill_output_path ? [{
-        kind: 'artifact' as const,
-        ref: `knowledge:${input.context.distill_output_path}`,
-        summary: 'Distilled knowledge output',
-        captured_at: new Date().toISOString(),
-      }] : []),
+      ...(trackId
+        ? [
+            {
+              kind: 'track' as const,
+              ref: `track:${trackId}`,
+              summary:
+                input.relationships?.track?.note ||
+                input.relationships?.track?.track_name ||
+                trackId,
+              captured_at: new Date().toISOString(),
+            },
+          ]
+        : []),
+      ...(input.context?.distill_output_path
+        ? [
+            {
+              kind: 'artifact' as const,
+              ref: `knowledge:${input.context.distill_output_path}`,
+              summary: 'Distilled knowledge output',
+              captured_at: new Date().toISOString(),
+            },
+          ]
+        : []),
     ]),
     distill_targets: [...distillTargets].sort(),
     knowledge_refs: [...knowledgeRefs].sort(),
-    last_distilled_at: input.status === 'completed' || input.status === 'archived' ? new Date().toISOString() : projectState.last_distilled_at,
+    last_distilled_at:
+      input.status === 'completed' || input.status === 'archived'
+        ? new Date().toISOString()
+        : projectState.last_distilled_at,
     updated_at: new Date().toISOString(),
     metadata: {
       ...(projectState.metadata || {}),

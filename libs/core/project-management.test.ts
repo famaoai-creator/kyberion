@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeReaddir,
+  safeRmSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   bootstrapManagedProject,
   createManagedProject,
@@ -11,6 +17,7 @@ import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
 
 const PROJECT_ID = 'PRJ-PMC-TEST-001';
 const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
+const CALLBACK_ROOT = pathResolver.sharedTmp('project-management-callback-test');
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 
@@ -25,10 +32,11 @@ function cleanup(): void {
   cleanupJsonFiles(pathResolver.shared('runtime/projects'), 'PRJ-PMC-TEST-');
   cleanupJsonFiles(pathResolver.shared('runtime/task-sessions'), 'TSK-PMC-TEST-');
   cleanupJsonFiles(pathResolver.shared('runtime/mission-seeds'), 'MSD-PMC-TEST-');
+  safeRmSync(CALLBACK_ROOT, { recursive: true, force: true });
   const workspace = pathResolver.projectWorkspaceDir(
     BOOTSTRAP_PROJECT_ID,
     'confidential',
-    'shared'
+    'tenant-pmc-test'
   );
   if (safeExistsSync(workspace)) safeRmSync(workspace);
 }
@@ -115,5 +123,33 @@ describe('project-management facade', () => {
     expect(safeExistsSync(`${result.project.project_os_path}/README.md`)).toBe(true);
     expect(result.mission_seed_ids.length).toBeGreaterThan(0);
     expect(result.kickoff_task_session.project_context?.project_id).toBe(BOOTSTRAP_PROJECT_ID);
+  });
+
+  it('runs the rollback hook when the commit callback fails after a partial write', () => {
+    const marker = `${CALLBACK_ROOT}/partial-callback.txt`;
+    let rollbackCalled = false;
+
+    expect(() =>
+      bootstrapManagedProject({
+        project_id: 'PRJ-PMC-TEST-CALLBACK',
+        name: 'Callback Rollback Test',
+        summary: 'The callback contract must compensate partial writes.',
+        tier: 'confidential',
+        tenant_slug: 'tenant-pmc-test',
+        rootDir: CALLBACK_ROOT,
+        onCommit: () => {
+          safeWriteFile(marker, 'partial');
+          throw new Error('callback failed');
+        },
+        onRollback: () => {
+          rollbackCalled = true;
+          safeUnlinkSync(marker);
+        },
+      })
+    ).toThrow('callback failed');
+
+    expect(rollbackCalled).toBe(true);
+    expect(safeExistsSync(marker)).toBe(false);
+    expect(loadProjectRecord('PRJ-PMC-TEST-CALLBACK', { rootDir: CALLBACK_ROOT })).toBeNull();
   });
 });
