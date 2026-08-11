@@ -155,8 +155,14 @@ export function openAlignmentApproval(
 }
 
 function findPendingAlignmentApproval(missionId: string): ApprovalRequestRecord | undefined {
-  return listApprovalRequests({ kind: 'mission_gate', status: 'pending' }).find(
-    (record) => record.source?.missionId?.toUpperCase() === missionId
+  return listApprovalRequests({
+    storageChannels: [ALIGNMENT_APPROVAL_CHANNEL],
+    kind: 'mission_gate',
+    status: 'pending',
+  }).find(
+    (record) =>
+      record.source?.missionId?.toUpperCase() === missionId &&
+      record.correlationId === `mission-alignment-${missionId}`
   );
 }
 

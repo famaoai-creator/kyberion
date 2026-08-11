@@ -77,16 +77,29 @@
     </section>
 
     <section class="card" aria-labelledby="screen-heading">
-      <h2 id="screen-heading">共有画面と指示語</h2>
+      <h2 id="screen-heading" data-i18n="screen.title"></h2>
       <div class="actions">
-        <button id="capture-button" class="secondary" type="button">画面を取り込む</button>
-        <button id="resolve-button" class="primary" type="button">指示語を解決</button>
+        <button
+          id="capture-button"
+          class="secondary"
+          type="button"
+          data-i18n="screen.capture"
+        ></button>
+        <button
+          id="resolve-button"
+          class="primary"
+          type="button"
+          data-i18n="screen.resolve"
+        ></button>
       </div>
       <p id="capture-status" class="ai-status" aria-live="polite"></p>
-      <p class="hint">
-        フレームは端末内でOCRされ、PII除去後のテキストだけがこのパネルに戻ります。画像はセッション終了時に破棄されます。
-      </p>
-      <pre id="screen-context" class="output" aria-label="画面から抽出したテキスト" hidden></pre>
+      <p class="hint" data-i18n="screen.hint"></p>
+      <pre
+        id="screen-context"
+        class="output"
+        data-i18n-aria-label="screen.contextLabel"
+        hidden
+      ></pre>
       <p id="resolve-status" class="ai-status" aria-live="polite"></p>
       <div id="resolve-output" class="output-block" hidden></div>
     </section>
@@ -96,6 +109,7 @@
       <pre id="transcript-output" class="output" aria-label="直近の字幕"></pre>
     </section>
 
+    <script src="locale.js"></script>
     <script src="pii-rules.generated.js"></script>
     <script src="meeting-ai.js"></script>
     <script src="sidepanel.js"></script>

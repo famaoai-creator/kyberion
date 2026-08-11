@@ -13,6 +13,8 @@
 (function installKyberionMeetingAi(global) {
   'use strict';
 
+  const meetT = global.KyberionMeetLocale?.t || ((key) => key);
+
   const MAX_INPUT_CHARS = 30_000;
   const PROMPT_INPUTS = [{ type: 'text', languages: ['en', 'ja'] }];
   const PROMPT_OUTPUTS = [{ type: 'text', languages: ['ja'] }];
@@ -447,10 +449,10 @@
    */
   async function resolveReferences({ transcript, screenContext, onProgress } = {}) {
     const source = normalizeTranscript(transcript, 12_000);
-    if (!source.text) throw new Error('指示語を解決する字幕がまだありません。');
+    if (!source.text) throw new Error(meetT('ai.referenceInputMissing'));
     const screen = scrubInput(screenContext, 8_000);
     if (!screen) {
-      throw new Error('画面から抽出したテキストがありません。先に画面を取り込んでください。');
+      throw new Error(meetT('ai.referenceScreenMissing'));
     }
     const session = await createPromptSession(onProgress);
     if (!session) throw unavailableError('Prompt API');
@@ -458,9 +460,9 @@
     try {
       const response = await session.prompt(
         [
-          '直近の発言に含まれる指示語（これ・それ・ここ・あちら など）が、共有画面上のどの項目を指しているか推定してください。',
-          '画面テキストに対応が見つからない指示語は返さないでください。項目名を推測で作らないでください。',
-          'evidence には、根拠にした画面テキストの該当箇所をそのまま入れてください。',
+          meetT('ai.referencePrompt1'),
+          meetT('ai.referencePrompt2'),
+          meetT('ai.referencePrompt3'),
           UNTRUSTED_NOTE,
           '<screen-text>',
           screen,
@@ -471,7 +473,7 @@
         ].join('\n'),
         { responseConstraint: REFERENCE_SCHEMA }
       );
-      const parsed = parseJsonResponse(response, '指示語解決');
+      const parsed = parseJsonResponse(response, meetT('ai.referenceParseLabel'));
       return {
         provider: 'chrome-prompt',
         references: Array.isArray(parsed.references)
