@@ -339,6 +339,8 @@ async function executeMeetingPipeline(
       apply: async (op, rawParams, context) => {
         const params = resolveMeetingParams(rawParams, context) as Record<string, any>;
         const missionId = String(params.mission_id || process.env.MISSION_ID || '');
+        const workItemId =
+          String(params.work_item_id || context.work_item_id || '').trim() || undefined;
         switch (op) {
           case 'join':
           case 'leave':
@@ -396,6 +398,7 @@ async function executeMeetingPipeline(
                   : undefined;
             const result = await extractActionItemsOp({
               mission_id: missionId,
+              ...(workItemId ? { work_item_id: workItemId } : {}),
               transcript,
               attendees,
               ...(params.operator_label ? { operator_label: String(params.operator_label) } : {}),
@@ -416,6 +419,8 @@ async function executeMeetingPipeline(
               context,
               params,
               await generateFacilitationScriptOp({
+                ...(missionId ? { mission_id: missionId } : {}),
+                ...(workItemId ? { work_item_id: workItemId } : {}),
                 agenda: Array.isArray(params.agenda) ? params.agenda.map(String) : undefined,
                 ...(params.current_topic ? { current_topic: String(params.current_topic) } : {}),
                 ...(params.recent_transcript_chunk
@@ -441,6 +446,8 @@ async function executeMeetingPipeline(
               params,
               await generateReminderMessageOp({
                 item: item as any,
+                ...(missionId ? { mission_id: missionId } : {}),
+                ...(workItemId ? { work_item_id: workItemId } : {}),
                 ...(params.days_overdue !== undefined
                   ? { days_overdue: Number(params.days_overdue) }
                   : {}),
@@ -454,6 +461,7 @@ async function executeMeetingPipeline(
             if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
             const result = await executeSelfActionItemsOp({
               mission_id: missionId,
+              ...(workItemId ? { work_item_id: workItemId } : {}),
               language: String(params.language || 'ja'),
             });
             if (params.output_path) {
@@ -468,6 +476,7 @@ async function executeMeetingPipeline(
             if (!missionId) throw new Error('track_pending_action_items: mission_id is required');
             const result = await trackPendingActionItemsOp({
               mission_id: missionId,
+              ...(workItemId ? { work_item_id: workItemId } : {}),
               tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
               language: String(params.language || 'ja'),
               max_items: Number(params.max_items || 20),
