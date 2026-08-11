@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Onboarding first work",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "kind",
+    "work_id",
+    "customer_slug",
+    "tenant_slug",
+    "organization_id",
+    "tier",
+    "intent",
+    "work_shape",
+    "management_unit",
+    "human_decision",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "kind": { "const": "onboarding_first_work" },
+    "work_id": { "type": "string", "pattern": "^ONB-WORK-[A-Fa-f0-9]{16}$" },
+    "customer_slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "organization_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "tier": { "enum": ["personal", "confidential", "public"] },
+    "intent": { "type": "string", "minLength": 1 },
+    "work_shape": {
+      "enum": [
+        "solution_project",
+        "service_operation",
+        "routine_operation",
+        "incident_response",
+        "governance_cadence",
+        "improvement_experiment"
+      ]
+    },
+    "management_unit": {
+      "enum": ["project", "service", "operation", "incident", "cadence", "experiment"]
+    },
+    "management_unit_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "work_item_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "human_decision": { "enum": ["accepted", "corrected"] },
+    "status": { "enum": ["active", "completed", "blocked"] },
+    "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

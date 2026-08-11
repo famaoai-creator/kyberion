@@ -49,6 +49,15 @@ function isTestFile(repoRelativePath: string): boolean {
   );
 }
 
+function isGeneratedFile(repoRelativePath: string): boolean {
+  const segments = repoRelativePath.split('/');
+  return (
+    segments.some((segment) =>
+      new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
+    ) || repoRelativePath.endsWith('/next-env.d.ts')
+  );
+}
+
 function emptyBucket(): RatchetBucket {
   return {
     any_keywords: 0,
@@ -105,6 +114,7 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
     for (const file of getAllFiles(absRoot)) {
       if (!/\.[cm]?[jt]sx?$/.test(file) || file.endsWith('.d.ts')) continue;
       const repoRelativePath = path.relative(ROOT, file).split(path.sep).join('/');
+      if (isGeneratedFile(repoRelativePath)) continue;
       const counts = countFile(file, repoRelativePath);
       if (isTestFile(repoRelativePath)) {
         incrementBucket(test, counts);

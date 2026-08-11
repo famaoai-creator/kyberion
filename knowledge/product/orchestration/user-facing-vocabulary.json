@@ -3,6 +3,88 @@
   "default_locale": "en",
   "required_locales": ["en", "ja", "qps-ploc"],
   "domains": {
+    "organization": {
+      "organization_resolution_reason_incident": {
+        "en": "The request contains terms associated with incident or emergency response.",
+        "ja": "障害または緊急対応に関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñŧȧïñş ŧėřɱş ȧşşőƈïȧŧėḓ ẇïŧħ ïñƈïḓėñŧ őř ėɱėřɠėñƈẏ řėşṗőñşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "organization_resolution_reason_governance": {
+        "en": "The request concerns organizational decisions, approvals, or recurring governance.",
+        "ja": "組織判断、承認、または定例ガバナンスに関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñƈėřñş őřɠȧñïẑȧŧïőñȧŀ ḓėƈïşïőñş, ȧṗṗřőṽȧŀş, őř řėƈůřřïñɠ ɠőṽėřñȧñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "organization_resolution_reason_routine": {
+        "en": "The request contains terms associated with recurring or scheduled operations.",
+        "ja": "反復または定期運用に関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñŧȧïñş ŧėřɱş ȧşşőƈïȧŧėḓ ẇïŧħ řėƈůřřïñɠ őř şƈħėḓůŀėḓ őṗėřȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "organization_resolution_reason_service": {
+        "en": "The request concerns an ongoing service or support capability.",
+        "ja": "継続的なサービスまたはサポートに関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñƈėřñş ȧñ őñɠőïñɠ şėřṽïƈė őř şůṗṗőřŧ ƈȧṗȧƀïŀïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "organization_resolution_reason_experiment": {
+        "en": "The request contains terms associated with improvement or experimentation.",
+        "ja": "改善または実験に関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñŧȧïñş ŧėřɱş ȧşşőƈïȧŧėḓ ẇïŧħ ïɱṗřőṽėɱėñŧ őř ėẋṗėřïɱėñŧȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "organization_resolution_reason_project": {
+        "en": "The request contains terms associated with building or launching a deliverable.",
+        "ja": "成果物の構築または導入に関する依頼として分類しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőñŧȧïñş ŧėřɱş ȧşşőƈïȧŧėḓ ẇïŧħ ƀůïŀḓïñɠ őř ŀȧůñƈħïñɠ ȧ ḓėŀïṽėřȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "organization_resolution_reason_fallback_project": {
+        "en": "The standard intent suggests starting a solution project.",
+        "ja": "標準インテントからソリューションプロジェクトの開始候補として分類しました。",
+        "qps-ploc": "⟦Ŧħė şŧȧñḓȧřḓ ïñŧėñŧ şůɠɠėşŧş şŧȧřŧïñɠ ȧ şőŀůŧïőñ ṗřőĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "organization_resolution_reason_fallback_service": {
+        "en": "The standard intent suggests a task-session service operation.",
+        "ja": "標準インテントからタスクセッション型のサービス運用候補として分類しました。",
+        "qps-ploc": "⟦Ŧħė şŧȧñḓȧřḓ ïñŧėñŧ şůɠɠėşŧş ȧ ŧȧşķ-şėşşïőñ şėřṽïƈė őṗėřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "organization_resolution_reason_fallback_routine": {
+        "en": "No clear classification term was found, so the request is provisionally treated as routine operation.",
+        "ja": "明確な分類語がないため、定常運用候補として仮置きしました。",
+        "qps-ploc": "⟦Ñő ƈŀėȧř ƈŀȧşşïƒïƈȧŧïőñ ŧėřɱ ẇȧş ƒőůñḓ, şő ŧħė řėɋůėşŧ ïş ṗřőṽïşïőñȧŀŀẏ ŧřėȧŧėḓ ȧş řőůŧïñė őṗėřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "organization_resolution_parent_question": {
+        "en": "Would you like to specify {parent}?",
+        "ja": "{parent} を指定しますか？",
+        "qps-ploc": "⟦Ẇőůŀḓ ẏőů ŀïķė ŧő şṗėƈïƒẏ {parent}? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "organization_resolution_confirmation_question": {
+        "en": "Would you like a human to confirm or correct this classification?",
+        "ja": "この分類を人間が確認または修正しますか？",
+        "qps-ploc": "⟦Ẇőůŀḓ ẏőů ŀïķė ȧ ħůɱȧñ ŧő ƈőñƒïřɱ őř ƈőřřėƈŧ ŧħïş ƈŀȧşşïƒïƈȧŧïőñ? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "organization_resolution_approval_question": {
+        "en": "Should the accountable owner approve this before execution?",
+        "ja": "実行前に責任者の承認を取得しますか？",
+        "qps-ploc": "⟦Şħőůŀḓ ŧħė ȧƈƈőůñŧȧƀŀė őẇñėř ȧṗṗřőṽė ŧħïş ƀėƒőřė ėẋėƈůŧïőñ? ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "organization_resolution_context_adopted": {
+        "en": "The supplied context was adopted as the proposed parent.",
+        "ja": "入力されたコンテキストを親候補として採用しました。",
+        "qps-ploc": "⟦Ŧħė şůṗṗŀïėḓ ƈőñŧėẋŧ ẇȧş ȧḓőṗŧėḓ ȧş ŧħė ṗřőṗőşėḓ ṗȧřėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "organization_resolution_standard_intent": {
+        "en": "The standard intent {intent} was referenced.",
+        "ja": "標準インテント {intent} を参照しました。",
+        "qps-ploc": "⟦Ŧħė şŧȧñḓȧřḓ ïñŧėñŧ {intent} ẇȧş řėƒėřėñƈėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "organization_resolution_no_standard_intent": {
+        "en": "No standard intent was selected.",
+        "ja": "標準インテントの確定候補はありません。",
+        "qps-ploc": "⟦Ñő şŧȧñḓȧřḓ ïñŧėñŧ ẇȧş şėŀėƈŧėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "organization_resolution_proposal_notice": {
+        "en": "This result only proposes an organizational management unit; it does not execute work or change state.",
+        "ja": "この結果は組織の管理単位を提案するだけで、実行や状態変更は行いません。",
+        "qps-ploc": "⟦Ŧħïş řėşůŀŧ őñŀẏ ṗřőṗőşėş ȧñ őřɠȧñïẑȧŧïőñȧŀ ɱȧñȧɠėɱėñŧ ůñïŧ; ïŧ ḓőėş ñőŧ ėẋėƈůŧė ẇőřķ őř ƈħȧñɠė şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      }
+    },
     "chronos": {
       "chronos_a2a_handoff_trail": {
         "en": "A2A Handoff Trail",

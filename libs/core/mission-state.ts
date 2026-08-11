@@ -178,8 +178,26 @@ export function calculateRequiredTier(
   return currentTier;
 }
 
-export function loadState(id: string): MissionState | null {
-  const missionPath = findMissionPath(id);
+function customMissionSearchDirs(rootDir: string): string[] {
+  return [
+    path.join(rootDir, 'knowledge/personal/missions'),
+    path.join(rootDir, 'active/missions/confidential'),
+    path.join(rootDir, 'active/missions/public'),
+  ];
+}
+
+function findMissionPathAtRoot(id: string, rootDir: string): string | null {
+  for (const directory of customMissionSearchDirs(rootDir)) {
+    const candidate = path.join(directory, id);
+    if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) return candidate;
+  }
+  return null;
+}
+
+export function loadState(id: string, options: { rootDir?: string } = {}): MissionState | null {
+  const missionPath = options.rootDir
+    ? findMissionPathAtRoot(id, options.rootDir)
+    : findMissionPath(id);
   if (!missionPath) return null;
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
@@ -225,7 +243,8 @@ export function checkDependencies(missionId: string): { ok: boolean; missing: st
   return { ok: missing.length === 0, missing };
 }
 
-export function getActiveMissionSearchDirs(): string[] {
+export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): string[] {
+  if (rootDir !== pathResolver.rootDir()) return customMissionSearchDirs(rootDir);
   const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
   if (safeExistsSync(configPath)) {
     try {
@@ -241,9 +260,11 @@ export function getActiveMissionSearchDirs(): string[] {
   return [pathResolver.active('missions')];
 }
 
-export function listMissionsInSearchDirs(): Array<{ missionId: string; missionPath: string }> {
+export function listMissionsInSearchDirs(
+  options: { rootDir?: string } = {}
+): Array<{ missionId: string; missionPath: string }> {
   const missions: Array<{ missionId: string; missionPath: string }> = [];
-  for (const dir of getActiveMissionSearchDirs()) {
+  for (const dir of getActiveMissionSearchDirs(options.rootDir)) {
     if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
     try {
       for (const entry of safeReaddir(dir)) {
@@ -264,9 +285,11 @@ export function listMissionsInSearchDirs(): Array<{ missionId: string; missionPa
   return missions;
 }
 
-export function listActiveMissions(): Array<{ missionId: string; missionPath: string }> {
-  return listMissionsInSearchDirs().filter(
-    ({ missionId }) => loadState(missionId)?.status === 'active'
+export function listActiveMissions(
+  options: { rootDir?: string } = {}
+): Array<{ missionId: string; missionPath: string }> {
+  return listMissionsInSearchDirs(options).filter(
+    ({ missionId }) => loadState(missionId, options)?.status === 'active'
   );
 }
 

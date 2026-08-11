@@ -61,6 +61,10 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
   - `knowledge/personal/connections/*.json`: Stores approved service connection drafts.
   - `knowledge/personal/tenants/*.json`: Stores tenant profiles entered during onboarding.
   - `knowledge/personal/onboarding/tutorial-plan.md`: Records the first tutorial plan.
+- **Post-onboarding context binding**: When a customer overlay and tenant are available, resolve
+  `customer_slug → tenant_slug → organization_id` with
+  `pnpm onboarding:context bind --customer-slug <customer> --tenant-slug <tenant> --dry-run`.
+  Apply only after review with `--apply`; this creates or reuses the governed organization state.
 - **Effect**: The ecosystem aligns its autonomy with the Sovereign's personality.
 
 ### Stage 4: Sensory & Re-configuration Options (任意・いつでも呼び出し可能)
@@ -75,6 +79,7 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
 2. **Operational Status**: `pnpm onboard:apply` returns `status: "complete"` after persisting the onboarding state.
 3. **Identity Alignment**: `my-identity.json`, `my-vision.md`, and `agent-identity.json` all exist in the Personal Tier.
 4. **Onboarding Summary**: `onboarding/onboarding-state.json` and `onboarding/onboarding-summary.md` are persisted.
+5. **Operating Context**: Customer organizations have a reviewed context binding before first work is routed.
 
 ## Related Documents
 
