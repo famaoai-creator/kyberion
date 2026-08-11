@@ -37,6 +37,7 @@ import {
 } from '@agent/core';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
+export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
 
 export type AlignmentDecisionVerdict =
   | 'approved'
@@ -82,8 +83,13 @@ function readBriefHash(briefPath: string): string | undefined {
  * approval after a `changes` round supersedes the earlier rejected one.
  */
 function findAlignmentRequest(missionId: string): ApprovalRequestRecord | undefined {
-  return listApprovalRequests({ kind: 'mission_gate' }).find(
-    (record) => record.source?.missionId?.toUpperCase() === missionId
+  return listApprovalRequests({
+    storageChannels: [ALIGNMENT_APPROVAL_CHANNEL],
+    kind: 'mission_gate',
+  }).find(
+    (record) =>
+      record.source?.missionId?.toUpperCase() === missionId &&
+      record.correlationId === `mission-alignment-${missionId}`
   );
 }
 

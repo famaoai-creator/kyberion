@@ -45,6 +45,8 @@ function approvalRecord(overrides: Record<string, unknown> = {}): FakeApprovalRe
     id: 'apr-1',
     kind: 'mission_gate',
     status: 'approved',
+    storageChannel: 'brief',
+    correlationId: `mission-alignment-${MISSION_ID}`,
     requestedAt: '2026-08-03T00:00:00.000Z',
     decidedAt: '2026-08-03T01:00:00.000Z',
     decidedBy: 'sovereign',
@@ -133,6 +135,21 @@ describe('mission_alignment_decision', () => {
     ]);
     const report = assessAlignmentDecision(MISSION_ID);
     expect(report.verdict).toBe('no_request');
+  });
+
+  it('ignores another mission_gate in the same mission but outside the alignment channel', () => {
+    mocks.listApprovalRequests.mockReturnValue([
+      approvalRecord({
+        storageChannel: 'terminal',
+        correlationId: `entity-governance-cleanup-${MISSION_ID}`,
+      }),
+    ]);
+    const report = assessAlignmentDecision(MISSION_ID);
+    expect(report.verdict).toBe('no_request');
+    expect(mocks.listApprovalRequests).toHaveBeenCalledWith({
+      storageChannels: ['brief'],
+      kind: 'mission_gate',
+    });
   });
 
   it('reports no_mission when the mission directory is absent', () => {

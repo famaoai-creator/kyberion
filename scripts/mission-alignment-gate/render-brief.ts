@@ -59,7 +59,13 @@ export interface MissionBrief {
   lifecycleModel?: string;
 }
 
-const HTML_ESCAPES: Record<string, string> = { '<': '&lt;', '>': '&gt;', '&': '&amp;' };
+const HTML_ESCAPES: Record<string, string> = {
+  '<': '&lt;',
+  '>': '&gt;',
+  '&': '&amp;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
 const esc = (s: unknown) =>
   String(s == null ? '' : s).replace(/[<>&]/g, (c) => HTML_ESCAPES[c] ?? c);
 const li = (arr: string[] | undefined) =>
@@ -269,7 +275,7 @@ function renderGateSection(
     const label =
       approval.status === 'approved' ? `✅ ${esc(m.approved)}` : `⛔ ${esc(approval.status)}`;
     const how = approval.decidedAuthMethod ? ` (auth: ${esc(approval.decidedAuthMethod)})` : '';
-    return `<div id="mg-gate" data-decision="${esc(approval.status)}">
+    return `<div id="mg-gate" data-decision="${esc(approval.status)}" data-decided-by="${esc(approval.decidedBy || '')}" data-decided-at="${esc(approval.decidedAt || '')}">
     <span id="mg-status">${label} — ${esc(approval.decidedBy || '?')} / ${esc(approval.decidedAt || '')} ${how}<br>${esc(m.settled)}</span>
   </div>`;
   }

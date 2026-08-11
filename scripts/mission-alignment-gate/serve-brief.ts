@@ -71,8 +71,10 @@ function readBrief(): MissionBrief {
  * reflects the store — including a decision just made on another surface.
  */
 function currentApproval(): ApprovalRequestRecord | undefined {
-  return listApprovalRequests({ kind: 'mission_gate' }).find(
-    (record) => record.source?.missionId?.toUpperCase() === missionId
+  return listApprovalRequests({ storageChannels: [ALIGNMENT_CHANNEL], kind: 'mission_gate' }).find(
+    (record) =>
+      record.source?.missionId?.toUpperCase() === missionId &&
+      record.correlationId === `mission-alignment-${missionId}`
   );
 }
 
