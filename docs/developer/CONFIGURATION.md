@@ -276,7 +276,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (157)
+## runtime (158)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -384,6 +384,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_REASONING_PROFILE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_REASONING_ROLE_`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_REASONING_ROLE_SUBAGENT`             | string | no       | _undocumented_                                                                                          |
+| `KYBERION_REHYDRATE_ITEM`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_REMINDER_CC_AFTER_N`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_REMOVED`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_ACTIONS_POLICY`           | string | no       | _undocumented_                                                                                          |
