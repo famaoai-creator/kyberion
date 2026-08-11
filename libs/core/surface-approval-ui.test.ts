@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import {
+  approvalEventLogicalPath,
   approvalRequestLogicalPath,
   createApprovalRequest,
+  decideApprovalRequest,
   listApprovalRequests,
+  loadApprovalRequest,
 } from './approval-store.js';
 import { withExecutionContext } from './authority.js';
 import {
@@ -23,7 +27,7 @@ const FIXTURE_CHANNEL = `test-${RUN_ID}`.slice(0, 63);
 afterEach(() => {
   withExecutionContext('surface_runtime', () => {
     try {
-      for (const surface of ['slack', 'telegram', 'discord'] as const) {
+      for (const surface of ['slack', 'telegram', 'discord', 'brief'] as const) {
         withExecutionContext(surface === 'slack' ? 'slack_bridge' : 'surface_runtime', () => {
           for (const record of listApprovalRequests({ storageChannels: [surface] })) {
             if (record.correlationId.startsWith(`surface-approval-test-${RUN_ID}`)) {
@@ -42,6 +46,167 @@ afterEach(() => {
     } catch {
       // Best-effort fixture cleanup.
     }
+  });
+});
+
+interface ApprovalEventLine {
+  event?: string;
+  request_id?: string;
+  reason_category?: string;
+  note?: string;
+}
+
+function readApprovalEvents(storageChannel: string): ApprovalEventLine[] {
+  return withExecutionContext('surface_runtime', () => {
+    const eventPath = pathResolver.resolve(approvalEventLogicalPath(storageChannel));
+    if (!safeExistsSync(eventPath)) return [];
+    return (safeReadFile(eventPath, { encoding: 'utf8' }) as string)
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as ApprovalEventLine);
+  });
+}
+
+describe('surface-approval-ui MO-11 cross-surface coherence', () => {
+  it('rejects the brief surface for human_only final approval (S-3)', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'brief',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-brief',
+      correlationId: `surface-approval-test-${RUN_ID}-brief`,
+      requestedBy: 'planner',
+      draft: { title: 'ミッションブリーフ', summary: 'アラインメント承認' },
+    });
+
+    expect(() =>
+      applySurfaceApprovalDecision({
+        surface: 'brief',
+        requestId: record.id,
+        decision: 'approved',
+        channel: FIXTURE_CHANNEL,
+        threadTs: 'thread-brief',
+        decidedBy: 'sovereign',
+      })
+    ).toThrow(/local_token is not sufficient/u);
+
+    expect(loadApprovalRequest('brief', record.id)?.status).toBe('pending');
+  });
+
+  it('does not invent an auth strength for other surfaces (S-3 regression guard)', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-strong',
+      correlationId: `surface-approval-test-${RUN_ID}-strong`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Deploy the reviewed change.' },
+    });
+    const decided = applySurfaceApprovalDecision({
+      surface: 'telegram',
+      requestId: record.id,
+      decision: 'approved',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-strong',
+      decidedBy: 'human-1',
+    });
+    // Unchanged from before MO-11: claiming surface_session for every surface
+    // would be the same dishonesty as claiming it for brief.
+    expect(decided.decidedAuthMethod).toBeUndefined();
+
+    // An explicit caller that knows its own strength still wins.
+    const explicit = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-explicit',
+      correlationId: `surface-approval-test-${RUN_ID}-explicit`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Explicit auth method.' },
+    });
+    expect(
+      applySurfaceApprovalDecision({
+        surface: 'telegram',
+        requestId: explicit.id,
+        decision: 'approved',
+        channel: FIXTURE_CHANNEL,
+        threadTs: 'thread-explicit',
+        decidedBy: 'human-1',
+        authMethod: 'passkey',
+      }).decidedAuthMethod
+    ).toBe('passkey');
+  });
+
+  it('carries the rejection reason and note into the store, not just the call', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-reason',
+      correlationId: `surface-approval-test-${RUN_ID}-reason`,
+      requestedBy: 'planner',
+      draft: { title: 'ミッションブリーフ', summary: '要修正ループ' },
+    });
+
+    const decided = applySurfaceApprovalDecision({
+      surface: 'telegram',
+      requestId: record.id,
+      decision: 'rejected',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-reason',
+      decidedBy: 'sovereign',
+      reasonCategory: 'scope',
+      note: 'スコープが広すぎる',
+    });
+
+    expect(decided.status).toBe('rejected');
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('rejected');
+
+    // LC-10: the rationale has to reach the event stream, which is what the
+    // changes loop and the learning loops actually read. `note`/`reasonCategory`
+    // were previously dropped on the floor here (spread args skip excess
+    // property checks), making a brief rejection indistinguishable from a bare
+    // "no" — assert the durable artifact, not just the return value.
+    const event = readApprovalEvents('telegram').find(
+      (entry) => entry.request_id === record.id && entry.event === 'rejected'
+    );
+    expect(event?.reason_category).toBe('scope');
+    expect(event?.note).toBe('スコープが広すぎる');
+  });
+
+  it('refuses to flip a settled decision from another surface (S-4)', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-settled',
+      correlationId: `surface-approval-test-${RUN_ID}-settled`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Approved on one surface first.' },
+    });
+
+    applySurfaceApprovalDecision({
+      surface: 'telegram',
+      requestId: record.id,
+      decision: 'approved',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-settled',
+      decidedBy: 'human-1',
+    });
+
+    // The concierge route reaches decideApprovalRequest directly rather than
+    // through applySurfaceApprovalDecision, so the guard has to live in core.
+    expect(() =>
+      decideApprovalRequest('surface_runtime', {
+        channel: FIXTURE_CHANNEL,
+        storageChannel: 'telegram',
+        requestId: record.id,
+        decision: 'rejected',
+        decidedBy: 'someone-else',
+        decidedByType: 'human',
+        authenticated: true,
+      })
+    ).toThrow(/already approved/u);
+
+    const persisted = loadApprovalRequest('telegram', record.id);
+    expect(persisted?.status).toBe('approved');
+    expect(persisted?.decidedBy).toBe('human-1');
   });
 });
 

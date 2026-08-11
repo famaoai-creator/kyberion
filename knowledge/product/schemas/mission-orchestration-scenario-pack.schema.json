@@ -30,6 +30,7 @@
           "mission_class": { "type": "string", "minLength": 1 },
           "delivery_shape": { "type": "string", "minLength": 1 },
           "workflow_pattern": { "type": "string", "minLength": 1 },
+          "expected_workflow_id": { "type": "string", "minLength": 1 },
           "prompt": { "type": "string", "minLength": 1 },
           "expected_signals": {
             "type": "array",

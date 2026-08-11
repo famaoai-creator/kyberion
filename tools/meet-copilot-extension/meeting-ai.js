@@ -417,12 +417,89 @@
     }
   }
 
+  const REFERENCE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      references: {
+        type: 'array',
+        maxItems: 8,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            expression: { type: 'string' },
+            refers_to: { type: 'string' },
+            confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+            evidence: { type: 'string' },
+          },
+          required: ['expression', 'refers_to', 'confidence', 'evidence'],
+        },
+      },
+    },
+    required: ['references'],
+  };
+
+  /**
+   * Resolve demonstratives ("これ", "それ", "ここ") against what is on the shared
+   * screen. `screenContext` is OCR text the driver already redacted — the frame
+   * itself never reaches this side.
+   */
+  async function resolveReferences({ transcript, screenContext, onProgress } = {}) {
+    const source = normalizeTranscript(transcript, 12_000);
+    if (!source.text) throw new Error('指示語を解決する字幕がまだありません。');
+    const screen = scrubInput(screenContext, 8_000);
+    if (!screen) {
+      throw new Error('画面から抽出したテキストがありません。先に画面を取り込んでください。');
+    }
+    const session = await createPromptSession(onProgress);
+    if (!session) throw unavailableError('Prompt API');
+
+    try {
+      const response = await session.prompt(
+        [
+          '直近の発言に含まれる指示語（これ・それ・ここ・あちら など）が、共有画面上のどの項目を指しているか推定してください。',
+          '画面テキストに対応が見つからない指示語は返さないでください。項目名を推測で作らないでください。',
+          'evidence には、根拠にした画面テキストの該当箇所をそのまま入れてください。',
+          UNTRUSTED_NOTE,
+          '<screen-text>',
+          screen,
+          '</screen-text>',
+          '<meeting-transcript>',
+          source.text,
+          '</meeting-transcript>',
+        ].join('\n'),
+        { responseConstraint: REFERENCE_SCHEMA }
+      );
+      const parsed = parseJsonResponse(response, '指示語解決');
+      return {
+        provider: 'chrome-prompt',
+        references: Array.isArray(parsed.references)
+          ? parsed.references
+              .slice(0, 8)
+              .map((item) => ({
+                expression: scrubOutput(item?.expression, 60),
+                refers_to: scrubOutput(item?.refers_to, 300),
+                confidence: ['high', 'medium', 'low'].includes(item?.confidence)
+                  ? item.confidence
+                  : 'low',
+                evidence: scrubOutput(item?.evidence, 300),
+              }))
+              .filter((item) => item.expression && item.refers_to)
+          : [],
+      };
+    } finally {
+      session.destroy?.();
+    }
+  }
+
   global.KyberionMeetingAI = {
     availability,
     prepare,
     summarizeMeeting,
     extractInsights,
     suggestUtterances,
+    resolveReferences,
     normalizeTranscript,
   };
 })(globalThis);

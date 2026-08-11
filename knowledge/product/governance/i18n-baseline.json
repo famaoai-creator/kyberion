@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-09T16:54:05.745Z",
+  "generated_at": "2026-08-10T20:09:40.438Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -43,7 +43,6 @@
     "satellites/slack-bridge",
     "satellites/telegram-bridge",
     "satellites/voice-hub",
-    "presence/displays/avatar-studio",
     "presence/displays/chronos-mirror-v2",
     "presence/displays/computer-surface",
     "presence/displays/concierge",
@@ -117,7 +116,6 @@
     "scripts/demos/demo_imessage_flow.ts": 2,
     "scripts/demos/demo_telegram_flow.ts": 2,
     "scripts/generate_all_objects_layout_sample.ts": 36,
-    "scripts/minutes_record.ts": 6,
     "scripts/onboarding_wizard.ts": 49,
     "scripts/process_portal_inbox.ts": 5,
     "scripts/refactor/mission-controller-router.ts": 3,

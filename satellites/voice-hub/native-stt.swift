@@ -491,9 +491,78 @@ if hasFlag("--list-devices") {
   exit(0)
 }
 
+/// Transcribe an existing audio file.
+///
+/// The live path uses SFSpeechAudioBufferRecognitionRequest, which only accepts
+/// a running mic tap. Recorded segments need the URL request instead — same
+/// recognizer, different source — so batch jobs (in-room minutes over saved
+/// WAVs) can run without a microphone or any download.
+///
+/// On-device recognition is REQUIRED, not preferred: this transcribes meeting
+/// audio, and the server-backed path would send it to Apple.
+func transcribeFile(path: String, locale: String, timeoutSeconds: Double) -> STTResult {
+  let url = URL(fileURLWithPath: path)
+  guard FileManager.default.fileExists(atPath: path) else {
+    return STTResult(ok: false, text: nil, error: "audio_file_not_found", locale: locale, isFinal: false)
+  }
+  let speechAuth = speechPermission()
+  guard speechAuth == .authorized else {
+    return STTResult(ok: false, text: nil, error: "speech_permission_\(speechAuth.rawValue)", locale: locale, isFinal: false)
+  }
+  guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)) ?? SFSpeechRecognizer() else {
+    return STTResult(ok: false, text: nil, error: "speech_recognizer_unavailable", locale: locale, isFinal: false)
+  }
+  guard recognizer.isAvailable else {
+    return STTResult(ok: false, text: nil, error: "speech_recognizer_not_available", locale: locale, isFinal: false)
+  }
+  guard recognizer.supportsOnDeviceRecognition else {
+    return STTResult(ok: false, text: nil, error: "on_device_recognition_unsupported_for_locale", locale: locale, isFinal: false)
+  }
+
+  let request = SFSpeechURLRecognitionRequest(url: url)
+  request.requiresOnDeviceRecognition = true
+  request.shouldReportPartialResults = false
+
+  var transcript: String?
+  var failure: String?
+  var finished = false
+  let task = recognizer.recognitionTask(with: request) { result, error in
+    if let error = error {
+      failure = "recognition_failed: \(error.localizedDescription)"
+      finished = true
+      return
+    }
+    guard let result = result else { return }
+    if result.isFinal {
+      transcript = result.bestTranscription.formattedString
+      finished = true
+    }
+  }
+  // The URL request delivers through the main run loop, so blocking on a
+  // semaphore here would deadlock until the timeout. Pump the loop instead.
+  let deadline = Date().addingTimeInterval(timeoutSeconds)
+  while !finished && Date() < deadline {
+    RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+  }
+  if !finished {
+    task.cancel()
+    return STTResult(ok: false, text: nil, error: "transcription_timeout", locale: locale, isFinal: false)
+  }
+  if let failure = failure {
+    return STTResult(ok: false, text: nil, error: failure, locale: locale, isFinal: false)
+  }
+  let text = (transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+  // An empty result is success: a segment can legitimately contain no speech.
+  return STTResult(ok: true, text: text, error: nil, locale: locale, isFinal: true)
+}
+
 let locale = parseArg("--locale", default: Locale.current.identifier)
 let timeout = Double(parseArg("--timeout", default: "8")) ?? 8
 let deviceUID = parseArg("--device-id", default: "")
+let transcribePath = parseArg("--transcribe-file", default: "")
+if !transcribePath.isEmpty {
+  emit(transcribeFile(path: transcribePath, locale: locale, timeoutSeconds: timeout))
+}
 if hasFlag("--meter") {
   let meter = MeterSession(durationSeconds: timeout, targetDeviceUID: deviceUID.isEmpty ? nil : deviceUID)
   let encoder = JSONEncoder()
