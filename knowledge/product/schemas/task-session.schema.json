@@ -19,7 +19,17 @@
     "correlation_id": { "type": "string", "minLength": 1 },
     "surface": {
       "type": "string",
-      "enum": ["presence", "slack", "terminal", "chronos", "web", "imessage", "discord", "telegram", "project-controller"]
+      "enum": [
+        "presence",
+        "slack",
+        "terminal",
+        "chronos",
+        "web",
+        "imessage",
+        "discord",
+        "telegram",
+        "project-controller"
+      ]
     },
     "task_type": {
       "type": "string",
@@ -112,6 +122,10 @@
         "collected": {
           "type": "object",
           "additionalProperties": true
+        },
+        "filled_order": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "additionalProperties": false
