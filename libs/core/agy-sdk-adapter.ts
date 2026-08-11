@@ -20,6 +20,7 @@ interface PendingRequest {
   resolve: (response: BridgeResponse) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  child?: ChildProcessWithoutNullStreams;
 }
 
 export interface AgySdkAdapterOptions {
@@ -43,6 +44,8 @@ export class AgySdkAdapter {
     Omit<AgySdkAdapterOptions, 'cwd' | 'timeoutMs'>;
   private process?: ChildProcessWithoutNullStreams;
   private bootPromise?: Promise<void>;
+  private bootChild?: ChildProcessWithoutNullStreams;
+  private bootReject?: (error: Error) => void;
   private sequence = 0;
   private readonly pending = new Map<string, PendingRequest>();
   private ready = false;
@@ -64,7 +67,9 @@ export class AgySdkAdapter {
   async boot(): Promise<void> {
     if (this.ready) return;
     if (this.bootPromise) return this.bootPromise;
+    let child: ChildProcessWithoutNullStreams | undefined;
     this.bootPromise = new Promise<void>((resolve, reject) => {
+      this.bootReject = reject;
       const python =
         this.options.pythonBin ??
         process.env.KYBERION_AGY_SDK_PYTHON ??
@@ -72,7 +77,7 @@ export class AgySdkAdapter {
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
       const sdkApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-      const child = (this.options.spawnProcess ?? spawn)(python, [script], {
+      child = (this.options.spawnProcess ?? spawn)(python, [script], {
         cwd: this.options.cwd,
         env: {
           ...buildProviderChildEnv({ provider: 'agy' }),
@@ -84,6 +89,7 @@ export class AgySdkAdapter {
         shell: false,
       }) as ChildProcessWithoutNullStreams;
       this.process = child;
+      this.bootChild = child;
       this.runtimeInfo = {
         ...this.runtimeInfo,
         pid: child.pid,
@@ -100,21 +106,60 @@ export class AgySdkAdapter {
         // sends actionable failures on stdout as structured responses.
       });
       child.once('error', (error) => {
-        this.rejectAll(error);
-        reject(this.unavailable(error.message));
+        const isBooting = this.bootChild === child;
+        this.rejectAll(error, child);
+        if (isBooting) {
+          reject(this.unavailable(error.message));
+        }
       });
       child.once('close', (code, signal) => {
-        this.ready = false;
+        const isCurrent = this.process === child;
+        const isBooting = this.bootChild === child;
+        if (isCurrent) {
+          this.process = undefined;
+          this.bootPromise = undefined;
+          this.ready = false;
+        }
         const error = this.unavailable(
           `SDK bridge exited (code=${code ?? 'null'}, signal=${signal ?? 'none'})`
         );
-        this.rejectAll(error);
-        if (!this.ready) reject(error);
+        this.rejectAll(error, child);
+        if (isBooting) {
+          this.bootChild = undefined;
+          this.bootReject = undefined;
+          reject(error);
+        }
       });
-    }).then(() => {
-      this.ready = true;
-      this.runtimeInfo = { ...this.runtimeInfo, supportsNativeSubagents: true };
-    });
+    })
+      .then(() => {
+        if (!child || this.process !== child) {
+          throw this.unavailable('AGY SDK bridge was superseded before boot completed.');
+        }
+        if (this.bootChild === child) {
+          this.bootChild = undefined;
+          this.bootReject = undefined;
+        }
+        this.ready = true;
+        this.runtimeInfo = { ...this.runtimeInfo, supportsNativeSubagents: true };
+      })
+      .catch((err) => {
+        this.bootPromise = undefined;
+        if (this.process === child) {
+          this.ready = false;
+          try {
+            child?.stdin?.end();
+            child?.kill();
+          } catch {
+            // best-effort cleanup
+          }
+          this.process = undefined;
+        }
+        if (this.bootChild === child) {
+          this.bootChild = undefined;
+          this.bootReject = undefined;
+        }
+        throw err;
+      });
     return this.bootPromise;
   }
 
@@ -149,13 +194,62 @@ export class AgySdkAdapter {
 
   async shutdown(): Promise<void> {
     const child = this.process;
+    const bootChild = this.bootChild;
+    const bootReject = this.bootReject;
     this.process = undefined;
     this.ready = false;
     this.bootPromise = undefined;
+    this.bootChild = undefined;
+    this.bootReject = undefined;
+    if (child && bootChild === child) {
+      bootReject?.(this.unavailable('AGY SDK adapter shut down during boot.'));
+    }
     this.rejectAll(this.unavailable('AGY SDK adapter shut down.'));
-    if (!child) return;
-    child.stdin.end();
-    child.kill();
+    if (!child || child.exitCode != null || child.signalCode != null) return;
+
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const cleanup = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        if (!done) {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // best-effort
+          }
+          cleanup();
+        }
+      }, 2000);
+
+      child.once('close', cleanup);
+
+      try {
+        if (child.stdin.writable && !child.stdin.writableEnded) {
+          child.stdin.end();
+        }
+        setTimeout(() => {
+          if (!done && child.exitCode == null && child.signalCode == null) {
+            try {
+              child.kill('SIGTERM');
+            } catch {
+              // best-effort
+            }
+          }
+        }, 300);
+      } catch {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // best-effort
+        }
+        cleanup();
+      }
+    });
   }
 
   private request(payload: Record<string, unknown>, signal?: AbortSignal): Promise<BridgeResponse> {
@@ -171,7 +265,7 @@ export class AgySdkAdapter {
         this.send({ id: `${id}-cancel`, op: 'cancel' });
         reject(this.unavailable('AGY SDK request timed out.'));
       }, this.options.timeoutMs);
-      const pending: PendingRequest = { resolve, reject, timer };
+      const pending: PendingRequest = { resolve, reject, timer, child };
       this.pending.set(id, pending);
       const onAbort = () => {
         signal?.removeEventListener('abort', onAbort);
@@ -241,11 +335,13 @@ export class AgySdkAdapter {
     pending.resolve(message);
   }
 
-  private rejectAll(error: Error): void {
+  private rejectAll(error: Error, targetChild?: ChildProcessWithoutNullStreams): void {
     for (const [id, pending] of this.pending) {
-      this.pending.delete(id);
-      clearTimeout(pending.timer);
-      pending.reject(error);
+      if (!targetChild || pending.child === targetChild) {
+        this.pending.delete(id);
+        clearTimeout(pending.timer);
+        pending.reject(error);
+      }
     }
   }
 
