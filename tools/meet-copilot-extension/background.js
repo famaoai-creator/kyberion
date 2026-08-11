@@ -34,6 +34,7 @@ const uiState = {
   captions: 0,
   lastError: '',
   lastAiAt: '',
+  lastScreenContextAt: '',
 };
 
 // Live caption ring buffer. MV3 can evict this worker at any time, so it is
@@ -255,7 +256,18 @@ async function handleCommand(msg) {
       await relayToContent(tab.id, { type: 'meet:set_camera', on: msg.on });
     else if (msg.cmd === 'chat')
       await relayToContent(tab.id, { type: 'meet:chat', text: msg.text });
-    else if (msg.cmd === 'leave') {
+    // The driver returns OCR text that has already passed the governed PII
+    // scrubber; the panel only ever sees this, never the frame it came from.
+    else if (msg.cmd === 'screen_context') {
+      uiState.lastScreenContextAt = new Date().toISOString();
+      notifyPanel({
+        type: 'panel:screen-context',
+        text: String(msg.text || ''),
+        provider: msg.provider || '',
+        at: uiState.lastScreenContextAt,
+      });
+      return;
+    } else if (msg.cmd === 'leave') {
       await relayToContent(tab.id, { type: 'meet:leave' });
       sendEvent({ event: 'left' });
     }
@@ -393,6 +405,46 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       transcript_lines: transcript.length,
     });
     sendResponse({ ok: true, event });
+    return true;
+  }
+  // Frame capture is operator-initiated and one-shot: the worker forwards the
+  // frame to the driver for local OCR + redaction and keeps no copy itself.
+  if (message && message.type === 'panel:capture-frame') {
+    (async () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        sendResponse({ ok: false, error: 'control channel is not connected' });
+        return;
+      }
+      const tab = await findMeetTab();
+      if (!tab) {
+        sendResponse({ ok: false, error: 'no Meet tab' });
+        return;
+      }
+      await ensureInjected(tab.id);
+      const shot = await relayToContent(tab.id, {
+        type: 'meet:capture_frame',
+        options: message.options || {},
+      });
+      if (!shot || !shot.ok) {
+        sendResponse({ ok: false, error: (shot && shot.error) || 'frame capture failed' });
+        return;
+      }
+      sendEvent({
+        event: 'frame',
+        data_url: shot.data_url,
+        width: shot.width,
+        height: shot.height,
+        at: new Date().toISOString(),
+      });
+      sendResponse({
+        ok: true,
+        width: shot.width,
+        height: shot.height,
+        source_kind: shot.source_kind,
+        source_size: shot.source_size,
+        candidate_count: shot.candidate_count,
+      });
+    })();
     return true;
   }
   // A suggested utterance only reaches the meeting through this path, and only

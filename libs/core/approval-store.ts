@@ -49,7 +49,13 @@ export interface ApprovalRequestDraft {
 }
 
 export interface ApprovalRequesterContext {
-  surface: 'slack' | 'chronos' | 'terminal' | 'presence' | 'api' | 'system';
+  /**
+   * MO-11 S-2: `brief` is the mission-brief HTML surface (report-review). It is
+   * a distinct value rather than an alias of `presence` because the origin of
+   * an approval is primary audit evidence — a decision taken in presence-studio
+   * must stay distinguishable from one taken in a brief review session.
+   */
+  surface: 'slack' | 'chronos' | 'terminal' | 'presence' | 'brief' | 'api' | 'system';
   actorId: string;
   actorRole: string;
   missionId?: string;
@@ -90,7 +96,13 @@ export interface ApprovalRecord {
   status: 'pending' | 'approved' | 'rejected' | 'skipped';
   approvedBy?: string;
   approvedAt?: string;
-  authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual';
+  /**
+   * MO-11 S-3: `local_token` = a loopback-bound page gated by a per-launch
+   * token (the mission-brief surface). It proves possession of a locally
+   * printed token, not identity — recorded distinctly so audits can tell it
+   * apart from a real session, and tighten later.
+   */
+  authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual' | 'local_token';
   note?: string;
   /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
   reasonCategory?: RejectionReasonCategory;
@@ -144,7 +156,8 @@ export interface ApprovalSteeringAction {
 
 export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   id: string;
-  kind: 'channel-approval' | 'secret_mutation';
+  /** MO-11 S-1: `mission_gate` = a mission phase gate awaiting Sovereign approval. */
+  kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
   storageChannel: string;
   channel: string;
   threadTs: string;
@@ -153,6 +166,14 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
+  /**
+   * MO-11 S-3: how the decider was authenticated. Previously this survived only
+   * inside `workflow.approvals[]` and the event log, so a record without a
+   * workflow lost it entirely — and every surface queue renders records, not
+   * event logs. Carried here so a weakly-authenticated decision (e.g. the
+   * `brief` surface's `local_token`) stays visible wherever it is reviewed.
+   */
+  decidedAuthMethod?: ApprovalRecord['authMethod'];
   status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'applied' | 'failed';
   sourceText?: string;
   /** KC-03: origin of the request, for source-scoped cancellation. */
@@ -322,10 +343,22 @@ export function computeApprovalPayloadHash(payload: Record<string, unknown> | un
     .digest('hex');
 }
 
+/**
+ * MO-11 S-4: statuses that represent a settled decision. `applied` / `failed`
+ * are post-decision effect outcomes, so they are settled too.
+ */
+const TERMINAL_DECIDED_STATUSES: ReadonlySet<ApprovalRequestRecord['status']> = new Set([
+  'approved',
+  'rejected',
+  'applied',
+  'failed',
+]);
+
 export function validateHumanFinalDecision(params: {
   accountability?: ApprovalAccountability;
   decidedByType?: ApprovalRecord['decidedByType'];
   authenticated?: boolean;
+  authMethod?: ApprovalRecord['authMethod'];
   payloadHash?: string;
   effectBinding?: string;
 }): void {
@@ -335,6 +368,11 @@ export function validateHumanFinalDecision(params: {
   }
   if (params.authenticated !== true) {
     throw new Error('[POLICY_VIOLATION] Final approval requires an authenticated human decider');
+  }
+  if (params.authMethod === 'local_token') {
+    throw new Error(
+      '[POLICY_VIOLATION] Final approval requires a human-authenticated surface; local_token is not sufficient'
+    );
   }
   if (
     params.accountability.payloadHash &&
@@ -742,6 +780,29 @@ export function decideApprovalRequest(
     );
   }
 
+  // MO-11 S-4: a settled decision is audit evidence and must not be silently
+  // flipped. The same request is visible on every surface at once (Slack,
+  // concierge, chronos, terminal, brief), so without this the last surface to
+  // act would win — approve in Slack, reject in the brief, and the record
+  // quietly changes underneath any gate that already read it. First decision
+  // wins; a genuine reversal must cancel and re-request, which stays visible
+  // in the event log.
+  if (TERMINAL_DECIDED_STATUSES.has(record.status)) {
+    // A staged/multi-role workflow may still owe decisions from other roles;
+    // only a fully-settled record is closed.
+    const awaitingOtherRoles = (record.workflow?.approvals ?? []).some(
+      (approval) => approval.status === 'pending'
+    );
+    if (!awaitingOtherRoles) {
+      throw new Error(
+        `[POLICY_VIOLATION] Approval request ${record.id} is already ${record.status}` +
+          `${record.decidedBy ? ` (decided by ${record.decidedBy}` : ''}` +
+          `${record.decidedBy && record.decidedAt ? ` at ${record.decidedAt}` : ''}` +
+          `${record.decidedBy ? ')' : ''} and cannot be decided again.`
+      );
+    }
+  }
+
   if (record.status === 'pending' && isApprovalRequestExpired(record)) {
     expireApprovalRequest(role, {
       channel: record.channel,
@@ -755,6 +816,7 @@ export function decideApprovalRequest(
     accountability: record.accountability,
     decidedByType: params.decidedByType,
     authenticated: params.authenticated,
+    authMethod: params.authMethod,
     payloadHash: params.payloadHash,
     effectBinding: params.effectBinding,
   });
@@ -768,6 +830,7 @@ export function decideApprovalRequest(
       accountability: { finalDecision: 'human_only' },
       decidedByType: params.decidedByType,
       authenticated: params.authenticated,
+      authMethod: params.authMethod,
     });
     approvalActionCacheKey(cacheDescriptor);
     if (
@@ -814,6 +877,7 @@ export function decideApprovalRequest(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
     workflow,
   };
 

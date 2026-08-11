@@ -65,6 +65,51 @@ Boundaries, mirroring `tools/adf-replay-extension`:
 - **No autonomous speech.** A suggestion reaches the meeting only via an explicit
   click → `panel:send-chat` → `meet:chat` in the content script.
 
+## Shared screen → demonstrative resolution
+
+To work out what "これ" / "それ" refers to, the panel can pull one frame of the
+shared screen. The frame never reaches the model in the browser:
+
+```
+sidepanel「画面を取り込む」
+   → content.js: largest <video> → canvas → JPEG   (no tabCapture/getDisplayMedia,
+   → background.js: WS 'frame' event                no extra permission, no indicator)
+   → driver: writes active/shared/tmp/meeting-frames-<session>/frame-NNNN.jpg
+   → ocr_image(mode:'local_only')  ── asserts providerDataEgress === 'none'
+   → scrubContent()                ── governed PII redaction
+   → WS cmd 'screen_context' ─────► sidepanel (redacted TEXT only)
+   → Prompt API: 字幕 + 画面テキスト → 指示語の対応
+```
+
+Why it is shaped this way:
+
+- **A frame bypasses the text scrubber**, so it is never sent anywhere. It is
+  read by an OCR provider that declares `dataEgress: 'none'`; the driver throws
+  if the served provider says otherwise, and `local_only` admits nothing else.
+  With no on-device provider the read fails closed rather than falling back.
+- **Only redacted text crosses back** to the extension, so the panel — and the
+  model in it — never holds the image.
+- **Frames are discarded when the session ends.** What survives is the redacted
+  text in `meeting-summary-<session>.json` under `screen_context`.
+- A protected/DRM stream taints the canvas; `toDataURL` throws and the capture
+  reports the failure instead of returning a blank frame.
+
+Per-platform status of the capture path (the picker itself uses no per-platform
+selectors — it takes the largest `<video>` or `<canvas>` on the page):
+
+| Platform | Expected surface | Status                                                                                                                        |
+| -------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Meet     | `<video>`        | untested                                                                                                                      |
+| Teams    | `<video>`        | untested                                                                                                                      |
+| Zoom     | `<canvas>`       | untested — Zoom's web client decodes in WASM and often paints into `<canvas>`, which is why the picker considers canvases too |
+
+**Known gap on every platform:** nothing checks that anyone is actually
+sharing. With no share in progress the picker returns the largest camera tile,
+so a capture would OCR a participant's video. The capture therefore reports
+`source_kind` / `source_size` / `candidate_count` back to the panel for the
+operator to sanity-check. Use **Diagnose DOM** in a real call on each platform
+to see the frame-source inventory before trusting it.
+
 Results are relayed to the driver as `ai_summary` / `ai_insights` /
 `ai_suggestions` events and persisted to
 `active/shared/tmp/meeting-summary-<session>.json` (latest of each kind plus a

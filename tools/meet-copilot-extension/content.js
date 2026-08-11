@@ -210,6 +210,17 @@
         text: t.slice(0, 120),
       });
     }
+    // Frame-source inventory for tuning the shared-screen picker per platform:
+    // which surface the platform actually paints into, and how many decoys the
+    // largest-area heuristic has to beat.
+    const videos = frameSourceCandidates()
+      .slice(0, 20)
+      .map((c) => ({
+        kind: c.kind,
+        intrinsic: `${c.width}x${c.height}`,
+        rendered_area: Math.round(c.area),
+        has_stream: c.kind === 'video' ? Boolean(c.el.srcObject) : undefined,
+      }));
     return {
       platform: PLATFORM,
       url: location.href,
@@ -217,6 +228,7 @@
       controls,
       regions,
       caption_candidates,
+      videos,
     };
   }
 
@@ -303,6 +315,82 @@
     if (sendBtn && isVisible(sendBtn)) sendBtn.click();
     else pressEnter(input);
     return { ok: true, detail: { platform: PLATFORM, sent_via: sendBtn ? 'button' : 'enter' } };
+  }
+
+  // Shared-screen capture. The platform renders the shared screen into a
+  // <video> fed by a WebRTC MediaStream, so a canvas readback gets the frame
+  // without tabCapture/getDisplayMedia — no extra permission, no capture
+  // indicator, and nothing is recorded that the operator is not already seeing.
+  const MIN_FRAME_SOURCE_WIDTH = 200;
+  const MIN_FRAME_SOURCE_HEIGHT = 150;
+
+  /**
+   * Candidate surfaces the shared screen could be painted on, largest first.
+   *
+   * Meet and Teams render remote streams into <video>. Zoom's web client
+   * decodes in WebAssembly and paints into <canvas>, so there is often no
+   * <video> to read at all — but a canvas the page painted itself is not
+   * tainted, so the same readback works on it.
+   */
+  function frameSourceCandidates() {
+    const candidates = [];
+    const consider = (el, kind, intrinsicWidth, intrinsicHeight) => {
+      if (!intrinsicWidth || !intrinsicHeight) return;
+      const rect = el.getBoundingClientRect();
+      // Participant tiles are small; the shared screen is the largest surface.
+      if (rect.width < MIN_FRAME_SOURCE_WIDTH || rect.height < MIN_FRAME_SOURCE_HEIGHT) return;
+      candidates.push({
+        el,
+        kind,
+        width: intrinsicWidth,
+        height: intrinsicHeight,
+        area: rect.width * rect.height,
+      });
+    };
+    for (const video of document.querySelectorAll('video')) {
+      consider(video, 'video', video.videoWidth, video.videoHeight);
+    }
+    for (const canvas of document.querySelectorAll('canvas')) {
+      consider(canvas, 'canvas', canvas.width, canvas.height);
+    }
+    return candidates.sort((a, b) => b.area - a.area);
+  }
+
+  function captureSharedScreenFrame({ maxWidth = 1600, quality = 0.7 } = {}) {
+    const candidates = frameSourceCandidates();
+    const source = candidates[0];
+    if (!source) {
+      return { ok: false, error: `no shared-screen surface found on ${PLATFORM}` };
+    }
+    const scale = Math.min(1, maxWidth / source.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(source.width * scale);
+    canvas.height = Math.round(source.height * scale);
+    try {
+      canvas.getContext('2d').drawImage(source.el, 0, 0, canvas.width, canvas.height);
+      // A protected stream taints the canvas and toDataURL throws. Report that
+      // instead of returning a blank frame that looks like a working capture.
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      return {
+        ok: true,
+        data_url: dataUrl,
+        width: canvas.width,
+        height: canvas.height,
+        // The picker cannot tell a shared screen from a large camera tile, so
+        // report what it grabbed and let the operator judge.
+        source_kind: source.kind,
+        source_size: `${source.width}x${source.height}`,
+        candidate_count: candidates.length,
+        platform: PLATFORM,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: `frame readback blocked on ${PLATFORM} (${source.kind}): ${
+          err && err.message ? err.message : err
+        }`,
+      };
+    }
   }
 
   let captionObserver = null;
@@ -570,6 +658,8 @@
           sendResponse({ ok: true, data });
         } else if (message.type === 'meet:chat') {
           sendResponse(await sendChat(message.text));
+        } else if (message.type === 'meet:capture_frame') {
+          sendResponse(captureSharedScreenFrame(message.options || {}));
         } else sendResponse({ ok: false, error: `unknown message ${message.type}` });
       } catch (err) {
         sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });

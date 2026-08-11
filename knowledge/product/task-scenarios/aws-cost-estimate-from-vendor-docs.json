@@ -1,0 +1,53 @@
+{
+  "id": "aws-cost-estimate-from-vendor-docs",
+  "title": "ベンダー提案書からのAWS費用見積り作成",
+  "description": "ベンダーのシステム提案書・要件定義書を読み込み、独立したAWS原価見積り(割引条件・サポートプラン・為替シナリオ込み)をテナントのブランドテーマに沿ったHTMLとして作成する。",
+  "trigger": {
+    "type": "manual",
+    "prompt": "このベンダー提案書と要件定義書を読んでAWS費用の見積りを出してください"
+  },
+  "input": {
+    "sources": ["vendor_proposal_pdf", "requirements_doc_pdf", "tenant_design_system"],
+    "required_params": [
+      "vendor_proposal_pdf_path",
+      "requirements_doc_pdf_path",
+      "aws_region",
+      "tenant_theme_id"
+    ],
+    "optional_params": [
+      "edp_discount_rate",
+      "support_tier",
+      "shield_advanced_coverage",
+      "savings_plan_coverage_rate",
+      "fx_rate_assumption",
+      "cost_optimization_measures",
+      "external_delivery_intent"
+    ]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "見積りの前提とするアーキテクチャは、ベンダー提案書と要件定義書のどちらを正とするか",
+      "他サービス・社内基幹系との外部接続の有無をどう扱うか",
+      "適用する割引条件(EDP割引率、Savings Plansカバー率など)は何か",
+      "サポートプラン(Enterprise Support等)やShield Advancedを含めるか、その場合の契約主体(組織全体契約でカバーか、本プロジェクト単独契約か)",
+      "為替レートの前提(既定レートと実勢レートの感応度提示が必要か)",
+      "成果物に適用するブランドテーマはどのテナントのデザインガイドに準拠するか",
+      "この見積りは顧客・社外への提示を想定しているか(mission化・CUSTOMER_SIGNOFFゲートの要否判断のため)"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/aws-cost-estimate-from-vendor-docs.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/aws-cost-estimate-from-vendor-docs.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/aws-cost-estimate-from-vendor-docs.json"
+  },
+  "result": {
+    "artifacts": ["aws-cost-estimate.html", "cost-buildup-summary.md"],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["external_delivery", "customer_signoff"],
+    "default_action": "draft-only"
+  }
+}

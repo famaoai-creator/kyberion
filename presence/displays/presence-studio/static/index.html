@@ -360,20 +360,26 @@
         gap: 8px;
         padding: 14px;
         border-radius: 16px;
-        border: 1px solid var(--panel-border);
-        background: var(--kb-panel-bg, rgba(15, 23, 42, 0.04));
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        background: rgba(17, 27, 39, 0.65);
       }
       .capability-title {
         font-weight: 700;
         font-size: 14px;
+        color: #edf6ff;
       }
       .capability-desc {
         font-size: 12px;
-        color: var(--kb-text-secondary, rgba(15, 23, 42, 0.62));
+        color: rgba(215, 233, 252, 0.85);
         flex: 1;
+        line-height: 1.45;
       }
       .capability-card .button {
         width: 100%;
+        background: rgba(125, 211, 252, 0.16);
+        border-color: rgba(125, 211, 252, 0.35);
+        color: #0284c7;
+        font-weight: 600;
       }
       .panel {
         background: var(--panel);
@@ -575,13 +581,13 @@
         color: var(--warm);
       }
       .hint {
-        color: var(--muted);
+        color: #93c5fd;
         font-size: 13px;
       }
       .select {
-        border: 1px solid rgba(125, 211, 252, 0.2);
-        background: rgba(9, 16, 24, 0.8);
-        color: var(--text);
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: rgba(13, 23, 36, 0.95);
+        color: #edf6ff;
         border-radius: 12px;
         padding: 10px 12px;
         font: inherit;
@@ -594,15 +600,15 @@
         flex: 1 1 240px;
       }
       .selection-label {
-        color: var(--muted);
+        color: #93c5fd;
         font-size: 11px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
       .text-input {
-        border: 1px solid rgba(125, 211, 252, 0.2);
-        background: rgba(9, 16, 24, 0.8);
-        color: var(--text);
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: rgba(13, 23, 36, 0.95);
+        color: #edf6ff;
         border-radius: 12px;
         padding: 10px 12px;
         font: inherit;
@@ -612,22 +618,25 @@
         width: 100%;
         min-height: 180px;
         resize: vertical;
-        border: 1px solid rgba(125, 211, 252, 0.2);
-        background: rgba(9, 16, 24, 0.82);
-        color: var(--text);
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: rgba(13, 23, 36, 0.95);
+        color: #f8fafc;
         border-radius: 16px;
         padding: 14px 16px;
         font: inherit;
         line-height: 1.55;
+      }
+      .notes-area::placeholder {
+        color: rgba(226, 232, 240, 0.5);
       }
       .artifact-view {
         width: 100%;
         min-height: 180px;
         white-space: pre-wrap;
         overflow: auto;
-        border: 1px solid rgba(125, 211, 252, 0.2);
-        background: rgba(9, 16, 24, 0.82);
-        color: var(--text);
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: rgba(13, 23, 36, 0.95);
+        color: #f8fafc;
         border-radius: 16px;
         padding: 14px 16px;
         font: inherit;
@@ -853,24 +862,24 @@
         <section class="panel" id="minutes-record-panel">
           <div class="label">会議を記録（マイク → 自動議事録）</div>
           <div class="controls" style="margin-top: 8px;">
-            <input class="text-input" id="minutes-record-mission" type="text" placeholder="ミッションID（例: MSN-MTG-001）" />
-            <button class="button" id="minutes-record-start" type="button">🎙️ 会議を記録</button>
-            <button class="button button-ghost" id="minutes-record-stop" type="button" disabled>⏹ 停止して議事録化</button>
+            <input class="text-input" id="minutes-record-mission" type="text" placeholder="Mission ID (blank creates one; e.g. MSN-MTG-001)" />
+            <button class="button" id="minutes-record-start" type="button">🎙️ Record meeting</button>
+            <button class="button button-ghost" id="minutes-record-stop" type="button" disabled>⏹ Stop and make minutes</button>
           </div>
-          <div id="minutes-live-transcript" class="artifact-view" style="margin-top: 12px; max-height: 180px; overflow-y: auto;" aria-live="polite"></div>
-          <div class="hint" id="minutes-record-hint">録音には voice consent（pnpm meeting:consent grant --mission &lt;ID&gt;）が必要です。停止すると minutes.md とアクションアイテムを自動生成します。</div>
+          <div id="minutes-live-transcript" class="artifact-view" style="margin-top: 12px; max-height: 180px; overflow-y: auto;" aria-live="polite">Live transcript appears here…</div>
+          <div class="hint" id="minutes-record-hint">Records microphone audio and creates minutes.md plus action items.</div>
         </section>
         <section class="panel" id="minutes-panel">
-          <div class="label">Dictation Notes</div>
-          <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Use Notes Capture with the browser mic, or paste text here before generating minutes."></textarea>
+          <div class="label">Dictation notes</div>
+          <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Dictated text appears here, or paste notes directly."></textarea>
           <div class="controls" style="margin-top: 12px;">
-            <input class="text-input" id="minutes-title" type="text" placeholder="Meeting title" />
-            <button class="button" id="minutes-save" type="button">Create Minutes</button>
-            <button class="button button-ghost" id="minutes-copy" type="button">Copy Notes</button>
-            <button class="button button-ghost" id="minutes-restore" type="button">Restore Draft</button>
-            <button class="button button-ghost" id="minutes-clear" type="button">Clear Notes</button>
+            <input class="text-input" id="minutes-title" type="text" placeholder="Meeting title (optional)" />
+            <button class="button" id="minutes-save" type="button">Create minutes</button>
+            <button class="button button-ghost" id="minutes-copy" type="button">Copy notes</button>
+            <button class="button button-ghost" id="minutes-restore" type="button">Restore draft</button>
+            <button class="button button-ghost" id="minutes-clear" type="button">Clear notes</button>
           </div>
-          <div class="hint" id="minutes-hint">Notes capture keeps the dictated text local until you choose to generate minutes.</div>
+          <div class="hint" id="minutes-hint">Create structured minutes from dictated or drafted notes.</div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
@@ -1016,6 +1025,7 @@
             <select class="select" id="browser-session"></select>
             <button class="button" id="browser-session-bootstrap" type="button">Prepare Browser</button>
           </div>
+          <div class="hint" id="browser-task-hint" style="margin-bottom: 10px;">Initialize a browser automation session for research or form operations.</div>
           <div class="list" id="browser-conversation-active"></div>
         </section>
       </div>
@@ -2314,8 +2324,102 @@
         return String(value || navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
       }
 
+      let presenceStudioVocabulary = {};
+
       function uiText(en, ja) {
         return normalizeUiLocale() === "ja" ? (ja || en) : en;
+      }
+
+      function uiTextKey(key, fallback) {
+        return presenceStudioVocabulary[key] || fallback;
+      }
+
+      function uiMessage(key, params, fallback) {
+        return Object.entries(params || {}).reduce(
+          (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
+          uiTextKey(key, fallback),
+        );
+      }
+
+      async function loadPresenceStudioVocabulary() {
+        try {
+          const response = await fetch(`/api/ui-vocabulary?locale=${encodeURIComponent(normalizeUiLocale())}`);
+          const body = await response.json();
+          if (response.ok && body.ok && body.texts && typeof body.texts === "object") {
+            presenceStudioVocabulary = body.texts;
+          }
+        } catch {
+          // English markup is the deterministic offline fallback.
+        }
+        localizeMinutesPanel();
+        localizeOperatorPanels();
+      }
+
+      function localizeMinutesPanel() {
+        const setText = (selector, key, fallback) => {
+          const element = document.querySelector(selector);
+          if (element) element.textContent = uiTextKey(`presence_studio:${key}`, fallback);
+        };
+        const setPlaceholder = (selector, key, fallback) => {
+          const element = document.querySelector(selector);
+          if (element) element.placeholder = uiTextKey(`presence_studio:${key}`, fallback);
+        };
+        setPlaceholder("#minutes-record-mission", "record_mission_placeholder", "Mission ID (blank creates one; e.g. MSN-MTG-001)");
+        setText("#minutes-record-start", "record_start", "🎙️ Record meeting");
+        setText("#minutes-record-stop", "record_stop", "⏹ Stop and make minutes");
+        setText("#minutes-live-transcript", "live_transcript", "Live transcript appears here…");
+        setText("#minutes-record-hint", "record_hint", "Records microphone audio and creates minutes.md plus action items.");
+        setText("#minutes-record-panel .label", "record_panel_label", "Record meeting (microphone → minutes)");
+        setText("#minutes-panel .label", "notes_panel_label", "Dictation notes");
+        setPlaceholder("#dictation-notes", "notes_placeholder", "Dictated text appears here, or paste notes directly.");
+        setPlaceholder("#minutes-title", "meeting_title_placeholder", "Meeting title (optional)");
+        setText("#minutes-save", "create_minutes", "Create minutes");
+        setText("#minutes-copy", "copy_notes", "Copy notes");
+        setText("#minutes-restore", "restore_draft", "Restore draft");
+        setText("#minutes-clear", "clear_notes", "Clear notes");
+        setText("#minutes-hint", "notes_hint", "Create structured minutes from dictated or drafted notes.");
+      }
+
+      function localizeOperatorPanels() {
+        const setText = (selector, key, fallback) => {
+          const element = document.querySelector(selector);
+          if (element) element.textContent = uiTextKey(`presence_studio:${key}`, fallback);
+        };
+        const setPlaceholder = (selector, key, fallback) => {
+          const element = document.querySelector(selector);
+          if (element) element.placeholder = uiTextKey(`presence_studio:${key}`, fallback);
+        };
+        setText("#email-triage-panel .label", "email_triage_label", "Email Triage");
+        setText("#email-triage-content", "email_triage_empty", "Email triage has not been loaded yet.");
+        setText("#email-triage-refresh", "refresh_triage", "Refresh Triage");
+        setText("#email-triage-copy", "copy_draft", "Copy Draft");
+        setText("#email-triage-hint", "email_triage_hint", "Run the email triage pipeline to populate the latest inbox summary and reply draft.");
+        setText("#email-panel .label", "email_reply_label", "Email Reply Draft");
+        setText("#email-auth-status", "email_auth_checking", "Checking email account status...");
+        setText("#email-account option[value='auto']", "account_auto", "Automatic account selection");
+        setPlaceholder("#email-draft-to", "recipient_placeholder", "Recipient");
+        setPlaceholder("#email-draft-subject", "subject_placeholder", "Subject");
+        setText("#email-draft-tone option[value='clear and concise']", "tone_clear", "Clear and concise");
+        setText("#email-draft-tone option[value='warm and helpful']", "tone_warm", "Warm and helpful");
+        setText("#email-draft-tone option[value='firm and direct']", "tone_firm", "Firm and direct");
+        setPlaceholder("#email-draft-message-id", "reply_message_id_placeholder", "Reply Message ID (optional)");
+        setText("#email-draft-mode option[value='new']", "mode_new", "New Email");
+        setText("#email-draft-mode option[value='reply']", "mode_reply", "Reply");
+        setText("#email-draft-mode option[value='reply-all']", "mode_reply_all", "Reply All");
+        setText("#email-draft-content", "email_draft_empty", "No email reply draft has been created yet.");
+        setText("#email-draft-create", "create_reply_draft", "Create Reply Draft");
+        setText("#email-draft-create-gmail", "create_account_draft", "Create Account Draft");
+        setText("#email-draft-send", "send_approved_email", "Send Approved Email");
+        setText("#email-auth-refresh", "refresh_auth", "Refresh Auth");
+        setText("#email-draft-refresh", "reload_draft", "Reload Draft");
+        setText("#email-draft-copy", "copy_reply", "Copy Reply");
+        setText("#email-draft-hint", "email_draft_hint", "Generate a local reply draft, then create it in the selected email account.");
+        setText("#approval-panel .label", "approval_label", "Approval Inbox");
+        setText("#outcome-panel .label", "outcomes_label", "Latest Outcomes");
+        setText("#requested-work-panel .label", "requested_work_label", "Requested Work");
+        setText("#browser-panel .label", "browser_label", "Browser Task");
+        setText("#browser-session-bootstrap", "prepare_browser", "Prepare Browser");
+        setText("#browser-task-hint", "browser_task_hint", "Initialize a browser automation session for research or form operations.");
       }
 
       function relatedPromotedRefsForProject(projectId) {
@@ -3514,11 +3618,17 @@
       const minutesRecordStartEl = document.getElementById("minutes-record-start");
       const minutesRecordStopEl = document.getElementById("minutes-record-stop");
       const minutesRecordHintEl = document.getElementById("minutes-record-hint");
+      void loadPresenceStudioVocabulary();
       minutesRecordStartEl?.addEventListener("click", async () => {
-        const missionId = (minutesRecordMissionEl?.value || "").trim();
+        let missionId = (minutesRecordMissionEl?.value || "").trim();
         if (!missionId) {
-          minutesRecordHintEl.textContent = "ミッションIDを入力してください（録音の保存先になります）。";
-          return;
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, "0");
+          const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+          missionId = `MSN-MTG-${dateStr}`;
+          if (minutesRecordMissionEl) {
+            minutesRecordMissionEl.value = missionId;
+          }
         }
         minutesRecordStartEl.disabled = true;
         try {
@@ -3528,10 +3638,17 @@
             body: JSON.stringify({ missionId }),
           });
           const body = await res.json();
-          if (!res.ok || !body.ok) throw new Error(body.error || "録音を開始できませんでした");
+          if (!res.ok || !body.ok) {
+            const nextAction = body.nextAction ? `\n${body.nextAction}` : "";
+            throw new Error((body.error || "録音を開始できませんでした") + nextAction);
+          }
           document.getElementById("minutes-live-transcript").textContent = "";
           minutesRecordStopEl.disabled = false;
-          minutesRecordHintEl.textContent = `録音中（${body.missionId} / ${body.backend}）… 発話が文字起こしされ次第ここに表示されます。`;
+          minutesRecordHintEl.textContent = uiMessage(
+            "presence_studio:recording_started",
+            { missionId: body.missionId, backend: body.backend },
+            `Recording (${body.missionId} / ${body.backend})… transcript will appear here.`,
+          );
         } catch (err) {
           minutesRecordStartEl.disabled = false;
           minutesRecordHintEl.textContent = String(err && err.message ? err.message : err);
@@ -3539,14 +3656,24 @@
       });
       minutesRecordStopEl?.addEventListener("click", async () => {
         minutesRecordStopEl.disabled = true;
-        minutesRecordHintEl.textContent = "録音を終了し、議事録を生成しています…";
+        minutesRecordHintEl.textContent = uiTextKey(
+          "presence_studio:recording_stopping",
+          "Stopping recording and generating minutes…",
+        );
         try {
           const res = await fetch("/api/minutes/session/stop", { method: "POST" });
           const body = await res.json();
           if (!res.ok || !body.ok) throw new Error(body.error || "議事録の生成に失敗しました");
           minutesRecordHintEl.textContent = body.minutesPath
-            ? `議事録を生成しました: ${body.minutesPath}（セグメント${body.segments}件）`
-            : "録音を終了しました（音声が短すぎたため議事録は未生成です）。";
+            ? uiMessage(
+                "presence_studio:minutes_created",
+                { path: body.minutesPath, segments: body.segments },
+                `Minutes created: ${body.minutesPath} (${body.segments} segment(s))`,
+              )
+            : uiTextKey(
+                "presence_studio:recording_short",
+                "Recording stopped (audio was too short; minutes were not generated).",
+              );
         } catch (err) {
           minutesRecordHintEl.textContent = String(err && err.message ? err.message : err);
         } finally {

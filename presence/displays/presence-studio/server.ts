@@ -1,5 +1,7 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import { normalizeLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -72,6 +74,7 @@ import {
   type A2UIMessage,
   type PresenceTimelineAdf,
   validatePresenceTimeline,
+  checkMeetingParticipationConsent,
   createCompanionWebThemePack,
   webThemePackToCssVars,
   installShellSpeechToTextBridgeIfAvailable,
@@ -893,6 +896,18 @@ app.post('/api/minutes/session/start', async (req, res) => {
       res.status(503).json({ ok: false, error: probe.reason || 'マイクが利用できません' });
       return;
     }
+    const consent = checkMeetingParticipationConsent({
+      mission_id: missionId,
+      purpose: 'recording',
+    });
+    if (!consent.allowed) {
+      res.status(412).json({
+        ok: false,
+        error: consent.reason || 'recording consent is required',
+        nextAction: `pnpm meeting:consent grant --mission ${missionId} --operator <handle>`,
+      });
+      return;
+    }
     installShellSpeechToTextBridgeIfAvailable();
     inRoomMinutesSession = await startInRoomMinutesSession({
       missionId,
@@ -964,6 +979,67 @@ app.get('/api/design-tokens.css', (_req, res) => {
   res.setHeader('Content-Type', 'text/css; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.send(body);
+});
+
+const PRESENCE_STUDIO_VOCABULARY_KEYS = [
+  'presence_studio:record_mission_placeholder',
+  'presence_studio:record_start',
+  'presence_studio:record_stop',
+  'presence_studio:live_transcript',
+  'presence_studio:record_hint',
+  'presence_studio:record_panel_label',
+  'presence_studio:notes_panel_label',
+  'presence_studio:notes_placeholder',
+  'presence_studio:meeting_title_placeholder',
+  'presence_studio:create_minutes',
+  'presence_studio:copy_notes',
+  'presence_studio:restore_draft',
+  'presence_studio:clear_notes',
+  'presence_studio:notes_hint',
+  'presence_studio:email_triage_label',
+  'presence_studio:email_triage_empty',
+  'presence_studio:refresh_triage',
+  'presence_studio:copy_draft',
+  'presence_studio:email_triage_hint',
+  'presence_studio:email_reply_label',
+  'presence_studio:email_auth_checking',
+  'presence_studio:account_auto',
+  'presence_studio:recipient_placeholder',
+  'presence_studio:subject_placeholder',
+  'presence_studio:tone_clear',
+  'presence_studio:tone_warm',
+  'presence_studio:tone_firm',
+  'presence_studio:reply_message_id_placeholder',
+  'presence_studio:mode_new',
+  'presence_studio:mode_reply',
+  'presence_studio:mode_reply_all',
+  'presence_studio:email_draft_empty',
+  'presence_studio:create_reply_draft',
+  'presence_studio:create_account_draft',
+  'presence_studio:send_approved_email',
+  'presence_studio:refresh_auth',
+  'presence_studio:reload_draft',
+  'presence_studio:copy_reply',
+  'presence_studio:email_draft_hint',
+  'presence_studio:approval_label',
+  'presence_studio:outcomes_label',
+  'presence_studio:requested_work_label',
+  'presence_studio:browser_label',
+  'presence_studio:prepare_browser',
+  'presence_studio:browser_task_hint',
+  'presence_studio:recording_started',
+  'presence_studio:recording_stopping',
+  'presence_studio:minutes_created',
+  'presence_studio:recording_short',
+] as const satisfies readonly VocabularyKey[];
+
+app.get('/api/ui-vocabulary', (req, res) => {
+  const locale = normalizeLocale(req.query.locale) ?? 'en';
+  const texts = Object.fromEntries(
+    PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, locale, texts });
 });
 
 app.get('/api/identity', (_req, res) => {

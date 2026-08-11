@@ -208,11 +208,14 @@ export function resolveCurrentTriggerAuthority(tenantSlug?: string): TriggerAuth
       `[POLICY_VIOLATION] Trigger authority role has no governed level: ${activeRole}`
     );
   }
+  // The `as` cast is gone deliberately: it was hiding a misspelled property
+  // (`tenantSlug` instead of the declared `tenant_slug`), so the tenant scope
+  // silently never reached the snapshot. Let the object be checked structurally.
   return {
     authority_role: activeRole,
     level,
     ...(tenantSlug?.trim() ? { tenant_slug: tenantSlug.trim() } : {}),
-  } as TriggerAuthoritySnapshot;
+  };
 }
 
 /** Reject a trigger whose requested authority exceeds its creator snapshot. */

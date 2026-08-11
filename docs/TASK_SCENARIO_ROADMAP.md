@@ -117,6 +117,18 @@ last_updated: 2026-07-13
 - Existing pipeline-template: `knowledge/product/pipeline-templates/weekly-executive-digest.json`
 - Implementation status: scenario + workflow MVP を追加済み
 
+### 7. `aws-cost-estimate-from-vendor-docs`
+
+- User phrase example: `このベンダー提案書と要件定義書を読んでAWS費用の見積りを出してください`
+- Business outcome: ベンダーのシステム提案書・要件定義書から独立したAWS原価見積り(割引・サポート・為替シナリオ込み)をテナントブランドのHTMLとして作成する
+- Input sources: vendor proposal PDF, requirements doc PDF, tenant design system
+- First-run reasoning / setup questions: 正とするアーキテクチャ資料、外部接続有無の扱い、割引条件(EDP/Savings Plans)、サポートプラン/Shield Advancedの契約主体、為替レート前提、適用するテナントブランドテーマ、社外提示を想定するか(mission化・CUSTOMER_SIGNOFFゲート要否の判断材料)
+- Repeat-run behavior: 保存済み profile の割引・サポート・為替前提を使って同じ構成の見積りを再生成する
+- Output artifacts: `aws-cost-estimate.html`, `cost-buildup-summary.md`
+- Approval boundary: `external_delivery` と `customer_signoff` は要承認、既定は `draft-only`
+- Existing pipeline-template: `knowledge/product/pipeline-templates/aws-cost-estimate-from-vendor-docs.json`(未実装)
+- Implementation status: TaskScenario定義+contract testを追加済み。pipeline-templateと反復実行の自動化は未実装(現状はチャットセッション内での手動実行のみ)。対外提示を伴う場合はCLAUDE.mdのdog-food ruleに従いミッション化・`CUSTOMER_SIGNOFF`ゲートの適用を検討すること。
+
 ## 次の実装順
 
 1. `TaskScenario` schema と example

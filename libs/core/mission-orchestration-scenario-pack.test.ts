@@ -19,6 +19,7 @@ type Scenario = {
   mission_class: string;
   delivery_shape: string;
   workflow_pattern: string;
+  expected_workflow_id?: string;
 };
 
 function loadPack(): { scenarios: Scenario[] } {
@@ -48,6 +49,21 @@ describe('mission orchestration scenario pack', () => {
     const pack = loadJson('product/governance/mission-orchestration-scenario-pack.json');
     expect(validate(pack), JSON.stringify(validate.errors || [])).toBe(true);
     expect(pack.purpose).toBe('regression-fixture');
+  });
+
+  it('keeps an explicit golden scenario for alignment-gated high-stakes work', () => {
+    const scenario = loadPack().scenarios.find(
+      (entry) => entry.scenario_id === 'golden-alignment-gated-high-stakes'
+    );
+    expect(scenario).toMatchObject({
+      scenario_class: 'golden',
+      mission_class: 'product_delivery',
+      workflow_pattern: 'stage_gated_delivery',
+      expected_workflow_id: 'stage-gated-high-stakes',
+    });
+    expect(scenario?.expected_signals).toEqual(
+      expect.arrayContaining(['alignment_brief_created', 'alignment_approval_required'])
+    );
   });
 
   it('executes every golden prompt through the runtime resolution chain', () => {
@@ -96,11 +112,22 @@ describe('mission orchestration scenario pack', () => {
       expect(classification.delivery_shape, scenario.scenario_id).toEqual(expect.any(String));
       expect(workflowIds.has(workflow.workflow_id), scenario.scenario_id).toBe(true);
       expect(patterns.has(workflow.pattern), scenario.scenario_id).toBe(true);
+      if (scenario.expected_workflow_id) {
+        expect(workflow.workflow_id, scenario.scenario_id).toBe(scenario.expected_workflow_id);
+      }
       expect(
         review.required_gate_ids.every((gateId) => gateIds.has(gateId)),
         scenario.scenario_id
       ).toBe(true);
       expect(scenario.expected_signals.length, scenario.scenario_id).toBeGreaterThan(0);
+      if (scenario.expected_signals.includes('alignment_approval_required')) {
+        const alignment = workflow.phase_specs?.find((phase) => phase.id === 'alignment');
+        expect(alignment?.exit_gate?.id, scenario.scenario_id).toBe('ALIGNMENT_APPROVED');
+        expect(
+          alignment?.exit_gate?.checks.some((check) => check.kind === 'command_succeeds'),
+          scenario.scenario_id
+        ).toBe(true);
+      }
     }
   });
 

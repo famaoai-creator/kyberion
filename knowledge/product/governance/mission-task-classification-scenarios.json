@@ -18,10 +18,18 @@
         "delivery_shape": "interactive_exploration",
         "risk_profile": "low",
         "stage": "planning",
-        "workflow_id": "explore-then-govern",
-        "workflow_pattern": "exploratory_to_deterministic_conversion",
-        "review_mode": "lean",
-        "required_gate_ids": ["CONTRACT_VALID"],
+        "workflow_id": "customer-engagement-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "REQUIREMENTS_COMPLETENESS",
+          "CUSTOMER_SIGNOFF",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
         "promotion_required": false
       }
     },
@@ -41,10 +49,18 @@
         "delivery_shape": "interactive_exploration",
         "risk_profile": "low",
         "stage": "planning",
-        "workflow_id": "explore-then-govern",
-        "workflow_pattern": "exploratory_to_deterministic_conversion",
-        "review_mode": "lean",
-        "required_gate_ids": ["CONTRACT_VALID"],
+        "workflow_id": "customer-engagement-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "REQUIREMENTS_COMPLETENESS",
+          "CUSTOMER_SIGNOFF",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
         "promotion_required": false
       }
     },
@@ -498,8 +514,8 @@
         "delivery_shape": "interactive_exploration",
         "risk_profile": "review_required",
         "stage": "planning",
-        "workflow_id": "explore-then-govern",
-        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "workflow_id": "crystallize-then-freeze",
+        "workflow_pattern": "pipeline_crystallization_loop",
         "review_mode": "standard",
         "required_gate_ids": [
           "CONTRACT_VALID",
@@ -529,10 +545,18 @@
         "delivery_shape": "interactive_exploration",
         "risk_profile": "low",
         "stage": "planning",
-        "workflow_id": "explore-then-govern",
-        "workflow_pattern": "exploratory_to_deterministic_conversion",
-        "review_mode": "lean",
-        "required_gate_ids": ["CONTRACT_VALID"],
+        "workflow_id": "customer-engagement-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "REQUIREMENTS_COMPLETENESS",
+          "CUSTOMER_SIGNOFF",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
         "promotion_required": false
       }
     },

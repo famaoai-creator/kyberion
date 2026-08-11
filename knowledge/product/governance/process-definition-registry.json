@@ -25,7 +25,7 @@
         "scripts/check_governance_rules.ts",
         "tests/scenario-coverage-contract.test.ts"
       ],
-      "expected_counts": { "scenarios": 23 }
+      "expected_counts": { "scenarios": 24 }
     },
     {
       "id": "mission-task-classification-scenarios",

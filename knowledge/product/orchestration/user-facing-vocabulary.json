@@ -5747,6 +5747,804 @@
         "qps-ploc": "⟦Ůñķñőẇñ ŀőř⟧"
       }
     },
+    "mission_alignment": {
+      "approval_title": {
+        "en": "Alignment approval: {title}",
+        "ja": "アラインメント承認: {title}",
+        "qps-ploc": "⟦Ȧŀïɠñɱėñŧ ȧṗṗřőṽȧŀ: {title} ŀőřėɱ ïṗ⟧"
+      },
+      "approval_summary": {
+        "en": "Sovereign approval is requested for the {missionId} execution plan.",
+        "ja": "{missionId} の実行計画について Sovereign の承認を求めます。",
+        "qps-ploc": "⟦Şőṽėřėïɠñ ȧṗṗřőṽȧŀ ïş řėɋůėşŧėḓ ƒőř ŧħė {missionId} ėẋėƈůŧïőñ ṗŀȧñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "approval_surfaces_notice": {
+        "en": "This approval appears on all surfaces (concierge / Slack / chronos / terminal / brief).",
+        "ja": "この承認は全サーフェス(concierge / Slack / chronos / terminal / brief)に現れます。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ ȧṗṗėȧřş őñ ȧŀŀ şůřƒȧƈėş (ƈőñƈïėřɠė / Şŀȧƈķ / ƈħřőñőş / ŧėřɱïñȧŀ / ƀřïėƒ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "brief_title": {
+        "en": "Mission brief",
+        "ja": "ミッションブリーフ",
+        "qps-ploc": "⟦Ɱïşşïőñ ƀřïėƒ ŀőřė⟧"
+      },
+      "label_persona": {
+        "en": "Persona",
+        "ja": "ペルソナ",
+        "qps-ploc": "⟦Ṗėřşőñȧ ŀőř⟧"
+      },
+      "label_tier": {
+        "en": "Tier",
+        "ja": "ティア",
+        "qps-ploc": "⟦Ŧïėř ŀőř⟧"
+      },
+      "label_mode": {
+        "en": "Mode",
+        "ja": "モード",
+        "qps-ploc": "⟦Ɱőḓė ŀőř⟧"
+      },
+      "label_risk": {
+        "en": "Risk",
+        "ja": "リスク",
+        "qps-ploc": "⟦Řïşķ ŀőř⟧"
+      },
+      "sudo_gate": {
+        "en": " (sudo gate)",
+        "ja": "（Sudoゲート該当）",
+        "qps-ploc": "⟦ (şůḓő ɠȧŧė) ŀőř⟧"
+      },
+      "section_intent": {
+        "en": "1. Intent and context",
+        "ja": "1. 意図・背景",
+        "qps-ploc": "⟦1. Ïñŧėñŧ ȧñḓ ƈőñŧėẋŧ ŀőřėɱ ⟧"
+      },
+      "section_goals": {
+        "en": "2. Goals (measurable victory conditions)",
+        "ja": "2. ゴール（Victory Conditions・測定可能）",
+        "qps-ploc": "⟦2. Ɠőȧŀş (ɱėȧşůřȧƀŀė ṽïƈŧőřẏ ƈőñḓïŧïőñş) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "section_scope": {
+        "en": "3. Scope",
+        "ja": "3. スコープ",
+        "qps-ploc": "⟦3. Şƈőṗė ŀőř⟧"
+      },
+      "scope_in": {
+        "en": "In scope",
+        "ja": "対象（In）",
+        "qps-ploc": "⟦Ïñ şƈőṗė ŀőř⟧"
+      },
+      "scope_out": {
+        "en": "Out of scope",
+        "ja": "対象外（Out）",
+        "qps-ploc": "⟦Őůŧ őƒ şƈőṗė ŀőř⟧"
+      },
+      "section_flow": {
+        "en": "4. Execution flow",
+        "ja": "4. 実行の流れ",
+        "qps-ploc": "⟦4. Ėẋėƈůŧïőñ ƒŀőẇ ŀőřėɱ⟧"
+      },
+      "section_roles": {
+        "en": "5. Team and roles",
+        "ja": "5. 体制・役割",
+        "qps-ploc": "⟦5. Ŧėȧɱ ȧñḓ řőŀėş ŀőřėɱ⟧"
+      },
+      "section_deliverables": {
+        "en": "6. Deliverables",
+        "ja": "6. 成果物",
+        "qps-ploc": "⟦6. Ḓėŀïṽėřȧƀŀėş ŀőřė⟧"
+      },
+      "section_risks": {
+        "en": "7. Risks and open items",
+        "ja": "7. リスク・オープン項目",
+        "qps-ploc": "⟦7. Řïşķş ȧñḓ őṗėñ ïŧėɱş ŀőřėɱ ï⟧"
+      },
+      "section_estimate": {
+        "en": "8. Estimate",
+        "ja": "8. 見積り",
+        "qps-ploc": "⟦8. Ėşŧïɱȧŧė ŀőř⟧"
+      },
+      "step": {
+        "en": "Step",
+        "ja": "ステップ",
+        "qps-ploc": "⟦Şŧėṗ ŀőř⟧"
+      },
+      "pipeline_basis": {
+        "en": "Pipeline / basis",
+        "ja": "pipeline/根拠",
+        "qps-ploc": "⟦Ṗïṗėŀïñė / ƀȧşïş ŀőřėɱ⟧"
+      },
+      "owner": {
+        "en": "Owner",
+        "ja": "担当",
+        "qps-ploc": "⟦Őẇñėř ŀőř⟧"
+      },
+      "role": {
+        "en": "Role",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀė ŀőř⟧"
+      },
+      "risk_header": {
+        "en": "Risk",
+        "ja": "リスク",
+        "qps-ploc": "⟦Řïşķ ŀőř⟧"
+      },
+      "level": {
+        "en": "Level",
+        "ja": "Lv",
+        "qps-ploc": "⟦Ŀėṽėŀ ŀőř⟧"
+      },
+      "mitigation": {
+        "en": "Mitigation",
+        "ja": "緩和",
+        "qps-ploc": "⟦Ɱïŧïɠȧŧïőñ ŀőř⟧"
+      },
+      "open_items": {
+        "en": "Open items",
+        "ja": "未決事項",
+        "qps-ploc": "⟦Őṗėñ ïŧėɱş ŀőř⟧"
+      },
+      "effort": {
+        "en": "Effort",
+        "ja": "工数",
+        "qps-ploc": "⟦Ėƒƒőřŧ ŀőř⟧"
+      },
+      "cost": {
+        "en": "Cost",
+        "ja": "コスト",
+        "qps-ploc": "⟦Ƈőşŧ ŀőř⟧"
+      },
+      "decider_name_prompt": {
+        "en": "Decider name:",
+        "ja": "決裁者名:",
+        "qps-ploc": "⟦Ḓėƈïḓėř ñȧɱė: ŀőřė⟧"
+      },
+      "sending": {
+        "en": "Sending…",
+        "ja": "送信中…",
+        "qps-ploc": "⟦Şėñḓïñɠ… ŀőř⟧"
+      },
+      "failed": {
+        "en": "Failed: {error}",
+        "ja": "失敗: {error}",
+        "qps-ploc": "⟦Ƒȧïŀėḓ: {error} ŀőřė⟧"
+      },
+      "approved_short": {
+        "en": "Approved",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "changes_short": {
+        "en": "Changes requested",
+        "ja": "要修正",
+        "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ ŀőřėɱ⟧"
+      },
+      "ad_hoc_flow": {
+        "en": "Ad hoc decision",
+        "ja": "都度判断",
+        "qps-ploc": "⟦Ȧḓ ħőƈ ḓėƈïşïőñ ŀőřė⟧"
+      },
+      "empty_value": {
+        "en": "—",
+        "ja": "—",
+        "qps-ploc": "⟦— ŀőř⟧"
+      },
+      "approval_unbound": {
+        "en": "This HTML is not bound to an approval request, so it cannot decide here. Open an approval with mission_alignment_request --mission <ID>, then serve it with serve-brief --mission <ID>.",
+        "ja": "この HTML は承認リクエストに紐づいていないため、ここから決裁できません。mission_alignment_request --mission <ID> で承認を開き、serve-brief --mission <ID> で配信してください。",
+        "qps-ploc": "⟦Ŧħïş ĦŦⱮĿ ïş ñőŧ ƀőůñḓ ŧő ȧñ ȧṗṗřőṽȧŀ řėɋůėşŧ, şő ïŧ ƈȧññőŧ ḓėƈïḓė ħėřė. Őṗėñ ȧñ ȧṗṗřőṽȧŀ ẇïŧħ ɱïşşïőñ_ȧŀïɠñɱėñŧ_řėɋůėşŧ --ɱïşşïőñ <ÏḒ>, ŧħėñ şėřṽė ïŧ ẇïŧħ şėřṽė-ƀřïėƒ --ɱïşşïőñ <ÏḒ>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "approval_approved": {
+        "en": "Approved",
+        "ja": "承認済み",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "approval_settled": {
+        "en": "This decision is final. Cancel and request again to change it.",
+        "ja": "この決定は確定済みです。覆すにはキャンセルして再申請してください。",
+        "qps-ploc": "⟦Ŧħïş ḓėƈïşïőñ ïş ƒïñȧŀ. Ƈȧñƈėŀ ȧñḓ řėɋůėşŧ ȧɠȧïñ ŧő ƈħȧñɠė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "approval_approve_button": {
+        "en": "Approve and make the mission eligible to start",
+        "ja": "承認してミッションを起動可能にする",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ȧñḓ ɱȧķė ŧħė ɱïşşïőñ ėŀïɠïƀŀė ŧő şŧȧřŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "approval_changes_button": {
+        "en": "Request changes",
+        "ja": "要修正",
+        "qps-ploc": "⟦Řėɋůėşŧ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "approval_reason_placeholder": {
+        "en": "Reason (required for changes)",
+        "ja": "理由（要修正時）",
+        "qps-ploc": "⟦Řėȧşőñ (řėɋůïřėḓ ƒőř ƈħȧñɠėş) ŀőřėɱ ïṗş⟧"
+      },
+      "reason_incorrect_content": {
+        "en": "Incorrect content",
+        "ja": "内容が誤り",
+        "qps-ploc": "⟦Ïñƈőřřėƈŧ ƈőñŧėñŧ ŀőřėɱ⟧"
+      },
+      "reason_wrong_direction": {
+        "en": "Wrong direction",
+        "ja": "方向が違う",
+        "qps-ploc": "⟦Ẇřőñɠ ḓïřėƈŧïőñ ŀőřė⟧"
+      },
+      "reason_quality": {
+        "en": "Insufficient quality",
+        "ja": "品質不足",
+        "qps-ploc": "⟦Ïñşůƒƒïƈïėñŧ ɋůȧŀïŧẏ ŀőřėɱ ⟧"
+      },
+      "reason_scope": {
+        "en": "Scope is too broad or narrow",
+        "ja": "スコープ過不足",
+        "qps-ploc": "⟦Şƈőṗė ïş ŧőő ƀřőȧḓ őř ñȧřřőẇ ŀőřėɱ ïṗş⟧"
+      },
+      "reason_other": {
+        "en": "Other",
+        "ja": "その他",
+        "qps-ploc": "⟦Őŧħėř ŀőř⟧"
+      },
+      "approval_pending": {
+        "en": "Pending — review the content, add a comment if needed, then approve or request changes.",
+        "ja": "未決定 — 内容を確認し、必要ならコメントで指示 → 承認 または 要修正",
+        "qps-ploc": "⟦Ṗėñḓïñɠ — řėṽïėẇ ŧħė ƈőñŧėñŧ, ȧḓḓ ȧ ƈőɱɱėñŧ ïƒ ñėėḓėḓ, ŧħėñ ȧṗṗřőṽė őř řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "approval_choose_reason": {
+        "en": "Choose a reason for the requested changes.",
+        "ja": "要修正の理由を選んでください。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ řėȧşőñ ƒőř ŧħė řėɋůėşŧėḓ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "approval_decider_required": {
+        "en": "A decider name is required and will be recorded in the audit trail.",
+        "ja": "決裁者名が必要です（監査証跡に記録されます）。",
+        "qps-ploc": "⟦Ȧ ḓėƈïḓėř ñȧɱė ïş řėɋůïřėḓ ȧñḓ ẇïŀŀ ƀė řėƈőřḓėḓ ïñ ŧħė ȧůḓïŧ ŧřȧïŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "approval_comment_prompt": {
+        "en": "Comment (optional):",
+        "ja": "コメント（任意）:",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ (őṗŧïőñȧŀ): ŀőřėɱ ⟧"
+      },
+      "approval_submitted": {
+        "en": "Recorded in the approval store ({requestId}). Reload to show the final state.",
+        "ja": "承認ストアに記録しました（{requestId}）。再読み込みで確定表示になります。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ïñ ŧħė ȧṗṗřőṽȧŀ şŧőřė ({requestId}). Řėŀőȧḓ ŧő şħőẇ ŧħė ƒïñȧŀ şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "static_preview_notice": {
+        "en": "This static HTML cannot decide because it is not bound to an approval request.",
+        "ja": "この静的HTMLからは決裁できません（承認リクエストに未紐付け）。",
+        "qps-ploc": "⟦Ŧħïş şŧȧŧïƈ ĦŦⱮĿ ƈȧññőŧ ḓėƈïḓė ƀėƈȧůşė ïŧ ïş ñőŧ ƀőůñḓ ŧő ȧñ ȧṗṗřőṽȧŀ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "static_preview_commands": {
+        "en": "To decide, open an approval with mission_alignment_request --mission <ID> and serve it with serve-brief --mission <ID>.",
+        "ja": "決裁するには mission_alignment_request --mission <ID> で承認を開き、serve-brief --mission <ID> で配信してください。",
+        "qps-ploc": "⟦Ŧő ḓėƈïḓė, őṗėñ ȧñ ȧṗṗřőṽȧŀ ẇïŧħ ɱïşşïőñ_ȧŀïɠñɱėñŧ_řėɋůėşŧ --ɱïşşïőñ <ÏḒ> ȧñḓ şėřṽė ïŧ ẇïŧħ şėřṽė-ƀřïėƒ --ɱïşşïőñ <ÏḒ>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "server_approval_missing": {
+        "en": "none — open it first with mission_alignment_request",
+        "ja": "なし — mission_alignment_request で先に開いてください",
+        "qps-ploc": "⟦ñőñė — őṗėñ ïŧ ƒïřşŧ ẇïŧħ ɱïşşïőñ_ȧŀïɠñɱėñŧ_řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "server_decision_notice": {
+        "en": "This decision is written to the same approval record as every other surface. Ctrl-C to stop.",
+        "ja": "この決裁は他サーフェスと同じ承認レコードに書かれます。Ctrl-C で停止。",
+        "qps-ploc": "⟦Ŧħïş ḓėƈïşïőñ ïş ẇřïŧŧėñ ŧő ŧħė şȧɱė ȧṗṗřőṽȧŀ řėƈőřḓ ȧş ėṽėřẏ őŧħėř şůřƒȧƈė. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "decision_approved": {
+        "en": "Approved. Run the following mission start command only after a human GO.",
+        "ja": "承認済み。人間GOで実行するミッション起動コマンド",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ. Řůñ ŧħė ƒőŀŀőẇïñɠ ɱïşşïőñ şŧȧřŧ ƈőɱɱȧñḓ őñŀẏ ȧƒŧėř ȧ ħůɱȧñ ƓŐ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "decision_changes": {
+        "en": "Changes requested. Apply the comments to the brief, render again, and review again.",
+        "ja": "要修正。上記コメントをブリーフに反映して再レンダリング → 再レビュー",
+        "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ. Ȧṗṗŀẏ ŧħė ƈőɱɱėñŧş ŧő ŧħė ƀřïėƒ, řėñḓėř ȧɠȧïñ, ȧñḓ řėṽïėẇ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "decision_pending": {
+        "en": "Pending. Waiting for the Sovereign to approve or request changes.",
+        "ja": "未決定（pending）。Sovereign の承認/要修正待ち",
+        "qps-ploc": "⟦Ṗėñḓïñɠ. Ẇȧïŧïñɠ ƒőř ŧħė Şőṽėřėïɠñ ŧő ȧṗṗřőṽė őř řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      }
+    },
+    "report_review": {
+      "bar_title": {
+        "en": "Review and edit layer (local only; no external upload)",
+        "ja": "推敲・修正レイヤ（ローカルのみ・外部送信なし）",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ėḓïŧ ŀȧẏėř (ŀőƈȧŀ őñŀẏ; ñő ėẋŧėřñȧŀ ůṗŀőȧḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "edit": {
+        "en": "Edit",
+        "ja": "編集",
+        "qps-ploc": "⟦Ėḓïŧ ŀőř⟧"
+      },
+      "comment": {
+        "en": "Comment",
+        "ja": "コメント",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ ŀőř⟧"
+      },
+      "list": {
+        "en": "List",
+        "ja": "一覧",
+        "qps-ploc": "⟦Ŀïşŧ ŀőř⟧"
+      },
+      "restore": {
+        "en": "Restore",
+        "ja": "復元",
+        "qps-ploc": "⟦Řėşŧőřė ŀőř⟧"
+      },
+      "export_html": {
+        "en": "Export HTML",
+        "ja": "HTML書出し",
+        "qps-ploc": "⟦Ėẋṗőřŧ ĦŦⱮĿ ŀőř⟧"
+      },
+      "export_md": {
+        "en": "Export comments MD",
+        "ja": "コメントMD",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƈőɱɱėñŧş ⱮḒ ŀőřėɱ⟧"
+      },
+      "save": {
+        "en": "Save",
+        "ja": "保存(直書き)",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "discard": {
+        "en": "Discard",
+        "ja": "破棄",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőř⟧"
+      },
+      "comments_title": {
+        "en": "Comments",
+        "ja": "コメント一覧",
+        "qps-ploc": "⟦Ƈőɱɱėñŧş ŀőř⟧"
+      },
+      "note_placeholder": {
+        "en": "Comment / suggested change",
+        "ja": "コメント / 修正案（キーボード または 音声で入力）",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ / şůɠɠėşŧėḓ ƈħȧñɠė ŀőřėɱ ïṗ⟧"
+      },
+      "cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "register": {
+        "en": "Add",
+        "ja": "登録",
+        "qps-ploc": "⟦Ȧḓḓ ŀőř⟧"
+      },
+      "dictation_note": {
+        "en": "OS dictation is processed on-device. Browser speech recognition may send audio to the browser provider's cloud; use OS dictation for sensitive content.",
+        "ja": "この欄はOSのディクテーション（端末内・外部送信なし）でそのまま話せます。ブラウザの音声認識は機種により音声が提供元のクラウドへ送信される場合があります。機微な内容はOSディクテーション推奨。",
+        "qps-ploc": "⟦ŐŞ ḓïƈŧȧŧïőñ ïş ṗřőƈėşşėḓ őñ-ḓėṽïƈė. Ƀřőẇşėř şṗėėƈħ řėƈőɠñïŧïőñ ɱȧẏ şėñḓ ȧůḓïő ŧő ŧħė ƀřőẇşėř ṗřőṽïḓėř'ş ƈŀőůḓ; ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "voice": {
+        "en": "Voice",
+        "ja": "音声",
+        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
+      },
+      "voice_stop": {
+        "en": "Stop",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "review_available": {
+        "en": "Ready for review",
+        "ja": "レビュー可",
+        "qps-ploc": "⟦Řėȧḓẏ ƒőř řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "previous_edit": {
+        "en": "Previous local edit available (restore to apply)",
+        "ja": "前回のローカル編集あり（復元で反映）",
+        "qps-ploc": "⟦Ṗřėṽïőůş ŀőƈȧŀ ėḓïŧ ȧṽȧïŀȧƀŀė (řėşŧőřė ŧő ȧṗṗŀẏ) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "saved": {
+        "en": "Saved {time}",
+        "ja": "保存済 {time}",
+        "qps-ploc": "⟦Şȧṽėḓ {time} ŀőř⟧"
+      },
+      "save_failed": {
+        "en": "Save failed: {error}",
+        "ja": "保存失敗: {error}",
+        "qps-ploc": "⟦Şȧṽė ƒȧïŀėḓ: {error} ŀőřėɱ ⟧"
+      },
+      "edit_on": {
+        "en": "Edit mode: editing the body (auto-save)",
+        "ja": "編集モード: 本文を直接書換（自動保存）",
+        "qps-ploc": "⟦Ėḓïŧ ɱőḓė: ėḓïŧïñɠ ŧħė ƀőḓẏ (ȧůŧő-şȧṽė) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "edit_off": {
+        "en": "Edit mode off",
+        "ja": "編集モード オフ",
+        "qps-ploc": "⟦Ėḓïŧ ɱőḓė őƒƒ ŀőřė⟧"
+      },
+      "comment_on": {
+        "en": "Comment mode: select text, then enter a note",
+        "ja": "コメント: 文章を選択→メモ入力",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ ɱőḓė: şėŀėƈŧ ŧėẋŧ, ŧħėñ ėñŧėř ȧ ñőŧė ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "comment_off": {
+        "en": "Comment mode off",
+        "ja": "コメント オフ",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ ɱőḓė őƒƒ ŀőřėɱ⟧"
+      },
+      "voice_stopped": {
+        "en": "Voice input stopped",
+        "ja": "音声入力を停止",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ şŧőṗṗėḓ ŀőřėɱ ⟧"
+      },
+      "voice_error": {
+        "en": "Speech recognition error: {error}",
+        "ja": "音声認識エラー: {error}",
+        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ėřřőř: {error} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "voice_started": {
+        "en": "Voice input active — use OS dictation for sensitive content",
+        "ja": "音声入力中…（機微な内容はOSディクテーション推奨）",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ȧƈŧïṽė — ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "voice_start_failed": {
+        "en": "Could not start voice input: {error}",
+        "ja": "音声を開始できません: {error}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ṽőïƈė ïñṗůŧ: {error} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "no_comments": {
+        "en": "No comments",
+        "ja": "コメントなし",
+        "qps-ploc": "⟦Ñő ƈőɱɱėñŧş ŀőř⟧"
+      },
+      "no_restore": {
+        "en": "No local edit to restore",
+        "ja": "復元できる編集がありません",
+        "qps-ploc": "⟦Ñő ŀőƈȧŀ ėḓïŧ ŧő řėşŧőřė ŀőřėɱ ï⟧"
+      },
+      "restore_confirm": {
+        "en": "Replace the body with the previous local edit?",
+        "ja": "前回ローカル保存した編集内容で本文を置き換えますか？",
+        "qps-ploc": "⟦Řėṗŀȧƈė ŧħė ƀőḓẏ ẇïŧħ ŧħė ṗřėṽïőůş ŀőƈȧŀ ėḓïŧ? ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "restored": {
+        "en": "Restored ({time})",
+        "ja": "復元しました（{time}）",
+        "qps-ploc": "⟦Řėşŧőřėḓ ({time}) ŀőřėɱ⟧"
+      },
+      "html_exported": {
+        "en": "Exported edited HTML",
+        "ja": "編集後HTMLを書き出しました",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ėḓïŧėḓ ĦŦⱮĿ ŀőřėɱ ⟧"
+      },
+      "md_empty": {
+        "en": "(no comments)",
+        "ja": "（コメントなし）",
+        "qps-ploc": "⟦(ñő ƈőɱɱėñŧş) ŀőřė⟧"
+      },
+      "md_exported": {
+        "en": "Exported comment Markdown",
+        "ja": "コメントMDを書き出しました",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ƈőɱɱėñŧ Ɱȧřķḓőẇñ ŀőřėɱ ïṗ⟧"
+      },
+      "discard_confirm": {
+        "en": "Discard local edits and comments? (The file itself will not change)",
+        "ja": "ローカル保存した編集/コメントを破棄しますか？（ファイル自体は変わりません）",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőƈȧŀ ėḓïŧş ȧñḓ ƈőɱɱėñŧş? (Ŧħė ƒïŀė ïŧşėŀƒ ẇïŀŀ ñőŧ ƈħȧñɠė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "discarded": {
+        "en": "Discarded local changes. Reload to restore the original.",
+        "ja": "ローカル保存を破棄。再読み込みで元に戻ります",
+        "qps-ploc": "⟦Ḓïşƈȧřḓėḓ ŀőƈȧŀ ƈħȧñɠėş. Řėŀőȧḓ ŧő řėşŧőřė ŧħė őřïɠïñȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "saving": {
+        "en": "Saving…",
+        "ja": "保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "saved_to_file": {
+        "en": "Saved directly to file {time}",
+        "ja": "ファイルへ直書き保存 {time}",
+        "qps-ploc": "⟦Şȧṽėḓ ḓïřėƈŧŀẏ ŧő ƒïŀė {time} ŀőřėɱ ïṗş⟧"
+      },
+      "markdown_title": {
+        "en": "Review comments — {title}",
+        "ja": "推敲コメント — {title}",
+        "qps-ploc": "⟦Řėṽïėẇ ƈőɱɱėñŧş — {title} ŀőřėɱ ïṗ⟧"
+      },
+      "generated": {
+        "en": "Generated",
+        "ja": "生成",
+        "qps-ploc": "⟦Ɠėñėřȧŧėḓ ŀőř⟧"
+      },
+      "target": {
+        "en": "Target",
+        "ja": "対象",
+        "qps-ploc": "⟦Ŧȧřɠėŧ ŀőř⟧"
+      },
+      "comment_label": {
+        "en": "Comment",
+        "ja": "コメント",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ ŀőř⟧"
+      }
+    },
+    "minutes_record": {
+      "mic_capture_failed": {
+        "en": "Could not start microphone capture: {reason}",
+        "ja": "マイクキャプチャを開始できません: {reason}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ɱïƈřőṗħőñė ƈȧṗŧůřė: {reason} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "stt_unavailable": {
+        "en": "No speech-to-text backend could be registered. Audio and segment WAV files will be saved, but no transcript will be generated. Configure KYBERION_STT_COMMAND or install mlx_whisper.",
+        "ja": "文字起こしバックエンドが1つも登録できませんでした。録音とセグメントWAVの保存は行われますが、transcript は生成されません。KYBERION_STT_COMMAND を設定するか、mlx_whisper を導入してください。",
+        "qps-ploc": "⟦Ñő şṗėėƈħ-ŧő-ŧėẋŧ ƀȧƈķėñḓ ƈőůŀḓ ƀė řėɠïşŧėřėḓ. Ȧůḓïő ȧñḓ şėɠɱėñŧ ẆȦṼ ƒïŀėş ẇïŀŀ ƀė şȧṽėḓ, ƀůŧ ñő ŧřȧñşƈřïṗŧ ẇïŀŀ ƀė ɠėñėřȧŧėḓ. Ƈőñƒïɠůřė ĶẎɃĖŘÏŐÑ_ŞŦŦ_ƇŐⱮⱮȦÑḒ őř ïñşŧȧŀŀ ɱŀẋ_ẇħïşṗėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "recording_started": {
+        "en": "Recording started (mission: {missionId}, backend: {backend}, stt: {stt})",
+        "ja": "録音を開始します (mission: {missionId}, backend: {backend}, stt: {stt})",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ şŧȧřŧėḓ (ɱïşşïőñ: {missionId}, ƀȧƈķėñḓ: {backend}, şŧŧ: {stt}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recording_stopping": {
+        "en": "Stopping recording and generating minutes…",
+        "ja": "録音を終了し、議事録を生成しています…",
+        "qps-ploc": "⟦Şŧőṗṗïñɠ řėƈőřḓïñɠ ȧñḓ ɠėñėřȧŧïñɠ ɱïñůŧėş… ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "recording_complete": {
+        "en": "Complete: {segments} segment(s) → transcript: {transcript}{minutes}",
+        "ja": "完了: セグメント{segments}件 → transcript: {transcript}{minutes}",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧė: {segments} şėɠɱėñŧ(ş) → ŧřȧñşƈřïṗŧ: {transcript}{minutes} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recording_minutes_path": {
+        "en": " / minutes: {path}",
+        "ja": " / 議事録: {path}",
+        "qps-ploc": "⟦ / ɱïñůŧėş: {path} ŀőřėɱ⟧"
+      },
+      "recording_short": {
+        "en": " (audio was too short; minutes were not generated)",
+        "ja": " （音声が短すぎたため議事録は未生成）",
+        "qps-ploc": "⟦ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      }
+    },
+    "presence_studio": {
+      "record_mission_placeholder": {
+        "en": "Mission ID (blank creates one; e.g. MSN-MTG-001)",
+        "ja": "ミッションID（空欄で自動発行。例: MSN-MTG-001）",
+        "qps-ploc": "⟦Ɱïşşïőñ ÏḒ (ƀŀȧñķ ƈřėȧŧėş őñė; ė.ɠ. ⱮŞÑ-ⱮŦƓ-001) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "record_start": {
+        "en": "🎙️ Record meeting",
+        "ja": "🎙️ 会議を記録",
+        "qps-ploc": "⟦🎙️ Řėƈőřḓ ɱėėŧïñɠ ŀőřėɱ⟧"
+      },
+      "record_stop": {
+        "en": "⏹ Stop and make minutes",
+        "ja": "⏹ 停止して議事録化",
+        "qps-ploc": "⟦⏹ Şŧőṗ ȧñḓ ɱȧķė ɱïñůŧėş ŀőřėɱ ï⟧"
+      },
+      "live_transcript": {
+        "en": "Live transcript appears here…",
+        "ja": "ここにリアルタイム文字起こしが表示されます…",
+        "qps-ploc": "⟦Ŀïṽė ŧřȧñşƈřïṗŧ ȧṗṗėȧřş ħėřė… ŀőřėɱ ïṗş⟧"
+      },
+      "record_hint": {
+        "en": "Records microphone audio and creates minutes.md plus action items.",
+        "ja": "会議音声をマイクから直接記録し、AIが自動で要約・議事録（minutes.md）とアクションアイテムを作成します。",
+        "qps-ploc": "⟦Řėƈőřḓş ɱïƈřőṗħőñė ȧůḓïő ȧñḓ ƈřėȧŧėş ɱïñůŧėş.ɱḓ ṗŀůş ȧƈŧïőñ ïŧėɱş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "record_panel_label": {
+        "en": "Record meeting (microphone → minutes)",
+        "ja": "会議を記録（マイク → 自動議事録）",
+        "qps-ploc": "⟦Řėƈőřḓ ɱėėŧïñɠ (ɱïƈřőṗħőñė → ɱïñůŧėş) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "notes_panel_label": {
+        "en": "Dictation notes",
+        "ja": "口述メモ・メモ作成",
+        "qps-ploc": "⟦Ḓïƈŧȧŧïőñ ñőŧėş ŀőřė⟧"
+      },
+      "notes_placeholder": {
+        "en": "Dictated text appears here, or paste notes directly.",
+        "ja": "ブラウザマイクで話した内容がここにリアルタイムでテキスト表示されます。または直接テキストをメモ・貼り付けしてください。",
+        "qps-ploc": "⟦Ḓïƈŧȧŧėḓ ŧėẋŧ ȧṗṗėȧřş ħėřė, őř ṗȧşŧė ñőŧėş ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "meeting_title_placeholder": {
+        "en": "Meeting title (optional)",
+        "ja": "会議タイトル（任意）",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ŧïŧŀė (őṗŧïőñȧŀ) ŀőřėɱ ï⟧"
+      },
+      "create_minutes": {
+        "en": "Create minutes",
+        "ja": "議事録を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ɱïñůŧėş ŀőřė⟧"
+      },
+      "copy_notes": {
+        "en": "Copy notes",
+        "ja": "メモをコピー",
+        "qps-ploc": "⟦Ƈőṗẏ ñőŧėş ŀőř⟧"
+      },
+      "restore_draft": {
+        "en": "Restore draft",
+        "ja": "下書き復元",
+        "qps-ploc": "⟦Řėşŧőřė ḓřȧƒŧ ŀőřė⟧"
+      },
+      "clear_notes": {
+        "en": "Clear notes",
+        "ja": "メモクリア",
+        "qps-ploc": "⟦Ƈŀėȧř ñőŧėş ŀőř⟧"
+      },
+      "notes_hint": {
+        "en": "Create structured minutes from dictated or drafted notes.",
+        "ja": "話した内容や下書きメモから、AIが整形された議事録を作成します。",
+        "qps-ploc": "⟦Ƈřėȧŧė şŧřůƈŧůřėḓ ɱïñůŧėş ƒřőɱ ḓïƈŧȧŧėḓ őř ḓřȧƒŧėḓ ñőŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "email_triage_label": {
+        "en": "Email Triage",
+        "ja": "受信メール要約・トリアージ",
+        "qps-ploc": "⟦Ėɱȧïŀ Ŧřïȧɠė ŀőř⟧"
+      },
+      "email_triage_empty": {
+        "en": "Email triage has not been loaded yet.",
+        "ja": "まだメール要約が読み込まれていません。「要約を更新」を押してください。",
+        "qps-ploc": "⟦Ėɱȧïŀ ŧřïȧɠė ħȧş ñőŧ ƀėėñ ŀőȧḓėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "refresh_triage": {
+        "en": "Refresh Triage",
+        "ja": "要約を更新",
+        "qps-ploc": "⟦Řėƒřėşħ Ŧřïȧɠė ŀőřė⟧"
+      },
+      "copy_draft": {
+        "en": "Copy Draft",
+        "ja": "返信下書きをコピー",
+        "qps-ploc": "⟦Ƈőṗẏ Ḓřȧƒŧ ŀőř⟧"
+      },
+      "email_triage_hint": {
+        "en": "Run the email triage pipeline to populate the latest inbox summary and reply draft.",
+        "ja": "連携されたメールアカウントの受信トレイをAIが分析し、重要度の高いメールの要約と返信案を提示します。",
+        "qps-ploc": "⟦Řůñ ŧħė ėɱȧïŀ ŧřïȧɠė ṗïṗėŀïñė ŧő ṗőṗůŀȧŧė ŧħė ŀȧŧėşŧ ïñƀőẋ şůɱɱȧřẏ ȧñḓ řėṗŀẏ ḓřȧƒŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "email_reply_label": {
+        "en": "Email Reply Draft",
+        "ja": "メール返信案作成・送信",
+        "qps-ploc": "⟦Ėɱȧïŀ Řėṗŀẏ Ḓřȧƒŧ ŀőřėɱ⟧"
+      },
+      "email_auth_checking": {
+        "en": "Checking email account status...",
+        "ja": "メールアカウント認証状態を確認中...（未認証の場合は CLI で pnpm services:setup を実行してください）",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ėɱȧïŀ ȧƈƈőůñŧ şŧȧŧůş... ŀőřėɱ ïṗşů⟧"
+      },
+      "account_auto": {
+        "en": "Automatic account selection",
+        "ja": "自動アカウント選択",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ ȧƈƈőůñŧ şėŀėƈŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "recipient_placeholder": {
+        "en": "Recipient",
+        "ja": "宛先（Recipient email）",
+        "qps-ploc": "⟦Řėƈïṗïėñŧ ŀőř⟧"
+      },
+      "subject_placeholder": {
+        "en": "Subject",
+        "ja": "件名（Subject）",
+        "qps-ploc": "⟦Şůƀĵėƈŧ ŀőř⟧"
+      },
+      "tone_clear": {
+        "en": "Clear and concise",
+        "ja": "簡潔・明確",
+        "qps-ploc": "⟦Ƈŀėȧř ȧñḓ ƈőñƈïşė ŀőřėɱ⟧"
+      },
+      "tone_warm": {
+        "en": "Warm and helpful",
+        "ja": "丁寧・親切",
+        "qps-ploc": "⟦Ẇȧřɱ ȧñḓ ħėŀṗƒůŀ ŀőřėɱ⟧"
+      },
+      "tone_firm": {
+        "en": "Firm and direct",
+        "ja": "丁寧かつ端的",
+        "qps-ploc": "⟦Ƒïřɱ ȧñḓ ḓïřėƈŧ ŀőřė⟧"
+      },
+      "reply_message_id_placeholder": {
+        "en": "Reply Message ID (optional)",
+        "ja": "返信対象 Message ID（任意）",
+        "qps-ploc": "⟦Řėṗŀẏ Ɱėşşȧɠė ÏḒ (őṗŧïőñȧŀ) ŀőřėɱ ïṗ⟧"
+      },
+      "mode_new": {
+        "en": "New Email",
+        "ja": "新規メール",
+        "qps-ploc": "⟦Ñėẇ Ėɱȧïŀ ŀőř⟧"
+      },
+      "mode_reply": {
+        "en": "Reply",
+        "ja": "返信",
+        "qps-ploc": "⟦Řėṗŀẏ ŀőř⟧"
+      },
+      "mode_reply_all": {
+        "en": "Reply All",
+        "ja": "全員へ返信",
+        "qps-ploc": "⟦Řėṗŀẏ Ȧŀŀ ŀőř⟧"
+      },
+      "email_draft_empty": {
+        "en": "No email reply draft has been created yet.",
+        "ja": "まだメール下書きは作成されていません。",
+        "qps-ploc": "⟦Ñő ėɱȧïŀ řėṗŀẏ ḓřȧƒŧ ħȧş ƀėėñ ƈřėȧŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "create_reply_draft": {
+        "en": "Create Reply Draft",
+        "ja": "返信下書きを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė Řėṗŀẏ Ḓřȧƒŧ ŀőřėɱ⟧"
+      },
+      "create_account_draft": {
+        "en": "Create Account Draft",
+        "ja": "アカウントに下書き保存",
+        "qps-ploc": "⟦Ƈřėȧŧė Ȧƈƈőůñŧ Ḓřȧƒŧ ŀőřėɱ ⟧"
+      },
+      "send_approved_email": {
+        "en": "Send Approved Email",
+        "ja": "承認して送信",
+        "qps-ploc": "⟦Şėñḓ Ȧṗṗřőṽėḓ Ėɱȧïŀ ŀőřėɱ ⟧"
+      },
+      "refresh_auth": {
+        "en": "Refresh Auth",
+        "ja": "認証状態の再確認",
+        "qps-ploc": "⟦Řėƒřėşħ Ȧůŧħ ŀőř⟧"
+      },
+      "reload_draft": {
+        "en": "Reload Draft",
+        "ja": "下書きの再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ Ḓřȧƒŧ ŀőř⟧"
+      },
+      "copy_reply": {
+        "en": "Copy Reply",
+        "ja": "本文コピー",
+        "qps-ploc": "⟦Ƈőṗẏ Řėṗŀẏ ŀőř⟧"
+      },
+      "email_draft_hint": {
+        "en": "Generate a local reply draft, then create it in the selected email account.",
+        "ja": "指示に基づきAIがメール本文を作成します。連携アカウントへの下書き保存や承認後の直接送信が可能です。",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ȧ ŀőƈȧŀ řėṗŀẏ ḓřȧƒŧ, ŧħėñ ƈřėȧŧė ïŧ ïñ ŧħė şėŀėƈŧėḓ ėɱȧïŀ ȧƈƈőůñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "approval_label": {
+        "en": "Approval Inbox",
+        "ja": "承認キュー",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ Ïñƀőẋ ŀőřė⟧"
+      },
+      "outcomes_label": {
+        "en": "Latest Outcomes",
+        "ja": "最新の成果物",
+        "qps-ploc": "⟦Ŀȧŧėşŧ Őůŧƈőɱėş ŀőřė⟧"
+      },
+      "requested_work_label": {
+        "en": "Requested Work",
+        "ja": "依頼中のタスク",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ Ẇőřķ ŀőřė⟧"
+      },
+      "browser_label": {
+        "en": "Browser Task",
+        "ja": "ブラウザ自動操作",
+        "qps-ploc": "⟦Ƀřőẇşėř Ŧȧşķ ŀőř⟧"
+      },
+      "prepare_browser": {
+        "en": "Prepare Browser",
+        "ja": "ブラウザセッション準備",
+        "qps-ploc": "⟦Ṗřėṗȧřė Ƀřőẇşėř ŀőřė⟧"
+      },
+      "browser_task_hint": {
+        "en": "Initialize a browser automation session for research or form operations.",
+        "ja": "調べものやフォーム操作などのブラウザ自動操作セッションを初期化・準備します。",
+        "qps-ploc": "⟦Ïñïŧïȧŀïẑė ȧ ƀřőẇşėř ȧůŧőɱȧŧïőñ şėşşïőñ ƒőř řėşėȧřƈħ őř ƒőřɱ őṗėřȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recording_started": {
+        "en": "Recording ({missionId} / {backend})… transcript will appear here.",
+        "ja": "録音中（{missionId} / {backend}）… 発話が文字起こしされ次第ここに表示されます。",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ({missionId} / {backend})… ŧřȧñşƈřïṗŧ ẇïŀŀ ȧṗṗėȧř ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recording_stopping": {
+        "en": "Stopping recording and generating minutes…",
+        "ja": "録音を終了し、議事録を生成しています…",
+        "qps-ploc": "⟦Şŧőṗṗïñɠ řėƈőřḓïñɠ ȧñḓ ɠėñėřȧŧïñɠ ɱïñůŧėş… ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "minutes_created": {
+        "en": "Minutes created: {path} ({segments} segment(s))",
+        "ja": "議事録を生成しました: {path}（セグメント{segments}件）",
+        "qps-ploc": "⟦Ɱïñůŧėş ƈřėȧŧėḓ: {path} ({segments} şėɠɱėñŧ(ş)) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "recording_short": {
+        "en": "Recording stopped (audio was too short; minutes were not generated).",
+        "ja": "録音を終了しました（音声が短すぎたため議事録は未生成です）。",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ şŧőṗṗėḓ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      }
+    },
     "tui": {
       "tui_tab_missions": {
         "en": "Missions",
