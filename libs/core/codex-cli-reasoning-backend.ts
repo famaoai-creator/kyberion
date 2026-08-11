@@ -63,6 +63,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   private harnessSession?: CodexHarnessSession;
   private harnessBoot?: Promise<void>;
   private harnessQueue: Promise<void> = Promise.resolve();
+  private harnessModel?: string;
   private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
   private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
@@ -132,7 +133,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: { signal?: AbortSignal }
+    options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const schema = z.object({ answer: z.string() });
@@ -144,7 +145,11 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         .join('\n\n'),
       schema,
       mode: 'workspace-write',
-      options: { ...this.options, ...(options?.signal ? { signal: options.signal } : {}) },
+      options: {
+        ...this.options,
+        ...(options?.model ? { model: normalizeCodexModelId(options.model) } : {}),
+        ...(options?.signal ? { signal: options.signal } : {}),
+      },
     })) as z.infer<typeof schema>;
     return result.answer;
   }
@@ -176,7 +181,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     });
     await previous;
     try {
-      const session = this.getHarnessSession(permission.args);
+      const session = await this.getHarnessSession(permission.args, options?.model);
       if (!this.harnessBoot) this.harnessBoot = session.boot();
       await this.harnessBoot;
       const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
@@ -246,26 +251,44 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     }
   }
 
-  private getHarnessSession(permissionArgs: readonly string[]): CodexHarnessSession {
+  private async getHarnessSession(
+    permissionArgs: readonly string[],
+    modelOverride?: string
+  ): Promise<CodexHarnessSession> {
+    const model = normalizeCodexModelId(modelOverride || this.options.model);
+    if (this.harnessSession && this.harnessModel !== model) {
+      const shutdown = (this.harnessSession as { shutdown?: () => Promise<void> }).shutdown;
+      if (shutdown) await shutdown.call(this.harnessSession).catch(() => undefined);
+      this.harnessSession = undefined;
+      this.harnessBoot = undefined;
+    }
     if (this.harnessSession) return this.harnessSession;
     if (this.injectedHarnessSession) {
       this.harnessSession = this.injectedHarnessSession;
+      this.harnessModel = model;
       return this.harnessSession;
     }
     this.harnessSession = new CodexAppServerAdapter({
-      model: this.options.model,
+      model,
       cwd: this.options.cwd,
       timeoutMs: this.options.timeoutMs,
       sandboxMode: sandboxModeFromArgs(permissionArgs),
       systemPrompt: 'Kyberion governed Codex app-server subagent session.',
       approvalMode: 'strict',
     });
+    this.harnessModel = model;
     return this.harnessSession;
   }
 
   async prompt(prompt: string): Promise<string> {
     return this.delegateTask(prompt);
   }
+}
+
+function normalizeCodexModelId(model?: string): string | undefined {
+  const value = model?.trim();
+  if (!value) return undefined;
+  return value.startsWith('openai:') ? value.slice('openai:'.length) : value;
 }
 
 function resolveProfile(options?: { role?: string; profile?: string }): SubagentCapabilityProfile {

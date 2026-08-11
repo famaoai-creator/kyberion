@@ -19,17 +19,34 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
 
   async delegate(request: AgentTaskEnvelope): Promise<AgentExecutionReceipt> {
     const startedAt = new Date().toISOString();
+    const nativeAdopter = this.backend.getNativeSubagentAdopter?.() || undefined;
+    const initialNativeInfo = nativeAdopter?.getInfo?.() || undefined;
+    const initialModelId =
+      request.model_id ||
+      (initialNativeInfo?.model as string | undefined) ||
+      (this.backend as ReasoningBackend & { model?: string }).model;
     try {
-      const output = await this.backend.delegateTask(
-        request.instruction,
-        request.context_refs?.join('\n'),
-        { signal: this.signal }
-      );
+      const output = nativeAdopter
+        ? await nativeAdopter.dispatch(request.instruction, request.context_refs?.join('\n'), {
+            signal: this.signal,
+            model: request.model_id,
+          })
+        : await this.backend.delegateTask(request.instruction, request.context_refs?.join('\n'), {
+            signal: this.signal,
+            model: request.model_id,
+          });
+      const nativeInfo = nativeAdopter?.getInfo?.() || initialNativeInfo;
+      const modelId =
+        request.model_id || (nativeInfo?.model as string | undefined) || initialModelId;
       return {
         execution_kind: 'agent_delegation',
         task_id: request.task_id,
         agent_id: request.agent_id || `task-agent-${request.task_id}`,
-        provider: this.backend.name,
+        provider: (nativeInfo?.provider as string | undefined) || this.backend.name,
+        model_id: modelId,
+        ...(nativeAdopter
+          ? { native_subagent: { adopter_id: nativeAdopter.id, ...nativeInfo } }
+          : {}),
         status: 'succeeded',
         started_at: startedAt,
         completed_at: new Date().toISOString(),
@@ -37,11 +54,18 @@ export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {
         output,
       };
     } catch (error) {
+      const nativeInfo = nativeAdopter?.getInfo?.() || initialNativeInfo;
+      const modelId =
+        request.model_id || (nativeInfo?.model as string | undefined) || initialModelId;
       return {
         execution_kind: 'agent_delegation',
         task_id: request.task_id,
         agent_id: request.agent_id || `task-agent-${request.task_id}`,
-        provider: this.backend.name,
+        provider: (nativeInfo?.provider as string | undefined) || this.backend.name,
+        model_id: modelId,
+        ...(nativeAdopter
+          ? { native_subagent: { adopter_id: nativeAdopter.id, ...nativeInfo } }
+          : {}),
         status: 'failed',
         started_at: startedAt,
         completed_at: new Date().toISOString(),

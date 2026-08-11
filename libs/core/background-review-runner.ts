@@ -56,6 +56,8 @@ import {
   highestTierForPaths,
   providerIdForReasoningIdentifier,
 } from './provider-egress-gate.js';
+import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
+import { getWorkItem } from './work-coordination.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -153,6 +155,7 @@ export interface BackgroundReviewForkInput {
   surface: SurfaceAsyncChannel;
   snapshot: string;
   missionId?: string;
+  workItemId?: string;
   approvalChannel?: string;
   approvalThreadTs?: string;
   sourceRef?: string;
@@ -449,16 +452,41 @@ export async function runBackgroundReviewFork(
         tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
         purpose: 'background review snapshot',
       },
-      async () =>
-        backend.delegateTask(
-          buildForkPrompt(input),
-          await buildBackgroundReviewKnowledgeContext(input, backend.name || ''),
-          input.callOptions || {
-            effort: 'low',
-            model_tier: 'fast',
-            budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
-          }
-        )
+      async () => {
+        const prompt = buildForkPrompt(input);
+        const context = await buildBackgroundReviewKnowledgeContext(input, backend.name || '');
+        if (!input.workItemId)
+          return backend.delegateTask(
+            prompt,
+            context,
+            input.callOptions || {
+              effort: 'low',
+              model_tier: 'fast',
+              budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
+            }
+          );
+        const coordinatedBackend = { ...getReasoningBackend(), ...backend } as ReasoningBackend;
+        const workItem = getWorkItem(input.workItemId);
+        const scope = workItem?.context;
+        const receipt = await delegateWorkItemWithReasoningBackend(coordinatedBackend, {
+          work_item_id: input.workItemId,
+          task_id: input.workItemId,
+          instruction: prompt,
+          security_scope: {
+            tenant_id: scope?.tenant_slug || 'public',
+            organization_id: scope?.organization_id,
+            project_id: scope?.project_id,
+            mission_id: scope?.mission_id || input.missionId || input.workItemId,
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'background review',
+          },
+          context_refs: [context],
+          success_status: 'review',
+          idempotency_key: `background-review:${input.workItemId}:${input.sessionId}`,
+        });
+        return receipt.output || '';
+      }
     );
     const proposal = parseProposal(raw);
     assertProposalPolicy(proposal);

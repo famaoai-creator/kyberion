@@ -1,4 +1,4 @@
-# CLI サブエージェント・チームモード — 単一 LLM プロバイダ CLI 内で完結するチーム構成と連携(CT-01〜05)
+# CLI サブエージェント・チームモード — 単一 LLM プロバイダ CLI 内で完結するチーム構成と連携(CT-01〜06)
 
 > **作成日**: 2026-07-25
 > **優先度**: P1(CT-01/02/05)/ P2(CT-03/04)
@@ -140,12 +140,46 @@ Codex を `ProcessSpawnDispatcher` のまま委譲ごとに起動する経路か
 
 — Codex adapter 実装 claude-sonnet-4 相当 / protocol 調査 claude-opus 相当 / 契約テスト claude-haiku 相当
 
+### CT-06: Mission WorkItemごとの実行面選択と独立レビュー配線
+
+> **優先度**: P1 / **規模**: M / **依存**: CT-03・CT-04・CT-05・MO-08
+
+missionを作成した後もターミナルのownerが実装を直接続けると、実装とレビューが同じ認知経路に寄り、別途レビュー依頼をしない限り指摘が弱くなりやすい。CT-06では、missionのWorkItemを実行面の単位として扱い、実装と独立レビューそれぞれに `cli_subagent` / `agent_runtime` / `hybrid` を指定または決定できるようにする。
+
+**契約**
+
+- `execution_surface`: `cli_subagent | agent_runtime | hybrid`
+- `review_execution_surface`: 実装とは独立したレビュー面。省略時は既存のレビュー経路を維持する。
+- `execution_surface_signals`: `expected_duration`、`write_volume`、`recovery_requirement`、`failure_isolation`、`approval_kill_switch`、`model_diversity` の0〜3スコア。
+- 最大スコアが0〜1なら `cli_subagent`、2なら `hybrid`、3なら `agent_runtime`。明示指定はルーブリックより優先する。
+- `hybrid` はCLI subagentを初期面とし、WorkItemとattemptに将来のruntime昇格条件を残す。
+- WorkItemの明示指定 > WorkItemのルーブリック > dispatch既定面 > 既存 `--dispatch-mode agent` の順で解決し、指定がない `auto` / `subagent` はCLI subagentを初期面とする。
+- `mission_controller dispatch-workitems` では `--dispatch-execution-surface` / `--dispatch-review-execution-surface` でmission単位の既定面を指定できる。WorkItem metadataが優先される。
+- 不正なsurface値は暗黙fallbackせず `EXECUTION_SURFACE_INVALID` として停止する。
+
+**実装タスク**
+
+1. `mission-execution-surface` の純粋resolverと契約テストを追加する。
+2. `dispatch-workitems` の実装経路へresolverを接続し、選択面と実際に使用した面をmanifest、WorkItem metadata、dispatch eventへ記録する。
+3. `agent_runtime` はA2A/runtime peerとrouteが無い場合にsubagentへ黙って降格せず、`EXECUTION_SURFACE_UNAVAILABLE` としてblockedにする。
+4. 独立reviewerも同じresolverを使い、レビュー面を実装面と別に選択できるようにする。選択したreviewer identityとcontext packのsecurity scopeを実際の委譲へ渡し、実装者から除外する。
+
+**受入条件**
+
+1. 短命・読み取り中心のWorkItemは `cli_subagent`、hard thresholdを含むWorkItemは `agent_runtime`、score 2のみのWorkItemは `hybrid` と決定される。
+2. 実装とレビューに異なる実行面を指定でき、manifestとレビューartifactから両方を確認できる。`execution_surface_used` は実行成功後だけ記録する。
+3. `agent_runtime` のroute不在時に成功扱い・暗黙subagent降格をしない。
+4. 既存の `--dispatch-mode agent|subagent` と既存レビュー経路の後方互換性を保つ。
+
+— 実装: Codex / 契約レビュー: 独立 reviewer
+
 ## 4. 実施順序
 
 ```
 CT-01(定義生成儀式)→ CT-02(dispatcher)→ CT-03(E2E 実証)
                                           ├→ CT-04(使い分け文書化)
                                           └→ CT-05(Codex app-server adapter)
+CT-03・CT-04・CT-05・MO-08 → CT-06(WorkItem実行面選択 + 独立レビュー配線)
 ```
 
 KP-01(配給 API 単一化)が先に入る場合、CT-02 は `provisionTaskKnowledge` を配給入口として利用する(役割別 pinned 知識が CLI サブエージェントにも自動で届く)。
@@ -160,6 +194,7 @@ KP-01(配給 API 単一化)が先に入る場合、CT-02 は `provisionTaskKnowl
 ## 6. 関連計画
 
 - [KD-05(サブエージェント能力ティア)](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md) — 能力宣言の語彙(DONE)。CT-01 と CT-05 はその射影。
+- [MO-08(成果物レビュー閉鎖)](./MO-08_ARTIFACT_REVIEW_CLOSURE.ja.md) — 独立レビューreceiptと実装者除外の正本。CT-06は実行面選択だけを追加する。
 - [MO-04](./MO-04_WORKER_CONTEXT_ECONOMY.ja.md) / [KP-01](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md) — context pack 配給。CT-02 の入力面。
 - [MO-07_QUALITY_MAXIMIZING_DELEGATION](./MO-07_QUALITY_MAXIMIZING_DELEGATION.ja.md) — best-of-N/judge。CT-03 の lens 分散はその単一プロバイダ版。
 - [HN-02](./HN-02_SCHEMA_FORCED_DELEGATION.ja.md) — schema 強制委譲。`task_result` 契約の基盤。

@@ -207,6 +207,27 @@ describe('reasoning-model-routing', () => {
     );
   });
 
+  it('honors an eligible explicit WorkItem model override', () => {
+    const registry = loadModelRegistry();
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'implement',
+          estimated_scope: 'M',
+          model_id: 'openai:gpt-5.6-luna',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        model_id: 'openai:gpt-5.6-luna',
+        tier: 'small',
+        execution_tier: 'fast',
+        effort: 'low',
+      })
+    );
+  });
+
   it('falls back to the next eligible model when the small lane is unavailable', () => {
     const registry = {
       version: '1.0.0',

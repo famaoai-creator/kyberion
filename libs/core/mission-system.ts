@@ -39,6 +39,7 @@ import {
 import { distillMission as _distillMission } from './mission-distill.js';
 import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
+import type { MissionExecutionSurface } from './mission-execution-surface.js';
 import { reconcileMissionExistingWork as _reconcileMissionExistingWork } from './mission-work-reconciliation.js';
 import { sealMission as _sealMission } from './mission-seal.js';
 import {
@@ -48,6 +49,16 @@ import {
   writeFocusedMissionId,
 } from './mission-state.js';
 import { syncProjectOperationalStateIfLinked } from './project-state-sync.js';
+import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
+import {
+  handoffWorkItem,
+  listWorkItems,
+  updateWorkItem,
+  type HandoffWorkItemInput,
+  type WorkItem,
+} from './work-coordination.js';
+import { appendCoordinationEvent } from './work-coordination.js';
+import { buildWorkItemHandoffPacket } from './handoff-packet.js';
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const missionFocusPath = pathResolver.shared('runtime/current_mission_focus.json');
@@ -307,6 +318,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       id: string,
       options?: {
         mode?: 'auto' | 'agent' | 'subagent';
+        executionSurface?: MissionExecutionSurface;
+        reviewExecutionSurface?: MissionExecutionSurface;
         limit?: number;
         statuses?: Array<
           'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
@@ -320,6 +333,142 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         throw new Error(`Mission ${id.toUpperCase()} not found.`);
       }
       return _dispatchMissionWorkItems(state, options);
+    },
+    /**
+     * Expand a mission handoff over the canonical WorkItem ledger. NEXT_TASKS
+     * is intentionally not consulted: unfinished WorkItems are the authority.
+     * Runtime prewarming is best-effort and happens before lease transfer so a
+     * missing receiver leaves the durable handoff packet recoverable.
+     */
+    async handoffMissionWorkItems(input: {
+      missionId: string;
+      fromPeerId: string;
+      toPeerId: string;
+      purpose: string;
+      toUserId?: string;
+      ttlMs?: number;
+      correlationId?: string;
+      metadata?: Record<string, unknown>;
+      ensureRuntime?: boolean;
+    }): Promise<{
+      mission_id: string;
+      handed_off: Array<ReturnType<typeof handoffWorkItem>>;
+      skipped: WorkItem[];
+      runtime_requested: boolean;
+      runtime_error?: string;
+    }> {
+      const missionId = input.missionId.toUpperCase();
+      const unfinished = listWorkItems().filter((item) => {
+        const belongsToMission =
+          item.project_id.toUpperCase() === missionId ||
+          item.context?.mission_id?.toUpperCase() === missionId ||
+          (typeof item.metadata?.mission_id === 'string' &&
+            item.metadata.mission_id.toUpperCase() === missionId);
+        return belongsToMission && !['done', 'archived'].includes(item.status);
+      });
+      let runtimeRequested = false;
+      let runtimeError: string | undefined;
+      if (input.ensureRuntime !== false) {
+        // The governed ensure path is requested even when the supervisor cannot
+        // satisfy it immediately. Keep this signal true so callers can
+        // distinguish a requested-but-unavailable receiver from a disabled
+        // prewarm path; the durable WorkItem handoff remains recoverable below.
+        runtimeRequested = true;
+        try {
+          await ensureMissionTeamRuntimeViaSupervisor({
+            missionId,
+            requestedBy: 'mission_controller',
+            reason: `Prepare receiving peer ${input.toPeerId} for mission handoff.`,
+          });
+        } catch (error) {
+          runtimeError = error instanceof Error ? error.message : String(error);
+          for (const item of unfinished) {
+            if (!item.lease_id || item.claimed_by_peer_id !== input.fromPeerId) continue;
+            const attemptId = item.attempts?.find(
+              (attempt) => attempt.run_id === item.current_attempt_id
+            )?.attempt_id;
+            const packet = buildWorkItemHandoffPacket({
+              itemId: item.item_id,
+              itemTitle: item.title,
+              purpose: input.purpose,
+              fromPeerId: input.fromPeerId,
+              toPeerId: input.toPeerId,
+              correlationId: input.correlationId ?? item.item_id,
+              ...(attemptId ? { attemptId } : {}),
+              metadata: input.metadata,
+            });
+            const pendingHandoff = {
+              packet,
+              source_peer_id: input.fromPeerId,
+              target_peer_id: input.toPeerId,
+              retry_marker: `runtime-unavailable:${Date.now()}`,
+              runtime_error: runtimeError,
+            };
+            updateWorkItem({
+              itemId: item.item_id,
+              expectedVersion: item.version,
+              metadata: {
+                ...(item.metadata || {}),
+                pending_handoff: pendingHandoff,
+              },
+            });
+            appendCoordinationEvent({
+              eventType: 'handoff_written',
+              itemId: item.item_id,
+              leaseId: item.lease_id,
+              actorPeerId: input.fromPeerId,
+              note: `pending handoff packet written for ${item.item_id}`,
+              payload: { pending_handoff: pendingHandoff },
+            });
+          }
+          return {
+            mission_id: missionId,
+            handed_off: [],
+            skipped: unfinished,
+            runtime_requested: runtimeRequested,
+            runtime_error: runtimeError,
+          };
+        }
+      }
+
+      const handedOff: Array<ReturnType<typeof handoffWorkItem>> = [];
+      const skipped: WorkItem[] = [];
+      for (const item of unfinished) {
+        if (!item.lease_id || item.claimed_by_peer_id !== input.fromPeerId) {
+          skipped.push(item);
+          continue;
+        }
+        const handoffInput: HandoffWorkItemInput = {
+          itemId: item.item_id,
+          fromLeaseId: item.lease_id,
+          fromPeerId: input.fromPeerId,
+          toPeerId: input.toPeerId,
+          ...(input.toUserId ? { toUserId: input.toUserId } : {}),
+          purpose: input.purpose,
+          ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+          expectedVersion: item.version,
+          ...(item.metadata?.pending_handoff &&
+          typeof item.metadata.pending_handoff === 'object' &&
+          item.metadata.pending_handoff !== null &&
+          'packet' in item.metadata.pending_handoff
+            ? {
+                handoffPacket: item.metadata.pending_handoff
+                  .packet as HandoffWorkItemInput['handoffPacket'],
+              }
+            : {}),
+          ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+          metadata: input.metadata,
+        };
+        const completed = handoffWorkItem(handoffInput);
+        handedOff.push(completed);
+      }
+      return {
+        mission_id: missionId,
+        handed_off: handedOff,
+        skipped,
+        runtime_requested: runtimeRequested,
+        ...(runtimeError ? { runtime_error: runtimeError } : {}),
+      };
     },
     sealMission(id: string) {
       return _sealMission(id);
