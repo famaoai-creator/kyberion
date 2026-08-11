@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpRoot: string;
 let mod: typeof import('./virtual_office.js');
+let core: typeof import('@agent/core') | undefined;
 
 describe('virtual office surface', () => {
   beforeAll(async () => {
@@ -162,7 +163,76 @@ describe('virtual office surface', () => {
         },
       })
     );
-    const { createTaskSession } = await import('@agent/core');
+    core = await import('@agent/core');
+    const {
+      createTaskSession,
+      clearWorkCoordinationStore,
+      createWorkItem,
+      setWorkCoordinationNamespace,
+    } = core;
+    setWorkCoordinationNamespace(`virtual-office-test-${process.pid}`);
+    clearWorkCoordinationStore();
+    createWorkItem({
+      itemId: 'office-work-item-1',
+      title: 'Build the thing',
+      description: 'build the thing',
+      projectId: 'MSN-OFFICE-1',
+      status: 'in_progress',
+      assigneePeerId: 'implementation-architect',
+      metadata: { team_role: 'implementer' },
+      context: {
+        organization_id: 'acme',
+        tenant_slug: 'acme',
+        mission_id: 'MSN-OFFICE-1',
+        project_id: 'MSN-OFFICE-1',
+        task_id: 'T-1',
+      },
+    });
+    createWorkItem({
+      itemId: 'office-work-item-2',
+      title: 'Verify the thing',
+      description: 'verify the thing',
+      projectId: 'MSN-OFFICE-1',
+      status: 'blocked',
+      assigneePeerId: 'nerve-agent',
+      metadata: { team_role: 'qa' },
+      context: {
+        organization_id: 'acme',
+        tenant_slug: 'acme',
+        mission_id: 'MSN-OFFICE-1',
+        project_id: 'MSN-OFFICE-1',
+        task_id: 'T-2',
+      },
+    });
+    createWorkItem({
+      itemId: 'office-work-item-3',
+      title: 'Completed task',
+      description: 'completed task',
+      projectId: 'MSN-OFFICE-1',
+      status: 'done',
+      context: {
+        organization_id: 'acme',
+        tenant_slug: 'acme',
+        mission_id: 'MSN-OFFICE-1',
+        project_id: 'MSN-OFFICE-1',
+        task_id: 'T-3',
+      },
+    });
+    createWorkItem({
+      itemId: 'office-work-item-beta',
+      title: 'Hidden tenant task',
+      description: 'should stay hidden from acme',
+      projectId: 'MSN-OFFICE-2',
+      status: 'in_progress',
+      assigneePeerId: 'nerve-agent',
+      metadata: { team_role: 'operator' },
+      context: {
+        tenant_slug: 'beta',
+        mission_id: 'MSN-OFFICE-2',
+        project_id: 'MSN-OFFICE-2',
+        task_id: 'T-9',
+      },
+    });
     const session = createTaskSession({
       sessionId: 'TSK-TEST-VIRTUAL-OFFICE',
       surface: 'presence',
@@ -280,6 +350,8 @@ describe('virtual office surface', () => {
   });
 
   afterAll(() => {
+    core?.clearWorkCoordinationStore();
+    core?.setWorkCoordinationNamespace(null);
     delete process.env.KYBERION_ROOT;
     delete process.env.KYBERION_CUSTOMER;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
