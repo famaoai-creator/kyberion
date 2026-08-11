@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearWorkCoordinationStore,
+  createWorkItem,
   pathResolver,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
+  setWorkCoordinationNamespace,
   safeReadFile,
   registerReasoningBackend,
   resetReasoningBackend,
@@ -13,6 +16,7 @@ import * as path from 'node:path';
 import { extractActionItemsOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 
 const FIXTURE_MISSION_ID = 'MSN-POSTPROCESS-001';
+const FIXTURE_WORK_ITEM_ID = 'WITEM-POSTPROCESS-001';
 const FIXTURE_TRANSCRIPT = pathResolver.rootResolve(
   'tests/fixtures/meeting-postprocess/transcript.txt'
 );
@@ -35,6 +39,22 @@ describe('meeting postprocess contract', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIXTURE_MISSION_ID;
+    setWorkCoordinationNamespace(`meeting-postprocess-${process.pid}`);
+    clearWorkCoordinationStore();
+    createWorkItem({
+      itemId: FIXTURE_WORK_ITEM_ID,
+      title: 'Extract postprocess action items',
+      description: 'Extract structured action items from the postprocess transcript.',
+      projectId: FIXTURE_MISSION_ID,
+      status: 'in_progress',
+      context: {
+        organization_id: 'postprocess',
+        tenant_slug: 'postprocess',
+        mission_id: FIXTURE_MISSION_ID,
+        project_id: FIXTURE_MISSION_ID,
+        task_id: 'postprocess-extract-action-items',
+      },
+    });
     safeMkdir(path.join(FIXTURE_MISSION_DIR, 'evidence'), { recursive: true });
     safeWriteFile(
       path.join(FIXTURE_MISSION_DIR, 'mission-state.json'),
@@ -52,6 +72,8 @@ describe('meeting postprocess contract', () => {
 
   afterEach(() => {
     resetReasoningBackend();
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
     vi.restoreAllMocks();
     safeRmSync(FIXTURE_MISSION_DIR, { recursive: true, force: true });
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -123,6 +145,7 @@ describe('meeting postprocess contract', () => {
 
     const report = await extractActionItemsOp({
       mission_id: FIXTURE_MISSION_ID,
+      work_item_id: FIXTURE_WORK_ITEM_ID,
       transcript: safeReadFile(FIXTURE_TRANSCRIPT, { encoding: 'utf8' }) as string,
       attendees: [{ name: 'Alice' }, { name: 'Bob' }],
       language: 'ja',

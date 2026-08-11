@@ -60,6 +60,7 @@
       "produces": { "channel": "action_item_count", "type": "number" },
       "params": {
         "mission_id": "{{mission_id}}",
+        "work_item_id": "{{work_item_id}}",
         "transcript": "{{transcript_text}}",
         "attendees": "{{attendees}}",
         "operator_label": "{{operator_label}}",

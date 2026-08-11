@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearWorkCoordinationStore,
   clearSlackOutboxMessage,
+  createWorkItem,
   listActionItems,
   listOthersPending,
   listSlackOutboxMessages,
@@ -12,6 +14,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  setWorkCoordinationNamespace,
 } from '@agent/core';
 import { createMission } from '../scripts/refactor/mission-creation.js';
 import { loadState, saveState } from '../scripts/refactor/mission-state.js';
@@ -19,6 +22,7 @@ import { runSteps } from '../scripts/run_pipeline.ts';
 import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js';
 
 const MISSION_ID = 'MSN-MEETING-E2E-001';
+const WORK_ITEM_ID = 'WITEM-MEETING-E2E-001';
 const CUSTOMER_SLUG = 'demo';
 const ROOT = pathResolver.rootDir();
 const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', MISSION_ID);
@@ -45,6 +49,8 @@ describe('meeting-to-value e2e', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
     process.env.KYBERION_REASONING_BACKEND = 'stub';
+    setWorkCoordinationNamespace(`meeting-to-value-e2e-${process.pid}`);
+    clearWorkCoordinationStore();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
     safeRmSync(CUSTOMER_ROOT, { recursive: true, force: true });
     safeRmSync(REPORT_PATH, { force: true });
@@ -69,10 +75,26 @@ describe('meeting-to-value e2e', () => {
       });
       await saveState(MISSION_ID, state);
     }
+    createWorkItem({
+      itemId: WORK_ITEM_ID,
+      title: 'Run meeting follow-up',
+      description: 'Extract and process the meeting follow-up action items.',
+      projectId: MISSION_ID,
+      status: 'in_progress',
+      context: {
+        organization_id: CUSTOMER_SLUG,
+        tenant_slug: CUSTOMER_SLUG,
+        mission_id: MISSION_ID,
+        project_id: MISSION_ID,
+        task_id: 'meeting-follow-up',
+      },
+    });
   });
 
   afterEach(() => {
     resetReasoningBackend();
+    clearWorkCoordinationStore();
+    setWorkCoordinationNamespace(null);
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
     safeRmSync(CUSTOMER_ROOT, { recursive: true, force: true });
@@ -179,6 +201,7 @@ describe('meeting-to-value e2e', () => {
       {
         ...(pipeline.context ?? {}),
         mission_id: MISSION_ID,
+        work_item_id: WORK_ITEM_ID,
         transcript_path: TRANSCRIPT_PATH,
         attendees: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Operator' }],
         operator_label: 'Operator',

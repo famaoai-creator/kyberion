@@ -31,7 +31,7 @@ describe('voice and browser smoke contract', () => {
     expect(page).toContain('Start Native Mic');
     expect(page).toContain('Start Browser Mic');
     expect(page).toContain('Notes Capture');
-    expect(page).toContain('Create Minutes');
+    expect(page).toContain('setText("#minutes-save", "create_minutes"');
     expect(page).toContain('Email Triage');
     expect(page).toContain('Refresh Triage');
     expect(page).toContain('Copy Draft');
