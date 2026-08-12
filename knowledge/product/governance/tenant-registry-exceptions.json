@@ -56,6 +56,30 @@
     {
       "slug": "tenant-meeting-ops",
       "reason": "Fixture slug used by wisdom-actuator meeting-ops tests (libs/actuators/wisdom-actuator/src/meeting-ops.test.ts:32) — same audit mirror path; customer/tenant-meeting-ops/ holds only logs/ and no work item record survives outside them. Not an operating tenant."
+    },
+    {
+      "slug": "meeting-followup",
+      "reason": "Logs-only customer fixture retained by meeting follow-up tests; not an operating tenant."
+    },
+    {
+      "slug": "postprocess",
+      "reason": "Logs-only customer fixture retained by post-processing tests; not an operating tenant."
+    },
+    {
+      "slug": "public",
+      "reason": "Tier-shaped logs-only fixture directory; public is a tier name, not an operating tenant slug."
+    },
+    {
+      "slug": "tenant-canonical",
+      "reason": "Logs-only customer fixture retained by tenant canonicalization tests; not an operating tenant."
+    },
+    {
+      "slug": "tenant-ctx",
+      "reason": "Logs-only customer fixture retained by tenant context tests; not an operating tenant."
+    },
+    {
+      "slug": "tenant-meeting",
+      "reason": "Logs-only customer fixture retained by meeting tests; not an operating tenant."
     }
   ]
 }

@@ -2511,7 +2511,7 @@
     {
       "path": "product/governance/tenant-registry-exceptions.json",
       "tier": "public",
-      "size": 2991,
+      "size": 3888,
       "type": "json"
     },
     {
@@ -3129,7 +3129,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 90664,
+      "size": 91152,
       "type": "json"
     },
     {
@@ -7479,7 +7479,7 @@
     {
       "path": "product/schemas/project-track-record.schema.json",
       "tier": "public",
-      "size": 1579,
+      "size": 1775,
       "type": "json"
     },
     {
@@ -7827,7 +7827,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 14172,
+      "size": 14340,
       "type": "json"
     },
     {

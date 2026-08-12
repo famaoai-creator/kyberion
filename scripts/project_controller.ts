@@ -3,11 +3,15 @@ import {
   bootstrapManagedProject,
   buildManagedProjectRecord,
   createManagedProject,
+  createManagedProjectTrack,
+  ensureProjectOsScaffold,
   getProjectManagementView,
   listManagedProjects,
   reconcileProjectOperationalState,
+  updateManagedProjectTrack,
   updateManagedProject,
 } from '@agent/core';
+import type { ProjectTrackRecord } from '@agent/core';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';
 type ProjectStatus = 'draft' | 'active' | 'paused' | 'archived';
@@ -53,7 +57,7 @@ function printProjectList(): void {
 
 function printHelp(): void {
   console.log(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
+    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
   );
 }
 
@@ -66,6 +70,50 @@ function parseStatus(value: string | undefined): ProjectStatus {
   if (value === 'draft' || value === 'active' || value === 'paused' || value === 'archived')
     return value;
   throw new Error(`Invalid project status: ${value || '(missing)'}`);
+}
+
+function parseTrackType(value: string | undefined): ProjectTrackRecord['track_type'] {
+  const values: ProjectTrackRecord['track_type'][] = [
+    'delivery',
+    'change',
+    'release',
+    'incident',
+    'compliance',
+    'operations',
+    'research',
+  ];
+  if (value && values.includes(value as ProjectTrackRecord['track_type'])) {
+    return value as ProjectTrackRecord['track_type'];
+  }
+  throw new Error(`Invalid --track-type: ${value || '(missing)'}`);
+}
+
+function parseLifecycleModel(value: string | undefined): ProjectTrackRecord['lifecycle_model'] {
+  const values: ProjectTrackRecord['lifecycle_model'][] = [
+    'sdlc',
+    'continuous_delivery',
+    'incident_response',
+    'continuous_operations',
+    'research_cycle',
+  ];
+  if (value && values.includes(value as ProjectTrackRecord['lifecycle_model'])) {
+    return value as ProjectTrackRecord['lifecycle_model'];
+  }
+  throw new Error(`Invalid --lifecycle-model: ${value || '(missing)'}`);
+}
+
+function parseTrackStatus(value: string | undefined): ProjectTrackRecord['status'] {
+  const values: ProjectTrackRecord['status'][] = [
+    'planned',
+    'active',
+    'paused',
+    'completed',
+    'archived',
+  ];
+  if (value && values.includes(value as ProjectTrackRecord['status'])) {
+    return value as ProjectTrackRecord['status'];
+  }
+  throw new Error(`Invalid track status: ${value || '(missing)'}`);
 }
 
 async function main(): Promise<void> {
@@ -101,6 +149,57 @@ async function main(): Promise<void> {
           'Task is a work item; Task Session is the resumable execution context and does not own the Task.'
         );
       }
+      return;
+    }
+    case 'scaffold': {
+      const projectId = positional || requiredOption(argv, '--project-id');
+      const view = getProjectManagementView(projectId);
+      const projectPath = ensureProjectOsScaffold(
+        view.project.project_id,
+        view.project.name,
+        view.project.tier,
+        view.project.tenant_slug || 'shared'
+      );
+      const result = { project_id: projectId, project_path: projectPath };
+      if (json) jsonOutput(result);
+      else console.log(`Scaffolded project ${projectId}: ${projectPath}`);
+      return;
+    }
+    case 'track': {
+      const [trackCommand, ...trackArgv] = argv;
+      if (trackCommand === 'update') {
+        const record = updateManagedProjectTrack(requiredOption(trackArgv, '--track-id'), {
+          tenant_slug: requiredOption(trackArgv, '--tenant-slug'),
+        });
+        if (hasFlag(trackArgv, '--json')) jsonOutput(record);
+        else console.log(`Updated project track ${record.track_id}`);
+        return;
+      }
+      if (trackCommand !== 'create')
+        throw new Error(`Unknown track command: ${trackCommand || '(missing)'}`);
+      const record = createManagedProjectTrack({
+        track_id: requiredOption(trackArgv, '--track-id'),
+        project_id: requiredOption(trackArgv, '--project-id'),
+        name: requiredOption(trackArgv, '--name'),
+        summary: requiredOption(trackArgv, '--summary'),
+        ...(optionValue(trackArgv, '--track-type')
+          ? { track_type: parseTrackType(optionValue(trackArgv, '--track-type')) }
+          : {}),
+        ...(optionValue(trackArgv, '--lifecycle-model')
+          ? { lifecycle_model: parseLifecycleModel(optionValue(trackArgv, '--lifecycle-model')) }
+          : {}),
+        ...(optionValue(trackArgv, '--status')
+          ? { status: parseTrackStatus(optionValue(trackArgv, '--status')) }
+          : {}),
+        ...(optionValue(trackArgv, '--release-id')
+          ? { release_id: optionValue(trackArgv, '--release-id') }
+          : {}),
+        ...(csvOption(trackArgv, '--required-artifacts')
+          ? { required_artifacts: csvOption(trackArgv, '--required-artifacts') }
+          : {}),
+      });
+      if (hasFlag(trackArgv, '--json')) jsonOutput(record);
+      else console.log(`Created project track ${record.track_id}`);
       return;
     }
     case 'create': {

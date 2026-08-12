@@ -82,6 +82,11 @@
         "project_name": { "type": "string" },
         "track_id": { "type": "string" },
         "track_name": { "type": "string" },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "tier": {
           "type": "string",
           "enum": ["personal", "confidential", "public"]
