@@ -15,6 +15,7 @@ import {
   resolveVocabularyLocale,
   resolveOnboardingText,
   isServiceConnectionReady,
+  isValidTenantSlug,
   type LocalizedOnboardingText,
   type SupportedLocale,
   safeExistsSync,
@@ -264,7 +265,7 @@ const normalizeInteractionStyle = (input: string): IdentityDraft['interaction_st
 
 const normalizeTenantSlug = (value: string): string => {
   const trimmed = value.trim();
-  if (/^[a-z][a-z0-9-]{1,30}$/.test(trimmed)) return trimmed;
+  if (isValidTenantSlug(trimmed)) return trimmed;
   throw new Error(`Invalid tenant slug: ${value}`);
 };
 

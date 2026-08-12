@@ -18,6 +18,7 @@ import {
   withLock,
   resolveOnboardingText,
   resolveOperatorLocale,
+  isValidTenantSlug,
 } from '@agent/core';
 import {
   evaluateReasoningBackend,
@@ -161,7 +162,7 @@ export function validateInput(input: ApplyInput) {
     );
   }
   for (const tenant of input.tenants || []) {
-    if (!/^[a-z][a-z0-9-]{1,30}$/.test(tenant.tenant_slug)) {
+    if (!isValidTenantSlug(tenant.tenant_slug)) {
       throw new Error(`Invalid tenant_slug: ${tenant.tenant_slug}`);
     }
   }

@@ -24,9 +24,9 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { safeAppendFile, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
 /** Shared (cross-tenant) confidential namespace — has no tenant profile. */
@@ -70,7 +70,7 @@ export interface IngestAssetRecord {
 export type IngestLedgerPathOptions = TenantRegistryPathOptions;
 
 function assertTenantSlug(slug: string): void {
-  if (!TENANT_SLUG_RE.test(slug)) {
+  if (!isValidTenantSlug(slug) && slug !== COMMON_TENANT_SLUG) {
     throw new Error(`[ingest-asset-ledger] invalid tenant slug '${slug}'`);
   }
 }

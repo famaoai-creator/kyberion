@@ -47,7 +47,10 @@
       "properties": {
         "raw": { "type": "string" },
         "kind": { "type": "string", "enum": ["company", "vision", "legacy"] },
-        "tenant_slug": { "type": ["string", "null"] },
+        "tenant_slug": {
+          "type": ["string", "null"],
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "path": { "type": ["string", "null"] },
         "query": { "type": ["string", "null"] }
       },

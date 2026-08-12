@@ -10,7 +10,11 @@
     "version": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },
     "audience": { "type": "string", "minLength": 1 },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "tone": { "type": "string" },
     "language": { "type": "string" },
     "deliverables": {

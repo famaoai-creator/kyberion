@@ -16,6 +16,7 @@ import {
   saveProjectMissionLink,
   saveProjectTrackState,
 } from './project-operational-state-links.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 export {
   projectOperationalMissionLinkPath,
@@ -349,9 +350,7 @@ function listProjectStateFiles(rootDir: string): string[] {
   return files;
 }
 
-function loadAllProjectStateRecords(
-  projectId: string
-): Array<{
+function loadAllProjectStateRecords(projectId: string): Array<{
   tier: ProjectOperationalState['tier'];
   tenant_slug?: string;
   record: ProjectOperationalState;
@@ -408,7 +407,20 @@ export function syncProjectOperationalStateFromMission(
 ): string | null {
   const projectId = input.relationships?.project?.project_id?.trim();
   if (!projectId) return null;
-  const tenantSlug = (input.tenant_slug || input.tenant_id || 'shared').trim() || 'shared';
+  const requestedTenantSlug = (input.tenant_slug || input.tenant_id || '').trim();
+  // `shared` is the tenantless workspace partition, not a serialized tenant.
+  // Keep it as undefined for public/personal state so the path resolver still
+  // uses active/projects/{tier}/shared/ while the schema remains truthful.
+  const tenantSlug =
+    requestedTenantSlug === 'shared' ? undefined : requestedTenantSlug || undefined;
+  if (tenantSlug && !isValidTenantSlug(tenantSlug)) {
+    throw new Error(`Invalid tenant_slug '${tenantSlug}' for project operational state.`);
+  }
+  if (input.tier === 'confidential' && !tenantSlug) {
+    throw new Error(
+      `tenant_slug is required for confidential project operational state (${projectId}).`
+    );
+  }
   const existingProject = loadProjectRecord(projectId);
   const projectPath = input.relationships?.project?.project_path?.trim();
   const relationships = input.relationships || {};

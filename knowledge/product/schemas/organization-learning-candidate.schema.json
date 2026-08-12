@@ -45,7 +45,11 @@
       "enum": ["proposed", "approved", "rejected", "promoted"]
     },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "metadata": { "type": "object", "additionalProperties": true }

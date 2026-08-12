@@ -52,6 +52,10 @@
     {
       "slug": "story-migrate",
       "reason": "Migration story fixture; retained outside the tenant spine and not an operating tenant."
+    },
+    {
+      "slug": "tenant-meeting-ops",
+      "reason": "Fixture slug used by wisdom-actuator meeting-ops tests (libs/actuators/wisdom-actuator/src/meeting-ops.test.ts:32) — same audit mirror path; customer/tenant-meeting-ops/ holds only logs/ and no work item record survives outside them. Not an operating tenant."
     }
   ]
 }

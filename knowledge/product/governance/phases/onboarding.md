@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-08-08
+last_updated: 2026-08-12
 runtime_stages: [intake, classification]
 ---
 
@@ -52,7 +52,7 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
    - Agent writes output files directly, conforming to `knowledge/public/templates/my-identity.schema.json` and `knowledge/product/schemas/onboarding-state.schema.json`.
 3. **Defaults bypass** (evaluation only): `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — accepts every default. Use only when defaults are knowingly acceptable.
 
-- **Output** (出力ルート: `KYBERION_CUSTOMER` が設定されている場合は `customer/{slug}/` overlay 配下、未設定時は `knowledge/personal/` 配下 — 詳細は `docs/INITIALIZATION.md` Stage 9-11):
+- **Output** (出力ルート: `KYBERION_CUSTOMER` が設定されている場合は stance overlay である `customer/{slug}/` 配下、未設定時は `knowledge/personal/` 配下 — 詳細は `docs/INITIALIZATION.md` Stage 9-11):
   - `knowledge/personal/my-identity.json`: Defines values, domain, and role.
   - `knowledge/personal/my-vision.md`: Defines the "North Star" (Vision).
   - `knowledge/personal/agent-identity.json`: Defines the Agent ID and trust tier.
@@ -61,10 +61,16 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
   - `knowledge/personal/connections/*.json`: Stores approved service connection drafts.
   - `knowledge/personal/tenants/*.json`: Stores tenant profiles entered during onboarding.
   - `knowledge/personal/onboarding/tutorial-plan.md`: Records the first tutorial plan.
-- **Post-onboarding context binding**: When a customer overlay and tenant are available, resolve
-  `customer_slug → tenant_slug → organization_id` with
+- **Post-onboarding context binding**: When a stance overlay (`customer/{slug}/`) and a tenant are
+  available, resolve `customer_slug → tenant_slug → organization_id` with
   `pnpm onboarding:context bind --customer-slug <customer> --tenant-slug <tenant> --dry-run`.
   Apply only after review with `--apply`; this creates or reuses the governed organization state.
+  Note the two different things being joined here: `customer_slug` names the **stance** you operate
+  from (runtime configuration), while `tenant_slug → organization_id` is the start of the
+  **containment hierarchy** the work will live in
+  ([entity-scope-hierarchy](../../architecture/entity-scope-hierarchy.md),
+  [stance-tenant-customer-model](../../architecture/stance-tenant-customer-model.md)). They are
+  often spelled the same and are still not the same thing.
 - **Effect**: The ecosystem aligns its autonomy with the Sovereign's personality.
 
 ### Stage 4: Sensory & Re-configuration Options (任意・いつでも呼び出し可能)

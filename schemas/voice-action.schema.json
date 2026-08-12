@@ -48,7 +48,11 @@
           "properties": {
             "request_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
             "mission_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+            "tenant_slug": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,30}$",
+              "not": { "enum": ["public", "confidential", "personal", "shared"] }
+            },
             "text": { "type": "string", "minLength": 1, "maxLength": 10000 },
             "expected_text": { "type": "string", "minLength": 1, "maxLength": 10000 },
             "language": { "type": "string", "minLength": 2, "maxLength": 35 },

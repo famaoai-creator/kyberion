@@ -8,7 +8,9 @@ last_updated: 2026-05-07
 
 # Customer Aggregation Point
 
-How Kyberion isolates **per-customer / per-deployment configuration** from the rest of the codebase, so that an FDE engineer can run a customer engagement without forking the repo.
+How Kyberion isolates **per-stance configuration** from the rest of the codebase, so that one checkout can be operated as several distinct entities without forking the repo.
+
+> **Naming note.** This document and the `customer/` directory were written for the FDE case, where the stance you operate from happens to be a customer's. That is one use of the mechanism, not its definition — the general concept is a **stance** ("which entity am I acting as right now"), and holding concurrent roles at several independent legal entities is an equally valid use. A stance is also distinct from a **tenant** (a confidentiality boundary) and from a **tenant's own customers**; all three get called "customer" in conversation. → [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md). Read "customer" below as "stance"; the environment variable and directory keep their historical names.
 
 This document defines the contract. For day-to-day usage, see [`customer/README.md`](../../customer/README.md).
 
@@ -17,7 +19,7 @@ This document defines the contract. For day-to-day usage, see [`customer/README.
 Kyberion's previous configuration model assumed a legacy personal fallback:
 
 - `knowledge/personal/` — legacy identity, vision, connections, tenants.
-- `knowledge/confidential/{project}/` — project-scoped governance.
+- `knowledge/confidential/{tenant-slug}/` — tenant-scoped governance (one confidentiality boundary).
 - `knowledge/public/` — reusable knowledge.
 
 For FDE / SI engagements, we need to:
@@ -141,7 +143,7 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 - **Live customer switching within a session** — currently requires restarting the process. A `pnpm customer:switch` command is a Phase D'-1 follow-up.
 - **Concurrent multi-customer execution** — the current model assumes one active customer per process. Concurrent runs require separate processes with different env vars.
 - **Customer-scoped trace storage** — trace files currently land under `active/shared/logs/`. Phase B-1 will extend this to `customer/{slug}/logs/` when a customer is active.
-- **Customer-scoped `confidential/` tier** — this document covers the single-sovereign overlay; per-customer confidential tier separation is the existing `knowledge/confidential/{project}/` mechanism and is unchanged.
+- **Stance-scoped `confidential/` tier** — this document covers the overlay only. Confidential data is separated by **tenant**, not by stance: that is the existing `knowledge/confidential/{tenant-slug}/` mechanism, and it is unchanged. A stance selects which tenants you can see; it never becomes a confidentiality boundary of its own.
 
 ## 7. Relationship to Existing Tier System
 

@@ -1,8 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildAnalysisIntentSupport } from './analysis-intent-support.js';
-import { saveProjectRecord } from './project-registry.js';
+import { projectRecordPath, saveProjectRecord } from './project-registry.js';
+import { safeExistsSync, safeRmSync } from './secure-io.js';
+
+/**
+ * EG-14: these fixtures write into the real project registry, so they must
+ * remove their records. Left behind, check:entity-governance reports them as
+ * registered projects whose workspace is missing — drift that survives the
+ * EG-11 cleanup because the next test run recreates it.
+ */
+const FIXTURE_PROJECT_IDS = ['PRJ-REVIEW', 'PRJ-BIND'];
 
 describe('analysis-intent-support', () => {
+  afterEach(() => {
+    for (const projectId of FIXTURE_PROJECT_IDS) {
+      const recordPath = projectRecordPath(projectId);
+      if (safeExistsSync(recordPath)) safeRmSync(recordPath);
+    }
+  });
+
   it('auto-fills incident basis and review target from project context', () => {
     const support = buildAnalysisIntentSupport({
       intentId: 'incident-informed-review',
@@ -55,7 +71,7 @@ describe('analysis-intent-support', () => {
       summary: 'For review target inference tests',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-analysis-review',
       repositories: [
         {
           repo_id: 'REPO-REVIEW',
@@ -115,7 +131,7 @@ describe('analysis-intent-support', () => {
       summary: 'For execution target binding',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-analysis-bind',
       repositories: [
         {
           repo_id: 'REPO-BIND',

@@ -10,6 +10,7 @@ import {
   safeRmSync,
   safeStat,
 } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * MP-04: turn a rendered artifact into images a model can actually look at.
@@ -178,7 +179,7 @@ export function assertVisualReviewPathScope(input: {
         '[VISUAL_REVIEW_MISSION_MISMATCH] artifact is not inside mission ' + input.missionId
       );
     }
-    if (input.tenantSlug && !/^[a-z][a-z0-9-]{1,30}$/u.test(input.tenantSlug)) {
+    if (input.tenantSlug && !isValidTenantSlug(input.tenantSlug)) {
       throw new Error('[VISUAL_REVIEW_TENANT_INVALID] tenant slug is not valid');
     }
     if (input.missionId) {

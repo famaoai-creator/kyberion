@@ -5,7 +5,16 @@
   "description": "Confidential theme pack derived from a source PowerPoint deck. Stores palette, fonts, logo, and PPTX heritage so the deck can be re-applied with high fidelity.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "version", "theme_id", "brand_name", "tenant_slug", "design_system_id", "theme", "pptx"],
+  "required": [
+    "kind",
+    "version",
+    "theme_id",
+    "brand_name",
+    "tenant_slug",
+    "design_system_id",
+    "theme",
+    "pptx"
+  ],
   "properties": {
     "kind": {
       "type": "string",
@@ -25,7 +34,8 @@
     },
     "tenant_slug": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "design_system_id": {
       "type": "string",

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)
@@ -242,6 +243,17 @@ function normalizePathSegment(value: string, fallback = 'shared') {
   );
 }
 
+function normalizeTenantWorkspaceSegment(value = 'shared'): string {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'shared') return normalized;
+  if (!isValidTenantSlug(normalized)) {
+    throw new Error(`[path-resolver] invalid tenant slug '${value}'`);
+  }
+  return normalized;
+}
+
 /**
  * Returns the workspace directory for a project.
  * Path: active/projects/{tier}/{tenantOrShared}/{projectId}/
@@ -256,7 +268,7 @@ export function projectWorkspaceDir(
     path.resolve(rootDir, 'active'),
     'projects',
     tier,
-    normalizePathSegment(tenantSlug, 'shared'),
+    normalizeTenantWorkspaceSegment(tenantSlug),
     normalizePathSegment(projectId, 'project')
   );
   return dir;
@@ -304,7 +316,7 @@ export function organizationWorkspaceDir(
     path.resolve(rootDir, 'active'),
     'organizations',
     tier,
-    normalizePathSegment(tenantSlug, 'shared'),
+    normalizeTenantWorkspaceSegment(tenantSlug),
     normalizePathSegment(organizationId, 'organization')
   );
   return dir;
@@ -371,7 +383,12 @@ export function tenantMissionDir(
       /* fallback */
     }
   }
-  const dir = path.join(PROJECT_ROOT_DIR, subPath, tenantSlug, missionId);
+  const dir = path.join(
+    PROJECT_ROOT_DIR,
+    subPath,
+    normalizeTenantWorkspaceSegment(tenantSlug),
+    missionId
+  );
   return dir;
 }
 
@@ -379,7 +396,7 @@ function currentTenantSlug(): string | undefined {
   const value = String(process.env.KYBERION_TENANT || '')
     .trim()
     .toLowerCase();
-  return /^[a-z][a-z0-9-]{1,30}$/.test(value) ? value : undefined;
+  return isValidTenantSlug(value) ? value : undefined;
 }
 
 /**

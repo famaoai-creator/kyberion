@@ -5,7 +5,10 @@
   "required": ["company_id", "tenant_slug", "source_kind", "source_path", "period", "objectives"],
   "properties": {
     "company_id": { "type": "string" },
-    "tenant_slug": { "type": ["string", "null"] },
+    "tenant_slug": {
+      "type": ["string", "null"],
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "source_kind": {
       "type": "string",
       "enum": ["customer", "confidential", "public", "derived"]

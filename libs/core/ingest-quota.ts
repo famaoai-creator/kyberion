@@ -25,10 +25,9 @@
 
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
 export const INGEST_QUOTA_POLICY_REPO_PATH =
@@ -93,7 +92,7 @@ export interface IngestQuotaOptions {
 }
 
 function assertTenantSlug(slug: string): void {
-  if (!TENANT_SLUG_RE.test(slug)) {
+  if (!isValidTenantSlug(slug)) {
     throw new Error(`[ingest-quota] invalid tenant slug '${slug}'`);
   }
 }
