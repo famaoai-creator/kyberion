@@ -43,8 +43,22 @@ describe('mesh-peer-directory', () => {
         endpoint_ref: 'mesh://peer-a1.local',
         key_ref: 'vault://mesh/peer-a1/key',
         authority_role: 'external_attacker',
-      }),
+      })
     ).toThrow(/registration_authority_denied/i);
+  });
+
+  it('rejects tier and shared partition names at every peer tenant boundary', () => {
+    for (const tenant_id of ['public', 'confidential', 'personal', 'shared']) {
+      expect(() =>
+        registerMeshPeer({
+          peer_id: 'peer-a1',
+          tenant_id,
+          endpoint_ref: 'mesh://peer-a1.local',
+          key_ref: 'vault://mesh/peer-a1/key',
+          authority_role: 'infrastructure_sentinel',
+        })
+      ).toThrow(/invalid_tenant_id/i);
+    }
   });
 
   it('registers peers, records heartbeats, advertises allowlisted capabilities, and resolves exact peers', () => {
@@ -145,8 +159,8 @@ describe('mesh-peer-directory', () => {
         {
           tenant_id: 'tenant-acme',
           now: '2026-06-24T00:03:00.000Z',
-        },
-      ),
+        }
+      )
     ).toEqual([]);
 
     expect(
@@ -158,8 +172,8 @@ describe('mesh-peer-directory', () => {
         {
           tenant_id: 'tenant-acme',
           now: '2026-06-24T00:03:00.000Z',
-        },
-      ),
+        }
+      )
     ).toEqual([]);
   });
 
@@ -193,8 +207,8 @@ describe('mesh-peer-directory', () => {
         {
           tenant_id: 'tenant-acme',
           now: '2026-06-24T00:03:00.000Z',
-        },
-      ),
+        }
+      )
     ).toEqual([]);
   });
 
@@ -216,7 +230,7 @@ describe('mesh-peer-directory', () => {
         version: '1',
         roles: ['reviewer'],
         request_kinds: ['review.request', 'capability.query'],
-      }),
+      })
     ).toThrow(/capability_outside_allowlist/i);
   });
 
@@ -253,8 +267,8 @@ describe('mesh-peer-directory', () => {
         {
           tenant_id: 'tenant-acme',
           now: '2026-06-24T00:03:00.000Z',
-        },
-      ),
+        }
+      )
     ).toEqual([]);
   });
 });

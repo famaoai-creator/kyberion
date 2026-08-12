@@ -35,14 +35,13 @@ import {
 import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
-
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
+import { isValidTenantSlug } from './entity-scope.js';
 
 function normalizeTenantSlug(value: string | undefined | null): string | undefined {
   if (!value) return undefined;
   const trimmed = String(value).trim();
   if (!trimmed) return undefined;
-  return TENANT_SLUG_RE.test(trimmed) ? trimmed : undefined;
+  return isValidTenantSlug(trimmed) ? trimmed : undefined;
 }
 
 export interface MissionVisionRefSummary {

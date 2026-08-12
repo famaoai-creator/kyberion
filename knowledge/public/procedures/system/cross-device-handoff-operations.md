@@ -3,7 +3,7 @@ title: Cross-Device Handoff Operations
 category: Procedure
 tags: [handoff, browser, ios, android, runbook, security]
 importance: 7
-last_updated: 2026-04-27
+last_updated: 2026-08-12
 ---
 
 # Cross-Device Handoff Operations
@@ -26,17 +26,17 @@ Use a handoff only when **all** of the following hold:
 Do **not** use a handoff when:
 
 - The principal differs (use re-authentication instead).
-- The handoff would cross tenants (`confidential/{org}/` boundaries).
+- The handoff would cross tenants (`knowledge/confidential/{tenant-slug}/` boundaries).
 - The session was opened in an interactive workflow that the user has not
   acknowledged completing on the source surface.
 
 ## 2. Pipelines
 
-| Pipeline | Direction |
-|---|---|
-| `pipelines/web-session-handoff-runner.json` | web → web (round-trip / template) |
-| `pipelines/mobile-webview-handoff-runner-ios.json` | iOS WebView → web |
-| `pipelines/mobile-webview-handoff-runner-android.json` | Android WebView → web |
+| Pipeline                                               | Direction                         |
+| ------------------------------------------------------ | --------------------------------- |
+| `pipelines/web-session-handoff-runner.json`            | web → web (round-trip / template) |
+| `pipelines/mobile-webview-handoff-runner-ios.json`     | iOS WebView → web                 |
+| `pipelines/mobile-webview-handoff-runner-android.json` | Android WebView → web             |
 
 Each pipeline calls the source actuator's `export_session_handoff` followed
 by the target actuator's `import_session_handoff`. The envelope written
@@ -71,14 +71,14 @@ between them must conform to the cross-device handoff schema.
 
 ## 4. Failure Modes and Fallbacks
 
-| Failure | Action |
-|---|---|
-| Envelope `expires_at` in past | Reject; emit `cross_device.handoff_expired` audit event; do not retry. |
-| `surface_state.contract_ref` unknown | Reject; emit `cross_device.handoff_unsupported_contract`. |
-| `policy.allowed_target_origins` mismatch | Reject; emit `cross_device.handoff_origin_mismatch`. |
-| `audit.source_chain_tip` missing or unreachable | Apply `policy.fallback_behavior`. |
-| Secret in `secret_refs` cannot be resolved | Apply `policy.fallback_behavior`. Default = `reject_and_log`. |
-| Surface state corrupt or schema-invalid | Reject; treat as a security event (see §6). |
+| Failure                                         | Action                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| Envelope `expires_at` in past                   | Reject; emit `cross_device.handoff_expired` audit event; do not retry. |
+| `surface_state.contract_ref` unknown            | Reject; emit `cross_device.handoff_unsupported_contract`.              |
+| `policy.allowed_target_origins` mismatch        | Reject; emit `cross_device.handoff_origin_mismatch`.                   |
+| `audit.source_chain_tip` missing or unreachable | Apply `policy.fallback_behavior`.                                      |
+| Secret in `secret_refs` cannot be resolved      | Apply `policy.fallback_behavior`. Default = `reject_and_log`.          |
+| Surface state corrupt or schema-invalid         | Reject; treat as a security event (see §6).                            |
 
 `fallback_behavior = prompt_operator` should only be used during
 operator-attended workflows; never in unattended pipelines.

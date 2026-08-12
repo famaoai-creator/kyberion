@@ -26,6 +26,7 @@ import {
   type MeshRequestKind,
   type MeshTargetSelector,
 } from './mesh-hub-contract.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/mesh-hub';
@@ -248,6 +249,12 @@ function validateRequestEnvelope(
   if (!request || request.kind !== 'mesh-request') {
     throw new Error(`mesh_hub_invalid_payload:${envelope.message_id}`);
   }
+  if (!request.tenant_scope?.tenant_id || !isValidTenantSlug(request.tenant_scope.tenant_id)) {
+    throw new Error(`mesh_hub_invalid_tenant_id:${String(request.tenant_scope?.tenant_id || '')}`);
+  }
+  if (request.tenant_scope.scope !== 'same_tenant') {
+    throw new Error(`mesh_hub_invalid_scope:${String(request.tenant_scope?.scope || '')}`);
+  }
   if (
     request.target.selector.kind === 'topic' &&
     request.request_kind === 'workitem.status_update'
@@ -260,6 +267,12 @@ function validateRequestEnvelope(
 function validateLocalRequest(request: MeshRequest, peerId: string): MeshRequest {
   if (!request || request.kind !== 'mesh-request') {
     throw new Error('mesh_hub_invalid_local_request');
+  }
+  if (!request.tenant_scope?.tenant_id || !isValidTenantSlug(request.tenant_scope.tenant_id)) {
+    throw new Error(`mesh_hub_invalid_tenant_id:${String(request.tenant_scope?.tenant_id || '')}`);
+  }
+  if (request.tenant_scope.scope !== 'same_tenant') {
+    throw new Error(`mesh_hub_invalid_scope:${String(request.tenant_scope?.scope || '')}`);
   }
   if (request.target.selector.kind === 'peer' && request.target.selector.peer_id !== peerId) {
     throw new Error(`mesh_hub_recipient_mismatch:${request.request_id}`);

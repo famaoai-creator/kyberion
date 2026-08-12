@@ -56,7 +56,10 @@
     "related_ids": { "type": "array", "items": { "type": "string" } },
     "evidence_refs": { "type": "array", "items": { "type": "string" } },
     "tier": { "enum": ["personal", "confidential", "public"] },
-    "tenant_slug": { "type": "string" },
+    "tenant_slug": {
+      "type": "string",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "redaction": { "enum": ["summary", "reference_only", "redacted"] },
     "source": {
       "enum": ["mission", "task", "worker", "orchestration", "a2a", "trace", "surface", "runtime"]

@@ -14,7 +14,8 @@
       "minLength": 1
     },
     "tenant_slug": {
-      "type": ["string", "null"]
+      "type": ["string", "null"],
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "source_kind": {
       "type": "string",

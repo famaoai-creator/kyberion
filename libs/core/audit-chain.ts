@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeReadFile,
   safeWriteFile,
@@ -92,14 +93,24 @@ class AuditChainImpl {
       const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
       const timestamp = new Date().toISOString();
 
-      const tenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+      const requestedTenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+      const tenantSlug =
+        requestedTenantSlug && isValidTenantSlug(requestedTenantSlug)
+          ? requestedTenantSlug
+          : undefined;
       const chainKey = resolveAuditChainKey({ createIfMissing: true });
       if (!chainKey) throw new Error('missing_audit_chain_key');
+
+      // Do not let an invalid caller-supplied tenantSlug survive through the
+      // object spread below. In particular, `public`/`shared` must not remain
+      // in the master chain merely because their mirror is skipped.
+      const entryWithoutTenantSlug = { ...entry };
+      delete entryWithoutTenantSlug.tenantSlug;
 
       const nextEntry: AuditEntry = {
         id,
         timestamp,
-        ...entry,
+        ...entryWithoutTenantSlug,
         correlationId:
           entry.correlationId ??
           (typeof entry.metadata?.correlationId === 'string'
@@ -415,9 +426,21 @@ class AuditChainImpl {
     }
 
     // Per-tenant mirror: copy to customer/{slug}/logs/audit/ when slug is present.
-    if (entry.tenantSlug) {
+    //
+    // EG-14: the mirror follows an existing stance overlay; it never creates one.
+    // `customer/{slug}/` is a stance overlay owned by `pnpm customer:create`, and
+    // entity-scope-hierarchy is explicit that "readers must not create missing
+    // directories as a side effect; creation belongs to the governed writer".
+    // Mirroring used to mkdir -p the whole path, so any audit entry carrying a
+    // novel slug — including a test fixture's — materialised a directory that
+    // later read back as if a tenant existed. Skipping is lossless: the master
+    // chain still holds the entry, and verifyTenantMirrors() skips slugs with no
+    // mirror directory, so master and mirror stay consistent.
+    if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
       try {
-        const tenantAuditDir = path.join(rootDir(), 'customer', entry.tenantSlug, 'logs', 'audit');
+        const stanceDir = path.join(rootDir(), 'customer', entry.tenantSlug);
+        if (!safeExistsSync(stanceDir)) return;
+        const tenantAuditDir = path.join(stanceDir, 'logs', 'audit');
         if (!safeExistsSync(tenantAuditDir)) {
           safeMkdir(tenantAuditDir, { recursive: true });
         }
@@ -445,7 +468,11 @@ class AuditChainImpl {
  */
 function resolveCurrentTenantSlug(): string | undefined {
   const fromEnv = (process.env.KYBERION_TENANT || '').trim();
-  if (fromEnv && /^[a-z][a-z0-9-]{1,30}$/.test(fromEnv)) return fromEnv;
+  // A tier name is syntactically a valid slug, so the shape check alone lets
+  // `KYBERION_TENANT=public` through and taints every audit entry it stamps.
+  if (fromEnv && isValidTenantSlug(fromEnv)) {
+    return fromEnv;
+  }
   const missionId = process.env.MISSION_ID;
   if (!missionId) return undefined;
   // Walk up looking for a mission-state.json with tenant_slug.
@@ -464,7 +491,7 @@ function resolveCurrentTenantSlug(): string | undefined {
     try {
       const state = JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string);
       const slug = (state.tenant_slug || '').trim();
-      if (slug && /^[a-z][a-z0-9-]{1,30}$/.test(slug)) return slug;
+      if (slug && isValidTenantSlug(slug)) return slug;
     } catch {
       /* ignore */
     }

@@ -198,7 +198,7 @@ Rule of thumb:
 - `quick conversational work` -> answer or task session
 - `larger durable work` -> mission
 
-Above all of this sits the organization layer: every work item carries a typed context chain (`organization_id → tenant_slug → mission_id → project_id → task_id` plus a `work_shape`), so the same work shows up consistently in the Organization, Home, Work Items, Operations, Missions, and Governance views. Routine operations, incidents, and cadences — work that is not a solution project — are tracked by the organization operating model (`pnpm organization`).
+All of this sits inside one containment chain, widest first: a **tenant** (a confidentiality boundary) contains an **organization** (how that entity runs), which contains a **project** (a long-lived container of meaning), which contains **missions** and their tasks. Every work item carries that chain as typed context (`tenant_slug → organization_id → project_id → mission_id → task_id` plus a `work_shape`), so the same work shows up consistently in the Organization, Home, Work Items, Operations, Missions, and Governance views. Routine operations, incidents, and cadences — work that is not a solution project — are tracked by the organization operating model (`pnpm organization`).
 
 ## 6. The Smallest Mental Model
 

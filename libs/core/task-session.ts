@@ -95,6 +95,7 @@ export interface TaskSession {
     project_name?: string;
     track_id?: string;
     track_name?: string;
+    tenant_slug?: string;
     tier?: 'personal' | 'confidential' | 'public';
     service_bindings?: string[];
     locale?: string;

@@ -315,7 +315,7 @@
     {
       "path": "product/architecture/entity-scope-hierarchy.md",
       "tier": "public",
-      "size": 1980,
+      "size": 2877,
       "type": "md"
     },
     {
@@ -579,7 +579,7 @@
     {
       "path": "product/architecture/multi-tenant-operations.md",
       "tier": "public",
-      "size": 16199,
+      "size": 17131,
       "type": "md"
     },
     {
@@ -645,7 +645,7 @@
     {
       "path": "product/architecture/project-mission-artifact-service-model.md",
       "tier": "public",
-      "size": 6089,
+      "size": 6516,
       "type": "md"
     },
     {
@@ -736,6 +736,12 @@
       "path": "product/architecture/stale-doc-cleanup-rationale-2026-06.md",
       "tier": "public",
       "size": 1680,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/stance-tenant-customer-model.md",
+      "tier": "public",
+      "size": 4543,
       "type": "md"
     },
     {
@@ -1953,7 +1959,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 5648,
+      "size": 6158,
       "type": "md"
     },
     {
@@ -2505,7 +2511,7 @@
     {
       "path": "product/governance/tenant-registry-exceptions.json",
       "tier": "public",
-      "size": 2663,
+      "size": 3888,
       "type": "json"
     },
     {
@@ -3123,7 +3129,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 90664,
+      "size": 91152,
       "type": "json"
     },
     {
@@ -5985,7 +5991,7 @@
     {
       "path": "product/schemas/README-mission-contract.md",
       "tier": "public",
-      "size": 2143,
+      "size": 2454,
       "type": "md"
     },
     {
@@ -6129,7 +6135,7 @@
     {
       "path": "product/schemas/agent-collaboration-event.schema.json",
       "tier": "public",
-      "size": 2042,
+      "size": 2127,
       "type": "json"
     },
     {
@@ -6171,7 +6177,7 @@
     {
       "path": "product/schemas/artifact-record.schema.json",
       "tier": "public",
-      "size": 1589,
+      "size": 1680,
       "type": "json"
     },
     {
@@ -6333,7 +6339,7 @@
     {
       "path": "product/schemas/company.schema.json",
       "tier": "public",
-      "size": 2808,
+      "size": 2962,
       "type": "json"
     },
     {
@@ -6345,7 +6351,7 @@
     {
       "path": "product/schemas/context-fragment.schema.json",
       "tier": "public",
-      "size": 913,
+      "size": 1004,
       "type": "json"
     },
     {
@@ -6381,7 +6387,7 @@
     {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
-      "size": 1986,
+      "size": 2061,
       "type": "json"
     },
     {
@@ -6471,7 +6477,7 @@
     {
       "path": "product/schemas/financial-model.schema.json",
       "tier": "public",
-      "size": 1134,
+      "size": 1219,
       "type": "json"
     },
     {
@@ -6825,37 +6831,37 @@
     {
       "path": "product/schemas/mesh-capability-advertisement.schema.json",
       "tier": "public",
-      "size": 2047,
+      "size": 2122,
       "type": "json"
     },
     {
       "path": "product/schemas/mesh-delivery-record.schema.json",
       "tier": "public",
-      "size": 6361,
+      "size": 6512,
       "type": "json"
     },
     {
       "path": "product/schemas/mesh-peer-presence.schema.json",
       "tier": "public",
-      "size": 1553,
+      "size": 1628,
       "type": "json"
     },
     {
       "path": "product/schemas/mesh-peer-registration.schema.json",
       "tier": "public",
-      "size": 1383,
+      "size": 1458,
       "type": "json"
     },
     {
       "path": "product/schemas/mesh-request.schema.json",
       "tier": "public",
-      "size": 4506,
+      "size": 4585,
       "type": "json"
     },
     {
       "path": "product/schemas/mesh-topic-subscription.schema.json",
       "tier": "public",
-      "size": 1800,
+      "size": 1875,
       "type": "json"
     },
     {
@@ -6873,7 +6879,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 14624,
+      "size": 15262,
       "type": "json"
     },
     {
@@ -7083,19 +7089,19 @@
     {
       "path": "product/schemas/okr.schema.json",
       "tier": "public",
-      "size": 1693,
+      "size": 1778,
       "type": "json"
     },
     {
       "path": "product/schemas/onboarding-context-binding.schema.json",
       "tier": "public",
-      "size": 1628,
+      "size": 1719,
       "type": "json"
     },
     {
       "path": "product/schemas/onboarding-first-work.schema.json",
       "tier": "public",
-      "size": 1793,
+      "size": 1884,
       "type": "json"
     },
     {
@@ -7107,7 +7113,7 @@
     {
       "path": "product/schemas/onboarding-state.schema.json",
       "tier": "public",
-      "size": 4669,
+      "size": 4915,
       "type": "json"
     },
     {
@@ -7155,13 +7161,13 @@
     {
       "path": "product/schemas/organization-cadence.schema.json",
       "tier": "public",
-      "size": 1595,
+      "size": 1686,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-capability.schema.json",
       "tier": "public",
-      "size": 1670,
+      "size": 1761,
       "type": "json"
     },
     {
@@ -7179,13 +7185,13 @@
     {
       "path": "product/schemas/organization-catalog.schema.json",
       "tier": "public",
-      "size": 1126,
+      "size": 1217,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-decision.schema.json",
       "tier": "public",
-      "size": 2121,
+      "size": 2212,
       "type": "json"
     },
     {
@@ -7203,19 +7209,19 @@
     {
       "path": "product/schemas/organization-domain.schema.json",
       "tier": "public",
-      "size": 1652,
+      "size": 1743,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-incident.schema.json",
       "tier": "public",
-      "size": 1853,
+      "size": 1944,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-learning-candidate.schema.json",
       "tier": "public",
-      "size": 1925,
+      "size": 2016,
       "type": "json"
     },
     {
@@ -7227,25 +7233,25 @@
     {
       "path": "product/schemas/organization-operation-run.schema.json",
       "tier": "public",
-      "size": 1616,
+      "size": 1707,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-operation-state.schema.json",
       "tier": "public",
-      "size": 1581,
+      "size": 1672,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-operation.schema.json",
       "tier": "public",
-      "size": 3118,
+      "size": 3209,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-operational-state.schema.json",
       "tier": "public",
-      "size": 1957,
+      "size": 2048,
       "type": "json"
     },
     {
@@ -7281,19 +7287,19 @@
     {
       "path": "product/schemas/organization-purpose.schema.json",
       "tier": "public",
-      "size": 2028,
+      "size": 2119,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-service-state.schema.json",
       "tier": "public",
-      "size": 1925,
+      "size": 2016,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-service.schema.json",
       "tier": "public",
-      "size": 3029,
+      "size": 3120,
       "type": "json"
     },
     {
@@ -7311,7 +7317,7 @@
     {
       "path": "product/schemas/organization-work-resolution.schema.json",
       "tier": "public",
-      "size": 2877,
+      "size": 2968,
       "type": "json"
     },
     {
@@ -7341,7 +7347,7 @@
     {
       "path": "product/schemas/peer-network.schema.json",
       "tier": "public",
-      "size": 1565,
+      "size": 1640,
       "type": "json"
     },
     {
@@ -7389,7 +7395,7 @@
     {
       "path": "product/schemas/pptx-theme-pack.schema.json",
       "tier": "public",
-      "size": 3693,
+      "size": 3804,
       "type": "json"
     },
     {
@@ -7461,19 +7467,19 @@
     {
       "path": "product/schemas/project-operational-state.schema.json",
       "tier": "public",
-      "size": 2331,
+      "size": 2620,
       "type": "json"
     },
     {
       "path": "product/schemas/project-record.schema.json",
       "tier": "public",
-      "size": 3123,
+      "size": 3214,
       "type": "json"
     },
     {
       "path": "product/schemas/project-track-record.schema.json",
       "tier": "public",
-      "size": 1579,
+      "size": 1775,
       "type": "json"
     },
     {
@@ -7581,7 +7587,7 @@
     {
       "path": "product/schemas/security-scope.schema.json",
       "tier": "public",
-      "size": 1188,
+      "size": 1279,
       "type": "json"
     },
     {
@@ -7821,7 +7827,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 14172,
+      "size": 14340,
       "type": "json"
     },
     {
@@ -7839,7 +7845,7 @@
     {
       "path": "product/schemas/tenant-profile.schema.json",
       "tier": "public",
-      "size": 1891,
+      "size": 2073,
       "type": "json"
     },
     {
@@ -8049,7 +8055,7 @@
     {
       "path": "product/schemas/web-theme-pack.schema.json",
       "tier": "public",
-      "size": 4114,
+      "size": 4225,
       "type": "json"
     },
     {
@@ -9783,7 +9789,7 @@
     {
       "path": "public/procedures/system/cross-device-handoff-operations.md",
       "tier": "public",
-      "size": 6166,
+      "size": 6754,
       "type": "md"
     },
     {

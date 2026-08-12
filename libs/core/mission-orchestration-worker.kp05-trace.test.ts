@@ -304,6 +304,17 @@ describe('mission-orchestration-worker KP-05 dispatch tracing', { timeout: 60_00
     const { safeExistsSync, safeRmSync } = await import('./secure-io.js');
     const missionPath = missionDir(MISSION_ID, 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
+    // The mission fixture declares a project_path, so dispatch materialises a
+    // project workspace next to the mission. Removing only the mission left it
+    // behind, and every run seeded a fresh unregistered workspace that
+    // check:entity-governance then reported as drift (EG-14).
+    const { pathResolver } = await import('./path-resolver.js');
+    const projectWorkspace = pathResolver.rootResolve(
+      `active/projects/public/shared/${MISSION_ID}`
+    );
+    if (safeExistsSync(projectWorkspace)) {
+      safeRmSync(projectWorkspace, { recursive: true, force: true });
+    }
     for (const envVar of [
       'KYBERION_TEST_OBSERVABILITY_DIR',
       'KYBERION_KNOWLEDGE_DELIVERY_DIR',
