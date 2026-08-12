@@ -42,6 +42,13 @@ import type {
 } from './reasoning-backend.js';
 import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import {
+  buildClaudeNativeAgentDefinitions,
+  buildClaudeNativeDelegationPrompt,
+  claudeNativeAgentName,
+} from './claude-native-subagent.js';
+import type { ObservedNativeSubagent } from './claude-agent-query.js';
+import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
 
 const SYSTEM_PROMPT = `You are a judgment-support reasoning engine for a CEO work-automation platform.
 
@@ -297,16 +304,25 @@ const SimulationResultSchema = z.object({
 export interface ClaudeAgentReasoningBackendOptions {
   /** Model alias ('opus' / 'sonnet' / 'haiku') or full id. Defaults to 'opus'. */
   model?: string;
+  /**
+   * CN-05: run delegations as real SDK sub-agents (`Options.agents` + the
+   * delegation tool) and fail closed when the turn does not start one.
+   * Defaults to `KYBERION_CLAUDE_NATIVE_SUBAGENT === '1'`.
+   */
+  nativeSubagent?: boolean;
 }
 
 export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   readonly name = 'claude-agent';
   private readonly model: string;
+  private readonly nativeSubagentEnabled: boolean;
   private lastNativeSubagentInfo: Record<string, unknown> | null = null;
   private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: ClaudeAgentReasoningBackendOptions = {}) {
     this.model = options.model ?? 'opus';
+    this.nativeSubagentEnabled =
+      options.nativeSubagent ?? process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1';
     this.nativeSubagentAdopter = {
       id: 'claude-agent-sdk',
       dispatch: (instruction, context, callOptions) =>
@@ -628,21 +644,53 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     const allowedTools = profile.cliTools.filter((tool) =>
       GOVERNED_AGENT_ALLOWED_TOOLS.includes(tool)
     );
+    // CN-05: with the native mode on, the turn must actually start a governed
+    // `kyberion-*` SDK sub-agent; without it, this stays the historical
+    // single governed agent turn (which is reported as such, never as a
+    // provider-native delegation).
+    const native = this.nativeSubagentEnabled;
     const result = await runClaudeAgentTask({
       systemPrompt: buildGovernedAgentSystemPrompt({
         base: profile.systemPromptPrefix,
         missionContext: context,
       }),
-      userPrompt: `Task: ${instruction}`,
+      userPrompt: native
+        ? buildClaudeNativeDelegationPrompt({
+            profileName: profile.name,
+            instruction,
+            ...(context ? { context } : {}),
+          })
+        : `Task: ${instruction}`,
       model: this.model,
       mcpServers: buildKyberionMcpServerConfig(),
-      allowedTools,
-      canUseTool: createKyberionCanUseTool(),
+      allowedTools: native ? [...allowedTools, 'Task'] : allowedTools,
+      canUseTool: createKyberionCanUseTool(native ? { allowNativeSubagentTools: true } : {}),
+      ...(native
+        ? {
+            agents: buildClaudeNativeAgentDefinitions(
+              profile.name as ProviderPermissionProfileName
+            ),
+          }
+        : {}),
     });
+    if (native) {
+      const reason = describeNativeSubagentGap(result.nativeSubagent, profile.name);
+      if (reason) {
+        this.lastNativeSubagentInfo = null;
+        throw new Error(`[SUBAGENT_UNAVAILABLE] ${reason}`);
+      }
+    }
     this.lastNativeSubagentInfo = {
       provider: 'claude',
       ...(result.sessionId ? { threadId: result.sessionId } : {}),
-      mode: 'agent-sdk',
+      // Honest labeling: only the native path is a provider sub-agent.
+      mode: native ? 'agent-sdk-subagent' : 'agent-sdk-single-turn',
+      ...(result.nativeSubagent
+        ? {
+            turnId: result.nativeSubagent.toolUseId,
+            subagentType: result.nativeSubagent.subagentType,
+          }
+        : {}),
       effort: options?.effort ?? 'medium',
     };
     return result.text;
@@ -659,6 +707,30 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   async prompt(prompt: string): Promise<string> {
     return this.delegateTask(prompt);
   }
+}
+
+/**
+ * CN-05 fail-closed check: why this turn may NOT be reported as a governed
+ * native delegation. `undefined` means it may. Mirrors the CLI adapter's
+ * rules — a non-governed `subagent_type`, a background launch (whose report
+ * never reaches this turn), an errored tool_result, or no delegation at all.
+ */
+function describeNativeSubagentGap(
+  observed: ObservedNativeSubagent | null | undefined,
+  profileName: string
+): string | undefined {
+  const expected = claudeNativeAgentName(profileName);
+  if (!observed) return 'Claude Agent SDK turn did not run a governed native sub-agent.';
+  if (observed.subagentType !== expected) {
+    return `Claude Agent SDK turn started the non-governed sub-agent "${observed.subagentType}" instead of "${expected}".`;
+  }
+  if (observed.failed) return `Claude Agent SDK sub-agent "${expected}" returned a tool error.`;
+  if (!observed.completed) {
+    return observed.background
+      ? `Claude Agent SDK sub-agent "${expected}" ran in the background; its report is not part of this turn.`
+      : `Claude Agent SDK sub-agent "${expected}" did not return a completed report in this turn.`;
+  }
+  return undefined;
 }
 
 function resolveClaudeSubagentProfile(options?: ReasoningCallOptions) {

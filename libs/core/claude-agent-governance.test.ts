@@ -87,6 +87,23 @@ describe('claude-agent-governance — canUseTool gate', () => {
     const unknown = await gate('SomeRandomTool', {}, opts);
     expect(unknown.behavior).toBe('deny');
   });
+
+  it('denies the delegation tool unless native sub-agent mode asked for it (CN-05)', async () => {
+    const denied = await gate('Task', { subagent_type: 'kyberion-explorer' }, opts);
+    expect(denied.behavior).toBe('deny');
+    if (denied.behavior === 'deny') expect(denied.message).toContain('not available on this path');
+  });
+
+  it('allows only governed kyberion-* sub-agents when native mode is on (CN-05)', async () => {
+    const nativeGate = createKyberionCanUseTool({ allowNativeSubagentTools: true });
+
+    const allowed = await nativeGate('Agent', { subagent_type: 'kyberion-explorer' }, opts);
+    expect(allowed.behavior).toBe('allow');
+
+    const builtin = await nativeGate('Task', { subagent_type: 'general-purpose' }, opts);
+    expect(builtin.behavior).toBe('deny');
+    if (builtin.behavior === 'deny') expect(builtin.message).toContain('kyberion-');
+  });
 });
 
 describe('claude-agent-governance — config + prompt', () => {

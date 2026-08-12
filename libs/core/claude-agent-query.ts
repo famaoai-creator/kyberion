@@ -23,6 +23,7 @@ import {
   type Options,
 } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
+import { CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES } from './claude-native-subagent.js';
 import { metrics } from './metrics.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
@@ -212,9 +213,26 @@ export interface ClaudeAgentTaskParams {
   canUseTool?: CanUseTool;
   /** Multi-turn budget for the agentic loop. Defaults to 8. */
   maxTurns?: number;
+  /** CN-05: sub-agent definitions this turn may delegate to (`Options.agents`). */
+  agents?: Options['agents'];
   extraOptions?: Partial<Options>;
   /** Metrics component label for usage attribution. Default 'reasoning:claude-agent-task'. */
   metricsLabel?: string;
+}
+
+/** Proof that a provider-native sub-agent actually ran during the turn. */
+export interface ObservedNativeSubagent {
+  toolUseId: string;
+  subagentType: string;
+  /** The delegation returned a real report inside this turn. */
+  completed: boolean;
+  /**
+   * The delegation was started in background mode, so its report is not part
+   * of this turn (the tool_result is only a launch acknowledgement).
+   */
+  background: boolean;
+  /** The delegation's tool_result was an error. */
+  failed?: boolean;
 }
 
 export interface ClaudeAgentTaskResult {
@@ -222,6 +240,12 @@ export interface ClaudeAgentTaskResult {
   sessionId: string;
   totalCostUsd: number;
   numTurns: number;
+  /**
+   * CN-05: null unless the SDK stream proved a native delegation happened.
+   * Callers that promise native execution must fail closed on null instead
+   * of presenting an ordinary agent turn as a sub-agent delegation.
+   */
+  nativeSubagent?: ObservedNativeSubagent | null;
 }
 
 /**
@@ -242,6 +266,7 @@ export async function runClaudeAgentTask(
     ...(params.mcpServers ? { mcpServers: params.mcpServers } : {}),
     ...(params.allowedTools ? { allowedTools: params.allowedTools } : {}),
     ...(params.canUseTool ? { canUseTool: params.canUseTool } : {}),
+    ...(params.agents ? { agents: params.agents } : {}),
     abortController: params.abortController,
     ...(params.extraOptions ?? {}),
   };
@@ -255,8 +280,10 @@ export async function runClaudeAgentTask(
   let numTurns = 0;
   let lastError: unknown;
   let resultMessage: unknown;
+  let nativeSubagent: ObservedNativeSubagent | null = null;
 
   for await (const message of iterator) {
+    nativeSubagent = observeNativeSubagent(message, nativeSubagent);
     if (message.type === 'result') {
       resultMessage = message;
       if (message.subtype === 'success') {
@@ -291,5 +318,95 @@ export async function runClaudeAgentTask(
     );
   }
 
-  return { text, sessionId, totalCostUsd, numTurns };
+  return { text, sessionId, totalCostUsd, numTurns, nativeSubagent };
+}
+
+/**
+ * CN-05 observation gate: a delegation counts as native only when the stream
+ * carries a `Task`/`Agent` tool_use with a `subagent_type`, and it counts as
+ * *completed* only when that tool_use is closed by a tool_result that is
+ * neither an error nor the background launch acknowledgement.
+ *
+ * Messages merely *scoped* to the delegation (`parent_tool_use_id`) are not
+ * completion: a background sub-agent emits those too, while its report never
+ * reaches this turn.
+ */
+function observeNativeSubagent(
+  message: unknown,
+  current: ObservedNativeSubagent | null
+): ObservedNativeSubagent | null {
+  const envelope = message as { message?: { content?: unknown } };
+  let observed = current;
+  const content = envelope.message?.content;
+  if (!Array.isArray(content)) return observed;
+  for (const raw of content as {
+    type?: string;
+    name?: string;
+    id?: string;
+    tool_use_id?: string;
+    is_error?: boolean;
+    content?: unknown;
+    input?: { subagent_type?: string; run_in_background?: unknown };
+  }[]) {
+    if (
+      !observed &&
+      raw?.type === 'tool_use' &&
+      typeof raw.name === 'string' &&
+      CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES.includes(raw.name) &&
+      typeof raw.id === 'string'
+    ) {
+      observed = {
+        toolUseId: raw.id,
+        subagentType: raw.input?.subagent_type ?? 'unknown',
+        background: raw.input?.run_in_background !== false,
+        completed: false,
+      };
+      continue;
+    }
+    if (
+      observed &&
+      raw?.type === 'tool_result' &&
+      typeof raw.tool_use_id === 'string' &&
+      raw.tool_use_id === observed.toolUseId
+    ) {
+      if (raw.is_error === true) {
+        observed = { ...observed, failed: true };
+        continue;
+      }
+      if (isAsyncLaunchAcknowledgement(raw.content)) {
+        observed = { ...observed, background: true };
+        continue;
+      }
+      observed = { ...observed, completed: true };
+    }
+  }
+  return observed;
+}
+
+/** tool_result bodies arrive either as a string or as content blocks. */
+function toolResultTexts(content: unknown): string[] {
+  if (typeof content === 'string') return [content];
+  if (!Array.isArray(content)) return [];
+  return content
+    .map((block) =>
+      block && typeof block === 'object' && typeof (block as { text?: unknown }).text === 'string'
+        ? (block as { text: string }).text
+        : ''
+    )
+    .filter((text) => text.length > 0);
+}
+
+/**
+ * The immediate acknowledgement returned for a background sub-agent ("Async
+ * agent launched successfully. … The agent is working in the background.").
+ * It closes the tool_use but carries no report.
+ */
+function isAsyncLaunchAcknowledgement(content: unknown): boolean {
+  const text = toolResultTexts(content).join('\n').toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes('async agent launched') ||
+    text.includes('agent is working in the background') ||
+    text.includes('launched in the background')
+  );
 }

@@ -24,6 +24,7 @@ describe('ClaudeAgentReasoningBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;
+    delete process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT;
   });
 
   it('shapes divergePersonas requests and normalizes hypothesis status', async () => {
@@ -117,8 +118,152 @@ describe('ClaudeAgentReasoningBackend', () => {
     expect(adopter?.getInfo?.()).toMatchObject({
       provider: 'claude',
       threadId: 'claude-s1',
-      mode: 'agent-sdk',
+      // Without CN-05 native mode this is one governed agent turn, and it is
+      // labeled as such rather than as a provider-native sub-agent.
+      mode: 'agent-sdk-single-turn',
       effort: 'medium',
+    });
+  });
+
+  describe('native SDK sub-agent mode (CN-05)', () => {
+    it('passes governed agent definitions and reports the observed delegation', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'native done',
+        sessionId: 'claude-s2',
+        nativeSubagent: {
+          toolUseId: 'toolu_7',
+          subagentType: 'kyberion-explorer',
+          background: false,
+          completed: true,
+        },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+      const adopter = backend.getNativeSubagentAdopter?.();
+      const answer = await adopter?.dispatch('inspect it', 'mission ctx', { profile: 'explorer' });
+
+      expect(answer).toBe('native done');
+      const call = mocks.runClaudeAgentTask.mock.calls[0][0];
+      expect(Object.keys(call.agents)).toEqual(['kyberion-explorer']);
+      expect(call.allowedTools).toContain('Task');
+      expect(call.userPrompt).toContain('run_in_background: false');
+      expect(adopter?.getInfo?.()).toMatchObject({
+        mode: 'agent-sdk-subagent',
+        threadId: 'claude-s2',
+        turnId: 'toolu_7',
+        subagentType: 'kyberion-explorer',
+      });
+    });
+
+    it('fails closed when the turn never started a sub-agent', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'I did it myself',
+        sessionId: 'claude-s3',
+        nativeSubagent: null,
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+      const adopter = backend.getNativeSubagentAdopter?.();
+
+      await expect(adopter?.dispatch('inspect it')).rejects.toThrow(
+        '[SUBAGENT_UNAVAILABLE] Claude Agent SDK turn did not run a governed native sub-agent.'
+      );
+      expect(adopter?.getInfo?.()).toBeNull();
+    });
+
+    it('fails closed when the sub-agent was started but never completed', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'agent launched',
+        sessionId: 'claude-s4',
+        nativeSubagent: {
+          toolUseId: 'toolu_8',
+          subagentType: 'kyberion-implementer',
+          background: false,
+          completed: false,
+        },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+
+      await expect(backend.getNativeSubagentAdopter()?.dispatch('build it')).rejects.toThrow(
+        'did not return a completed report in this turn'
+      );
+    });
+
+    it('fails closed on a background delegation whose report never reaches the turn', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'Agent launched in the background.',
+        sessionId: 'claude-s5',
+        nativeSubagent: {
+          toolUseId: 'toolu_9',
+          subagentType: 'kyberion-implementer',
+          background: true,
+          completed: false,
+        },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+
+      await expect(backend.getNativeSubagentAdopter()?.dispatch('build it')).rejects.toThrow(
+        '[SUBAGENT_UNAVAILABLE] Claude Agent SDK sub-agent "kyberion-implementer" ran in the background'
+      );
+    });
+
+    it('fails closed when a non-governed built-in sub-agent ran', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'done',
+        sessionId: 'claude-s6',
+        nativeSubagent: {
+          toolUseId: 'toolu_10',
+          subagentType: 'general-purpose',
+          background: false,
+          completed: true,
+        },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+
+      await expect(
+        backend.getNativeSubagentAdopter()?.dispatch('build it', undefined, {
+          profile: 'implementer',
+        })
+      ).rejects.toThrow(
+        '[SUBAGENT_UNAVAILABLE] Claude Agent SDK turn started the non-governed sub-agent "general-purpose" instead of "kyberion-implementer".'
+      );
+    });
+
+    it('fails closed when the delegation tool_result was an error', async () => {
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: '',
+        sessionId: 'claude-s7',
+        nativeSubagent: {
+          toolUseId: 'toolu_11',
+          subagentType: 'kyberion-implementer',
+          background: false,
+          completed: false,
+          failed: true,
+        },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: true });
+
+      await expect(backend.getNativeSubagentAdopter()?.dispatch('build it')).rejects.toThrow(
+        'returned a tool error'
+      );
+    });
+
+    it('turns on from KYBERION_CLAUDE_NATIVE_SUBAGENT=1', async () => {
+      process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT = '1';
+      mocks.runClaudeAgentTask.mockResolvedValue({
+        text: 'ok',
+        sessionId: 's',
+        nativeSubagent: { toolUseId: 't', subagentType: 'kyberion-implementer', completed: true },
+      });
+
+      const backend = new ClaudeAgentReasoningBackend();
+      await backend.getNativeSubagentAdopter()?.dispatch('go');
+
+      expect(mocks.runClaudeAgentTask.mock.calls[0][0].agents).toBeDefined();
     });
   });
 
