@@ -7,13 +7,18 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
+import { createTaskSession, saveTaskSession } from './task-session.js';
 import {
   bootstrapManagedProject,
+  createManagedProjectTrack,
   createManagedProject,
   getProjectManagementView,
   reconcileProjectOperationalState,
 } from './project-management.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
+import { saveProjectTrackRecord } from './project-track-registry.js';
+import { saveState } from './mission-state.js';
+import type { MissionState } from './mission-types.js';
 
 const PROJECT_ID = 'PRJ-PMC-TEST-001';
 const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
@@ -29,16 +34,26 @@ function cleanupJsonFiles(directory: string, prefix: string): void {
 }
 
 function cleanup(): void {
-  cleanupJsonFiles(pathResolver.shared('runtime/projects'), 'PRJ-PMC-TEST-');
+  cleanupJsonFiles(pathResolver.shared('runtime/projects'), 'PRJ-PMC-');
+  cleanupJsonFiles(pathResolver.shared('runtime/project-tracks'), 'TRK-PMC-');
   cleanupJsonFiles(pathResolver.shared('runtime/task-sessions'), 'TSK-PMC-TEST-');
   cleanupJsonFiles(pathResolver.shared('runtime/mission-seeds'), 'MSD-PMC-TEST-');
   safeRmSync(CALLBACK_ROOT, { recursive: true, force: true });
+  const foreignMissionPath = pathResolver.missionDir('MSN-PMC-FOREIGN', 'confidential');
+  if (safeExistsSync(foreignMissionPath))
+    safeRmSync(foreignMissionPath, { recursive: true, force: true });
   const workspace = pathResolver.projectWorkspaceDir(
     BOOTSTRAP_PROJECT_ID,
     'confidential',
     'tenant-pmc-test'
   );
   if (safeExistsSync(workspace)) safeRmSync(workspace);
+  const sharedWorkspace = pathResolver.projectWorkspaceDir(
+    BOOTSTRAP_PROJECT_ID,
+    'confidential',
+    'shared'
+  );
+  if (safeExistsSync(sharedWorkspace)) safeRmSync(sharedWorkspace);
 }
 
 describe('project-management facade', () => {
@@ -123,6 +138,157 @@ describe('project-management facade', () => {
     expect(safeExistsSync(`${result.project.project_os_path}/README.md`)).toBe(true);
     expect(result.mission_seed_ids.length).toBeGreaterThan(0);
     expect(result.kickoff_task_session.project_context?.project_id).toBe(BOOTSTRAP_PROJECT_ID);
+    expect(result.kickoff_task_session.project_context?.tenant_slug).toBe('tenant-pmc-test');
+    expect(
+      getProjectManagementView(BOOTSTRAP_PROJECT_ID).operational_states.map(
+        (state) => state.tenant_slug || 'shared'
+      )
+    ).toEqual(['tenant-pmc-test']);
+  });
+
+  it('creates a release track through the project facade and makes it the default track', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-TRACK',
+      name: 'Track Test Project',
+      summary: 'Project track fixture.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+
+    const track = createManagedProjectTrack({
+      track_id: 'TRK-PMC-RELEASE',
+      project_id: project.project_id,
+      name: 'Product Release',
+      summary: 'Release delivery slice.',
+    });
+
+    expect(track).toMatchObject({
+      project_id: project.project_id,
+      track_type: 'release',
+      lifecycle_model: 'continuous_delivery',
+      tier: 'confidential',
+      status: 'active',
+    });
+    expect(loadProjectRecord(project.project_id)).toMatchObject({
+      default_track_id: track.track_id,
+      active_tracks: [track.track_id],
+    });
+  });
+
+  it('does not expose or reconcile an unscoped confidential project session', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-UNSCOPED',
+      name: 'Unscoped Session Project',
+      summary: 'Rejects ambiguous confidential session scope.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const session = createTaskSession({
+      sessionId: 'TSK-PMC-TEST-UNSCOPED',
+      surface: 'project-controller',
+      taskType: 'analysis',
+      status: 'planning',
+      goal: { summary: 'Ambiguous session', success_condition: 'Rejected from tenant scope' },
+      projectContext: { project_id: project.project_id, tier: 'confidential' },
+    });
+    saveTaskSession(session);
+
+    expect(getProjectManagementView(project.project_id).task_sessions).toEqual([]);
+    const report = reconcileProjectOperationalState(project.project_id);
+    expect(report.expected.active_task_sessions).toEqual([]);
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'out_of_scope_task_session',
+        actual: [session.session_id],
+      })
+    );
+  });
+
+  it('does not assign a paused track as the project default', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-PAUSED-TRACK',
+      name: 'Paused Track Project',
+      summary: 'Paused track fixture.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+
+    createManagedProjectTrack({
+      track_id: 'TRK-PMC-PAUSED',
+      project_id: project.project_id,
+      name: 'Paused Release',
+      summary: 'Paused release lane.',
+      status: 'paused',
+    });
+
+    expect(loadProjectRecord(project.project_id)?.default_track_id).toBeUndefined();
+  });
+
+  it('excludes foreign project tracks and missions from view and reconciliation', async () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-FOREIGN',
+      name: 'Foreign Scope Project',
+      summary: 'Foreign scope fixture.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    saveProjectTrackRecord({
+      track_id: 'TRK-PMC-FOREIGN',
+      project_id: project.project_id,
+      name: 'Foreign Track',
+      summary: 'Foreign tenant track.',
+      status: 'active',
+      track_type: 'release',
+      lifecycle_model: 'continuous_delivery',
+      tier: 'confidential',
+      tenant_slug: 'other-tenant',
+    });
+    const mission: MissionState = {
+      mission_id: 'MSN-PMC-FOREIGN',
+      mission_type: 'development',
+      tier: 'confidential',
+      status: 'paused',
+      tenant_slug: 'other-tenant',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      relationships: {
+        project: {
+          relationship_type: 'belongs_to',
+          project_id: project.project_id,
+          project_path: `active/projects/confidential/tenant-pmc-test/${project.project_id}`,
+          affected_artifacts: [],
+          gate_impact: 'informational',
+          traceability_refs: [],
+        },
+      },
+      git: {
+        branch: 'mission/msn-pmc-foreign',
+        start_commit: 'fixture',
+        latest_commit: 'fixture',
+        checkpoints: [],
+      },
+      history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
+    };
+    await saveState(mission.mission_id, mission);
+
+    const view = getProjectManagementView(project.project_id);
+    expect(view.tracks).toEqual([]);
+    expect(view.missions).toEqual([]);
+    const report = reconcileProjectOperationalState(project.project_id);
+    expect(report.expected.active_missions).toEqual([]);
+    expect(report.expected.active_tracks).toEqual([]);
+    expect(report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'out_of_scope_mission', actual: [mission.mission_id] }),
+        expect.objectContaining({ kind: 'out_of_scope_track', actual: ['TRK-PMC-FOREIGN'] }),
+      ])
+    );
   });
 
   it('runs the rollback hook when the commit callback fails after a partial write', () => {

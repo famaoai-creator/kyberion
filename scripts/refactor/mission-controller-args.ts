@@ -3,6 +3,7 @@ import {
   loadProjectRecord,
   loadProjectTrackRecord,
   pathResolver,
+  assertManagedProjectTrackScope,
   resolveMissionExecutionSurface,
   validateWritePermission,
 } from '@agent/core';
@@ -61,7 +62,8 @@ export function resolveMissionStartCreateInputFromArgv(
     const defaultTrackId = projectRecord?.default_track_id;
     if (defaultTrackId) {
       const trackRecord = loadProjectTrackRecord(defaultTrackId);
-      if (trackRecord) {
+      if (trackRecord?.status === 'active') {
+        if (projectRecord) assertManagedProjectTrackScope(projectRecord, trackRecord);
         relationships.track = {
           relationship_type: 'belongs_to',
           track_id: trackRecord.track_id,
@@ -113,6 +115,42 @@ export function validateMissionStartCreateInput(
   }
   if (track?.track_id && !project?.project_id) {
     throw new Error(`${actionName} ${missionId}: --track-id requires --project-id`);
+  }
+  if (project?.project_id) {
+    const projectRecord = loadProjectRecord(project.project_id);
+    if (track?.track_id) {
+      if (!projectRecord) {
+        throw new Error(
+          `${actionName} ${missionId}: project record not found for track scope validation: ${project.project_id}`
+        );
+      }
+      const trackRecord = loadProjectTrackRecord(track.track_id);
+      if (!trackRecord) {
+        throw new Error(`${actionName} ${missionId}: project track not found: ${track.track_id}`);
+      }
+      assertManagedProjectTrackScope(projectRecord, trackRecord);
+    }
+    if (projectRecord) {
+      const requestedTier = input.tier;
+      const requestedTenant = input.tenantSlug || input.tenantId || 'shared';
+      const projectTenant = projectRecord.tenant_slug || 'shared';
+      if (requestedTier && requestedTier !== projectRecord.tier) {
+        throw new Error(
+          `${actionName} ${missionId}: mission tier '${requestedTier}' must match project tier '${projectRecord.tier}'.`
+        );
+      }
+      if (
+        (projectRecord.tier === 'confidential' ||
+          projectRecord.tenant_slug ||
+          input.tenantSlug ||
+          input.tenantId) &&
+        requestedTenant !== projectTenant
+      ) {
+        throw new Error(
+          `${actionName} ${missionId}: mission tenant '${requestedTenant}' must match project tenant '${projectTenant}'.`
+        );
+      }
+    }
   }
   if (project?.project_path && input.ledgerTargets) {
     const markdownGuard = validateWritePermission(input.ledgerTargets.markdown);
