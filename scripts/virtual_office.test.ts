@@ -31,7 +31,12 @@ describe('virtual office surface', () => {
     fs.mkdirSync(missionDir, { recursive: true });
     fs.writeFileSync(
       path.join(missionDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: 'MSN-OFFICE-1', status: 'active', mission_type: 'development' })
+      JSON.stringify({
+        mission_id: 'MSN-OFFICE-1',
+        status: 'active',
+        mission_type: 'development',
+        tenant_slug: 'acme-prod',
+      })
     );
     fs.writeFileSync(
       path.join(missionDir, 'NEXT_TASKS.json'),
@@ -78,7 +83,11 @@ describe('virtual office surface', () => {
     fs.mkdirSync(archivedDir, { recursive: true });
     fs.writeFileSync(
       path.join(archivedDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: 'MSN-OFFICE-OLD', status: 'archived', tenant_slug: 'acme' })
+      JSON.stringify({
+        mission_id: 'MSN-OFFICE-OLD',
+        status: 'archived',
+        tenant_slug: 'acme-prod',
+      })
     );
     const customerRoot = path.join(tmpRoot, 'customer', 'acme');
     fs.mkdirSync(customerRoot, { recursive: true });
@@ -146,6 +155,67 @@ describe('virtual office surface', () => {
         2
       )
     );
+    fs.mkdirSync(path.join(customerRoot, 'tenants'), { recursive: true });
+    fs.writeFileSync(
+      path.join(customerRoot, 'tenants', 'acme-prod.json'),
+      JSON.stringify({
+        tenant_slug: 'acme-prod',
+        tenant_id: 'tenant-acme-prod',
+        display_name: 'Acme Production',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+    fs.writeFileSync(
+      path.join(customerRoot, 'tenants', 'acme-sandbox.json'),
+      JSON.stringify({
+        tenant_slug: 'acme-sandbox',
+        tenant_id: 'tenant-acme-sandbox',
+        display_name: 'Acme Sandbox',
+        status: 'suspended',
+        assigned_role: 'operator',
+      })
+    );
+    const betaRoot = path.join(tmpRoot, 'customer', 'beta');
+    fs.mkdirSync(path.join(customerRoot, 'deals'), { recursive: true });
+    fs.writeFileSync(
+      path.join(customerRoot, 'deals', 'DEAL-ACME-PROD.json'),
+      JSON.stringify({
+        kind: 'deal',
+        deal_id: 'DEAL-ACME-PROD',
+        tenant_slug: 'acme-prod',
+        channel: { surface: 'slack', channel_id: 'acme-channel' },
+        stage: 'discovery',
+        summary: 'Acme production deal',
+        mission_ids: [],
+        notes: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    );
+    fs.mkdirSync(path.join(betaRoot, 'connections'), { recursive: true });
+    fs.mkdirSync(path.join(betaRoot, 'deals'), { recursive: true });
+    fs.writeFileSync(
+      path.join(betaRoot, 'connections', 'channel-bindings.json'),
+      JSON.stringify({
+        bindings: [{ surface: 'slack', channel_id: 'beta-channel', active: true }],
+      })
+    );
+    fs.writeFileSync(
+      path.join(betaRoot, 'deals', 'DEAL-BETA-SECRET.json'),
+      JSON.stringify({
+        kind: 'deal',
+        deal_id: 'DEAL-BETA-SECRET',
+        tenant_slug: 'beta',
+        channel: { surface: 'slack', channel_id: 'beta-channel' },
+        stage: 'qualified',
+        summary: 'Beta confidential deal',
+        mission_ids: [],
+        notes: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    );
     // performance index
     const perfDir = path.join(tmpRoot, 'active', 'shared', 'observability', 'retrospectives');
     fs.mkdirSync(perfDir, { recursive: true });
@@ -182,7 +252,7 @@ describe('virtual office surface', () => {
       metadata: { team_role: 'implementer' },
       context: {
         organization_id: 'acme',
-        tenant_slug: 'acme',
+        tenant_slug: 'acme-prod',
         mission_id: 'MSN-OFFICE-1',
         project_id: 'MSN-OFFICE-1',
         task_id: 'T-1',
@@ -198,7 +268,7 @@ describe('virtual office surface', () => {
       metadata: { team_role: 'qa' },
       context: {
         organization_id: 'acme',
-        tenant_slug: 'acme',
+        tenant_slug: 'acme-prod',
         mission_id: 'MSN-OFFICE-1',
         project_id: 'MSN-OFFICE-1',
         task_id: 'T-2',
@@ -212,7 +282,7 @@ describe('virtual office surface', () => {
       status: 'done',
       context: {
         organization_id: 'acme',
-        tenant_slug: 'acme',
+        tenant_slug: 'acme-prod',
         mission_id: 'MSN-OFFICE-1',
         project_id: 'MSN-OFFICE-1',
         task_id: 'T-3',
@@ -233,6 +303,34 @@ describe('virtual office surface', () => {
         task_id: 'T-9',
       },
     });
+    const projectDir = path.join(tmpRoot, 'active', 'shared', 'runtime', 'projects');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, 'PRJ-OFFICE-ACME.json'),
+      JSON.stringify({
+        project_id: 'PRJ-OFFICE-ACME',
+        name: 'Acme Launch',
+        summary: 'Project linked to the active tenant and mission.',
+        status: 'active',
+        tier: 'confidential',
+        organization_id: 'acme',
+        tenant_slug: 'acme-prod',
+        active_missions: ['MSN-OFFICE-1'],
+        active_task_sessions: ['TSK-TEST-VIRTUAL-OFFICE'],
+      })
+    );
+    fs.writeFileSync(
+      path.join(projectDir, 'PRJ-OFFICE-BETA.json'),
+      JSON.stringify({
+        project_id: 'PRJ-OFFICE-BETA',
+        name: 'Hidden Beta Project',
+        summary: 'Project from another tenant.',
+        status: 'active',
+        tier: 'confidential',
+        organization_id: 'beta',
+        tenant_slug: 'beta',
+      })
+    );
     const session = createTaskSession({
       sessionId: 'TSK-TEST-VIRTUAL-OFFICE',
       surface: 'presence',
@@ -360,8 +458,21 @@ describe('virtual office surface', () => {
   it('collects rooms, agent states, performance, and archive shelf from disk', () => {
     const snapshot = mod.collectOfficeSnapshot();
     expect(snapshot.tenant_slug).toBe('acme');
+    expect(snapshot.customer_slug).toBe('acme');
+    expect(snapshot.tenants.map((tenant) => tenant.tenant_slug)).toEqual([
+      'acme-prod',
+      'acme-sandbox',
+    ]);
+    expect(snapshot.tenants.find((tenant) => tenant.tenant_slug === 'acme-prod')).toMatchObject({
+      organization_id: 'acme',
+      project_count: 1,
+      mission_count: 1,
+    });
+    expect(snapshot.projects.map((project) => project.project_id)).toEqual(['PRJ-OFFICE-ACME']);
     expect(snapshot.organization?.organization_id).toBe('acme');
     expect(snapshot.organization_chart?.name).toBe('Acme Org Chart');
+    expect(snapshot.deals.map((deal) => deal.deal_id)).toContain('DEAL-ACME-PROD');
+    expect(snapshot.deals.map((deal) => deal.deal_id)).not.toContain('DEAL-BETA-SECRET');
     const room = snapshot.rooms.find((entry) => entry.mission_id === 'MSN-OFFICE-1');
     expect(room).toBeTruthy();
     expect(room!.tasks).toHaveLength(3);
@@ -390,7 +501,12 @@ describe('virtual office surface', () => {
     const snapshot = mod.collectOfficeSnapshot();
     const html = mod.renderOfficeHtml(snapshot, 30);
     expect(html).toContain('KYBERION VIRTUAL OFFICE');
-    expect(html).toContain('tenant acme');
+    expect(html).toContain('customer acme');
+    expect(html).toContain('2 tenants visible');
+    expect(html).toContain('Acme Production');
+    expect(html).toContain('Acme Launch');
+    expect(html).not.toContain('Beta confidential deal');
+    expect(html).not.toContain('Hidden Beta Project');
     expect(html).toContain('Acme Org Chart');
     expect(html).toContain('MSN-OFFICE-1');
     expect(html).toContain('implementation-architect');
@@ -402,6 +518,38 @@ describe('virtual office surface', () => {
     expect(html).not.toMatch(/src="http|href="http/);
     // archived mission is on the shelf, not a floor room
     expect(html.indexOf('MSN-OFFICE-OLD')).toBeGreaterThan(html.indexOf('Archive'));
+  });
+
+  it('narrows to a registered tenant and fails closed for an unknown tenant', () => {
+    const previousTenant = process.env.KYBERION_TENANT;
+    try {
+      process.env.KYBERION_TENANT = 'acme-prod';
+      const scoped = mod.collectOfficeSnapshot();
+      expect(scoped.tenants.map((tenant) => tenant.tenant_slug)).toEqual(['acme-prod']);
+      expect(scoped.projects.map((project) => project.project_id)).toEqual(['PRJ-OFFICE-ACME']);
+      expect(scoped.organization_chart?.name).toBe('Acme Org Chart');
+      expect(scoped.rooms.map((room) => room.mission_id)).toContain('MSN-OFFICE-1');
+      expect(scoped.rooms.map((room) => room.mission_id)).not.toContain('MSN-OFFICE-2');
+      expect(scoped.deals.map((deal) => deal.deal_id)).toContain('DEAL-ACME-PROD');
+      expect(scoped.deals.map((deal) => deal.deal_id)).not.toContain('DEAL-BETA-SECRET');
+
+      process.env.KYBERION_TENANT = 'unknown-tenant';
+      const unknown = mod.collectOfficeSnapshot();
+      expect(unknown.tenants).toEqual([]);
+      expect(unknown.projects).toEqual([]);
+      expect(unknown.rooms).toEqual([]);
+      expect(unknown.deals).toEqual([]);
+      expect(unknown.agents).toEqual([]);
+      expect(unknown.performance).toEqual([]);
+      expect(unknown.approvals_pending).toBe(0);
+      expect(unknown.alerts).toEqual([]);
+      expect(unknown.proposals).toEqual([]);
+      expect(unknown.organization).toBeNull();
+      expect(unknown.organization_chart).toBeNull();
+    } finally {
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
+    }
   });
 
   it('office palette meets WCAG AA (design-qa dog-food)', async () => {
