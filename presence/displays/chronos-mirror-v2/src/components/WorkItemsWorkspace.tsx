@@ -29,8 +29,10 @@ type WorkItem = {
   created_at: string;
   updated_at: string;
   context?: {
+    organization_id?: string;
     mission_id?: string;
     project_id?: string;
+    task_id?: string;
     tenant_slug?: string;
     work_shape?: string;
     source?: string;
@@ -39,6 +41,16 @@ type WorkItem = {
   claimed_by_peer_id?: string;
   claimed_by_user_id?: string;
   metadata?: Record<string, unknown>;
+};
+
+type WorkItemLineage = {
+  hierarchy: string[];
+  nodes: Array<{ key: string; kind: string; id: string; item_count: number }>;
+  edges: Array<{ from: string; to: string; relationship: string; item_count: number }>;
+  total_items: number;
+  complete_chain_items: number;
+  incomplete_chain_items: number;
+  missing_by_kind: Record<string, number>;
 };
 
 type WorkCoordinationSummary = {
@@ -104,6 +116,7 @@ export function WorkItemsWorkspace({
       migrated_context: number;
       missing_context: number;
     };
+    lineage?: WorkItemLineage;
   } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -122,6 +135,7 @@ export function WorkItemsWorkspace({
         scope: String(payload.scope || 'work_items'),
         view: String(payload.view || 'all'),
         quality: payload.quality,
+        lineage: payload.lineage,
       });
       if (intelligenceResponse.ok) {
         const intelligencePayload = await intelligenceResponse.json();
@@ -205,6 +219,8 @@ export function WorkItemsWorkspace({
           {error}
         </div>
       ) : null}
+
+      {projection?.lineage ? <WorkItemLineageOverview lineage={projection.lineage} /> : null}
 
       {coordination ? (
         <section className="mt-5 rounded-2xl border kb-border-accent kb-surface-accent p-4">
@@ -333,6 +349,7 @@ export function WorkItemsWorkspace({
                             {compactDate(item.updated_at)}
                           </div>
                         </div>
+                        <WorkItemLineageChain context={item.context} />
                         {missionId && onOpenMission ? (
                           <button
                             type="button"
@@ -404,6 +421,124 @@ function CoordinationMetric({
       </div>
       <div className="mt-2 text-2xl font-semibold kb-text-primary">{value}</div>
       <div className="mt-1 text-[10px] leading-4 kb-text-muted">{detail}</div>
+    </div>
+  );
+}
+
+const LINEAGE_LABELS: Record<string, string> = {
+  tenant_slug: 'tenant',
+  organization_id: 'organization',
+  project_id: 'project',
+  mission_id: 'mission',
+  task_id: 'task',
+};
+
+function WorkItemLineageOverview({ lineage }: { lineage: WorkItemLineage }) {
+  return (
+    <section className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] kb-text-accent">
+            Scope lineage
+          </div>
+          <p className="mt-1 text-[11px] leading-5 kb-text-muted">
+            Every visible WorkItem is traced through tenant → organization → project → mission →
+            task. Missing links remain visible as governance debt.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[10px]">
+          <span className="rounded-full border kb-border-positive kb-status-positive-surface px-2 py-1 kb-status-positive">
+            complete {lineage.complete_chain_items}
+          </span>
+          <span className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 kb-status-warning">
+            incomplete {lineage.incomplete_chain_items}
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[10px]">
+        {lineage.hierarchy.map((kind, index) => (
+          <React.Fragment key={kind}>
+            <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 font-semibold kb-text-accent">
+              {LINEAGE_LABELS[kind] || kind}
+            </span>
+            {index < lineage.hierarchy.length - 1 ? (
+              <ArrowRight size={12} className="kb-text-muted" aria-hidden="true" />
+            ) : null}
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-5">
+        {lineage.hierarchy.map((kind) => {
+          const nodes = lineage.nodes.filter((node) => node.kind === kind).slice(0, 4);
+          const missing = lineage.missing_by_kind[kind] || 0;
+          return (
+            <div key={kind} className="rounded-xl border kb-border-subtle kb-surface-raised p-2">
+              <div className="text-[9px] font-bold uppercase tracking-[0.14em] kb-text-muted">
+                {LINEAGE_LABELS[kind] || kind}
+              </div>
+              <div className="mt-2 grid gap-1">
+                {nodes.map((node) => (
+                  <div
+                    key={node.key}
+                    className="truncate text-[10px] kb-text-primary"
+                    title={node.id}
+                  >
+                    {node.id} <span className="kb-text-muted">({node.item_count})</span>
+                  </div>
+                ))}
+                {missing > 0 ? (
+                  <div className="text-[10px] kb-status-warning">missing ({missing})</div>
+                ) : null}
+                {nodes.length === 0 && missing === 0 ? (
+                  <div className="text-[10px] kb-text-muted">-</div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {lineage.edges.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2 text-[9px] kb-text-muted">
+          {lineage.edges.slice(0, 8).map((edge) => (
+            <span
+              key={`${edge.from}->${edge.to}`}
+              className="rounded border kb-border-subtle px-2 py-1"
+            >
+              {edge.from} → {edge.to} ({edge.item_count})
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function WorkItemLineageChain({ context }: { context: WorkItem['context'] }) {
+  if (!context) return null;
+  const chain = [
+    ['tenant_slug', context.tenant_slug],
+    ['organization_id', context.organization_id],
+    ['project_id', context.project_id],
+    ['mission_id', context.mission_id],
+    ['task_id', context.task_id],
+  ] as const;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1 text-[9px]" aria-label="scope lineage">
+      {chain.map(([kind, value], index) => (
+        <React.Fragment key={kind}>
+          <span
+            className={`max-w-full truncate rounded border px-1.5 py-1 ${
+              value
+                ? 'kb-border-subtle kb-surface-sunken kb-text-secondary'
+                : 'kb-status-warning-border kb-status-warning-surface kb-status-warning'
+            }`}
+            title={value || `${LINEAGE_LABELS[kind]} missing`}
+          >
+            {LINEAGE_LABELS[kind]}: {value || 'missing'}
+          </span>
+          {index < chain.length - 1 ? <ArrowRight size={10} className="kb-text-muted" /> : null}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
