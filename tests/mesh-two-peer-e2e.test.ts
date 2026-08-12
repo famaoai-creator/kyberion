@@ -28,7 +28,7 @@ function buildRequest(requestId: string): MeshRequest {
   return {
     kind: 'mesh-request',
     request_id: requestId,
-    tenant_scope: { tenant_id: 'e2e-demo' },
+    tenant_scope: { tenant_id: 'e2e-demo', scope: 'same_tenant' },
     sender_peer_id: PEER_A,
     created_at: new Date().toISOString(),
     ttl_ms: 30 * 60_000,

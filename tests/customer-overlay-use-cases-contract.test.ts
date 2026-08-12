@@ -14,9 +14,11 @@ describe('Customer overlay use cases contract', () => {
     const readme = read('docs/user/README.md');
     const customerReadme = read('customer/README.md');
 
-    expect(doc).toContain('Customer Overlay Use Cases');
+    expect(doc).toContain('Stance Overlay Use Cases');
     expect(doc).toContain('create a customer overlay from the template');
-    expect(doc).toContain('inspect which customer overlays are present and whether the required files are filled in');
+    expect(doc).toContain(
+      'inspect which customer overlays are present and whether the required files are filled in'
+    );
     expect(doc).toContain('switch the active customer only after the overlay is ready');
     expect(doc).toContain('pnpm customer:create <slug>');
     expect(doc).toContain('pnpm customer:migrate-from-personal <slug>');
