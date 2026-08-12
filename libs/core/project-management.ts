@@ -10,11 +10,17 @@ import {
 } from './project-registry.js';
 import {
   listProjectOperationalStates,
+  listProjectOperationalStatePaths,
   projectOperationalStatePath,
   saveProjectOperationalState,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
-import { listProjectTracksForProject, loadProjectTrackRecord } from './project-track-registry.js';
+import {
+  listProjectTracksForProject,
+  loadProjectTrackRecord,
+  saveProjectTrackRecord,
+  type ProjectTrackRecord,
+} from './project-track-registry.js';
 import { missionSeedRecordPath, saveMissionSeedRecord } from './mission-seed-registry.js';
 import {
   createTaskSession,
@@ -95,7 +101,11 @@ export interface ProjectReconciliationIssue {
     | 'operational_state_missions'
     | 'operational_state_tracks'
     | 'operational_state_task_sessions'
-    | 'missing_operational_state';
+    | 'missing_operational_state'
+    | 'out_of_scope_task_session'
+    | 'out_of_scope_mission'
+    | 'out_of_scope_track'
+    | 'out_of_scope_operational_state';
   scope?: string;
   expected: string[];
   actual: string[];
@@ -144,6 +154,23 @@ export interface ProjectBootstrapResult {
   work_items: ProjectBootstrapWorkItem[];
 }
 
+export interface ManagedProjectTrackCreateInput {
+  track_id: string;
+  project_id: string;
+  name: string;
+  summary: string;
+  track_type?: ProjectTrackRecord['track_type'];
+  lifecycle_model?: ProjectTrackRecord['lifecycle_model'];
+  status?: ProjectTrackRecord['status'];
+  tier?: ProjectTrackRecord['tier'];
+  primary_locale?: string;
+  release_id?: string;
+  change_scope?: string;
+  gate_profile_id?: string;
+  required_artifacts?: string[];
+  metadata?: Record<string, unknown>;
+}
+
 const ACTIVE_MISSION_STATUSES = new Set([
   'planned',
   'active',
@@ -168,6 +195,130 @@ function normalizeId(value: string, label: string): string {
   return normalized;
 }
 
+export function createManagedProjectTrack(
+  input: ManagedProjectTrackCreateInput
+): ProjectTrackRecord {
+  const projectId = normalizeId(input.project_id, 'project_id');
+  const trackId = normalizeId(input.track_id, 'track_id');
+  const name = normalizeId(input.name, 'name');
+  const summary = normalizeId(input.summary, 'summary');
+  const project = loadProjectRecord(projectId);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  if (loadProjectTrackRecord(trackId)) throw new Error(`Project track already exists: ${trackId}`);
+  const tier = input.tier || project.tier;
+  if (tier !== project.tier) {
+    throw new Error(
+      `Project track tier '${tier}' must match project tier '${project.tier}' (${projectId}).`
+    );
+  }
+  const record: ProjectTrackRecord = {
+    track_id: trackId,
+    project_id: projectId,
+    name,
+    summary,
+    status: input.status || 'active',
+    track_type: input.track_type || 'release',
+    lifecycle_model: input.lifecycle_model || 'continuous_delivery',
+    tier,
+    ...(project.tenant_slug ? { tenant_slug: project.tenant_slug } : {}),
+    ...(input.primary_locale || project.primary_locale
+      ? { primary_locale: input.primary_locale || project.primary_locale }
+      : {}),
+    ...(input.release_id ? { release_id: input.release_id } : {}),
+    ...(input.change_scope ? { change_scope: input.change_scope } : {}),
+    ...(input.gate_profile_id ? { gate_profile_id: input.gate_profile_id } : {}),
+    ...(input.required_artifacts ? { required_artifacts: [...input.required_artifacts] } : {}),
+    ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
+  };
+  const currentDefaultTrack = project.default_track_id
+    ? loadProjectTrackRecord(project.default_track_id)
+    : null;
+  const hasUsableDefaultTrack = Boolean(
+    currentDefaultTrack &&
+    currentDefaultTrack.status === 'active' &&
+    isTrackInProjectScope(currentDefaultTrack, project)
+  );
+  const previousStatePaths = listProjectOperationalStatePaths({ projectId });
+  const previousStates = listProjectOperationalStates({ projectId });
+  const trackPath = saveProjectTrackRecord(record);
+  try {
+    saveProjectRecord({
+      ...project,
+      ...(hasUsableDefaultTrack || record.status !== 'active' ? {} : { default_track_id: trackId }),
+      active_tracks:
+        record.status === 'active'
+          ? sortedUnique([...(project.active_tracks || []), trackId])
+          : sortedUnique(project.active_tracks),
+    });
+    reconcileProjectOperationalState(projectId, { apply: true });
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      action: 'project.track_created',
+      operation: `create:${trackId}`,
+      result: 'completed',
+      metadata: { project_id: projectId, track_id: trackId, tier },
+    });
+  } catch (error) {
+    safeUnlinkSync(trackPath);
+    try {
+      saveProjectRecord(project);
+      for (const statePath of listProjectOperationalStatePaths({ projectId })) {
+        if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
+      }
+      for (const state of previousStates) saveProjectOperationalState(state);
+    } catch {
+      // Preserve the original failure; the next governed reconcile reports any residue.
+    }
+    throw error;
+  }
+  return record;
+}
+
+export function updateManagedProjectTrack(
+  trackId: string,
+  patch: Pick<ProjectTrackRecord, 'tenant_slug'>
+): ProjectTrackRecord {
+  const current = loadProjectTrackRecord(normalizeId(trackId, 'track_id'));
+  if (!current) throw new Error(`Project track not found: ${trackId}`);
+  const project = loadProjectRecord(current.project_id);
+  if (!project) throw new Error(`Project not found: ${current.project_id}`);
+  if (patch.tenant_slug && patch.tenant_slug !== project.tenant_slug) {
+    throw new Error(
+      `Project track tenant '${patch.tenant_slug}' must match project tenant '${project.tenant_slug || 'shared'}'.`
+    );
+  }
+  const next = {
+    ...current,
+    ...(patch.tenant_slug ? { tenant_slug: patch.tenant_slug } : {}),
+  };
+  const previousStatePaths = listProjectOperationalStatePaths({ projectId: current.project_id });
+  const previousStates = listProjectOperationalStates({ projectId: current.project_id });
+  saveProjectTrackRecord(next);
+  try {
+    reconcileProjectOperationalState(current.project_id, { apply: true });
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      action: 'project.track_updated',
+      operation: `update:${current.track_id}`,
+      result: 'completed',
+      metadata: { project_id: current.project_id, track_id: current.track_id },
+    });
+  } catch (error) {
+    try {
+      saveProjectTrackRecord(current);
+      saveProjectRecord(project);
+      for (const statePath of listProjectOperationalStatePaths({ projectId: current.project_id })) {
+        if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
+      }
+      for (const state of previousStates) saveProjectOperationalState(state);
+    } catch {
+      // Preserve the original failure; the next governed reconcile reports any residue.
+    }
+    throw error;
+  }
+  return next;
+}
+
 export function assertManagedProjectId(value: string): string {
   const normalized = normalizeId(value, 'project_id');
   if (!/^PRJ-[A-Z0-9][A-Z0-9._-]*$/.test(normalized)) {
@@ -176,6 +327,27 @@ export function assertManagedProjectId(value: string): string {
     );
   }
   return normalized;
+}
+
+export function assertManagedProjectTrackScope(
+  project: ProjectRecord,
+  track: ProjectTrackRecord
+): void {
+  const projectTenant = project.tenant_slug || 'shared';
+  const trackTenant = track.tenant_slug || projectTenant;
+  if (track.project_id !== project.project_id) {
+    throw new Error(`Track ${track.track_id} does not belong to project ${project.project_id}`);
+  }
+  if (track.tier !== project.tier || (project.tier === 'confidential' && !track.tenant_slug)) {
+    throw new Error(
+      `Track ${track.track_id} scope (${track.tier}:${track.tenant_slug || 'unknown'}) must match project scope (${project.tier}:${projectTenant}).`
+    );
+  }
+  if (trackTenant !== projectTenant) {
+    throw new Error(
+      `Track ${track.track_id} scope (${track.tier}:${track.tenant_slug || 'shared'}) must match project scope (${project.tier}:${projectTenant}).`
+    );
+  }
 }
 
 function projectMissions(projectId: string, rootDir = pathResolver.rootDir()): MissionState[] {
@@ -192,6 +364,56 @@ function projectSessions(projectId: string, rootDir = pathResolver.rootDir()): T
   );
 }
 
+function projectSessionScope(
+  session: TaskSession,
+  project: ProjectRecord
+): { tier: ProjectRecord['tier']; tenant?: string } {
+  const tier = session.project_context?.tier || project.tier;
+  const tenant =
+    session.project_context?.tenant_slug ||
+    (tier === 'confidential' ? undefined : project.tenant_slug || 'shared');
+  return { tier, tenant };
+}
+
+function projectMissionScope(mission: MissionState): {
+  tier: ProjectRecord['tier'];
+  tenant?: string;
+} {
+  const tier = mission.tier;
+  const tenant =
+    mission.tenant_slug || mission.tenant_id || (tier === 'confidential' ? undefined : 'shared');
+  return { tier, tenant };
+}
+
+function isMissionInProjectScope(mission: MissionState, project: ProjectRecord): boolean {
+  const scope = projectMissionScope(mission);
+  return scope.tier === project.tier && scope.tenant === (project.tenant_slug || 'shared');
+}
+
+function isTrackInProjectScope(track: ProjectTrackRecord, project: ProjectRecord): boolean {
+  if (track.project_id !== project.project_id || track.tier !== project.tier) return false;
+  if (project.tier === 'confidential' && !track.tenant_slug) return false;
+  return (
+    (track.tenant_slug || project.tenant_slug || 'shared') === (project.tenant_slug || 'shared')
+  );
+}
+
+function isOperationalStateInProjectScope(
+  state: ProjectOperationalState,
+  project: ProjectRecord
+): boolean {
+  return (
+    state.project_id === project.project_id &&
+    state.tier === project.tier &&
+    (state.tenant_slug || 'shared') === (project.tenant_slug || 'shared')
+  );
+}
+
+function isInProjectScope(session: TaskSession, project: ProjectRecord): boolean {
+  const scope = projectSessionScope(session, project);
+  return scope.tier === project.tier && scope.tenant === (project.tenant_slug || 'shared');
+}
+
 function scopeKey(tier: ProjectRecord['tier'], tenantSlug?: string): string {
   return `${tier}:${tenantSlug || 'shared'}`;
 }
@@ -202,19 +424,42 @@ function expectedForScope(
   tenantSlug?: string
 ): { missions: string[]; tracks: string[]; sessions: string[] } {
   const tenant = tenantSlug || 'shared';
-  const missions = projectMissions(projectId).filter(
-    (mission) =>
-      mission.tier === tier &&
-      (mission.tenant_slug || mission.tenant_id || 'shared') === tenant &&
-      ACTIVE_MISSION_STATUSES.has(mission.status)
-  );
-  const sessions = projectSessions(projectId).filter(
-    (session) =>
-      (session.project_context?.tier || tier) === tier &&
+  const project = loadProjectRecord(projectId);
+  const projectTenant = project?.tenant_slug || 'shared';
+  const missions = project
+    ? projectMissions(projectId).filter(
+        (mission) =>
+          isMissionInProjectScope(mission, project) &&
+          mission.tier === tier &&
+          (projectMissionScope(mission).tenant || 'shared') === tenant &&
+          ACTIVE_MISSION_STATUSES.has(mission.status)
+      )
+    : [];
+  const sessions = projectSessions(projectId).filter((session) => {
+    if (!project) return false;
+    const scope = projectSessionScope(session, project);
+    return (
+      scope.tier === tier &&
+      scope.tenant === tenant &&
       ACTIVE_TASK_SESSION_STATUSES.has(session.status)
-  );
-  const tracks = listProjectTracksForProject(projectId).filter(
-    (track) => track.tier === tier && track.status === 'active'
+    );
+  });
+  const tracks = project
+    ? listProjectTracksForProject(projectId).filter(
+        (track) =>
+          isTrackInProjectScope(track, project) &&
+          track.tier === tier &&
+          track.status === 'active' &&
+          (track.tenant_slug || projectTenant) === tenant
+      )
+    : [];
+  const scopedTrackIds = new Set(
+    (project
+      ? listProjectTracksForProject(projectId).filter((track) =>
+          isTrackInProjectScope(track, project)
+        )
+      : []
+    ).map((track) => track.track_id)
   );
   return {
     missions: missions.map((mission) => mission.mission_id).sort(),
@@ -222,7 +467,7 @@ function expectedForScope(
       ...tracks.map((track) => track.track_id),
       ...missions
         .map((mission) => mission.relationships?.track?.track_id)
-        .filter((trackId): trackId is string => Boolean(trackId)),
+        .filter((trackId): trackId is string => Boolean(trackId) && scopedTrackIds.has(trackId)),
     ]
       .sort()
       .filter((trackId, index, values) => values.indexOf(trackId) === index),
@@ -463,10 +708,17 @@ export function getProjectManagementView(
 ): ProjectManagementView {
   const project = loadProjectRecord(normalizeId(projectId, 'project_id'), { rootDir });
   if (!project) throw new Error(`Project not found: ${projectId}`);
-  const tracks = listProjectTracksForProject(project.project_id, { rootDir });
+  const tracks = listProjectTracksForProject(project.project_id, { rootDir }).filter((track) =>
+    isTrackInProjectScope(track, project)
+  );
   const tasks = project.bootstrap_work_items || [];
-  const missions = projectMissions(project.project_id, rootDir);
-  const taskSessions = projectSessions(project.project_id, rootDir);
+  const missions = projectMissions(project.project_id, rootDir).filter((mission) =>
+    isMissionInProjectScope(mission, project)
+  );
+  const taskSessions = projectSessions(project.project_id, rootDir).filter((session) =>
+    isInProjectScope(session, project)
+  );
+  const projectTrackIds = new Set(tracks.map((track) => track.track_id));
   const pipelineRefs = Array.isArray(project.pipeline_refs)
     ? project.pipeline_refs
     : Array.isArray(project.metadata?.pipeline_refs)
@@ -478,7 +730,14 @@ export function getProjectManagementView(
     tasks,
     missions,
     task_sessions: taskSessions,
-    operational_states: listProjectOperationalStates({ projectId: project.project_id, rootDir }),
+    operational_states: listProjectOperationalStates({
+      projectId: project.project_id,
+      rootDir,
+    }).filter(
+      (state) =>
+        state.tier === project.tier &&
+        (state.tenant_slug || 'shared') === (project.tenant_slug || 'shared')
+    ),
     lineage: {
       project: { project_id: project.project_id, name: project.name, role: 'durable_context' },
       tracks: tracks.map((track) => ({
@@ -499,7 +758,8 @@ export function getProjectManagementView(
       missions: missions.map((mission) => ({
         mission_id: mission.mission_id,
         status: mission.status,
-        ...(mission.relationships?.track?.track_id
+        ...(mission.relationships?.track?.track_id &&
+        projectTrackIds.has(mission.relationships.track.track_id)
           ? { track_id: mission.relationships.track.track_id }
           : {}),
         role: 'governed_ownership',
@@ -532,29 +792,80 @@ export function reconcileProjectOperationalState(
   const project = loadProjectRecord(normalizeId(projectId, 'project_id'));
   if (!project) throw new Error(`Project not found: ${projectId}`);
   const allMissions = projectMissions(project.project_id);
+  const allTracks = listProjectTracksForProject(project.project_id);
   const allSessions = projectSessions(project.project_id);
+  const allStateRecords = listProjectOperationalStates({ projectId: project.project_id });
+  const scopedMissions = allMissions.filter((mission) => isMissionInProjectScope(mission, project));
+  const scopedTracks = allTracks.filter((track) => isTrackInProjectScope(track, project));
+  const scopedStateRecords = allStateRecords.filter((state) =>
+    isOperationalStateInProjectScope(state, project)
+  );
+  const outOfScopeMissions = allMissions.filter(
+    (mission) => !isMissionInProjectScope(mission, project)
+  );
+  const outOfScopeTracks = allTracks.filter((track) => !isTrackInProjectScope(track, project));
+  const outOfScopeStateRecords = allStateRecords.filter(
+    (state) => !isOperationalStateInProjectScope(state, project)
+  );
+  const outOfScopeSessions = allSessions.filter((session) => !isInProjectScope(session, project));
+  const scopedSessions = allSessions.filter((session) => isInProjectScope(session, project));
   const expected = {
-    active_missions: allMissions
+    active_missions: scopedMissions
       .filter((mission) => ACTIVE_MISSION_STATUSES.has(mission.status))
       .map((mission) => mission.mission_id)
       .sort(),
     active_tracks: [
-      ...listProjectTracksForProject(project.project_id)
-        .filter((track) => track.status === 'active')
-        .map((track) => track.track_id),
-      ...allMissions
+      ...scopedTracks.filter((track) => track.status === 'active').map((track) => track.track_id),
+      ...scopedMissions
         .filter((mission) => ACTIVE_MISSION_STATUSES.has(mission.status))
         .map((mission) => mission.relationships?.track?.track_id)
-        .filter((trackId): trackId is string => Boolean(trackId)),
+        .filter(
+          (trackId): trackId is string =>
+            Boolean(trackId) && scopedTracks.some((track) => track.track_id === trackId)
+        ),
     ]
       .sort()
       .filter((trackId, index, values) => values.indexOf(trackId) === index),
-    active_task_sessions: allSessions
+    active_task_sessions: scopedSessions
       .filter((session) => ACTIVE_TASK_SESSION_STATUSES.has(session.status))
       .map((session) => session.session_id)
       .sort(),
   };
   const issues: ProjectReconciliationIssue[] = [];
+  if (outOfScopeMissions.length > 0) {
+    issues.push({
+      kind: 'out_of_scope_mission',
+      scope: scopeKey(project.tier, project.tenant_slug),
+      expected: [],
+      actual: outOfScopeMissions.map((mission) => mission.mission_id).sort(),
+    });
+  }
+  if (outOfScopeTracks.length > 0) {
+    issues.push({
+      kind: 'out_of_scope_track',
+      scope: scopeKey(project.tier, project.tenant_slug),
+      expected: [],
+      actual: outOfScopeTracks.map((track) => track.track_id).sort(),
+    });
+  }
+  if (outOfScopeStateRecords.length > 0) {
+    issues.push({
+      kind: 'out_of_scope_operational_state',
+      scope: scopeKey(project.tier, project.tenant_slug),
+      expected: [],
+      actual: outOfScopeStateRecords
+        .map((state) => `${state.tier}:${state.tenant_slug || 'shared'}`)
+        .sort(),
+    });
+  }
+  if (outOfScopeSessions.length > 0) {
+    issues.push({
+      kind: 'out_of_scope_task_session',
+      scope: scopeKey(project.tier, project.tenant_slug),
+      expected: [],
+      actual: outOfScopeSessions.map((session) => session.session_id).sort(),
+    });
+  }
   if (!sameIds(project.active_missions, expected.active_missions)) {
     issues.push({
       kind: 'project_active_missions',
@@ -577,20 +888,20 @@ export function reconcileProjectOperationalState(
     });
   }
 
-  const stateRecords = listProjectOperationalStates({ projectId: project.project_id });
+  const stateRecords = scopedStateRecords;
   const scopes = new Map<string, { tier: ProjectRecord['tier']; tenant?: string }>();
-  for (const mission of allMissions) {
-    const tenant = mission.tenant_slug || mission.tenant_id || 'shared';
-    scopes.set(scopeKey(mission.tier, tenant), { tier: mission.tier, tenant });
+  for (const mission of scopedMissions) {
+    const { tier, tenant } = projectMissionScope(mission);
+    scopes.set(scopeKey(tier, tenant), { tier, tenant });
   }
   for (const session of allSessions) {
-    const tier = session.project_context?.tier || project.tier;
-    scopes.set(scopeKey(tier, 'shared'), { tier, tenant: 'shared' });
+    if (!isInProjectScope(session, project)) continue;
+    const { tier, tenant } = projectSessionScope(session, project);
+    scopes.set(scopeKey(tier, tenant), { tier, tenant });
   }
-  for (const track of listProjectTracksForProject(project.project_id).filter(
-    (item) => item.status === 'active'
-  )) {
-    scopes.set(scopeKey(track.tier, 'shared'), { tier: track.tier, tenant: 'shared' });
+  for (const track of scopedTracks.filter((item) => item.status === 'active')) {
+    const tenant = track.tenant_slug || project.tenant_slug || 'shared';
+    scopes.set(scopeKey(track.tier, tenant), { tier: track.tier, tenant });
   }
   for (const state of stateRecords) {
     scopes.set(scopeKey(state.tier, state.tenant_slug), {
@@ -753,6 +1064,14 @@ export async function reassignMissionToProject(input: {
   if (input.track_id && (!targetTrack || targetTrack.project_id !== targetProjectId)) {
     throw new Error(`Track ${input.track_id} does not belong to project ${targetProjectId}`);
   }
+  const missionTenant = state.tenant_slug || state.tenant_id || 'shared';
+  const targetTenant = targetProject.tenant_slug || 'shared';
+  if (targetTrack) assertManagedProjectTrackScope(targetProject, targetTrack);
+  if (state.tier !== targetProject.tier || missionTenant !== targetTenant) {
+    throw new Error(
+      `Mission scope (${state.tier}:${missionTenant}) must match target project scope (${targetProject.tier}:${targetTenant}); cross-tier or cross-tenant reassignment is denied.`
+    );
+  }
   if (input.dry_run)
     return {
       mission_id: missionId,
@@ -762,6 +1081,12 @@ export async function reassignMissionToProject(input: {
     };
 
   const { track: _previousTrack, ...relationshipsWithoutTrack } = state.relationships || {};
+  const inheritedTraceabilityRefs =
+    oldProjectId === targetProjectId
+      ? (oldProject?.traceability_refs || []).filter(
+          (ref) => ref !== `previous_project:${targetProjectId}`
+        )
+      : oldProject?.traceability_refs || [];
   const nextState: MissionState = {
     ...state,
     relationships: {
@@ -773,8 +1098,10 @@ export async function reassignMissionToProject(input: {
         affected_artifacts: oldProject?.affected_artifacts || [],
         gate_impact: oldProject?.gate_impact || 'informational',
         traceability_refs: [
-          ...(oldProject?.traceability_refs || []),
-          ...(oldProjectId ? [`previous_project:${oldProjectId}`] : []),
+          ...inheritedTraceabilityRefs,
+          ...(oldProjectId && oldProjectId !== targetProjectId
+            ? [`previous_project:${oldProjectId}`]
+            : []),
         ],
         note: input.note || `Mission reassigned to ${targetProjectId}`,
       },
@@ -805,7 +1132,7 @@ export async function reassignMissionToProject(input: {
   };
   await saveState(missionId, nextState);
 
-  if (oldProjectId && oldProject?.project_path) {
+  if (oldProjectId && oldProjectId !== targetProjectId && oldProject?.project_path) {
     removeMissionFromProjectLedger(oldProject.project_path, missionId);
     const oldRecord = loadProjectRecord(oldProjectId);
     if (oldRecord) {
@@ -922,6 +1249,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
         project_name: input.name,
         ...(input.track_id ? { track_id: input.track_id } : {}),
         ...(input.track_name ? { track_name: input.track_name } : {}),
+        ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
         tier: input.tier,
         ...(input.primary_locale ? { locale: input.primary_locale } : {}),
         ...(input.service_bindings ? { service_bindings: input.service_bindings } : {}),

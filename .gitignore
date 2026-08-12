@@ -45,6 +45,7 @@ projects/
 
 # Next.js build output
 .next/
+/presence/displays/concierge/next-env.d.ts
 
 # Runtime artifacts
 cache/

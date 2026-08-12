@@ -1566,7 +1566,10 @@
             "properties": {
               "tenant_slug": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "not": {
+                  "enum": ["public", "confidential", "personal", "shared"]
+                }
               },
               "source_system": {
                 "type": "string",
@@ -1684,7 +1687,10 @@
                 "properties": {
                   "tenant_slug": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "not": {
+                      "enum": ["public", "confidential", "personal", "shared"]
+                    }
                   },
                   "relative_path": {
                     "type": "string",
@@ -1734,7 +1740,10 @@
             "properties": {
               "tenant_slug": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "not": {
+                  "enum": ["public", "confidential", "personal", "shared"]
+                }
               },
               "current_sources": {
                 "type": "array",
@@ -1792,7 +1801,10 @@
             "properties": {
               "tenant_slug": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "not": {
+                  "enum": ["public", "confidential", "personal", "shared"]
+                }
               },
               "normalized": {
                 "type": "object",
