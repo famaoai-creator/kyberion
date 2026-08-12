@@ -20,7 +20,11 @@
     "kind": { "const": "organization_work_resolution" },
     "utterance": { "type": "string", "minLength": 1 },
     "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
     "work_shape": {
       "type": "string",

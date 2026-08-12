@@ -6,6 +6,7 @@ import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -124,7 +125,6 @@ const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';
 const DEFAULT_EVENT_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
-const TENANT_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '::1']);
 
@@ -229,12 +229,16 @@ export function buildPeerMessageEnvelope<TPayload>(
 export function loadPeerNetworkCatalog(
   options: PeerMessagingCatalogOptions = {}
 ): PeerNetworkCatalog | null {
+  if (options.tenantId) normalizeTenantId(options.tenantId);
   const catalogPath = resolvePeerNetworkCatalogPath(options);
   try {
     if (!safeExistsSync(catalogPath)) return null;
     const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
     const parsed = JSON.parse(raw) as PeerNetworkCatalog;
     if (parsed && parsed.version === '1' && Array.isArray(parsed.peers)) {
+      if (parsed.tenant_id && !isValidTenantSlug(parsed.tenant_id)) {
+        throw new Error(`peer_catalog_invalid_tenant:${parsed.tenant_id}`);
+      }
       if (options.tenantId && parsed.tenant_id && parsed.tenant_id !== options.tenantId) {
         throw new Error(`peer_catalog_tenant_mismatch:${options.tenantId}`);
       }
@@ -256,7 +260,7 @@ export function loadPeerNetworkCatalog(
 
 function normalizeTenantId(tenantId: string): string {
   const normalized = String(tenantId || '').trim();
-  if (!TENANT_ID_PATTERN.test(normalized)) {
+  if (!isValidTenantSlug(normalized)) {
     throw new Error(`invalid_peer_network_tenant_id:${normalized || 'missing'}`);
   }
   return normalized;

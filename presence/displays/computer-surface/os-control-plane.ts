@@ -5,15 +5,14 @@ import {
   auditChain,
   type CloudflareOsSurfaceAccess,
   type CloudflareOsSurfaceSnapshot,
+  isValidTenantSlug,
 } from '@agent/core';
-
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
 export function getComputerSurfaceAccess(
   env: NodeJS.ProcessEnv = process.env
 ): CloudflareOsSurfaceAccess {
   const rawTenant = String(env.KYBERION_TENANT || '').trim();
-  const tenant = TENANT_SLUG_RE.test(rawTenant) ? rawTenant : undefined;
+  const tenant = isValidTenantSlug(rawTenant) ? rawTenant : undefined;
   const configuredPrincipal = String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL || '').trim();
   if (tenant && !configuredPrincipal) {
     throw new Error(
@@ -36,7 +35,7 @@ export function getComputerSurfaceTenantScope(
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
   const rawTenant = String(env.KYBERION_TENANT || '').trim();
-  return TENANT_SLUG_RE.test(rawTenant) ? rawTenant : undefined;
+  return isValidTenantSlug(rawTenant) ? rawTenant : undefined;
 }
 
 export function getComputerSurfaceGuardedSurfaceUrl(

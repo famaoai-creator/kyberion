@@ -24,7 +24,11 @@
     "kind": { "const": "onboarding_first_work" },
     "work_id": { "type": "string", "pattern": "^ONB-WORK-[A-Fa-f0-9]{16}$" },
     "customer_slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "organization_id": { "type": "string", "minLength": 1, "maxLength": 128 },
     "tier": { "enum": ["personal", "confidential", "public"] },
     "intent": { "type": "string", "minLength": 1 },

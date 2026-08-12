@@ -101,7 +101,7 @@ The 3-tier directory layout: `knowledge/{personal,confidential,public}/`.
 
 - Tier names and their purpose (cf. `CLAUDE.md` Rule 5).
 - Tier-guard enforcement at `secure-io` boundary.
-- Project scoping under `confidential/{project}/`.
+- Tenant scoping under `confidential/{tenant-slug}/` (the `project_permissions` policy key is a legacy name for this same path segment).
 
 **Internal**:
 

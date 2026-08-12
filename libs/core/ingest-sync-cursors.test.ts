@@ -131,6 +131,27 @@ describe('ingest-sync-cursors (DA-03 watermark store)', () => {
     );
   });
 
+  // An unreadable cursor is not a corrupt cursor. Reporting it as corrupt JSON
+  // also prescribed resetSyncCursor, which would discard an intact watermark and
+  // force a full re-fetch to "fix" an access problem it cannot fix.
+  it('reports an unreadable state file as a read failure and does not advise a reset', () => {
+    // A source system no other test touches: 'box' already holds a valid cursor
+    // by this point, and safeMkdir would skip an existing path.
+    const file = syncCursorPath(TENANT, 'onedrive', { cursorsDir });
+    safeMkdir(file, { recursive: true });
+    expect(safeExistsSync(file)).toBe(true);
+    let message = '';
+    try {
+      readSyncCursor(TENANT, 'onedrive', { cursorsDir });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/could not be read/);
+    expect(message).not.toMatch(/not valid JSON/);
+    expect(message).not.toMatch(/resetSyncCursor/);
+    expect(message).toMatch(/watermark is intact/);
+  });
+
   it('fails closed on a shape-invalid state file', () => {
     const file = syncCursorPath(TENANT, 'jira', { cursorsDir });
     safeMkdir(path.dirname(file), { recursive: true });

@@ -6,8 +6,16 @@
   "type": "object",
   "required": ["tenant_slug", "display_name", "status", "assigned_role"],
   "properties": {
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
-    "tenant_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "display_name": { "type": "string" },
     "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
     "assigned_role": {

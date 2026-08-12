@@ -1,4 +1,5 @@
 import type { TierLevel } from './types.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 const TIER_SENSITIVITY: Record<TierLevel, number> = {
   public: 1,
@@ -61,6 +62,7 @@ function nonEmpty(value: string | undefined): boolean {
 export function validateContextSecurityScope(scope: ContextSecurityScope): string[] {
   const errors: string[] = [];
   if (!nonEmpty(scope.tenant_id)) errors.push('tenant_id is required');
+  else if (!isValidTenantSlug(scope.tenant_id)) errors.push('tenant_id is invalid');
   if (!nonEmpty(scope.mission_id)) errors.push('mission_id is required');
   if (!nonEmpty(scope.purpose)) errors.push('purpose is required');
   if (!Array.isArray(scope.read_tiers) || scope.read_tiers.length === 0) {

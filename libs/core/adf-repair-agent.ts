@@ -29,6 +29,7 @@ import {
 } from './provider-egress-gate.js';
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
@@ -285,12 +286,16 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       if (!options.workItemId) return backend.delegateTask(instruction, repairContext);
       const workItem = getWorkItem(options.workItemId);
       const scope = workItem?.context;
+      const tenantId = scope?.tenant_slug?.trim();
+      if (!tenantId || !isValidTenantSlug(tenantId)) {
+        throw new Error(`adf_repair_requires_valid_tenant_scope:${String(tenantId || '')}`);
+      }
       const receipt = await delegateWorkItemWithReasoningBackend(backend, {
         work_item_id: options.workItemId,
         task_id: options.workItemId,
         instruction,
         security_scope: {
-          tenant_id: scope?.tenant_slug || 'public',
+          tenant_id: tenantId,
           organization_id: scope?.organization_id,
           project_id: scope?.project_id,
           mission_id: scope?.mission_id || options.workItemId,

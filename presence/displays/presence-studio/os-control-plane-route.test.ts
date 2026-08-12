@@ -32,4 +32,10 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(source).toContain('item.failureRecorded');
     expect(source).not.toContain('item.applyError');
   });
+
+  it('does not rewrite the governed voice-consent evidence when recording starts', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+
+    expect(source).not.toContain("operator_handle: 'presence-studio-user'");
+  });
 });

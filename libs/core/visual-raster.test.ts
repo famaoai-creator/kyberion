@@ -52,6 +52,16 @@ describe('capability detection', () => {
 });
 
 describe('degradation', () => {
+  it('rejects reserved scope names as visual-review tenants', () => {
+    expect(() =>
+      assertVisualReviewPathScope({
+        artifactPath: pathResolver.rootResolve('active/projects/confidential/public/deck.pptx'),
+        tier: 'confidential',
+        tenantSlug: 'public',
+      })
+    ).toThrow(/VISUAL_REVIEW_TENANT_INVALID|VISUAL_REVIEW_PATH_DENIED/);
+  });
+
   it('keeps non-public artifacts out of shared and foreign paths', () => {
     expect(() =>
       assertVisualReviewPathScope({

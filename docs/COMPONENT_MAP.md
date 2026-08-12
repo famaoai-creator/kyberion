@@ -78,7 +78,7 @@ The concept map explains how those ideas fit together logically.
 | `satellites/`     | External bridges                                     | Connect Kyberion to Slack, Telegram, Discord, iMessage, or voice                                          |
 | `presence/`       | Background sensing, dashboards, and control surfaces | Inspect pulse, sensors, bridges, and the UI surfaces under `presence/displays/` (map: `docs/SURFACES.md`) |
 | `active/`         | Mission/runtime workspace and operational state      | Review live mission state, organization state (`active/organizations/`), and generated operational files  |
-| `customer/`       | Customer overlay for FDE engagements                 | Layer customer-specific identity/config over `knowledge/personal/`                                        |
+| `customer/`       | Stance overlay (historical name)                     | Layer one stance's identity/config over `knowledge/personal/` — not where a tenant's customers live       |
 | `templates/`      | Reusable scaffolds and document templates            | Start a new pipeline, onboarding profile, or document from a template                                     |
 | `schemas/`        | Structured data contracts                            | Validate JSON-based ADF and ecosystem data                                                                |
 | `tests/`          | Cross-cutting tests                                  | Run smoke and integration coverage                                                                        |
@@ -315,7 +315,7 @@ Background surfaces and bridges are not started ad hoc. Their canonical startup 
 
 ## Mission control model
 
-Kyberion uses a `single-owner, multi-worker` mission model. Missions themselves sit inside the organization layer: every work item carries the canonical context chain `organization_id → tenant_slug → mission_id → project_id → task_id` (+ `work_shape`), and non-mission operating work (services, routine operations, incidents, cadences) is tracked by the organization operating model (`pnpm organization`).
+Kyberion uses a `single-owner, multi-worker` mission model. Missions sit inside a project, which sits inside an organization, which sits inside a tenant: every work item carries the canonical context chain `tenant_slug → organization_id → project_id → mission_id → task_id` (+ `work_shape`), declared once in `libs/core/entity-scope.ts` and explained in [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md). Non-mission operating work (services, routine operations, incidents, cadences) is tracked by the organization operating model (`pnpm organization`).
 
 - The mission is the durable control contract.
 - One owner agent holds mission write authority.

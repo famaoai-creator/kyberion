@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
+import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState, loadState } from './mission-state.js';
 import { reassignMissionToProject } from './project-management.js';
 import { resolveProjectLedgerPath, syncProjectLedger } from './mission-project-ledger.js';
@@ -10,8 +11,10 @@ import type { MissionState } from './mission-types.js';
 const MISSION_ID = 'MSN-PM-TEST-REASSIGN';
 const SOURCE_PROJECT_ID = 'PRJ-PM-TEST-SOURCE';
 const TARGET_PROJECT_ID = 'PRJ-PM-TEST-TARGET';
-const SOURCE_PATH = `active/projects/confidential/shared/${SOURCE_PROJECT_ID}`;
-const TARGET_PATH = `active/projects/confidential/shared/${TARGET_PROJECT_ID}`;
+const TARGET_TRACK_ID = 'TRK-PM-TEST-TARGET';
+const TEST_TENANT = 'tenant-reassignment';
+const SOURCE_PATH = `active/projects/confidential/${TEST_TENANT}/${SOURCE_PROJECT_ID}`;
+const TARGET_PATH = `active/projects/confidential/${TEST_TENANT}/${TARGET_PROJECT_ID}`;
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 
@@ -20,16 +23,17 @@ function cleanup(): void {
   const sourceWorkspace = pathResolver.projectWorkspaceDir(
     SOURCE_PROJECT_ID,
     'confidential',
-    'shared'
+    TEST_TENANT
   );
   const targetWorkspace = pathResolver.projectWorkspaceDir(
     TARGET_PROJECT_ID,
     'confidential',
-    'shared'
+    TEST_TENANT
   );
   for (const filePath of [
     `${pathResolver.shared('runtime/projects')}/${SOURCE_PROJECT_ID}.json`,
     `${pathResolver.shared('runtime/projects')}/${TARGET_PROJECT_ID}.json`,
+    `${pathResolver.shared('runtime/project-tracks')}/${TARGET_TRACK_ID}.json`,
   ]) {
     if (safeExistsSync(filePath)) safeRmSync(filePath);
   }
@@ -44,6 +48,7 @@ function fixtureMission(): MissionState {
     mission_type: 'development',
     tier: 'confidential',
     status: 'paused',
+    tenant_slug: TEST_TENANT,
     execution_mode: 'local',
     priority: 1,
     assigned_persona: 'worker',
@@ -80,7 +85,7 @@ describe('mission Project reassignment', () => {
       summary: 'Source fixture.',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-reassignment',
       repositories: [{ repo_id: 'REPO-SOURCE', kind: 'project-root', root_path: SOURCE_PATH }],
     });
     saveProjectRecord({
@@ -89,7 +94,7 @@ describe('mission Project reassignment', () => {
       summary: 'Target fixture.',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-reassignment',
       repositories: [{ repo_id: 'REPO-TARGET', kind: 'project-root', root_path: TARGET_PATH }],
     });
   });
@@ -128,5 +133,43 @@ describe('mission Project reassignment', () => {
     expect(
       safeReadFile(resolveProjectLedgerPath(TARGET_PATH), { encoding: 'utf8' }) as string
     ).toContain(MISSION_ID);
+  });
+
+  it('rejects reassignment across tenant scope even when the mission is paused', async () => {
+    await saveState(MISSION_ID, { ...fixtureMission(), tenant_slug: 'other-tenant' });
+
+    await expect(
+      reassignMissionToProject({
+        mission_id: MISSION_ID,
+        project_id: TARGET_PROJECT_ID,
+        project_path: TARGET_PATH,
+        dry_run: true,
+      })
+    ).rejects.toThrow('cross-tier or cross-tenant reassignment is denied');
+  });
+
+  it('rejects a target track whose scope does not match the target project', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    saveProjectTrackRecord({
+      track_id: TARGET_TRACK_ID,
+      project_id: TARGET_PROJECT_ID,
+      name: 'Wrong tenant track',
+      summary: 'Scope mismatch fixture.',
+      status: 'active',
+      track_type: 'release',
+      lifecycle_model: 'continuous_delivery',
+      tier: 'confidential',
+      tenant_slug: 'other-tenant',
+    });
+
+    await expect(
+      reassignMissionToProject({
+        mission_id: MISSION_ID,
+        project_id: TARGET_PROJECT_ID,
+        project_path: TARGET_PATH,
+        track_id: TARGET_TRACK_ID,
+        dry_run: true,
+      })
+    ).rejects.toThrow('must match project scope');
   });
 });

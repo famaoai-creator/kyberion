@@ -7,7 +7,11 @@
   "properties": {
     "artifact_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "organization_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
     "task_session_id": { "type": "string", "minLength": 1 },
