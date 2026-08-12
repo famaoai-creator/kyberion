@@ -2120,6 +2120,8 @@ export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
 export * from './subagent-capability-profiles.js';
+export * from './subagent-prompt-framing.js';
+export * from './claude-native-subagent.js';
 export {
   buildBridgeErrorReplyText,
   buildBridgeEmptyReplyText,
