@@ -17,6 +17,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/agy-sdk-adapter.ts',
   'libs/core/audio-playback.ts',
   'libs/core/audit-forwarder.ts',
+  'libs/core/claude-cli-session-adapter.ts',
   'libs/core/codex-cli-query.ts',
   'libs/core/deployment-adapter.ts',
   'libs/core/deployment-adapters/mobile-beta.ts',

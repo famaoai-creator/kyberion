@@ -33,6 +33,8 @@ import {
   DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE,
   SUBAGENT_CAPABILITY_PROFILES,
   SUBAGENT_PROFILE_CLI_TOOLS,
+  SUBAGENT_SECURE_IO_CONSTRAINT,
+  SUBAGENT_SHARED_DIRECTORY_RULES_LINES,
   buildWorkingPrinciplesLines,
   pathResolver,
   resolveCapabilityProfileForTeamRole,
@@ -79,27 +81,12 @@ export const PROFILE_SPECS: Readonly<Record<SubagentProfileName, ProfileSpec>> =
 export const DEFAULT_PROFILE: SubagentProfileName =
   DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE as SubagentProfileName;
 
-// XP-04 §"The read/write matrix" projection. Canonical source of truth is
-// knowledge/product/governance/multi-provider-coexecution-contract.md — this
-// is a compressed, imperative-mood mirror of its 5 rows (same compression
-// AGENTS.md §1's "Multi-provider co-execution" bullet uses). If the
-// canonical doc's matrix changes, update it there first, then mirror the
-// change into these lines — this is the single generator-side location that
-// needs editing.
-export const SHARED_DIRECTORY_RULES_LINES: readonly string[] = [
-  '## Shared-directory rules (multi-provider co-execution)',
-  '',
-  'Other provider CLIs (`claude`, `codex`, `agy`, …) may be operating on this same checkout concurrently. Follow the read/write matrix:',
-  '',
-  '- Read any repo file freely — reads never race.',
-  '- Write only what your active work-item claim covers — never a file outside your assignment scope.',
-  "- Never touch `.git/` or repo config (`.gitignore`, workspace wiring, etc.) — that's the mission owner's, never a worker CLI's.",
-  '- Temp files only under `active/shared/tmp/` (or mission-local storage) — never ad hoc directories.',
-  '- Do not create or hand-edit provider state directories (`.claude/`, `.codex/`, `.agy/`, `.gemini/`, …) — they are gitignored and reproduced by generation ceremonies.',
-  '',
-  'Canonical contract: [multi-provider-coexecution-contract](../../knowledge/product/governance/multi-provider-coexecution-contract.md)',
-  '',
-];
+// XP-04 §"The read/write matrix" projection, re-exported from the shared
+// framing SSoT (libs/core/subagent-prompt-framing.ts) so this committed
+// generation ceremony and the runtime `--agents` projection (CN-02,
+// libs/core/claude-native-subagent.ts) quote the same text.
+export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
+  SUBAGENT_SHARED_DIRECTORY_RULES_LINES;
 
 // The representative roles this ceremony generates definitions for today
 // (CT-01 acceptance criterion 1: implementer / an explorer-tier analysis
@@ -209,9 +196,7 @@ export function buildAgentDefinitionSource(role: string): string {
   }
   lines.push('## secure-io constraint');
   lines.push('');
-  lines.push(
-    'All file I/O goes through `@agent/core` secure-io helpers — never call `node:fs` directly. Write only within your assigned task scope; never mutate mission-wide or goal state directly. Prefer an existing `pnpm pipeline` or a typed CLI over ad-hoc file edits when one already covers the task (see `pipelines/README.md`, `CAPABILITIES_GUIDE.md`).'
-  );
+  lines.push(SUBAGENT_SECURE_IO_CONSTRAINT);
   lines.push('');
   lines.push(...SHARED_DIRECTORY_RULES_LINES);
   return lines.join('\n');

@@ -587,6 +587,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CLAUDE_NATIVE_SUBAGENT",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 1 to delegate through Claude's provider-native sub-agents (one shared stream-json CLI session / SDK `agents`) instead of spawning `claude -p` per task. Fails closed with subagent_unavailable when a delegation cannot be observed.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_CODEX_APPROVAL",
       "category": "runtime",
       "type": "string",

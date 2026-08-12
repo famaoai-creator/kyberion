@@ -45,8 +45,14 @@ export {
   isClaudeCliPlaceholderFailure,
   resolveClaudeCliFallbackCandidates,
 } from './claude-cli-resolution.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import { ClaudeCliSessionAdapter } from './claude-cli-session-adapter.js';
+import { buildClaudeNativeDelegationPrompt } from './claude-native-subagent.js';
+import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import type {
   ReasoningBackend,
+  ReasoningCallOptions,
   DivergeHypothesisInput,
   HypothesisSketch,
   CritiqueInput,
@@ -90,6 +96,28 @@ export interface ShellClaudeCliBackendOptions {
   timeoutMs?: number;
   /** Additional CLI args to inject (e.g. --effort high). */
   extraArgs?: string[];
+  /**
+   * CN-02: expose the provider-native sub-agent adopter (one shared
+   * stream-json CLI session, delegation as a real Claude sub-agent) instead
+   * of spawning `claude -p` per delegated task. Defaults to
+   * `KYBERION_CLAUDE_NATIVE_SUBAGENT === '1'`; an explicit value wins.
+   */
+  nativeSubagent?: boolean;
+  /** Test seam and runtime injection for the shared native CLI session. */
+  harnessSession?: ClaudeHarnessSession;
+}
+
+/**
+ * Provider-native session contract this backend delegates through — the
+ * Claude counterpart of `CodexHarnessSession` / `AgyHarnessSession`.
+ */
+export interface ClaudeHarnessSession {
+  boot(): Promise<void>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  getRuntimeInfo?(): Record<string, unknown>;
+  /** Executed by resetSession() for backend-owned sessions only. */
+  shutdown?(): Promise<void>;
 }
 
 export interface ShellClaudeCliAvailability {
@@ -127,12 +155,30 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly extraArgs: string[];
+  private readonly nativeSubagentEnabled: boolean;
+  private readonly injectedHarnessSession?: ClaudeHarnessSession;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
+  private harnessSession?: ClaudeHarnessSession;
+  private harnessSignature?: string;
+  private harnessBoot?: Promise<void>;
+  private harnessQueue: Promise<void> = Promise.resolve();
+  private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
 
   constructor(options: ShellClaudeCliBackendOptions = {}) {
     this.bin = options.bin ?? 'claude';
     this.model = options.model ?? 'opus';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+    this.nativeSubagentEnabled =
+      options.nativeSubagent ??
+      (options.harnessSession !== undefined || process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1');
+    if (options.harnessSession) this.injectedHarnessSession = options.harnessSession;
+    this.nativeSubagentAdopter = {
+      id: 'claude-cli',
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
+    };
   }
 
   /** The validated executable path used by this backend and its adapters. */
@@ -465,6 +511,137 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   }
 
   /**
+   * CN-02: delegate through the shared native CLI session instead of one
+   * `claude -p` process per task. Kept separate from `delegateTask` so the
+   * historical spawn path stays byte-compatible for callers that predate
+   * this option; `HarnessSubagentDispatcher` / the work-graph execution port
+   * opt in through {@link getNativeSubagentAdopter}.
+   *
+   * Fails closed: if the session cannot prove that a provider-native
+   * sub-agent actually ran, this raises `[SUBAGENT_UNAVAILABLE]` rather than
+   * silently degrading to a spawn and reporting it as native.
+   */
+  private async dispatchNativeSubagent(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const profile = resolveClaudeSubagentProfile(options);
+    const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);
+
+    const previous = this.harnessQueue;
+    let release!: () => void;
+    this.harnessQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const session = this.getHarnessSession(profile, model, options?.effort);
+      if (!session.askNativeSubagent) {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] claude CLI session has no native subagent operation.'
+        );
+      }
+      if (!this.harnessBoot) {
+        this.harnessBoot = session.boot().catch((err) => {
+          this.harnessBoot = undefined;
+          throw err;
+        });
+      }
+      await this.harnessBoot;
+      const response = await session.askNativeSubagent(
+        buildClaudeNativeDelegationPrompt({
+          profileName: profile,
+          instruction,
+          ...(context ? { context } : {}),
+        }),
+        {
+          profile,
+          subagent: true,
+          effort: options?.effort ?? 'medium',
+          ...(options?.signal ? { signal: options.signal } : {}),
+        }
+      );
+      const nativeInfo = response.metadata?.nativeSubagent;
+      if (!nativeInfo || typeof nativeInfo !== 'object') {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] claude CLI session returned no native subagent metadata.'
+        );
+      }
+      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
+      return response.text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
+      throw new Error(`[SUBAGENT_UNAVAILABLE] claude CLI harness failed: ${message}`);
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * Null until CN-02 is switched on (`KYBERION_CLAUDE_NATIVE_SUBAGENT=1`, an
+   * explicit `nativeSubagent` option, or an injected harness session), so the
+   * default delegation path stays the historical per-task spawn.
+   */
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    return this.nativeSubagentEnabled ? this.nativeSubagentAdopter : null;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return this.nativeSubagentEnabled;
+  }
+
+  /**
+   * QM-06: drop the shared CLI session on a failover switch. An INJECTED
+   * session belongs to its injector and is never shut down here — only the
+   * backend's own bookkeeping is cleared.
+   */
+  async resetSession(): Promise<void> {
+    const session = this.harnessSession;
+    this.harnessSession = undefined;
+    this.harnessSignature = undefined;
+    this.harnessBoot = undefined;
+    this.lastHarnessSubagentInfo = null;
+    if (!session || session === this.injectedHarnessSession) return;
+    await session.shutdown?.().catch(() => undefined);
+  }
+
+  /**
+   * One session per (profile, model, effort) signature: those are session
+   * construction flags (`--agents`, `--permission-mode`, `--model`,
+   * `--effort`), so a changed signature re-boots rather than silently
+   * running the delegation under the previous tier's permissions.
+   */
+  private getHarnessSession(
+    profile: ProviderPermissionProfileName,
+    model: string,
+    effort?: 'low' | 'medium' | 'high'
+  ): ClaudeHarnessSession {
+    if (this.injectedHarnessSession) {
+      this.harnessSession = this.injectedHarnessSession;
+      return this.harnessSession;
+    }
+    const signature = `${profile}|${model}|${effort ?? 'medium'}`;
+    if (this.harnessSession && this.harnessSignature === signature) return this.harnessSession;
+    if (this.harnessSession) {
+      void this.harnessSession.shutdown?.().catch(() => undefined);
+      this.harnessBoot = undefined;
+    }
+    this.harnessSession = new ClaudeCliSessionAdapter({
+      bin: this.bin,
+      model,
+      profile,
+      timeoutMs: this.timeoutMs,
+      ...(effort ? { effort } : {}),
+      ...(this.extraArgs.length > 0 ? { extraArgs: this.extraArgs } : {}),
+    });
+    this.harnessSignature = signature;
+    return this.harnessSession;
+  }
+
+  /**
    * Run a document or media generation task in a separate Claude CLI agent
    * session. This is intended for higher-level orchestration paths that need
    * artifact generation without using the reasoning-only structured backend.
@@ -612,6 +789,21 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   }
 }
 
+/**
+ * KD-05 tier for a delegation, degrade-not-fail (mirrors the dispatcher's
+ * own rule: `profile` > `role` > default; unknown names degrade).
+ */
+function resolveClaudeSubagentProfile(
+  options?: ReasoningCallOptions
+): ProviderPermissionProfileName {
+  const requested = options?.profile || options?.role || 'implementer';
+  try {
+    return getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+  } catch {
+    return 'implementer';
+  }
+}
+
 // SYNC, NOT WALL-CLOCK-BUDGETED (XP-06): this is a one-shot local readiness
 // probe, not a delegation's unit of work — it never goes through `spawnCli`/
 // `withWallClockBudget`. It must not issue a paid model request during startup;
@@ -752,6 +944,7 @@ export function buildClaudeCliOptionsFromEnv(
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
+    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
   };
 }
 
@@ -780,6 +973,7 @@ export function buildShellClaudeCliBackendFromEnv(
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
+    ...(env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1' ? { nativeSubagent: true } : {}),
   });
   logger.info(
     `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`
