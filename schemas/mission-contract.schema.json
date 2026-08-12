@@ -36,7 +36,7 @@
           },
           "project": {
             "type": "string",
-            "description": "Required scoping when tier is 'confidential': matches knowledge/confidential/{project}/."
+            "description": "Required scoping when tier is 'confidential': the tenant slug segment of knowledge/confidential/{tenant-slug}/. The field name is historical — this segment is a tenant (a confidentiality boundary from the tenant registry), not a project."
           },
           "domains": {
             "type": "array",

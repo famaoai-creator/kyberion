@@ -347,11 +347,26 @@ function collectSourceFiles(rootRelativeDirs: string[]): string[] {
 const KNOWN_KEY_CALL_RE = /\b(?:uxText|uxLabel|renderVocabularyText)\(\s*'([^']+)'/g;
 const CLI_T_CALL_RE = /\bt\(\s*'([^']+)'/g;
 
-function findUndefinedKeyReferences(files: string[]): string[] {
+/**
+ * Pure core of the forward code→catalog check.
+ *
+ * `sources` maps a repo-relative label to that file's text, and `resolveKey`
+ * answers whether a key exists (throwing on ambiguity). Keeping the scan
+ * separate from the reading is what lets the suite exercise it with fixture
+ * text instead of writing a file into the repo and re-running the checker as a
+ * subprocess — the pattern check_mission_gate_docs.ts already uses.
+ */
+export function collectUndefinedKeyReferenceViolations(
+  sources: Record<string, string>,
+  resolveKey: (key: string) => unknown = resolveVocabularyEntry
+): string[] {
   const violations: string[] = [];
-  for (const file of files) {
-    const source = String(safeReadFile(file, { encoding: 'utf8' }) || '');
-    const isCliScript = file.endsWith(`${path.sep}scripts${path.sep}cli.ts`);
+  for (const [label, source] of Object.entries(sources)) {
+    // Only scripts/cli.ts uses the bare `t('…')` form; scanning every file for
+    // it would collide with unrelated one-letter helpers.
+    const normalizedLabel = label.replaceAll('\\', '/');
+    const isCliScript =
+      normalizedLabel === 'scripts/cli.ts' || normalizedLabel.endsWith('/scripts/cli.ts');
     const matches = [
       ...source.matchAll(KNOWN_KEY_CALL_RE),
       ...(isCliScript ? source.matchAll(CLI_T_CALL_RE) : []),
@@ -359,19 +374,26 @@ function findUndefinedKeyReferences(files: string[]): string[] {
     for (const match of matches) {
       const key = match[1];
       try {
-        if (!resolveVocabularyEntry(key)) {
-          violations.push(
-            `user-facing-vocabulary: ${path.relative(pathResolver.rootDir(), file)} references undefined key "${key}"`
-          );
+        if (!resolveKey(key)) {
+          violations.push(`user-facing-vocabulary: ${label} references undefined key "${key}"`);
         }
       } catch (error) {
         violations.push(
-          `user-facing-vocabulary: ${path.relative(pathResolver.rootDir(), file)} references ambiguous key "${key}" (${(error as Error).message})`
+          `user-facing-vocabulary: ${label} references ambiguous key "${key}" (${(error as Error).message})`
         );
       }
     }
   }
   return violations;
+}
+
+function findUndefinedKeyReferences(files: string[]): string[] {
+  const sources: Record<string, string> = {};
+  for (const file of files) {
+    const label = path.relative(pathResolver.rootDir(), file);
+    sources[label] = String(safeReadFile(file, { encoding: 'utf8' }) || '');
+  }
+  return collectUndefinedKeyReferenceViolations(sources);
 }
 
 /**
@@ -405,11 +427,18 @@ function findUnusedKeys(catalog: VocabularyCatalogShape, haystack: string): stri
   return unused;
 }
 
-function validateUserFacingVocabulary(
-  data: Record<string, unknown>,
-  violations: string[],
-  warnings: string[]
-) {
+/**
+ * Pure core of the vocabulary catalog checks: required locales present for
+ * every key, and placeholders consistent across locales for the same key.
+ *
+ * Takes the parsed catalog and returns violations, so the suite can assert on a
+ * fixture catalog rather than editing the repository's real
+ * user-facing-vocabulary.json and restoring it afterwards. That editing was the
+ * source of cross-file interference: vitest runs files in parallel, so any suite
+ * reading the catalog while it was deliberately broken saw the injected drift.
+ */
+export function collectVocabularyCatalogViolations(data: Record<string, unknown>): string[] {
+  const violations: string[] = [];
   const typed = data as VocabularyCatalogShape;
   const defaultLocale = String(typed.default_locale || '');
   const requiredLocales = typed.required_locales || [];
@@ -458,13 +487,69 @@ function validateUserFacingVocabulary(
     }
   }
 
+  return violations;
+}
+
+function validateUserFacingVocabulary(
+  data: Record<string, unknown>,
+  violations: string[],
+  warnings: string[]
+) {
+  violations.push(...collectVocabularyCatalogViolations(data));
+
   const files = collectSourceFiles(VOCABULARY_SCAN_DIRS);
   violations.push(...findUndefinedKeyReferences(files));
 
   const haystack = files
     .map((file) => String(safeReadFile(file, { encoding: 'utf8' }) || ''))
     .join('\n');
-  warnings.push(...findUnusedKeys(typed, haystack));
+  warnings.push(...findUnusedKeys(data as VocabularyCatalogShape, haystack));
+}
+
+export interface ThemeEntryShape {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+}
+
+export interface ThemeCatalogShape {
+  default_theme?: string;
+  themes?: Record<string, ThemeEntryShape>;
+}
+
+/**
+ * Pure core of the theme-catalog drift check.
+ *
+ * The generated design tokens are the source of truth; a theme catalog must
+ * reproduce them exactly. Comparing supplied data rather than re-reading the
+ * repository means the suite can assert on a drifted fixture without editing
+ * `themes.json` in place — an edit that other suites running in parallel would
+ * otherwise observe.
+ */
+export function collectThemeCatalogViolations(input: {
+  label: string;
+  catalog: ThemeCatalogShape;
+  expectedThemes: Record<string, ThemeEntryShape>;
+  isRootThemesCatalog: boolean;
+}): string[] {
+  const violations: string[] = [];
+  const { label, catalog, expectedThemes, isRootThemesCatalog } = input;
+
+  if (isRootThemesCatalog && catalog.default_theme !== 'kyberion-standard') {
+    violations.push(`design-tokens: ${label} default_theme must be kyberion-standard`);
+  }
+
+  for (const themeName of ['kyberion-standard', 'kyberion-sovereign'] as const) {
+    const actual = catalog.themes?.[themeName];
+    const expected = expectedThemes[themeName];
+    if (!expected) continue;
+    if (
+      JSON.stringify(actual?.colors) !== JSON.stringify(expected.colors) ||
+      JSON.stringify(actual?.fonts) !== JSON.stringify(expected.fonts)
+    ) {
+      violations.push(`design-tokens: ${label} ${themeName} drift`);
+    }
+  }
+  return violations;
 }
 
 function validateDesignTokenCatalog(violations: string[]) {
@@ -528,36 +613,19 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const raw = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '')) as {
-      default_theme?: string;
-      themes?: Record<string, { colors?: Record<string, string>; fonts?: Record<string, string> }>;
-    };
-    const kyberionStandard = raw.themes?.['kyberion-standard'];
-    const kyberionSovereign = raw.themes?.['kyberion-sovereign'];
-    const expectedStandard = expectedThemes['kyberion-standard'];
-    const expectedSovereign = expectedThemes['kyberion-sovereign'];
-    const isRootThemesCatalog = path.basename(path.dirname(filePath)) !== 'themes';
-    if (isRootThemesCatalog && raw.default_theme !== 'kyberion-standard') {
-      violations.push(
-        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} default_theme must be kyberion-standard`
-      );
-    }
-    if (
-      JSON.stringify(kyberionStandard?.colors) !== JSON.stringify(expectedStandard.colors) ||
-      JSON.stringify(kyberionStandard?.fonts) !== JSON.stringify(expectedStandard.fonts)
-    ) {
-      violations.push(
-        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} kyberion-standard drift`
-      );
-    }
-    if (
-      JSON.stringify(kyberionSovereign?.colors) !== JSON.stringify(expectedSovereign.colors) ||
-      JSON.stringify(kyberionSovereign?.fonts) !== JSON.stringify(expectedSovereign.fonts)
-    ) {
-      violations.push(
-        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} kyberion-sovereign drift`
-      );
-    }
+    const raw = JSON.parse(
+      String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
+    ) as ThemeCatalogShape;
+    violations.push(
+      ...collectThemeCatalogViolations({
+        label: path.relative(pathResolver.rootDir(), filePath),
+        catalog: raw,
+        expectedThemes,
+        // Only the flat catalog declares default_theme; the decomposed copy
+        // under themes/ inherits it.
+        isRootThemesCatalog: path.basename(path.dirname(filePath)) !== 'themes',
+      })
+    );
   }
 
   // E2E-02: the flat catalog and the decomposed directory copy are a generated
@@ -643,4 +711,9 @@ function main() {
   console.log('[check:catalogs] OK');
 }
 
-main();
+// Guarded so importing the pure collectors above does not run the whole
+// repository check as a side effect.
+const isDirectRun =
+  process.argv[1]?.endsWith('check_catalog_integrity.ts') ||
+  process.argv[1]?.endsWith('check_catalog_integrity.js');
+if (isDirectRun) main();

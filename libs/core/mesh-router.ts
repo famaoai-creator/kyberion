@@ -1,19 +1,13 @@
 import { safeReadFile } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import {
   listEligibleMeshPeers,
   listMeshPeerDirectoryEntries,
   type MeshPeerDirectoryEntry,
 } from './mesh-peer-directory.js';
-import {
-  resolveMeshTopicRecipients,
-  type MeshTopicResolution,
-} from './mesh-topic-registry.js';
-import type {
-  MeshRequest,
-  MeshRequestKind,
-  MeshTargetSelector,
-} from './mesh-hub-contract.js';
+import { resolveMeshTopicRecipients, type MeshTopicResolution } from './mesh-topic-registry.js';
+import type { MeshRequest, MeshRequestKind, MeshTargetSelector } from './mesh-hub-contract.js';
 
 const DEFAULT_POLICY_VERSION = '1.0.0';
 
@@ -76,7 +70,9 @@ function normalizeIso(value?: string | Date): string {
 
 function loadMeshHubPolicy(): MeshHubPolicySnapshot {
   const policyPath = pathResolver.resolve('knowledge/product/governance/mesh-hub-policy.json');
-  return JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' }) || '{}')) as MeshHubPolicySnapshot;
+  return JSON.parse(
+    String(safeReadFile(policyPath, { encoding: 'utf8' }) || '{}')
+  ) as MeshHubPolicySnapshot;
 }
 
 function normalizeRequestKind(value: string): MeshRequestKind | null {
@@ -117,7 +113,7 @@ function candidateReasons(entry: MeshPeerDirectoryEntry, requestKind: MeshReques
 function topicResolutionToRouteDecision(
   request: MeshRequest,
   resolution: MeshTopicResolution,
-  policyVersion: string,
+  policyVersion: string
 ): MeshRouteDecision {
   const selected_peer_ids = [...resolution.selected_peer_ids];
   return {
@@ -152,15 +148,13 @@ function buildDirectRouteDecision(
   selector: MeshTargetSelector,
   eligiblePeers: MeshPeerDirectoryEntry[],
   policyVersion: string,
-  exclusions: MeshRouteExclusion[],
+  exclusions: MeshRouteExclusion[]
 ): MeshRouteDecision {
-  const ranked = eligiblePeers
-    .slice()
-    .sort((left, right) => {
-      const rankDelta = scorePeer(right) - scorePeer(left);
-      if (rankDelta !== 0) return rankDelta;
-      return left.peer_id.localeCompare(right.peer_id);
-    });
+  const ranked = eligiblePeers.slice().sort((left, right) => {
+    const rankDelta = scorePeer(right) - scorePeer(left);
+    if (rankDelta !== 0) return rankDelta;
+    return left.peer_id.localeCompare(right.peer_id);
+  });
   const selectedPeer = ranked[0] || null;
   const decision = ranked.length > 1 ? 'requires_operator_selection' : 'direct';
   return {
@@ -183,7 +177,9 @@ function buildDirectRouteDecision(
     })),
     exclusions,
     reason_codes: selectedPeer
-      ? (decision === 'direct' ? ['direct_recipient_selected'] : ['requires_operator_selection'])
+      ? decision === 'direct'
+        ? ['direct_recipient_selected']
+        : ['requires_operator_selection']
       : ['no_eligible_peer'],
   };
 }
@@ -192,7 +188,7 @@ function collectPeerExclusions(
   entries: MeshPeerDirectoryEntry[],
   eligiblePeerIds: Set<string>,
   tenantId: string,
-  requestKind: MeshRequestKind,
+  requestKind: MeshRequestKind
 ): MeshRouteExclusion[] {
   return entries
     .filter((entry) => !eligiblePeerIds.has(entry.peer_id))
@@ -209,7 +205,9 @@ function collectPeerExclusions(
       if (entry.status !== 'enrolled') {
         return { peer_id: entry.peer_id, reason: `status_${entry.status}` };
       }
-      const requestAuthorized = entry.capabilities.some((capability) => capability.request_kinds.includes(requestKind));
+      const requestAuthorized = entry.capabilities.some((capability) =>
+        capability.request_kinds.includes(requestKind)
+      );
       if (!requestAuthorized) {
         return { peer_id: entry.peer_id, reason: 'request_kind_not_authorized' };
       }
@@ -217,7 +215,14 @@ function collectPeerExclusions(
     });
 }
 
-export function routeMeshRequest(request: MeshRequest, options: MeshRouteOptions = {}): MeshRouteDecision {
+export function routeMeshRequest(
+  request: MeshRequest,
+  options: MeshRouteOptions = {}
+): MeshRouteDecision {
+  const tenantId = request.tenant_scope?.tenant_id;
+  if (!tenantId || !isValidTenantSlug(tenantId)) {
+    throw new Error(`invalid_mesh_request_tenant_id:${String(tenantId || '')}`);
+  }
   const policy = loadMeshHubPolicy();
   const policyVersion = options.policyVersion || policy.version || DEFAULT_POLICY_VERSION;
   const now = normalizeIso(options.now);
@@ -240,7 +245,7 @@ export function routeMeshRequest(request: MeshRequest, options: MeshRouteOptions
         namespace: options.namespace,
         maxFanOut: options.maxFanOut || policy.topic_delivery?.max_fan_out || 1,
         policyVersion,
-      },
+      }
     );
     return topicResolutionToRouteDecision(request, resolution, policyVersion);
   }
@@ -252,7 +257,12 @@ export function routeMeshRequest(request: MeshRequest, options: MeshRouteOptions
     request_kind: request.request_kind,
   });
   const eligiblePeerIds = new Set(eligiblePeers.map((peer) => peer.peer_id));
-  const exclusions = collectPeerExclusions(directoryEntries, eligiblePeerIds, request.tenant_scope.tenant_id, request.request_kind);
+  const exclusions = collectPeerExclusions(
+    directoryEntries,
+    eligiblePeerIds,
+    request.tenant_scope.tenant_id,
+    request.request_kind
+  );
 
   if (selector.kind === 'peer') {
     const exact = eligiblePeers.filter((peer) => peer.peer_id === selector.peer_id);

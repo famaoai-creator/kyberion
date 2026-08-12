@@ -24,6 +24,7 @@ export interface ProjectTrackRecord {
     | 'continuous_operations'
     | 'research_cycle';
   tier: 'personal' | 'confidential' | 'public';
+  tenant_slug?: string;
   primary_locale?: string;
   release_id?: string;
   change_scope?: string;

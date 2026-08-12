@@ -43,6 +43,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeWriteFile,
+  isValidTenantSlug,
   readCanonicalWorkGraph,
 } from '@agent/core';
 
@@ -299,7 +300,7 @@ function normalizeTenantSlug(value: string | null | undefined): string | null {
   const slug = String(value || '')
     .trim()
     .toLowerCase();
-  return slug || null;
+  return isValidTenantSlug(slug) ? slug : null;
 }
 
 function missionTenantSlug(state: {
@@ -316,7 +317,9 @@ function missionMatchesTenant(
   allowUnscoped: boolean
 ): boolean {
   if (!allowedTenants) return true;
+  const rawTenant = state.tenant_slug || state.tenant_id;
   const missionTenant = missionTenantSlug(state);
+  if (rawTenant && !missionTenant) return false;
   if (!missionTenant) return allowUnscoped;
   return allowedTenants.has(missionTenant);
 }

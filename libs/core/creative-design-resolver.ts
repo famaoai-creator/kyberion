@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -221,7 +222,6 @@ const FALLBACK_CONSTRAINTS: CreativeDesignConstraints = {
   ],
 };
 
-const TENANT_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 const CSS_TOKEN_FORBIDDEN = /[<>{};\u0000\r\n]/u;
 
 function normalizeFiniteNumber(
@@ -244,7 +244,7 @@ function normalizeCssToken(value: unknown, fallback: string, maxLength = 256): s
 function normalizeTenantSlug(value: unknown): string | undefined {
   const slug = typeof value === 'string' ? value.trim() : '';
   if (!slug) return undefined;
-  if (!TENANT_SLUG_PATTERN.test(slug)) {
+  if (!isValidTenantSlug(slug)) {
     throw new Error(
       `Invalid tenant slug: expected lowercase letters, digits, and hyphens only (${slug})`
     );

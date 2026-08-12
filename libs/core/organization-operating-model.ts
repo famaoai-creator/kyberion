@@ -8,6 +8,7 @@ import { loadState } from './mission-state.js';
 import { t } from './t.js';
 import type { SupportedLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
 import {
@@ -550,7 +551,6 @@ export interface ResolveOrganizationWorkInput {
   locale?: SupportedLocale;
 }
 
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/organization-operating-model.json'
@@ -638,7 +638,7 @@ function assertOrganizationId(organizationId: string): void {
 }
 
 function assertTenantSlug(tenantSlug: string): void {
-  if (tenantSlug !== 'shared' && !TENANT_SLUG_RE.test(tenantSlug)) {
+  if (tenantSlug !== 'shared' && !isValidTenantSlug(tenantSlug)) {
     throw new Error(`Invalid tenant_slug '${tenantSlug}'.`);
   }
 }

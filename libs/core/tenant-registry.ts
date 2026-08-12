@@ -3,6 +3,7 @@ import AjvModule from 'ajv';
 import { customerDirForSlug, customerIsConfigured, customerRoot } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -11,7 +12,6 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const TENANT_GROUP_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -97,7 +97,7 @@ export function assertTenantOperational(profile: TenantProfile, operation = 'ope
 }
 
 function assertTenantSlug(slug: string): void {
-  if (!TENANT_SLUG_RE.test(slug)) {
+  if (!isValidTenantSlug(slug)) {
     throw new Error(`[tenant-registry] invalid tenant slug '${slug}'`);
   }
 }
@@ -141,6 +141,7 @@ export function listTenantProfileSlugs(options: TenantRegistryPathOptions = {}):
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => entry.slice(0, -'.json'.length))
+    .filter(isValidTenantSlug)
     .sort();
 }
 
@@ -161,9 +162,29 @@ export function defaultTenantKnowledgeRoot(slug: string): string {
   return `knowledge/confidential/${slug}`;
 }
 
+/** Underlying failure text, without its trailing period, so a suffix reads as one sentence. */
+function describeCause(error: unknown): string {
+  return String((error as Error)?.message ?? error).replace(/\s*\.\s*$/, '');
+}
+
+/**
+ * Actionable suffix for a refused profile read. Keyed off where the profile
+ * lives rather than the error text: personal-tier reads need an authorized
+ * execution context, so that is the first thing to check.
+ */
+function profileReadHint(file: string): string {
+  const normalized = file.replace(/\\/g, '/');
+  if (!normalized.includes('/knowledge/personal/')) return '';
+  return (
+    '. Personal-tier profiles require an authorized execution context — ' +
+    'check KYBERION_PERSONA / MISSION_ROLE before suspecting the file itself'
+  );
+}
+
 /**
  * Reads and schema-validates a tenant profile. Returns null when the profile
- * file does not exist; throws when it exists but is corrupt or schema-invalid.
+ * file does not exist; throws when it exists but cannot be read, is corrupt, or
+ * is schema-invalid — each reported as its own failure so the cause is legible.
  */
 export function readTenantProfile(
   slug: string,
@@ -171,9 +192,23 @@ export function readTenantProfile(
 ): TenantProfile | null {
   const file = tenantProfilePath(slug, options);
   if (!safeExistsSync(file)) return null;
+  // Read and parse are reported separately on purpose. Profiles normally live in
+  // the personal tier, where secure-io denies unauthorized readers ("Sovereign
+  // Sanctuary"); folding that denial into a "not valid JSON" message sent
+  // callers looking for a corrupt file instead of a missing execution context.
+  let source: string;
+  try {
+    source = safeReadFile(file, { encoding: 'utf8' }) as string;
+  } catch (error) {
+    throw new Error(
+      `[tenant-registry] tenant profile '${slug}' could not be read (${file}): ${describeCause(
+        error
+      )}${profileReadHint(file)}`
+    );
+  }
   let profile: TenantProfile;
   try {
-    profile = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as TenantProfile;
+    profile = JSON.parse(source) as TenantProfile;
   } catch (error) {
     throw new Error(
       `[tenant-registry] tenant profile '${slug}' is not valid JSON (${file}): ${(error as Error).message}`

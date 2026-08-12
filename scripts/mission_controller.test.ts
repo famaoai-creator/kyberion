@@ -38,9 +38,28 @@ function cleanupAutoTrackFixture(): void {
   });
 }
 
+function cleanupScopeTrackFixture(): void {
+  safeRmSync(pathResolver.shared('runtime/projects/PRJ-TEST-SCOPE-TRACK.json'), {
+    force: true,
+  });
+  safeRmSync(pathResolver.shared('runtime/project-tracks/TRK-TEST-SCOPE-TRACK.json'), {
+    force: true,
+  });
+}
+
+function cleanupPublicTenantFixture(): void {
+  safeRmSync(pathResolver.shared('runtime/projects/PRJ-TEST-PUBLIC-TENANT.json'), {
+    force: true,
+  });
+}
+
 describe('mission_controller argument parsing', () => {
   beforeEach(cleanupAutoTrackFixture);
-  afterEach(cleanupAutoTrackFixture);
+  afterEach(() => {
+    cleanupAutoTrackFixture();
+    cleanupScopeTrackFixture();
+    cleanupPublicTenantFixture();
+  });
 
   it('removes project traceability flags and their values from positional arguments', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
@@ -965,6 +984,89 @@ describe('mission_controller argument parsing', () => {
       lifecycle_model: 'sdlc',
       traceability_refs: [],
     });
+  });
+
+  it('rejects an explicit track whose scope differs from the linked project', () => {
+    saveProjectRecord({
+      project_id: 'PRJ-TEST-SCOPE-TRACK',
+      name: 'Scoped Track Project',
+      summary: 'Scope validation fixture.',
+      status: 'active',
+      tier: 'confidential',
+      tenant_slug: 'tenant-a',
+    });
+    saveProjectTrackRecord({
+      track_id: 'TRK-TEST-SCOPE-TRACK',
+      project_id: 'PRJ-TEST-SCOPE-TRACK',
+      name: 'Foreign Track',
+      summary: 'Foreign tenant track.',
+      status: 'active',
+      track_type: 'release',
+      lifecycle_model: 'continuous_delivery',
+      tier: 'confidential',
+      tenant_slug: 'tenant-b',
+    });
+
+    expect(() =>
+      validateMissionStartCreateInput('start', 'MSN-TEST-SCOPE-TRACK', [
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-TEST-SCOPE-TRACK',
+        '--tier',
+        'confidential',
+        '--tenant-slug',
+        'tenant-a',
+        '--project-id',
+        'PRJ-TEST-SCOPE-TRACK',
+        '--project-path',
+        'active/projects/tenant-a/PRJ-TEST-SCOPE-TRACK',
+        '--track-id',
+        'TRK-TEST-SCOPE-TRACK',
+      ])
+    ).toThrow('must match project scope');
+  });
+
+  it('requires the project tenant even for a public tenant-bound project', () => {
+    const projectId = 'PRJ-TEST-PUBLIC-TENANT';
+    saveProjectRecord({
+      project_id: projectId,
+      name: 'Public tenant-bound project',
+      summary: 'Scope validation fixture.',
+      status: 'active',
+      tier: 'public',
+      tenant_slug: 'tenant-a',
+    });
+
+    expect(() =>
+      validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT', [
+        'node',
+        'dist/scripts/mission_controller.js',
+        'create',
+        '--tier',
+        'public',
+        '--tenant-slug',
+        'tenant-a',
+        '--project-id',
+        projectId,
+        '--project-path',
+        'active/projects/public/tenant-a/project',
+      ])
+    ).not.toThrow();
+
+    expect(() =>
+      validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT-MISSING', [
+        'node',
+        'dist/scripts/mission_controller.js',
+        'create',
+        '--tier',
+        'public',
+        '--project-id',
+        projectId,
+        '--project-path',
+        'active/projects/public/tenant-a/project',
+      ])
+    ).toThrow("mission tenant 'shared' must match project tenant 'tenant-a'");
   });
 
   it('emits a redacted intent-track gate summary for project-linked dry runs', async () => {

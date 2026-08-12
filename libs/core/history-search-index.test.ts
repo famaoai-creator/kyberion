@@ -37,6 +37,65 @@ function entry(
 }
 
 describe('history-search-index', () => {
+  it('rejects a configured database outside active/shared', () => {
+    process.env.KYBERION_HISTORY_SEARCH_DB = '/tmp/kyberion-history.sqlite';
+    expect(() => historySearchDatabasePath()).toThrow(/must stay under active\/shared/);
+  });
+
+  it('keeps the FTS triggers usable under sqlite trusted_schema=0', () => {
+    // Apple's bundled sqlite3 defaults to trusted_schema=0, which forbids using
+    // a virtual table inside a trigger body. The index syncs history_fts from
+    // triggers, so without the pragma every write — and therefore every search —
+    // fails with "unsafe use of virtual table". Linux CI ships the permissive
+    // default and never sees it, so this asserts the condition directly instead
+    // of relying on the platform the suite happens to run on.
+    const probeDb = pathResolver.shared(
+      `tmp/history-search-trusted-schema-probe-${process.pid}.sqlite`
+    );
+    safeMkdir(pathResolver.shared('tmp'), { recursive: true });
+    try {
+      // Kept free of any trusted_schema pragma so each run below can set its
+      // own; a pragma baked in here would override the one under test.
+      const schemaSql = [
+        'CREATE TABLE entries(content TEXT);',
+        'CREATE VIRTUAL TABLE entries_fts USING fts5(content);',
+        'CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN',
+        '  INSERT INTO entries_fts(rowid, content) VALUES (new.rowid, new.content);',
+        'END;',
+        "INSERT INTO entries VALUES('probe');",
+      ].join('\n');
+      let rejectedWithoutPragma = false;
+      try {
+        safeExec('sqlite3', [probeDb], {
+          input: `PRAGMA trusted_schema=OFF;\n${schemaSql}`,
+          timeoutMs: 10_000,
+        });
+      } catch {
+        rejectedWithoutPragma = true;
+      }
+      if (!rejectedWithoutPragma) {
+        // A permissive sqlite build: the pragma is harmless, nothing to assert.
+        return;
+      }
+      // On a strict build the same schema must succeed once the pragma leads the
+      // batch — the exact remedy runSql() applies.
+      safeRmSync(probeDb, { force: true });
+      const output = safeExec('sqlite3', [probeDb], {
+        input: `PRAGMA trusted_schema=ON;\n${schemaSql}\nSELECT count(*) FROM entries_fts;`,
+        timeoutMs: 10_000,
+      });
+      expect(String(output).trim()).toBe('1');
+    } finally {
+      for (const suffix of ['', '-wal', '-shm']) {
+        try {
+          safeRmSync(`${probeDb}${suffix}`, { force: true });
+        } catch {
+          // Test cleanup is best-effort.
+        }
+      }
+    }
+  });
+
   afterEach(() => {
     delete process.env.KYBERION_HISTORY_SEARCH_DB;
     for (const suffix of ['', '-wal', '-shm']) {

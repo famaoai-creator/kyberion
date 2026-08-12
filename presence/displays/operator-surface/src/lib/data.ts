@@ -28,6 +28,7 @@ import {
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
   buildSurfaceLauncherRecommendations,
+  isValidTenantSlug,
   type SurfaceDirectoryRow,
   type SurfaceDirectorySummary,
   type SurfaceScenarioGuide,
@@ -50,12 +51,10 @@ export type {
   CloudflareOsSurfaceSnapshot,
 };
 
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
-
 export function getTenantScope(): string | undefined {
   const slug = (process.env.KYBERION_TENANT || '').trim();
   if (!slug) return undefined;
-  return TENANT_SLUG_RE.test(slug) ? slug : undefined;
+  return isValidTenantSlug(slug) ? slug : undefined;
 }
 
 /**
@@ -137,7 +136,7 @@ function detectMissionTenantSlug(state: any, dirPath: string): string | undefine
   // Path-based detection: confidential/{slug}/MSN-... layout.
   const segs = dirPath.split(path.sep);
   const idx = segs.indexOf('confidential');
-  if (idx >= 0 && segs[idx + 1] && TENANT_SLUG_RE.test(segs[idx + 1])) {
+  if (idx >= 0 && segs[idx + 1] && isValidTenantSlug(segs[idx + 1])) {
     return segs[idx + 1];
   }
   return undefined;

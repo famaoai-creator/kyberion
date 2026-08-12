@@ -125,6 +125,7 @@
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./product/architecture/passkey-push-protocol.md) (public | Ecosystem Architect)
 - [Spectrum TS Message Handling Absorption Assessment](./product/architecture/spectrum-ts-message-handling-absorption-assessment.md) (public | Ecosystem Architect)
 - [Stale Doc Cleanup Rationale](./product/architecture/stale-doc-cleanup-rationale-2026-06.md) (public | Unknown)
+- [Stance / Tenant / Customer — three layers that all get called customer](./product/architecture/stance-tenant-customer-model.md) (public | Unknown)
 - [Studio Agent Orchestration Absorption Plan](./product/architecture/studio-agent-orchestration-absorption-plan.md) (public | Ecosystem Architect)
 - [Subagent Observability Model](./product/architecture/subagent-observability-model.md) (public | Ecosystem Architect)
 - [Surface Responsibility Model](./product/architecture/surface-responsibility-model.md) (public | Ecosystem Architect)

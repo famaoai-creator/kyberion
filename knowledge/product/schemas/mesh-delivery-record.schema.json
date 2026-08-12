@@ -42,7 +42,8 @@
       "properties": {
         "tenant_id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
         },
         "scope": {
           "type": "string",
@@ -139,7 +140,16 @@
     },
     "status": {
       "type": "string",
-      "enum": ["accepted", "queued", "dispatched", "acknowledged", "completed", "rejected", "expired", "dead_lettered"]
+      "enum": [
+        "accepted",
+        "queued",
+        "dispatched",
+        "acknowledged",
+        "completed",
+        "rejected",
+        "expired",
+        "dead_lettered"
+      ]
     },
     "route": {
       "type": "object",

@@ -73,7 +73,11 @@
       "additionalProperties": false
     },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "status": { "type": "string", "enum": ["draft", "active", "paused", "retired"] },
     "updated_at": { "type": "string", "format": "date-time" },
     "source_refs": { "type": "array", "items": { "type": "string" } },

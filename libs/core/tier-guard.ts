@@ -8,6 +8,7 @@ import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveIdentityContext } from './authority.js';
 import { createLogger } from './logger.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -237,7 +238,7 @@ function isValidTenantGroupProfile(groupId: string, profile: TenantGroupProfile)
       profile.status === 'archived') &&
     Array.isArray(profile.member_tenants) &&
     profile.member_tenants.length > 0 &&
-    profile.member_tenants.every((tenant) => /^[a-z][a-z0-9-]{1,30}$/.test(String(tenant))) &&
+    profile.member_tenants.every((tenant) => isValidTenantSlug(String(tenant))) &&
     Array.isArray(profile.shared_prefixes) &&
     profile.shared_prefixes.length > 0 &&
     profile.shared_prefixes.every((prefix) =>
@@ -330,8 +331,15 @@ function checkTenantScope(
   const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
   if (!scoped) return null;
   if (!tenantSlug && !brokeredTenants) return null;
+  if (brokeredTenants?.some((tenant) => !isValidTenantSlug(tenant))) {
+    return {
+      allowed: false,
+      reason:
+        '[POLICY_VIOLATION] tenant.broker_scope_invalid — brokered tenant list contains a reserved or invalid tenant slug.',
+    };
+  }
   const targetTenant = scoped.tenant;
-  if (!targetTenant || !cfg.slugPattern.test(targetTenant)) {
+  if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
     return {
       allowed: false,
       reason: `[POLICY_VIOLATION] tenant.scope_invalid_prefix — '${relativePath}' is under protected prefix '${scoped.prefix}' but tenant segment '${targetTenant || '(missing)'}' is invalid.`,

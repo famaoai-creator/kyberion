@@ -141,7 +141,7 @@ Kyberion currently covers:
 - **Network and service actions**: governed fetch plus Slack / Google / Notion / Microsoft 365 integration.
 - **System operations**: shell, screenshots, and OS-level introspection.
 - **Knowledge and memory**: search, distill, and reuse organizational hints — including zero-LLM history search (SQLite FTS5 + CJK trigram, tier-isolated).
-- **Organization operations**: an organization operating model control plane (purpose, services, routine operations, incidents, cadences, decisions — six `work_shape` kinds beyond solution projects), governed project management, and a canonical work-item context chain (`organization_id → tenant_slug → mission_id → project_id → task_id`) projected into per-view visibility scopes.
+- **Organization operations**: an organization operating model control plane (purpose, services, routine operations, incidents, cadences, decisions — six `work_shape` kinds beyond solution projects), governed project management, and a canonical work-item context chain (`tenant_slug → organization_id → project_id → mission_id → task_id`) projected into per-view visibility scopes.
 - **Multi-tenant foundations**: a tenant registry with isolated knowledge roots (`knowledge/confidential/{tenant-slug}/`), deny-unless-brokered cross-tenant access, and an HMAC-signed tenant peer mesh (`pnpm peer:register`).
 
 Plus:
@@ -149,7 +149,7 @@ Plus:
 - **ADF pipeline format** — declarative, schema-validated, sub-pipeline composable. With `on_error` recovery semantics.
 - **Mission lifecycle** — each piece of work is a mission with its own git repo, state, evidence. Survives 24h+ runs.
 - **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary, with per-tenant scoping under `confidential/` and viewer-scoped surface APIs on top (staged warn→enforce).
-- **Customer aggregation** — `customer/{slug}/` overlay for FDE / implementation-support engagements without forks.
+- **Stance overlay** — `customer/{slug}/` swaps identity, connections and policy for the entity you are currently acting as (an FDE engagement, or one of several affiliations) without forks. A stance is not a tenant and not a tenant's customer — the three are [distinguished here](./knowledge/product/architecture/stance-tenant-customer-model.md).
 - **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
 - **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
 - **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.

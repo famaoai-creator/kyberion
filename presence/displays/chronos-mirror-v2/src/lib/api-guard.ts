@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { secretGuard } from '@agent/core/secret-guard';
-import { pathResolver, safeExistsSync, type OsKnowledgeTier } from '@agent/core';
+import { isValidTenantSlug, pathResolver, safeExistsSync, type OsKnowledgeTier } from '@agent/core';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -45,7 +45,9 @@ function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
         typeof value.token_hash === 'string' &&
         (value.role === 'readonly' || value.role === 'localadmin') &&
         Array.isArray(value.tenant_slugs) &&
-        value.tenant_slugs.every((tenant) => typeof tenant === 'string' && tenant.length > 0) &&
+        value.tenant_slugs.every(
+          (tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)
+        ) &&
         (value.tier_access === undefined ||
           (Array.isArray(value.tier_access) &&
             value.tier_access.every(

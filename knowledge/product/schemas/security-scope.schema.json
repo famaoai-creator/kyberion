@@ -6,7 +6,11 @@
   "additionalProperties": false,
   "required": ["tenant_id", "mission_id", "read_tiers", "write_tier", "purpose"],
   "properties": {
-    "tenant_id": { "type": "string", "minLength": 1 },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "organization_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },

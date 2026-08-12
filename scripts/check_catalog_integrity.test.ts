@@ -1,155 +1,215 @@
-import { spawnSync } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { afterEach, describe, expect, it } from 'vitest';
+  collectThemeCatalogViolations,
+  collectUndefinedKeyReferenceViolations,
+  collectVocabularyCatalogViolations,
+  type ThemeEntryShape,
+} from './check_catalog_integrity.js';
 
-const ROOT = pathResolver.rootDir();
-const THEMES_PATH = pathResolver.rootResolve(
-  'knowledge/public/design-patterns/media-templates/themes.json'
-);
-const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-const UNDEFINED_KEY_FIXTURE_PATH = pathResolver.rootResolve(
-  'tests/fixtures/i18n-undefined-key-reference.fixture.ts'
-);
+/**
+ * These suites used to inject drift by editing the repository's real
+ * `themes.json` / `user-facing-vocabulary.json`, re-running the checker as a
+ * subprocess, then restoring the files. `describe.sequential` ordered the tests
+ * inside this file, but vitest runs files in parallel — so the interference went
+ * both ways: another suite could read a catalog while it was deliberately
+ * broken, and residue another suite left under `knowledge/` could make the
+ * checker report a violation this file never injected. The result was three
+ * tests that passed alone and failed in a full run.
+ *
+ * The checker now exposes its validation logic as pure functions over supplied
+ * data (the shape `check_mission_gate_docs.ts` already uses), so the drift cases
+ * assert on fixtures and touch nothing shared.
+ *
+ * There is deliberately **no** "the repository is currently clean" test here.
+ * That is a global-state assertion, and 36 test files legitimately write under
+ * `knowledge/` during a run, so inside a parallel suite it measures transient
+ * churn rather than the repository. It was flaky even with `retry: 2`. The claim
+ * belongs where it can hold: CI runs `pnpm run check:catalogs` as its own
+ * serial step ("Check knowledge catalogs & index freshness"), and `pnpm validate`
+ * includes it. Removing it here moves the assertion to where it is valid instead
+ * of dropping it.
+ */
+const EXPECTED_THEMES: Record<string, ThemeEntryShape> = {
+  'kyberion-standard': {
+    colors: { accent: '#112233', background: '#000000' },
+    fonts: { body: 'Inter' },
+  },
+  'kyberion-sovereign': {
+    colors: { accent: '#445566', background: '#111111' },
+    fonts: { body: 'Inter' },
+  },
+};
 
-function withSudo(fn: () => void): void {
-  withExecutionContext('mission_controller', () => {
-    const previousSudo = process.env.KYBERION_SUDO;
-    process.env.KYBERION_SUDO = 'true';
-    try {
-      fn();
-    } finally {
-      if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
-      else process.env.KYBERION_SUDO = previousSudo;
-    }
-  });
-}
-
-function runCheckCatalogIntegrity(): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync(
-    process.execPath,
-    ['--import', './scripts/ts-loader.mjs', 'scripts/check_catalog_integrity.ts'],
-    {
-      cwd: ROOT,
-      encoding: 'utf8',
-    }
-  );
-
+function themeCatalog(overrides: Partial<Record<string, ThemeEntryShape>> = {}) {
   return {
-    status: result.status,
-    stdout: result.stdout || '',
-    stderr: result.stderr || '',
+    default_theme: 'kyberion-standard',
+    themes: {
+      'kyberion-standard': structuredClone(EXPECTED_THEMES['kyberion-standard']),
+      'kyberion-sovereign': structuredClone(EXPECTED_THEMES['kyberion-sovereign']),
+      ...overrides,
+    },
   };
 }
 
-describe.sequential('check_catalog_integrity', () => {
-  let originalThemesJson = '';
-  let originalVocabularyJson = '';
-
-  afterEach(() => {
-    withSudo(() => {
-      if (originalThemesJson) {
-        safeWriteFile(THEMES_PATH, originalThemesJson);
-      }
-      if (originalVocabularyJson) {
-        safeWriteFile(VOCABULARY_PATH, originalVocabularyJson);
-      }
-      if (safeExistsSync(UNDEFINED_KEY_FIXTURE_PATH)) {
-        safeRmSync(UNDEFINED_KEY_FIXTURE_PATH, { force: true });
-      }
-    });
-    originalThemesJson = '';
-    originalVocabularyJson = '';
-  });
-
-  // Asserts GLOBAL repo state; parallel suites legitimately mutate knowledge/
-  // and mission dirs mid-run, so retry to let transient churn settle.
-  it('passes on the current repository state', { retry: 2 }, () => {
-    const result = runCheckCatalogIntegrity();
-
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[check:catalogs] OK');
-  });
-
-  it('flags drift when the kyberion token theme changes', () => {
-    withExecutionContext('mission_controller', () => {
-      const previousSudo = process.env.KYBERION_SUDO;
-      process.env.KYBERION_SUDO = 'true';
-      try {
-        originalThemesJson = String(safeReadFile(THEMES_PATH, { encoding: 'utf8' }) || '');
-        const payload = JSON.parse(originalThemesJson) as {
-          themes?: Record<string, { colors?: Record<string, string> }>;
-        };
-        const kyberionStandard = payload.themes?.['kyberion-standard'];
-        if (!kyberionStandard?.colors) {
-          throw new Error('kyberion-standard colors missing');
-        }
-        kyberionStandard.colors.accent = '#ff0000';
-        safeWriteFile(THEMES_PATH, `${JSON.stringify(payload, null, 2)}\n`);
-      } finally {
-        if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
-        else process.env.KYBERION_SUDO = previousSudo;
-      }
+describe('check_catalog_integrity', () => {
+  describe('theme catalog drift', () => {
+    it('accepts a catalog that reproduces the generated tokens', () => {
+      expect(
+        collectThemeCatalogViolations({
+          label: 'themes.json',
+          catalog: themeCatalog(),
+          expectedThemes: EXPECTED_THEMES,
+          isRootThemesCatalog: true,
+        })
+      ).toEqual([]);
     });
 
-    const result = runCheckCatalogIntegrity();
+    it('flags drift when the kyberion token theme changes', () => {
+      const drifted = themeCatalog({
+        'kyberion-standard': {
+          colors: { accent: '#ff0000', background: '#000000' },
+          fonts: { body: 'Inter' },
+        },
+      });
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('design-tokens:');
-    expect(result.stderr).toContain('kyberion-standard drift');
-  });
+      const violations = collectThemeCatalogViolations({
+        label: 'themes.json',
+        catalog: drifted,
+        expectedThemes: EXPECTED_THEMES,
+        isRootThemesCatalog: true,
+      });
 
-  // I18N-02: a key missing a required locale must fail check:catalogs (the
-  // pre-I18N-02 check only looked at default_locale, so a ja-less key
-  // silently passed).
-  it('flags a catalog key missing a required locale', () => {
-    withSudo(() => {
-      originalVocabularyJson = String(safeReadFile(VOCABULARY_PATH, { encoding: 'utf8' }) || '');
-      const payload = JSON.parse(originalVocabularyJson) as {
-        domains: Record<string, Record<string, Record<string, string>>>;
-      };
-      delete payload.domains.cli.cli_readiness.ja;
-      safeWriteFile(VOCABULARY_PATH, `${JSON.stringify(payload, null, 2)}\n`);
+      expect(violations).toContain('design-tokens: themes.json kyberion-standard drift');
     });
 
-    const result = runCheckCatalogIntegrity();
+    it('flags a missing default_theme only on the flat catalog', () => {
+      const catalog = { ...themeCatalog(), default_theme: 'something-else' };
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(
-      'user-facing-vocabulary: cli.cli_readiness must define required locale "ja"'
-    );
+      expect(
+        collectThemeCatalogViolations({
+          label: 'themes.json',
+          catalog,
+          expectedThemes: EXPECTED_THEMES,
+          isRootThemesCatalog: true,
+        })
+      ).toContain('design-tokens: themes.json default_theme must be kyberion-standard');
+
+      // The decomposed copy under themes/ inherits default_theme, so the same
+      // value must not be reported there.
+      expect(
+        collectThemeCatalogViolations({
+          label: 'themes/themes.json',
+          catalog,
+          expectedThemes: EXPECTED_THEMES,
+          isRootThemesCatalog: false,
+        })
+      ).toEqual([]);
+    });
   });
 
-  // I18N-02: a t()/uxText()/uxLabel()/renderVocabularyText() reference to a
-  // key absent from the catalog must fail check:catalogs (the forward half
-  // of the bidirectional code<->catalog cross-check).
-  //
-  // The fixture's function name is built from a variable (not written
-  // literally as `renderVocabularyText(` in this file's own source) so that
-  // check_catalog_integrity's own scan of scripts/*.ts does not mistake
-  // *this test's source code* for a real reference — it should only find
-  // the reference in the fixture file this test writes at runtime.
-  it('flags a code reference to an undefined vocabulary key', () => {
-    const vocabFnName = ['render', 'VocabularyText'].join('');
-    withSudo(() => {
-      safeWriteFile(
-        UNDEFINED_KEY_FIXTURE_PATH,
-        `import { ${vocabFnName} } from '@agent/core';\n` +
-          `export const label = ${vocabFnName}('this_key_does_not_exist_in_the_catalog');\n`
+  describe('vocabulary catalog', () => {
+    const catalog = () => ({
+      default_locale: 'en',
+      required_locales: ['en', 'ja'],
+      domains: {
+        cli: {
+          cli_readiness: { en: 'Ready', ja: '準備完了' },
+        },
+      },
+    });
+
+    it('accepts a catalog with every required locale present', () => {
+      expect(collectVocabularyCatalogViolations(catalog())).toEqual([]);
+    });
+
+    // I18N-02: a key missing a required locale must fail check:catalogs (the
+    // pre-I18N-02 check only looked at default_locale, so a ja-less key
+    // silently passed).
+    it('flags a catalog key missing a required locale', () => {
+      const payload = catalog();
+      delete (payload.domains.cli.cli_readiness as Record<string, string>).ja;
+
+      expect(collectVocabularyCatalogViolations(payload)).toContain(
+        'user-facing-vocabulary: cli.cli_readiness must define required locale "ja"'
       );
     });
 
-    const result = runCheckCatalogIntegrity();
+    it('flags placeholders that differ between locales', () => {
+      const payload = catalog();
+      payload.domains.cli.cli_readiness = { en: 'Ready {name}', ja: '準備完了' };
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(
-      'references undefined key "this_key_does_not_exist_in_the_catalog"'
-    );
+      expect(collectVocabularyCatalogViolations(payload).join('\n')).toContain(
+        'placeholders differ between "en" (name) and "ja" (none)'
+      );
+    });
+
+    it('flags a default_locale outside required_locales', () => {
+      const payload = { ...catalog(), default_locale: 'fr' };
+
+      expect(collectVocabularyCatalogViolations(payload)).toContain(
+        'user-facing-vocabulary: default_locale "fr" must be a member of required_locales'
+      );
+    });
+  });
+
+  describe('code → catalog references', () => {
+    // The fixture's function name is assembled from parts so that the checker's
+    // own scan of scripts/*.ts does not read *this test's source* as a real
+    // reference to a nonexistent key.
+    const vocabFnName = ['render', 'VocabularyText'].join('');
+    const resolveKey = (key: string) => (key === 'known_key' ? { en: 'Known' } : undefined);
+
+    // I18N-02: a t()/uxText()/uxLabel()/renderVocabularyText() reference to a
+    // key absent from the catalog must fail check:catalogs (the forward half of
+    // the bidirectional code<->catalog cross-check).
+    it('flags a code reference to an undefined vocabulary key', () => {
+      const violations = collectUndefinedKeyReferenceViolations(
+        {
+          'tests/fixtures/example.ts': `export const label = ${vocabFnName}('this_key_does_not_exist_in_the_catalog');`,
+        },
+        resolveKey
+      );
+
+      expect(violations).toEqual([
+        'user-facing-vocabulary: tests/fixtures/example.ts references undefined key "this_key_does_not_exist_in_the_catalog"',
+      ]);
+    });
+
+    it('accepts a reference to a key that resolves', () => {
+      expect(
+        collectUndefinedKeyReferenceViolations(
+          { 'tests/fixtures/example.ts': `${vocabFnName}('known_key')` },
+          resolveKey
+        )
+      ).toEqual([]);
+    });
+
+    it('reads the bare t() form only in scripts/cli.ts', () => {
+      const source = "t('this_key_does_not_exist_in_the_catalog')";
+
+      expect(
+        collectUndefinedKeyReferenceViolations({ 'scripts/cli.ts': source }, resolveKey)
+      ).toHaveLength(1);
+      // Elsewhere `t(` is too common a helper name to treat as a catalog lookup.
+      expect(
+        collectUndefinedKeyReferenceViolations({ 'libs/core/other.ts': source }, resolveKey)
+      ).toEqual([]);
+      expect(
+        collectUndefinedKeyReferenceViolations({ 'scripts\\cli.ts': source }, resolveKey)
+      ).toHaveLength(1);
+    });
+
+    it('reports an ambiguous key with the resolver error', () => {
+      const violations = collectUndefinedKeyReferenceViolations(
+        { 'tests/fixtures/example.ts': `${vocabFnName}('ambiguous_key')` },
+        () => {
+          throw new Error('matches 2 domains');
+        }
+      );
+
+      expect(violations.join('\n')).toContain(
+        'references ambiguous key "ambiguous_key" (matches 2 domains)'
+      );
+    });
   });
 });

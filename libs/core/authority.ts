@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // secure-io) that hit TDZ errors during module evaluation and silently broke
 // resolveIdentityContext. Read-only bootstrap IO goes through fs-primitives.
 import { rawExistsSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
@@ -294,7 +295,7 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
   if (!value) return undefined;
   const trimmed = String(value).trim();
   if (!trimmed) return undefined;
-  return /^[a-z][a-z0-9-]{1,30}$/.test(trimmed) ? trimmed : undefined;
+  return isValidTenantSlug(trimmed) ? trimmed : undefined;
 }
 
 // ---------------------------------------------------------------------------

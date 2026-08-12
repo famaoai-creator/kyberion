@@ -21,8 +21,11 @@ declares a **tier** directly instead of a literal file path:
   this field, it does not sniff a path. If any entry's tier outweighs the requested tier, the
   mission's own execution tier is raised to match (see "ミッション・ティアの継承" in
   [knowledge-protocol.md](../governance/knowledge-protocol.md)).
-- `project` — required scoping when `tier` is `confidential`; matches
-  `knowledge/confidential/{project}/`.
+- `project` — required scoping when `tier` is `confidential`; it is the tenant slug segment of
+  `knowledge/confidential/{tenant-slug}/`. The field name is historical: that segment is a
+  **tenant** (a confidentiality boundary resolved from the tenant registry), not a project. A
+  project sits one level inside the organization inside the tenant
+  ([entity-scope-hierarchy](../architecture/entity-scope-hierarchy.md)).
 - `domains` / `tags` — used at runtime to resolve which files actually match, via
   `knowledge-index.ts`'s scoped search (`KnowledgeScope`) or the `knowledge/product/hints/*.json`
   tag catalog. Not resolved at template-authoring time.

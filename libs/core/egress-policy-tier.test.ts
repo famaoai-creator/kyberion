@@ -96,6 +96,20 @@ describe('confidential material', () => {
     expect(decision.verdict).toBe('deny');
   });
 
+  it('rejects a tier or shared partition name as a tenant', () => {
+    writePolicy({
+      version: '1',
+      mode: 'warn',
+      tenant_allowed_domains: { public: ['reserved.example'] },
+    });
+    const decision = evaluateEgressPolicy('https://reserved.example/upload', {
+      tier: 'confidential',
+      tenant_slug: 'public',
+    });
+    expect(decision.verdict).toBe('deny');
+    expect(decision.reason).toContain('TENANT_SCOPE_INVALID');
+  });
+
   it('still honours the blocklist above any tenant approval', () => {
     writePolicy({
       version: '1',

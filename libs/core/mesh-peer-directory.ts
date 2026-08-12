@@ -1,6 +1,7 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshCapabilityAdvertisement,
   MeshPeerPresence,
@@ -107,7 +108,9 @@ function latestCapabilityKey(record: MeshCapabilityAdvertisement): string {
   return `${record.peer_id}::${record.capability_id}`;
 }
 
-function latestCapabilityAds(records: MeshCapabilityAdvertisement[]): Map<string, MeshCapabilityAdvertisement> {
+function latestCapabilityAds(
+  records: MeshCapabilityAdvertisement[]
+): Map<string, MeshCapabilityAdvertisement> {
   const latest = new Map<string, MeshCapabilityAdvertisement>();
   for (const record of records) {
     latest.set(latestCapabilityKey(record), record);
@@ -134,13 +137,18 @@ function normalizeSelector(selector: MeshTargetSelector): MeshTargetSelector {
   }
 }
 
-function currentPresence(now: string, presence: MeshPeerPresence | undefined): MeshPeerPresence | null {
+function currentPresence(
+  now: string,
+  presence: MeshPeerPresence | undefined
+): MeshPeerPresence | null {
   if (!presence) return null;
   if (presence.expires_at <= now) return null;
   return presence;
 }
 
-function normalizeHeartbeatCapacity(capacity?: Partial<MeshPeerPresenceCapacity>): MeshPeerPresenceCapacity {
+function normalizeHeartbeatCapacity(
+  capacity?: Partial<MeshPeerPresenceCapacity>
+): MeshPeerPresenceCapacity {
   return {
     accepting_new_work: capacity?.accepting_new_work ?? true,
     available_slots: capacity?.available_slots ?? 1,
@@ -161,20 +169,33 @@ function loadCapabilities(): MeshCapabilityAdvertisement[] {
 }
 
 function appendRegistration(record: MeshPeerRegistration): string {
-  return appendGovernedArtifactJsonl('infrastructure_sentinel', runtimePath('registrations.jsonl'), record);
+  return appendGovernedArtifactJsonl(
+    'infrastructure_sentinel',
+    runtimePath('registrations.jsonl'),
+    record
+  );
 }
 
 function appendPresence(record: MeshPeerPresence): string {
-  return appendGovernedArtifactJsonl('infrastructure_sentinel', runtimePath('presence.jsonl'), record);
+  return appendGovernedArtifactJsonl(
+    'infrastructure_sentinel',
+    runtimePath('presence.jsonl'),
+    record
+  );
 }
 
 function appendCapability(record: MeshCapabilityAdvertisement): string {
-  return appendGovernedArtifactJsonl('infrastructure_sentinel', runtimePath('capabilities.jsonl'), record);
+  return appendGovernedArtifactJsonl(
+    'infrastructure_sentinel',
+    runtimePath('capabilities.jsonl'),
+    record
+  );
 }
 
 function resolveBootstrapPeer(peerId: string): MeshPeerDirectoryEntry | null {
   const catalog = loadPeerNetworkCatalog();
-  const peer = catalog?.peers?.find((entry: PeerNetworkPeerRecord) => entry.peer_id === peerId) || null;
+  const peer =
+    catalog?.peers?.find((entry: PeerNetworkPeerRecord) => entry.peer_id === peerId) || null;
   if (!peer) return null;
 
   return {
@@ -191,7 +212,7 @@ function resolveBootstrapPeer(peerId: string): MeshPeerDirectoryEntry | null {
 function buildDirectoryEntry(
   registration: MeshPeerRegistration,
   presence: MeshPeerPresence | null,
-  capabilities: MeshCapabilityAdvertisement[],
+  capabilities: MeshCapabilityAdvertisement[]
 ): MeshPeerDirectoryEntry {
   return {
     peer_id: registration.peer_id,
@@ -216,10 +237,17 @@ function buildAllDirectoryEntries(now?: string | Date): MeshPeerDirectoryEntry[]
 
   return [...registrations.values()]
     .map((registration) => {
-      const presence = currentPresence(normalizedNow, presences.get(registration.peer_id) || undefined);
+      const presence = currentPresence(
+        normalizedNow,
+        presences.get(registration.peer_id) || undefined
+      );
       const capabilities = [...capabilityMap.values()]
         .filter((record) => record.peer_id === registration.peer_id)
-        .sort((left, right) => left.capability_id.localeCompare(right.capability_id) || left.version.localeCompare(right.version));
+        .sort(
+          (left, right) =>
+            left.capability_id.localeCompare(right.capability_id) ||
+            left.version.localeCompare(right.version)
+        );
       return buildDirectoryEntry(registration, presence, capabilities);
     })
     .sort((left, right) => left.peer_id.localeCompare(right.peer_id));
@@ -232,25 +260,26 @@ function getCurrentSnapshot(peerId: string): MeshPeerDirectoryEntry | null {
     return resolveBootstrapPeer(peerId);
   }
 
-  const presence = currentPresence(normalizeIso(), latestByPeerId(loadPresence()).get(peerId) || undefined);
+  const presence = currentPresence(
+    normalizeIso(),
+    latestByPeerId(loadPresence()).get(peerId) || undefined
+  );
   const capabilityMap = latestCapabilityAds(loadCapabilities());
   const capabilities = [...capabilityMap.values()].filter((record) => record.peer_id === peerId);
   return buildDirectoryEntry(registration, presence, capabilities);
 }
 
-function peerMatchesSelector(
-  entry: MeshPeerDirectoryEntry,
-  selector: MeshTargetSelector,
-): boolean {
+function peerMatchesSelector(entry: MeshPeerDirectoryEntry, selector: MeshTargetSelector): boolean {
   switch (selector.kind) {
     case 'peer':
       return entry.peer_id === selector.peer_id;
     case 'role':
       return entry.capabilities.some((capability) => capability.roles.includes(selector.role));
     case 'capability':
-      return entry.capabilities.some((capability) =>
-        capability.capability_id === selector.capability_id &&
-        (!selector.version || capability.version === selector.version),
+      return entry.capabilities.some(
+        (capability) =>
+          capability.capability_id === selector.capability_id &&
+          (!selector.version || capability.version === selector.version)
       );
     case 'topic':
       return false;
@@ -266,7 +295,7 @@ function sameTenant(entry: MeshPeerDirectoryEntry, tenantId: string): boolean {
 function isEligibleEntry(
   entry: MeshPeerDirectoryEntry,
   selector: MeshTargetSelector,
-  policyContext: MeshPeerDirectoryPolicyContext,
+  policyContext: MeshPeerDirectoryPolicyContext
 ): boolean {
   if (!entry.tenant_id) return false;
   if (!sameTenant(entry, policyContext.tenant_id)) return false;
@@ -274,7 +303,9 @@ function isEligibleEntry(
   const presence = currentPresence(normalizeIso(policyContext.now), entry.presence || undefined);
   if (!presence) return false;
   if (policyContext.request_kind) {
-    const requestAuthorized = entry.capabilities.some((capability) => capability.request_kinds.includes(policyContext.request_kind as MeshRequestKind));
+    const requestAuthorized = entry.capabilities.some((capability) =>
+      capability.request_kinds.includes(policyContext.request_kind as MeshRequestKind)
+    );
     if (!requestAuthorized) return false;
   }
   return peerMatchesSelector(entry, selector);
@@ -291,6 +322,9 @@ export function registerMeshPeer(input: RegisterMeshPeerInput): MeshPeerRegistra
   if (!peer_id || !tenant_id || !endpoint_ref || !key_ref) {
     throw new Error('registration_missing_required_fields');
   }
+  if (!isValidTenantSlug(tenant_id)) {
+    throw new Error(`registration_invalid_tenant_id:${tenant_id}`);
+  }
 
   const registration: MeshPeerRegistration = {
     kind: 'mesh-peer-registration',
@@ -301,7 +335,9 @@ export function registerMeshPeer(input: RegisterMeshPeerInput): MeshPeerRegistra
     status: input.status || 'enrolled',
     registered_at: normalizeIso(input.registered_at),
     ...(input.revoked_at ? { revoked_at: normalizeIso(input.revoked_at) } : {}),
-    ...(input.allowed_request_kinds ? { allowed_request_kinds: [...input.allowed_request_kinds] } : {}),
+    ...(input.allowed_request_kinds
+      ? { allowed_request_kinds: [...input.allowed_request_kinds] }
+      : {}),
   };
   appendRegistration(registration);
   return registration;
@@ -312,6 +348,9 @@ export function recordMeshHeartbeat(input: RecordMeshHeartbeatInput): MeshPeerPr
   const tenant_id = String(input.tenant_id || '').trim();
   if (!peer_id || !tenant_id) {
     throw new Error('heartbeat_missing_required_fields');
+  }
+  if (!isValidTenantSlug(tenant_id)) {
+    throw new Error(`heartbeat_invalid_tenant_id:${tenant_id}`);
   }
 
   const registration = latestByPeerId(loadRegistrations()).get(peer_id) || null;
@@ -330,17 +369,23 @@ export function recordMeshHeartbeat(input: RecordMeshHeartbeatInput): MeshPeerPr
     expires_at: normalizeIso(input.expires_at),
     health: input.health || 'healthy',
     capacity: normalizeHeartbeatCapacity(input.capacity),
-    receive_modes: input.receive_modes && input.receive_modes.length ? [...input.receive_modes] : ['request'],
+    receive_modes:
+      input.receive_modes && input.receive_modes.length ? [...input.receive_modes] : ['request'],
   };
   appendPresence(presence);
   return presence;
 }
 
-export function advertiseMeshCapabilities(input: AdvertiseMeshCapabilitiesInput): MeshCapabilityAdvertisement {
+export function advertiseMeshCapabilities(
+  input: AdvertiseMeshCapabilitiesInput
+): MeshCapabilityAdvertisement {
   const peer_id = String(input.peer_id || '').trim();
   const tenant_id = String(input.tenant_id || '').trim();
   if (!peer_id || !tenant_id) {
     throw new Error('capability_advertisement_missing_required_fields');
+  }
+  if (!isValidTenantSlug(tenant_id)) {
+    throw new Error(`capability_advertisement_invalid_tenant_id:${tenant_id}`);
   }
 
   const registration = latestByPeerId(loadRegistrations()).get(peer_id) || null;
@@ -395,7 +440,7 @@ export function resolveMeshPeer(peerId: string): MeshPeerDirectoryEntry | null {
 
 export function listEligibleMeshPeers(
   selector: MeshTargetSelector,
-  policyContext: MeshPeerDirectoryPolicyContext,
+  policyContext: MeshPeerDirectoryPolicyContext
 ): MeshPeerDirectoryEntry[] {
   const normalizedSelector = normalizeSelector(selector);
   if (normalizedSelector.kind === 'topic') {
@@ -411,12 +456,18 @@ export function listEligibleMeshPeers(
     const presence = currentPresence(now, presences.get(registration.peer_id) || undefined);
     const capabilities = [...capabilityMap.values()]
       .filter((record) => record.peer_id === registration.peer_id)
-      .sort((left, right) => left.capability_id.localeCompare(right.capability_id) || left.version.localeCompare(right.version));
+      .sort(
+        (left, right) =>
+          left.capability_id.localeCompare(right.capability_id) ||
+          left.version.localeCompare(right.version)
+      );
     return buildDirectoryEntry(registration, presence, capabilities);
   });
 
   return entries
-    .filter((entry) => isEligibleEntry(entry, normalizedSelector, { tenant_id: policyContext.tenant_id, now }))
+    .filter((entry) =>
+      isEligibleEntry(entry, normalizedSelector, { tenant_id: policyContext.tenant_id, now })
+    )
     .sort((left, right) => left.peer_id.localeCompare(right.peer_id));
 }
 
@@ -437,7 +488,9 @@ export function expireMeshPresence(now: string | Date): MeshPeerDirectoryEntry[]
       if (!registration) {
         return null;
       }
-      const capabilities = [...capabilityMap.values()].filter((record) => record.peer_id === registration.peer_id);
+      const capabilities = [...capabilityMap.values()].filter(
+        (record) => record.peer_id === registration.peer_id
+      );
       return buildDirectoryEntry(registration, null, capabilities);
     })
     .filter((entry): entry is MeshPeerDirectoryEntry => Boolean(entry))

@@ -21,12 +21,13 @@ function buildRequest(input: {
   selector: MeshRequest['target']['selector'];
   requestKind: MeshRequest['request_kind'];
   classification?: MeshRequest['payload']['classification'];
+  tenantId?: string;
 }): MeshRequest {
   return {
     kind: 'mesh-request',
     request_id: input.requestId,
     tenant_scope: {
-      tenant_id: 'tenant-acme',
+      tenant_id: input.tenantId || 'tenant-acme',
       scope: 'same_tenant',
     },
     sender_peer_id: 'peer-sender',
@@ -52,7 +53,10 @@ function buildRequest(input: {
 describe('mesh-router', () => {
   beforeEach(() => {
     process.env.KYBERION_MESH_HUB_RUNTIME_ROOT = TEST_RUNTIME_ROOT;
-    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace('runtime', 'observability');
+    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace(
+      'runtime',
+      'observability'
+    );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshTopicRegistryNamespace();
   });
@@ -60,6 +64,19 @@ describe('mesh-router', () => {
   afterEach(() => {
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshTopicRegistryNamespace();
+  });
+
+  it('rejects a tier name before it can enter route decisions', () => {
+    expect(() =>
+      routeMeshRequest(
+        buildRequest({
+          requestId: 'req-invalid-tenant',
+          selector: { kind: 'peer', peer_id: 'peer-a1' },
+          requestKind: 'review.request',
+          tenantId: 'public',
+        })
+      )
+    ).toThrow(/invalid_mesh_request_tenant_id/i);
   });
 
   it('routes an exact peer only when the peer is enrolled, present, and capability-authorized', () => {
@@ -95,7 +112,7 @@ describe('mesh-router', () => {
         },
         requestKind: 'review.request',
       }),
-      { now: '2026-06-24T00:03:00.000Z' },
+      { now: '2026-06-24T00:03:00.000Z' }
     );
 
     expect(decision.decision).toBe('direct');
@@ -172,12 +189,15 @@ describe('mesh-router', () => {
         },
         requestKind: 'review.request',
       }),
-      { now: '2026-06-24T00:03:00.000Z' },
+      { now: '2026-06-24T00:03:00.000Z' }
     );
 
     expect(decision.decision).toBe('requires_operator_selection');
     expect(decision.selected_peer_ids).toEqual([]);
-    expect(decision.candidates.map((candidate) => candidate.peer_id)).toEqual(['peer-b1', 'peer-a1']);
+    expect(decision.candidates.map((candidate) => candidate.peer_id)).toEqual([
+      'peer-b1',
+      'peer-a1',
+    ]);
     expect(decision.reason_codes).toContain('requires_operator_selection');
   });
 
@@ -241,7 +261,7 @@ describe('mesh-router', () => {
         policy_version: '1.0.0',
         authority_role: 'infrastructure_sentinel',
       },
-      { namespace: '' },
+      { namespace: '' }
     );
     subscribeMeshTopic(
       {
@@ -257,7 +277,7 @@ describe('mesh-router', () => {
         policy_version: '1.0.0',
         authority_role: 'infrastructure_sentinel',
       },
-      { namespace: '' },
+      { namespace: '' }
     );
 
     const decision = routeMeshRequest(
@@ -273,7 +293,7 @@ describe('mesh-router', () => {
       {
         now: '2026-06-24T00:03:00.000Z',
         maxFanOut: 2,
-      },
+      }
     );
 
     expect(decision.decision).toBe('fan_out');
@@ -294,7 +314,7 @@ describe('mesh-router', () => {
       {
         now: '2026-06-24T00:03:00.000Z',
         maxFanOut: 1,
-      },
+      }
     );
 
     expect(rejectedDecision.decision).toBe('rejected');

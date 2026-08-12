@@ -39,9 +39,10 @@ import {
   safeReaddir,
   safeStat,
   listProjectRecords,
+  isValidTenantSlug,
+  TENANT_SLUG_PATTERN,
 } from '@agent/core';
 
-export const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
 const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
@@ -200,10 +201,10 @@ export function evaluateTenantConsistency(
 
   for (const row of rows) {
     const excepted = row.exception != null;
-    if (!TENANT_SLUG_RE.test(row.slug)) {
+    if (!isValidTenantSlug(row.slug)) {
       if (!excepted) {
         violations.push(
-          `'${row.slug}' is not a valid tenant slug (${TENANT_SLUG_RE.source}) and has no documented exception`
+          `'${row.slug}' is not a valid tenant slug (${TENANT_SLUG_PATTERN.source}) and has no documented exception`
         );
       }
       continue;

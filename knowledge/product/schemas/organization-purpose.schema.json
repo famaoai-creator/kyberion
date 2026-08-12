@@ -36,7 +36,11 @@
       }
     },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "owner_role": { "type": "string", "minLength": 1 },
     "approval_state": {
       "type": "string",

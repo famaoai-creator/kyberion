@@ -27,7 +27,11 @@
       "properties": {
         "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
         "mission_id": { "type": "string", "minLength": 1 },
-        "tenant_slug": { "type": "string", "minLength": 1 },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "project_id": { "type": "string", "minLength": 1 },
         "track_id": { "type": "string", "minLength": 1 },
         "task_session_id": { "type": "string", "minLength": 1 },
@@ -39,7 +43,11 @@
       "type": "object",
       "required": ["tenant_id", "mission_id", "read_tiers", "write_tier", "purpose"],
       "properties": {
-        "tenant_id": { "type": "string", "minLength": 1 },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "organization_id": { "type": "string", "minLength": 1 },
         "project_id": { "type": "string", "minLength": 1 },
         "mission_id": { "type": "string", "minLength": 1 },
@@ -96,8 +104,16 @@
         "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
         "status": { "type": "string", "minLength": 1 },
         "assigned_persona": { "type": "string", "minLength": 1 },
-        "tenant_id": { "type": "string", "minLength": 1 },
-        "tenant_slug": { "type": "string", "minLength": 1 },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "vision_ref": { "type": "string" },
         "execution_mode": { "type": "string" },
         "priority": { "type": "number" },
@@ -117,7 +133,11 @@
         "summary": { "type": "string", "minLength": 1 },
         "status": { "type": "string", "enum": ["draft", "active", "paused", "archived"] },
         "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-        "tenant_slug": { "type": "string", "minLength": 1 },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "project_path": { "type": "string", "minLength": 1 },
         "current_phase": {
           "type": "string",
@@ -383,7 +403,10 @@
           "summary": { "type": "string" },
           "captured_at": { "type": "string" },
           "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-          "tenant_slug": { "type": "string" }
+          "tenant_slug": {
+            "type": "string",
+            "not": { "enum": ["public", "confidential", "personal", "shared"] }
+          }
         },
         "additionalProperties": true
       }

@@ -3,7 +3,7 @@ title: Multi-Tenant Operations
 category: Architecture
 tags: [multi-tenant, isolation, tier, governance, audit, operations]
 importance: 8
-last_updated: 2026-04-27
+last_updated: 2026-08-12
 ---
 
 # Multi-Tenant Operations
@@ -28,6 +28,24 @@ In Kyberion this maps cleanly to:
 
 It does **not** map to a separate code repository — the same code base
 serves all tenants, only the data and authority layers differ.
+
+Three neighbouring concepts are **not** tenants, and confusing them puts records
+on the wrong side of this boundary
+([stance-tenant-customer-model](./stance-tenant-customer-model.md)):
+
+- A **stance** (`customer/{slug}/` + `KYBERION_CUSTOMER`) is runtime configuration
+  for which entity Kyberion is acting as. It selects which tenants are in view; it
+  is not itself a boundary.
+- A **tenant's own end customers** live inside that tenant at
+  `knowledge/confidential/{tenant-slug}/customers/`, deliberately not deduplicated
+  across tenants.
+- A **tier or partition name** (`public`, `confidential`, `personal`, `shared`) is
+  an orthogonal axis and can never be a `tenant_slug` (`RESERVED_SCOPE_NAMES` in
+  `libs/core/entity-scope.ts`).
+
+Inside the boundary, the containment order is
+`tenant_slug → organization_id → project_id → mission_id → task_id → session`
+([entity-scope-hierarchy](./entity-scope-hierarchy.md)).
 
 ## 2. Isolation Layers
 

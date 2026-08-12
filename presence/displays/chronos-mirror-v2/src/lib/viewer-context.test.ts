@@ -39,6 +39,16 @@ describe('viewer-context', () => {
     ).toThrow(/tenant-b/);
   });
 
+  it('rejects tier names as requested viewer tenants', async () => {
+    const { viewerScopeTenantSlugs } = await import('./viewer-context.js');
+    expect(() =>
+      viewerScopeTenantSlugs(
+        { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+        'public'
+      )
+    ).toThrow(/invalid viewer tenant scope/i);
+  });
+
   it('does not allow a viewer registration to widen the role tier policy', async () => {
     const { resolveViewerTierAccess } = await import('./viewer-context.js');
     expect(resolveViewerTierAccess('readonly', ['public', 'confidential'])).toEqual([

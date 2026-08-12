@@ -233,12 +233,20 @@ dry-runで書き込み範囲を確認してから同じコマンドを実行し�
 - **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
 - **物理的変化**:
   - `customer/{slug}/connections/*.json` が候補として生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` になります。
-  - `customer/{slug}/tenants/*.json` が 1 件ずつ生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/*.json` になります。
+  - `customer/{slug}/tenants/*.json` が 1 件ずつ生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/*.json` になります。これは**テナントプロファイル**（機密境界が存在するという宣言 — slug・表示名・status・自分の役割・knowledge root の位置）であり、テナントのデータ自体ではありません。データは `knowledge/confidential/{tenant-slug}/` 側にあります。
   - `customer/{slug}/onboarding/tutorial-plan.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/tutorial-plan.md` になります。
 
 ### Stage 12: 運用コンテキストの確定
 
-会社・顧客オンボーディング後は、最初の仕事を作る前に customer・tenant・organization の対応を確認します。
+会社・顧客オンボーディング後は、最初の仕事を作る前に customer・tenant・organization の対応を確認します。ここで 3 つの別物が結び付けられるので、先に区別しておきます:
+
+| 何を指すか                             | 役割                                                             | 置き場                                          |
+| -------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定**   | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
+| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**               | `knowledge/confidential/{tenant-slug}/`         |
+| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル   | `active/organizations/{tier}/{tenant}/{org_id}` |
+
+`customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`customer/{slug}/` には置きません。
 
 ```bash
 pnpm onboarding:context bind \

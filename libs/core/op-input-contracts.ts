@@ -872,7 +872,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         type: 'object',
         required: ['tenant_slug', 'source_system', 'source_params'],
         properties: {
-          tenant_slug: { type: 'string', minLength: 1 },
+          tenant_slug: {
+            type: 'string',
+            minLength: 1,
+            not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+          },
           source_system: { type: 'string', enum: ['box', 'slack', 'confluence'] },
           source_params: { type: 'object' },
           auth: { type: 'string', enum: ['none', 'secret-guard'] },
@@ -949,7 +953,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
             type: 'object',
             required: ['relative_path'],
             properties: {
-              tenant_slug: { type: 'string', minLength: 1 },
+              tenant_slug: {
+                type: 'string',
+                minLength: 1,
+                not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+              },
               relative_path: { type: 'string', minLength: 1 },
             },
             additionalProperties: true,
@@ -1015,7 +1023,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         type: 'object',
         required: ['tenant_slug', 'normalized'],
         properties: {
-          tenant_slug: { type: 'string', minLength: 1 },
+          tenant_slug: {
+            type: 'string',
+            minLength: 1,
+            not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+          },
           normalized: {
             type: 'object',
             required: ['target_path', 'frontmatter', 'card_markdown'],
@@ -1081,7 +1093,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         type: 'object',
         required: ['tenant_slug'],
         properties: {
-          tenant_slug: { type: 'string', minLength: 1 },
+          tenant_slug: {
+            type: 'string',
+            minLength: 1,
+            not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+          },
           current_sources: {
             type: 'array',
             items: {

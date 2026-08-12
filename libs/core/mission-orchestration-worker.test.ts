@@ -205,6 +205,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { safeExistsSync, safeRmSync } = await import('./secure-io.js');
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
+    // The mission fixture declares a project_path, so dispatch materialises a
+    // project workspace next to the mission. Removing only the mission left it
+    // behind, and every run seeded an unregistered workspace that
+    // check:entity-governance then reported as drift (EG-14).
+    const { pathResolver } = await import('./path-resolver.js');
+    const projectWorkspace = pathResolver.rootResolve('active/projects/public/shared/MSN-FOLLOWUP');
+    if (safeExistsSync(projectWorkspace)) {
+      safeRmSync(projectWorkspace, { recursive: true, force: true });
+    }
     const observabilityDir = process.env.KYBERION_TEST_OBSERVABILITY_DIR;
     if (observabilityDir && safeExistsSync(observabilityDir)) safeRmSync(observabilityDir);
     delete process.env.KYBERION_TEST_OBSERVABILITY_DIR;

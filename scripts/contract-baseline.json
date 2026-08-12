@@ -279,7 +279,7 @@
     },
     {
       "actuator_id": "voice-actuator",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "ops": [
         "collect_and_register_voice_profile",
         "collect_voice_samples",
@@ -295,7 +295,7 @@
         "verify_tts_loopback"
       ],
       "contract_schema": "schemas/voice-action.schema.json",
-      "contract_schema_sha256": "15aeb633b0001c3199abcb8924eaa69d7aa4e957a197fe2d07d799f7e719912e"
+      "contract_schema_sha256": "ceb732326e672b84ecac029a8683d7929348cd3fe1edfc5e473937eb62687d26"
     },
     {
       "actuator_id": "wisdom-actuator",

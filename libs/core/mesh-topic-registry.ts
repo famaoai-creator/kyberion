@@ -3,6 +3,7 @@ import * as crypto from 'node:crypto';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { listEligibleMeshPeers } from './mesh-peer-directory.js';
 import type {
   MeshPayloadClassification,
@@ -14,7 +15,10 @@ const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/mesh-hub';
 const DEFAULT_POLICY_VERSION = '1.0.0';
 const DEFAULT_WRITER_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
-const ALLOWED_SUBSCRIPTION_AUTHORITIES = new Set<GovernedArtifactRole>(['infrastructure_sentinel', 'mission_controller']);
+const ALLOWED_SUBSCRIPTION_AUTHORITIES = new Set<GovernedArtifactRole>([
+  'infrastructure_sentinel',
+  'mission_controller',
+]);
 
 export interface MeshTopicRegistryPolicyContext {
   tenant_id: string;
@@ -157,6 +161,9 @@ function normalizeSubscription(input: MeshTopicSubscriptionInput): MeshTopicSubs
   if (!tenant_id || !topic || !peer_id) {
     throw new Error('topic_subscription_missing_required_fields');
   }
+  if (!isValidTenantSlug(tenant_id)) {
+    throw new Error(`topic_subscription_invalid_tenant_id:${tenant_id}`);
+  }
   if (!ALLOWED_SUBSCRIPTION_AUTHORITIES.has(input.authority_role)) {
     throw new Error(`topic_subscription_authority_denied:${input.authority_role}`);
   }
@@ -184,7 +191,7 @@ function isActiveSubscription(subscription: MeshTopicSubscription, now: string):
 
 function matchesSubscription(
   subscription: MeshTopicSubscription,
-  context: MeshTopicRegistryPolicyContext,
+  context: MeshTopicRegistryPolicyContext
 ): boolean {
   return (
     subscription.tenant_id === context.tenant_id &&
@@ -194,7 +201,10 @@ function matchesSubscription(
   );
 }
 
-export function subscribeMeshTopic(input: MeshTopicSubscriptionInput, options: { namespace?: string } = {}): MeshTopicSubscription {
+export function subscribeMeshTopic(
+  input: MeshTopicSubscriptionInput,
+  options: { namespace?: string } = {}
+): MeshTopicSubscription {
   const subscription = normalizeSubscription(input);
   const namespace = options.namespace || '';
   appendRecord(DEFAULT_WRITER_ROLE, subscriptionsPath(namespace), subscription);
@@ -213,7 +223,7 @@ export function subscribeMeshTopic(input: MeshTopicSubscriptionInput, options: {
 
 export function listMeshTopicSubscriptions(
   filter: MeshTopicSubscriptionFilter = {},
-  options: { namespace?: string; now?: string | Date } = {},
+  options: { namespace?: string; now?: string | Date } = {}
 ): MeshTopicSubscription[] {
   const namespace = options.namespace || '';
   const now = normalizeIso(options.now);
@@ -230,8 +240,11 @@ export function listMeshTopicSubscriptions(
 
 export function resolveMeshTopicRecipients(
   context: MeshTopicRegistryPolicyContext,
-  options: MeshTopicResolutionOptions = {},
+  options: MeshTopicResolutionOptions = {}
 ): MeshTopicResolution {
+  if (!context.tenant_id || !isValidTenantSlug(context.tenant_id)) {
+    throw new Error(`invalid_mesh_topic_tenant_id:${String(context.tenant_id || '')}`);
+  }
   const namespace = options.namespace || '';
   const policyVersion = options.policyVersion || DEFAULT_POLICY_VERSION;
   const fanOutLimit = Math.max(1, Math.floor(options.maxFanOut || 1));
@@ -266,7 +279,7 @@ export function resolveMeshTopicRecipients(
         tenant_id: context.tenant_id,
         now,
         request_kind: context.request_kind,
-      },
+      }
     );
 
     if (!eligiblePeers.length) {
@@ -369,7 +382,8 @@ export function resolveMeshTopicRecipients(
     selected_peer_ids,
     candidates,
     exclusions,
-    reason_codes: decision === 'fan_out' ? ['explicit_subscription', 'fan_out'] : ['explicit_subscription'],
+    reason_codes:
+      decision === 'fan_out' ? ['explicit_subscription', 'fan_out'] : ['explicit_subscription'],
     fan_out_limit: fanOutLimit,
     resolved_at: now,
   };
@@ -378,7 +392,9 @@ export function resolveMeshTopicRecipients(
 export function clearMeshTopicRegistryNamespace(namespace?: string): void {
   const normalized = normalizeNamespace(namespace);
   const root = normalized ? `${meshHubRuntimeRoot(normalized)}` : meshHubRuntimeRoot();
-  const obsRoot = normalized ? `${meshHubObservabilityRoot(normalized)}` : meshHubObservabilityRoot();
+  const obsRoot = normalized
+    ? `${meshHubObservabilityRoot(normalized)}`
+    : meshHubObservabilityRoot();
   withExecutionContext(DEFAULT_WRITER_ROLE, () => {
     if (safeExistsSync(root)) safeRmSync(root, { recursive: true, force: true });
     if (safeExistsSync(obsRoot)) safeRmSync(obsRoot, { recursive: true, force: true });

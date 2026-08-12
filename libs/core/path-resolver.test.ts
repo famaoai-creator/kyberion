@@ -9,6 +9,7 @@ import {
   toRepoRelative,
   normalizeStoredPath,
   missionDir,
+  projectWorkspaceDir,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -109,5 +110,11 @@ describe('path-resolver portability helpers', () => {
 
   it('rejects flag-shaped mission ids without creating a directory', () => {
     expect(() => missionDir('--ID')).toThrow(/invalid mission id/i);
+  });
+
+  it('rejects tier names as tenant workspace segments', () => {
+    expect(() => projectWorkspaceDir('PRJ-TEST', 'confidential', 'public')).toThrow(
+      /invalid tenant slug/i
+    );
   });
 });

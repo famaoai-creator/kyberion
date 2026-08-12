@@ -5,7 +5,16 @@
   "description": "Confidential theme pack derived from a source website or HTML snapshot. Stores palette, typography, layout grid, spacing, hero structure, and other web heritage so the site can be recreated consistently.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "version", "theme_id", "brand_name", "tenant_slug", "design_system_id", "theme", "web"],
+  "required": [
+    "kind",
+    "version",
+    "theme_id",
+    "brand_name",
+    "tenant_slug",
+    "design_system_id",
+    "theme",
+    "web"
+  ],
   "properties": {
     "kind": {
       "type": "string",
@@ -25,7 +34,8 @@
     },
     "tenant_slug": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "design_system_id": {
       "type": "string",
