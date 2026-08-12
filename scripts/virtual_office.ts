@@ -30,6 +30,10 @@ import {
   composeOfficeSnapshot as composeChronosOfficeSnapshot,
   type OfficeSnapshot as ChronosOfficeSnapshot,
   loadOrganizationProfile,
+  loadOnboardingContextBinding,
+  getProjectManagementView,
+  listProjectRecords,
+  listTenants,
   listTaskSessions,
   loadAgentProfileIndex,
   resolveOrganizationOrgChart,
@@ -57,12 +61,39 @@ interface OfficeRoom {
   mission_type: string;
   status: string;
   tier: string;
+  tenant_slug: string | null;
   tasks: OfficeTask[];
+}
+
+interface OfficeTenant {
+  tenant_slug: string;
+  display_name: string;
+  status: string;
+  assigned_role: string;
+  organization_id: string | null;
+  project_count: number;
+  mission_count: number;
+}
+
+interface OfficeProject {
+  project_id: string;
+  name: string;
+  status: string;
+  tier: string;
+  tenant_slug: string | null;
+  organization_id: string | null;
+  mission_count: number | null;
+  task_session_count: number | null;
 }
 
 interface OfficeSnapshot {
   generated_at: string;
+  customer_slug: string | null;
   tenant_slug: string | null;
+  /** Explicit tenant selection; null means all tenants visible to the customer scope. */
+  tenant_scope: string | null;
+  tenants: OfficeTenant[];
+  projects: OfficeProject[];
   organization: {
     organization_id: string;
     name: string;
@@ -281,18 +312,52 @@ function missionTenantSlug(state: {
 
 function missionMatchesTenant(
   state: { tenant_slug?: string; tenant_id?: string; tier?: string },
-  tenantSlug: string | null
+  allowedTenants: Set<string> | null,
+  allowUnscoped: boolean
 ): boolean {
-  if (!tenantSlug) return true;
+  if (!allowedTenants) return true;
   const missionTenant = missionTenantSlug(state);
-  if (!missionTenant) return true;
-  return missionTenant === tenantSlug;
+  if (!missionTenant) return allowUnscoped;
+  return allowedTenants.has(missionTenant);
 }
 
 export function collectOfficeSnapshot(): OfficeSnapshot {
-  const tenantSlug = customerResolver.activeCustomer();
-  const organizationProfile = loadOrganizationProfile();
-  const organizationChartData = resolveOrganizationOrgChart(tenantSlug, pathResolver.rootDir());
+  const customerSlug = customerResolver.activeCustomer();
+  const requestedTenantSlug = normalizeTenantSlug(process.env.KYBERION_TENANT);
+  const rootDir = pathResolver.rootDir();
+  let tenantRegistryReadable = true;
+  const tenantProfiles = (() => {
+    try {
+      return listTenants({ rootDir, env: process.env });
+    } catch {
+      tenantRegistryReadable = false;
+      return [];
+    }
+  })();
+  const visibleTenantSlugs = !tenantRegistryReadable
+    ? new Set<string>()
+    : requestedTenantSlug
+      ? new Set(
+          tenantProfiles.some((profile) => profile.tenant_slug === requestedTenantSlug)
+            ? [requestedTenantSlug]
+            : []
+        )
+      : tenantProfiles.length
+        ? new Set(tenantProfiles.map((profile) => normalizeTenantSlug(profile.tenant_slug)!))
+        : customerSlug
+          ? new Set([normalizeTenantSlug(customerSlug)!])
+          : null;
+  const allowUnscopedRecords = !requestedTenantSlug && tenantRegistryReadable;
+  const tenantSlug = requestedTenantSlug || customerSlug;
+  const tenantScopeReadable = visibleTenantSlugs === null || visibleTenantSlugs.size > 0;
+  const organizationProfile = tenantScopeReadable ? loadOrganizationProfile() : null;
+  const contextBinding =
+    tenantScopeReadable && customerSlug
+      ? loadOnboardingContextBinding(customerSlug, rootDir)
+      : null;
+  const organizationChartData = tenantScopeReadable
+    ? resolveOrganizationOrgChart(customerSlug || tenantSlug, rootDir)
+    : null;
   const organizationChart = summarizeOrganizationOrgChart(organizationChartData);
   const rooms: OfficeRoom[] = [];
   const archivedRecent: Array<{ id: string; mtime: number }> = [];
@@ -306,7 +371,8 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       tenant_id?: string;
     }>(path.join(missionPath, 'mission-state.json'));
     if (!state?.mission_id) continue;
-    if (!missionMatchesTenant({ ...state, tier }, tenantSlug)) continue;
+    if (!missionMatchesTenant({ ...state, tier }, visibleTenantSlugs, allowUnscopedRecords))
+      continue;
     const status = String(state.status || 'unknown');
     if (['archived', 'completed', 'closed'].includes(status)) {
       archivedRecent.push({ id: state.mission_id, mtime: 0 });
@@ -341,6 +407,7 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       mission_type: String(state.mission_type || '-'),
       status,
       tier,
+      tenant_slug: missionTenantSlug(state),
       tasks,
     });
   }
@@ -349,7 +416,9 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   // fresh deployment has no profile index yet, and the office must still open.
   let roster: Record<string, unknown> = {};
   try {
-    roster = loadAgentProfileIndex() as unknown as Record<string, unknown>;
+    if (tenantScopeReadable) {
+      roster = loadAgentProfileIndex() as unknown as Record<string, unknown>;
+    }
   } catch {
     roster = {};
   }
@@ -357,12 +426,12 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const activeSessions = taskSessions
     .filter((session) => SESSION_ACTIVE_STATUSES.has(session.status))
     .filter((session) => {
-      if (!tenantSlug) return true;
+      if (!visibleTenantSlugs) return true;
       const sessionTenant = missionTenantSlug({
         tenant_slug: (session.payload?.tenant_slug as string | undefined) || undefined,
         tenant_id: (session.payload?.tenant_id as string | undefined) || undefined,
       });
-      return !sessionTenant || sessionTenant === tenantSlug;
+      return sessionTenant ? visibleTenantSlugs.has(sessionTenant) : allowUnscopedRecords;
     })
     .slice(0, 24)
     .map((session) => summarizeSession(session));
@@ -445,12 +514,20 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   });
 
   // performance index (retrospective loop output)
-  const performanceFile = readJson<{
-    by_agent_role?: Record<
-      string,
-      { samples: number; success: number; review: number; blocked: number; success_rate: number }
-    >;
-  }>(pathResolver.shared('observability/retrospectives/agent-performance.json'));
+  const performanceFile = tenantScopeReadable
+    ? readJson<{
+        by_agent_role?: Record<
+          string,
+          {
+            samples: number;
+            success: number;
+            review: number;
+            blocked: number;
+            success_rate: number;
+          }
+        >;
+      }>(pathResolver.shared('observability/retrospectives/agent-performance.json'))
+    : null;
   const performance = Object.entries(performanceFile?.by_agent_role || {})
     .map(([key, record]) => {
       const [agent, role] = key.split('|');
@@ -460,36 +537,58 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .slice(0, 10);
 
   // customer front desk
-  const tenants = tenantSlug
-    ? [tenantSlug]
-    : Array.from(new Set(listCustomerChannelBindings().map((b) => b.tenantSlug)));
-  const deals = tenants
-    .flatMap((tenant) =>
-      listDeals(tenant).map((deal) => ({
-        deal_id: deal.deal_id,
-        tenant,
-        stage: deal.stage,
-        summary: String(deal.summary || '').slice(0, 60),
-      }))
-    )
-    .slice(0, 12);
-
-  // mail room
-  const inboxUnread = listInboxEntries({
-    limit: 100,
-    ...(tenantSlug ? { tenant: tenantSlug } : {}),
-  }).filter((entry) => entry.status === 'unread').length;
-  const approvalsPending = listApprovalRequests({ status: 'pending' }).length;
-
-  // bulletin board
-  const alertLines = safeExistsSync(pathResolver.shared('observability/ops-alerts.jsonl'))
-    ? String(
-        safeReadFile(pathResolver.shared('observability/ops-alerts.jsonl'), { encoding: 'utf8' })
-      )
-        .trim()
-        .split('\n')
-        .slice(-5)
+  // Deal files live in the customer overlay; tenant_slug on each deal is the
+  // canonical sub-scope. Do not enumerate other customer roots while a
+  // customer or explicit tenant scope is active.
+  const channelBindings = customerSlug ? [] : listCustomerChannelBindings();
+  const dealRoots = customerSlug
+    ? [customerSlug]
+    : requestedTenantSlug
+      ? [requestedTenantSlug]
+      : Array.from(
+          new Set(
+            channelBindings
+              .map((binding) => normalizeTenantSlug(binding.tenantSlug))
+              .filter((slug): slug is string => Boolean(slug))
+          )
+        );
+  const deals = tenantScopeReadable
+    ? dealRoots
+        .flatMap((root) => listDeals(root))
+        .filter((deal) => {
+          const dealTenant = normalizeTenantSlug(deal.tenant_slug);
+          if (!visibleTenantSlugs) return true;
+          return dealTenant ? visibleTenantSlugs.has(dealTenant) : allowUnscopedRecords;
+        })
+        .map((deal) => ({
+          deal_id: deal.deal_id,
+          tenant: normalizeTenantSlug(deal.tenant_slug) || customerSlug || 'unscoped',
+          stage: deal.stage,
+          summary: String(deal.summary || '').slice(0, 60),
+        }))
+        .slice(0, 12)
     : [];
+  const approvalsPending = tenantScopeReadable
+    ? listApprovalRequests({ status: 'pending' }).length
+    : 0;
+  // mail room
+  const inboxUnread = listInboxEntries({ limit: 100 })
+    .filter((entry) => entry.status === 'unread')
+    .filter((entry) => {
+      const entryTenant = normalizeTenantSlug(entry.tenant_slug);
+      if (!visibleTenantSlugs) return true;
+      return entryTenant ? visibleTenantSlugs.has(entryTenant) : allowUnscopedRecords;
+    }).length;
+  // bulletin board
+  const alertLines =
+    tenantScopeReadable && safeExistsSync(pathResolver.shared('observability/ops-alerts.jsonl'))
+      ? String(
+          safeReadFile(pathResolver.shared('observability/ops-alerts.jsonl'), { encoding: 'utf8' })
+        )
+          .trim()
+          .split('\n')
+          .slice(-5)
+      : [];
   const alerts = alertLines
     .map((line) => {
       try {
@@ -506,21 +605,104 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .reverse();
   let proposals: Array<{ id: string; status: string; kind: string }> = [];
   try {
-    proposals = listProcessImprovementProposals()
-      .slice(-6)
-      .map((proposal) => ({
-        id: proposal.proposal_id,
-        status: proposal.status,
-        kind: proposal.kind,
-      }))
-      .reverse();
+    proposals = tenantScopeReadable
+      ? listProcessImprovementProposals()
+          .slice(-6)
+          .map((proposal) => ({
+            id: proposal.proposal_id,
+            status: proposal.status,
+            kind: proposal.kind,
+          }))
+          .reverse()
+      : [];
   } catch {
     proposals = [];
   }
 
+  const projectRecords = (() => {
+    try {
+      return listProjectRecords(rootDir);
+    } catch {
+      return [];
+    }
+  })().filter((project) => {
+    const projectTenant = normalizeTenantSlug(project.tenant_slug);
+    if (!visibleTenantSlugs) return true;
+    return projectTenant ? visibleTenantSlugs.has(projectTenant) : allowUnscopedRecords;
+  });
+  const projectViews = new Map(
+    projectRecords.flatMap((project) => {
+      try {
+        return [
+          [project.project_id, getProjectManagementView(project.project_id, rootDir)] as const,
+        ];
+      } catch {
+        return [];
+      }
+    })
+  );
+  const roomByMission = new Map(rooms.map((room) => [room.mission_id, room]));
+  const projects: OfficeProject[] = projectRecords.map((project) => {
+    const projectView = projectViews.get(project.project_id);
+    const missionIds = projectView?.missions.map((mission) => mission.mission_id) || [];
+    const taskSessionCount = projectView
+      ? projectView.task_sessions.filter((session) => SESSION_ACTIVE_STATUSES.has(session.status))
+          .length
+      : null;
+    return {
+      project_id: project.project_id,
+      name: project.name,
+      status: project.status,
+      tier: project.tier,
+      tenant_slug: normalizeTenantSlug(project.tenant_slug),
+      organization_id: project.organization_id || null,
+      mission_count: projectView
+        ? missionIds.filter((missionId) => roomByMission.has(missionId)).length
+        : null,
+      task_session_count: taskSessionCount,
+    };
+  });
+  const projectsByTenant = new Map<string, number>();
+  for (const project of projects) {
+    if (!project.tenant_slug) continue;
+    projectsByTenant.set(project.tenant_slug, (projectsByTenant.get(project.tenant_slug) || 0) + 1);
+  }
+  const missionsByTenant = new Map<string, number>();
+  for (const room of rooms) {
+    if (!room.tenant_slug) continue;
+    missionsByTenant.set(room.tenant_slug, (missionsByTenant.get(room.tenant_slug) || 0) + 1);
+  }
+  const tenantOrganizationId = contextBinding
+    ? new Map([[contextBinding.tenant_slug, contextBinding.organization_id]])
+    : new Map<string, string>();
+  for (const project of projects) {
+    if (
+      project.tenant_slug &&
+      project.organization_id &&
+      !tenantOrganizationId.has(project.tenant_slug)
+    ) {
+      tenantOrganizationId.set(project.tenant_slug, project.organization_id);
+    }
+  }
+  const tenants: OfficeTenant[] = tenantProfiles
+    .filter((profile) => !requestedTenantSlug || profile.tenant_slug === requestedTenantSlug)
+    .map((profile) => ({
+      tenant_slug: profile.tenant_slug,
+      display_name: profile.display_name,
+      status: profile.status,
+      assigned_role: profile.assigned_role,
+      organization_id: tenantOrganizationId.get(profile.tenant_slug) || null,
+      project_count: projectsByTenant.get(profile.tenant_slug) || 0,
+      mission_count: missionsByTenant.get(profile.tenant_slug) || 0,
+    }));
+
   return {
     generated_at: new Date().toISOString(),
+    customer_slug: customerSlug,
     tenant_slug: tenantSlug,
+    tenant_scope: requestedTenantSlug,
+    tenants,
+    projects,
     organization: organizationProfile
       ? {
           organization_id: organizationProfile.organization_id,
@@ -850,11 +1032,50 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
         </div>
       </div>`
     : '<div class="empty">組織図なし</div>';
-  const tenantSummary = data.tenant_slug
-    ? `tenant ${esc(data.tenant_slug)}${data.organization ? ` · ${esc(data.organization.name)}` : ''}`
-    : data.organization
-      ? esc(data.organization.name)
-      : 'tenant-agnostic';
+  const tenantRows = data.tenants.length
+    ? data.tenants
+        .map(
+          (tenant) => `<div class="context-row">
+            <div><strong>${esc(tenant.display_name)}</strong> <span class="pill">${esc(tenant.status)}</span></div>
+            <div class="context-meta">tenant=${esc(tenant.tenant_slug)} · role=${esc(tenant.assigned_role)} · organization=${esc(tenant.organization_id || '-')}</div>
+            <div class="context-meta">projects=${tenant.project_count} · missions=${tenant.mission_count}</div>
+          </div>`
+        )
+        .join('')
+    : '<div class="empty">No tenant profiles in the active scope</div>';
+  const projectRows = data.projects.length
+    ? data.projects
+        .map(
+          (project) => `<div class="context-row">
+            <div><strong>${esc(project.name)}</strong> <span class="pill">${esc(project.status)}</span></div>
+            <div class="context-meta">project=${esc(project.project_id)} · tenant=${esc(project.tenant_slug || '-')} · organization=${esc(project.organization_id || '-')}</div>
+            <div class="context-meta">tier=${esc(project.tier)} · missions=${project.mission_count ?? 'unknown'} · task_sessions=${project.task_session_count ?? 'unknown'}</div>
+          </div>`
+        )
+        .join('')
+    : '<div class="empty">No projects in the active scope</div>';
+  const contextHtml = `<section><h2>Context — Tenant / Organization / Project</h2>
+    <div class="panel">
+      <div class="context-scope">customer=${esc(data.customer_slug || '-')} · tenant_scope=${esc(data.tenant_scope || 'all-visible')}</div>
+      <div class="context-title">Tenants</div>
+      <div class="context-list">${tenantRows}</div>
+      <div class="context-title">Projects</div>
+      <div class="context-list">${projectRows}</div>
+    </div>
+  </section>`;
+  const tenantSummary = data.customer_slug
+    ? `customer ${esc(data.customer_slug)} · ${
+        data.tenant_scope
+          ? `tenant ${esc(data.tenant_scope)}`
+          : data.tenants.length
+            ? `${data.tenants.length} tenants visible`
+            : `tenant ${esc(data.tenant_slug || data.customer_slug)}`
+      }${data.organization ? ` · ${esc(data.organization.name)}` : ''}`
+    : data.tenant_scope
+      ? `tenant ${esc(data.tenant_scope)}`
+      : data.organization
+        ? esc(data.organization.name)
+        : 'tenant-agnostic';
 
   // Now Working — plain-language answer to 「いま誰が何をしているの?」
   const nowWorkingRows = data.agents
@@ -951,6 +1172,11 @@ section{margin-bottom:22px}
 .org-positions{margin-top:10px}
 .org-position{padding:8px 0;border-top:1px solid rgba(30,41,59,.6)}
 .org-role{font-size:12px;font-weight:700;margin-bottom:2px}
+.context-scope,.context-meta{font-size:11px;color:var(--muted);line-height:1.6}
+.context-title{font-size:12px;font-weight:700;margin:12px 0 4px}
+.context-list{display:grid;gap:6px}
+.context-row{border-top:1px solid rgba(30,41,59,.6);padding:7px 0;font-size:12px}
+.context-row strong{font-size:12px}
 .archive{color:var(--muted);font-size:11px;line-height:1.9}
 /* ---- character life ---- */
 .char.working .body-wrap{animation:type .5s ease-in-out infinite}
@@ -1004,6 +1230,7 @@ ${legend}
   </section>
 </div>
 <div>
+  ${contextHtml}
   <section><h2>Organization Chart — 組織図</h2>
     ${orgChartHtml}
   </section>
