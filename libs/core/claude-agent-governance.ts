@@ -7,6 +7,10 @@ import {
   evaluateShellCommandPolicy,
   shellCommandApprovalDescriptor,
 } from './shell-command-policy.js';
+import {
+  CLAUDE_NATIVE_AGENT_PREFIX,
+  CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES,
+} from './claude-native-subagent.js';
 
 /**
  * Direction B: make the claude-agent SDK sub-agent a *governed Kyberion citizen*
@@ -24,6 +28,17 @@ import {
 
 const READ_ONLY_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead']);
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+/** Tools that start a provider-native sub-agent (CN-05). */
+const NATIVE_SUBAGENT_TOOLS = new Set(CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES);
+
+export interface KyberionCanUseToolOptions {
+  /**
+   * Allow the delegation tool (`Task`/`Agent`) so the turn can start a
+   * governed native sub-agent. Off by default: on the ordinary governed
+   * agent path a sub-agent would run outside the KD-05 tool projection.
+   */
+  allowNativeSubagentTools?: boolean;
+}
 
 /** Advisory allowlist passed to the SDK (the canUseTool gate is the real enforcer). */
 export const GOVERNED_AGENT_ALLOWED_TOOLS: string[] = [
@@ -77,9 +92,28 @@ function summarizeInput(input: Record<string, unknown> = {}): Record<string, unk
  * tool calls. Reuses the Direction-A tier-guard for file writes so both entry
  * points share one kernel.
  */
-export function createKyberionCanUseTool(): CanUseTool {
+export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}): CanUseTool {
   return async (toolName, input) => {
     if (READ_ONLY_TOOLS.has(toolName)) return allow(input);
+
+    // CN-05: starting a provider-native sub-agent is only permitted on the
+    // native delegation path, and only for a governed `kyberion-*` definition
+    // — never for a built-in agent whose tool surface Kyberion does not own.
+    if (NATIVE_SUBAGENT_TOOLS.has(toolName)) {
+      if (!options.allowNativeSubagentTools) {
+        return deny(
+          `${toolName} is not available on this path: native sub-agent delegation was not requested.`
+        );
+      }
+      const subagentType = String((input as { subagent_type?: unknown }).subagent_type ?? '');
+      if (!subagentType.startsWith(CLAUDE_NATIVE_AGENT_PREFIX)) {
+        return deny(
+          `Only governed ${CLAUDE_NATIVE_AGENT_PREFIX}* sub-agents may be started (requested "${subagentType || 'none'}").`
+        );
+      }
+      auditAgentTool(toolName, input);
+      return allow(input);
+    }
 
     // Governed Kyberion MCP tools (already allowlisted / tier-isolated / audited server-side).
     if (toolName.includes('kyberion')) {

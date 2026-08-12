@@ -231,6 +231,130 @@ describe('shell-claude-cli-backend', () => {
     });
   });
 
+  describe('native subagent adopter (CN-02)', () => {
+    const previousFlag = process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT;
+
+    beforeEach(() => {
+      delete process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT;
+      spawnMock.mockClear();
+    });
+
+    afterEach(() => {
+      if (previousFlag === undefined) delete process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT;
+      else process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT = previousFlag;
+    });
+
+    function fakeHarness(response: Record<string, unknown>) {
+      return {
+        boot: vi.fn(async () => {}),
+        ask: vi.fn(async () => ({ text: 'plain', stopReason: 'completed' })),
+        askNativeSubagent: vi.fn(async () => response as any),
+        shutdown: vi.fn(async () => {}),
+      };
+    }
+
+    it('stays off by default so the historical per-task spawn path is unchanged', () => {
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+
+      expect(backend.getNativeSubagentAdopter()).toBeNull();
+      expect(backend.requiresNativeSubagent()).toBe(false);
+    });
+
+    it('turns on via KYBERION_CLAUDE_NATIVE_SUBAGENT=1', () => {
+      process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT = '1';
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+
+      expect(backend.getNativeSubagentAdopter()?.id).toBe('claude-cli');
+      expect(backend.requiresNativeSubagent()).toBe(true);
+    });
+
+    it('delegates through the shared session and reports provider-observed metadata', async () => {
+      const harness = fakeHarness({
+        text: 'sub-agent report',
+        stopReason: 'completed',
+        metadata: {
+          nativeSubagent: {
+            provider: 'claude',
+            mode: 'cli-stream-json',
+            threadId: 'sess-9',
+            turnId: 'toolu_9',
+          },
+        },
+      });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', harnessSession: harness });
+      const adopter = backend.getNativeSubagentAdopter();
+
+      const result = await adopter!.dispatch('do the thing', 'mission ctx', {
+        profile: 'explorer',
+      });
+
+      expect(result).toBe('sub-agent report');
+      expect(spawnMock).not.toHaveBeenCalled();
+      expect(harness.askNativeSubagent).toHaveBeenCalledTimes(1);
+      const [prompt, options] = harness.askNativeSubagent.mock.calls[0] as [string, any];
+      expect(prompt).toContain('subagent_type: "kyberion-explorer"');
+      expect(prompt).toContain('run_in_background: false');
+      expect(prompt).toContain('Task: do the thing');
+      expect(prompt).toContain('mission ctx');
+      expect(options).toMatchObject({ profile: 'explorer', subagent: true, effort: 'medium' });
+      expect(adopter!.getInfo?.()).toMatchObject({ provider: 'claude', threadId: 'sess-9' });
+    });
+
+    it('fails closed when the session cannot prove a native delegation happened', async () => {
+      const harness = fakeHarness({ text: 'plain answer', stopReason: 'completed' });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', harnessSession: harness });
+
+      await expect(backend.getNativeSubagentAdopter()!.dispatch('do the thing')).rejects.toThrow(
+        '[SUBAGENT_UNAVAILABLE] claude CLI session returned no native subagent metadata.'
+      );
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('degrades an unknown profile to implementer instead of failing', async () => {
+      const harness = fakeHarness({
+        text: 'ok',
+        stopReason: 'completed',
+        metadata: { nativeSubagent: { provider: 'claude' } },
+      });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', harnessSession: harness });
+
+      await backend.getNativeSubagentAdopter()!.dispatch('do it', undefined, {
+        profile: 'not-a-tier',
+      });
+
+      const [, options] = harness.askNativeSubagent.mock.calls[0] as [string, any];
+      expect(options.profile).toBe('implementer');
+    });
+
+    it('resets the session on failover but never shuts down an injected one (QM-06)', async () => {
+      const harness = fakeHarness({
+        text: 'ok',
+        stopReason: 'completed',
+        metadata: { nativeSubagent: { provider: 'claude' } },
+      });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', harnessSession: harness });
+      await backend.getNativeSubagentAdopter()!.dispatch('do it');
+
+      await backend.resetSession();
+
+      expect(harness.shutdown).not.toHaveBeenCalled();
+      expect(backend.getNativeSubagentAdopter()!.getInfo?.()).toBeNull();
+    });
+
+    it('re-boots the owned session when the tier or model signature changes', () => {
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' }) as any;
+
+      const first = backend.getHarnessSession('explorer', 'sonnet', 'medium');
+      const same = backend.getHarnessSession('explorer', 'sonnet', 'medium');
+      expect(same).toBe(first);
+
+      const shutdown = vi.spyOn(first, 'shutdown').mockResolvedValue(undefined);
+      const switched = backend.getHarnessSession('implementer', 'sonnet', 'medium');
+      expect(switched).not.toBe(first);
+      expect(shutdown).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('wall-clock budget wiring (XP-06)', () => {
     beforeEach(() => {
       spawnMock.mockClear();
