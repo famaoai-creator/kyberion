@@ -64,7 +64,7 @@ Code: `libs/actuators/`, `CAPABILITIES_GUIDE.md`.
 
 ### 2.3 ADF (Agentic Data Format) Pipeline
 
-A declarative, schema-validated description of *what to do*. Steps reference actuator ops.
+A declarative, schema-validated description of _what to do_. Steps reference actuator ops.
 
 - Lives in `pipelines/*.json`. Composable: a step can reference another pipeline via `ref`.
 - Has `on_error` semantics: `skip` / `abort` / `fallback`.
@@ -77,13 +77,13 @@ Code: `libs/core/src/pipeline-engine.ts`, `pipelines/`, `schemas/*-pipeline.sche
 
 Three-tier filesystem isolation for what an agent reads and writes:
 
-| Tier | Path | Audience |
-|---|---|---|
-| Legacy personal fallback | `knowledge/personal/` (gitignored) | Legacy personal fallback when no customer overlay is active |
-| Confidential | `knowledge/confidential/{project}/` (gitignored) | One project / org |
-| Public | `knowledge/public/` (committed) | Reusable, shared |
+| Tier                     | Path                                                 | Audience                                                                   |
+| ------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| Legacy personal fallback | `knowledge/personal/` (gitignored)                   | Legacy personal fallback when no customer overlay is active                |
+| Confidential             | `knowledge/confidential/{tenant-slug}/` (gitignored) | One tenant — a confidentiality boundary, resolved from the tenant registry |
+| Public                   | `knowledge/public/` (committed)                      | Reusable, shared                                                           |
 
-When `KYBERION_CUSTOMER` is set, `customer/{slug}/` becomes the preferred overlay root for customer-specific identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`.
+When `KYBERION_CUSTOMER` is set, `customer/{slug}/` becomes the preferred overlay root for identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`. That overlay is a **stance** — which entity Kyberion is acting as — and is a different layer from the tenant boundary above: the stance is runtime configuration, the tenant is a data boundary, and a tenant's own end customers live inside that tenant at `knowledge/confidential/{tenant-slug}/customers/`. See [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md).
 
 Enforced at the file-IO boundary by `secure-io.ts` + `tier-guard.ts`. There is no "trusted code" exception — everything goes through the boundary.
 
@@ -139,6 +139,7 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
 ```
 
 Cross-cuts:
+
 - Every state-changing op writes to `active/audit/audit-{date}.jsonl` (audit chain).
 - Every external LLM/HTTP egress goes through `egress-guard` (TODO: stronger redaction in Phase C'-7).
 - Every actuator op is rate-limited / approval-gated per `knowledge/product/governance/`.
@@ -266,15 +267,15 @@ For governance / decision rules: [`GOVERNANCE.md`](../../GOVERNANCE.md). For who
 
 ## 7. Where to go next
 
-| Task | Doc |
-|---|---|
-| Author a new actuator | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) |
-| Customize for an FDE customer | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) |
-| Add Trace observability to an actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md) |
-| Add a vertical mission seed | [`../../templates/verticals/README.md`](../../templates/verticals/README.md) |
-| Run a release | [`RELEASE_OPERATIONS.md`](./RELEASE_OPERATIONS.md) |
-| Triage incoming issues | [`ISSUE_TRIAGE.md`](./ISSUE_TRIAGE.md) |
-| Understand stable vs internal surfaces | [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) |
+| Task                                   | Doc                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| Author a new actuator                  | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md)                               |
+| Customize for an FDE customer          | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md)                       |
+| Add Trace observability to an actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md)               |
+| Add a vertical mission seed            | [`../../templates/verticals/README.md`](../../templates/verticals/README.md) |
+| Run a release                          | [`RELEASE_OPERATIONS.md`](./RELEASE_OPERATIONS.md)                           |
+| Triage incoming issues                 | [`ISSUE_TRIAGE.md`](./ISSUE_TRIAGE.md)                                       |
+| Understand stable vs internal surfaces | [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md)                               |
 
 Meeting-specific orientation:
 

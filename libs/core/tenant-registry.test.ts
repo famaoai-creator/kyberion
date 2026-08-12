@@ -158,6 +158,35 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
   });
 
+  // A refused/failed read used to be reported as "is not valid JSON", which sent
+  // callers to inspect a file that was fine. The realistic cause is an
+  // authorization failure on the personal tier (Sovereign Sanctuary), so the two
+  // failures must stay distinguishable. A directory at the profile path is the
+  // cross-platform way to make the read fail while the path still exists.
+  it('reports an unreadable profile as a read failure, not as corrupt JSON', () => {
+    const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(path.join(dir, 'unreadable-co.json'), { recursive: true });
+    let message = '';
+    try {
+      resolveTenant('unreadable-co', { rootDir: fixtureRoot, env: EMPTY_ENV });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/could not be read/);
+    expect(message).not.toMatch(/not valid JSON/);
+    // The hint is keyed off the personal-tier location, not the error text.
+    expect(message).toMatch(/KYBERION_PERSONA/);
+  });
+
+  it('still reports genuinely corrupt profile JSON as a JSON failure', () => {
+    const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'corrupt-co.json'), '{ not json');
+    expect(() => resolveTenant('corrupt-co', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+      /is not valid JSON/
+    );
+  });
+
   it('rejects schema-invalid profiles instead of resolving them', () => {
     const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
     fs.mkdirSync(dir, { recursive: true });

@@ -8,7 +8,9 @@ last_updated: 2026-05-07
 
 # 顧客集約ポイント
 
-FDE / 導入支援案件で、Kyberion を fork せずに顧客ごとの設定を分離するための仕組み。
+Kyberion を fork せずに、1 つのチェックアウトを複数の主体として運用するための設定分離機構。
+
+> **命名について**: 本ドキュメントと `customer/` ディレクトリは FDE 案件を念頭に書かれており、そこでは「運用主体（stance）」がたまたま顧客だった。それは用途の 1 つであって定義ではない。一般概念は **stance**（いま自分はどの主体として振る舞っているか）であり、複数の独立法人で役割を兼務して 1 つずつ演じる用途も同格に正当である。さらに stance は **テナント**（機密境界）とも、**テナント自身の顧客**とも別の層である — 会話ではこの 3 つが全部「顧客」と呼ばれる。→ [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md)。以下の「顧客」は「stance」と読み替えること。環境変数とディレクトリ名は歴史的経緯のまま維持する。
 
 詳細な英語版は [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) を参照。日々の利用方法は [`customer/README.md`](../../customer/README.md)。
 
@@ -17,7 +19,7 @@ FDE / 導入支援案件で、Kyberion を fork せずに顧客ごとの設定�
 従来の Kyberion は customer overlay がないレガシー単一利用前提:
 
 - `knowledge/personal/` — レガシーフォールバック
-- `knowledge/confidential/{project}/` — プロジェクト単位
+- `knowledge/confidential/{tenant-slug}/` — テナント単位（機密境界 1 つ）
 - `knowledge/public/` — 再利用可能
 
 FDE 案件では:
@@ -75,14 +77,14 @@ export KYBERION_CUSTOMER=acme-corp
 
 ## 3. 配置先一覧
 
-| ファイル | 顧客オーバーレイ | 個人フォールバック | 公開デフォルト |
-|---|---|---|---|
-| identity | `identity.json` | `my-identity.json` | — |
-| vision | `vision.md` | `my-vision.md` | — |
-| connections | `connections/*.json` | `connections/*.json` | — |
-| voice | `voice/profile.json` | `voice/profile-registry.json` | `voice/*` |
-| 承認ポリシー | `policy/approval-policy.json` | — | `governance/approval-policy.json` |
-| ミッション seed | `mission-seeds/*.json` | — | (additive のみ) |
+| ファイル        | 顧客オーバーレイ              | 個人フォールバック            | 公開デフォルト                    |
+| --------------- | ----------------------------- | ----------------------------- | --------------------------------- |
+| identity        | `identity.json`               | `my-identity.json`            | —                                 |
+| vision          | `vision.md`                   | `my-vision.md`                | —                                 |
+| connections     | `connections/*.json`          | `connections/*.json`          | —                                 |
+| voice           | `voice/profile.json`          | `voice/profile-registry.json` | `voice/*`                         |
+| 承認ポリシー    | `policy/approval-policy.json` | —                             | `governance/approval-policy.json` |
+| ミッション seed | `mission-seeds/*.json`        | —                             | (additive のみ)                   |
 
 ## 4. 既存 1 ユーザ設定からの移行
 

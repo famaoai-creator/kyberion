@@ -22,12 +22,12 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeUnlink, safeWriteFile } from './secure-io.js';
 
 /** Default repo-relative base directory for cursor state files. */
 export const DEFAULT_INGEST_CURSORS_DIR = 'active/shared/runtime/ingest-cursors';
 
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const SOURCE_SYSTEM_RE = /^[a-z][a-z0-9_-]{0,40}$/;
 
 export const SYNC_CURSOR_KINDS = ['marker', 'updated_since', 'delta_token', 'etag_map'] as const;
@@ -57,7 +57,7 @@ export interface SyncCursorPathOptions {
 }
 
 function assertTenantSlug(slug: string): void {
-  if (!TENANT_SLUG_RE.test(slug)) {
+  if (!isValidTenantSlug(slug)) {
     throw new Error(`[ingest-sync-cursors] invalid tenant slug '${slug}'`);
   }
 }
@@ -101,7 +101,7 @@ function assertCursorState(state: SyncCursorState, file: string): void {
   if (!state || typeof state !== 'object') {
     throw new Error(`[ingest-sync-cursors] ${file}: state must be an object`);
   }
-  if (!TENANT_SLUG_RE.test(String(state.tenant_slug ?? ''))) problems.push('tenant_slug invalid');
+  if (!isValidTenantSlug(String(state.tenant_slug ?? ''))) problems.push('tenant_slug invalid');
   if (!SOURCE_SYSTEM_RE.test(String(state.source_system ?? ''))) {
     problems.push('source_system invalid');
   }
@@ -126,8 +126,8 @@ function assertCursorState(state: SyncCursorState, file: string): void {
 
 /**
  * Reads the cursor state. Returns null when no state file exists (first
- * sync). Throws on corrupt JSON or invalid shape (fail-closed — see module
- * header).
+ * sync). Throws on an unreadable file, corrupt JSON, or invalid shape
+ * (fail-closed — see module header).
  */
 export function readSyncCursor(
   tenantSlug: string,
@@ -136,9 +136,26 @@ export function readSyncCursor(
 ): SyncCursorState | null {
   const file = syncCursorPath(tenantSlug, sourceSystem, options);
   if (!safeExistsSync(file)) return null;
+  // Read failures must not be reported as corrupt JSON: cursors live under a
+  // tenant-scoped prefix, so a refused read is an authorization problem, and
+  // the "resetSyncCursor" remedy below would discard a perfectly good watermark
+  // and force a full re-fetch to fix something it cannot fix.
+  let source: string;
+  try {
+    source = String(safeReadFile(file, { encoding: 'utf8' }));
+  } catch (error) {
+    throw new Error(
+      `[ingest-sync-cursors] cursor state at ${file} could not be read: ${String(
+        (error as Error)?.message ?? error
+      ).replace(
+        /\s*\.\s*$/,
+        ''
+      )}. Fail-closed: the watermark is intact — resolve access before re-running the sync.`
+    );
+  }
   let state: SyncCursorState;
   try {
-    state = JSON.parse(String(safeReadFile(file, { encoding: 'utf8' }))) as SyncCursorState;
+    state = JSON.parse(source) as SyncCursorState;
   } catch (error) {
     throw new Error(
       `[ingest-sync-cursors] cursor state at ${file} is not valid JSON: ${(error as Error).message}. ` +

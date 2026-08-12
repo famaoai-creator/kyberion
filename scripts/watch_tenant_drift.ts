@@ -26,13 +26,12 @@ import {
   pathResolver,
   safeExistsSync,
   sendOpsAlert,
+  isValidTenantSlug,
   type OpsAlertInput,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
-
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
 interface DriftFinding {
   path: string;
@@ -74,7 +73,7 @@ function detectExpectedTenantFromPath(relPath: string): string | null {
   if (idx === -1) return null;
   const candidate = segments[idx + 1];
   if (!candidate) return null;
-  return TENANT_SLUG_RE.test(candidate) ? candidate : null;
+  return isValidTenantSlug(candidate) ? candidate : null;
 }
 
 function readMissionState(

@@ -110,9 +110,15 @@ export function resolveHistoryTier(raw: unknown): HistorySearchTier | undefined 
 
 function databasePath(): string {
   const configured = process.env.KYBERION_HISTORY_SEARCH_DB?.trim();
-  return configured
+  const resolved = configured
     ? pathResolver.rootResolve(configured)
     : pathResolver.shared('runtime/history-search/history.sqlite');
+  const sharedRoot = path.resolve(pathResolver.shared()) + path.sep;
+  const absolute = path.resolve(resolved);
+  if (!absolute.startsWith(sharedRoot)) {
+    throw new Error(`history search database must stay under active/shared (received ${absolute})`);
+  }
+  return absolute;
 }
 
 function sqlLiteral(value: unknown): string {
@@ -126,7 +132,21 @@ function runSql(sql: string, json = false): string {
   const result = safeExecResult('sqlite3', json ? ['-json', db] : [db], {
     timeoutMs: 10_000,
     maxOutputMB: 20,
-    input: sql,
+    // The index keeps `history_fts` in sync through AFTER INSERT/DELETE/UPDATE
+    // triggers on `history_entries`, and a trigger body counts as schema-defined
+    // SQL. With `trusted_schema=0` SQLite refuses to use a virtual table there —
+    // "unsafe use of virtual table history_fts" — so every write, and therefore
+    // every search, fails. Apple's bundled sqlite3 ships that default, which is
+    // why this only surfaces on macOS while Linux CI passes.
+    //
+    // The pragma is per-connection and each CLI invocation opens a new one, so
+    // it has to lead every batch rather than being set once at schema creation.
+    //
+    // Scope of the relaxation: this database is created by us under active/ and
+    // we author its whole schema. The protection being waived is against a
+    // hostile schema inside a database file someone else planted — an attacker
+    // able to do that already has write access to the repository.
+    input: `PRAGMA trusted_schema=ON;\n${sql}`,
   });
   if (result.status !== 0) {
     throw new Error(
@@ -274,8 +294,7 @@ function ensureFtsHealthy(): boolean {
     true
   );
   const row = JSON.parse(raw || '[]')[0] as
-    | { entries: number; unicode_entries: number; trigram_entries: number }
-    | undefined;
+    { entries: number; unicode_entries: number; trigram_entries: number } | undefined;
   return Boolean(row && row.entries === row.unicode_entries && row.entries === row.trigram_entries);
 }
 

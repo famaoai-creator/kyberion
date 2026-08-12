@@ -11,16 +11,16 @@ Kyberion がデータに対して何をして、何をしないか。
 
 ## 1. ローカルに保存されるもの
 
-| パス                                | 内容                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------- |
-| `knowledge/personal/`               | identity, vision, connections, voice プロファイル。**gitignored**               |
-| `customer/{slug}/`                  | FDE 顧客設定（`KYBERION_CUSTOMER` 設定時）。**gitignored**（`_template/` 除く） |
-| `active/missions/{id}/`             | mission ごとの git repo・state・evidence。**gitignored**                        |
-| `active/shared/logs/traces/`        | 構造化実行 trace (JSONL)。**gitignored**                                        |
-| `active/shared/runtime/`            | runtime state, ロック, surface metadata。**gitignored**                         |
-| `active/audit/*.jsonl`              | 監査台帳エントリ。**gitignored**                                                |
-| `knowledge/confidential/{project}/` | プロジェクトスコープ confidential ナレッジ。**gitignored**                      |
-| `knowledge/public/`                 | 公開再利用可能ナレッジ。**committed**（意図的に共有）                           |
+| パス                                    | 内容                                                                                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge/personal/`                   | identity, vision, connections, voice プロファイル。**gitignored**                                                                                                               |
+| `customer/{slug}/`                      | stance オーバーレイ — いま振る舞っている主体の identity/connections/policy（`KYBERION_CUSTOMER` 設定時）。**gitignored**（`_template/` 除く）                                   |
+| `active/missions/{id}/`                 | mission ごとの git repo・state・evidence。**gitignored**                                                                                                                        |
+| `active/shared/logs/traces/`            | 構造化実行 trace (JSONL)。**gitignored**                                                                                                                                        |
+| `active/shared/runtime/`                | runtime state, ロック, surface metadata。**gitignored**                                                                                                                         |
+| `active/audit/*.jsonl`                  | 監査台帳エントリ。**gitignored**                                                                                                                                                |
+| `knowledge/confidential/{tenant-slug}/` | テナントスコープ confidential ナレッジ。機密境界 1 つにつき 1 ディレクトリで、テナントレジストリが正本。共有プレフィックスは `common/` と `tenant-groups/` のみ。**gitignored** |
+| `knowledge/public/`                     | 公開再利用可能ナレッジ。**committed**（意図的に共有）                                                                                                                           |
 
 `.gitignore` ポリシーは強制される。canonical list は同ファイルを参照。
 

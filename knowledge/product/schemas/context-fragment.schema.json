@@ -12,7 +12,11 @@
       "type": "string",
       "enum": ["personal", "confidential", "public"]
     },
-    "tenant_id": { "type": "string", "minLength": 1 },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "organization_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },

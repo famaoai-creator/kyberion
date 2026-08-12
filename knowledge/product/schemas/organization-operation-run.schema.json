@@ -17,7 +17,11 @@
     "operation_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "status": {
       "type": "string",
       "enum": ["started", "succeeded", "failed", "blocked", "cancelled"]

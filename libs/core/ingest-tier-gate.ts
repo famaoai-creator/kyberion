@@ -26,6 +26,7 @@ import {
   loadMemoryPromotionCandidate,
   type MemoryCandidate,
 } from './memory-promotion-queue.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /** Landing roots a steward can approve (anything else is unreachable). */
 export const TIER_PROMOTION_TARGET_ROOTS = [
@@ -36,7 +37,6 @@ export const TIER_PROMOTION_TARGET_ROOTS = [
 export type TierPromotionTargetRoot = (typeof TIER_PROMOTION_TARGET_ROOTS)[number];
 
 const TIER_PROMOTION_SOURCE_REF_PREFIX = 'tier_promotion:';
-const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
 export interface TierPlacementInput {
   source_meta?: {
@@ -75,7 +75,7 @@ export function proposeTierPlacement(input: TierPlacementInput): TierPlacementPr
   );
   const tenantSlug = String(input?.tenant_slug || '').trim();
   if (tenantSlug) {
-    if (!TENANT_SLUG_RE.test(tenantSlug)) fail(`invalid tenant_slug '${tenantSlug}'`);
+    if (!isValidTenantSlug(tenantSlug)) fail(`invalid tenant_slug '${tenantSlug}'`);
     return {
       proposed_path_root: `knowledge/confidential/${tenantSlug}`,
       rationale: [

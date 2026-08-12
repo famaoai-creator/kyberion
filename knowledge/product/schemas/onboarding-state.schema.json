@@ -124,8 +124,15 @@
             "type": "object",
             "required": ["tenant_slug", "display_name", "assigned_role", "status"],
             "properties": {
-              "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
-              "tenant_id": { "type": "string" },
+              "tenant_slug": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,30}$",
+                "not": { "enum": ["public", "confidential", "personal", "shared"] }
+              },
+              "tenant_id": {
+                "type": "string",
+                "not": { "enum": ["public", "confidential", "personal", "shared"] }
+              },
               "display_name": { "type": "string" },
               "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
               "assigned_role": { "type": "string" },

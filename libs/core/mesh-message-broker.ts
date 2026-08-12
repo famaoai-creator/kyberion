@@ -4,6 +4,7 @@ import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshDeliveryRecord,
   MeshDeliveryStatus,
@@ -113,7 +114,9 @@ function meshHubRoot(namespace?: string): string {
 
 function meshHubObservabilityRoot(namespace?: string): string {
   const suffix = normalizeNamespace(namespace);
-  return suffix ? `active/shared/observability/mesh-hub/${suffix}` : 'active/shared/observability/mesh-hub';
+  return suffix
+    ? `active/shared/observability/mesh-hub/${suffix}`
+    : 'active/shared/observability/mesh-hub';
 }
 
 function deliveriesPath(namespace?: string): string {
@@ -188,7 +191,9 @@ function loadCurrentDeliveries(namespace?: string): MeshHubDeliveryRecord[] {
 function loadCurrentDelivery(deliveryId: string, namespace?: string): MeshHubDeliveryRecord | null {
   const normalized = String(deliveryId || '').trim();
   if (!normalized) return null;
-  return loadCurrentDeliveries(namespace).find((record) => record.delivery_id === normalized) || null;
+  return (
+    loadCurrentDeliveries(namespace).find((record) => record.delivery_id === normalized) || null
+  );
 }
 
 function deliveryIdentity(request: MeshRequest): string {
@@ -203,11 +208,18 @@ function deliveryIdForRequest(request: MeshRequest): string {
   return `mhd-${deliveryIdentity(request)}`;
 }
 
-function findCurrentDeliveryByIdempotency(request: MeshRequest, namespace?: string): MeshHubDeliveryRecord | null {
+function findCurrentDeliveryByIdempotency(
+  request: MeshRequest,
+  namespace?: string
+): MeshHubDeliveryRecord | null {
   const deliveryId = deliveryIdForRequest(request);
   const current = loadCurrentDelivery(deliveryId, namespace);
   if (current) return current;
-  return loadCurrentDeliveries(namespace).find((record) => record.idempotency_key === request.idempotency_key) || null;
+  return (
+    loadCurrentDeliveries(namespace).find(
+      (record) => record.idempotency_key === request.idempotency_key
+    ) || null
+  );
 }
 
 function loadCurrentDeadLetters(namespace?: string): MeshDeadLetterRecord[] {
@@ -217,7 +229,7 @@ function loadCurrentDeadLetters(namespace?: string): MeshDeadLetterRecord[] {
 function recordEvent(
   namespace: string | undefined,
   event: Record<string, unknown>,
-  role: GovernedArtifactRole,
+  role: GovernedArtifactRole
 ): string {
   return appendRecord(role, eventsPath(namespace), {
     ts: nowIso(),
@@ -237,7 +249,10 @@ function redactReason(reason: unknown): string {
 
 function normalizeRetryPolicy(input?: Partial<MeshRetryPolicy>): MeshRetryPolicy {
   return {
-    initial_delay_ms: Math.max(0, Math.floor(input?.initial_delay_ms ?? DEFAULT_RETRY_POLICY.initial_delay_ms)),
+    initial_delay_ms: Math.max(
+      0,
+      Math.floor(input?.initial_delay_ms ?? DEFAULT_RETRY_POLICY.initial_delay_ms)
+    ),
     max_delay_ms: Math.max(0, Math.floor(input?.max_delay_ms ?? DEFAULT_RETRY_POLICY.max_delay_ms)),
     max_attempts: Math.max(1, Math.floor(input?.max_attempts ?? DEFAULT_RETRY_POLICY.max_attempts)),
   };
@@ -245,15 +260,20 @@ function normalizeRetryPolicy(input?: Partial<MeshRetryPolicy>): MeshRetryPolicy
 
 function nextRetryDelayMs(attemptCount: number, policy: MeshRetryPolicy): number {
   const exponent = Math.max(0, attemptCount - 1);
-  const delay = policy.initial_delay_ms * (2 ** exponent);
+  const delay = policy.initial_delay_ms * 2 ** exponent;
   return Math.min(policy.max_delay_ms, delay);
 }
 
-function buildRoute(request: MeshRequest, policyVersion = DEFAULT_POLICY_VERSION): MeshDeliveryRecord['route'] {
+function buildRoute(
+  request: MeshRequest,
+  policyVersion = DEFAULT_POLICY_VERSION
+): MeshDeliveryRecord['route'] {
   return {
     selector: request.target.selector,
     decision: 'direct',
-    ...(request.target.selector.kind === 'peer' ? { selected_peer_id: request.target.selector.peer_id } : {}),
+    ...(request.target.selector.kind === 'peer'
+      ? { selected_peer_id: request.target.selector.peer_id }
+      : {}),
     selected_at: nowIso(),
     policy_version: policyVersion,
   };
@@ -268,7 +288,7 @@ function buildDeliverySnapshot(
     failure_class?: MeshFailureClass;
     idempotency_key?: string;
     expires_at?: string;
-  },
+  }
 ): MeshHubDeliveryRecord {
   return {
     kind: 'mesh-delivery-record',
@@ -303,7 +323,11 @@ function buildDeliverySnapshot(
   };
 }
 
-function buildDeadLetter(snapshot: MeshDeliveryRecord, failureClass: MeshFailureClass, reason: unknown): MeshDeadLetterRecord {
+function buildDeadLetter(
+  snapshot: MeshDeliveryRecord,
+  failureClass: MeshFailureClass,
+  reason: unknown
+): MeshDeadLetterRecord {
   return {
     kind: 'mesh-dead-letter-record',
     dead_letter_id: randomId('mhdl'),
@@ -326,7 +350,19 @@ function buildDeadLetter(snapshot: MeshDeliveryRecord, failureClass: MeshFailure
   };
 }
 
+function validateTenantScope(request: MeshRequest): void {
+  if (!request.tenant_scope?.tenant_id || !isValidTenantSlug(request.tenant_scope.tenant_id)) {
+    throw new Error(
+      `mesh_request_invalid_tenant_id:${String(request.tenant_scope?.tenant_id || '')}`
+    );
+  }
+  if (request.tenant_scope.scope !== 'same_tenant') {
+    throw new Error(`mesh_request_invalid_scope:${String(request.tenant_scope?.scope || '')}`);
+  }
+}
+
 function validateFreshRequest(request: MeshRequest, now = nowIso()): void {
+  validateTenantScope(request);
   const createdAt = nowMs(request.created_at);
   const expiresAt = createdAt + request.ttl_ms;
   if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt)) {
@@ -341,23 +377,32 @@ function requestExpiryIso(request: MeshRequest): string {
   return new Date(nowMs(request.created_at) + request.ttl_ms).toISOString();
 }
 
-function writeDeliveryEvent(namespace: string | undefined, snapshot: MeshDeliveryRecord, eventType: string, role: GovernedArtifactRole): string {
-  return recordEvent(namespace, {
-    type: eventType,
-    delivery_id: snapshot.delivery_id,
-    request_id: snapshot.request_id,
-    tenant_id: snapshot.tenant_scope.tenant_id,
-    request_kind: snapshot.request_kind,
-    status: snapshot.status,
-    attempt_count: snapshot.attempt_count,
-    retry_at: snapshot.retry_at,
-    failure_class: snapshot.failure_class,
-    ...selectorSummary(snapshot.target.selector),
-    payload: {
-      classification: snapshot.payload.classification,
-      reference: snapshot.payload.reference,
+function writeDeliveryEvent(
+  namespace: string | undefined,
+  snapshot: MeshDeliveryRecord,
+  eventType: string,
+  role: GovernedArtifactRole
+): string {
+  return recordEvent(
+    namespace,
+    {
+      type: eventType,
+      delivery_id: snapshot.delivery_id,
+      request_id: snapshot.request_id,
+      tenant_id: snapshot.tenant_scope.tenant_id,
+      request_kind: snapshot.request_kind,
+      status: snapshot.status,
+      attempt_count: snapshot.attempt_count,
+      retry_at: snapshot.retry_at,
+      failure_class: snapshot.failure_class,
+      ...selectorSummary(snapshot.target.selector),
+      payload: {
+        classification: snapshot.payload.classification,
+        reference: snapshot.payload.reference,
+      },
     },
-  }, role);
+    role
+  );
 }
 
 function claimWriter(namespace: string, token: string): void {
@@ -379,7 +424,10 @@ export class MeshHubCommandLoop {
   private tail: Promise<unknown> = Promise.resolve();
   private active = false;
 
-  constructor(private readonly namespace = '', private readonly writerRole: GovernedArtifactRole = DEFAULT_WRITER_ROLE) {
+  constructor(
+    private readonly namespace = '',
+    private readonly writerRole: GovernedArtifactRole = DEFAULT_WRITER_ROLE
+  ) {
     claimWriter(this.namespace, this.token);
   }
 
@@ -398,7 +446,7 @@ export class MeshHubCommandLoop {
     const next = this.tail.then(execute, execute);
     this.tail = next.then(
       () => undefined,
-      () => undefined,
+      () => undefined
     );
     return next;
   }
@@ -420,16 +468,23 @@ export class MeshMessageBroker {
   private readonly loop: MeshHubCommandLoop;
 
   constructor(private readonly options: MeshHubCommandLoopOptions = {}) {
-    this.loop = new MeshHubCommandLoop(options.namespace || '', options.writerRole || DEFAULT_WRITER_ROLE);
+    this.loop = new MeshHubCommandLoop(
+      options.namespace || '',
+      options.writerRole || DEFAULT_WRITER_ROLE
+    );
   }
 
   public close(): void {
     this.loop.close();
   }
 
-  public acceptMeshRequest(request: MeshRequest, options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}): Promise<MeshHubAcceptResult> {
+  public acceptMeshRequest(
+    request: MeshRequest,
+    options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}
+  ): Promise<MeshHubAcceptResult> {
     return this.loop.run('acceptMeshRequest', async () => {
       const namespace = this.options.namespace || '';
+      validateTenantScope(request);
       const current = findCurrentDeliveryByIdempotency(request, namespace);
       if (current) {
         return { accepted: true, delivery: current, duplicate: true };
@@ -472,8 +527,12 @@ export class MeshMessageBroker {
     });
   }
 
-  public enqueueMeshDelivery(routeDecision: MeshHubRouteDecision, options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}): Promise<MeshDeliveryRecord> {
+  public enqueueMeshDelivery(
+    routeDecision: MeshHubRouteDecision,
+    options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}
+  ): Promise<MeshDeliveryRecord> {
     return this.loop.run('enqueueMeshDelivery', async () => {
+      validateFreshRequest(routeDecision.request, options.now);
       const namespace = this.options.namespace || '';
       const current = findCurrentDeliveryByIdempotency(routeDecision.request, namespace);
       if (current) return current;
@@ -521,7 +580,10 @@ export class MeshMessageBroker {
           const candidate = record.retry_at ? nowMs(record.retry_at) : nowMs(record.created_at);
           return candidate <= dueAt;
         })
-        .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.delivery_id.localeCompare(b.delivery_id))
+        .sort(
+          (a, b) =>
+            a.created_at.localeCompare(b.created_at) || a.delivery_id.localeCompare(b.delivery_id)
+        )
         .slice(0, Math.max(0, limit));
 
       const claimed: MeshDeliveryRecord[] = [];
@@ -539,7 +601,10 @@ export class MeshMessageBroker {
     });
   }
 
-  public acknowledgeMeshDelivery(deliveryId: string, receipt: MeshDeliveryReceipt = {}): Promise<MeshDeliveryRecord> {
+  public acknowledgeMeshDelivery(
+    deliveryId: string,
+    receipt: MeshDeliveryReceipt = {}
+  ): Promise<MeshDeliveryRecord> {
     return this.loop.run('acknowledgeMeshDelivery', async () => {
       const namespace = this.options.namespace || '';
       const current = loadCurrentDelivery(deliveryId, namespace);
@@ -554,14 +619,25 @@ export class MeshMessageBroker {
         status: receipt.completed ? 'completed' : 'acknowledged',
       };
       appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
-      writeDeliveryEvent(namespace, next, receipt.completed ? 'delivery_completed' : 'delivery_acknowledged', this.loop.getWriterRole());
+      writeDeliveryEvent(
+        namespace,
+        next,
+        receipt.completed ? 'delivery_completed' : 'delivery_acknowledged',
+        this.loop.getWriterRole()
+      );
       return next;
     });
   }
 
   public rejectMeshDelivery(
     deliveryId: string,
-    reason: string | { code?: string; redacted_reason?: string; failure_class?: MeshFailureClass } = 'recipient_rejected',
+    reason:
+      | string
+      | {
+          code?: string;
+          redacted_reason?: string;
+          failure_class?: MeshFailureClass;
+        } = 'recipient_rejected'
   ): Promise<MeshDeliveryRecord> {
     return this.loop.run('rejectMeshDelivery', async () => {
       const namespace = this.options.namespace || '';
@@ -569,7 +645,10 @@ export class MeshMessageBroker {
       if (!current) {
         throw new Error(`mesh_delivery_not_found:${deliveryId}`);
       }
-      const failureClass = typeof reason === 'string' ? 'recipient_rejected' : reason.failure_class || 'recipient_rejected';
+      const failureClass =
+        typeof reason === 'string'
+          ? 'recipient_rejected'
+          : reason.failure_class || 'recipient_rejected';
       if (nowMs(nowIso()) >= nowMs(current.expires_at)) {
         throw new Error(`mesh_delivery_expired:${deliveryId}`);
       }
@@ -586,7 +665,11 @@ export class MeshMessageBroker {
     });
   }
 
-  public retryMeshDelivery(deliveryId: string, now: string, retryPolicy: Partial<MeshRetryPolicy> = {}): Promise<MeshDeliveryRecord> {
+  public retryMeshDelivery(
+    deliveryId: string,
+    now: string,
+    retryPolicy: Partial<MeshRetryPolicy> = {}
+  ): Promise<MeshDeliveryRecord> {
     return this.loop.run('retryMeshDelivery', async () => {
       const namespace = this.options.namespace || '';
       const current = loadCurrentDelivery(deliveryId, namespace);
@@ -605,7 +688,13 @@ export class MeshMessageBroker {
         writeDeliveryEvent(namespace, expired, 'delivery_expired', this.loop.getWriterRole());
         return expired;
       }
-      if (current.status === 'expired' || current.status === 'dead_lettered' || current.status === 'rejected' || current.status === 'acknowledged' || current.status === 'completed') {
+      if (
+        current.status === 'expired' ||
+        current.status === 'dead_lettered' ||
+        current.status === 'rejected' ||
+        current.status === 'acknowledged' ||
+        current.status === 'completed'
+      ) {
         throw new Error(`mesh_delivery_not_retryable:${deliveryId}`);
       }
       const policy = normalizeRetryPolicy(retryPolicy);
@@ -643,7 +732,12 @@ export class MeshMessageBroker {
       const nowValue = nowMs(now);
       const expired: MeshDeliveryRecord[] = [];
       for (const record of loadCurrentDeliveries(namespace)) {
-        if (record.status !== 'queued' && record.status !== 'dispatched' && record.status !== 'accepted') continue;
+        if (
+          record.status !== 'queued' &&
+          record.status !== 'dispatched' &&
+          record.status !== 'accepted'
+        )
+          continue;
         if (nowValue < nowMs(record.expires_at)) continue;
         const next: MeshDeliveryRecord = {
           ...record,
@@ -684,34 +778,58 @@ function getDefaultBroker(): MeshMessageBroker {
   return defaultBroker;
 }
 
-export function createMeshMessageBroker(options: MeshHubCommandLoopOptions = {}): MeshMessageBroker {
+export function createMeshMessageBroker(
+  options: MeshHubCommandLoopOptions = {}
+): MeshMessageBroker {
   return new MeshMessageBroker(options);
 }
 
-export async function acceptMeshRequest(request: MeshRequest, options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}): Promise<MeshHubAcceptResult> {
+export async function acceptMeshRequest(
+  request: MeshRequest,
+  options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}
+): Promise<MeshHubAcceptResult> {
   return getDefaultBroker().acceptMeshRequest(request, options);
 }
 
-export async function enqueueMeshDelivery(routeDecision: MeshHubRouteDecision, options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}): Promise<MeshDeliveryRecord> {
+export async function enqueueMeshDelivery(
+  routeDecision: MeshHubRouteDecision,
+  options: { now?: string; retryPolicy?: Partial<MeshRetryPolicy> } = {}
+): Promise<MeshDeliveryRecord> {
   return getDefaultBroker().enqueueMeshDelivery(routeDecision, options);
 }
 
-export async function claimDueMeshDeliveries(now: string, limit = 1): Promise<MeshDeliveryRecord[]> {
+export async function claimDueMeshDeliveries(
+  now: string,
+  limit = 1
+): Promise<MeshDeliveryRecord[]> {
   return getDefaultBroker().claimDueMeshDeliveries(now, limit);
 }
 
-export async function acknowledgeMeshDelivery(deliveryId: string, receipt: MeshDeliveryReceipt = {}): Promise<MeshDeliveryRecord> {
+export async function acknowledgeMeshDelivery(
+  deliveryId: string,
+  receipt: MeshDeliveryReceipt = {}
+): Promise<MeshDeliveryRecord> {
   return getDefaultBroker().acknowledgeMeshDelivery(deliveryId, receipt);
 }
 
 export async function rejectMeshDelivery(
   deliveryId: string,
-  reason: string | { code?: string; redacted_reason?: string; failure_class?: MeshFailureClass } = 'recipient_rejected',
+  reason:
+    | string
+    | {
+        code?: string;
+        redacted_reason?: string;
+        failure_class?: MeshFailureClass;
+      } = 'recipient_rejected'
 ): Promise<MeshDeliveryRecord> {
   return getDefaultBroker().rejectMeshDelivery(deliveryId, reason);
 }
 
-export async function retryMeshDelivery(deliveryId: string, now: string, retryPolicy: Partial<MeshRetryPolicy> = {}): Promise<MeshDeliveryRecord> {
+export async function retryMeshDelivery(
+  deliveryId: string,
+  now: string,
+  retryPolicy: Partial<MeshRetryPolicy> = {}
+): Promise<MeshDeliveryRecord> {
   return getDefaultBroker().retryMeshDelivery(deliveryId, now, retryPolicy);
 }
 
@@ -721,7 +839,7 @@ export async function expireMeshDeliveries(now: string): Promise<MeshDeliveryRec
 
 export async function listMeshDeadLetters(
   filter: MeshDeadLetterFilter = {},
-  options: { namespace?: string } = {},
+  options: { namespace?: string } = {}
 ): Promise<MeshDeadLetterRecord[]> {
   const namespace = options.namespace || '';
   return loadCurrentDeadLetters(namespace).filter((record) => {
@@ -741,7 +859,9 @@ export async function listMeshDeliveries(namespace?: string): Promise<MeshHubDel
 export function clearMeshMessageBrokerNamespace(namespace?: string): void {
   const normalized = normalizeNamespace(namespace);
   const root = normalized ? `${meshHubRoot(normalized)}` : meshHubRoot();
-  const obsRoot = normalized ? `${meshHubObservabilityRoot(normalized)}` : meshHubObservabilityRoot();
+  const obsRoot = normalized
+    ? `${meshHubObservabilityRoot(normalized)}`
+    : meshHubObservabilityRoot();
   withExecutionContext(DEFAULT_WRITER_ROLE, () => {
     if (safeExistsSync(root)) safeRmSync(root, { recursive: true, force: true });
     if (safeExistsSync(obsRoot)) safeRmSync(obsRoot, { recursive: true, force: true });

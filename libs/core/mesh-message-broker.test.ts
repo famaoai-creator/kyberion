@@ -31,6 +31,7 @@ function buildRequest(input: {
   createdAt: string;
   ttlMs: number;
   body?: string;
+  tenantId?: string;
 }): MeshRequest {
   const payload: any = {
     classification: 'confidential',
@@ -45,7 +46,7 @@ function buildRequest(input: {
     kind: 'mesh-request',
     request_id: input.requestId,
     tenant_scope: {
-      tenant_id: 'tenant-acme',
+      tenant_id: input.tenantId || 'tenant-acme',
       scope: 'same_tenant',
     },
     sender_peer_id: 'peer-sender',
@@ -74,6 +75,49 @@ describe('mesh-message-broker', () => {
     clearMeshMessageBrokerNamespace('mesh-message-broker-expiry-test');
     clearMeshMessageBrokerNamespace('mesh-message-broker-fence-test');
     clearMeshMessageBrokerNamespace('mesh-message-broker-ack-test');
+    clearMeshMessageBrokerNamespace('mesh-message-broker-invalid-tenant-test');
+    clearMeshMessageBrokerNamespace('mesh-message-broker-duplicate-validation-test');
+  });
+
+  it('rejects reserved scope names before persisting a delivery', async () => {
+    const broker = createMeshMessageBroker({
+      namespace: 'mesh-message-broker-invalid-tenant-test',
+    });
+    activeBroker = broker;
+    await expect(
+      broker.acceptMeshRequest(
+        buildRequest({
+          requestId: 'meshreq-invalid-tenant',
+          idempotencyKey: 'idem-invalid-tenant',
+          createdAt: new Date().toISOString(),
+          ttlMs: 60_000,
+          tenantId: 'public',
+        })
+      )
+    ).rejects.toThrow(/mesh_request_invalid_tenant_id/i);
+  });
+
+  it('validates a duplicate request before returning the existing delivery', async () => {
+    const namespace = 'mesh-message-broker-duplicate-validation-test';
+    const broker = createMeshMessageBroker({ namespace });
+    activeBroker = broker;
+    const requestTime = new Date().toISOString();
+    const valid = buildRequest({
+      requestId: 'meshreq-duplicate-validation',
+      idempotencyKey: 'idem-duplicate-validation',
+      createdAt: requestTime,
+      ttlMs: 60_000,
+    });
+    await broker.acceptMeshRequest(valid, { now: requestTime });
+    await expect(
+      broker.acceptMeshRequest(
+        {
+          ...valid,
+          tenant_scope: { tenant_id: 'public', scope: 'same_tenant' },
+        },
+        { now: requestTime }
+      )
+    ).rejects.toThrow(/mesh_request_invalid_tenant_id/i);
   });
 
   it('serializes duplicate accepts, persists one delivery id, and redacts raw payload content', async () => {
@@ -116,7 +160,6 @@ describe('mesh-message-broker', () => {
         storage_class: 'artifact_store',
       },
     });
-
   });
 
   it('fences a second writer and rejects reentrant commands deterministically', async () => {
@@ -125,11 +168,9 @@ describe('mesh-message-broker', () => {
     activeBroker = loop;
 
     expect(() => new MeshHubCommandLoop(namespace)).toThrow(/mesh_hub_writer_fenced/);
-    await expect(
-      loop.run('outer', async () =>
-        loop.run('inner', async () => 1),
-      ),
-    ).rejects.toThrow(/mesh_hub_reentrant_command_rejected/);
+    await expect(loop.run('outer', async () => loop.run('inner', async () => 1))).rejects.toThrow(
+      /mesh_hub_reentrant_command_rejected/
+    );
   });
 
   it('acks, rejects, expires, and refuses stale retry or re-accept paths', async () => {
@@ -177,11 +218,13 @@ describe('mesh-message-broker', () => {
     const expiredAccepted = await broker.acceptMeshRequest(expiredRequest, { now: requestTime });
     const expiredAt = new Date(Date.parse(requestTime) + 2_000).toISOString();
     const expired = await broker.expireMeshDeliveries(expiredAt);
-    expect(expired.some((row) => row.delivery_id === expiredAccepted.delivery.delivery_id)).toBe(true);
+    expect(expired.some((row) => row.delivery_id === expiredAccepted.delivery.delivery_id)).toBe(
+      true
+    );
     const retried = await broker.retryMeshDelivery(expiredAccepted.delivery.delivery_id, expiredAt);
     expect(retried.status).toBe('expired');
     await expect(
-      broker.acceptMeshRequest(expiredRequest, { now: expiredAt }),
+      broker.acceptMeshRequest(expiredRequest, { now: expiredAt })
     ).resolves.toMatchObject({
       duplicate: true,
     });
@@ -192,7 +235,11 @@ describe('mesh-message-broker', () => {
     expect(JSON.stringify(brokerDeadLetters)).not.toContain('SECOND_RAW_SECRET');
 
     const runtimeRecords = readJsonl(namespacePath(namespace, 'deliveries.jsonl'));
-    expect(runtimeRecords.every((row) => !JSON.stringify(row).includes('RAW_SECRET_PAYLOAD'))).toBe(true);
-    expect(runtimeRecords.every((row) => !JSON.stringify(row).includes('SECOND_RAW_SECRET'))).toBe(true);
+    expect(runtimeRecords.every((row) => !JSON.stringify(row).includes('RAW_SECRET_PAYLOAD'))).toBe(
+      true
+    );
+    expect(runtimeRecords.every((row) => !JSON.stringify(row).includes('SECOND_RAW_SECRET'))).toBe(
+      true
+    );
   });
 });

@@ -11,16 +11,16 @@ What Kyberion does and doesn't do with your data.
 
 ## 1. What Kyberion Stores Locally
 
-| Path | Contents |
-|---|---|
-| `knowledge/personal/` | Your identity, vision, connections, voice profile. **Gitignored.** |
-| `customer/{slug}/` | FDE customer configs (when `KYBERION_CUSTOMER` is set). **Gitignored** except `_template/`. |
-| `active/missions/{id}/` | Per-mission git repo, state, evidence. **Gitignored.** |
-| `active/shared/logs/traces/` | Structured execution traces (JSONL). **Gitignored.** |
-| `active/shared/runtime/` | Runtime state, locks, surface metadata. **Gitignored.** |
-| `active/audit/*.jsonl` | Audit ledger entries. **Gitignored.** |
-| `knowledge/confidential/{project}/` | Project-scoped confidential knowledge. **Gitignored.** |
-| `knowledge/public/` | Public reusable knowledge. **Committed** (intentionally shared). |
+| Path                                    | Contents                                                                                                                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge/personal/`                   | Your identity, vision, connections, voice profile. **Gitignored.**                                                                                                                                |
+| `customer/{slug}/`                      | Stance overlay — identity/connections/policy for the entity you are acting as (when `KYBERION_CUSTOMER` is set). **Gitignored** except `_template/`.                                              |
+| `active/missions/{id}/`                 | Per-mission git repo, state, evidence. **Gitignored.**                                                                                                                                            |
+| `active/shared/logs/traces/`            | Structured execution traces (JSONL). **Gitignored.**                                                                                                                                              |
+| `active/shared/runtime/`                | Runtime state, locks, surface metadata. **Gitignored.**                                                                                                                                           |
+| `active/audit/*.jsonl`                  | Audit ledger entries. **Gitignored.**                                                                                                                                                             |
+| `knowledge/confidential/{tenant-slug}/` | Tenant-scoped confidential knowledge; one directory per confidentiality boundary, resolved from the tenant registry. `common/` and `tenant-groups/` are the only shared prefixes. **Gitignored.** |
+| `knowledge/public/`                     | Public reusable knowledge. **Committed** (intentionally shared).                                                                                                                                  |
 
 The `.gitignore` policy is enforced — see the file for the canonical list.
 
@@ -36,17 +36,17 @@ The `.gitignore` policy is enforced — see the file for the canonical list.
 
 When you configure these, Kyberion sends data **to that provider on your behalf**, not to Kyberion:
 
-| Service | What gets sent | When |
-|---|---|---|
-| Anthropic / Claude | The conversation context + tool calls | When you select the `anthropic` reasoning backend |
-| OpenAI / Codex | Same | When you select the `codex-cli` backend |
-| Google Gemini CLI | Same | When you select the `gemini-cli` backend |
-| NVIDIA Nemotron API | Same | When you select the `nemotron-api` backend |
-| Local Claude CLI | Same, but routed through your local CLI | When you select `claude-cli` |
-| Local OpenAI-compatible LLM | Same, but routed through your own endpoint | When you select `local` |
-| Style-Bert-VITS2 (local) | TTS text → local server, no network egress | When you opt into local voice (Phase 2) |
-| Whisper (local) | STT audio → local server, no network egress | When you opt into local voice (Phase 2) |
-| Slack / Google Workspace / Notion | Whatever the connection is configured to read/write | When you wire those connections |
+| Service                           | What gets sent                                      | When                                              |
+| --------------------------------- | --------------------------------------------------- | ------------------------------------------------- |
+| Anthropic / Claude                | The conversation context + tool calls               | When you select the `anthropic` reasoning backend |
+| OpenAI / Codex                    | Same                                                | When you select the `codex-cli` backend           |
+| Google Gemini CLI                 | Same                                                | When you select the `gemini-cli` backend          |
+| NVIDIA Nemotron API               | Same                                                | When you select the `nemotron-api` backend        |
+| Local Claude CLI                  | Same, but routed through your local CLI             | When you select `claude-cli`                      |
+| Local OpenAI-compatible LLM       | Same, but routed through your own endpoint          | When you select `local`                           |
+| Style-Bert-VITS2 (local)          | TTS text → local server, no network egress          | When you opt into local voice (Phase 2)           |
+| Whisper (local)                   | STT audio → local server, no network egress         | When you opt into local voice (Phase 2)           |
+| Slack / Google Workspace / Notion | Whatever the connection is configured to read/write | When you wire those connections                   |
 
 You always know which backend is active — `pnpm doctor` and CLI logs print it on startup.
 

@@ -10,8 +10,9 @@ import type { MissionState } from './mission-types.js';
 const MISSION_ID = 'MSN-PM-TEST-REASSIGN';
 const SOURCE_PROJECT_ID = 'PRJ-PM-TEST-SOURCE';
 const TARGET_PROJECT_ID = 'PRJ-PM-TEST-TARGET';
-const SOURCE_PATH = `active/projects/confidential/shared/${SOURCE_PROJECT_ID}`;
-const TARGET_PATH = `active/projects/confidential/shared/${TARGET_PROJECT_ID}`;
+const TEST_TENANT = 'tenant-reassignment';
+const SOURCE_PATH = `active/projects/confidential/${TEST_TENANT}/${SOURCE_PROJECT_ID}`;
+const TARGET_PATH = `active/projects/confidential/${TEST_TENANT}/${TARGET_PROJECT_ID}`;
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 
@@ -20,12 +21,12 @@ function cleanup(): void {
   const sourceWorkspace = pathResolver.projectWorkspaceDir(
     SOURCE_PROJECT_ID,
     'confidential',
-    'shared'
+    TEST_TENANT
   );
   const targetWorkspace = pathResolver.projectWorkspaceDir(
     TARGET_PROJECT_ID,
     'confidential',
-    'shared'
+    TEST_TENANT
   );
   for (const filePath of [
     `${pathResolver.shared('runtime/projects')}/${SOURCE_PROJECT_ID}.json`,
@@ -44,6 +45,7 @@ function fixtureMission(): MissionState {
     mission_type: 'development',
     tier: 'confidential',
     status: 'paused',
+    tenant_slug: TEST_TENANT,
     execution_mode: 'local',
     priority: 1,
     assigned_persona: 'worker',
@@ -80,7 +82,7 @@ describe('mission Project reassignment', () => {
       summary: 'Source fixture.',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-reassignment',
       repositories: [{ repo_id: 'REPO-SOURCE', kind: 'project-root', root_path: SOURCE_PATH }],
     });
     saveProjectRecord({
@@ -89,7 +91,7 @@ describe('mission Project reassignment', () => {
       summary: 'Target fixture.',
       status: 'active',
       tier: 'confidential',
-      tenant_slug: 'shared',
+      tenant_slug: 'tenant-reassignment',
       repositories: [{ repo_id: 'REPO-TARGET', kind: 'project-root', root_path: TARGET_PATH }],
     });
   });

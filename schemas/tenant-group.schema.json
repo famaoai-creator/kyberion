@@ -14,7 +14,11 @@
     "member_tenants": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{1,30}$",
+        "not": { "enum": ["public", "confidential", "personal", "shared"] }
+      },
       "uniqueItems": true
     },
     "shared_prefixes": {

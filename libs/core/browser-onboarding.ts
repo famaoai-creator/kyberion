@@ -19,6 +19,7 @@ import { listServiceBindingRecords } from './service-binding-registry.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import { getToolRuntimePolicy } from './tool-runtime-policy.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   getVoiceProfileRegistry,
   resetVoiceProfileRegistryCache,
@@ -49,7 +50,7 @@ const identitySchema = z.object({
   tenant_slug: z
     .string()
     .trim()
-    .regex(/^[a-z][a-z0-9-]{1,30}$/)
+    .refine(isValidTenantSlug, 'tenant slug is reserved or invalid')
     .optional(),
 });
 

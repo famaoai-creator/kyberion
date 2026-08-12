@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -307,6 +308,16 @@ export function evaluateEgressPolicy(
     };
   }
 
+  if (context?.tenant_slug && !isValidTenantSlug(context.tenant_slug)) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[TENANT_SCOPE_INVALID] '${context.tenant_slug}' is not a valid tenant slug.`,
+      mode: policy.mode || 'warn',
+      tier: context.tier,
+    };
+  }
+
   const blocked = new Set(
     (policy.blocked_domains ?? [])
       .map((domain) => normalizeDomain(domain))
@@ -413,7 +424,7 @@ function loadTenantEgressDomains(policy: EgressPolicyFile, tenantSlug?: string):
     const normalized = normalizeDomain(domain);
     if (normalized) domains.add(normalized);
   }
-  if (tenantSlug && /^[a-z][a-z0-9-]{1,30}$/u.test(tenantSlug)) {
+  if (tenantSlug && isValidTenantSlug(tenantSlug)) {
     const tenantDomains = Object.prototype.hasOwnProperty.call(table, tenantSlug)
       ? table[tenantSlug]
       : [];

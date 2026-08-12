@@ -10,6 +10,7 @@ import {
   withReasoningPayloadScope,
 } from './reasoning-egress-scope.js';
 import { detectRasterCapabilities, rasterInstallHint } from './visual-raster.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * MP-04: look at the render, critique it, and say what to fix.
@@ -37,11 +38,7 @@ const logger = createLogger('visual-review');
 
 export type VisualFindingSeverity = 'error' | 'warning';
 export type VisualFindingAction =
-  | 'layout_fit'
-  | 'content_reflow'
-  | 'contrast_adjustment'
-  | 'spacing_adjustment'
-  | 'manual_review';
+  'layout_fit' | 'content_reflow' | 'contrast_adjustment' | 'spacing_adjustment' | 'manual_review';
 
 export interface VisualReviewCriterion {
   id: string;
@@ -82,10 +79,10 @@ const BUILT_IN_RUBRIC: VisualReviewRubric = {
 const cachedRubrics = new Map<string, VisualReviewRubric>();
 
 export function loadVisualReviewRubric(options: { tenantSlug?: string } = {}): VisualReviewRubric {
-  const tenantSlug =
-    options.tenantSlug && /^[a-z][a-z0-9-]{1,30}$/u.test(options.tenantSlug)
-      ? options.tenantSlug
-      : '';
+  if (options.tenantSlug && !isValidTenantSlug(options.tenantSlug)) {
+    throw new Error('[VISUAL_REVIEW_TENANT_INVALID] tenant slug is not valid');
+  }
+  const tenantSlug = options.tenantSlug || '';
   const cacheKey = tenantSlug || 'public';
   const cached = cachedRubrics.get(cacheKey);
   if (cached) return cached;

@@ -22,7 +22,10 @@ const TEST_RUNTIME_ROOT_ABS = path.join(ROOT, TEST_RUNTIME_ROOT);
 describe('mesh-topic-registry', () => {
   beforeEach(() => {
     process.env.KYBERION_MESH_HUB_RUNTIME_ROOT = TEST_RUNTIME_ROOT;
-    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace('runtime', 'observability');
+    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace(
+      'runtime',
+      'observability'
+    );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshTopicRegistryNamespace();
   });
@@ -30,6 +33,24 @@ describe('mesh-topic-registry', () => {
   afterEach(() => {
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshTopicRegistryNamespace();
+  });
+
+  it('rejects tier and shared partition names as subscription tenants', () => {
+    for (const tenant_id of ['public', 'confidential', 'personal', 'shared']) {
+      expect(() =>
+        subscribeMeshTopic({
+          tenant_id,
+          topic: 'release.review',
+          peer_id: 'peer-a1',
+          filters: {
+            request_kinds: ['notification.publish'],
+            payload_classifications: ['public'],
+          },
+          expires_at: '2099-06-24T01:03:00.000Z',
+          authority_role: 'infrastructure_sentinel',
+        })
+      ).toThrow(/invalid_tenant_id/i);
+    }
   });
 
   it('stores explicit subscriptions and rejects unauthorized subscription authorities', () => {
@@ -45,7 +66,7 @@ describe('mesh-topic-registry', () => {
         expires_at: '2026-06-24T01:03:00.000Z',
         policy_version: '1.0.0',
         authority_role: 'slack_bridge' as any,
-      }),
+      })
     ).toThrow(/topic_subscription_authority_denied/i);
 
     const subscription = subscribeMeshTopic({
@@ -65,11 +86,14 @@ describe('mesh-topic-registry', () => {
     expect(subscription.kind).toBe('mesh-topic-subscription');
     expect(subscription.subscription_id).toBe('sub-a1');
     expect(
-      listMeshTopicSubscriptions({
-        tenant_id: 'tenant-acme',
-        topic: 'release.review',
-        peer_id: 'peer-a1',
-      }, { now: '2026-06-24T00:03:00.000Z' }),
+      listMeshTopicSubscriptions(
+        {
+          tenant_id: 'tenant-acme',
+          topic: 'release.review',
+          peer_id: 'peer-a1',
+        },
+        { now: '2026-06-24T00:03:00.000Z' }
+      )
     ).toHaveLength(1);
   });
 
@@ -146,17 +170,23 @@ describe('mesh-topic-registry', () => {
       authority_role: 'infrastructure_sentinel',
     });
 
-    const resolution = resolveMeshTopicRecipients({
-      tenant_id: 'tenant-acme',
-      topic: 'release.review',
-      request_kind: 'notification.publish',
-      payload_classification: 'public',
-      now: '2026-06-24T00:03:00.000Z',
-    }, { maxFanOut: 2 });
+    const resolution = resolveMeshTopicRecipients(
+      {
+        tenant_id: 'tenant-acme',
+        topic: 'release.review',
+        request_kind: 'notification.publish',
+        payload_classification: 'public',
+        now: '2026-06-24T00:03:00.000Z',
+      },
+      { maxFanOut: 2 }
+    );
 
     expect(resolution.decision).toBe('fan_out');
     expect(resolution.selected_peer_ids).toEqual(['peer-a1', 'peer-b1']);
-    expect(resolution.candidates.map((candidate) => candidate.peer_id)).toEqual(['peer-a1', 'peer-b1']);
+    expect(resolution.candidates.map((candidate) => candidate.peer_id)).toEqual([
+      'peer-a1',
+      'peer-b1',
+    ]);
     expect(resolution.exclusions).toEqual([]);
   });
 
@@ -242,7 +272,7 @@ describe('mesh-topic-registry', () => {
       },
       {
         maxFanOut: 1,
-      },
+      }
     );
 
     expect(resolution.decision).toBe('rejected');

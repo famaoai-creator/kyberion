@@ -12,7 +12,8 @@
     },
     "tenant_id": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]{1,30}$"
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "catalog_visibility": {
       "type": "string",

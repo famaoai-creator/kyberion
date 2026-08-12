@@ -67,13 +67,7 @@
       "description": "Hard deadline. If absent, default reminder cadence is daily."
     },
     "status": {
-      "enum": [
-        "pending",
-        "in_progress",
-        "completed",
-        "blocked",
-        "cancelled"
-      ]
+      "enum": ["pending", "in_progress", "completed", "blocked", "cancelled"]
     },
     "priority": {
       "enum": ["must", "should", "could", "wont"],
@@ -85,6 +79,7 @@
     "tenant_slug": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] },
       "description": "Optional tenant scope; mirrors mission tenant."
     },
     "reminders": {
