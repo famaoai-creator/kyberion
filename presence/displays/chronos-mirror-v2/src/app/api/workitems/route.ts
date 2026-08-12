@@ -77,6 +77,7 @@ export function GET(req: NextRequest) {
       items: projection.items,
       counts: projection.counts,
       quality: projection.quality,
+      lineage: projection.lineage,
     });
   } catch (error) {
     return viewerErrorResponse(error);

@@ -13,6 +13,10 @@ type Entry = {
   team_role?: string;
   mission_id?: string;
   tenant_slug?: string;
+  organization_id?: string;
+  project_id?: string;
+  task_id?: string;
+  work_shape?: string;
   item_id: string;
   title: string;
   status: string;
@@ -167,9 +171,15 @@ export function AgentOpsBoards({
               </span>
             </div>
             <div className="mt-1 text-[10px] kb-text-muted">
-              {entry.mission_id}
+              {entry.tenant_slug ? `tenant: ${entry.tenant_slug}` : 'tenant: missing'}
+              {entry.organization_id
+                ? ` · organization: ${entry.organization_id}`
+                : ' · organization: missing'}
+              {entry.project_id ? ` · project: ${entry.project_id}` : ' · project: missing'}
+              {entry.mission_id ? ` · mission: ${entry.mission_id}` : ' · mission: missing'}
+              {entry.task_id ? ` · task: ${entry.task_id}` : ' · task: missing'}
               {entry.phase ? ` · phase: ${entry.phase}` : ''}
-              {entry.tenant_slug ? ` · tenant: ${entry.tenant_slug}` : ''}
+              {entry.work_shape ? ` · shape: ${entry.work_shape}` : ''}
             </div>
             {entry.blockers.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-2">

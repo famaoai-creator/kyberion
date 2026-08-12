@@ -14,6 +14,40 @@ export interface VisibleWorkItem extends WorkItem {
   context: ResolvedWorkItemContext;
 }
 
+export const WORK_ITEM_LINEAGE_KEYS = [
+  'tenant_slug',
+  'organization_id',
+  'project_id',
+  'mission_id',
+  'task_id',
+] as const;
+
+export type WorkItemLineageKey = (typeof WORK_ITEM_LINEAGE_KEYS)[number];
+
+export interface WorkItemLineageNode {
+  key: string;
+  kind: WorkItemLineageKey;
+  id: string;
+  item_count: number;
+}
+
+export interface WorkItemLineageEdge {
+  from: string;
+  to: string;
+  relationship: 'contains';
+  item_count: number;
+}
+
+export interface WorkItemLineage {
+  hierarchy: readonly WorkItemLineageKey[];
+  nodes: WorkItemLineageNode[];
+  edges: WorkItemLineageEdge[];
+  total_items: number;
+  complete_chain_items: number;
+  incomplete_chain_items: number;
+  missing_by_kind: Record<WorkItemLineageKey, number>;
+}
+
 export interface WorkVisibilityProjection {
   scope: WorkVisibilityScope;
   view: WorkVisibilityView;
@@ -25,6 +59,7 @@ export interface WorkVisibilityProjection {
     missing_context: number;
     warnings: string[];
   };
+  lineage: WorkItemLineage;
 }
 
 export interface WorkVisibilityViewer {
@@ -154,6 +189,71 @@ function matchesView(item: VisibleWorkItem, view: WorkVisibilityView): boolean {
   return true;
 }
 
+function lineageKey(kind: WorkItemLineageKey, id: string): string {
+  return `${kind}:${id}`;
+}
+
+/** Build the shared tenant → organization → project → mission → task graph. */
+export function buildWorkItemLineage(items: VisibleWorkItem[]): WorkItemLineage {
+  const nodes = new Map<string, WorkItemLineageNode>();
+  const edges = new Map<string, WorkItemLineageEdge>();
+  const missingByKind = Object.fromEntries(
+    WORK_ITEM_LINEAGE_KEYS.map((kind) => [kind, 0])
+  ) as Record<WorkItemLineageKey, number>;
+  let completeChainItems = 0;
+
+  for (const item of items) {
+    const present = WORK_ITEM_LINEAGE_KEYS.map((kind) => ({
+      kind,
+      id: stringValue(item.context[kind]),
+    }));
+    if (present.every((entry) => entry.id)) completeChainItems += 1;
+    for (const entry of present) {
+      if (!entry.id) {
+        missingByKind[entry.kind] += 1;
+        continue;
+      }
+      const key = lineageKey(entry.kind, entry.id);
+      const node = nodes.get(key);
+      if (node) node.item_count += 1;
+      else {
+        nodes.set(key, {
+          key,
+          kind: entry.kind,
+          id: entry.id,
+          item_count: 1,
+        });
+      }
+    }
+
+    for (let index = 1; index < present.length; index += 1) {
+      const previous = present[index - 1];
+      const current = present[index];
+      // Do not bridge over a missing parent: tenant -> project would falsely
+      // imply that the organization link was known and authorized.
+      if (!previous.id || !current.id) continue;
+      const from = lineageKey(previous.kind, previous.id);
+      const to = lineageKey(current.kind, current.id);
+      const key = `${from}->${to}`;
+      const edge = edges.get(key);
+      if (edge) edge.item_count += 1;
+      else edges.set(key, { from, to, relationship: 'contains', item_count: 1 });
+    }
+  }
+
+  return {
+    hierarchy: WORK_ITEM_LINEAGE_KEYS,
+    nodes: [...nodes.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    edges: [...edges.values()].sort((a, b) =>
+      `${a.from}->${a.to}`.localeCompare(`${b.from}->${b.to}`)
+    ),
+    total_items: items.length,
+    complete_chain_items: completeChainItems,
+    incomplete_chain_items: items.length - completeChainItems,
+    missing_by_kind: missingByKind,
+  };
+}
+
 /** Shared projection consumed by Work Items, Home, Operations, Missions and Governance. */
 export function buildWorkVisibilityProjection(input: {
   items: WorkItem[];
@@ -202,5 +302,12 @@ export function buildWorkVisibilityProjection(input: {
     ).length,
     warnings: [...new Set(projected.flatMap((item) => item.context.warnings))],
   };
-  return { scope, view, items: projected, counts, quality };
+  return {
+    scope,
+    view,
+    items: projected,
+    counts,
+    quality,
+    lineage: buildWorkItemLineage(projected),
+  };
 }
