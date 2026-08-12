@@ -67,7 +67,11 @@ export function GET(req: NextRequest) {
       ok: true,
       scope: 'operations',
       view: 'active',
-      projection: { counts: projection.counts, quality: projection.quality },
+      projection: {
+        counts: projection.counts,
+        quality: projection.quality,
+        lineage: projection.lineage,
+      },
       board,
       office,
       trackRecords,
