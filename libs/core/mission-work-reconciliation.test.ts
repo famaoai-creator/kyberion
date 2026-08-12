@@ -118,7 +118,6 @@ function prepareMission(tasks?: Array<Record<string, unknown>>): void {
         mission_id: missionId,
         project_id: missionId,
         task_id: taskId,
-        tenant_slug: 'public',
       },
       metadata: {
         task_id: taskId,
@@ -148,7 +147,6 @@ function prepareMission(tasks?: Array<Record<string, unknown>>): void {
         mission_id: missionId,
         project_id: missionId,
         task_id: taskId,
-        tenant_slug: 'public',
       },
       assigneePeerId:
         task.assigned_to && typeof task.assigned_to === 'object'

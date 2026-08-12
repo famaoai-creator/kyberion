@@ -58,6 +58,7 @@ import {
 } from './provider-egress-gate.js';
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -468,12 +469,18 @@ export async function runBackgroundReviewFork(
         const coordinatedBackend = { ...getReasoningBackend(), ...backend } as ReasoningBackend;
         const workItem = getWorkItem(input.workItemId);
         const scope = workItem?.context;
+        const tenantId = scope?.tenant_slug?.trim();
+        if (!tenantId || !isValidTenantSlug(tenantId)) {
+          throw new Error(
+            `background_review_requires_valid_tenant_scope:${String(tenantId || '')}`
+          );
+        }
         const receipt = await delegateWorkItemWithReasoningBackend(coordinatedBackend, {
           work_item_id: input.workItemId,
           task_id: input.workItemId,
           instruction: prompt,
           security_scope: {
-            tenant_id: scope?.tenant_slug || 'public',
+            tenant_id: tenantId,
             organization_id: scope?.organization_id,
             project_id: scope?.project_id,
             mission_id: scope?.mission_id || input.missionId || input.workItemId,

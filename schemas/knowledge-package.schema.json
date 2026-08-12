@@ -27,7 +27,11 @@
         "package_version": { "type": "string", "minLength": 1 },
         "package_id": { "type": "string", "minLength": 1 },
         "origin_agent_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
-        "origin_tenant_id": { "type": "string", "minLength": 1 },
+        "origin_tenant_id": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "origin_project_id": { "type": "string" },
         "source_tier": { "enum": ["personal", "confidential", "public"] },
         "requested_target_tier": { "enum": ["personal", "confidential", "public"] },

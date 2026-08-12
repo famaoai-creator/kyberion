@@ -14,6 +14,7 @@ import {
   saveProjectMissionLink,
   saveProjectOperationalState,
   saveProjectTrackState,
+  syncProjectOperationalStateFromMission,
 } from './project-operational-state-registry.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -21,7 +22,11 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 
-function cleanupWorkspace(projectId: string, tier: 'personal' | 'confidential' | 'public', tenantSlug = 'shared') {
+function cleanupWorkspace(
+  projectId: string,
+  tier: 'personal' | 'confidential' | 'public',
+  tenantSlug = 'shared'
+) {
   const workspace = pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug);
   if (safeExistsSync(workspace)) {
     safeRmSync(workspace);
@@ -34,9 +39,11 @@ describe('project-operational-state-registry', () => {
     process.env.MISSION_ROLE = 'software_developer';
     cleanupWorkspace('PRJ-TEST-OPS', 'public', 'tenant-alpha');
     cleanupWorkspace('PRJ-TEST-OPS-2', 'confidential', 'shared');
+    cleanupWorkspace('PRJ-TEST-OPS-TENANTLESS', 'public', 'shared');
   });
 
   afterEach(() => {
+    cleanupWorkspace('PRJ-TEST-OPS-TENANTLESS', 'public', 'shared');
     process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
   });
@@ -67,12 +74,29 @@ describe('project-operational-state-registry', () => {
       metadata: { owner: 'team-alpha' },
     });
 
-    expect(filePath).toContain(path.join('active', 'projects', 'public', 'tenant-alpha', 'PRJ-TEST-OPS', 'state', 'project-state.json'));
+    expect(filePath).toContain(
+      path.join(
+        'active',
+        'projects',
+        'public',
+        'tenant-alpha',
+        'PRJ-TEST-OPS',
+        'state',
+        'project-state.json'
+      )
+    );
     expect(projectOperationalStatePath('PRJ-TEST-OPS', 'public', 'tenant-alpha')).toBe(filePath);
-    expect(projectOperationalStateDir('PRJ-TEST-OPS', 'public', 'tenant-alpha')).toContain(path.join('active', 'projects', 'public', 'tenant-alpha', 'PRJ-TEST-OPS', 'state'));
-    expect(loadProjectOperationalState('PRJ-TEST-OPS', { tier: 'public', tenantSlug: 'tenant-alpha' })?.current_phase).toBe('build');
+    expect(projectOperationalStateDir('PRJ-TEST-OPS', 'public', 'tenant-alpha')).toContain(
+      path.join('active', 'projects', 'public', 'tenant-alpha', 'PRJ-TEST-OPS', 'state')
+    );
+    expect(
+      loadProjectOperationalState('PRJ-TEST-OPS', { tier: 'public', tenantSlug: 'tenant-alpha' })
+        ?.current_phase
+    ).toBe('build');
     expect(loadProjectOperationalState('PRJ-TEST-OPS')?.tenant_slug).toBe('tenant-alpha');
-    expect(listProjectOperationalStates({ tier: 'public', tenantSlug: 'tenant-alpha' })).toHaveLength(1);
+    expect(
+      listProjectOperationalStates({ tier: 'public', tenantSlug: 'tenant-alpha' })
+    ).toHaveLength(1);
 
     const missionLink = saveProjectMissionLink({
       project_id: 'PRJ-TEST-OPS',
@@ -97,15 +121,22 @@ describe('project-operational-state-registry', () => {
       active_mission_ids: ['MSN-TEST-001'],
     });
 
-    expect(missionLink).toBe(projectOperationalMissionLinkPath('PRJ-TEST-OPS', 'public', 'tenant-alpha', 'MSN-TEST-001'));
-    expect(trackState).toBe(projectOperationalTrackStatePath('PRJ-TEST-OPS', 'public', 'tenant-alpha', 'TRK-TEST-REL1'));
+    expect(missionLink).toBe(
+      projectOperationalMissionLinkPath('PRJ-TEST-OPS', 'public', 'tenant-alpha', 'MSN-TEST-001')
+    );
+    expect(trackState).toBe(
+      projectOperationalTrackStatePath('PRJ-TEST-OPS', 'public', 'tenant-alpha', 'TRK-TEST-REL1')
+    );
     expect(safeExistsSync(missionLink)).toBe(true);
     expect(safeExistsSync(trackState)).toBe(true);
   });
 
   it('emits project operational state records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/project-operational-state.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/project-operational-state.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const valid = validate({
       project_id: 'PRJ-TEST-SCHEMA',
@@ -130,5 +161,31 @@ describe('project-operational-state-registry', () => {
       updated_at: new Date('2026-06-05T00:00:00.000Z').toISOString(),
     });
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('keeps tenantless public state in the shared partition without serializing shared', () => {
+    const filePath = syncProjectOperationalStateFromMission({
+      mission_id: 'MSN-TEST-TENANTLESS',
+      tier: 'public',
+      status: 'active',
+      relationships: {
+        project: {
+          project_id: 'PRJ-TEST-OPS-TENANTLESS',
+        },
+      },
+    });
+
+    expect(filePath).toContain(
+      path.join(
+        'active',
+        'projects',
+        'public',
+        'shared',
+        'PRJ-TEST-OPS-TENANTLESS',
+        'state',
+        'project-state.json'
+      )
+    );
+    expect(loadProjectOperationalState('PRJ-TEST-OPS-TENANTLESS')?.tenant_slug).toBeUndefined();
   });
 });

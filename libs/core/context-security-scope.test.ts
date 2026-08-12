@@ -83,6 +83,15 @@ describe('compileScopedContextPack', () => {
       '[CONTEXT_SCOPE_INVALID]'
     );
   });
+
+  it.each(['public', 'confidential', 'personal', 'shared'])(
+    'rejects reserved scope name %s as a tenant',
+    (tenant_id) => {
+      expect(() => compileScopedContextPack({ ...scope, tenant_id }, [fragment()])).toThrow(
+        '[CONTEXT_SCOPE_INVALID]'
+      );
+    }
+  );
 });
 
 describe('validateContextOutputTier', () => {

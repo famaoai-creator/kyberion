@@ -41,6 +41,12 @@ function critiqueReturning(payload: unknown) {
 const CLEAN_CRITIQUE = critiqueReturning({ findings: [], verdict: 'looks good' });
 
 describe('rubric', () => {
+  it('rejects reserved scope names instead of falling back to public rubric', () => {
+    expect(() => loadVisualReviewRubric({ tenantSlug: 'public' })).toThrow(
+      'VISUAL_REVIEW_TENANT_INVALID'
+    );
+  });
+
   it('loads criteria from the catalog', () => {
     const rubric = loadVisualReviewRubric();
     expect(rubric.criteria.length).toBeGreaterThanOrEqual(5);

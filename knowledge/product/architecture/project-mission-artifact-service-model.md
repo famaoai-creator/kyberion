@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, project, mission, artifact, service-binding, vault, outcome]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-29
+last_updated: 2026-08-12
 ---
 
 # Project Mission Artifact Service Model
@@ -49,6 +49,12 @@ The system should decide the execution shape.
 ### 3.1 Project
 
 `Project` is the container of meaning.
+
+Where it sits: a project is contained by an organization, which is contained by a tenant
+(`tenant_slug → organization_id → project_id → mission_id → task_id → session` —
+[entity-scope-hierarchy](./entity-scope-hierarchy.md)). This document describes what a project
+_is_; that document is the canonical statement of what contains it. The layers named here —
+project, mission, task session — are the inner ones.
 
 It holds:
 

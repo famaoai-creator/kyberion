@@ -996,6 +996,12 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
         summary: nextProject.summary,
         status: nextProject.status,
         tier: nextProject.tier,
+        // EG-14: the state file is partitioned by tier AND tenant. Omitting the
+        // slug made saveProjectOperationalState fall back to `shared`, so a
+        // confidential project's state landed in the shared partition — outside
+        // the tenant boundary that was supposed to contain it, and invisible to
+        // any tenant-scoped query.
+        ...(nextProject.tenant_slug ? { tenant_slug: nextProject.tenant_slug } : {}),
         ...(input.project_path ? { project_path: input.project_path } : {}),
         active_track_ids: input.track_id ? [input.track_id] : [],
         active_mission_ids: [],

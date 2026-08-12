@@ -1,6 +1,6 @@
 # Why Kyberion
 
-A short answer to: *who is this for, what problem does it solve, and why couldn't it be solved by something else?*
+A short answer to: _who is this for, what problem does it solve, and why couldn't it be solved by something else?_
 
 ## The Problem
 
@@ -14,7 +14,7 @@ Knowledge workers — especially executives, founders, and FDE / SI engineers �
 Tools today fall into two camps:
 
 1. **Generic LLM chat (ChatGPT, Claude.ai)** — flexible, but stateless. No memory of your context, no governance, no execution. You re-explain everything every time.
-2. **RPA / no-code automation (Zapier, n8n, UiPath)** — has execution, but brittle. Every workflow is a fragile chain of point-to-point rules with no understanding of *intent*.
+2. **RPA / no-code automation (Zapier, n8n, UiPath)** — has execution, but brittle. Every workflow is a fragile chain of point-to-point rules with no understanding of _intent_.
 
 Neither matches how organizations actually work, which is:
 
@@ -45,7 +45,7 @@ If you've used:
 
 In priority order:
 
-1. **Founders / executives / power users** who want to delegate repetitive cognitive work and have it *actually* be done, with audit trails.
+1. **Founders / executives / power users** who want to delegate repetitive cognitive work and have it _actually_ be done, with audit trails.
 2. **FDE / SI engineers** who deliver Kyberion-based automation to customers and need fork-free customization.
 3. **OSS contributors** building actuators / pipelines / vertical templates on top.
 
@@ -57,15 +57,15 @@ This is **not** for:
 
 ## What Makes Kyberion Different
 
-| Trait | Why it matters |
-|---|---|
-| **Mission as first-class state** | A piece of work has its own git repo, its own state, its own evidence. Survives restarts, audits, and 24h+ runs. |
-| **3-tier knowledge isolation** | Personal / confidential / public tiers, enforced at the file-IO boundary. Customer secrets cannot leak into reusable knowledge. |
-| **Actuator catalog with semver** | 23+ actuators covering browser, voice, file, code, network, etc. Each with a semver-stable contract so 3rd-party extensions don't rot. |
-| **ADF (governed pipeline format)** | Pipelines are validated, sub-pipeline composable, with declarative `on_error`. Not yet another YAML soup. |
-| **Customer aggregation point** | One directory (`customer/{slug}/`) for FDE customizations. No fork required for 80%+ of customer work. |
-| **Trace + governance** | Every run emits a structured trace + audit chain entry. Failures get classified and fed back into reusable hints. |
-| **Voice-native UX** | Speak to it; it speaks back. From the browser, no API key required. |
+| Trait                              | Why it matters                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mission as first-class state**   | A piece of work has its own git repo, its own state, its own evidence. Survives restarts, audits, and 24h+ runs.                                                                                                                                                                                                          |
+| **3-tier knowledge isolation**     | Personal / confidential / public tiers, enforced at the file-IO boundary. Customer secrets cannot leak into reusable knowledge.                                                                                                                                                                                           |
+| **Actuator catalog with semver**   | 23+ actuators covering browser, voice, file, code, network, etc. Each with a semver-stable contract so 3rd-party extensions don't rot.                                                                                                                                                                                    |
+| **ADF (governed pipeline format)** | Pipelines are validated, sub-pipeline composable, with declarative `on_error`. Not yet another YAML soup.                                                                                                                                                                                                                 |
+| **Stance overlay**                 | One directory (`customer/{slug}/`) swaps identity, connections and policy for the entity you are acting as — an FDE engagement, or one of several affiliations. No fork required for 80%+ of that setup. A stance is not a tenant: [the three layers](../knowledge/product/architecture/stance-tenant-customer-model.md). |
+| **Trace + governance**             | Every run emits a structured trace + audit chain entry. Failures get classified and fed back into reusable hints.                                                                                                                                                                                                         |
+| **Voice-native UX**                | Speak to it; it speaks back. From the browser, no API key required.                                                                                                                                                                                                                                                       |
 
 ## The Strategic Bet
 

@@ -42,9 +42,10 @@ import {
   releaseWorkItem,
 } from './work-coordination.js';
 
-const missionId = 'MSN-WORKITEM-DISPATCH-001';
+const missionId = `MSN-WORKITEM-DISPATCH-${process.pid}`;
 const workCoordinationNamespace = `mission-workitem-dispatch-test-${process.pid}`;
 const missionPath = pathResolver.missionDir(missionId, 'public');
+const projectWorkspace = pathResolver.rootResolve(`active/projects/public/shared/${missionId}`);
 const artifactRegistryPath = artifactOwnershipRegistryPath();
 let originalArtifactRegistryRaw: string | null = null;
 
@@ -156,6 +157,7 @@ beforeEach(() => {
 afterEach(() => {
   clearWorkCoordinationStore();
   safeRmSync(missionPath, { recursive: true, force: true });
+  safeRmSync(projectWorkspace, { recursive: true, force: true });
   setWorkCoordinationNamespace(null);
   if (originalArtifactRegistryRaw !== null) {
     safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);

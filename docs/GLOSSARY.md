@@ -358,7 +358,7 @@ The canonical unit of executable work shared by all views and surfaces (`libs/co
 
 ### WorkItem Context
 
-The typed identity chain on a work item: `organization_id → tenant_slug → mission_id → project_id → task_id`, plus `work_shape`. This is field-listing order, not a containment claim; the canonical containment hierarchy is defined in [entity-scope-hierarchy](knowledge/product/architecture/entity-scope-hierarchy.md). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+The typed identity chain on a work item: `tenant_slug → organization_id → project_id → mission_id → task_id`, plus `work_shape`. This is the canonical containment order — the same one `ENTITY_SCOPE_HIERARCHY` declares and `normalizeWorkItemContext` serializes ([entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
 
 ### Work Visibility Scope
 
@@ -370,7 +370,7 @@ A governed project record with lifecycle controls (create / update-status / arch
 
 ### Tenant
 
-An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,30}$`). Each tenant has an isolated knowledge root (default `knowledge/confidential/{tenant-slug}/`); cross-tenant access is deny-unless-brokered and audited.
+An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,30}$`): its own confidential data, its own identity/approval flow, its own audit posture. Each tenant has an isolated knowledge root (default `knowledge/confidential/{tenant-slug}/`); cross-tenant access is deny-unless-brokered and audited. Tier and partition are an orthogonal axis, so `public` / `confidential` / `personal` / `shared` can never be a tenant slug (`RESERVED_SCOPE_NAMES` in `libs/core/entity-scope.ts`).
 
 ### Tenant Registry
 
@@ -384,9 +384,13 @@ A named set of tenants sharing a `knowledge/confidential/tenant-groups/{group}/`
 
 HMAC-signed peer-to-peer messaging between tenant instances. Peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata.
 
-### Customer Overlay
+### Stance (Customer Overlay)
 
-The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER`, layering customer-specific identity and configuration over `knowledge/personal/` for FDE / implementation-support engagements without forking.
+The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/customer-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy, and the directory keeps its historical `customer/` name. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+
+### Tenant's Customers
+
+The end customers a tenant delivers to, stored inside that tenant's own boundary at `knowledge/confidential/{tenant-slug}/customers/`. Deliberately not deduplicated across tenants: when two tenants serve the same end customer, each holds its own contract and obligations under its own compliance posture, and merging them would be exactly the leak the tenant boundary prevents. Distinct from both **Tenant** and **Stance** above, all three of which get called "customer" in conversation.
 
 ### History Search
 

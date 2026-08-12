@@ -23,7 +23,8 @@
     },
     "tenant_slug": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "name": {
       "type": "string",
@@ -75,7 +76,8 @@
       "required": ["tenant_slug", "source_path", "source_kind", "title", "raw", "sections"],
       "properties": {
         "tenant_slug": {
-          "type": ["string", "null"]
+          "type": ["string", "null"],
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
         },
         "source_path": {
           "type": "string",

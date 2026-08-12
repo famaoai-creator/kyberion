@@ -9,6 +9,7 @@ import {
   listPeerInboxRecords,
   listPeerOutboxRecords,
   registerPeerNetworkPeer,
+  peerNetworkCatalogPath,
   resolvePeerRecord,
   resolvePeerDispatchTarget,
   sendPeerMessage,
@@ -48,6 +49,30 @@ afterEach(() => {
 });
 
 describe('peer messaging', () => {
+  it.each(['public', 'confidential', 'personal', 'shared'])(
+    'rejects reserved scope name %s as a peer tenant',
+    (tenantId) => {
+      expect(() => peerNetworkCatalogPath(tenantId)).toThrow(/invalid_peer_network_tenant_id/);
+    }
+  );
+
+  it('rejects a catalog that declares a reserved tenant id', () => {
+    safeWriteFile(
+      REGISTRY_TEST_CATALOG,
+      JSON.stringify({ version: '1', tenant_id: 'public', peers: [] })
+    );
+    expect(loadPeerNetworkCatalog({ catalogPath: REGISTRY_TEST_CATALOG })).toBeNull();
+  });
+
+  it('validates tenant selection even when an explicit catalog path is supplied', () => {
+    expect(() =>
+      loadPeerNetworkCatalog({
+        catalogPath: REGISTRY_TEST_CATALOG,
+        tenantId: 'public',
+      })
+    ).toThrow(/invalid_peer_network_tenant_id/);
+  });
+
   it('builds and verifies signed peer envelopes', () => {
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-a-test',

@@ -13,6 +13,7 @@ import {
   safeRmSync,
   safeWriteFile,
   saveProjectRecord,
+  projectRecordPath,
   saveServiceBindingRecord,
   pptxUtils,
   withExecutionContext,
@@ -106,6 +107,13 @@ describe('media-actuator pdf to pptx bridge', () => {
           recursive: true,
           force: true,
         });
+        // EG-14: these fixtures write into the real project registry. Left
+        // behind, check:entity-governance reports them as registered projects
+        // with no workspace — drift the EG-11 cleanup cannot settle, because
+        // the next test run recreates it.
+        for (const projectId of ['PRJ-MEDIA-BRAND', 'PRJ-DESIGN-REF']) {
+          safeRmSync(projectRecordPath(projectId), { force: true });
+        }
       } finally {
         if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
         else process.env.KYBERION_SUDO = previousSudo;

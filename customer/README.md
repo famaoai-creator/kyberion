@@ -1,16 +1,49 @@
-# Customer Aggregation Directory
+# Affiliation Overlay Directory (`customer/`)
 
-This directory holds **per-customer / per-deployment configuration** for FDE (Forward Deployed Engineer) and implementation-support engagements with Kyberion.
+**What this actually is:** an overlay on `knowledge/personal/`. When
+`KYBERION_CUSTOMER` is set, `customer/{slug}/` replaces "who I am and how I
+operate" — identity, connections, policy, voice, mission seeds — for the
+duration. See `libs/core/customer-resolver.ts`.
 
-It is the **single aggregation point** for everything that varies between customers, so that 80%+ of customization is config rather than fork.
+So the directory does not hold _customers_. It holds **the stances you can
+operate from**, one per slug. "Deploying for a customer" is one such stance,
+not the definition.
 
 ## When to use this directory
 
-- You are deploying Kyberion for a customer or distinct organization.
-- You want to keep multiple customer configurations side-by-side in one checkout.
-- You are an FDE / SI engineer running Kyberion on behalf of an end customer.
+Any time "which hat am I wearing" changes what Kyberion should be:
 
-If you are a single individual using Kyberion for personal/own use, you do **not** need this directory. Continue to use `knowledge/personal/` as before.
+- **Engagement (FDE / SI)** — you run Kyberion on behalf of an end customer,
+  with their identity, connections and policy.
+- **Concurrent affiliation** — you hold roles at several independent legal
+  entities (e.g. an executive serving on multiple boards) and must act as one
+  at a time, with that entity's connections and approval policy.
+- **Multiple deployments side by side** in one checkout.
+
+A single individual with exactly one stance does not need this directory —
+`knowledge/personal/` alone is enough. Needing it is about _how many stances_
+you have, not about whether you are an individual or a firm.
+
+## The three things called "customer"
+
+They are different layers and are easy to confuse. The canonical containment
+hierarchy is `tenant_slug → organization_id → project_id → mission_id → …`
+(see `knowledge/product/architecture/entity-scope-hierarchy.md`).
+
+| Concept                      | Question it answers                         | Where it lives                               |
+| ---------------------------- | ------------------------------------------- | -------------------------------------------- |
+| **Stance** (this directory)  | Which stance am I operating from right now? | `customer/{slug}/` + `KYBERION_CUSTOMER`     |
+| **Tenant**                   | Which confidentiality boundary am I inside? | `knowledge/confidential/{tenant}/`           |
+| **A tenant's own customers** | Who does that tenant deliver to?            | `knowledge/confidential/{tenant}/customers/` |
+
+A stance slug and a tenant slug are often spelled the same (you operate as that
+entity, and that entity is a confidentiality boundary), but they are not the
+same thing: the stance is runtime configuration, the tenant is a data boundary.
+
+**A tenant's customers do not go here.** They belong inside that tenant's own
+boundary, next to its other substance (`organization/`, `security/`, …). Putting
+them under `customer/{slug}/` would place one tenant's customer records outside
+the boundary that is supposed to contain them.
 
 ## Layout
 
@@ -19,18 +52,23 @@ customer/
 ├── README.md                       # this file (committed)
 ├── _template/                      # template for new customers (committed, copy from this)
 │   ├── README.md
-│   ├── customer.json               # customer metadata
-│   ├── identity.json               # sovereign identity for this customer
+│   ├── customer.json               # stance metadata
+│   ├── identity.json               # sovereign identity for this stance
 │   ├── vision.md                   # vision document
 │   ├── connections/                # external service connections (placeholder)
-│   ├── tenants/                    # tenant configs (placeholder)
-│   ├── policy/                     # customer-specific policy overrides
+│   ├── tenants/                    # tenant profiles readable from this stance
+│   ├── policy/                     # policy overrides for this stance
 │   ├── voice/                      # voice profile overrides
-│   ├── mission-seeds/              # customer-specific mission templates
+│   ├── mission-seeds/              # stance-specific mission templates
 │   └── secrets.local.example.json  # secret reference template
-└── {customer-slug}/                # per-customer dir (gitignored — never commit secrets)
+└── {slug}/                         # per-stance dir (gitignored — never commit secrets)
     └── ...                         # same shape as _template/
 ```
+
+`tenants/` is the tenant **profile** directory for this stance — it overrides
+`knowledge/personal/tenants/` (see `tenantProfileDir()` in
+`libs/core/tenant-registry.ts`). It declares which tenants exist and where their
+knowledge roots are. It is **not** where a tenant's customer records go.
 
 ## Quickstart
 
@@ -66,12 +104,12 @@ When `KYBERION_CUSTOMER` is set, Kyberion overlays `customer/{slug}/` on top of 
 
 ## Resolution rules
 
-| Lookup | Order |
-|---|---|
-| `customer/{slug}/identity.json` → `knowledge/personal/my-identity.json` | overlay → fallback |
-| `customer/{slug}/connections/*.json` → `knowledge/personal/connections/*.json` | overlay → fallback |
-| `customer/{slug}/policy/*.json` → `knowledge/product/governance/*.json` | overlay → fallback (public is the base policy) |
-| `customer/{slug}/mission-seeds/*.json` | additive (customer-specific seeds; not a fallback) |
+| Lookup                                                                         | Order                                              |
+| ------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `customer/{slug}/identity.json` → `knowledge/personal/my-identity.json`        | overlay → fallback                                 |
+| `customer/{slug}/connections/*.json` → `knowledge/personal/connections/*.json` | overlay → fallback                                 |
+| `customer/{slug}/policy/*.json` → `knowledge/product/governance/*.json`        | overlay → fallback (public is the base policy)     |
+| `customer/{slug}/mission-seeds/*.json`                                         | additive (customer-specific seeds; not a fallback) |
 
 ## Slug rules
 

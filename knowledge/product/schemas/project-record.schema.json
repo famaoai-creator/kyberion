@@ -18,7 +18,11 @@
       "enum": ["personal", "confidential", "public"]
     },
     "organization_id": { "type": "string", "minLength": 1 },
-    "tenant_slug": { "type": "string", "minLength": 1 },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "repositories": {
       "type": "array",
       "items": {

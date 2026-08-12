@@ -1,7 +1,7 @@
 ---
 title: Canonical Entity Scope Hierarchy
 tags: [architecture, governance, tenant, organization, project, mission, task, session]
-last_updated: 2026-08-09
+last_updated: 2026-08-12
 ---
 
 # Canonical Entity Scope Hierarchy
@@ -21,6 +21,11 @@ present it is always inside the tenant boundary. A `WorkItemContext` carries
 the same references and the writer normalizes their serialized order to this
 hierarchy; JSON key order is not an authorization mechanism.
 
+The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER` is **not** a level
+in this hierarchy. It is a stance — runtime configuration for which entity
+Kyberion is acting as — and is deliberately orthogonal to scope
+([stance-tenant-customer-model](./stance-tenant-customer-model.md)).
+
 ## Consumers
 
 | Consumer              | Rule                                                                      |
@@ -34,6 +39,14 @@ hierarchy; JSON key order is not an authorization mechanism.
 
 `shared` is an explicit public/shared storage partition. It is not a tenant
 and must not satisfy the required `tenant_slug` field for confidential data.
+The same reasoning applies to the tier names, so tier and partition are an
+orthogonal axis to tenancy and no value of one may satisfy the other. This is
+executable, not advisory: `RESERVED_SCOPE_NAMES` in `entity-scope.ts` lists
+`public` / `confidential` / `personal` / `shared`, and `assertTenantSlug()` /
+`resolveCurrentTenantSlug()` reject them — see
+[EG-14](../../../docs/developer/improvement-plans-2026-08/EG-14_TIER_NAME_AS_TENANT_SLUG.ja.md)
+for the drift that motivated it, in both directions (a partition name taking a
+tenant's seat, and a tenant's state falling into a partition's place).
 
 Every writer must validate the referenced parent records before committing a
 child. Readers must not create missing directories as a side effect; creation

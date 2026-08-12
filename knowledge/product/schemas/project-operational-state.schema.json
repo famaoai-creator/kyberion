@@ -16,11 +16,24 @@
       "type": "string",
       "enum": ["personal", "confidential", "public"]
     },
-    "tenant_slug": { "type": "string", "minLength": 1 },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "project_path": { "type": "string", "minLength": 1 },
     "current_phase": {
       "type": "string",
-      "enum": ["initiate", "define", "design", "build", "validate", "transfer_run", "run", "unknown"]
+      "enum": [
+        "initiate",
+        "define",
+        "design",
+        "build",
+        "validate",
+        "transfer_run",
+        "run",
+        "unknown"
+      ]
     },
     "active_track_ids": {
       "type": "array",
@@ -46,7 +59,16 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["mission", "track", "task_session", "artifact", "service_binding", "surface_event", "manual_note", "other"]
+            "enum": [
+              "mission",
+              "track",
+              "task_session",
+              "artifact",
+              "service_binding",
+              "surface_event",
+              "manual_note",
+              "other"
+            ]
           },
           "ref": { "type": "string", "minLength": 1 },
           "summary": { "type": "string" },
