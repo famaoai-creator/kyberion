@@ -2,7 +2,7 @@
 
 import { ArrowRight, CircleAlert, ListChecks } from 'lucide-react';
 import { MISSION_CYCLE } from '../lib/operator-console';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxMessage, uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
 type MissionJourneySummaryProps = {
@@ -12,6 +12,7 @@ type MissionJourneySummaryProps = {
     statusDetail?: string;
     nextAction?: { title?: string; reason?: string };
     counts?: Record<string, number>;
+    plannedMissions?: unknown[];
     activeMissions?: Array<{
       missionId: string;
       status?: string;
@@ -32,6 +33,16 @@ function resolveCurrentStepIndex(status: string | undefined): number {
   return 2;
 }
 
+function resolveMissionTypeLabel(
+  missionType: string | undefined,
+  locale: Parameters<typeof uxText>[1]
+): string {
+  if (missionType === 'product_delivery') {
+    return uxText('chronos_mission_type_product_delivery', locale);
+  }
+  return missionType || uxText('chronos_journey_no_active_mission', locale);
+}
+
 export function MissionJourneySummary({
   summary,
   onOpenMissions,
@@ -42,6 +53,30 @@ export function MissionJourneySummary({
   const currentStep = resolveCurrentStepIndex(summary?.status);
   const counts = summary?.counts || {};
   const needsAttention = Number(counts.blockedMissions || 0) > 0;
+  const blocked = Number(counts.blockedMissions || 0);
+  const pendingApprovals = Number(counts.pendingApprovals || 0);
+  const planned = summary?.plannedMissions?.length || 0;
+  const unreadInbox = Number(counts.unreadInbox || 0);
+  const nextAction =
+    blocked > 0
+      ? uxText('chronos_home_action_blocked', locale)
+      : pendingApprovals > 0
+        ? uxText('chronos_home_action_approvals', locale)
+        : planned > 0
+          ? uxText('chronos_home_action_planned', locale)
+          : unreadInbox > 0
+            ? uxText('chronos_home_action_inbox', locale)
+            : uxText('chronos_home_action_clear', locale);
+  const nextActionReason =
+    blocked > 0
+      ? uxMessage('chronos_home_reason_blocked', { count: blocked }, '', locale)
+      : pendingApprovals > 0
+        ? uxMessage('chronos_home_reason_approvals', { count: pendingApprovals }, '', locale)
+        : planned > 0
+          ? uxMessage('chronos_home_reason_planned', { count: planned }, '', locale)
+          : unreadInbox > 0
+            ? uxMessage('chronos_home_reason_inbox', { count: unreadInbox }, '', locale)
+            : uxText('chronos_home_action_clear_detail', locale);
 
   return (
     <section className="rounded-[28px] border kb-border-accent kb-surface-accent p-5 md:p-6">
@@ -76,7 +111,7 @@ export function MissionJourneySummary({
           const isComplete = index < currentStep;
           return (
             <div
-              key={step.label}
+              key={step.labelKey}
               className={`rounded-2xl border px-3 py-3 ${
                 isCurrent
                   ? 'kb-border-accent kb-surface-raised'
@@ -100,7 +135,7 @@ export function MissionJourneySummary({
                 <span
                   className={`text-[10px] font-bold uppercase tracking-[0.14em] ${isCurrent ? 'kb-text-accent' : 'kb-text-secondary'}`}
                 >
-                  {step.label}
+                  {uxText(step.labelKey, locale)}
                 </span>
               </div>
               {isCurrent ? (
@@ -124,8 +159,7 @@ export function MissionJourneySummary({
           </div>
           <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
             {currentMission?.goalSummary ||
-              currentMission?.missionType ||
-              summary?.statusDetail ||
+              resolveMissionTypeLabel(currentMission?.missionType, locale) ||
               uxText('chronos_journey_no_active_mission', locale)}
           </div>
         </div>
@@ -133,15 +167,8 @@ export function MissionJourneySummary({
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] kb-text-accent">
             {uxText('chronos_journey_next_action', locale)}
           </div>
-          <div className="mt-2 text-sm font-semibold kb-text-primary">
-            {summary?.nextAction?.title ||
-              (needsAttention
-                ? uxText('chronos_needs_attention', locale)
-                : uxText('chronos_journey_next_action', locale))}
-          </div>
-          <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
-            {summary?.nextAction?.reason || uxText('chronos_journey_open_detail_hint', locale)}
-          </div>
+          <div className="mt-2 text-sm font-semibold kb-text-primary">{nextAction}</div>
+          <div className="mt-1 text-[11px] leading-5 kb-text-secondary">{nextActionReason}</div>
         </div>
       </div>
 

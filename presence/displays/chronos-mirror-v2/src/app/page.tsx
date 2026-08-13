@@ -47,6 +47,11 @@ import { WorkItemsWorkspace } from '../components/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../components/SurfaceControlWorkspace';
 import { OrganizationOperatingModel } from '../components/OrganizationOperatingModel';
 import { CloudflareOsPanel } from '../components/CloudflareOsPanel';
+import { ApprovalsWorkspace } from '../components/ApprovalsWorkspace';
+import { DeliverablesWorkspace } from '../components/DeliverablesWorkspace';
+import { KnowledgeWorkspace } from '../components/KnowledgeWorkspace';
+import { DiagnosticsAttentionSummary } from '../components/DiagnosticsAttentionSummary';
+import { ChronosTenantScope, useChronosTenant } from '../components/ChronosTenantScope';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -100,6 +105,8 @@ type ConsoleSectionId =
   | 'work-items'
   | 'surface-control'
   | 'deliverables'
+  | 'approvals'
+  | 'knowledge'
   | 'operations'
   | 'governance'
   | 'diagnostics'
@@ -127,6 +134,16 @@ const CONSOLE_SECTIONS: Array<{
     id: 'deliverables',
     labelKey: 'chronos_nav_deliverables',
     detailKey: 'chronos_nav_deliverables_hint',
+  },
+  {
+    id: 'approvals',
+    labelKey: 'chronos_nav_approvals',
+    detailKey: 'chronos_nav_approvals_hint',
+  },
+  {
+    id: 'knowledge',
+    labelKey: 'chronos_nav_knowledge',
+    detailKey: 'chronos_nav_knowledge_hint',
   },
   {
     id: 'operations',
@@ -438,7 +455,17 @@ const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
 ];
 
 export default function ChronosMirrorV2() {
+  return (
+    <Suspense fallback={null}>
+      <ChronosMirrorV2Content />
+    </Suspense>
+  );
+}
+
+function ChronosMirrorV2Content() {
   const locale = useChronosLocale();
+  const searchParams = useSearchParams();
+  const tenant = useChronosTenant();
   const quickActionGroups = useMemo(() => buildQuickActionGroups(locale), [locale]);
   const statusCards = useMemo(() => buildStatusCards(locale), [locale]);
   const [surface, setSurface] = useState<any>(null);
@@ -565,7 +592,7 @@ export default function ChronosMirrorV2() {
   useEffect(() => {
     let cancelled = false;
     void fetch(
-      `/api/deliverables?limit=24${deliverablesQuery ? `&query=${encodeURIComponent(deliverablesQuery)}` : ''}`,
+      `/api/deliverables?limit=24${deliverablesQuery ? `&query=${encodeURIComponent(deliverablesQuery)}` : ''}${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`,
       {
         headers: { 'Cache-Control': 'no-cache' },
       }
@@ -589,7 +616,7 @@ export default function ChronosMirrorV2() {
     return () => {
       cancelled = true;
     };
-  }, [deliverablesQuery, deliverablesRefreshTick]);
+  }, [deliverablesQuery, deliverablesRefreshTick, tenant]);
 
   useEffect(() => {
     let cancelled = false;
@@ -598,6 +625,7 @@ export default function ChronosMirrorV2() {
     if (missionHistoryQuery) params.set('query', missionHistoryQuery);
     if (missionHistoryStatus) params.set('status', missionHistoryStatus);
     if (missionHistoryTier) params.set('tier', missionHistoryTier);
+    if (tenant) params.set('tenant', tenant);
     void fetch(`/api/missions/search?${params.toString()}`, {
       headers: { 'Cache-Control': 'no-cache' },
     })
@@ -618,12 +646,13 @@ export default function ChronosMirrorV2() {
     return () => {
       cancelled = true;
     };
-  }, [missionHistoryQuery, missionHistoryStatus, missionHistoryTier]);
+  }, [missionHistoryQuery, missionHistoryStatus, missionHistoryTier, tenant]);
 
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams();
     if (selectedMissionId) params.set('missionId', selectedMissionId);
+    if (tenant) params.set('tenant', tenant);
     params.set('since', new Date().toISOString().slice(0, 10));
     void fetch(`/api/cost?${params.toString()}`, {
       headers: { 'Cache-Control': 'no-cache' },
@@ -645,11 +674,11 @@ export default function ChronosMirrorV2() {
     return () => {
       cancelled = true;
     };
-  }, [selectedMissionId]);
+  }, [selectedMissionId, tenant]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/connections', {
+    void fetch(`/api/connections${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`, {
       headers: { 'Cache-Control': 'no-cache' },
     })
       .then(async (response) => {
@@ -669,13 +698,16 @@ export default function ChronosMirrorV2() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tenant]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/operator-home?limit=8', {
-      headers: { 'Cache-Control': 'no-cache' },
-    })
+    void fetch(
+      `/api/operator-home?limit=8${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`,
+      {
+        headers: { 'Cache-Control': 'no-cache' },
+      }
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error(`operator-home ${response.status}`);
         return (await response.json()) as { summary?: any };
@@ -693,7 +725,7 @@ export default function ChronosMirrorV2() {
     return () => {
       cancelled = true;
     };
-  }, [operatorHomeRefreshTick]);
+  }, [operatorHomeRefreshTick, tenant]);
 
   useEffect(() => {
     if (!focusedOperatorView) return;
@@ -761,8 +793,49 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
-  const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>('home');
+  const sectionFromUrl = searchParams.get('section');
+  const initialSection: ConsoleSectionId =
+    sectionFromUrl &&
+    [
+      'home',
+      'organization',
+      'missions',
+      'work-items',
+      'surface-control',
+      'deliverables',
+      'approvals',
+      'knowledge',
+      'operations',
+      'governance',
+      'diagnostics',
+      'surface',
+    ].includes(sectionFromUrl)
+      ? (sectionFromUrl as ConsoleSectionId)
+      : 'home';
+  const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>(initialSection);
   const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>('home');
+
+  useEffect(() => {
+    if (!sectionFromUrl) return;
+    if (
+      [
+        'home',
+        'organization',
+        'missions',
+        'work-items',
+        'surface-control',
+        'deliverables',
+        'approvals',
+        'knowledge',
+        'operations',
+        'governance',
+        'diagnostics',
+        'surface',
+      ].includes(sectionFromUrl)
+    ) {
+      setConsoleSection(sectionFromUrl as ConsoleSectionId);
+    }
+  }, [sectionFromUrl]);
 
   const openConsoleSection = useCallback((section: ConsoleSectionId) => {
     if (section === 'surface') {
@@ -840,19 +913,36 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const openDeliverableAsset = useCallback(
-    (item: { missionId?: string; path?: string; externalRef?: string }) => {
+    (item: {
+      artifactId?: string;
+      missionId?: string;
+      tenantSlug?: string;
+      path?: string;
+      externalRef?: string;
+      previewText?: string;
+    }) => {
       if (item.externalRef && /^https?:/.test(item.externalRef)) {
         window.open(item.externalRef, '_blank', 'noreferrer');
         return;
       }
-      if (!item.path) return;
+      if (!item.path) {
+        if (item.artifactId && item.previewText) {
+          const params = new URLSearchParams({ artifactId: item.artifactId });
+          if (item.tenantSlug || tenant) params.set('tenant', item.tenantSlug || tenant);
+          window.open(`/api/deliverable-preview?${params.toString()}`, '_blank', 'noreferrer');
+        }
+        return;
+      }
       // repo-relative artifact mode covers exports/tmp/missions uniformly;
       // mission mode remains for mission-relative records.
+      const params = new URLSearchParams({ path: item.path });
+      if (item.artifactId) params.set('artifactId', item.artifactId);
+      if (item.tenantSlug || tenant) params.set('tenant', item.tenantSlug || tenant);
       const url = item.path.startsWith('active/')
-        ? `/api/mission-asset?path=${encodeURIComponent(item.path)}`
+        ? `/api/mission-asset?${params.toString()}`
         : item.missionId
-          ? `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`
-          : `/api/mission-asset?path=${encodeURIComponent(item.path)}`;
+          ? `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&${params.toString()}`
+          : `/api/mission-asset?${params.toString()}`;
       window.open(url, '_blank', 'noreferrer');
     },
     []
@@ -1019,6 +1109,7 @@ export default function ChronosMirrorV2() {
             bindingId,
             action,
             note: connectionReviewNote,
+            tenant,
           }),
         });
         const payload = await response.json();
@@ -1048,15 +1139,16 @@ export default function ChronosMirrorV2() {
 
   const handleOperatorViewOpen = useCallback(
     (targetId: string, missionId: string | null = null) => {
-      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
-      setConsoleSection('surface');
       if (targetId === 'mission-control-plane' && missionId) {
+        setConsoleSection('missions');
         setFocusedOperatorView(null);
         setFocusedOperatorMissionId(null);
         setMissionIntelligenceFocus('mission-control-plane');
         setMissionIntelligenceFocusedMissionId(missionId);
         return;
       }
+      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setConsoleSection('surface');
       setFocusedOperatorView(targetId);
       setMissionIntelligenceFocus(null);
       setMissionIntelligenceFocusedMissionId(null);
@@ -1147,6 +1239,75 @@ export default function ChronosMirrorV2() {
     [deliverables, showCleanedDeliverables]
   );
 
+  const homeCopy = useMemo(() => {
+    const counts = operatorHomeSummary?.counts || {};
+    const blocked = Number(counts.blockedMissions || 0);
+    const approvals = Number(counts.pendingApprovals || 0);
+    const planned = operatorHomeSummary?.plannedMissions?.length || 0;
+    const inbox = Number(counts.unreadInbox || 0);
+    const status = operatorHomeSummary?.status;
+    const statusMessage =
+      status === 'blocked'
+        ? uxMessage(
+            'chronos_home_status_blocked',
+            { count: blocked },
+            'Paused or failed missions need review.',
+            locale
+          )
+        : status === 'attention'
+          ? uxText('chronos_home_status_attention', locale)
+          : operatorHomeSummary
+            ? uxText('chronos_home_status_clear', locale)
+            : uxText('chronos_cb_reading_state', locale);
+    const actionTitle =
+      blocked > 0
+        ? uxText('chronos_home_action_blocked', locale)
+        : approvals > 0
+          ? uxText('chronos_home_action_approvals', locale)
+          : planned > 0
+            ? uxText('chronos_home_action_planned', locale)
+            : inbox > 0
+              ? uxText('chronos_home_action_inbox', locale)
+              : uxText('chronos_home_action_clear', locale);
+    const actionReason =
+      blocked > 0
+        ? uxMessage(
+            'chronos_home_reason_blocked',
+            { count: blocked },
+            'Review the cause and next step for the paused or failed missions.',
+            locale
+          )
+        : approvals > 0
+          ? uxMessage(
+              'chronos_home_reason_approvals',
+              { count: approvals },
+              'Review the requested changes waiting for approval.',
+              locale
+            )
+          : planned > 0
+            ? uxMessage(
+                'chronos_home_reason_planned',
+                { count: planned },
+                'Review what the planned missions cover.',
+                locale
+              )
+            : inbox > 0
+              ? uxMessage(
+                  'chronos_home_reason_inbox',
+                  { count: inbox },
+                  'Review the items waiting for your check.',
+                  locale
+                )
+              : uxText('chronos_cb_all_clear_detail', locale);
+    const statusLabel =
+      status === 'blocked' || status === 'attention'
+        ? uxText('chronos_status_needs_action', locale)
+        : operatorHomeSummary
+          ? uxText('chronos_status_clear', locale)
+          : uxText('chronos_working', locale);
+    return { statusMessage, actionTitle, actionReason, statusLabel };
+  }, [locale, operatorHomeSummary]);
+
   const homePrimaryAction = useMemo(() => {
     if (!operatorHomeSummary) return null;
     const counts = operatorHomeSummary.counts || {};
@@ -1155,15 +1316,17 @@ export default function ChronosMirrorV2() {
         ? { targetId: 'needs-attention', surface: 'mission-intelligence' }
         : counts.pendingApprovals > 0
           ? { targetId: 'approvals', surface: 'mission-intelligence' }
-          : counts.unreadInbox > 0
-            ? { targetId: 'recent-surface-outbox', surface: 'mission-intelligence' }
-            : { targetId: 'mission-control-plane', surface: 'mission-intelligence' };
+          : (operatorHomeSummary.plannedMissions?.length ?? 0) > 0
+            ? { targetId: 'mission-control-plane', surface: 'mission-intelligence' }
+            : counts.unreadInbox > 0
+              ? { targetId: 'recent-surface-outbox', surface: 'mission-intelligence' }
+              : { targetId: 'mission-control-plane', surface: 'mission-intelligence' };
     return {
-      title: operatorHomeSummary.nextAction?.title as string | undefined,
-      reason: operatorHomeSummary.nextAction?.reason as string | undefined,
+      title: homeCopy.actionTitle,
+      reason: homeCopy.actionReason,
       ...target,
     };
-  }, [operatorHomeSummary]);
+  }, [homeCopy, operatorHomeSummary]);
 
   /**
    * The counters double as navigation: each one is the shortest path to the
@@ -1193,6 +1356,13 @@ export default function ChronosMirrorV2() {
         label: uxText('chronos_cb_count_active', locale),
         targetId: 'mission-control-plane',
         tone: 'neutral' as const,
+      },
+      {
+        key: 'planned',
+        value: operatorHomeSummary.plannedMissions?.length ?? 0,
+        label: uxText('chronos_cb_count_planned', locale),
+        targetId: 'mission-control-plane',
+        tone: 'alert' as const,
       },
       {
         key: 'blocked',
@@ -1288,13 +1458,6 @@ export default function ChronosMirrorV2() {
                 >
                   {uxText('chronos_nav_operations', locale)}
                 </button>
-                <div
-                  className={`ml-2 rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-accent'}`}
-                  title={uxText('chronos_surface_role_title', locale)}
-                >
-                  {/* Legacy surface-role contract: 管制塔 — 実行状態の監視と介入 */}
-                  {uxText('chronos_surface_role_tagline', locale)}
-                </div>
                 <button
                   type="button"
                   onClick={() => openConsoleSection('organization')}
@@ -1318,7 +1481,13 @@ export default function ChronosMirrorV2() {
                   className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] kb-surface-raised text-[var(--kb-text-primary)] hover:kb-surface-raised' : 'kb-border-subtle kb-surface-raised/5 kb-text-secondary hover:kb-surface-raised hover:kb-text-accent'}`}
                 >
                   <Palette size={12} />
-                  <span>{themeModePreference}</span>
+                  <span>
+                    {themeModePreference === 'system'
+                      ? uxText('chronos_theme_auto', locale)
+                      : themeModePreference === 'light'
+                        ? uxText('chronos_theme_light', locale)
+                        : uxText('chronos_theme_dark', locale)}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1342,6 +1511,8 @@ export default function ChronosMirrorV2() {
               </div>
             </div>
           </header>
+
+          <ChronosTenantScope />
 
           <nav
             aria-label="Chronos sections"
@@ -1389,9 +1560,7 @@ export default function ChronosMirrorV2() {
                     <h2
                       className={`mt-3 text-xl font-semibold leading-snug tracking-tight ${shellTitleClass} md:text-2xl`}
                     >
-                      {operatorHomeSummary
-                        ? operatorHomeSummary.statusDetail
-                        : uxText('chronos_cb_reading_state', locale)}
+                      {homeCopy.statusMessage}
                     </h2>
                     <p className={`mt-2 text-sm leading-6 ${shellSubtleClass}`}>
                       {uxText('chronos_cb_instruction', locale)}
@@ -1408,7 +1577,7 @@ export default function ChronosMirrorV2() {
                             : 'neutral'
                     )}`}
                   >
-                    {operatorHomeSummary?.statusLabel || uxText('chronos_working', locale)}
+                    {homeCopy.statusLabel}
                   </div>
                 </div>
 
@@ -1427,10 +1596,10 @@ export default function ChronosMirrorV2() {
                         {uxText('chronos_cb_do_this_next', locale)}
                       </div>
                       <div className={`mt-1 text-base font-semibold ${shellTitleClass}`}>
-                        {homePrimaryAction.title || uxText('chronos_cb_all_clear', locale)}
+                        {homePrimaryAction.title}
                       </div>
                       <div className={`mt-1 text-[11px] leading-5 ${shellSubtleClass}`}>
-                        {homePrimaryAction.reason || uxText('chronos_cb_all_clear_detail', locale)}
+                        {homePrimaryAction.reason}
                       </div>
                     </div>
                     <button
@@ -1488,13 +1657,38 @@ export default function ChronosMirrorV2() {
                     ))}
                   </div>
                 ) : null}
+                {operatorHomeSummary?.plannedMissions?.length ? (
+                  <div className="mt-4 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] kb-text-accent">
+                      {uxText('chronos_home_planned_title', locale)}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {operatorHomeSummary.plannedMissions.slice(0, 4).map((mission: any) => (
+                        <button
+                          key={mission.missionId}
+                          type="button"
+                          onClick={() =>
+                            handleOperatorViewOpen('mission-control-plane', mission.missionId)
+                          }
+                          className="rounded-full border kb-border-subtle px-3 py-1 text-[10px] font-mono kb-text-secondary hover:kb-border-accent hover:kb-text-accent"
+                        >
+                          {mission.missionId} · {mission.projectId || 'project pending'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </section>
             </>
           ) : null}
 
           {consoleSection === 'home' ? (
             <>
-              <ChronosOffice compact onOpenOperations={() => openConsoleSection('operations')} />
+              <ChronosOffice
+                compact
+                tenant={tenant}
+                onOpenOperations={() => openConsoleSection('operations')}
+              />
               <CloudflareOsPanel missionId={selectedMissionId} />
               <MissionJourneySummary
                 summary={operatorHomeSummary}
@@ -1506,27 +1700,23 @@ export default function ChronosMirrorV2() {
           ) : null}
 
           {(consoleSection === 'missions' || consoleSection === 'diagnostics') && (
-            <section
-              className={`grid gap-4 ${
-                consoleSection === 'missions' ? 'xl:grid-cols-1' : 'xl:grid-cols-[1.05fr,0.95fr]'
-              }`}
-            >
+            <section className={`grid gap-4 ${'xl:grid-cols-1'}`}>
               {consoleSection === 'missions' ? (
                 <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                        SU history
+                        {uxText('chronos_missions_history_eyebrow', locale)}
                       </div>
                       <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                        Mission history
+                        {uxText('chronos_missions_history_title', locale)}
                       </h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
                         value={missionHistoryQuery}
                         onChange={(event) => setMissionHistoryQuery(event.target.value)}
-                        placeholder="search"
+                        placeholder={uxText('chronos_search', locale)}
                         className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                       />
                       <select
@@ -1535,20 +1725,24 @@ export default function ChronosMirrorV2() {
                         className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
                       >
                         <option value="">{uxText('chronos_mh_all_statuses', locale)}</option>
-                        <option value="completed">completed</option>
-                        <option value="active">active</option>
-                        <option value="paused">paused</option>
-                        <option value="failed">failed</option>
+                        <option value="completed">
+                          {uxText('chronos_status_completed', locale)}
+                        </option>
+                        <option value="active">{uxText('chronos_status_active', locale)}</option>
+                        <option value="paused">{uxText('chronos_status_paused', locale)}</option>
+                        <option value="failed">{uxText('chronos_status_failed', locale)}</option>
                       </select>
                       <select
                         value={missionHistoryTier}
                         onChange={(event) => setMissionHistoryTier(event.target.value)}
                         className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none focus:kb-border-accent"
                       >
-                        <option value="">all tiers</option>
-                        <option value="public">public</option>
-                        <option value="confidential">confidential</option>
-                        <option value="personal">personal</option>
+                        <option value="">{uxText('chronos_all_tiers', locale)}</option>
+                        <option value="public">{uxText('chronos_tier_public', locale)}</option>
+                        <option value="confidential">
+                          {uxText('chronos_tier_confidential', locale)}
+                        </option>
+                        <option value="personal">{uxText('chronos_tier_personal', locale)}</option>
                       </select>
                     </div>
                   </div>
@@ -1567,7 +1761,10 @@ export default function ChronosMirrorV2() {
                         <button
                           key={mission.missionId}
                           type="button"
-                          onClick={() => setSelectedMissionId(mission.missionId)}
+                          onClick={() => {
+                            setSelectedMissionId(mission.missionId);
+                            setMissionIntelligenceFocusedMissionId(mission.missionId);
+                          }}
                           className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                             selectedMissionId === mission.missionId
                               ? 'kb-border-accent kb-surface-accent'
@@ -1581,13 +1778,22 @@ export default function ChronosMirrorV2() {
                               </div>
                               <div className="mt-1 text-sm font-semibold kb-text-primary">
                                 {mission.goalSummary ||
-                                  mission.intentText ||
-                                  mission.missionType ||
-                                  'Mission'}
+                                mission.intentText ||
+                                mission.missionType === 'product_delivery'
+                                  ? uxText('chronos_mission_type_product_delivery', locale)
+                                  : mission.missionType || uxText('chronos_mission', locale)}
                               </div>
                             </div>
                             <div className="text-right text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                              {mission.status}
+                              {mission.status === 'completed'
+                                ? uxText('chronos_status_completed', locale)
+                                : mission.status === 'active'
+                                  ? uxText('chronos_status_active', locale)
+                                  : mission.status === 'paused'
+                                    ? uxText('chronos_status_paused', locale)
+                                    : mission.status === 'failed'
+                                      ? uxText('chronos_status_failed', locale)
+                                      : mission.status}
                             </div>
                           </div>
                           <div className="mt-2 grid gap-2 text-[10px] kb-text-muted sm:grid-cols-2">
@@ -1603,7 +1809,9 @@ export default function ChronosMirrorV2() {
                             <div>
                               {uxText('chronos_mission_type', locale)}:{' '}
                               <span className="kb-text-secondary">
-                                {mission.missionType || '-'}
+                                {mission.missionType === 'product_delivery'
+                                  ? uxText('chronos_mission_type_product_delivery', locale)
+                                  : mission.missionType || '-'}
                               </span>
                             </div>
                             <div>
@@ -1619,9 +1827,13 @@ export default function ChronosMirrorV2() {
                               {uxText('chronos_mission_tier', locale)}:{' '}
                               <span className="kb-text-secondary">{mission.tier || '-'}</span>
                             </div>
-                            <div>updated {mission.updatedAt || mission.startedAt || '-'}</div>
+                            <div>
+                              {uxText('chronos_updated', locale)}:{' '}
+                              {mission.updatedAt || mission.startedAt || '-'}
+                            </div>
                             <div className="truncate">
-                              tenant {mission.tenantSlug || mission.tenantId || '-'}
+                              {uxText('chronos_tenant', locale)}:{' '}
+                              {mission.tenantSlug || mission.tenantId || '-'}
                             </div>
                           </div>
                           {mission.successCondition ? (
@@ -1637,19 +1849,19 @@ export default function ChronosMirrorV2() {
               ) : null}
 
               {consoleSection === 'diagnostics' ? (
-                <div className="grid gap-4">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                          SU cost
+                          {uxText('chronos_diagnostics_cost', locale)}
                         </div>
                         <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                          Cost visibility
+                          {uxText('chronos_diagnostics_cost_title', locale)}
                         </h2>
                       </div>
                       <div className="text-[10px] uppercase tracking-[0.2em] kb-text-muted">
-                        {selectedMissionId ? selectedMissionId : 'today'}
+                        {selectedMissionId ? selectedMissionId : uxText('chronos_today', locale)}
                       </div>
                     </div>
                     {costSummaryError ? (
@@ -1660,7 +1872,7 @@ export default function ChronosMirrorV2() {
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                       <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
                         <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                          usd
+                          {uxText('chronos_diagnostics_currency', locale)}
                         </div>
                         <div className="mt-2 text-2xl font-semibold kb-text-primary">
                           {typeof costSummary?.totalUsd === 'number'
@@ -1668,12 +1880,13 @@ export default function ChronosMirrorV2() {
                             : '-'}
                         </div>
                         <div className="mt-1 text-[10px] kb-text-muted">
-                          {costSummary?.entryCount || 0} entries
+                          {costSummary?.entryCount || 0}{' '}
+                          {uxText('chronos_diagnostics_entries', locale)}
                         </div>
                       </div>
                       <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
                         <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                          tokens
+                          {uxText('chronos_diagnostics_tokens', locale)}
                         </div>
                         <div className="mt-2 text-2xl font-semibold kb-text-primary">
                           {typeof costSummary?.totalTokens === 'number'
@@ -1681,22 +1894,23 @@ export default function ChronosMirrorV2() {
                             : '-'}
                         </div>
                         <div className="mt-1 text-[10px] kb-text-muted">
-                          {costSummary?.missionCount || 0} missions
+                          {costSummary?.missionCount || 0}{' '}
+                          {uxText('chronos_diagnostics_missions', locale)}
                         </div>
                       </div>
                       <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
                         <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                          budget
+                          予算
                         </div>
                         <div className="mt-2 text-2xl font-semibold kb-text-primary">
                           {typeof costSummary?.budgetUsd === 'number'
                             ? `$${costSummary.budgetUsd.toFixed(3)}`
-                            : 'n/a'}
+                            : '未設定'}
                         </div>
                         <div className="mt-1 text-[10px] kb-text-muted">
                           {typeof costSummary?.remainingUsd === 'number'
                             ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
-                            : 'no spend guard configured'}
+                            : uxText('chronos_no_budget_guard', locale)}
                         </div>
                       </div>
                     </div>
@@ -1723,8 +1937,9 @@ export default function ChronosMirrorV2() {
                               <div className="kb-text-primary">${item.usd.toFixed(3)}</div>
                             </div>
                             <div className="mt-1 kb-text-muted">
-                              {item.tokens.toLocaleString(chronosSpeechLocale())} tokens ·{' '}
-                              {item.entryCount} entries
+                              {item.tokens.toLocaleString(chronosSpeechLocale())}{' '}
+                              {uxText('chronos_diagnostics_tokens', locale)} · {item.entryCount}{' '}
+                              {uxText('chronos_diagnostics_entries', locale)}
                             </div>
                           </div>
                         ))}
@@ -1736,16 +1951,16 @@ export default function ChronosMirrorV2() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                          SU connections
+                          {uxText('chronos_connection_check', locale)}
                         </div>
                         <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                          Connection review
+                          {uxText('chronos_connection_review', locale)}
                         </h2>
                       </div>
                       <input
                         value={connectionsQuery}
                         onChange={(event) => setConnectionsQuery(event.target.value)}
-                        placeholder="search"
+                        placeholder={uxText('chronos_search', locale)}
                         className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                       />
                     </div>
@@ -1894,21 +2109,17 @@ export default function ChronosMirrorV2() {
             </section>
           )}
 
-          {(consoleSection === 'missions' || consoleSection === 'deliverables') && (
-            <section
-              className={`grid gap-4 ${
-                consoleSection === 'deliverables' ? 'xl:grid-cols-1' : 'xl:grid-cols-[1.1fr,0.9fr]'
-              }`}
-            >
+          {consoleSection === 'missions' && (
+            <section className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
               {consoleSection === 'missions' ? (
                 <div className="kyberion-glass rounded-[28px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                        SU workbench
+                        {uxText('chronos_mission_plan_title', locale)}
                       </div>
                       <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                        Plan preview and approval
+                        {uxText('chronos_mission_plan_title', locale)}
                       </h2>
                     </div>
                     <div className="flex gap-2">
@@ -1918,7 +2129,9 @@ export default function ChronosMirrorV2() {
                         disabled={planPreviewBusy}
                         className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {planPreviewBusy ? 'previewing' : 'preview'}
+                        {planPreviewBusy
+                          ? uxText('chronos_previewing', locale)
+                          : uxText('chronos_preview', locale)}
                       </button>
                       <button
                         type="button"
@@ -1926,13 +2139,15 @@ export default function ChronosMirrorV2() {
                         disabled={planApprovalBusy || !planPreview || planPreviewIsStale}
                         className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {planApprovalBusy ? 'starting' : 'approve & start'}
+                        {planApprovalBusy
+                          ? uxText('chronos_starting', locale)
+                          : uxText('chronos_approve_start', locale)}
                       </button>
                     </div>
                   </div>
                   {planPreview && planPreviewIsStale ? (
                     <div className="mt-3 rounded-xl border kb-status-warning-border kb-status-warning-surface px-4 py-3 text-[11px] kb-status-warning">
-                      Preview is stale. Re-run preview before approving.
+                      {uxText('chronos_preview_stale', locale)}
                     </div>
                   ) : null}
                   <textarea
@@ -1943,7 +2158,7 @@ export default function ChronosMirrorV2() {
                   />
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      mission type
+                      {uxText('chronos_mission_type_field', locale)}
                       <input
                         value={planMissionType}
                         onChange={(event) => setPlanMissionType(event.target.value)}
@@ -1951,7 +2166,7 @@ export default function ChronosMirrorV2() {
                       />
                     </label>
                     <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      persona
+                      {uxText('chronos_persona_field', locale)}
                       <input
                         value={planPersona}
                         onChange={(event) => setPlanPersona(event.target.value)}
@@ -1959,7 +2174,7 @@ export default function ChronosMirrorV2() {
                       />
                     </label>
                     <label className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      tier
+                      {uxText('chronos_data_level_field', locale)}
                       <select
                         value={planTier}
                         onChange={(event) =>
@@ -2105,16 +2320,16 @@ export default function ChronosMirrorV2() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">
-                      SU inbox
+                      {uxText('chronos_deliverables', locale)}
                     </div>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                      Deliverables
+                      {uxText('chronos_deliverables_preview_title', locale)}
                     </h2>
                   </div>
                   <input
                     value={deliverablesQuery}
                     onChange={(event) => setDeliverablesQuery(event.target.value)}
-                    placeholder="search"
+                    placeholder={uxText('chronos_search', locale)}
                     className="w-36 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary outline-none placeholder:kb-text-muted focus:kb-border-accent"
                   />
                 </div>
@@ -2143,7 +2358,7 @@ export default function ChronosMirrorV2() {
                   {visibleDeliverables.length === 0 ? (
                     <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
                       {deliverables.length === 0
-                        ? 'No deliverables found yet.'
+                        ? uxText('chronos_deliverables_empty', locale)
                         : uxText('chronos_dl_none_live', locale)}
                     </div>
                   ) : (
@@ -2203,7 +2418,7 @@ export default function ChronosMirrorV2() {
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="text-[10px] uppercase tracking-[0.22em] kb-text-accent">
-                                review
+                                {uxText('chronos_preview_review', locale)}
                               </div>
                               <div className="mt-1 text-sm font-semibold kb-text-primary">
                                 {selected.artifactId}
@@ -2211,8 +2426,8 @@ export default function ChronosMirrorV2() {
                             </div>
                             <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                               {selected.reviewVerdict
-                                ? `latest ${selected.reviewVerdict}`
-                                : 'not reviewed'}
+                                ? `${uxText('chronos_updated', locale)}: ${selected.reviewVerdict}`
+                                : uxText('chronos_not_reviewed', locale)}
                             </div>
                           </div>
                           <div className="mt-2 text-[11px] leading-6 kb-text-secondary">
@@ -2280,7 +2495,7 @@ export default function ChronosMirrorV2() {
                               onClick={() => submitDeliverableReview('accept')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('approve')}`}
                             >
-                              accept
+                              {uxText('chronos_approve', locale)}
                             </button>
                             <button
                               type="button"
@@ -2288,7 +2503,7 @@ export default function ChronosMirrorV2() {
                               onClick={() => submitDeliverableReview('request-changes')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('info')}`}
                             >
-                              request-changes
+                              {uxText('chronos_request_changes', locale)}
                             </button>
                             <button
                               type="button"
@@ -2296,7 +2511,7 @@ export default function ChronosMirrorV2() {
                               onClick={() => submitDeliverableReview('reject')}
                               className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:opacity-50 ${toneChipClass('reject')}`}
                             >
-                              reject
+                              {uxText('chronos_reject', locale)}
                             </button>
                           </div>
                           <div className="mt-3 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
@@ -2318,7 +2533,14 @@ export default function ChronosMirrorV2() {
           {consoleSection === 'missions' ? (
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <MissionIntelligence
+                tenant={tenant}
                 workspace="missions"
+                focusedView={missionIntelligenceFocus}
+                focusedMissionId={selectedMissionId || missionIntelligenceFocusedMissionId}
+                onClearFocus={() => {
+                  setMissionIntelligenceFocus(null);
+                  setMissionIntelligenceFocusedMissionId(null);
+                }}
                 showMissionIntelligenceLabel
                 onOpenWorkspace={(target) => openConsoleSection(target)}
               />
@@ -2326,16 +2548,26 @@ export default function ChronosMirrorV2() {
           ) : null}
 
           {consoleSection === 'deliverables' ? (
-            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <MissionIntelligence
-                workspace="deliverables"
-                onOpenWorkspace={(target) => openConsoleSection(target)}
-              />
-            </section>
+            <DeliverablesWorkspace
+              tenant={tenant || undefined}
+              onOpenMission={(missionId) =>
+                handleOperatorViewOpen('mission-control-plane', missionId)
+              }
+            />
+          ) : null}
+
+          {consoleSection === 'approvals' ? (
+            <ApprovalsWorkspace tenant={tenant || undefined} />
+          ) : null}
+
+          {consoleSection === 'knowledge' ? (
+            <KnowledgeWorkspace tenant={tenant || undefined} />
           ) : null}
 
           {legacyWorkspaceEnabled &&
           consoleSection !== 'deliverables' &&
+          consoleSection !== 'approvals' &&
+          consoleSection !== 'knowledge' &&
           consoleSection !== 'work-items' &&
           consoleSection !== 'surface-control' &&
           consoleSection !== 'organization' ? (
@@ -2633,7 +2865,7 @@ export default function ChronosMirrorV2() {
                         aria-expanded={expandedSections.taxonomy}
                         className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                       >
-                        <span>Surface Taxonomy</span>
+                        <span>{uxText('chronos_screen_roles_title', locale)}</span>
                         {expandedSections.taxonomy ? (
                           <ChevronDown size={12} />
                         ) : (
@@ -2643,26 +2875,24 @@ export default function ChronosMirrorV2() {
                       {expandedSections.taxonomy && (
                         <>
                           <div className="mt-2 text-sm kb-text-secondary">
-                            Every surface connects people and agent execution in a different mode.
-                            Chronos is the control surface, while A2UI provides drill-down work
-                            surfaces.
+                            {uxText('chronos_screen_roles_description', locale)}
                           </div>
                           <div className="mt-4 space-y-3">
                             {SURFACE_ROLES.map((role) => (
                               <div
-                                key={role.label}
+                                key={role.labelKey}
                                 className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
                               >
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                                    {role.label}
+                                    {uxText(role.labelKey, locale)}
                                   </div>
                                   <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                                    {role.value}
+                                    {uxText(role.valueKey, locale)}
                                   </div>
                                 </div>
                                 <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                                  {role.detail}
+                                  {uxText(role.detailKey, locale)}
                                 </div>
                               </div>
                             ))}
@@ -2677,7 +2907,7 @@ export default function ChronosMirrorV2() {
                         aria-expanded={expandedSections.cycle}
                         className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] kb-text-muted hover:kb-text-primary transition"
                       >
-                        <span>Mission Cycle</span>
+                        <span>{uxText('chronos_work_cycle_title', locale)}</span>
                         {expandedSections.cycle ? (
                           <ChevronDown size={12} />
                         ) : (
@@ -2687,14 +2917,12 @@ export default function ChronosMirrorV2() {
                       {expandedSections.cycle && (
                         <>
                           <div className="mt-2 text-sm kb-text-secondary">
-                            Kyberion should always make this loop legible: a request becomes a
-                            mission, execution stays explainable, and the result remains inspectable
-                            and reusable.
+                            {uxText('chronos_work_cycle_description', locale)}
                           </div>
                           <div className="mt-4 grid gap-2">
                             {MISSION_CYCLE.map((step, index) => (
                               <div
-                                key={step.label}
+                                key={step.labelKey}
                                 className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3"
                               >
                                 <div className="flex items-center gap-3">
@@ -2702,11 +2930,11 @@ export default function ChronosMirrorV2() {
                                     {index + 1}
                                   </div>
                                   <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                                    {step.label}
+                                    {uxText(step.labelKey, locale)}
                                   </div>
                                 </div>
                                 <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                                  {step.detail}
+                                  {uxText(step.detailKey, locale)}
                                 </div>
                               </div>
                             ))}
@@ -2814,7 +3042,7 @@ export default function ChronosMirrorV2() {
                 <div className="flex items-center justify-between border-b kb-border-subtle px-5 py-4 md:px-6">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.34em] kb-text-muted">
-                      Active Surface
+                      {uxText('chronos_active_surface_heading', locale)}
                     </div>
                     <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                       {activeSurfaceTitle}
@@ -2824,12 +3052,12 @@ export default function ChronosMirrorV2() {
                     <PanelsTopLeft size={12} />
                     <span>
                       {surface
-                        ? 'a2ui drill-down'
+                        ? uxText('chronos_surface_mode_detail', locale)
                         : focusedOperatorView
-                          ? 'focused operator view'
+                          ? uxText('chronos_surface_mode_operator', locale)
                           : missionIntelligenceFocus
-                            ? 'focused mission console'
-                            : 'default operator view'}
+                            ? uxText('chronos_surface_mode_mission', locale)
+                            : uxText('chronos_surface_mode_default', locale)}
                     </span>
                   </div>
                 </div>
@@ -2838,6 +3066,7 @@ export default function ChronosMirrorV2() {
                   {!surface ? (
                     focusedOperatorView ? (
                       <FocusedOperatorView
+                        tenant={tenant || undefined}
                         viewId={
                           focusedOperatorView as
                             | 'needs-attention'
@@ -2863,6 +3092,7 @@ export default function ChronosMirrorV2() {
                       />
                     ) : (
                       <MissionIntelligence
+                        tenant={tenant}
                         focusedView={missionIntelligenceFocus}
                         hideSurfaceControl
                         onClearFocus={() => {
@@ -2903,6 +3133,7 @@ export default function ChronosMirrorV2() {
 
           {consoleSection === 'organization' ? (
             <OrganizationOperatingModel
+              tenant={tenant || undefined}
               onOpenOperations={() => openConsoleSection('operations')}
               onOpenGovernance={() => openConsoleSection('governance')}
             />
@@ -2933,23 +3164,34 @@ export default function ChronosMirrorV2() {
                 </button>
               </div>
               <AgentOpsBoards
+                tenant={tenant}
                 onOpenMission={(missionId) =>
                   handleOperatorViewOpen('mission-control-plane', missionId)
                 }
                 onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
               />
-              <div className="mt-6">
-                <MissionIntelligence
-                  workspace="operations"
-                  onOpenWorkspace={(target) => openConsoleSection(target)}
-                />
-              </div>
+              <details className="mt-6 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+                <summary className="cursor-pointer text-sm font-semibold kb-text-primary">
+                  {uxText('chronos_operations_mission_details_title', locale)}
+                  <span className="ml-2 text-[11px] font-normal kb-text-muted">
+                    {uxText('chronos_operations_mission_details_hint', locale)}
+                  </span>
+                </summary>
+                <div className="mt-4">
+                  <MissionIntelligence
+                    tenant={tenant}
+                    workspace="operations"
+                    onOpenWorkspace={(target) => openConsoleSection(target)}
+                  />
+                </div>
+              </details>
             </section>
           ) : null}
 
           {consoleSection === 'work-items' ? (
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <WorkItemsWorkspace
+                tenant={tenant || undefined}
                 onOpenMission={(missionId) =>
                   handleOperatorViewOpen('mission-control-plane', missionId)
                 }
@@ -2959,9 +3201,10 @@ export default function ChronosMirrorV2() {
 
           {consoleSection === 'surface-control' ? (
             <>
-              <SurfaceControlWorkspace />
+              <SurfaceControlWorkspace tenant={tenant || undefined} />
               <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
                 <MissionIntelligence
+                  tenant={tenant}
                   workspace="surface-control"
                   hideSurfaceControl
                   onOpenWorkspace={(target) => openConsoleSection(target)}
@@ -2980,16 +3223,54 @@ export default function ChronosMirrorV2() {
                   {uxText('chronos_nav_governance_hint', locale)}
                 </h2>
               </div>
-              <MissionIntelligence
-                workspace="governance"
-                onOpenWorkspace={(target) => openConsoleSection(target)}
-              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => openConsoleSection('approvals')}
+                  className="rounded-2xl border kb-border-accent kb-surface-accent p-5 text-left transition hover:brightness-110"
+                >
+                  <div className="text-[10px] uppercase tracking-[0.2em] kb-text-accent">
+                    {uxText('chronos_governance_approvals_label', locale)}
+                  </div>
+                  <div className="mt-2 text-lg font-semibold kb-text-primary">
+                    {uxText('chronos_governance_approvals_title', locale)}
+                  </div>
+                  <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                    {uxText('chronos_governance_approvals_description', locale)}
+                  </div>
+                  <div className="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] kb-text-accent">
+                    {uxText('chronos_governance_approvals_action', locale)} →
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openConsoleSection('knowledge')}
+                  className="rounded-2xl border kb-border-accent kb-surface-accent p-5 text-left transition hover:brightness-110"
+                >
+                  <div className="text-[10px] uppercase tracking-[0.2em] kb-text-accent">
+                    {uxText('chronos_governance_knowledge_label', locale)}
+                  </div>
+                  <div className="mt-2 text-lg font-semibold kb-text-primary">
+                    {uxText('chronos_governance_knowledge_title', locale)}
+                  </div>
+                  <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
+                    {uxText('chronos_governance_knowledge_description', locale)}
+                  </div>
+                  <div className="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] kb-text-accent">
+                    {uxText('chronos_governance_knowledge_action', locale)} →
+                  </div>
+                </button>
+              </div>
+              <div className="mt-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
+                {uxText('chronos_governance_description', locale)}
+              </div>
             </section>
           ) : null}
 
           {consoleSection === 'diagnostics' && focusedOperatorView ? (
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <FocusedOperatorView
+                tenant={tenant || undefined}
                 viewId={focusedOperatorView as any}
                 onBack={() => {
                   setFocusedOperatorView(null);
@@ -3007,12 +3288,10 @@ export default function ChronosMirrorV2() {
           ) : null}
 
           {consoleSection === 'diagnostics' ? (
-            <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <MissionIntelligence
-                workspace="diagnostics"
-                onOpenWorkspace={(target) => openConsoleSection(target)}
-              />
-            </section>
+            <DiagnosticsAttentionSummary
+              tenant={tenant || undefined}
+              onOpenView={(viewId, missionId) => handleOperatorViewOpen(viewId, missionId)}
+            />
           ) : null}
 
           {consoleSection === 'surface' ? (
@@ -3059,6 +3338,7 @@ export default function ChronosMirrorV2() {
                   </div>
                 ) : focusedOperatorView ? (
                   <FocusedOperatorView
+                    tenant={tenant || undefined}
                     viewId={focusedOperatorView as any}
                     onBack={() => {
                       setFocusedOperatorView(null);
@@ -3074,6 +3354,7 @@ export default function ChronosMirrorV2() {
                   />
                 ) : (
                   <MissionIntelligence
+                    tenant={tenant}
                     focusedView={missionIntelligenceFocus}
                     hideSurfaceControl
                     onClearFocus={() => {

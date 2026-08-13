@@ -396,12 +396,14 @@ export function FocusedOperatorView({
   onOpenView,
   focusedMissionId,
   onOpenMissionThread,
+  tenant,
 }: {
   viewId: FocusedViewId;
   onBack: () => void;
   onOpenView?: (viewId: FocusedViewId, missionId?: string | null) => void;
   focusedMissionId?: string | null;
   onOpenMissionThread?: (missionId: string) => void;
+  tenant?: string;
 }) {
   const locale = resolveChronosLocale();
   const ft = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
@@ -423,7 +425,10 @@ export function FocusedOperatorView({
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch('/api/intelligence', { cache: 'no-store' });
+        const res = await fetch(
+          `/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`,
+          { cache: 'no-store' }
+        );
         const body = await res.json();
         if (!alive) return;
         if (!res.ok) {
@@ -438,7 +443,9 @@ export function FocusedOperatorView({
     };
     load();
     const timer = setInterval(load, 15000);
-    const source = new EventSource('/api/intelligence/stream');
+    const source = new EventSource(
+      `/api/intelligence/stream${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`
+    );
     source.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as Partial<Payload>;
@@ -476,7 +483,7 @@ export function FocusedOperatorView({
       clearInterval(timer);
       source.close();
     };
-  }, [viewId]);
+  }, [tenant, viewId]);
 
   useEffect(() => {
     if (viewId !== 'computer-sessions') return;
@@ -623,7 +630,7 @@ export function FocusedOperatorView({
             aria-label="Return to full Chronos console"
             className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.2em] kb-text-secondary transition hover:kb-surface-raised"
           >
-            Show Full Console
+            {ft('chronos_show_full_console', 'Show full console')}
           </button>
         </div>
       </section>
@@ -632,9 +639,15 @@ export function FocusedOperatorView({
         <div className="grid gap-3">
           {attentionItems.length === 0 ? (
             <SurfaceStatusPanel
-              eyebrow="Needs attention"
-              title="No immediate operator intervention is recommended"
-              detail="The current snapshot does not show a blocking surface or mission issue."
+              eyebrow={ft('chronos_sc_needs_attention_label', 'Needs attention')}
+              title={ft(
+                'chronos_no_immediate_intervention',
+                'No immediate operator intervention is recommended'
+              )}
+              detail={ft(
+                'chronos_no_blocking_issue',
+                'The current snapshot does not show a blocking screen or mission issue.'
+              )}
               tone="success"
             />
           ) : (
