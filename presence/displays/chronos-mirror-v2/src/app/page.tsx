@@ -1450,6 +1450,9 @@ function ChronosMirrorV2Content() {
                   <h1 className={`text-lg font-bold tracking-tight ${shellTitleClass}`}>
                     {uxText('chronos_home_title', locale)}
                   </h1>
+                  <p className={`mt-0.5 text-[11px] ${shellMutedClass}`}>
+                    {uxText('chronos_surface_role_tagline', locale)}
+                  </p>
                 </div>
                 <button
                   type="button"

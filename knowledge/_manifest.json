@@ -2403,7 +2403,7 @@
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 2647,
+      "size": 2749,
       "type": "json"
     },
     {
@@ -4749,7 +4749,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 444005,
+      "size": 452720,
       "type": "json"
     },
     {
