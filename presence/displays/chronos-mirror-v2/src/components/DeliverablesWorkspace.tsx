@@ -12,7 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
 
 type Deliverable = {
   artifactId: string;
@@ -296,7 +296,7 @@ export function DeliverablesWorkspace({
               <div>
                 <span className="kb-text-muted">{uxText('chronos_updated', locale)}</span>
                 <div className="kb-text-primary">
-                  {new Date(selected.updatedAt).toLocaleString()}
+                  {formatChronosDateTime(selected.updatedAt, locale)}
                 </div>
               </div>
             </div>

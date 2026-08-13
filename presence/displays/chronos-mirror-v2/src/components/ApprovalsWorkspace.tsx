@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AlertTriangle, CheckCircle2, FileCheck2, ShieldAlert, XCircle } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
 
 type Approval = {
   id: string;
@@ -169,7 +169,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
                   {item.kind || '承認'}
                 </div>
                 <div className="mt-1 text-[10px] kb-text-muted">
-                  {item.requestedBy} · {new Date(item.requestedAt).toLocaleString()}
+                  {item.requestedBy} · {formatChronosDateTime(item.requestedAt, locale)}
                 </div>
               </button>
             ))
