@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOrganizationManagementView } from '@agent/core';
+import { buildOrganizationManagementView, listTenantProfileSlugs } from '@agent/core';
 import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
   withViewerExecutionContext,
   ViewerContextError,
 } from '../../../lib/viewer-context';
 
 /**
  * Read-only organization control-plane projection for Chronos Mirror.
- * The tenant is resolved from the server-side active customer context; the
- * browser cannot select an arbitrary tenant through this endpoint. The
- * request-derived viewer still gates access to that active tenant.
+ * The browser may narrow the organization view to a tenant, but the
+ * request-derived viewer remains the authority for whether that tenant can be
+ * read. When no tenant is selected, preserve the active customer for the
+ * all-tenant operator view and use the sole granted tenant for scoped viewers.
  */
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -27,11 +28,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const viewer = resolvedViewer.context;
-    const company = resolveCompany();
-    // This endpoint has no client-selected tenant parameter. A scoped viewer
-    // may read the active organization only when that server-side tenant is
-    // within the viewer's grant.
-    viewerScopeTenantSlugs(viewer, company.tenant_slug);
+    const requestedTenant = req.nextUrl.searchParams.get('tenant') || undefined;
+    const tenantSlugs = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+    const selectedTenant =
+      requestedTenant ||
+      (tenantSlugs !== 'all' && tenantSlugs.length === 1 ? tenantSlugs[0] : undefined);
+    const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
+    if (selectedTenant && !registeredTenants.includes(selectedTenant)) {
+      throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
+    }
+    const company = resolveCompany(selectedTenant);
     const view = withViewerExecutionContext(viewer, () =>
       buildOrganizationManagementView({
         organizationId: company.company_id,
@@ -44,7 +50,7 @@ export async function GET(req: NextRequest) {
       tenant: {
         company_id: company.company_id,
         tenant_slug: company.tenant_slug,
-        name: company.name,
+        name: view.purpose?.name || view.operational_state?.name || company.name,
       },
     });
   } catch (error) {

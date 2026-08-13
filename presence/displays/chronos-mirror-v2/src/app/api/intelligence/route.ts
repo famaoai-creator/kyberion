@@ -7,7 +7,14 @@ import {
   requireChronosAccess,
   roleToMissionRole,
 } from '../../../lib/api-guard';
-import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
+import {
+  resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
+  ViewerContextError,
+  type ViewerContext,
+} from '../../../lib/viewer-context';
+import { resolveApprovalTenant } from '../../../lib/su-surface-data';
+import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
 import {
   summarizeApprovalAuditDrilldown,
@@ -97,9 +104,11 @@ import {
   stopAgentRuntime,
   summarizeMissionSeedAssessment,
   updateDistillCandidateRecord,
+  updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
-import { listManagedProjects } from '@agent/core';
+import { getProjectManagementView } from '@agent/core';
+import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
 
 interface RuntimeTopologySurfaceInput {
   id: string;
@@ -111,6 +120,7 @@ interface RuntimeTopologySurfaceInput {
 
 interface MissionSummary {
   missionId: string;
+  tenantSlug?: string;
   status: string;
   tier: string;
   missionType?: string;
@@ -285,6 +295,7 @@ interface PendingApprovalSummary {
   riskLevel: 'low' | 'medium' | 'high' | 'critical';
   pendingRoles: string[];
   missionId?: string;
+  tenantSlug?: string;
   serviceId?: string;
   work_loop?: OrganizationWorkLoopSummary;
 }
@@ -317,6 +328,105 @@ interface ControlActionDetail {
   outcome?: string;
   why?: string;
   error?: string;
+}
+
+type TenantScope = string[] | 'all';
+
+function missionTenantSlug(missionId: string): string | undefined {
+  const normalized = String(missionId || '').trim();
+  if (!normalized) return undefined;
+  try {
+    const matches = listMissionsInSearchDirs().filter((entry) => entry.missionId === normalized);
+    if (matches.length !== 1) return undefined;
+    const directory = path.dirname(matches[0].missionPath);
+    const state = loadState(normalized, { directories: [directory] });
+    return state?.tenant_slug || state?.tenant_id;
+  } catch {
+    return undefined;
+  }
+}
+
+function missionVisibleToTenant(missionId: string | undefined, tenantSlugs: TenantScope): boolean {
+  if (!missionId) return false;
+  const tenant = missionTenantSlug(missionId);
+  if (!tenant) return false;
+  if (tenantSlugs === 'all') return true;
+  return Boolean(tenant && tenantSlugs.includes(tenant));
+}
+
+function projectVisibleToTenant(
+  project: { tier: 'personal' | 'confidential' | 'public'; tenant_slug?: string },
+  tenantSlugs: TenantScope
+): boolean {
+  if (tenantSlugs === 'all') return true;
+  return Boolean(project.tenant_slug && tenantSlugs.includes(project.tenant_slug));
+}
+
+function distillCandidateVisibleToTenant(
+  candidate: { project_id?: string; mission_id?: string },
+  tenantSlugs: TenantScope
+): boolean {
+  if (tenantSlugs === 'all') return true;
+  if (candidate.project_id) {
+    const project = loadProjectRecord(candidate.project_id);
+    return Boolean(project && projectVisibleToTenant(project, tenantSlugs));
+  }
+  return missionVisibleToTenant(candidate.mission_id, tenantSlugs);
+}
+
+function filterServiceBindingsToTenant(
+  bindings: Array<{
+    binding_id: string;
+    scope: string;
+    tenant_slug?: string;
+    project_id?: string;
+  }>,
+  projects: Array<{ service_bindings?: string[] }>,
+  tenantSlugs: TenantScope
+) {
+  if (tenantSlugs === 'all') return bindings;
+  const projectBindingIds = new Set(projects.flatMap((project) => project.service_bindings || []));
+  return bindings.filter((binding) => {
+    if (binding.scope === 'project') return projectBindingIds.has(binding.binding_id);
+    return Boolean(binding.tenant_slug && tenantSlugs.includes(binding.tenant_slug));
+  });
+}
+
+function surfaceOutboxVisibleToTenant(
+  message: { correlation_id?: string },
+  tenantSlugs: TenantScope
+): boolean {
+  if (tenantSlugs === 'all') return true;
+  const correlationId = String(message.correlation_id || '')
+    .trim()
+    .toUpperCase();
+  return correlationId.startsWith('MSN-') && missionVisibleToTenant(correlationId, tenantSlugs);
+}
+
+function missionScopeError(
+  viewer: ViewerContext,
+  missionId: string,
+  requestedTenant?: string
+): NextResponse | null {
+  const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+  if (missionVisibleToTenant(missionId, allowedTenants)) return null;
+  return NextResponse.json(
+    { error: 'Mission is outside the viewer tenant scope' },
+    { status: 403 }
+  );
+}
+
+function projectScopeError(
+  viewer: ViewerContext,
+  project: { tier: 'personal' | 'confidential' | 'public'; tenant_slug?: string },
+  requestedTenant?: string
+): NextResponse | null {
+  const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+  if (projectVisibleToTenant(project, allowedTenants)) return null;
+  return NextResponse.json(
+    { error: 'Project is outside the viewer tenant scope' },
+    { status: 403 }
+  );
 }
 
 function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
@@ -454,8 +564,10 @@ function buildChronosNextActions(input: {
   return actions;
 }
 
-function collectWorkCoordinationSummary(): WorkCoordinationSummary {
-  const items = listWorkItems();
+function collectWorkCoordinationSummary(
+  tenantSlugs: string[] | 'all' = 'all'
+): WorkCoordinationSummary {
+  const items = listWorkItems({ tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs });
   const summary: WorkCoordinationSummary = {
     total: items.length,
     backlog: 0,
@@ -697,22 +809,29 @@ function collectActiveMissions(): MissionSummary[] {
       for (const item of safeReaddir(root.dir)) {
         const missionPath = path.join(root.dir, item);
         const state = readJson<any>(path.join(missionPath, 'mission-state.json'));
-        if (!state || state.status !== 'active') continue;
+        if (!state || !['active', 'planned', 'paused', 'failed'].includes(state.status)) continue;
         const nextTasks = readJson<any[]>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
         const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
         const nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
-        const controlSummary = planReady
-          ? nextTaskCount > 0
-            ? 'execution ready'
-            : 'plan ready'
-          : 'planning pending';
-        const controlTone: MissionSummary['controlTone'] = planReady
-          ? nextTaskCount > 0
-            ? 'ready'
-            : 'planning'
-          : 'attention';
+        const controlSummary =
+          state.status === 'paused' || state.status === 'failed'
+            ? `${state.status} mission`
+            : planReady
+              ? nextTaskCount > 0
+                ? 'execution ready'
+                : 'plan ready'
+              : 'planning pending';
+        const controlTone: MissionSummary['controlTone'] =
+          state.status === 'paused' || state.status === 'failed'
+            ? 'attention'
+            : planReady
+              ? nextTaskCount > 0
+                ? 'ready'
+                : 'planning'
+              : 'attention';
         missions.push({
           missionId: state.mission_id || item,
+          tenantSlug: state.tenant_slug || state.tenant_id,
           status: state.status,
           tier: state.tier || root.tier,
           missionType: state.mission_type,
@@ -793,7 +912,7 @@ function collectMissionProgress(activeMissions: MissionSummary[]): MissionProgre
   return summaries.sort((a, b) => a.missionId.localeCompare(b.missionId));
 }
 
-function collectRecentEvents() {
+function collectRecentEvents(tenantSlugs: TenantScope = 'all') {
   const files = [
     pathResolver.shared('observability/channels/slack/missions.jsonl'),
     pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
@@ -817,10 +936,13 @@ function collectRecentEvents() {
       }
     }
   }
-  return lines.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
+  return lines
+    .filter((event) => missionVisibleToTenant(event.mission_id, tenantSlugs))
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 8);
 }
 
-function collectControlActions(): ControlActionSummary[] {
+function collectControlActions(tenantSlugs: TenantScope = 'all'): ControlActionSummary[] {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
   if (!safeExistsSync(file)) return [];
 
@@ -937,6 +1059,11 @@ function collectControlActions(): ControlActionSummary[] {
   }
 
   return Array.from(lifecycle.values())
+    .filter(
+      (action) =>
+        (action.kind === 'mission' && missionVisibleToTenant(action.target, tenantSlugs)) ||
+        (action.kind === 'surface' && tenantSlugs === 'all')
+    )
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 10);
 }
@@ -1194,7 +1321,9 @@ function collectControlActionAvailability(
   return { mission, surface, globalSurface };
 }
 
-function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
+function collectControlActionDetails(
+  tenantSlugs: TenantScope = 'all'
+): Record<string, ControlActionDetail[]> {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
   if (!safeExistsSync(file)) return {};
 
@@ -1245,10 +1374,20 @@ function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
     details[key] = details[key].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
   }
 
+  if (tenantSlugs !== 'all') {
+    for (const key of Object.keys(details)) {
+      const scoped = details[key].filter((detail) =>
+        missionVisibleToTenant(detail.mission_id, tenantSlugs)
+      );
+      if (scoped.length > 0) details[key] = scoped;
+      else delete details[key];
+    }
+  }
+
   return details;
 }
 
-function collectOwnerSummaries(): OwnerSummary[] {
+function collectOwnerSummaries(tenantSlugs: TenantScope = 'all'): OwnerSummary[] {
   const summaries: OwnerSummary[] = [];
   const files = [
     pathResolver.shared('observability/channels/slack/missions.jsonl'),
@@ -1263,6 +1402,7 @@ function collectOwnerSummaries(): OwnerSummary[] {
       try {
         const event = JSON.parse(line) as any;
         if ((event.decision || event.event_type) !== 'mission_owner_notified') continue;
+        if (!missionVisibleToTenant(event.mission_id, tenantSlugs)) continue;
         summaries.push({
           ts: event.ts || new Date().toISOString(),
           mission_id: event.mission_id || 'unknown',
@@ -1390,59 +1530,82 @@ function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
     .slice(0, 8);
 }
 
-function collectPendingSecretApprovals(): SecretApprovalSummary[] {
+function collectPendingSecretApprovals(tenantSlugs: string[] | 'all'): SecretApprovalSummary[] {
   const secretApprovals = listApprovalRequests({
     kind: 'secret_mutation',
     status: 'pending',
-  }).map((request) => ({
-    id: request.id,
-    title: request.title,
-    summary: request.summary,
-    storageChannel: request.storageChannel,
-    requestedAt: request.requestedAt,
-    requestedBy: request.requestedBy,
-    serviceId: request.target?.serviceId || 'unknown',
-    secretKey: request.target?.secretKey || 'unknown',
-    mutation: request.target?.mutation || 'set',
-    riskLevel: request.risk?.level || 'medium',
-    requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-    pendingRoles:
-      request.workflow?.approvals
-        .filter((approval) => approval.status === 'pending')
-        .map((approval) => approval.role) || [],
-    kind: 'secret_mutation' as const,
-  }));
+  })
+    .filter(
+      (request) =>
+        tenantSlugs === 'all' ||
+        Boolean(
+          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
+        )
+    )
+    .map((request) => ({
+      id: request.id,
+      title: request.title,
+      summary: request.summary,
+      storageChannel: request.storageChannel,
+      requestedAt: request.requestedAt,
+      requestedBy: request.requestedBy,
+      serviceId: request.target?.serviceId || 'unknown',
+      secretKey: request.target?.secretKey || 'unknown',
+      mutation: request.target?.mutation || 'set',
+      riskLevel: request.risk?.level || 'medium',
+      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+      pendingRoles:
+        request.workflow?.approvals
+          .filter((approval) => approval.status === 'pending')
+          .map((approval) => approval.role) || [],
+      kind: 'secret_mutation' as const,
+    }));
 
   const computerApprovals = listApprovalRequests({
     storageChannels: ['computer'],
     kind: 'channel-approval',
     status: 'pending',
-  }).map((request) => ({
-    id: request.id,
-    title: request.title,
-    summary: request.summary,
-    storageChannel: request.storageChannel,
-    requestedAt: request.requestedAt,
-    requestedBy: request.requestedBy,
-    serviceId: 'computer',
-    secretKey: 'n/a',
-    mutation: request.justification?.requestedEffects?.[0] || 'computer_action',
-    riskLevel: request.risk?.level || 'medium',
-    requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-    pendingRoles:
-      request.workflow?.approvals
-        .filter((approval) => approval.status === 'pending')
-        .map((approval) => approval.role) || [],
-    kind: 'computer_action' as const,
-  }));
+  })
+    .filter(
+      (request) =>
+        tenantSlugs === 'all' ||
+        Boolean(
+          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
+        )
+    )
+    .map((request) => ({
+      id: request.id,
+      title: request.title,
+      summary: request.summary,
+      storageChannel: request.storageChannel,
+      requestedAt: request.requestedAt,
+      requestedBy: request.requestedBy,
+      serviceId: 'computer',
+      secretKey: 'n/a',
+      mutation: request.justification?.requestedEffects?.[0] || 'computer_action',
+      riskLevel: request.risk?.level || 'medium',
+      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+      pendingRoles:
+        request.workflow?.approvals
+          .filter((approval) => approval.status === 'pending')
+          .map((approval) => approval.role) || [],
+      kind: 'computer_action' as const,
+    }));
 
   return [...secretApprovals, ...computerApprovals]
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 20);
 }
 
-function collectPendingApprovals(): PendingApprovalSummary[] {
+function collectPendingApprovals(tenantSlugs: string[] | 'all'): PendingApprovalSummary[] {
   return listApprovalRequests({ status: 'pending' })
+    .filter(
+      (request) =>
+        tenantSlugs === 'all' ||
+        Boolean(
+          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
+        )
+    )
     .map((request) => ({
       id: request.id,
       kind: request.kind,
@@ -1458,6 +1621,7 @@ function collectPendingApprovals(): PendingApprovalSummary[] {
           .filter((approval) => approval.status === 'pending')
           .map((approval) => approval.role) || [],
       missionId: request.requestedByContext?.missionId,
+      tenantSlug: resolveApprovalTenant(request),
       trackId: request.track_id,
       serviceId: request.target?.serviceId,
       work_loop: request.work_loop,
@@ -1635,21 +1799,46 @@ export async function GET(req: NextRequest) {
     if (accessDenied) return accessDenied;
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
+    const tenantSlugs = strictViewerScopeTenantSlugs(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('tenant') || undefined
+    );
     const accessRole = getChronosAccessRoleOrThrow(req);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
-    const rawActiveMissions = collectActiveMissions();
-    const runtimeLeases = listAgentRuntimeLeaseSummaries().slice(0, 12);
+    const rawActiveMissions = collectActiveMissions().filter(
+      (mission) =>
+        tenantSlugs === 'all' ||
+        Boolean(mission.tenantSlug && tenantSlugs.includes(mission.tenantSlug))
+    );
+    const runtimeLeases = listAgentRuntimeLeaseSummaries()
+      .filter((lease) =>
+        tenantSlugs === 'all'
+          ? true
+          : missionVisibleToTenant(
+              lease.owner_type === 'mission'
+                ? lease.owner_id
+                : typeof lease.metadata?.mission_id === 'string'
+                  ? lease.metadata.mission_id
+                  : undefined,
+              tenantSlugs
+            )
+      )
+      .slice(0, 12);
     const rawSurfaces = await collectSurfaceSummaries();
-    const controlActions = collectControlActions();
+    const controlActions = collectControlActions(tenantSlugs);
     const { activeMissions, surfaces } = applyPendingActionSummaries(
       rawActiveMissions,
       rawSurfaces,
       controlActions
     );
     const missionProgress = collectMissionProgress(activeMissions);
-    const agentMessages = collectAgentMessages();
-    const a2aHandoffs = collectA2AHandoffs();
+    const agentMessages = collectAgentMessages().filter((message) =>
+      missionVisibleToTenant(message.missionId, tenantSlugs)
+    );
+    const a2aHandoffs = collectA2AHandoffs().filter((handoff) =>
+      missionVisibleToTenant(handoff.missionId, tenantSlugs)
+    );
     let managedRuntimes: Array<{
       agentId: string;
       provider: string;
@@ -1704,14 +1893,26 @@ export async function GET(req: NextRequest) {
         };
       });
     }
+    const scopedRuntime =
+      tenantSlugs === 'all'
+        ? runtime
+        : runtime.filter((entry) =>
+            runtimeLeases.some((lease) => lease.agent_id === entry.agent.agentId)
+          );
+    if (tenantSlugs !== 'all') {
+      const scopedAgentIds = new Set(runtimeLeases.map((lease) => lease.agent_id));
+      managedRuntimes = managedRuntimes.filter((runtimeEntry) =>
+        scopedAgentIds.has(runtimeEntry.agentId)
+      );
+    }
     const controlActionCatalog = collectControlActionCatalog(accessRole);
     const controlActionAvailability = collectControlActionAvailability(
       accessRole,
       activeMissions,
       surfaces
     );
-    const secretApprovals = collectPendingSecretApprovals();
-    const pendingApprovals = collectPendingApprovals();
+    const secretApprovals = collectPendingSecretApprovals(tenantSlugs);
+    const pendingApprovals = collectPendingApprovals(tenantSlugs);
     const workCoordination = safeCollect(
       'collectWorkCoordinationSummary',
       {
@@ -1726,32 +1927,86 @@ export async function GET(req: NextRequest) {
         runningAttempts: 0,
         recentItems: [],
       },
-      collectWorkCoordinationSummary
+      () => collectWorkCoordinationSummary(tenantSlugs)
     );
-    const projects = listProjectRecords();
+    const projects = listProjectRecords().filter(
+      (project) =>
+        project.tier !== 'personal' &&
+        Boolean(project.tenant_slug) &&
+        (tenantSlugs === 'all' || tenantSlugs.includes(project.tenant_slug as string))
+    );
     const projectManagement = safeCollect('collectProjectManagement', [], () =>
-      listManagedProjects().map((view) => ({ project: view.project, lineage: view.lineage }))
+      projects.map((project) => {
+        const view = getProjectManagementView(project.project_id);
+        return { project: view.project, lineage: view.lineage };
+      })
     );
-    const projectTracks = listProjectTrackRecords();
-    const missionSeeds = listMissionSeedRecords();
+    const projectIds = new Set(projects.map((project) => project.project_id));
+    const projectTracks = listProjectTrackRecords().filter(
+      (track) =>
+        tenantSlugs === 'all' ||
+        Boolean(
+          (track.tenant_slug && tenantSlugs.includes(track.tenant_slug)) ||
+          projectIds.has(track.project_id)
+        )
+    );
+    const missionSeeds = listMissionSeedRecords().filter(
+      (seed) => tenantSlugs === 'all' || projectIds.has(seed.project_id)
+    );
     const missionSeedAssessment = summarizeMissionSeedAssessment(missionSeeds);
-    const distillCandidates = listDistillCandidateRecords();
-    const memoryCandidates = listMemoryPromotionCandidates();
+    const distillCandidates = listDistillCandidateRecords().filter(
+      (candidate) =>
+        tenantSlugs === 'all' || (candidate.project_id && projectIds.has(candidate.project_id))
+    );
+    const memoryCandidates = listMemoryPromotionCandidates().filter((candidate) =>
+      memoryCandidateVisibleToViewer(
+        candidate,
+        resolvedViewer.context,
+        req.nextUrl.searchParams.get('tenant') || undefined
+      )
+    );
     const nextActions = buildChronosNextActions({
       pendingApprovals: pendingApprovals.length,
       missionSeeds,
       memoryCandidates,
     });
-    const serviceBindings = listServiceBindingRecords();
-    const allArtifacts = listArtifactRecords();
+    const serviceBindings = filterServiceBindingsToTenant(
+      listServiceBindingRecords(),
+      projects,
+      tenantSlugs
+    );
+    const scopedSurfaceOutbox = {
+      slack: listSurfaceOutboxMessages('slack').filter((message) =>
+        surfaceOutboxVisibleToTenant(message, tenantSlugs)
+      ),
+      chronos: listSurfaceOutboxMessages('chronos').filter((message) =>
+        surfaceOutboxVisibleToTenant(message, tenantSlugs)
+      ),
+    };
+    const scopedBrowserSessions = tenantSlugs === 'all' ? collectBrowserSessions() : [];
+    const scopedBrowserConversationSessions =
+      tenantSlugs === 'all' ? collectBrowserConversationSessions() : [];
+    const scopedComputerSessions = tenantSlugs === 'all' ? collectComputerSessions() : [];
+    const allArtifacts = listArtifactRecords().filter(
+      (artifact) =>
+        tenantSlugs === 'all' ||
+        Boolean(artifact.tenant_slug && tenantSlugs.includes(artifact.tenant_slug))
+    );
     const recentArtifacts = allArtifacts.slice(-8).reverse();
     const gateReadiness = buildTrackGateReadinessSummaries({
       tracks: projectTracks,
       artifacts: allArtifacts,
     });
-    const company = summarizeCompany(resolveCompany(resolveChronosTenantSlug()));
+    const company = summarizeCompany(
+      resolveCompany(
+        tenantSlugs !== 'all' && tenantSlugs.length === 1
+          ? tenantSlugs[0]
+          : resolveChronosTenantSlug()
+      )
+    );
     return NextResponse.json({
       company,
+      tenantSlugs,
       activeMissions,
       missionProgress,
       projects,
@@ -1770,42 +2025,38 @@ export async function GET(req: NextRequest) {
       secretApprovals,
       surfaces,
       accessRole,
-      recentEvents: safeCollect('collectRecentEvents', [], collectRecentEvents),
+      recentEvents: safeCollect('collectRecentEvents', [], () => collectRecentEvents(tenantSlugs)),
       agentMessages,
       a2aHandoffs,
       controlActionCatalog,
       controlActionAvailability,
       controlActions,
-      controlActionDetails: safeCollect(
-        'collectControlActionDetails',
-        {},
-        collectControlActionDetails
+      controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
+        collectControlActionDetails(tenantSlugs)
       ),
-      ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
-      browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
-      browserConversationSessions: safeCollect(
-        'collectBrowserConversationSessions',
-        [],
-        collectBrowserConversationSessions
+      ownerSummaries: safeCollect('collectOwnerSummaries', [], () =>
+        collectOwnerSummaries(tenantSlugs)
       ),
-      computerSessions: safeCollect('collectComputerSessions', [], collectComputerSessions),
+      browserSessions: scopedBrowserSessions,
+      browserConversationSessions: scopedBrowserConversationSessions,
+      computerSessions: scopedComputerSessions,
       surfaceOutbox: {
-        slack: listSurfaceOutboxMessages('slack').length,
-        chronos: listSurfaceOutboxMessages('chronos').length,
+        slack: scopedSurfaceOutbox.slack.length,
+        chronos: scopedSurfaceOutbox.chronos.length,
       },
-      recentSurfaceOutbox: safeCollect(
-        'collectRecentSurfaceOutbox',
-        [],
-        collectRecentSurfaceOutbox
+      recentSurfaceOutbox: safeCollect('collectRecentSurfaceOutbox', [], () =>
+        collectRecentSurfaceOutbox().filter((message) =>
+          surfaceOutboxVisibleToTenant(message, tenantSlugs)
+        )
       ),
       runtime: {
-        total: runtime.length,
-        ready: runtime.filter((entry) => entry.agent.status === 'ready').length,
-        busy: runtime.filter((entry) => entry.agent.status === 'busy').length,
-        error: runtime.filter((entry) => entry.agent.status === 'error').length,
+        total: scopedRuntime.length,
+        ready: scopedRuntime.filter((entry) => entry.agent.status === 'ready').length,
+        busy: scopedRuntime.filter((entry) => entry.agent.status === 'busy').length,
+        error: scopedRuntime.filter((entry) => entry.agent.status === 'error').length,
       },
       runtimeLeases,
-      runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, runtime),
+      runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, scopedRuntime),
       runtimeTopology: buildRuntimeTopology({
         surfaces: collectRuntimeTopologySurfaces(surfaces),
         runtimes: managedRuntimes,
@@ -1817,7 +2068,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to load mission intelligence' },
-      { status: 500 }
+      { status: err instanceof ViewerContextError ? err.status : 500 }
     );
   }
 }
@@ -1838,6 +2089,9 @@ export async function POST(req: NextRequest) {
       action !== 'restart_runtime_lease' &&
       action !== 'clear_surface_outbox' &&
       action !== 'memory_promote_pending' &&
+      action !== 'memory_promote_candidate' &&
+      action !== 'memory_approve_candidate' &&
+      action !== 'memory_reject_candidate' &&
       action !== 'next_action_execute' &&
       action !== 'mission_control' &&
       action !== 'intervention_respond' &&
@@ -1868,6 +2122,20 @@ export async function POST(req: NextRequest) {
       const approvalRecord = loadApprovalRequest(storageChannel, requestId);
       if (!approvalRecord) {
         return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
+      }
+      const approvalTenant = resolveApprovalTenant(approvalRecord);
+      const allowedTenants = strictViewerScopeTenantSlugs(
+        resolvedViewer.context,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (
+        allowedTenants !== 'all' &&
+        (!approvalTenant || !allowedTenants.includes(approvalTenant))
+      ) {
+        return NextResponse.json(
+          { error: 'Approval is outside the viewer tenant scope' },
+          { status: 403 }
+        );
       }
       const updated = decideApprovalRequest('chronos_gateway', {
         channel,
@@ -1902,6 +2170,114 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, approval: updated });
     }
 
+    if (action === 'memory_promote_candidate') {
+      const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
+      if (!candidateId) {
+        return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
+      }
+      const candidate = listMemoryPromotionCandidates().find(
+        (entry) => entry.candidate_id === candidateId
+      );
+      if (!candidate) {
+        return NextResponse.json(
+          { error: 'Memory promotion candidate not found' },
+          { status: 404 }
+        );
+      }
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+      if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
+        return NextResponse.json(
+          { error: 'Memory candidate is outside the viewer scope' },
+          { status: 403 }
+        );
+      }
+      const promoted = await promoteMemoryCandidateToKnowledge({
+        candidateId,
+        executionRole: 'chronos_gateway',
+        ratificationNote: 'Promoted from the Chronos knowledge review page.',
+      });
+      return NextResponse.json({
+        ok: true,
+        candidate: promoted.candidate,
+        promotedRef: promoted.promotedRef,
+        tenantSlugs: allowedTenants,
+      });
+    }
+
+    if (action === 'memory_approve_candidate') {
+      const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
+      if (!candidateId) {
+        return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
+      }
+      const candidate = listMemoryPromotionCandidates().find(
+        (entry) => entry.candidate_id === candidateId
+      );
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+      if (!candidate) {
+        return NextResponse.json(
+          { error: 'Memory promotion candidate not found' },
+          { status: 404 }
+        );
+      }
+      if (candidate.status !== 'queued' || !candidate.ratification_required) {
+        return NextResponse.json(
+          { error: 'Only queued candidates requiring ratification can be approved' },
+          { status: 409 }
+        );
+      }
+      if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
+        return NextResponse.json(
+          { error: 'Memory candidate is outside the viewer scope' },
+          { status: 403 }
+        );
+      }
+      const updated = updateMemoryPromotionCandidateStatus({
+        candidateId,
+        status: 'approved',
+        ratificationNote: 'Approved from the Chronos knowledge review page.',
+      });
+      return NextResponse.json({ ok: true, candidate: updated || candidate });
+    }
+
+    if (action === 'memory_reject_candidate') {
+      const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
+      if (!candidateId) {
+        return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
+      }
+      const candidate = listMemoryPromotionCandidates().find(
+        (entry) => entry.candidate_id === candidateId
+      );
+      if (!candidate) {
+        return NextResponse.json(
+          { error: 'Memory promotion candidate not found' },
+          { status: 404 }
+        );
+      }
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+      if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
+        return NextResponse.json(
+          { error: 'Memory candidate is outside the viewer scope' },
+          { status: 403 }
+        );
+      }
+      if (candidate.status !== 'queued' && candidate.status !== 'approved') {
+        return NextResponse.json(
+          { error: 'Only queued or approved candidates can be rejected' },
+          { status: 409 }
+        );
+      }
+      const note = typeof body?.note === 'string' ? body.note.trim() : '';
+      const updated = updateMemoryPromotionCandidateStatus({
+        candidateId,
+        status: 'rejected',
+        ratificationNote: note || 'Rejected from the Chronos knowledge review page.',
+      });
+      return NextResponse.json({ ok: true, candidate: updated || candidate });
+    }
+
     if (action === 'distill_candidate_decision') {
       const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
       const decision =
@@ -1915,6 +2291,14 @@ export async function POST(req: NextRequest) {
       const candidate = loadDistillCandidateRecord(candidateId);
       if (!candidate) {
         return NextResponse.json({ error: 'Distill candidate not found' }, { status: 404 });
+      }
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+      if (!distillCandidateVisibleToTenant(candidate, allowedTenants)) {
+        return NextResponse.json(
+          { error: 'Distill candidate is outside the viewer tenant scope' },
+          { status: 403 }
+        );
       }
       let updated = candidate;
       if (decision === 'archive') {
@@ -1944,9 +2328,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'memory_promote_pending') {
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
       const dryRun = body?.dryRun === true;
       const approved = listMemoryPromotionCandidates()
-        .filter((candidate) => candidate.status === 'approved')
+        .filter(
+          (candidate) =>
+            candidate.status === 'approved' &&
+            memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
+        )
         .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
       if (dryRun) {
         return NextResponse.json({
@@ -1983,11 +2373,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const personalAutopromote = await promotePersonalMemoryCandidates({
-        executionRole: 'chronos_gateway',
-        ratificationNote: 'Autopromoted from Chronos control action memory_promote_pending.',
-        dryRun: false,
-      });
+      const personalAutopromote =
+        allowedTenants === 'all' && resolvedViewer.context.source === 'loopback'
+          ? await promotePersonalMemoryCandidates({
+              executionRole: 'chronos_gateway',
+              ratificationNote: 'Autopromoted from Chronos control action memory_promote_pending.',
+              dryRun: false,
+            })
+          : { enabled: false, considered: 0, promoted: [], skipped: [] };
 
       emitMissionOrchestrationObservation({
         event_id: `CA-MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -2049,6 +2442,14 @@ export async function POST(req: NextRequest) {
       if (!sessionId) {
         return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
       }
+      const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+      const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+      if (allowedTenants !== 'all') {
+        return NextResponse.json(
+          { error: 'Browser session has no resolvable tenant scope' },
+          { status: 403 }
+        );
+      }
       const ok = applyBrowserSessionControl(sessionId, action);
       if (!ok) {
         return NextResponse.json({ error: 'Browser session not found' }, { status: 404 });
@@ -2082,6 +2483,12 @@ export async function POST(req: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: 'Parent project not found' }, { status: 404 });
       }
+      const projectError = projectScopeError(
+        resolvedViewer.context,
+        project,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (projectError) return projectError;
       const projectPath = resolveProjectRootPath(project);
       if (!projectPath) {
         return NextResponse.json(
@@ -2111,7 +2518,7 @@ export async function POST(req: NextRequest) {
         '--persona',
         persona,
         '--tenant-id',
-        'default',
+        project.tenant_slug || 'default',
         '--mission-type',
         missionType,
         '--project-id',
@@ -2222,6 +2629,12 @@ export async function POST(req: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: 'Parent project not found' }, { status: 404 });
       }
+      const projectError = projectScopeError(
+        resolvedViewer.context,
+        project,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (projectError) return projectError;
       const readiness = buildTrackGateReadinessSummaries({
         tracks: [track],
         artifacts: listArtifactRecords(),
@@ -2308,6 +2721,12 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json({ error: 'Unsupported mission operation' }, { status: 400 });
       }
+      const missionError = missionScopeError(
+        resolvedViewer.context,
+        missionId,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (missionError) return missionError;
 
       const event = enqueueMissionOrchestrationEvent({
         eventType: 'mission_control_requested',
@@ -2337,6 +2756,12 @@ export async function POST(req: NextRequest) {
       if (!missionId || !response) {
         return NextResponse.json({ error: 'Missing missionId or response' }, { status: 400 });
       }
+      const missionError = missionScopeError(
+        resolvedViewer.context,
+        missionId,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (missionError) return missionError;
       emitMissionOrchestrationObservation({
         decision: 'mission_intervention_response_recorded',
         event_type: 'mission_intervention_response_recorded',
@@ -2402,6 +2827,16 @@ export async function POST(req: NextRequest) {
       const message = listSurfaceOutboxMessages(surface).find(
         (entry) => entry.message_id === messageId
       );
+      const allowedTenants = strictViewerScopeTenantSlugs(
+        resolvedViewer.context,
+        typeof body?.tenant === 'string' ? body.tenant : undefined
+      );
+      if (!message || !surfaceOutboxVisibleToTenant(message, allowedTenants)) {
+        return NextResponse.json(
+          { error: 'Surface outbox message is outside the viewer tenant scope' },
+          { status: 403 }
+        );
+      }
       clearSurfaceOutboxMessage(surface, messageId);
       emitMissionOrchestrationObservation({
         decision: 'surface_outbox_cleared',
@@ -2439,6 +2874,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing agentId' }, { status: 400 });
     }
     const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === agentId);
+    if (!lease) {
+      return NextResponse.json({ error: 'Runtime lease not found' }, { status: 404 });
+    }
+    const leaseMissionId =
+      lease.owner_type === 'mission'
+        ? lease.owner_id
+        : typeof lease.metadata?.mission_id === 'string'
+          ? lease.metadata.mission_id
+          : undefined;
+    const leaseError = missionScopeError(
+      resolvedViewer.context,
+      leaseMissionId || '',
+      typeof body?.tenant === 'string' ? body.tenant : undefined
+    );
+    if (leaseError) return leaseError;
 
     if (action === 'cleanup_runtime_lease') {
       await stopAgentRuntime(agentId, 'chronos_localadmin');
@@ -2463,7 +2913,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to apply runtime remediation' },
-      { status: 500 }
+      { status: err instanceof ViewerContextError ? err.status : 500 }
     );
   }
 }
