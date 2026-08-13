@@ -1466,6 +1466,11 @@
         "ja": "この project にはまだ active mission がありません。現在の bootstrap work:",
         "qps-ploc": "⟦Ŧħïş ṗřőĵėƈŧ ḓőėş ñőŧ ħȧṽė ȧƈŧïṽė ɱïşşïőñş ẏėŧ. Ƈůřřėñŧ ƀőőŧşŧřȧṗ ẇőřķ: ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "chronos_project": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
       "chronos_projects": {
         "en": "Projects",
         "ja": "Projects",
