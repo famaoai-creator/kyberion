@@ -14,7 +14,8 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs,
+  ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -54,7 +55,7 @@ export function GET(req: NextRequest) {
     ? (rawView as WorkVisibilityView)
     : 'all';
   try {
-    const tenantSlugs = viewerScopeTenantSlugs(
+    const tenantSlugs = strictViewerScopeTenantSlugs(
       viewer,
       req.nextUrl.searchParams.get('tenant') || undefined
     );
@@ -121,7 +122,13 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: error instanceof Error && error.message.includes('not authorized') ? 403 : 500 }
+      {
+        status:
+          error instanceof ViewerContextError ||
+          (error instanceof Error && error.message.includes('not authorized'))
+            ? 403
+            : 500,
+      }
     );
   }
 }

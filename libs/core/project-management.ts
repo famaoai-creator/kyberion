@@ -351,7 +351,20 @@ export function assertManagedProjectTrackScope(
 }
 
 function projectMissions(projectId: string, rootDir = pathResolver.rootDir()): MissionState[] {
-  const missionOptions = { rootDir };
+  const project = loadProjectRecord(projectId, { rootDir });
+  const missionDirectories = project
+    ? [
+        project.tier === 'personal'
+          ? path.join(rootDir, 'knowledge/personal/missions')
+          : project.tier === 'confidential'
+            ? path.join(rootDir, 'active/missions/confidential')
+            : path.join(rootDir, 'active/missions/public'),
+      ]
+    : undefined;
+  const missionOptions = {
+    rootDir,
+    ...(missionDirectories ? { directories: missionDirectories } : {}),
+  };
   return listMissionsInSearchDirs(missionOptions)
     .map(({ missionId }) => loadState(missionId, missionOptions))
     .filter((state): state is MissionState => Boolean(state))
