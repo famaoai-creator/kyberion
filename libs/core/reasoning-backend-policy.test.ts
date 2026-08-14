@@ -16,10 +16,12 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
     expect(policy.allowed_modes).toContain('grok-cli');
+    expect(policy.allowed_modes).toContain('grok-api');
     expect(policy.mode_aliases['gemini-api']).toBeUndefined();
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
     expect(policy.mode_aliases.grok).toBe('grok-cli');
     expect(policy.mode_aliases['grok-build']).toBe('grok-cli');
+    expect(policy.mode_aliases.xai).toBe('grok-api');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('grok-cli');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('claude-cli');
     expect(policy.openrouter).toEqual({
@@ -113,6 +115,22 @@ describe('reasoning-backend-policy', () => {
         providers: [{ provider: 'grok', installed: true, healthy: true }],
       })
     ).toBe('grok-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { XAI_API_KEY: 'xai-test-key' },
+        providers: [{ provider: 'grok', installed: true, healthy: true }],
+      })
+    ).toBe('grok-api');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { KYBERION_REASONING_BACKEND: 'xai' },
+        providers: [],
+      })
+    ).toBe('grok-api');
 
     expect(
       resolveReasoningBackendModeFromContext({

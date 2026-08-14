@@ -105,6 +105,10 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_OPENROUTER_COST_POLICY;
     delete process.env.KYBERION_OPENROUTER_REQUIRED_PARAMETERS;
     delete process.env.KYBERION_OPENROUTER_URL;
+    delete process.env.XAI_API_KEY;
+    delete process.env.KYBERION_GROK_API_KEY;
+    delete process.env.KYBERION_GROK_API_URL;
+    delete process.env.KYBERION_GROK_API_MODEL;
     mockProviders.setProviders(mockProviders.defaultProviders);
     mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReset();
     mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue(null);
@@ -149,6 +153,26 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('agy-cli');
     expect(getIntentExtractor().name).toBe('agy-cli');
     expect(getVoiceBridge().name).toBe('agy-cli-text');
+  });
+
+  it('installs grok-cli adapters when requested explicitly', () => {
+    const installed = installReasoningBackends({ mode: 'grok-cli', force: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('grok-cli');
+    expect(getReasoningBackend().name).toBe('shell-grok-cli');
+    expect(getIntentExtractor().name).toBe('grok-cli');
+    expect(getVoiceBridge().name).toBe('grok-cli-text');
+  });
+
+  it('installs the xAI Grok API backend when a key is configured', () => {
+    process.env.XAI_API_KEY = 'xai-test-key';
+
+    const installed = installReasoningBackends({ mode: 'grok-api' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('grok-api');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
   });
 
   it('installs the local OpenAI-compatible backend when configured', () => {
@@ -264,6 +288,8 @@ describe('reasoning-bootstrap', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-api');
     expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
     expect(normalizeReasoningBackendMode('nemotron')).toBe('nemotron-api');
+    expect(normalizeReasoningBackendMode('grok-api')).toBe('grok-api');
+    expect(normalizeReasoningBackendMode('grok-cli')).toBe('grok-cli');
   });
 
   describe('XP-01 provider-capability-registry wiring', () => {

@@ -154,6 +154,22 @@ describe('shell-claude-cli-backend', () => {
       const [spawnedBin] = spawnMock.mock.calls[0];
       expect(spawnedBin).toBe('/pinned/claude');
     });
+
+    it('allows a governed route model to override the CLI environment default', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = buildShellClaudeCliBackendFromEnv(
+        { KYBERION_CLAUDE_CLI_MODEL: 'opus' } as NodeJS.ProcessEnv,
+        () => ({ available: true, bin: '/home/op/.local/bin/claude' }),
+        'claude-opus-5'
+      );
+
+      expect(backend).not.toBeNull();
+      await backend!.delegateTask('do the thing');
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--model');
+      expect(argv[argv.indexOf('--model') + 1]).toBe('claude-opus-5');
+    });
   });
 
   describe('spawnCli env allowlisting (XP-02)', () => {

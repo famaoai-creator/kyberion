@@ -1505,6 +1505,14 @@ export {
   probeOpenAiCompatibleBackendAvailability,
   probeNemotronBackendAvailability,
 } from './openai-compatible-backend.js';
+export {
+  GROK_API_DEFAULT_BASE_URL,
+  GROK_API_DEFAULT_MODEL,
+  buildGrokApiBackendFromEnv,
+  probeGrokApiBackendAvailability,
+  resolveGrokApiKey,
+  resolveGrokApiModel,
+} from './grok-api-backend.js';
 export type {
   OpenAiCompatibleBackendOptions,
   OpenAiCompatibleBackendAvailability,

@@ -1329,7 +1329,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 80083,
+      "size": 80931,
       "type": "json"
     },
     {
@@ -1371,7 +1371,7 @@
     {
       "path": "product/governance/environment-manifests/reasoning-backend.json",
       "tier": "public",
-      "size": 2958,
+      "size": 3081,
       "type": "json"
     },
     {
@@ -1449,7 +1449,7 @@
     {
       "path": "product/governance/harness-capability-registry.json",
       "tier": "public",
-      "size": 34307,
+      "size": 35278,
       "type": "json"
     },
     {
@@ -1791,19 +1791,19 @@
     {
       "path": "product/governance/model-cost-registry.fallback.json",
       "tier": "public",
-      "size": 1199,
+      "size": 1328,
       "type": "json"
     },
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1546,
+      "size": 1671,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 11629,
+      "size": 15730,
       "type": "json"
     },
     {
@@ -2103,7 +2103,7 @@
     {
       "path": "product/governance/provider-capability-scan-policy.json",
       "tier": "public",
-      "size": 6250,
+      "size": 6567,
       "type": "json"
     },
     {
@@ -2115,7 +2115,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1190,
+      "size": 1186,
       "type": "json"
     },
     {
@@ -2139,7 +2139,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2659,
+      "size": 2840,
       "type": "json"
     },
     {
@@ -2151,7 +2151,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 12171,
+      "size": 13252,
       "type": "json"
     },
     {
@@ -3951,13 +3951,13 @@
     {
       "path": "product/orchestration/provider-capabilities.fallback.json",
       "tier": "public",
-      "size": 10443,
+      "size": 12394,
       "type": "json"
     },
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 13030,
+      "size": 15061,
       "type": "json"
     },
     {

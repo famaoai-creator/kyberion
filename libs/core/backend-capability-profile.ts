@@ -99,6 +99,7 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   'gemini-api': api('gemini-api', { images: true }),
   'agy-cli': cli('agy-cli'),
   'grok-cli': cli('grok-cli'),
+  'grok-api': api('grok-api', { images: true }),
   // CopilotAcpReasoningBackend holds a persistent ACP mediator session.
   copilot: cli('copilot', { session_continuity: true }),
   local: localServer('local'),

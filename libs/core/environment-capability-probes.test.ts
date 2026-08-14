@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   installCoreEnvironmentProbes,
   nodeVersionSatisfiesFloor,
@@ -94,6 +94,11 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
   const binaryYes = () => true;
   const binaryNo = () => false;
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('treats explicit stub as not-real with an actionable reason', async () => {
     const result = await probeExplicitReasoningBackend('stub', {});
     expect(result.available).toBe(false);
@@ -150,6 +155,26 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
     const down = await probeExplicitReasoningBackend('grok-cli', {}, { binaryProbe: binaryNo });
     expect(down.available).toBe(false);
     expect(down.reason).toContain('grok');
+  });
+
+  it('probes grok-api from an xAI key and normalizes the xai alias', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.6' }] }), { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      probeExplicitReasoningBackend('grok-api', { XAI_API_KEY: 'xai-test-key' })
+    ).resolves.toEqual({ available: true });
+    await expect(
+      probeExplicitReasoningBackend('xai', { KYBERION_GROK_API_KEY: 'kyb-xai-key' })
+    ).resolves.toEqual({ available: true });
+
+    const down = await probeExplicitReasoningBackend('grok-api', {});
+    expect(down.available).toBe(false);
+    expect(down.reason).toMatch(/XAI_API_KEY/);
   });
 
   it('does not fall back to a different working backend when the selected one is down', async () => {

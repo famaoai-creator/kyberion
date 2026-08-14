@@ -17,6 +17,8 @@
  *
  *   `gemini-api`  — use the Google AI Studio Gemini REST API. Requires
  *                   GEMINI_API_KEY or GOOGLE_API_KEY.
+ *   `grok-api`    — use the xAI Grok REST API (OpenAI-compatible). Requires
+ *                   XAI_API_KEY or KYBERION_GROK_API_KEY.
  *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
@@ -68,6 +70,7 @@ import {
 } from './grok-cli-backend.js';
 import { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
 import { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
+import { buildGrokApiBackendFromEnv } from './grok-api-backend.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from './adapter-default-selection.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
@@ -218,6 +221,8 @@ function providerForReasoningMode(mode: ReasoningBackendMode): string | undefine
       return 'agy';
     case 'grok-cli':
       return 'grok';
+    case 'grok-api':
+      return 'grok-api';
     case 'copilot':
       return 'copilot';
     case 'anthropic':
@@ -317,7 +322,7 @@ function buildReasoningRuntimeBundle(
       };
     }
     case 'claude-cli': {
-      const cliBackend = buildShellClaudeCliBackendFromEnv();
+      const cliBackend = buildShellClaudeCliBackendFromEnv(process.env, undefined, options.model);
       if (!cliBackend) return null;
       // The availability probe may have selected a real CLI outside
       // node_modules/.bin when the PATH entry is a pnpm placeholder. Reuse
@@ -325,6 +330,7 @@ function buildReasoningRuntimeBundle(
       // execute the same binary.
       const claudeOptions = {
         ...buildClaudeCliOptionsFromEnv(),
+        ...(options.model ? { model: options.model } : {}),
         bin: cliBackend.getBinaryPath(),
       };
       return {
@@ -445,7 +451,7 @@ function buildReasoningRuntimeBundle(
     case 'grok-cli': {
       // Probe via env helper, then re-construct with optional model override so
       // installReasoningBackends({ model }) pins intent/voice/reasoning alike.
-      if (!buildShellGrokCliBackendFromEnv()) return null;
+      if (!buildShellGrokCliBackendFromEnv() && !options.force) return null;
       const grokOptions = {
         ...buildGrokCliOptionsFromEnv(),
         ...(options.model ? { model: options.model } : {}),
@@ -461,6 +467,22 @@ function buildReasoningRuntimeBundle(
         },
         voiceBridge: {
           bridge: new GrokCliVoiceBridge(grokOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'grok-api': {
+      const grokApiBackend = buildGrokApiBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
+      if (!grokApiBackend && !options.force) return null;
+      if (!grokApiBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: grokApiBackend,
           provider,
           label: mode,
         },
@@ -767,6 +789,7 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<Reaso
   'gemini-api',
   'agy-cli',
   'grok-cli',
+  'grok-api',
   'copilot',
   'local',
   'nemotron',

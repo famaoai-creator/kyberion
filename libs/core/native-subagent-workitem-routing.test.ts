@@ -6,6 +6,7 @@ import {
   type CodexHarnessSession,
 } from './codex-cli-reasoning-backend.js';
 import { AgyCliBackend, type AgyHarnessSession } from './agy-cli-backend.js';
+import { ShellGrokCliBackend, type GrokHarnessSession } from './shell-grok-cli-backend.js';
 
 describe('native Codex Luna WorkItem routing', () => {
   it('selects the native adopter, routes gpt-5.6-luna, and records execution proof', async () => {
@@ -100,6 +101,54 @@ describe('native AGY WorkItem routing', () => {
       provider: 'agy',
       threadId: 'thread-workitem-native-agy',
       mode: 'agy-subagent-adopter',
+    });
+  });
+});
+
+describe('native Grok WorkItem routing', () => {
+  it('selects the grok-acp adopter, routes native spawn_subagent, and records execution proof', async () => {
+    const session: GrokHarnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async (_prompt, options) => ({
+        text: 'native-grok-workitem-result',
+        stopReason: 'completed',
+        metadata: {
+          nativeSubagent: {
+            provider: 'grok',
+            parentThreadId: 'sess-grok-parent',
+            threadId: 'sess-grok-parent',
+            forked: false,
+            mode: 'acp-native-subagent',
+            effort: 'medium',
+            profile: options?.profile,
+          },
+        },
+      })),
+    };
+    const backend = new ShellGrokCliBackend({
+      bin: 'grok',
+      model: 'grok-4.6',
+      harnessSession: session,
+    });
+    const dispatcher = new HarnessSubagentDispatcher();
+
+    const result = await dispatcher.dispatch(
+      'Execute the native Grok WorkItem task.',
+      'workitem:witem-native-grok-01',
+      backend,
+      { profile: 'implementer' }
+    );
+
+    expect(result).toBe('native-grok-workitem-result');
+    expect(session.boot).toHaveBeenCalledOnce();
+    expect(session.askNativeSubagent).toHaveBeenCalledOnce();
+    expect(session.ask).not.toHaveBeenCalled();
+    expect(backend.getNativeSubagentAdopter?.().id).toBe('grok-acp');
+    expect(backend.getNativeSubagentAdopter?.().getInfo?.()).toMatchObject({
+      provider: 'grok',
+      threadId: 'sess-grok-parent',
+      mode: 'acp-native-subagent',
     });
   });
 });

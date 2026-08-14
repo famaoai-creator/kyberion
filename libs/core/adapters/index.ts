@@ -14,4 +14,6 @@ export { AgyAdapter } from '../agent-adapter.js';
 export type { AgyAdapterOptions } from '../agent-adapter.js';
 export { AgySdkAdapter } from '../agy-sdk-adapter.js';
 export type { AgySdkAdapterOptions } from '../agy-sdk-adapter.js';
+export { GrokAdapter } from './grok-adapter.js';
+export type { GrokAdapterOptions } from './grok-adapter.js';
 export { AgentFactory } from './agent-factory.js';

@@ -1026,6 +1026,33 @@
       },
       "status": "active",
       "notes": "Grok Build CLI structured output is used when a governed JSON contract is required."
+    },
+    {
+      "capability_id": "cli.native.grok_spawn_subagent",
+      "source": {
+        "type": "cli_native",
+        "provider": "grok-cli",
+        "name": "spawn-subagent",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["delegate-subagent", "fan-out-work", "bounded-sidecar"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Grok Build ACP (`grok agent stdio`) native spawn_subagent. Observed tool/session events only; session/fork is not used. Unobserved turns fail closed as subagent_unavailable."
     }
   ]
 }

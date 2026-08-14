@@ -24,6 +24,7 @@ const REASONING_SETUP_GUIDANCE = [
   '  - Gemini CLI: authenticate `gemini`, then set `KYBERION_REASONING_BACKEND=gemini-cli`',
   '  - AGY CLI: authenticate `agy`, then set `KYBERION_REASONING_BACKEND=agy-cli`',
   '  - Grok Build CLI: authenticate `grok` (`grok login`), then set `KYBERION_REASONING_BACKEND=grok-cli`',
+  '  - xAI Grok API: set `XAI_API_KEY` (or `KYBERION_GROK_API_KEY`), then set `KYBERION_REASONING_BACKEND=grok-api`',
   '  - GitHub Copilot CLI: authenticate Copilot CLI, then set `KYBERION_REASONING_BACKEND=copilot`',
   '  - Anthropic API: set `ANTHROPIC_API_KEY`, then set `KYBERION_REASONING_BACKEND=anthropic`',
   '  - OpenRouter API: set `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), then set `KYBERION_REASONING_BACKEND=openrouter`',
