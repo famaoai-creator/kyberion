@@ -45,6 +45,59 @@ describe('reasoning-route-resolver', () => {
     expect(route.capabilities).toEqual(expect.arrayContaining(['tools', 'vision', 'streaming']));
   });
 
+  it('resolves the grok-api default profile against the approved xAI model', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'grok-api-default',
+      env: { XAI_API_KEY: 'xai-test-key' },
+    });
+    expect(route.mode).toBe('grok-api');
+    expect(route.model).toBe('xai:grok-4.6');
+    expect(route.capabilities).toEqual(expect.arrayContaining(['tools', 'vision']));
+  });
+
+  it('pins Claude default profiles and honors Anthropic model overrides', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'anthropic-default',
+      env: { ANTHROPIC_API_KEY: 'test-anthropic-key' },
+    });
+    expect(route.model).toBe('anthropic:claude-opus-5');
+
+    const overridden = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'anthropic-default',
+      env: {
+        ANTHROPIC_API_KEY: 'test-anthropic-key',
+        KYBERION_ANTHROPIC_MODEL: 'claude-opus-4-8',
+      },
+    });
+    expect(overridden.model).toBe('anthropic:claude-opus-4-8');
+  });
+
+  it('does not let a Grok CLI model override the Grok API route', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'grok-api-default',
+      env: {
+        XAI_API_KEY: 'xai-test-key',
+        KYBERION_GROK_CLI_MODEL: 'grok-4.5-build',
+      },
+    });
+    expect(route.mode).toBe('grok-api');
+    expect(route.model).toBe('xai:grok-4.6');
+  });
+
+  it('accepts the registered Grok Build model alias for the CLI route', () => {
+    const route = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'grok-cli-default',
+      env: { KYBERION_GROK_CLI_MODEL: 'grok-4.5-build' },
+    });
+    expect(route.mode).toBe('grok-cli');
+    expect(route.model).toBe('xai:grok-4.5-build');
+  });
+
   it('rejects parameters unsupported by an adapter', () => {
     expect(() =>
       resolveSamplingParams({ mode: 'codex-cli', sampling: { temperature: 0.2 } })

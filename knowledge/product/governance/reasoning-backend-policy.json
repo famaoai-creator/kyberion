@@ -4,7 +4,8 @@
   "mode_aliases": {
     "nemotron": "nemotron-api",
     "grok": "grok-cli",
-    "grok-build": "grok-cli"
+    "grok-build": "grok-cli",
+    "xai": "grok-api"
   },
   "allowed_modes": [
     "claude-cli",
@@ -15,6 +16,7 @@
     "gemini-api",
     "agy-cli",
     "grok-cli",
+    "grok-api",
     "copilot",
     "local",
     "ollama",
@@ -39,6 +41,14 @@
     {
       "env": "GOOGLE_API_KEY",
       "mode": "gemini-api"
+    },
+    {
+      "env": "XAI_API_KEY",
+      "mode": "grok-api"
+    },
+    {
+      "env": "KYBERION_GROK_API_KEY",
+      "mode": "grok-api"
     },
     {
       "env": "KYBERION_NEMOTRON_URL",

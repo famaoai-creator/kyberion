@@ -11,10 +11,11 @@ describe('provider-config', () => {
   it('loads runtime defaults and lifecycle defaults from the shared config', () => {
     const config = loadProviderConfig();
     expect(config.default_models.gemini).toBe('gemini-3.6-flash');
-    expect(config.default_models.claude).toBe('claude-opus-4-8');
-    expect(config.default_models.agy).toBe('Gemini 3.6 Flash (Medium)');
+    expect(config.default_models.claude).toBe('claude-opus-5');
+    expect(config.default_models.agy).toBe('Gemini 3.7 Flash (Medium)');
     expect(config.default_models.codex).toBe('gpt-5.6-sol');
-    expect(config.runtime_defaults['anthropic-default']).toBe('claude-opus-4-8');
+    expect(config.default_models.grok).toBe('grok-4.6');
+    expect(config.runtime_defaults['anthropic-default']).toBe('claude-opus-5');
     expect(config.runtime_defaults['anthropic-fast']).toBe('claude-haiku-4-5-20251001');
     expect(config.default_models.copilot).toBe('auto');
     expect(config.runtime_defaults['copilot-default']).toBe('auto');

@@ -85,6 +85,33 @@ describe('agy-cli-backend', () => {
     );
   });
 
+  it('passes configured Gemini 3.7 Flash model to AGY CLI invocation', async () => {
+    process.env.KYBERION_AGY_CLI_MODEL = 'Gemini 3.7 Flash (Low)';
+    const backend = buildAgyCliBackendFromEnv();
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+
+    await backend?.prompt('analyze this');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'agy',
+      expect.arrayContaining(['--model', 'Gemini 3.7 Flash (Low)']),
+      expect.anything()
+    );
+  });
+
+  it('supports explicit gemini-3.7-flash in backend constructor options', async () => {
+    const backend = new AgyCliBackend({ model: 'gemini-3.7-flash' });
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+
+    await backend.prompt('test run');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'agy',
+      expect.arrayContaining(['--model', 'gemini-3.7-flash']),
+      expect.anything()
+    );
+  });
+
   it('exposes a valid native subagent adopter via AGY session harness', async () => {
     const fakeHarness = {
       boot: vi.fn(async () => {}),

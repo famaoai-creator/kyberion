@@ -196,6 +196,16 @@
             "max_output_mb": 1,
             "evidence": "grok --json-schema"
           }
+        },
+        {
+          "capability_ids": ["cli.native.grok_spawn_subagent"],
+          "probe": {
+            "command": "grok",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "grok agent stdio / --agents / spawn_subagent"
+          }
         }
       ]
     },
