@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Crown } from 'lucide-react';
 
 interface IdentityResponse {
   status: string;
@@ -38,14 +37,9 @@ export function IdentityBadge() {
   }, []);
 
   if (error || !data) return null;
-  if (!data.onboarded) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest kb-status-warning">
-        <Crown size={12} />
-        <span>Onboarding required</span>
-      </div>
-    );
-  }
+  // Personal identity setup is optional for the tenant/project console.
+  // Do not present it as a blocker when the operator can already work.
+  if (!data.onboarded) return null;
 
   const name = data.sovereign?.name || 'Sovereign';
   const agentId = data.agent?.agent_id || 'agent';
@@ -56,7 +50,6 @@ export function IdentityBadge() {
       className="flex items-center gap-2 rounded-lg border border-[color:var(--kb-accent)]/30 bg-[color:var(--kb-panel-bg)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[color:var(--kb-text-primary)]"
       title={data.vision || undefined}
     >
-      <Crown size={12} className="text-[color:var(--kb-accent)]" />
       <span className="text-[color:var(--kb-text-primary)]">{name}</span>
       <span className="text-[color:var(--kb-text-secondary)]">·</span>
       <span className="text-[color:var(--kb-accent)]">{agentId}</span>

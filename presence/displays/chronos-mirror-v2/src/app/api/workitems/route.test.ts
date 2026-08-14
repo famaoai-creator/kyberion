@@ -64,6 +64,21 @@ describe('workitems route', () => {
       items: [{ item_id: 'WI-1', context: { project_id: 'PROJECT-A' } }],
       counts: { ready: 1 },
       quality: { explicit_context: 1, migrated_context: 0, missing_context: 0, warnings: [] },
+      lineage: {
+        hierarchy: ['tenant_slug', 'organization_id', 'project_id', 'mission_id', 'task_id'],
+        nodes: [],
+        edges: [],
+        total_items: 1,
+        complete_chain_items: 0,
+        incomplete_chain_items: 1,
+        missing_by_kind: {
+          tenant_slug: 1,
+          organization_id: 1,
+          project_id: 0,
+          mission_id: 1,
+          task_id: 1,
+        },
+      },
     });
   });
 
@@ -89,6 +104,10 @@ describe('workitems route', () => {
       scope: 'operations',
       view: 'active',
       items: [{ item_id: 'WI-1' }],
+      lineage: {
+        total_items: 1,
+        incomplete_chain_items: 1,
+      },
     });
   });
 });

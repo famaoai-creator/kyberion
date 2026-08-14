@@ -27,6 +27,10 @@ export interface AgentActivityEntry {
   team_role?: string;
   mission_id?: string;
   tenant_slug?: string;
+  organization_id?: string;
+  project_id?: string;
+  task_id?: string;
+  work_shape?: string;
   item_id: string;
   title: string;
   status: string;
@@ -119,6 +123,10 @@ export function composeAgentActivityBoard(input: {
       team_role: metadata.team_role ? String(metadata.team_role) : undefined,
       mission_id: missionId,
       tenant_slug: tenant,
+      organization_id: context.organization_id,
+      project_id: context.project_id,
+      task_id: context.task_id,
+      work_shape: context.work_shape,
       item_id: item.item_id,
       title: item.title,
       status: item.status,

@@ -4,7 +4,7 @@ import { buildApprovalQueueItems } from '../../../lib/su-surface-data';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
 
 export function GET(req: NextRequest) {
@@ -17,7 +17,7 @@ export function GET(req: NextRequest) {
 
   try {
     const url = new URL(req.url);
-    const tenantSlugs = viewerScopeTenantSlugs(
+    const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
       url.searchParams.get('tenant') || undefined
     );
@@ -31,7 +31,7 @@ export function GET(req: NextRequest) {
       channel: url.searchParams.get('channel') || undefined,
       limit: Number(url.searchParams.get('limit') || 24),
     });
-    return NextResponse.json({ approvals });
+    return NextResponse.json({ approvals, accessRole: resolvedViewer.context.role });
   } catch (error) {
     return viewerErrorResponse(error);
   }
