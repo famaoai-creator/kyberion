@@ -92,9 +92,9 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('audit drilldown');
     expect(component).toContain('control summary');
     expect(component).toContain('requested by');
-    expect(component).toContain('Recent Control Actions');
-    expect(component).toContain('show details');
-    expect(component).toContain('jump to target');
+    expect(component).toContain("'chronos_recent_control_actions'");
+    expect(component).toContain("'chronos_show_details'");
+    expect(component).toContain("'chronos_jump_to_target'");
     expect(component).toContain('show latest action');
     expect(component).toContain('retry latest action');
     expect(component).toContain('operator guidance');
@@ -117,9 +117,10 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('mission pinned');
     expect(component).toContain("url.searchParams.set('mission', selectedMissionId)");
     expect(component).toContain("const mission = params.get('mission')");
-    expect(component).toContain("new EventSource('/api/intelligence/stream')");
+    expect(component).toContain('new EventSource(');
+    expect(component).toContain("'/api/intelligence/stream'");
     expect(component).toContain('No mission-scoped agent messages observed yet.');
-    expect(component).toContain('Owner Summaries');
+    expect(component).toContain("'chronos_owner_summaries'");
     expect(component).toContain('Delivery Exceptions');
     expect(component).toContain('clear outbox');
     expect(component).toContain('Surface Control');
