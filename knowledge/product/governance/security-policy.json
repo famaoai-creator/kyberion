@@ -437,7 +437,12 @@
       ]
     },
     "chronos_operator": {
-      "allow_read": ["active/shared/observability/", "active/shared/runtime/"],
+      "allow_read": [
+        "active/missions/",
+        "active/projects/",
+        "active/shared/observability/",
+        "active/shared/runtime/"
+      ],
       "allow_write": []
     },
     "chronos_mirror_v2": {
@@ -454,6 +459,9 @@
     },
     "chronos_localadmin": {
       "allow_read": [
+        "knowledge/personal/tenants/",
+        "active/missions/",
+        "active/projects/",
         "active/shared/coordination/channels/",
         "active/shared/coordination/chronos/",
         "active/shared/coordination/orchestration/",

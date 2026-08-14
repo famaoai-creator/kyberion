@@ -85,4 +85,55 @@ describe('work-visibility', () => {
       })
     ).toThrow(/not authorized/);
   });
+
+  it('projects the canonical scope lineage and reports missing links', () => {
+    const projection = buildWorkVisibilityProjection({
+      items: [
+        item({
+          context: {
+            tenant_slug: 'tenant-a',
+            organization_id: 'org-a',
+            project_id: 'PROJECT-A',
+            mission_id: 'MSN-A',
+            task_id: 'TASK-A',
+            work_shape: 'solution_project',
+          },
+        }),
+        item({
+          item_id: 'missing-org',
+          context: {
+            tenant_slug: 'tenant-a',
+            project_id: 'PROJECT-A',
+            work_shape: 'routine_operation',
+          },
+        }),
+      ],
+      viewer: { tenantSlugs: 'all' },
+    });
+
+    expect(projection.lineage).toMatchObject({
+      hierarchy: ['tenant_slug', 'organization_id', 'project_id', 'mission_id', 'task_id'],
+      total_items: 2,
+      complete_chain_items: 1,
+      incomplete_chain_items: 1,
+      missing_by_kind: {
+        tenant_slug: 0,
+        organization_id: 1,
+        project_id: 0,
+        mission_id: 1,
+        task_id: 1,
+      },
+    });
+    expect(projection.lineage.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'tenant_slug:tenant-a', to: 'organization_id:org-a' }),
+        expect.objectContaining({ from: 'organization_id:org-a', to: 'project_id:PROJECT-A' }),
+      ])
+    );
+    expect(projection.lineage.edges).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'tenant_slug:tenant-a', to: 'project_id:PROJECT-A' }),
+      ])
+    );
+  });
 });

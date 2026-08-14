@@ -72,7 +72,11 @@ describe('agent-activity-board', () => {
     expect(review?.blockers.some((b) => b.kind === 'review_wait')).toBe(true);
     const impl = board.agents.find((a) => a.agent_id === 'impl-agent');
     expect(impl).toMatchObject({ blocked: 2, in_review: 1 });
-    expect(board.entries[0]?.tenant_slug).toBe('aurora');
+    expect(board.entries[0]).toMatchObject({
+      tenant_slug: 'aurora',
+      project_id: 'P',
+      mission_id: 'MSN-A',
+    });
   });
 
   it('filters by tenant and hides done items', () => {

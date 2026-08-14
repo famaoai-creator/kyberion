@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
 import {
   MISSION_CYCLE,
@@ -6,121 +6,127 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
   buildAttentionItems,
-} from "../presence/displays/chronos-mirror-v2/src/lib/operator-console";
+} from '../presence/displays/chronos-mirror-v2/src/lib/operator-console';
 
-describe("Chronos operator console helpers", () => {
-  it("defines the expected surface taxonomy for human-agent connection", () => {
-    expect(SURFACE_ROLES.map((entry) => entry.label)).toEqual([
-      "Command Surface",
-      "Control Surface",
-      "Performance Surface",
-      "Work Surface",
+describe('Chronos operator console helpers', () => {
+  it('defines the expected surface taxonomy for human-agent connection', () => {
+    expect(SURFACE_ROLES.map((entry) => entry.labelKey)).toEqual([
+      'chronos_role_request_label',
+      'chronos_role_review_label',
+      'chronos_role_activity_label',
+      'chronos_role_detail_label',
     ]);
   });
 
-  it("defines the mission cycle through inspection and distillation", () => {
-    expect(MISSION_CYCLE.map((entry) => entry.label)).toEqual([
-      "Intent",
-      "Mission",
-      "Execution",
-      "Explanation",
-      "Inspection",
-      "Distillation",
+  it('defines the mission cycle through inspection and distillation', () => {
+    expect(MISSION_CYCLE.map((entry) => entry.labelKey)).toEqual([
+      'chronos_cycle_request',
+      'chronos_cycle_plan',
+      'chronos_cycle_execute',
+      'chronos_cycle_explain',
+      'chronos_cycle_review',
+      'chronos_cycle_record',
     ]);
   });
 
-  it("exposes runtime topology in the operator view menu", () => {
-    expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain("Runtime Topology");
-    expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === "Runtime Topology")).toMatchObject({
-      targetId: "runtime-topology-map",
+  it('exposes runtime topology in the operator view menu', () => {
+    expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain('Runtime Topology');
+    expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === 'Runtime Topology')).toMatchObject({
+      targetId: 'runtime-topology-map',
     });
   });
 
-  it("exposes secret approvals in the operator view menu", () => {
-    expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain("Secret Approvals");
-    expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === "Secret Approvals")).toMatchObject({
-      targetId: "secret-approval-queue",
+  it('exposes secret approvals in the operator view menu', () => {
+    expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain('Secret Approvals');
+    expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === 'Secret Approvals')).toMatchObject({
+      targetId: 'secret-approval-queue',
     });
   });
 
-  it("exposes scenario presets for common operator goals", () => {
+  it('exposes scenario presets for common operator goals', () => {
     expect(OPERATOR_SCENARIO_PRESETS.map((entry) => entry.label)).toEqual([
-      "Review blockers",
-      "Start a mission",
-      "Check runtime health",
-      "Inspect delivery",
-      "Investigate traces",
-      "Review sessions",
-      "Handle approvals",
+      'Review blockers',
+      'Start a mission',
+      'Check runtime health',
+      'Inspect delivery',
+      'Investigate traces',
+      'Review sessions',
+      'Handle approvals',
     ]);
-    expect(OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === "Review blockers")).toMatchObject({
-      targetId: "needs-attention",
-      surface: "mission-intelligence",
+    expect(
+      OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === 'Review blockers')
+    ).toMatchObject({
+      targetId: 'needs-attention',
+      surface: 'mission-intelligence',
     });
-    expect(OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === "Investigate traces")).toMatchObject({
-      targetId: "trace-viewer",
-      surface: "focused-operator",
+    expect(
+      OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === 'Investigate traces')
+    ).toMatchObject({
+      targetId: 'trace-viewer',
+      surface: 'focused-operator',
     });
-    expect(OPERATOR_SCENARIO_PRESETS.filter((entry) => entry.surface === "mission-intelligence").length).toBeGreaterThan(0);
+    expect(
+      OPERATOR_SCENARIO_PRESETS.filter((entry) => entry.surface === 'mission-intelligence').length
+    ).toBeGreaterThan(0);
     expect(OPERATOR_SCENARIO_PRESETS.every((entry) => entry.nextStep.length > 0)).toBe(true);
   });
 
-  it("prioritizes mission and runtime exceptions in the attention queue", () => {
+  it('prioritizes mission and runtime exceptions in the attention queue', () => {
     const items = buildAttentionItems({
       missions: [
         {
-          missionId: "MSN-ALPHA",
+          missionId: 'MSN-ALPHA',
           nextTaskCount: 3,
-          controlSummary: "planning pending",
-          controlTone: "attention",
+          controlSummary: 'planning pending',
+          controlTone: 'attention',
         },
         {
-          missionId: "MSN-BETA",
+          missionId: 'MSN-BETA',
           nextTaskCount: 1,
-          controlSummary: "refresh pending",
-          controlTone: "pending",
+          controlSummary: 'refresh pending',
+          controlTone: 'pending',
         },
       ],
       runtimeDoctor: [
         {
-          severity: "critical",
-          agentId: "chronos-mirror",
-          ownerId: "chronos",
-          reason: "Runtime lease without an active owner.",
-          recommendedAction: "stop_runtime",
+          severity: 'critical',
+          agentId: 'chronos-mirror',
+          ownerId: 'chronos',
+          reason: 'Runtime lease without an active owner.',
+          recommendedAction: 'stop_runtime',
         },
       ],
       surfaces: [
         {
-          id: "presence-studio",
-          health: "unhealthy",
-          controlSummary: "needs attention",
-          controlTone: "attention",
+          id: 'presence-studio',
+          health: 'unhealthy',
+          controlSummary: 'needs attention',
+          controlTone: 'attention',
         },
       ],
       outbox: [
         {
-          message_id: "msg-1",
-          surface: "chronos",
-          text: "A delivery is waiting.",
+          message_id: 'msg-1',
+          surface: 'chronos',
+          text: 'A delivery is waiting.',
         },
       ],
     });
 
     expect(items.map((item) => item.targetType)).toEqual([
-      "mission",
-      "mission",
-      "runtime",
-      "surface",
-      "delivery",
+      'mission',
+      'mission',
+      'runtime',
+      'surface',
+      'delivery',
     ]);
     expect(items[0]).toMatchObject({
-      targetId: "MSN-ALPHA",
-      tone: "critical",
+      targetId: 'MSN-ALPHA',
+      tone: 'critical',
     });
     expect(items[2]).toMatchObject({
-      targetId: "chronos-mirror",
-      remediationAction: "cleanup_runtime_lease",
+      targetId: 'chronos-mirror',
+      remediationAction: 'cleanup_runtime_lease',
     });
   });
 });

@@ -4,6 +4,7 @@ import { listArtifactRecords } from '@agent/core/artifact-record';
 import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
+import { findMissionPath } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir, safeReadFile } from '@agent/core/secure-io';
 import { type MissionState } from '../../../../../scripts/refactor/mission-types.js';
 
@@ -66,6 +67,12 @@ export interface ApprovalQueueItem {
   kind: ApprovalRequestRecord['kind'];
   title: string;
   summary: string;
+  details?: string;
+  sourceText?: string;
+  target?: ApprovalRequestRecord['target'];
+  justification?: ApprovalRequestRecord['justification'];
+  risk?: ApprovalRequestRecord['risk'];
+  workLoop?: ApprovalRequestRecord['work_loop'];
   requestedAt: string;
   requestedBy: string;
   missionId?: string;
@@ -77,6 +84,36 @@ export interface ApprovalQueueItem {
   correlationId?: string;
   decidedAt?: string;
   decidedBy?: string;
+}
+
+export function resolveApprovalTenant(record: ApprovalRequestRecord): string | undefined {
+  const context = record.requestedByContext as
+    | (ApprovalRequestRecord['requestedByContext'] & {
+        tenant_slug?: string;
+        tenantSlug?: string;
+      })
+    | undefined;
+  const loopContext = record.work_loop?.context as Record<string, unknown> | undefined;
+  const direct =
+    context?.tenant_slug ||
+    context?.tenantSlug ||
+    (typeof loopContext?.tenant_slug === 'string' ? loopContext.tenant_slug : undefined);
+  if (direct) return direct;
+  const missionId = context?.missionId || record.steering?.missionId;
+  if (!missionId) return undefined;
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return undefined;
+  const statePath = `${missionPath}/mission-state.json`;
+  if (!safeExistsSync(statePath)) return undefined;
+  try {
+    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+      tenant_slug?: string;
+      tenant_id?: string;
+    };
+    return state.tenant_slug || state.tenant_id;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface ApprovalQueueQuery {
@@ -292,14 +329,19 @@ function getMetricCost(entry: Record<string, any>): number {
 export function buildCostSummary(input: {
   history: Record<string, any>[];
   missionId?: string;
+  missionIds?: string[];
   since?: string;
   budgetUsd?: number;
 }): CostSummary {
   const sinceIso = input.since || '';
   const missionFilter = (input.missionId || '').trim().toUpperCase();
+  const missionFilters = new Set(
+    (input.missionIds || []).map((missionId) => missionId.trim().toUpperCase()).filter(Boolean)
+  );
   const entries = input.history.filter((entry) => {
     const entryMissionId = String(entry.mission_id || entry.missionId || '').toUpperCase();
     if (missionFilter && entryMissionId !== missionFilter) return false;
+    if (input.missionIds !== undefined && !missionFilters.has(entryMissionId)) return false;
     if (sinceIso && String(entry.timestamp || entry.ts || '') < sinceIso) return false;
     return true;
   });
@@ -356,6 +398,7 @@ export function buildCostSummary(input: {
 export function collectCostSummary(
   input: {
     missionId?: string;
+    missionIds?: string[];
     since?: string;
     budgetUsd?: number;
   } = {}
@@ -364,6 +407,7 @@ export function collectCostSummary(
   return buildCostSummary({
     history,
     missionId: input.missionId,
+    missionIds: input.missionIds,
     since: input.since,
     budgetUsd: input.budgetUsd,
   });
@@ -387,17 +431,14 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       if (kindFilter && !kindFilter.has(record.kind)) return false;
       if (missionFilter && record.requestedByContext?.missionId?.toUpperCase() !== missionFilter)
         return false;
+      const resolvedTenant = resolveApprovalTenant(record);
       if (tenantFilter) {
         const tenantValue =
-          `${record.requestedByContext?.actorId || ''} ${record.requestedByContext?.surface || ''} ${record.track_id || ''} ${record.track_name || ''}`.toLowerCase();
+          `${resolvedTenant || ''} ${record.requestedByContext?.actorId || ''} ${record.requestedByContext?.surface || ''} ${record.track_id || ''} ${record.track_name || ''}`.toLowerCase();
         if (!tenantValue.includes(tenantFilter)) return false;
       }
       if (query.tenantSlugs && query.tenantSlugs !== 'all') {
-        const tenantValue =
-          record.requestedByContext?.surface ||
-          record.requestedByContext?.actorId ||
-          record.track_id;
-        if (!tenantValue || !query.tenantSlugs.includes(tenantValue)) return false;
+        if (!resolvedTenant || !query.tenantSlugs.includes(resolvedTenant)) return false;
       }
       if (
         channelFilter &&
@@ -435,11 +476,17 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       kind: record.kind,
       title: record.title,
       summary: record.summary,
+      details: record.details,
+      sourceText: record.sourceText,
+      target: record.target,
+      justification: record.justification,
+      risk: record.risk,
+      workLoop: record.work_loop,
       requestedAt: record.requestedAt,
       requestedBy: record.requestedBy,
       missionId: record.requestedByContext?.missionId,
       tenantId: record.requestedByContext?.actorId,
-      tenantSlug: record.requestedByContext?.surface,
+      tenantSlug: resolveApprovalTenant(record),
       riskLevel: record.risk?.level,
       serviceId: record.target?.serviceId,
       mutation: record.target?.mutation,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { loadArtifactRecord } from '@agent/core/artifact-record';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -10,7 +11,11 @@ import {
   type RejectionReasonCategory,
 } from '@agent/core/rejection-reason';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
-import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
+import {
+  resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
+  ViewerContextError,
+} from '../../../lib/viewer-context';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
 const VERDICT_TO_INBOX_STATUS = {
@@ -84,6 +89,23 @@ export async function POST(req: NextRequest) {
     if (!artifactId || !verdict) {
       return NextResponse.json({ error: 'Missing deliverable review payload' }, { status: 400 });
     }
+    const artifact = loadArtifactRecord(artifactId);
+    if (!artifact) {
+      return NextResponse.json({ error: 'Deliverable not found' }, { status: 404 });
+    }
+    const tenantSlugs = strictViewerScopeTenantSlugs(
+      resolvedViewer.context,
+      typeof body?.tenant === 'string' ? body.tenant : undefined
+    );
+    if (
+      tenantSlugs !== 'all' &&
+      (!artifact.tenant_slug || !tenantSlugs.includes(artifact.tenant_slug))
+    ) {
+      return NextResponse.json(
+        { error: 'Deliverable is outside the viewer tenant scope' },
+        { status: 403 }
+      );
+    }
 
     const result = reviewDeliverable({
       artifactId,
@@ -139,7 +161,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to review deliverable' },
-      { status: 500 }
+      { status: err instanceof ViewerContextError ? err.status : 500 }
     );
   }
 }

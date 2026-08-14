@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
 import { buildRuntimeTopology } from '../../../../lib/runtime-topology';
 import {
@@ -13,7 +13,11 @@ import {
   guardRequest,
   roleToMissionRole,
 } from '../../../../lib/api-guard';
-import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
+import {
+  resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
+} from '../../../../lib/viewer-context';
+import { resolveApprovalTenant } from '../../../../lib/su-surface-data';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
@@ -175,6 +179,18 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
+  let tenantSlugs: string[] | 'all';
+  try {
+    tenantSlugs = strictViewerScopeTenantSlugs(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('tenant') || undefined
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : 'Tenant scope denied' },
+      { status: 403 }
+    );
+  }
 
   const accessRole = getChronosAccessRoleOrThrow(req);
   process.env.MISSION_ROLE = roleToMissionRole(accessRole);
@@ -213,14 +229,27 @@ export async function GET(req: NextRequest) {
         })();
         const { managedRuntimes, surfaces, runtimeSummary } = runtimeTopology;
         if (closed) return;
+        const scopedView = tenantSlugs !== 'all';
         const payload = {
           ts: new Date().toISOString(),
           accessRole,
-          recentEvents: safeCollect('collectRecentEvents', [], collectRecentEvents),
-          agentMessages,
-          a2aHandoffs,
+          ...(scopedView
+            ? {}
+            : {
+                recentEvents: safeCollect('collectRecentEvents', [], collectRecentEvents),
+                agentMessages,
+                a2aHandoffs,
+              }),
           secretApprovals: safeCollect('listApprovalRequests', [], () =>
             listApprovalRequests({ kind: 'secret_mutation', status: 'pending' })
+              .filter(
+                (request) =>
+                  tenantSlugs === 'all' ||
+                  Boolean(
+                    resolveApprovalTenant(request) &&
+                    tenantSlugs.includes(resolveApprovalTenant(request)!)
+                  )
+              )
               .slice(0, 20)
               .map((request) => ({
                 id: request.id,
@@ -240,21 +269,37 @@ export async function GET(req: NextRequest) {
                     .map((approval) => approval.role) || [],
               }))
           ),
-          controlActions: safeCollect('collectControlActions', [], collectControlActions),
-          controlActionDetails: safeCollect(
-            'collectControlActionDetails',
-            {},
-            collectControlActionDetails
-          ),
-          ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
-          browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
-          runtime: runtimeSummary,
-          runtimeTopology: buildRuntimeTopology({
-            surfaces,
-            runtimes: managedRuntimes,
-            handoffs: a2aHandoffs,
-            messages: agentMessages,
-          }),
+          ...(scopedView
+            ? {
+                controlActions: [],
+                controlActionDetails: {},
+                ownerSummaries: [],
+                browserSessions: [],
+                runtime: { total: 0, ready: 0, busy: 0, error: 0 },
+                runtimeTopology: buildRuntimeTopology({
+                  surfaces: [],
+                  runtimes: [],
+                  handoffs: [],
+                  messages: [],
+                }),
+              }
+            : {
+                controlActions: safeCollect('collectControlActions', [], collectControlActions),
+                controlActionDetails: safeCollect(
+                  'collectControlActionDetails',
+                  {},
+                  collectControlActionDetails
+                ),
+                ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
+                browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
+                runtime: runtimeSummary,
+                runtimeTopology: buildRuntimeTopology({
+                  surfaces,
+                  runtimes: managedRuntimes,
+                  handoffs: a2aHandoffs,
+                  messages: agentMessages,
+                }),
+              }),
         };
         const serialized = JSON.stringify(payload);
         if (serialized === previousPayload) return;

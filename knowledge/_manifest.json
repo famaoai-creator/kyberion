@@ -1461,7 +1461,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6535,
+      "size": 6454,
       "type": "json"
     },
     {
@@ -2211,7 +2211,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20424,
+      "size": 20599,
       "type": "json"
     },
     {
@@ -2403,7 +2403,7 @@
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 2647,
+      "size": 2749,
       "type": "json"
     },
     {
@@ -4749,7 +4749,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 368987,
+      "size": 452720,
       "type": "json"
     },
     {
@@ -7599,7 +7599,7 @@
     {
       "path": "product/schemas/service-binding-record.schema.json",
       "tier": "public",
-      "size": 1167,
+      "size": 1312,
       "type": "json"
     },
     {

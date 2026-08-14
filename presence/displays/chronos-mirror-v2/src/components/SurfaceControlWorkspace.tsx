@@ -50,7 +50,7 @@ const EMPTY_PAYLOAD: IntelligencePayload = {
   controlActionAvailability: { globalSurface: [], surface: {} },
 };
 
-export function SurfaceControlWorkspace() {
+export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
   const locale = useChronosLocale();
   const [data, setData] = React.useState<IntelligencePayload>(EMPTY_PAYLOAD);
   const [busyKey, setBusyKey] = React.useState<string | null>(null);
@@ -59,10 +59,17 @@ export function SurfaceControlWorkspace() {
     action: ActionDefinition;
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [surfaceQuery, setSurfaceQuery] = React.useState('');
+  const [surfaceFilter, setSurfaceFilter] = React.useState<
+    'all' | 'attention' | 'running' | 'stopped'
+  >('all');
 
   const refresh = React.useCallback(async () => {
     try {
-      const response = await fetch('/api/intelligence', { cache: 'no-store' });
+      const response = await fetch(
+        `/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`,
+        { cache: 'no-store' }
+      );
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'surface control failed');
       setData({
@@ -83,7 +90,7 @@ export function SurfaceControlWorkspace() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [tenant]);
 
   React.useEffect(() => {
     void refresh();
@@ -131,6 +138,34 @@ export function SurfaceControlWorkspace() {
     data.controlActions.find((action) => action.kind === 'surface' && action.target === target) ||
     null;
 
+  const visibleSurfaces = React.useMemo(() => {
+    const query = surfaceQuery.trim().toLowerCase();
+    return [...data.surfaces]
+      .filter((surface) => {
+        if (surfaceFilter === 'running' && !surface.running) return false;
+        if (surfaceFilter === 'stopped' && surface.running) return false;
+        if (
+          surfaceFilter === 'attention' &&
+          !['unhealthy', 'degraded', 'unknown'].includes(surface.health.toLowerCase())
+        ) {
+          return false;
+        }
+        if (!query) return true;
+        return [surface.id, surface.kind, surface.detail, surface.controlSummary]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort(
+        (left, right) =>
+          Number(['unhealthy', 'degraded', 'unknown'].includes(right.health.toLowerCase())) -
+          Number(['unhealthy', 'degraded', 'unknown'].includes(left.health.toLowerCase()))
+      );
+  }, [data.surfaces, surfaceFilter, surfaceQuery]);
+
+  const surfaceAttentionCount = data.surfaces.filter((surface) =>
+    ['unhealthy', 'degraded', 'unknown'].includes(surface.health.toLowerCase())
+  ).length;
+
   return (
     <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -170,7 +205,7 @@ export function SurfaceControlWorkspace() {
                 {uxText('chronos_surface_control_confirm_title', locale)}
               </div>
               <div className="mt-1 text-[11px] kb-text-secondary">
-                {pendingAction.action.label} ·{' '}
+                {surfaceActionLabel(pendingAction.action, locale)} ·{' '}
                 {pendingAction.surfaceId || uxText('chronos_surfaces', locale)}
               </div>
               <div className="mt-3 flex gap-2">
@@ -205,6 +240,7 @@ export function SurfaceControlWorkspace() {
               key={action.operation}
               action={action}
               busy={busyKey === `all:${action.operation}`}
+              locale={locale}
               onClick={() => requestAction(null, action)}
             />
           ))}
@@ -215,7 +251,7 @@ export function SurfaceControlWorkspace() {
           ) : null}
         </div>
         {latestAction('surface-runtime') ? (
-          <ActionStatus action={latestAction('surface-runtime') as ActionSummary} />
+          <ActionStatus action={latestAction('surface-runtime') as ActionSummary} locale={locale} />
         ) : null}
       </div>
 
@@ -225,50 +261,104 @@ export function SurfaceControlWorkspace() {
             {uxText('chronos_no_managed_surfaces', locale)}
           </div>
         ) : (
-          data.surfaces.map((surface) => {
-            const actions = data.controlActionAvailability.surface[surface.id] || [];
-            return (
-              <article
-                key={surface.id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold kb-text-primary">{surface.id}</div>
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      {surface.kind} · {surface.running ? 'running' : 'stopped'} · {surface.health}
+          <>
+            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] kb-text-secondary">
+                  {uxText('chronos_surface_list_detail', locale)}
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px]">
+                  <span className="rounded-full kb-status-warning-surface px-2 py-1 kb-status-warning">
+                    {uxText('chronos_attention', locale)} {surfaceAttentionCount}
+                  </span>
+                  <span className="rounded-full kb-surface-raised px-2 py-1 kb-text-secondary">
+                    {uxText('chronos_surface_visible_count', locale)} {visibleSurfaces.length}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <input
+                  value={surfaceQuery}
+                  onChange={(event) => setSurfaceQuery(event.target.value)}
+                  placeholder={uxText('chronos_surface_search_placeholder', locale)}
+                  aria-label={uxText('chronos_surface_search_label', locale)}
+                  className="min-w-[220px] flex-1 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary placeholder:kb-text-muted"
+                />
+                <select
+                  value={surfaceFilter}
+                  onChange={(event) => setSurfaceFilter(event.target.value as typeof surfaceFilter)}
+                  aria-label={uxText('chronos_surface_filter_label', locale)}
+                  className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary"
+                >
+                  <option value="all">{uxText('chronos_surface_filter_all', locale)}</option>
+                  <option value="attention">
+                    {uxText('chronos_surface_filter_attention', locale)}
+                  </option>
+                  <option value="running">
+                    {uxText('chronos_surface_filter_running', locale)}
+                  </option>
+                  <option value="stopped">
+                    {uxText('chronos_surface_filter_stopped', locale)}
+                  </option>
+                </select>
+              </div>
+            </div>
+            {visibleSurfaces.length === 0 ? (
+              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
+                {uxText('chronos_surface_no_matches', locale)}
+              </div>
+            ) : null}
+            {visibleSurfaces.map((surface) => {
+              const actions = data.controlActionAvailability.surface[surface.id] || [];
+              return (
+                <article
+                  key={surface.id}
+                  className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold kb-text-primary">{surface.id}</div>
+                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                        {surfaceKindLabel(surface.kind, locale)} ·{' '}
+                        {surfaceStateLabel(surface.running ? 'running' : 'stopped', locale)} ·{' '}
+                        {surfaceStateLabel(surface.health, locale)}
+                      </div>
+                    </div>
+                    <div
+                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
+                    >
+                      {surface.running ? (
+                        <CheckCircle2 size={11} className="inline" />
+                      ) : (
+                        <CircleStop size={11} className="inline" />
+                      )}{' '}
+                      {surfaceStateLabel(surface.health, locale)}
                     </div>
                   </div>
-                  <div
-                    className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
-                  >
-                    {surface.running ? (
-                      <CheckCircle2 size={11} className="inline" />
-                    ) : (
-                      <CircleStop size={11} className="inline" />
-                    )}{' '}
-                    {surface.health}
+                  {surface.detail ? (
+                    <div className="mt-2 text-[10px] kb-text-muted">{surface.detail}</div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {actions.map((action) => (
+                      <ActionButton
+                        key={action.operation}
+                        action={action}
+                        busy={busyKey === `${surface.id}:${action.operation}`}
+                        locale={locale}
+                        onClick={() => requestAction(surface.id, action)}
+                      />
+                    ))}
                   </div>
-                </div>
-                {surface.detail ? (
-                  <div className="mt-2 text-[10px] kb-text-muted">{surface.detail}</div>
-                ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {actions.map((action) => (
-                    <ActionButton
-                      key={action.operation}
-                      action={action}
-                      busy={busyKey === `${surface.id}:${action.operation}`}
-                      onClick={() => requestAction(surface.id, action)}
+                  {latestAction(surface.id) ? (
+                    <ActionStatus
+                      action={latestAction(surface.id) as ActionSummary}
+                      locale={locale}
                     />
-                  ))}
-                </div>
-                {latestAction(surface.id) ? (
-                  <ActionStatus action={latestAction(surface.id) as ActionSummary} />
-                ) : null}
-              </article>
-            );
-          })
+                  ) : null}
+                </article>
+              );
+            })}
+          </>
         )}
       </div>
     </section>
@@ -278,10 +368,12 @@ export function SurfaceControlWorkspace() {
 function ActionButton({
   action,
   busy,
+  locale,
   onClick,
 }: {
   action: ActionDefinition;
   busy: boolean;
+  locale: string;
   onClick: () => void;
 }) {
   return (
@@ -292,18 +384,61 @@ function ActionButton({
       title={action.disabledReason}
       className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-40 ${action.risk === 'risky' ? 'kb-status-negative-border kb-status-negative-surface kb-status-negative' : 'kb-border-accent kb-surface-accent kb-text-accent'}`}
     >
-      {busy ? 'working' : action.label}
+      {busy ? uxText('chronos_working', locale) : surfaceActionLabel(action, locale)}
     </button>
   );
 }
 
-function ActionStatus({ action }: { action: ActionSummary }) {
+function ActionStatus({ action, locale }: { action: ActionSummary; locale: string }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
-      <span>{action.operation}</span>
-      <span className="font-mono kb-text-secondary">{action.status}</span>
-      {action.requested_by ? <span>by {action.requested_by}</span> : null}
+      <span>{surfaceActionLabel({ ...action, risk: 'safe', enabled: true }, locale)}</span>
+      <span className="font-mono kb-text-secondary">
+        {surfaceStatusLabel(action.status, locale)}
+      </span>
+      {action.requested_by ? (
+        <span>
+          {uxText('chronos_requested_by', locale)} {action.requested_by}
+        </span>
+      ) : null}
       {action.error ? <span className="kb-status-negative">{action.error}</span> : null}
     </div>
   );
+}
+
+function surfaceStatusLabel(value: ActionSummary['status'], locale: string) {
+  const keyByValue: Record<ActionSummary['status'], string> = {
+    queued: 'chronos_action_queued',
+    completed: 'chronos_action_completed',
+    failed: 'chronos_action_failed',
+  };
+  return uxText(keyByValue[value], locale);
+}
+
+function surfaceActionLabel(action: Pick<ActionDefinition, 'operation'>, locale: string) {
+  const keyByOperation: Record<string, string> = {
+    reconcile: 'chronos_surface_reconcile',
+    refresh: 'chronos_surface_refresh',
+    start: 'chronos_surface_start',
+    stop: 'chronos_surface_stop',
+  };
+  const key = keyByOperation[action.operation];
+  return key ? uxText(key, locale) : action.label;
+}
+
+function surfaceKindLabel(kind: string, locale: string) {
+  return kind.toLowerCase() === 'ui' ? uxText('chronos_surface_kind_ui', locale) : kind;
+}
+
+function surfaceStateLabel(value: string, locale: string) {
+  const keyByValue: Record<string, string> = {
+    running: 'chronos_surface_running',
+    stopped: 'chronos_surface_stopped',
+    healthy: 'chronos_surface_healthy',
+    unhealthy: 'chronos_surface_unhealthy',
+    degraded: 'chronos_surface_degraded',
+    unknown: 'chronos_surface_unknown',
+  };
+  const key = keyByValue[value.toLowerCase()];
+  return key ? uxText(key, locale) : value;
 }

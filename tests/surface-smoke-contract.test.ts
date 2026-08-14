@@ -29,7 +29,12 @@ describe('surface smoke contract', () => {
     expect(page).toContain('chronos://quick-action/schedule-tick');
     expect(page).toContain('chronos://quick-action/schedule-list');
     expect(page).toContain('chronos://quick-action/vital-check');
-    expect(banner).toContain('First Run');
+    expect(banner).toContain('chronos_first_run_eyebrow');
+    expect(banner).toContain('chronos_first_run_welcome');
+    expect(banner).toContain('chronos_first_run_step_prereq');
+    expect(banner).toContain('chronos_first_run_step_agent');
+    expect(banner).toContain('chronos_first_run_step_diagnostics');
+    expect(banner).toContain('chronos_first_run_step_tutorial');
     expect(banner).toContain('Open');
     expect(banner).toContain('Prereq Check');
     expect(banner).toContain('Setup Report');
