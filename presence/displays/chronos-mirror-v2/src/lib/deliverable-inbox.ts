@@ -19,6 +19,8 @@ export interface DeliverableInboxItem {
   supersededCount?: number;
   missionId?: string;
   projectId?: string;
+  tenantSlug?: string;
+  organizationId?: string;
   trackId?: string;
   trackName?: string;
   kind: string;
@@ -43,6 +45,7 @@ export interface DeliverableInboxQuery {
   missionId?: string;
   kind?: string;
   tier?: 'personal' | 'confidential' | 'public' | '';
+  tenantSlugs?: string[] | 'all';
   limit?: number;
 }
 
@@ -59,6 +62,37 @@ function readMissionStatus(missionId?: string): string | undefined {
     return typeof parsed.status === 'string' ? parsed.status : undefined;
   } catch {
     return undefined;
+  }
+}
+
+function readMissionContext(missionId?: string): {
+  tenantSlug?: string;
+  projectId?: string;
+  trackId?: string;
+  trackName?: string;
+} {
+  if (!missionId) return {};
+  const missionPath = findMissionPath(missionId.toUpperCase());
+  if (!missionPath) return {};
+  const statePath = path.join(missionPath, 'mission-state.json');
+  if (!safeExistsSync(statePath)) return {};
+  try {
+    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+      tenant_slug?: string;
+      tenant_id?: string;
+      relationships?: {
+        project?: { project_id?: string };
+        track?: { track_id?: string; track_name?: string };
+      };
+    };
+    return {
+      tenantSlug: state.tenant_slug || state.tenant_id,
+      projectId: state.relationships?.project?.project_id,
+      trackId: state.relationships?.track?.track_id,
+      trackName: state.relationships?.track?.track_name,
+    };
+  } catch {
+    return {};
   }
 }
 
@@ -151,13 +185,16 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           artifactPath.replace(/\\/g, '/').endsWith(normalizedPath)
         );
       });
+      const missionContext = readMissionContext(record.mission_id);
       return {
         artifactId: record.artifact_id,
         missing: targetMissing,
         missionId: record.mission_id,
-        projectId: record.project_id,
-        trackId: record.track_id,
-        trackName: record.track_name,
+        tenantSlug: record.tenant_slug || missionContext.tenantSlug,
+        organizationId: record.organization_id,
+        projectId: record.project_id || missionContext.projectId,
+        trackId: record.track_id || missionContext.trackId,
+        trackName: record.track_name || missionContext.trackName,
         kind: record.kind,
         storageClass: record.storage_class,
         path: normalizedPath,
@@ -180,6 +217,11 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
+    .filter((item) =>
+      input.tenantSlugs && input.tenantSlugs !== 'all'
+        ? Boolean(item.tenantSlug && input.tenantSlugs.includes(item.tenantSlug))
+        : true
+    )
     .filter((item) => (kind ? item.kind.toLowerCase().includes(kind) : true))
     .filter((item) =>
       tier ? item.path?.includes(`/${tier}/`) || item.externalRef?.includes(tier) : true

@@ -7,7 +7,10 @@ import {
   buildOrganizationProjectLink,
   buildOrganizationPurposeRecord,
   buildOrganizationScaffold,
+  buildOrganizationCadence,
+  buildOrganizationDecision,
   buildOrganizationServiceAddition,
+  buildOrganizationServiceState,
   enqueueOrganizationLearningCandidate,
   loadOrganizationOperatingModelCatalog,
   loadOrganizationProfile,
@@ -20,11 +23,17 @@ import {
   saveOrganizationOperation,
   saveOrganizationOperationalState,
   saveOrganizationPurpose,
+  saveOrganizationCadence,
+  saveOrganizationDecision,
   saveOrganizationService,
+  saveOrganizationServiceState,
+  type OrganizationCadenceRecord,
+  type OrganizationDecisionRecord,
   type OrganizationOperationRecord,
   type OrganizationOperationType,
   type OrganizationPurposeRecord,
   type OrganizationServiceRecord,
+  type OrganizationServiceState,
 } from '@agent/core';
 
 type ParsedArgs = {
@@ -59,6 +68,12 @@ type ParsedArgs = {
   consumers: string[];
   sloTarget?: string;
   sloWindow?: string;
+  /** `service state set` value. Distinct from the boolean `--health` of `service list`. */
+  healthStatus?: OrganizationServiceState['health'];
+  reconcileStatus?: OrganizationServiceState['reconcile_status'];
+  freshnessSeconds?: number;
+  confidence?: number;
+  sourceTimestamp?: string;
   operationId?: string;
   operationType?: OrganizationOperationType;
   triggerKind?: OrganizationOperationRecord['trigger']['kind'];
@@ -66,6 +81,18 @@ type ParsedArgs = {
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   projectId?: string;
+  cadenceId?: string;
+  cadenceType?: OrganizationCadenceRecord['cadence_type'];
+  schedule?: string;
+  decisionId?: string;
+  decisionType?: OrganizationDecisionRecord['decision_type'];
+  decisionOwner?: string;
+  dueAt?: string;
+  options: string[];
+  chosenOption?: string;
+  rationale?: string;
+  requestedBy?: string;
+  followUpRefs: string[];
   recordStatus?: string;
   recordKind?: 'domain' | 'capability' | 'service' | 'operation' | 'cadence';
   recordId?: string;
@@ -87,6 +114,8 @@ function parseArgs(args: string[]): ParsedArgs {
     consumers: [],
     runbookRefs: [],
     evidenceOutputs: [],
+    options: [],
+    followUpRefs: [],
   };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -198,6 +227,74 @@ function parseArgs(args: string[]): ParsedArgs {
       parsed.outcome = args[++index];
       continue;
     }
+    if (arg === '--cadence-id') {
+      parsed.cadenceId = args[++index];
+      continue;
+    }
+    if (arg === '--cadence-type') {
+      parsed.cadenceType = args[++index] as OrganizationCadenceRecord['cadence_type'];
+      continue;
+    }
+    if (arg === '--schedule') {
+      parsed.schedule = args[++index];
+      continue;
+    }
+    if (arg === '--decision-id') {
+      parsed.decisionId = args[++index];
+      continue;
+    }
+    if (arg === '--decision-type') {
+      parsed.decisionType = args[++index] as OrganizationDecisionRecord['decision_type'];
+      continue;
+    }
+    if (arg === '--decision-owner') {
+      parsed.decisionOwner = args[++index];
+      continue;
+    }
+    if (arg === '--due-at') {
+      parsed.dueAt = args[++index];
+      continue;
+    }
+    if (arg === '--option') {
+      parsed.options.push(args[++index]);
+      continue;
+    }
+    if (arg === '--chosen-option') {
+      parsed.chosenOption = args[++index];
+      continue;
+    }
+    if (arg === '--rationale') {
+      parsed.rationale = args[++index];
+      continue;
+    }
+    if (arg === '--requested-by') {
+      parsed.requestedBy = args[++index];
+      continue;
+    }
+    if (arg === '--follow-up-ref') {
+      parsed.followUpRefs.push(args[++index]);
+      continue;
+    }
+    if (arg === '--health-status') {
+      parsed.healthStatus = args[++index] as OrganizationServiceState['health'];
+      continue;
+    }
+    if (arg === '--reconcile-status') {
+      parsed.reconcileStatus = args[++index] as OrganizationServiceState['reconcile_status'];
+      continue;
+    }
+    if (arg === '--freshness-seconds') {
+      parsed.freshnessSeconds = Number(args[++index]);
+      continue;
+    }
+    if (arg === '--confidence') {
+      parsed.confidence = Number(args[++index]);
+      continue;
+    }
+    if (arg === '--source-timestamp') {
+      parsed.sourceTimestamp = args[++index];
+      continue;
+    }
     if (arg === '--consumer') {
       parsed.consumers.push(args[++index]);
       continue;
@@ -283,6 +380,8 @@ function usage(): string {
     '  pnpm organization service list --organization-id <id> [--health] [--json]',
     '  pnpm organization operation list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization project list --organization-id <id> [--json]',
+    '  pnpm organization cadence list --organization-id <id> [--status <status>] [--json]',
+    '  pnpm organization decision list --organization-id <id> [--cadence-id <id>] [--status <status>] [--json]',
     '  pnpm organization lineage --organization-id <id> [--json]',
     '  pnpm organization learning list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <type> --source-ref <ref> --title <title> --summary <summary> --target-kind <kind> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
@@ -296,6 +395,9 @@ function usage(): string {
     '  pnpm organization domain add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --domain-id <id> --name <name> --owner-role <role> [--purpose <text>]',
     '  pnpm organization service add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --domain-id <id> --name <name> --outcome <text> --owner-role <role> --consumer <c>... [--slo-target <t>] [--slo-window <w>] [--runbook-ref <ref>]... [--record-status <s>]',
     '  pnpm organization operation add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --name <name> --operation-type <continuous|scheduled|event_driven|governance> --owner-role <role> [--service-id <id>] [--purpose <text>] [--trigger-kind <k>] [--trigger-expression <cron>] [--execution-kind <k>] [--execution-ref <ref>] [--evidence-output <ref>]...',
+    '  pnpm organization service state set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --health-status <healthy|degraded|critical|unknown> [--reconcile-status <current|stale|missing_source|conflict|unknown>] [--freshness-seconds <n>] [--confidence <0..1>] [--source-timestamp <iso>]',
+    '  pnpm organization cadence add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --cadence-id <id> --name <name> --cadence-type <daily|weekly|monthly|quarterly|ad_hoc> --schedule <text> --owner-role <role> [--record-status <s>]',
+    '  pnpm organization decision add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --cadence-id <id> --title <title> --decision-owner <role> --due-at <iso> --option <o>... [--decision-type <t>] [--requested-by <role>] [--chosen-option <o>] [--rationale <text>] [--follow-up-ref <ref>]... [--record-status <s>]',
     '  pnpm organization project attach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
     '  pnpm organization project detach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
     '  pnpm organization pause|resume|archive --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
@@ -306,6 +408,10 @@ function usage(): string {
     '  - Writes under active/organizations/ are authority-gated: run with KYBERION_PERSONA=sovereign.',
     '  - confidential tier requires --tenant-slug (tenant-scoped storage).',
     '  - service add also updates the parent domain service_ids; project attach validates the project registry.',
+    '  - service state set declares runtime health when no telemetry feed owns the service; reconcile',
+    '    reports a service with no state as services_without_state and will not infer health from absence.',
+    '  - decision add requires an existing cadence and appends the decision to its decision_ids, so the',
+    '    cadence record stays the index of everything that body decided. decision list is newest-first.',
   ].join('\n');
 }
 
@@ -608,6 +714,90 @@ export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): 
     emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
     return;
   }
+  if (parsed.command === 'cadence add') {
+    if (!organizationId) throw new Error('--organization-id is required for cadence add.');
+    requireFlags('cadence add', {
+      '--tier': parsed.tier,
+      '--cadence-id': parsed.cadenceId,
+      '--name': parsed.name,
+      '--cadence-type': parsed.cadenceType,
+      '--schedule': parsed.schedule,
+      '--owner-role': parsed.ownerRole,
+    });
+    const mode = resolveWriteMode(parsed, 'cadence add');
+    const record = buildOrganizationCadence({
+      organizationId,
+      cadenceId: parsed.cadenceId!,
+      name: parsed.name!,
+      cadenceType: parsed.cadenceType!,
+      schedule: parsed.schedule!,
+      ownerRole: parsed.ownerRole!,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+      status: parsed.recordStatus as OrganizationCadenceRecord['status'] | undefined,
+    });
+    const savedPaths = mode === 'apply' ? [saveOrganizationCadence(record)] : [];
+    emit({ mode, cadence: record, saved_paths: savedPaths }, parsed.json);
+    return;
+  }
+  if (parsed.command === 'decision add') {
+    if (!organizationId) throw new Error('--organization-id is required for decision add.');
+    requireFlags('decision add', {
+      '--tier': parsed.tier,
+      '--decision-id': parsed.decisionId,
+      '--cadence-id': parsed.cadenceId,
+      '--title': parsed.title,
+      '--decision-owner': parsed.decisionOwner,
+      '--due-at': parsed.dueAt,
+    });
+    const mode = resolveWriteMode(parsed, 'decision add');
+    const addition = buildOrganizationDecision({
+      organizationId,
+      decisionId: parsed.decisionId!,
+      cadenceId: parsed.cadenceId!,
+      title: parsed.title!,
+      decisionOwner: parsed.decisionOwner!,
+      dueAt: parsed.dueAt!,
+      options: parsed.options,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+      decisionType: parsed.decisionType,
+      status: parsed.recordStatus as OrganizationDecisionRecord['status'] | undefined,
+      requestedBy: parsed.requestedBy,
+      chosenOption: parsed.chosenOption,
+      rationale: parsed.rationale,
+      followUpRefs: parsed.followUpRefs,
+    });
+    const savedPaths =
+      mode === 'apply'
+        ? [saveOrganizationDecision(addition.decision), saveOrganizationCadence(addition.cadence)]
+        : [];
+    emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
+    return;
+  }
+  if (parsed.command === 'service state set') {
+    if (!organizationId) throw new Error('--organization-id is required for service state set.');
+    requireFlags('service state set', {
+      '--tier': parsed.tier,
+      '--service-id': parsed.serviceId,
+      '--health-status': parsed.healthStatus,
+    });
+    const mode = resolveWriteMode(parsed, 'service state set');
+    const state = buildOrganizationServiceState({
+      organizationId,
+      serviceId: parsed.serviceId!,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+      health: parsed.healthStatus!,
+      reconcileStatus: parsed.reconcileStatus,
+      freshnessSeconds: parsed.freshnessSeconds,
+      confidence: parsed.confidence,
+      sourceTimestamp: parsed.sourceTimestamp,
+    });
+    const savedPaths = mode === 'apply' ? [saveOrganizationServiceState(state)] : [];
+    emit({ mode, service_state: state, saved_paths: savedPaths }, parsed.json);
+    return;
+  }
   if (parsed.command === 'operation add') {
     if (!organizationId) throw new Error('--organization-id is required for operation add.');
     requireFlags('operation add', {
@@ -662,6 +852,8 @@ export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): 
     parsed.command === 'operation list' ||
     parsed.command === 'project list' ||
     parsed.command === 'lineage' ||
+    parsed.command === 'cadence list' ||
+    parsed.command === 'decision list' ||
     parsed.command === 'learning list'
   ) {
     if (!organizationId) {
@@ -702,6 +894,31 @@ export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): 
     }
     if (parsed.command === 'lineage') {
       emit(view.lineage, parsed.json);
+      return;
+    }
+    if (parsed.command === 'cadence list') {
+      emit(
+        parsed.status
+          ? view.cadences.filter((cadence) => cadence.status === parsed.status)
+          : view.cadences,
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'decision list') {
+      // Ordered newest-first so "last meeting's decisions" is the head of the
+      // list rather than something the reader has to scan for.
+      const decisions = [...view.decisions].sort((left, right) =>
+        left.updated_at < right.updated_at ? 1 : left.updated_at > right.updated_at ? -1 : 0
+      );
+      emit(
+        [
+          ...(parsed.cadenceId
+            ? decisions.filter((decision) => decision.cadence_id === parsed.cadenceId)
+            : decisions),
+        ].filter((decision) => !parsed.status || decision.status === parsed.status),
+        parsed.json
+      );
       return;
     }
     if (parsed.command === 'learning list') {
