@@ -328,7 +328,8 @@ export function composeMissionTeamPlan(input: {
       authorityRoles,
       agents,
       missionTaskModelHint,
-      separationForRole(role)
+      separationForRole(role),
+      organizationProfile?.organization_id
     );
     recordAssignment(role, selectedRequired);
     assignments.push(
@@ -367,7 +368,8 @@ export function composeMissionTeamPlan(input: {
       authorityRoles,
       agents,
       missionTaskModelHint,
-      separationForRole(role)
+      separationForRole(role),
+      organizationProfile?.organization_id
     );
     recordAssignment(role, assignment);
     assignment.required = false;

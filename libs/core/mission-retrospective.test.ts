@@ -149,6 +149,8 @@ describe('mission retrospective loop', () => {
           item_id: `witem-${index}`,
           team_role: 'implementer',
           assignee_peer_id: 'implementation-architect',
+          provider: 'openai',
+          model_id: 'openai:gpt-5.6-luna',
           work_item_status_after: index < 5 ? 'done' : 'blocked',
         })),
       })
@@ -168,6 +170,17 @@ describe('mission retrospective loop', () => {
     expect(bonus).toBeLessThanOrEqual(8);
     // below min samples → neutral
     expect(perf.performanceScoreAdjustment('unknown-agent', 'implementer')).toBe(0);
+
+    const modelPerf = await import('./model-performance-index.js');
+    modelPerf.resetModelPerformanceIndexCache();
+    expect(modelPerf.getModelRolePerformance('openai:gpt-5.6-luna', 'implementer')).toMatchObject({
+      samples: 6,
+      success: 5,
+      blocked: 1,
+    });
+    expect(
+      modelPerf.modelPerformanceScoreAdjustment('openai:gpt-5.6-luna', 'implementer')
+    ).toBeGreaterThan(0);
   });
 
   it('proposal lifecycle: approve → apply issues a work order; reject blocks apply', async () => {

@@ -43,6 +43,19 @@ The composed team plan now carries a `team_governance` block with two concerns:
 
 This metadata is copied into `team-blueprint.json` so the runtime binding and audit trail keep the same lifecycle contract as the plan artifact.
 
+## Runtime Orchestrator
+
+Multi-step mission templates include an `orchestrator` team role between the
+owner and execution workers. The owner retains final accountability; the
+orchestrator supervises kickoff/follow-up sequencing, graph progress, retry /
+replay decisions, provider degradation, and escalation. It does not author the
+planner contract or mission deliverables.
+
+The canonical role contract is
+`knowledge/product/orchestration/team-roles/orchestrator.json`. The role is
+staffed through the same composition path as other roles and is recorded in
+`team-composition.json` and `staffing-assignments.json`.
+
 ## Indexes
 
 - `knowledge/product/governance/authority-roles/` canonical directory, with `knowledge/product/governance/authority-role-index.json` as the compatibility snapshot
@@ -77,6 +90,19 @@ To keep planning and execution explicit, mission team data is split into three a
   - append-only record of actual execution events
   - always includes both logical role (`team_role`) and execution actor (`actor_id`)
   - post-verification evidence can be appended with `mission_controller record-evidence <MISSION_ID> <TASK_ID> "<NOTE>" --team-role <ROLE> --actor-id <ACTOR> --evidence <CSV>`
+
+## Evaluation Feedback
+
+Mission retrospective records objective `model × team_role` outcomes in
+`active/shared/observability/retrospectives/model-role-outcomes.jsonl` and
+aggregates them in `model-performance.json`. A user or operator may also
+record a bounded 1–5 rating with `pnpm model:feedback`; ratings are kept in a
+separate append-only journal.
+
+The learned score is deliberately bounded and ignored until the minimum sample
+count is reached. It is a staffing hint only: explicit operator preferences,
+capability matching, separation of duties, and governance policy remain
+authoritative.
 
 Relationship with project and mission layers:
 
