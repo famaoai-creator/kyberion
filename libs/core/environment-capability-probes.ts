@@ -37,6 +37,7 @@ import {
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
+import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
@@ -117,6 +118,12 @@ export async function probeExplicitReasoningBackend(
       return binaryProbe('grok', ['--version'])
         ? { available: true }
         : unavailable('`grok --version` failed');
+    case 'grok-api': {
+      const probe = await probeGrokApiBackendAvailability(env);
+      return probe.available
+        ? { available: true }
+        : unavailable(probe.reason ?? 'xAI Grok API probe failed');
+    }
     case 'copilot':
       return binaryProbe('gh', ['copilot', '--', '--help'])
         ? { available: true }
@@ -221,6 +228,10 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
     if (geminiProbe.available) return { available: true };
   }
+  if (process.env.XAI_API_KEY || process.env.KYBERION_GROK_API_KEY) {
+    const grokApiProbe = await probeGrokApiBackendAvailability(process.env);
+    if (grokApiProbe.available) return { available: true };
+  }
   if (process.env.OPENROUTER_API_KEY || process.env.KYBERION_OPENROUTER_KEY) {
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
     if (openrouterProbe.available) return { available: true };
@@ -260,7 +271,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), xAI Grok API key (XAI_API_KEY or KYBERION_GROK_API_KEY), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

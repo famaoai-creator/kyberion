@@ -297,6 +297,7 @@ const REASONING_IDENTIFIER_TO_PROVIDER_ID: Readonly<Record<string, string>> = {
   'copilot-acp': 'copilot',
   'grok-cli': 'grok',
   'shell-grok-cli': 'grok',
+  'grok-api': 'grok',
   grok: 'grok',
 };
 
