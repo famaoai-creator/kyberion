@@ -18,22 +18,49 @@ export interface AgentAdapter {
   ask(prompt: string): Promise<AgentResponse>;
   shutdown(): Promise<void>;
   getRuntimeInfo?(): Record<string, unknown>;
-  refreshContext?(): Promise<{ mode: 'soft' | 'stateless'; sessionId?: string | null; threadId?: string | null }>;
+  refreshContext?(): Promise<{
+    mode: 'soft' | 'stateless';
+    sessionId?: string | null;
+    threadId?: string | null;
+  }>;
 }
 
 const ENV_WHITELIST = [
-  'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'TERM', 'NODE_ENV',
-  'NVM_DIR', 'NVM_BIN', 'GOOGLE_API_KEY', 'GEMINI_API_KEY',
-  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'MISSION_ID', 'MISSION_ROLE', 'KYBERION_PERSONA',
+  'PATH',
+  'HOME',
+  'USER',
+  'SHELL',
+  'LANG',
+  'TERM',
+  'NODE_ENV',
+  'NVM_DIR',
+  'NVM_BIN',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'XAI_API_KEY',
+  'KYBERION_GROK_API_KEY',
+  'MISSION_ID',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
   'CODEX_HOME',
-  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
-  'http_proxy', 'https_proxy', 'no_proxy',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
 ];
 
 export function safeEnv(): Record<string, string> {
   const env: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
-  for (const k of ENV_WHITELIST) { if (process.env[k]) env[k] = process.env[k] as string; }
+  for (const k of ENV_WHITELIST) {
+    if (process.env[k]) env[k] = process.env[k] as string;
+  }
   return env;
 }
 

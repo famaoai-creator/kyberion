@@ -172,7 +172,7 @@ dry-runで書き込み範囲を確認してから同じコマンドを実行し�
 ### Stage 6: Reasoning Backend Setup
 
 - **実行コマンド**: `pnpm reasoning:setup`
-- **目的**: `claude-cli` / `codex-cli` / `claude-agent` / `anthropic` / `gemini-cli` / `gemini-api` / `agy-cli` / `grok-cli` / `copilot` / `openrouter` / ローカル系(`ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai` / `local` / `nemotron-api`)/ `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します(正準カタログは `knowledge/product/governance/reasoning-backend-policy.json` の `allowed_modes`)。
+- **目的**: `claude-cli` / `codex-cli` / `claude-agent` / `anthropic` / `gemini-cli` / `gemini-api` / `agy-cli` / `grok-cli` / `grok-api` / `copilot` / `openrouter` / ローカル系(`ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai` / `local` / `nemotron-api`)/ `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します(正準カタログは `knowledge/product/governance/reasoning-backend-policy.json` の `allowed_modes`)。
 - **物理的変化**:
   - まだ実体の変更は行いません。利用可能な backend と不足条件が見えるだけです。
   - 対話モードで backend を選択した場合のみ、`.env.local` に `KYBERION_REASONING_BACKEND` が永続化されます。

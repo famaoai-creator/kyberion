@@ -950,7 +950,8 @@ export function buildClaudeCliOptionsFromEnv(
 
 export function buildShellClaudeCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability
+  probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability,
+  modelOverride?: string
 ): ShellClaudeCliBackend | null {
   const availability = probe(env);
   if (!availability.available) {
@@ -963,7 +964,7 @@ export function buildShellClaudeCliBackendFromEnv(
   // Prefer an explicit pin; otherwise honor the binary the probe actually
   // validated (LC-03: may be a fallback outside node_modules/.bin).
   const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim() || availability.bin?.trim();
-  const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
+  const model = modelOverride?.trim() || env.KYBERION_CLAUDE_CLI_MODEL?.trim();
   const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();

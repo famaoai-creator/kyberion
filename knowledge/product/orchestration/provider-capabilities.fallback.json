@@ -3,6 +3,7 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
         "auto-gemini-3",
@@ -34,6 +35,17 @@
         "a2ui"
       ],
       "modelCapabilities": {
+        "gemini-3.7-flash": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
         "gemini-3.6-flash": [
           "reasoning",
           "planning",
@@ -138,6 +150,7 @@
         "fable",
         "claude-fable-5",
         "claude-sonnet-5",
+        "claude-opus-5",
         "claude-opus-4-8",
         "claude-sonnet-4-6",
         "claude-opus-4-6",
@@ -208,6 +221,17 @@
           "code",
           "long_context",
           "structured_json"
+        ],
+        "claude-opus-5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning"
         ],
         "claude-opus-4-8": [
           "reasoning",
@@ -339,6 +363,10 @@
     },
     "agy": {
       "models": [
+        "Gemini 3.7 Flash (Medium)",
+        "Gemini 3.7 Flash (High)",
+        "Gemini 3.7 Flash (Low)",
+        "gemini-3.7-flash",
         "Gemini 3.6 Flash (Medium)",
         "Gemini 3.6 Flash (High)",
         "Gemini 3.6 Flash (Low)",
@@ -355,6 +383,46 @@
         "structured_json"
       ],
       "modelCapabilities": {
+        "Gemini 3.7 Flash (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.7 Flash (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.7 Flash (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
+        "gemini-3.7-flash": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
         "Gemini 3.6 Flash (Medium)": [
           "reasoning",
           "planning",
@@ -397,7 +465,7 @@
       }
     },
     "grok": {
-      "models": ["grok-4.5", "grok-4.5-build"],
+      "models": ["grok-4.6", "grok-4.5", "grok-4.5-build"],
       "capabilities": [
         "reasoning",
         "planning",
@@ -412,6 +480,19 @@
         "can_subagent"
       ],
       "modelCapabilities": {
+        "grok-4.6": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
         "grok-4.5": [
           "reasoning",
           "planning",

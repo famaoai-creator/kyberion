@@ -61,7 +61,7 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 
-const DEFAULT_MODEL = 'grok-4.5';
+const DEFAULT_MODEL = 'grok-4.6';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function resolveGrokModelForTier(
@@ -79,7 +79,7 @@ export function resolveGrokModelForTier(
 export interface ShellGrokCliBackendOptions {
   /** CLI binary. Defaults to `grok` (resolved via PATH). */
   bin?: string;
-  /** Model ID. Defaults to `grok-4.5`. */
+  /** Model ID. Defaults to `grok-4.6`. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;
@@ -94,6 +94,12 @@ export interface GrokHarnessSession {
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   getRuntimeInfo?(): Record<string, unknown>;
+  /**
+   * Optional shutdown contract. Executed by resetSession() for backend-owned
+   * sessions so the ACP process is torn down on failover. Injected harness
+   * sessions are owned by the caller.
+   */
+  shutdown?(): Promise<void>;
 }
 
 export interface ShellGrokCliAvailability {
@@ -232,7 +238,12 @@ export class ShellGrokCliBackend implements ReasoningBackend {
           '[SUBAGENT_UNAVAILABLE] Grok ACP session has no native subagent operation.'
         );
       }
-      if (!this.harnessBoot) this.harnessBoot = session.boot();
+      if (!this.harnessBoot) {
+        this.harnessBoot = session.boot().catch((err) => {
+          this.harnessBoot = undefined;
+          throw err;
+        });
+      }
       await this.harnessBoot;
       const response = await session.askNativeSubagent(
         [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
@@ -245,15 +256,14 @@ export class ShellGrokCliBackend implements ReasoningBackend {
           signal: options?.signal,
         }
       );
+      if (response.stopReason === 'error') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP returned an error response.');
+      }
       const nativeInfo = response.metadata?.nativeSubagent;
-      const runtimeInfo = session.getRuntimeInfo?.();
-      const runtimeNativeInfo = runtimeInfo?.lastNativeSubagent;
-      this.lastHarnessSubagentInfo =
-        nativeInfo && typeof nativeInfo === 'object'
-          ? { ...(nativeInfo as Record<string, unknown>) }
-          : runtimeNativeInfo && typeof runtimeNativeInfo === 'object'
-            ? { ...(runtimeNativeInfo as Record<string, unknown>) }
-            : null;
+      if (!nativeInfo || typeof nativeInfo !== 'object') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP returned no native subagent metadata.');
+      }
+      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
       return response.text;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -270,6 +280,19 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 
   requiresNativeSubagent(): boolean {
     return true;
+  }
+
+  /**
+   * QM-06: drop the active Grok ACP session on a failover switch.
+   * An injected harness belongs to its caller and is never shut down here.
+   */
+  async resetSession(): Promise<void> {
+    const session = this.harnessSession;
+    this.harnessSession = undefined;
+    this.harnessBoot = undefined;
+    this.lastHarnessSubagentInfo = null;
+    if (!session || session === this.injectedHarnessSession) return;
+    await session.shutdown?.().catch(() => undefined);
   }
 
   private getHarnessSession(): GrokHarnessSession {
