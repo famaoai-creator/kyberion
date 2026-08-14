@@ -5,6 +5,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -32,6 +33,25 @@ export async function GET(req: NextRequest) {
   if (!isAllowedKnowledgeRefPath(logicalPath)) {
     return NextResponse.json(
       { error: `knowledge ref is not accessible: ${logicalPath}` },
+      { status: 403 }
+    );
+  }
+  const requestedTenant = req.nextUrl.searchParams.get('tenant') || undefined;
+  let tenantSlugs: string[] | 'all';
+  try {
+    tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Tenant scope denied' },
+      { status: 403 }
+    );
+  }
+  const pathParts = logicalPath.split('/');
+  const pathTenant =
+    pathParts[1] === 'confidential' && pathParts[2] !== 'common' ? pathParts[2] : undefined;
+  if (pathTenant && tenantSlugs !== 'all' && !tenantSlugs.includes(pathTenant)) {
+    return NextResponse.json(
+      { error: 'Knowledge ref is outside the viewer tenant scope' },
       { status: 403 }
     );
   }

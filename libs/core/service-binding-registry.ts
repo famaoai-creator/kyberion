@@ -1,6 +1,12 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 
 export interface ServiceBindingRecord {
   binding_id: string;
@@ -10,6 +16,8 @@ export interface ServiceBindingRecord {
   allowed_actions: string[];
   secret_refs: string[];
   approval_policy: Record<string, 'allowed' | 'approval_required' | 'denied'>;
+  tenant_slug?: string;
+  project_id?: string;
   service_id?: string;
   auth_mode?: 'none' | 'secret-guard' | 'session';
   metadata?: Record<string, unknown>;
@@ -17,7 +25,9 @@ export interface ServiceBindingRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const BINDING_SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-binding-record.schema.json');
+const BINDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-binding-record.schema.json'
+);
 const BINDING_DIR = pathResolver.shared('runtime/service-bindings');
 let bindingValidateFn: ValidateFunction | null = null;
 
@@ -38,7 +48,9 @@ export function validateServiceBindingRecord(value: unknown): value is ServiceBi
 
 export function saveServiceBindingRecord(record: ServiceBindingRecord): string {
   if (!validateServiceBindingRecord(record)) {
-    const errors = (ensureValidator().errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+    const errors = (ensureValidator().errors || []).map(
+      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+    );
     throw new Error(`Invalid service binding record: ${errors.join('; ')}`);
   }
   if (!safeExistsSync(BINDING_DIR)) safeMkdir(BINDING_DIR, { recursive: true });

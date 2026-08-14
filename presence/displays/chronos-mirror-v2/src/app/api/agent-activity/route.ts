@@ -12,7 +12,7 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const viewer = resolvedViewer.context;
-    const tenantSlugs = viewerScopeTenantSlugs(viewer, tenant);
+    const tenantSlugs = strictViewerScopeTenantSlugs(viewer, tenant);
     const filter = tenantSlugs === 'all' ? undefined : tenantSlugs;
     const projection = buildWorkVisibilityProjection({
       items: listWorkItems({ tenantSlugs: filter }),
@@ -67,7 +67,11 @@ export function GET(req: NextRequest) {
       ok: true,
       scope: 'operations',
       view: 'active',
-      projection: { counts: projection.counts, quality: projection.quality },
+      projection: {
+        counts: projection.counts,
+        quality: projection.quality,
+        lineage: projection.lineage,
+      },
       board,
       office,
       trackRecords,

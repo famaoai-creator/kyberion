@@ -199,6 +199,25 @@ export function viewerScopeTenantSlugs(
   return viewer.tenantSlugs;
 }
 
+/**
+ * Use for data-bearing Chronos views. A browser-supplied tenant may narrow an
+ * already authorized viewer, but it can never expand that viewer's tenant set.
+ */
+export function strictViewerScopeTenantSlugs(
+  viewer: ViewerContext,
+  requested?: string
+): string[] | 'all' {
+  const normalized = requested?.trim() || undefined;
+  if (normalized && !isValidTenantSlug(normalized)) {
+    throw new ViewerContextError(403, `invalid viewer tenant scope: ${normalized}`);
+  }
+  if (normalized && viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(normalized)) {
+    throw new ViewerContextError(403, `viewer tenant scope denied: ${normalized}`);
+  }
+  if (normalized) return [normalized];
+  return viewer.tenantSlugs;
+}
+
 /** Propagate the request-derived tenant into tier-guard identity resolution. */
 export function withViewerExecutionContext<T>(viewer: ViewerContext, fn: () => T): T {
   const role = viewer.role === 'localadmin' ? 'chronos_localadmin' : 'chronos_operator';

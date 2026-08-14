@@ -117,12 +117,14 @@ function MetricCard({
   value,
   detail,
   tone = 'neutral',
+  compactValue = false,
 }: {
   icon: typeof Building2;
   label: string;
   value: string | number;
-  detail: string;
+  detail: React.ReactNode;
   tone?: 'neutral' | 'positive' | 'warning' | 'negative';
+  compactValue?: boolean;
 }) {
   const toneClass = {
     neutral: 'kb-border-subtle kb-surface-raised kb-text-primary',
@@ -136,16 +138,22 @@ function MetricCard({
         <Icon size={13} />
         <span>{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-[10px] opacity-80">{detail}</div>
+      <div
+        className={`mt-2 font-semibold tracking-tight ${compactValue ? 'text-sm leading-5' : 'text-2xl'}`}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-[10px] leading-4 opacity-80">{detail}</div>
     </div>
   );
 }
 
 export function OrganizationOperatingModel({
+  tenant,
   onOpenGovernance,
   onOpenOperations,
 }: {
+  tenant?: string;
   onOpenGovernance?: () => void;
   onOpenOperations?: () => void;
 }) {
@@ -155,9 +163,20 @@ export function OrganizationOperatingModel({
   const [busy, setBusy] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
+    if (!tenant) {
+      setView(null);
+      setError(null);
+      setBusy(false);
+      return;
+    }
     setBusy(true);
     try {
-      const response = await fetch('/api/organization-operating-model', { cache: 'no-store' });
+      const params = new URLSearchParams();
+      if (tenant) params.set('tenant', tenant);
+      const response = await fetch(
+        `/api/organization-operating-model${params.size ? `?${params.toString()}` : ''}`,
+        { cache: 'no-store' }
+      );
       const payload = (await response.json()) as {
         view?: OrganizationOperatingModelView;
         error?: string;
@@ -171,7 +190,7 @@ export function OrganizationOperatingModel({
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [tenant]);
 
   React.useEffect(() => {
     void refresh();
@@ -213,7 +232,9 @@ export function OrganizationOperatingModel({
 
       {!view && !error ? (
         <div className="mt-6 rounded-2xl border kb-border-subtle kb-surface-sunken p-5 text-sm kb-text-muted">
-          {uxText('chronos_org_loading', locale)}
+          {tenant
+            ? uxText('chronos_org_loading', locale)
+            : uxText('chronos_organization_scope_hint', locale)}
         </div>
       ) : null}
 
@@ -223,6 +244,11 @@ export function OrganizationOperatingModel({
             <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] kb-text-accent">
               {view.organization_id}
             </span>
+            {tenant ? (
+              <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[10px] kb-text-secondary">
+                tenant: {tenant}
+              </span>
+            ) : null}
             <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[10px] kb-text-secondary">
               {uxText('chronos_org_readiness', locale)}:{' '}
               {organizationReadinessLabel(view.readiness, locale)}
@@ -236,9 +262,25 @@ export function OrganizationOperatingModel({
             <MetricCard
               icon={Target}
               label={uxText('chronos_org_purpose', locale)}
-              value={view.purpose?.objectives?.length || 0}
-              detail={view.purpose?.name || uxText('chronos_org_not_configured', locale)}
+              value={view.purpose?.purpose || uxText('chronos_org_not_configured', locale)}
+              detail={
+                view.purpose?.objectives?.length ? (
+                  <div>
+                    <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.14em]">
+                      {uxText('chronos_org_objectives', locale)}
+                    </div>
+                    <ul className="list-disc space-y-1 pl-4">
+                      {view.purpose.objectives.map((objective) => (
+                        <li key={objective.objective_id}>{objective.title}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  uxText('chronos_org_no_objectives', locale)
+                )
+              }
               tone={view.readiness.purpose === 'approved' ? 'positive' : 'warning'}
+              compactValue
             />
             <MetricCard
               icon={ShieldCheck}

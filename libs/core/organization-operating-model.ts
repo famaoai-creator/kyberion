@@ -2214,6 +2214,92 @@ export function buildOrganizationServiceAddition(
   return { service, domain: nextDomain };
 }
 
+export interface BuildOrganizationServiceStateInput {
+  organizationId: string;
+  serviceId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  health: OrganizationServiceState['health'];
+  /** Defaults to `current`: an operator declaration is the source, so it is not stale. */
+  reconcileStatus?: OrganizationServiceState['reconcile_status'];
+  /**
+   * How old the underlying observation is. Defaults to 0 — a declaration made
+   * now describes now. Feeds `stale_services` detection in reconciliation.
+   */
+  freshnessSeconds?: number;
+  /** 0..1. Defaults to 1: the operator asserting the health IS the source. */
+  confidence?: number;
+  /** ISO timestamp the observation came from. Defaults to `observed_at`. */
+  sourceTimestamp?: string;
+  activeProjectIds?: string[];
+  activeOperationIds?: string[];
+  openIncidentIds?: string[];
+  lastOutcomeRefs?: string[];
+  rootDir?: string;
+}
+
+/**
+ * Builds the runtime-health half of a service record.
+ *
+ * A service declares what is promised; its state declares whether the promise
+ * is currently being met. Reconciliation treats a service with no state as
+ * `services_without_state` and refuses to summarise health from nothing —
+ * fail-closed, because "no state" and "healthy" must never look alike. This
+ * builder is how a state gets declared when no telemetry feed owns the service
+ * yet, so the parent service must already exist: a state for a service that was
+ * never defined would be health without a promise to measure against.
+ */
+export function buildOrganizationServiceState(
+  input: BuildOrganizationServiceStateInput,
+  now = new Date().toISOString()
+): OrganizationServiceState {
+  const service = loadOrganizationService(input.serviceId, {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  if (!service) {
+    throw new Error(
+      `Service '${input.serviceId}' not found for '${input.organizationId}'. Run 'service add' first.`
+    );
+  }
+  if (input.confidence !== undefined && (input.confidence < 0 || input.confidence > 1)) {
+    throw new Error(`--confidence must be between 0 and 1 (received ${input.confidence}).`);
+  }
+  if (input.freshnessSeconds !== undefined && input.freshnessSeconds < 0) {
+    throw new Error(
+      `--freshness-seconds must not be negative (received ${input.freshnessSeconds}).`
+    );
+  }
+  const state: OrganizationServiceState = {
+    service_id: input.serviceId,
+    organization_id: input.organizationId,
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    health: input.health,
+    observed_at: now,
+    source_timestamp: input.sourceTimestamp || now,
+    freshness_seconds: input.freshnessSeconds ?? 0,
+    confidence: input.confidence ?? 1,
+    ...(input.activeProjectIds?.length ? { active_project_ids: input.activeProjectIds } : {}),
+    ...(input.activeOperationIds?.length ? { active_operation_ids: input.activeOperationIds } : {}),
+    ...(input.openIncidentIds?.length ? { open_incident_ids: input.openIncidentIds } : {}),
+    ...(input.lastOutcomeRefs?.length ? { last_outcome_refs: input.lastOutcomeRefs } : {}),
+    reconcile_status: input.reconcileStatus || 'current',
+    updated_at: now,
+  };
+  assertRecordIdentity(state, input.rootDir);
+  if (!validateOrganizationServiceState(state)) {
+    throw new Error(
+      `Invalid organization service state: ${validationErrors(
+        validatorFor(SERVICE_STATE_SCHEMA_PATH)
+      )}`
+    );
+  }
+  return state;
+}
+
 export interface BuildOrganizationOperationInput {
   organizationId: string;
   operationId: string;
@@ -2274,6 +2360,154 @@ export function buildOrganizationOperationRecord(
     );
   }
   return record;
+}
+
+export interface BuildOrganizationCadenceInput {
+  organizationId: string;
+  cadenceId: string;
+  name: string;
+  cadenceType: OrganizationCadenceRecord['cadence_type'];
+  schedule: string;
+  ownerRole: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  status?: OrganizationCadenceRecord['status'];
+  rootDir?: string;
+}
+
+/**
+ * Builds a governance cadence — the recurring body that decides, rather than the
+ * work being decided about (`governance_cadence` in the work-shape catalog).
+ *
+ * `decision_ids` starts empty and grows through `buildOrganizationDecision`, so
+ * the cadence record is the durable index of everything that body ever decided.
+ */
+export function buildOrganizationCadence(
+  input: BuildOrganizationCadenceInput,
+  now = new Date().toISOString()
+): OrganizationCadenceRecord {
+  const existing = loadOrganizationCadence(input.cadenceId, {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  const record: OrganizationCadenceRecord = {
+    version: '1.0.0',
+    cadence_id: input.cadenceId,
+    organization_id: input.organizationId,
+    name: input.name,
+    cadence_type: input.cadenceType,
+    schedule: input.schedule,
+    owner_role: input.ownerRole,
+    // Re-running `cadence add` must not erase the decision history already
+    // indexed against this body.
+    decision_ids: existing?.decision_ids ?? [],
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: input.status || 'active',
+    updated_at: now,
+  };
+  assertRecordIdentity(record, input.rootDir);
+  if (!validateOrganizationCadence(record)) {
+    throw new Error(
+      `Invalid organization cadence: ${validationErrors(validatorFor(CADENCE_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export interface BuildOrganizationDecisionInput {
+  organizationId: string;
+  decisionId: string;
+  cadenceId: string;
+  title: string;
+  decisionOwner: string;
+  dueAt: string;
+  options: string[];
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  decisionType?: OrganizationDecisionRecord['decision_type'];
+  status?: OrganizationDecisionRecord['status'];
+  requestedBy?: string;
+  chosenOption?: string;
+  rationale?: string;
+  approvalRefs?: string[];
+  followUpRefs?: string[];
+  rootDir?: string;
+}
+
+export interface OrganizationDecisionAddition {
+  decision: OrganizationDecisionRecord;
+  cadence: OrganizationCadenceRecord;
+}
+
+/**
+ * Builds a decision and links it back into its cadence.
+ *
+ * The parent cadence must exist: reconciliation reports a decision whose
+ * `cadence_id` resolves to nothing as `missing_decision_cadences`, because a
+ * decision with no body that made it cannot be audited. Returning the updated
+ * cadence alongside the decision keeps that index in one transaction — the same
+ * shape `service add` uses for its parent domain.
+ */
+export function buildOrganizationDecision(
+  input: BuildOrganizationDecisionInput,
+  now = new Date().toISOString()
+): OrganizationDecisionAddition {
+  if (!input.options.length) {
+    throw new Error('At least one --option is required for decision add.');
+  }
+  if (input.chosenOption && !input.options.includes(input.chosenOption)) {
+    throw new Error(
+      `--chosen-option '${input.chosenOption}' is not one of the declared options (${input.options.join(', ')}).`
+    );
+  }
+  const cadence = loadOrganizationCadence(input.cadenceId, {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  if (!cadence) {
+    throw new Error(
+      `Cadence '${input.cadenceId}' not found for '${input.organizationId}'. Run 'cadence add' first.`
+    );
+  }
+  const decision: OrganizationDecisionRecord = {
+    version: '1.0.0',
+    decision_id: input.decisionId,
+    organization_id: input.organizationId,
+    cadence_id: input.cadenceId,
+    title: input.title,
+    ...(input.decisionType ? { decision_type: input.decisionType } : {}),
+    status: input.status || 'proposed',
+    ...(input.requestedBy ? { requested_by: input.requestedBy } : {}),
+    decision_owner: input.decisionOwner,
+    due_at: input.dueAt,
+    options: input.options,
+    ...(input.chosenOption ? { chosen_option: input.chosenOption } : {}),
+    ...(input.rationale ? { rationale: input.rationale } : {}),
+    ...(input.approvalRefs?.length ? { approval_refs: input.approvalRefs } : {}),
+    follow_up_refs: input.followUpRefs ?? [],
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    updated_at: now,
+  };
+  assertRecordIdentity(decision, input.rootDir);
+  if (!validateOrganizationDecision(decision)) {
+    throw new Error(
+      `Invalid organization decision: ${validationErrors(validatorFor(DECISION_SCHEMA_PATH))}`
+    );
+  }
+  const nextCadence: OrganizationCadenceRecord = cadence.decision_ids.includes(input.decisionId)
+    ? cadence
+    : {
+        ...cadence,
+        decision_ids: [...cadence.decision_ids, input.decisionId],
+        updated_at: now,
+      };
+  return { decision, cadence: nextCadence };
 }
 
 export interface BuildOrganizationProjectLinkInput {

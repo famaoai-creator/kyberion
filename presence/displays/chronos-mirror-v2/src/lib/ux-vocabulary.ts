@@ -137,6 +137,27 @@ export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
   return speechLocales[locale] || speechLocales.en;
 }
 
+/**
+ * Browser-safe, explicit date/time formatting for Chronos surfaces.
+ * Keep this here instead of importing the Node-oriented @agent/core index
+ * into a client component; that index also exposes server-only actuators.
+ */
+export function formatChronosDateTime(
+  value: Date | string | number,
+  locale = resolveChronosLocale()
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat(chronosSpeechLocale(locale), {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 export function selectChronosLocaleText(
   locale: SupportedLocale,
   variants: Partial<Record<SupportedLocale, string>> & { en: string }

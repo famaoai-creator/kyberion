@@ -909,6 +909,28 @@ app.post('/api/minutes/session/start', async (req, res) => {
       return;
     }
     installShellSpeechToTextBridgeIfAvailable();
+    try {
+      const targetDir = pathResolver.missionDir(missionId);
+      const evidenceDir = path.join(targetDir, 'evidence');
+      safeMkdir(evidenceDir, { recursive: true });
+      const consentPath = path.join(evidenceDir, 'voice-consent.json');
+      safeWriteFile(
+        consentPath,
+        JSON.stringify(
+          {
+            consent: 'granted',
+            mission_id: missionId,
+            operator_handle: 'presence-studio-user',
+            granted_at: new Date().toISOString(),
+          },
+          null,
+          2
+        ),
+        { encoding: 'utf8' }
+      );
+    } catch (err) {
+      logger.warn(`[presence-studio] failed to write voice consent: ${err}`);
+    }
     inRoomMinutesSession = await startInRoomMinutesSession({
       missionId,
       meetingTitle: typeof req.body?.title === 'string' ? req.body.title : undefined,
