@@ -42,7 +42,11 @@ export {
   loadMissionSeedRecord,
   saveMissionSeedRecord,
 } from '@agent/core/mission-seed-registry';
-export { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
+export {
+  listMemoryPromotionCandidates,
+  loadMemoryPromotionCandidate,
+  updateMemoryPromotionCandidateStatus,
+} from '@agent/core/memory-promotion-queue';
 export {
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,

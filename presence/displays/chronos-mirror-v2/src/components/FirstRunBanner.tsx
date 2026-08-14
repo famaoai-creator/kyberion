@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
+import { uxMessage, uxText } from '../lib/ux-vocabulary';
 
 const STORAGE_KEY = 'chronos.first-run.dismissed';
 
@@ -64,43 +65,30 @@ export function FirstRunBanner() {
 
   const name = identity.sovereign?.name || 'Sovereign';
   const agentId = identity.agent?.agent_id || 'your agent';
-  const ja = locale === 'ja';
-
   return (
     <div className="mx-1 mt-2 flex items-start gap-3 rounded-2xl border kb-border-accent bg-gradient-to-r from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent p-4">
       <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full kb-surface-accent kb-text-accent">
         <Sparkles size={14} />
       </div>
       <div className="flex-1 text-[12px] leading-relaxed kb-text-primary">
-        <div className="text-[10px] uppercase tracking-[0.3em] kb-text-accent">First Run</div>
+        <div className="text-[10px] uppercase tracking-[0.3em] kb-text-accent">
+          {uxText('chronos_first_run_eyebrow', locale)}
+        </div>
         <div className="mt-1 kb-text-primary">
-          {ja ? (
-            <>
-              ようこそ、<span className="font-semibold kb-text-primary">{name}</span>{' '}
-              さん。アイデンティティは <span className="font-mono kb-text-accent">{agentId}</span>{' '}
-              として確定していますが、agent runtime はまだ起動していません。
-            </>
-          ) : (
-            <>
-              Welcome, <span className="font-semibold kb-text-primary">{name}</span>. Identity is
-              sealed as <span className="font-mono kb-text-accent">{agentId}</span>, but no agent
-              runtime is live yet.
-            </>
+          {uxMessage(
+            'chronos_first_run_welcome',
+            { name, agent: agentId },
+            'Welcome, {name}. Identity is registered as {agent}, but no agent is running yet.',
+            locale
           )}
         </div>
         <ol className="mt-2 list-decimal pl-4 kb-text-secondary text-[11.5px] space-y-0.5">
-          {ja ? (
+          {locale === 'ja' ? (
             <>
-              <li>
-                左レールの <span className="font-bold kb-text-primary">Prereq Check</span> と{' '}
-                <span className="font-bold kb-text-primary">Setup Report</span> を実行する。
-              </li>
-              <li>
-                右上の <span className="font-bold kb-text-primary">Agent Runtimes</span>{' '}
-                を開き、最初のエージェントを起動する。
-              </li>
-              <li>Verify チェック(Vital Check / Diagnostics)でエコシステムの健全性を確認する。</li>
-              <li>準備ができたら、シミュレーションの Tutorial を実ミッションへ昇格する。</li>
+              <li>{uxText('chronos_first_run_step_prereq', locale)}</li>
+              <li>{uxText('chronos_first_run_step_agent', locale)}</li>
+              <li>{uxText('chronos_first_run_step_diagnostics', locale)}</li>
+              <li>{uxText('chronos_first_run_step_tutorial', locale)}</li>
             </>
           ) : (
             <>
@@ -123,7 +111,7 @@ export function FirstRunBanner() {
       <button
         onClick={dismiss}
         className="opacity-50 transition hover:opacity-90"
-        aria-label={ja ? '初回バナーを閉じる' : 'Dismiss first run banner'}
+        aria-label={uxText('chronos_first_run_dismiss', locale)}
       >
         <X size={14} />
       </button>

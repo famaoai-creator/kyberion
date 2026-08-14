@@ -15,7 +15,13 @@ import {
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import {
+  chronosSpeechLocale,
+  resolveChronosLocale,
+  uxMessage,
+  uxText,
+  uxTextOr,
+} from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import type { OrganizationWorkLoopSummary } from '@agent/core';
 
@@ -791,6 +797,7 @@ function toDomId(prefix: 'mission' | 'surface', value: string): string {
 }
 
 function ActionStatusBadge({ action }: { action: ControlActionSummary }) {
+  const locale = resolveChronosLocale();
   return (
     <div
       className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
@@ -801,9 +808,151 @@ function ActionStatusBadge({ action }: { action: ControlActionSummary }) {
             : 'kb-status-warning-surface kb-status-warning'
       }`}
     >
-      {action.operation} · {action.status}
+      {surfaceOperationLabel(action.operation, locale)} · {actionStatusLabel(action.status, locale)}
     </div>
   );
+}
+
+function surfaceOperationLabel(operation: string, locale: string) {
+  const keyByOperation: Record<string, string> = {
+    route_to_approvals: 'chronos_action_route_to_approvals',
+    mission_control_requested: 'chronos_action_mission_control_requested',
+    resume: 'chronos_action_resume',
+  };
+  const key = keyByOperation[operation];
+  return key ? uxText(key, locale) : operation;
+}
+
+function missionActionLabel(action: ControlActionDefinition, locale: string): string {
+  const keyByOperation: Record<string, string> = {
+    refresh_team: 'chronos_action_refresh_team',
+    prewarm: 'chronos_action_prewarm',
+    prewarm_runtime: 'chronos_action_prewarm',
+    staff: 'chronos_action_staff',
+    assign_staff: 'chronos_action_staff',
+    resume: 'chronos_action_resume',
+    resume_mission: 'chronos_action_resume',
+    pause: 'chronos_action_pause',
+    finish: 'chronos_action_finish',
+    cancel: 'chronos_action_cancel',
+    retry: 'chronos_action_retry',
+  };
+  const operation = action.operation.toLowerCase();
+  const label = action.label.toLowerCase();
+  const key =
+    keyByOperation[operation] ||
+    (operation.includes('prewarm') || label.includes('prewarm')
+      ? keyByOperation.prewarm
+      : operation.includes('staff') || label.includes('staff')
+        ? keyByOperation.staff
+        : operation.includes('resume') || label.includes('resume')
+          ? keyByOperation.resume
+          : operation.includes('pause') || label.includes('pause')
+            ? keyByOperation.pause
+            : operation.includes('finish') || label.includes('finish')
+              ? keyByOperation.finish
+              : operation.includes('cancel') || label.includes('cancel')
+                ? keyByOperation.cancel
+                : undefined);
+  return key ? uxText(key, locale) : action.label;
+}
+
+function missionStatusLabel(value: string | undefined, locale: string): string {
+  const normalized = (value || '').toLowerCase().replace(/[- ]/g, '_');
+  const keyByStatus: Record<string, string> = {
+    active: 'chronos_status_active',
+    completed: 'chronos_status_completed',
+    complete: 'chronos_status_completed',
+    paused: 'chronos_status_paused',
+    failed: 'chronos_status_failed',
+    planned: 'chronos_status_planned',
+    planning_pending: 'chronos_status_planning_pending',
+    pending: 'chronos_status_planning_pending',
+  };
+  const key = keyByStatus[normalized];
+  return key ? uxText(key, locale) : value || uxText('chronos_unknown', locale);
+}
+
+function attentionSourceLabel(item: AttentionItem, locale: string): string {
+  const keyByTargetType: Partial<Record<AttentionItem['targetType'], string>> = {
+    mission: 'chronos_mission_control',
+    runtime: 'chronos_runtime_incidents',
+    surface: 'chronos_surface_control',
+    delivery: 'chronos_delivery',
+    approval: 'chronos_approvals_title',
+  };
+  const key = keyByTargetType[item.targetType];
+  return key ? uxText(key, locale) : item.sourceLabel || uxText('chronos_control_plane', locale);
+}
+
+function attentionReasonLabel(item: AttentionItem, locale: string): string {
+  if (item.targetType === 'mission') {
+    const match = /^(.*?) · next tasks (\d+)$/.exec(item.reason);
+    if (match) {
+      return uxMessage(
+        'chronos_attention_mission_reason',
+        { status: missionStatusLabel(match[1], locale), count: Number(match[2]) },
+        '{status} · {count} next tasks',
+        locale
+      );
+    }
+  }
+  if (item.targetType === 'surface') {
+    const separatorIndex = item.reason.indexOf(' · ');
+    if (separatorIndex > 0) {
+      return uxMessage(
+        'chronos_attention_surface_reason',
+        {
+          status: surfaceStateLabel(item.reason.slice(0, separatorIndex), locale),
+          summary: item.reason.slice(separatorIndex + 3),
+        },
+        '{status} · {summary}',
+        locale
+      );
+    }
+  }
+  return item.reason;
+}
+
+function attentionNextStepLabel(item: AttentionItem, locale: string): string {
+  const keyByTargetType: Partial<Record<AttentionItem['targetType'], string>> = {
+    mission: 'chronos_attention_mission_next_step',
+    runtime: 'chronos_runtime_needs_review',
+    surface: 'chronos_attention_surface_next_step',
+    delivery: 'chronos_delivery_needs_review',
+    approval: 'chronos_attention_approval_next_step',
+  };
+  const key = keyByTargetType[item.targetType];
+  return key ? uxText(key, locale) : item.nextStep || '';
+}
+
+function attentionActionLabel(item: AttentionItem, locale: string): string {
+  if (item.targetType === 'runtime') {
+    return uxText(
+      item.remediationAction === 'restart_runtime_lease'
+        ? 'chronos_restart_runtime'
+        : 'chronos_cleanup_lease',
+      locale
+    );
+  }
+  const keyByTargetType: Partial<Record<AttentionItem['targetType'], string>> = {
+    mission: 'chronos_focus_mission',
+    surface: 'chronos_review_surface',
+    delivery: 'chronos_open_delivery',
+    approval: 'chronos_review_approval',
+  };
+  const key = keyByTargetType[item.targetType];
+  return key ? uxText(key, locale) : item.actionLabel || '';
+}
+
+function actionStatusLabel(status: string, locale: string) {
+  const keyByStatus: Record<string, string> = {
+    queued: 'chronos_action_queued',
+    completed: 'chronos_action_completed',
+    failed: 'chronos_action_failed',
+  };
+  const key = keyByStatus[status];
+  return key ? uxText(key, locale) : status;
 }
 
 function messageToneClass(tone: AgentMessageSummary['tone']): string {
@@ -1188,6 +1337,7 @@ export function MissionIntelligence({
   focusedMissionId = null,
   hideSurfaceControl = false,
   showMissionIntelligenceLabel = false,
+  tenant = '',
 }: {
   workspace?: MissionIntelligenceWorkspace;
   focusedView?: string | null;
@@ -1199,12 +1349,17 @@ export function MissionIntelligence({
   focusedMissionId?: string | null;
   hideSurfaceControl?: boolean;
   showMissionIntelligenceLabel?: boolean;
+  tenant?: string;
 }) {
   const locale = resolveChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
+  const missionActionText = (action: ControlActionDefinition) => missionActionLabel(action, locale);
   const missionIntelligenceEyebrow = showMissionIntelligenceLabel
     ? uxText('chronos_mission_intelligence', locale)
     : undefined;
+  const intelligenceUrl = tenant
+    ? `/api/intelligence?tenant=${encodeURIComponent(tenant)}`
+    : '/api/intelligence';
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<IntelligencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1245,6 +1400,7 @@ export function MissionIntelligence({
   );
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [showMissionDetails, setShowMissionDetails] = useState(false);
   const [selectedReferencePath, setSelectedReferencePath] = useState<string | null>(null);
   const [referenceDetail, setReferenceDetail] = useState<ReferenceDetail | null>(null);
   const missionThreadPanelRef = useRef<HTMLDivElement | null>(null);
@@ -1310,7 +1466,7 @@ export function MissionIntelligence({
   };
 
   const refreshData = async () => {
-    const refreshed = await fetch('/api/intelligence', { cache: 'no-store' });
+    const refreshed = await fetch(intelligenceUrl, { cache: 'no-store' });
     const refreshedBody = await refreshed.json();
     if (!refreshed.ok) {
       throw new Error(refreshedBody.error || 'Failed to refresh mission intelligence');
@@ -1323,7 +1479,7 @@ export function MissionIntelligence({
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch('/api/intelligence', { cache: 'no-store' });
+        const res = await fetch(intelligenceUrl, { cache: 'no-store' });
         const body = await res.json();
         if (!alive) return;
         if (!res.ok) {
@@ -1342,11 +1498,12 @@ export function MissionIntelligence({
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [intelligenceUrl]);
 
   const focusMissionThread = (missionId: string) => {
     setSelectedMissionId(missionId);
     setMessageMissionFilter(missionId);
+    setShowMissionDetails(true);
     if (typeof window === 'undefined') return;
     window.requestAnimationFrame(() => {
       missionThreadPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1356,6 +1513,7 @@ export function MissionIntelligence({
   const focusMissionCard = (missionId: string) => {
     setSelectedMissionId(missionId);
     setMessageMissionFilter(missionId);
+    setShowMissionDetails(true);
     if (typeof window === 'undefined') return;
     window.requestAnimationFrame(() => {
       document.getElementById(`mission-card-${missionId}`)?.scrollIntoView({
@@ -1366,7 +1524,11 @@ export function MissionIntelligence({
   };
 
   useEffect(() => {
-    const source = new EventSource('/api/intelligence/stream');
+    const source = new EventSource(
+      tenant
+        ? `/api/intelligence/stream?tenant=${encodeURIComponent(tenant)}`
+        : '/api/intelligence/stream'
+    );
 
     source.onmessage = (event) => {
       try {
@@ -1426,7 +1588,7 @@ export function MissionIntelligence({
     return () => {
       source.close();
     };
-  }, []);
+  }, [tenant]);
 
   useEffect(() => {
     if (!focusedView) return;
@@ -1441,7 +1603,7 @@ export function MissionIntelligence({
   ) => {
     try {
       setRemediationTarget(agentId);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1466,7 +1628,7 @@ export function MissionIntelligence({
   const clearOutboxMessage = async (surface: 'slack' | 'chronos', messageId: string) => {
     try {
       setOutboxTarget(messageId);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1492,7 +1654,7 @@ export function MissionIntelligence({
   const runMissionControl = async (missionId: string, operation: string) => {
     try {
       setMissionActionTarget(`${missionId}:${operation}`);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1515,7 +1677,7 @@ export function MissionIntelligence({
   const promoteMissionSeed = async (seedId: string) => {
     try {
       setMissionSeedTarget(seedId);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1537,7 +1699,7 @@ export function MissionIntelligence({
   const createTrackSeed = async (trackId: string, artifactId?: string) => {
     try {
       setTrackSeedTarget(trackId);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1683,7 +1845,7 @@ export function MissionIntelligence({
   ) => {
     try {
       setApprovalTarget(approval.id);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1711,7 +1873,7 @@ export function MissionIntelligence({
   ) => {
     try {
       setDistillCandidateTarget(candidate.candidate_id);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1734,7 +1896,7 @@ export function MissionIntelligence({
   const runSurfaceControl = async (surfaceId: string | null, operation: string) => {
     try {
       setSurfaceActionTarget(`${surfaceId || 'all'}:${operation}`);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1757,7 +1919,7 @@ export function MissionIntelligence({
   const runMemoryPromotion = async (dryRun: boolean) => {
     try {
       setMemoryPromotionTarget(dryRun ? 'dry-run' : 'promote');
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1791,7 +1953,7 @@ export function MissionIntelligence({
     detail?: string;
   }) => {
     try {
-      await fetch('/api/intelligence', {
+      await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1944,7 +2106,7 @@ export function MissionIntelligence({
   ) => {
     try {
       setBrowserSessionTarget(`${sessionId}:${action}`);
-      const res = await fetch('/api/intelligence', {
+      const res = await fetch(intelligenceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1986,6 +2148,15 @@ export function MissionIntelligence({
   }, [selectedMissionId, selectedProjectId, selectedTrackId]);
 
   useEffect(() => {
+    if (focusedMissionId && focusedMissionId !== selectedMissionId) {
+      setSelectedMissionId(focusedMissionId);
+      setMessageMissionFilter(focusedMissionId);
+      setShowMissionDetails(true);
+      return;
+    }
+    if (focusedMissionId === selectedMissionId && focusedMissionId) {
+      setShowMissionDetails(true);
+    }
     if (focusedView !== 'mission-control-plane') return;
     const missionId = resolveMissionControlFocusId(
       missionControlViewRef.current.filteredMissions,
@@ -2017,7 +2188,9 @@ export function MissionIntelligence({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusedView]);
 
-  const missionPinStatusLabel = selectedMissionId ? 'mission pinned' : 'pin mission thread';
+  const missionPinStatusLabel = selectedMissionId
+    ? mt('chronos_mission_selected', 'Mission selected')
+    : mt('chronos_mission_not_selected', 'Select a mission');
 
   if (error) {
     const safeError = buildUserFacingError(error, { locale, surface: 'chronos' });
@@ -2055,7 +2228,7 @@ export function MissionIntelligence({
     return (
       <SurfaceStatusPanel
         eyebrow={missionIntelligenceEyebrow}
-        title="Waiting for mission data"
+        title={mt('chronos_waiting_for_data', 'Waiting for data')}
         detail={mt('chronos_mission_loading', 'Loading mission intelligence...')}
         tone="neutral"
       />
@@ -2252,19 +2425,23 @@ export function MissionIntelligence({
       return focusedView === panelId;
     }
 
+    const missionDetailsFocused =
+      showMissionDetails || focusedView === 'mission-control-plane' || Boolean(focusedMissionId);
     const panelWorkspaces: Record<Exclude<MissionIntelligenceWorkspace, 'surface'>, string[]> = {
-      missions: [
-        'next-actions',
-        'needs-attention',
-        'mission-control-plane',
-        'projects',
-        'tracks',
-        'service-bindings',
-        'mission-seeds',
-        'skeleton-detail',
-        'selected-mission-thread',
-        'a2a-handoff-trail',
-      ],
+      missions: missionDetailsFocused
+        ? [
+            'next-actions',
+            'needs-attention',
+            'mission-control-plane',
+            'projects',
+            'tracks',
+            'service-bindings',
+            'mission-seeds',
+            'skeleton-detail',
+            'selected-mission-thread',
+            'a2a-handoff-trail',
+          ]
+        : ['next-actions', 'needs-attention', 'mission-control-plane'],
       deliverables: ['recent-artifacts'],
       operations: [
         'runtime-topology-map',
@@ -2359,6 +2536,32 @@ export function MissionIntelligence({
             </div>
           </div>
         </div>
+      ) : null}
+      {workspace === 'missions' ? (
+        <section className="rounded-2xl border kb-border-accent kb-surface-accent px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.22em] kb-text-accent">
+                {mt('chronos_mission_overview_eyebrow', 'Mission overview')}
+              </div>
+              <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
+                {mt(
+                  'chronos_mission_overview_hint',
+                  'Start with the goal, current state, and next step. Open related information only when you need it.'
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMissionDetails((current) => !current)}
+              className="self-start rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] font-bold tracking-[0.12em] kb-text-secondary transition hover:kb-border-accent hover:kb-text-accent"
+            >
+              {showMissionDetails
+                ? mt('chronos_hide_mission_details', 'Hide related information')
+                : mt('chronos_show_mission_details', 'Show related information')}
+            </button>
+          </div>
+        </section>
       ) : null}
       {/* Command Center: High-Visibility Action Dashboard */}
       {workspace === 'surface' && !selectedProject && !selectedMissionId && (
@@ -2500,25 +2703,25 @@ export function MissionIntelligence({
             </div>
             <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-4">
               <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                <div>needs attention</div>
+                <div>{mt('chronos_sc_needs_attention_label', 'Needs attention')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {attentionItems.length}
                 </div>
               </div>
               <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                <div>missions</div>
+                <div>{mt('chronos_missions_label', 'Missions')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.activeMissions.length}
                 </div>
               </div>
               <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                <div>runtime incidents</div>
+                <div>{mt('chronos_runtime_incidents', 'Runtime incidents')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.runtimeDoctor.length}
                 </div>
               </div>
               <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-                <div>delivery queue</div>
+                <div>{mt('chronos_delivery_queue', 'Delivery queue')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
                 </div>
@@ -2710,9 +2913,10 @@ export function MissionIntelligence({
             </div>
           )}
           <div className="mt-3 rounded-xl border kb-status-warning-border kb-surface-raised-subtle px-3 py-3 text-[11px] leading-5 kb-text-secondary">
-            Surfaces are the explainable boundary between people and agent execution. Chronos is the
-            control surface: it should clarify mission flow, runtime risk, and intervention points
-            before it offers controls.
+            {mt(
+              'chronos_surface_explanation',
+              'Surfaces are the explainable boundary between people and agent execution. Chronos clarifies mission flow, runtime risk, and intervention points before offering controls.'
+            )}
           </div>
         </section>
       ) : null}
@@ -2730,13 +2934,13 @@ export function MissionIntelligence({
           />
           <MetricCard
             icon={<Bot size={14} />}
-            label="Runtime Governance"
+            label={mt('chronos_runtime_governance', 'Runtime governance')}
             value={`${data.runtimeDoctor.length}/${data.runtimeLeases.length}`}
             detail={`ready=${data.runtime.ready} busy=${data.runtime.busy} error=${data.runtime.error}`}
           />
           <MetricCard
             icon={<Send size={14} />}
-            label={mt('chronos_delivery_exceptions', 'Delivery Exceptions')}
+            label={mt('chronos_delivery_exceptions', 'Delivery exceptions')}
             value={String(data.surfaceOutbox.slack + data.surfaceOutbox.chronos)}
             detail={mt(
               'chronos_delivery_exceptions_detail',
@@ -2745,10 +2949,12 @@ export function MissionIntelligence({
           />
           <MetricCard
             icon={<Brain size={14} />}
-            label="Memory Promotion"
+            label={mt('chronos_memory_promotion', 'Learning registration')}
             value={String(memoryCandidateCount)}
             detail={
-              nextAction ? `next: ${nextAction.reason}` : 'No immediate memory action recommended'
+              nextAction
+                ? `${mt('chronos_next_action_prefix', '次')}: ${nextAction.reason}`
+                : mt('chronos_memory_no_action', 'No learning needs to be registered now')
             }
           />
         </div>
@@ -2767,24 +2973,27 @@ export function MissionIntelligence({
         <Panel
           id="next-actions"
           visible={panelVisible('next-actions')}
-          title="Recommended Next Actions"
+          title={mt('chronos_recommended_next_actions', 'What to check next')}
         >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            These actions are generated from current control-plane state. Execute only what is
-            necessary to unblock mission flow.
+            {mt(
+              'chronos_recommended_next_actions_detail',
+              'Suggestions based on the current state. Run only the actions needed to move the mission forward.'
+            )}
           </div>
           <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[10px] leading-5 kb-text-accent">
-            mission seed assessment: eligible{' '}
+            {mt('chronos_mission_seed_assessment', 'Mission candidate status')}:{' '}
+            {mt('chronos_eligible', 'Ready to start')}{' '}
             <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.eligible ?? 0}
             </span>
             {' · '}
-            flagged{' '}
+            {mt('chronos_flagged', 'Needs review')}{' '}
             <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.flagged ?? 0}
             </span>
             {' · '}
-            promotable{' '}
+            {mt('chronos_promotable', 'Can become a mission')}{' '}
             <span className="font-mono kb-text-accent">
               {data.missionSeedAssessment?.promotable ?? 0}
             </span>
@@ -2792,7 +3001,7 @@ export function MissionIntelligence({
           <div className="space-y-3">
             {nextActions.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">
-                No immediate next actions recommended.
+                {mt('chronos_no_immediate_next_actions', 'There are no actions needed right now.')}
               </div>
             ) : (
               nextActions.map((action) => (
@@ -2810,16 +3019,17 @@ export function MissionIntelligence({
                   </div>
                   <div className="mt-2 text-[10px] kb-text-secondary">{action.reason}</div>
                   <div className="mt-2 text-[10px] kb-text-muted">
-                    risk: <span className="font-mono kb-text-secondary">{action.risk}</span>
+                    {mt('chronos_risk', 'Risk')}:{' '}
+                    <span className="font-mono kb-text-secondary">{action.risk}</span>
                     <span className="mx-2 kb-text-muted">·</span>
-                    approval required:{' '}
+                    {mt('chronos_approval_required', 'Approval needed')}:{' '}
                     <span className="font-mono kb-text-secondary">
-                      {action.approval_required ? 'yes' : 'no'}
+                      {action.approval_required ? mt('chronos_yes', 'Yes') : mt('chronos_no', 'No')}
                     </span>
                   </div>
                   {resolveNextActionRoute(action) ? (
                     <div className="mt-1 text-[10px] kb-text-muted">
-                      route:{' '}
+                      {mt('chronos_route', 'Destination')}:{' '}
                       <span className="font-mono kb-text-secondary">
                         {resolveNextActionRoute(action)?.label}
                       </span>
@@ -2827,7 +3037,7 @@ export function MissionIntelligence({
                   ) : null}
                   {action.suggested_command ? (
                     <div className="mt-1 text-[10px] kb-text-muted">
-                      command:{' '}
+                      {mt('chronos_command', 'Command')}:{' '}
                       <span className="font-mono kb-text-secondary">
                         {action.suggested_command}
                       </span>
@@ -2840,7 +3050,7 @@ export function MissionIntelligence({
                         onClick={() => jumpToNextActionRoute(action)}
                         className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
-                        jump
+                        {mt('chronos_jump', 'Open')}
                       </button>
                     ) : null}
                     <button
@@ -2851,7 +3061,7 @@ export function MissionIntelligence({
                     >
                       {nextActionTarget === action.action_id
                         ? mt('chronos_processing', 'processing')
-                        : 'execute'}
+                        : mt('chronos_execute', 'Run')}
                     </button>
                     {action.action_id === 'chronos-promote-memory' ? (
                       <button
@@ -2862,7 +3072,7 @@ export function MissionIntelligence({
                       >
                         {memoryPromotionTarget === 'dry-run'
                           ? mt('chronos_processing', 'processing')
-                          : 'dry-run'}
+                          : mt('chronos_dry_run', 'Preview')}
                       </button>
                     ) : null}
                   </div>
@@ -2875,18 +3085,22 @@ export function MissionIntelligence({
         <Panel
           id="needs-attention"
           visible={panelVisible('needs-attention')}
-          title="Needs Attention"
+          title={mt('chronos_needs_attention_panel', 'Items needing attention')}
         >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            Start here. These are the items most likely to block mission progress or degrade
-            operator trust. Use the action only when the control plane does not self-heal.
+            {mt(
+              'chronos_needs_attention_detail',
+              'Prioritized items to review. Each item shows why it matters, where it came from, and the next safe step.'
+            )}
           </div>
           <div className="grid gap-3 lg:grid-cols-[1.15fr,0.85fr]">
             <div className="space-y-3">
               {attentionItems.length === 0 ? (
                 <div className="rounded-xl border kb-status-positive-border kb-status-positive-surface px-4 py-3 text-[11px] kb-status-positive">
-                  No immediate operator intervention is recommended. Stay in observe mode and use
-                  A2UI drill-downs for detail.
+                  {mt(
+                    'chronos_no_operator_intervention',
+                    'No immediate action is needed. Open details if you need to investigate further.'
+                  )}
                 </div>
               ) : (
                 attentionItems.map((item) => (
@@ -2903,21 +3117,43 @@ export function MissionIntelligence({
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                         {item.tone === 'critical'
-                          ? 'critical'
+                          ? mt('chronos_critical', 'Urgent')
                           : item.tone === 'warning'
-                            ? 'warning'
-                            : 'info'}
+                            ? mt('chronos_warning', 'Caution')
+                            : mt('chronos_info', 'Information')}
                       </div>
                       <div className="text-[10px] font-mono kb-text-muted">{item.title}</div>
                     </div>
-                    <div className="mt-2 text-[11px] kb-text-secondary">{item.reason}</div>
+                    <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+                      <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-2">
+                        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                          {mt('chronos_why_now', 'Why check now')}
+                        </div>
+                        <div className="mt-1 kb-text-secondary">
+                          {attentionReasonLabel(item, locale)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-2">
+                        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                          {mt('chronos_source_next_step', 'Source and next step')}
+                        </div>
+                        <div className="mt-1 kb-text-secondary">
+                          {attentionSourceLabel(item, locale)}
+                        </div>
+                        {item.nextStep ? (
+                          <div className="mt-1 kb-text-muted">
+                            {attentionNextStepLabel(item, locale)}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                     {item.actionLabel && (
                       <button
                         type="button"
                         onClick={() => runAttentionAction(item)}
                         className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
-                        {item.actionLabel}
+                        {attentionActionLabel(item, locale)}
                       </button>
                     )}
                   </div>
@@ -2927,27 +3163,36 @@ export function MissionIntelligence({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <MiniSummaryCard
                 icon={<GitBranch size={13} />}
-                label="Work needing attention"
+                label={mt('chronos_work_needing_attention', 'Work to review')}
                 value={missionExceptions.length}
-                detail="Requests or missions that need operator attention"
+                detail={mt(
+                  'chronos_work_needing_attention_detail',
+                  'Requests or missions that need a person to check them'
+                )}
               />
               <MiniSummaryCard
                 icon={<Bot size={13} />}
-                label="Runtime incidents"
+                label={mt('chronos_runtime_incidents', 'Runtime issues')}
                 value={data.runtimeDoctor.length}
-                detail="Leases or runtimes flagged by doctor"
+                detail={mt(
+                  'chronos_runtime_incidents_detail',
+                  'Execution environments with a diagnostic issue'
+                )}
               />
               <MiniSummaryCard
                 icon={<Radar size={13} />}
-                label="Surface incidents"
+                label={mt('chronos_surface_incidents', 'Surface issues')}
                 value={surfaceExceptions.length}
-                detail="Managed surfaces needing review"
+                detail={mt('chronos_surface_incidents_detail', 'Managed surfaces that need review')}
               />
               <MiniSummaryCard
                 icon={<Send size={13} />}
-                label="Delivery exceptions"
+                label={mt('chronos_delivery_exceptions', 'Delivery issues')}
                 value={deliveryExceptions.length}
-                detail="Outbox entries or delivery residue"
+                detail={mt(
+                  'chronos_delivery_exceptions_detail',
+                  'Pending or leftover delivery issues'
+                )}
               />
             </div>
           </div>
@@ -2958,7 +3203,7 @@ export function MissionIntelligence({
         <Panel
           id="mission-control-plane"
           visible={panelVisible('mission-control-plane')}
-          title="Mission Control"
+          title={mt('chronos_mission_control', 'Mission control')}
         >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
             {mt(
@@ -3011,7 +3256,7 @@ export function MissionIntelligence({
                       return latestAction ? (
                         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
                           <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            latest intervention
+                            {mt('chronos_latest_intervention', 'Latest action')}
                           </div>
                           <ActionStatusBadge action={latestAction} />
                         </div>
@@ -3028,10 +3273,12 @@ export function MissionIntelligence({
                         </div>
                         {mission.projectId || mission.trackId ? (
                           <div className="mt-1 text-[10px] kb-text-muted">
-                            {mission.projectId ? `project ${mission.projectId}` : null}
+                            {mission.projectId
+                              ? `${mt('chronos_project', 'Project')} ${mission.projectId}`
+                              : null}
                             {mission.projectId && mission.trackId ? ' · ' : null}
                             {mission.trackId
-                              ? `track ${mission.trackName || mission.trackId}`
+                              ? `${mt('chronos_track', 'Track')} ${mission.trackName || mission.trackId}`
                               : null}
                           </div>
                         ) : null}
@@ -3043,19 +3290,23 @@ export function MissionIntelligence({
                             : 'kb-status-warning-surface kb-status-warning'
                         }`}
                       >
-                        {mission.planReady ? 'plan ready' : mission.status}
+                        {mission.planReady
+                          ? mt('chronos_plan_ready', 'Plan ready')
+                          : missionStatusLabel(mission.status, locale)}
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2">
                       <div
                         className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${missionSummaryBadgeClass(mission.controlTone)}`}
                       >
-                        {mission.controlSummary}
+                        {missionStatusLabel(mission.controlSummary, locale)}
                       </div>
-                      <div className="text-[10px] kb-text-muted">current state</div>
+                      <div className="text-[10px] kb-text-muted">
+                        {mt('chronos_current_state', 'Current state')}
+                      </div>
                       {mission.controlRequestedBy && (
                         <div className="text-[10px] kb-text-muted">
-                          requested by{' '}
+                          {mt('chronos_requested_by', 'Requested by')}{' '}
                           <span className="font-mono kb-text-secondary">
                             {mission.controlRequestedBy}
                           </span>
@@ -3064,44 +3315,51 @@ export function MissionIntelligence({
                     </div>
                     <div className="mt-3 grid gap-2 text-[10px] kb-text-muted">
                       <div>
-                        intent: <span className="kb-text-primary">{missionIntent}</span>
+                        {mt('chronos_intent', 'Intent')}:{' '}
+                        <span className="kb-text-primary">{missionIntent}</span>
                       </div>
                       <div>
-                        plan:{' '}
+                        {mt('chronos_plan', 'Plan')}:{' '}
                         <span className="kb-text-primary">
                           {mission.planReady
-                            ? 'ready to execute or continue'
-                            : 'still being aligned'}
+                            ? mt('chronos_plan_ready_to_continue', 'Ready to execute or continue')
+                            : mt('chronos_plan_pending', 'Still being prepared')}
                         </span>
                       </div>
                       <div>
-                        result:{' '}
+                        {mt('chronos_result', 'Result')}:{' '}
                         <span className="kb-text-primary">
-                          {latestAsset ? latestAsset.path.split('/').pop() : 'No artifact yet'}
+                          {latestAsset
+                            ? latestAsset.path.split('/').pop()
+                            : mt('chronos_no_artifact_yet', 'No deliverable yet')}
                         </span>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
                       <div>
-                        open work:{' '}
+                        {mt('chronos_open_work', 'Open work')}:{' '}
                         <span className="font-mono kb-text-primary">{mission.nextTaskCount}</span>
                       </div>
                       <div>
-                        plan:{' '}
+                        {mt('chronos_plan', 'Plan')}:{' '}
                         <span className="font-mono kb-text-primary">
-                          {mission.planReady ? 'ready' : 'pending'}
+                          {mission.planReady
+                            ? mt('chronos_ready', 'Ready')
+                            : mt('chronos_pending', 'Pending')}
                         </span>
                       </div>
                       <div>
-                        results:{' '}
+                        {mt('chronos_results', 'Results')}:{' '}
                         <span className="font-mono kb-text-primary">
                           {progress?.generatedAssets?.length ?? 0}
                         </span>
                       </div>
                       <div>
-                        latest artifact:{' '}
+                        {mt('chronos_latest_deliverable', 'Latest deliverable')}:{' '}
                         <span className="font-mono kb-text-primary">
-                          {latestAsset ? latestAsset.path.split('/').pop() : 'none'}
+                          {latestAsset
+                            ? latestAsset.path.split('/').pop()
+                            : mt('chronos_none', 'None')}
                         </span>
                       </div>
                     </div>
@@ -3112,7 +3370,7 @@ export function MissionIntelligence({
                         className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <span>Thread</span>
+                          <span>{mt('chronos_thread', 'Conversation')}</span>
                           <span className="rounded-full border kb-border-accent kb-surface-accent px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-accent">
                             T
                           </span>
@@ -3124,7 +3382,7 @@ export function MissionIntelligence({
                         className="ml-2 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <span>Card</span>
+                          <span>{mt('chronos_card', 'Summary')}</span>
                           <span className="rounded-full border kb-border-subtle kb-surface-raised/8 px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-secondary">
                             C
                           </span>
@@ -3155,8 +3413,8 @@ export function MissionIntelligence({
                               className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
                             >
                               {expandedMissionCardActionId === latestAction.event_id
-                                ? 'hide latest action'
-                                : 'show latest action'}
+                                ? mt('chronos_hide_latest_action', 'Hide latest action')
+                                : mt('chronos_show_latest_action', 'Show latest action')}
                             </button>
                             {latestAction.status === 'failed' && (
                               <button
@@ -3174,8 +3432,8 @@ export function MissionIntelligence({
                               >
                                 {missionActionTarget ===
                                 `${mission.missionId}:${latestAction.operation}`
-                                  ? 'retrying'
-                                  : 'retry latest action'}
+                                  ? mt('chronos_retrying', 'Retrying')
+                                  : mt('chronos_retry_latest_action', 'Retry latest action')}
                               </button>
                             )}
                           </>
@@ -3183,7 +3441,7 @@ export function MissionIntelligence({
                       })()}
                       <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
                         <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
-                          safe actions
+                          {mt('chronos_safe_actions', 'Safe actions')}
                         </div>
                         {safeMissionActions.map((action) => (
                           <button
@@ -3198,8 +3456,8 @@ export function MissionIntelligence({
                             className={actionButtonClass('safe')}
                           >
                             {missionActionTarget === `${mission.missionId}:${action.operation}`
-                              ? 'working'
-                              : action.label}
+                              ? mt('chronos_processing', 'Processing')
+                              : missionActionText(action)}
                           </button>
                         ))}
                         {safeDisabledReason && (
@@ -3210,7 +3468,10 @@ export function MissionIntelligence({
                       </div>
                       <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
                         <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
-                          risky actions · approval required
+                          {mt(
+                            'chronos_risky_actions_approval_required',
+                            'Risky actions · approval required'
+                          )}
                         </div>
                         {riskyMissionActions.map((action) => (
                           <button
@@ -3237,8 +3498,8 @@ export function MissionIntelligence({
                             className={actionButtonClass('risky')}
                           >
                             {missionActionTarget === `${mission.missionId}:${action.operation}`
-                              ? 'working'
-                              : action.label}
+                              ? mt('chronos_processing', 'Processing')
+                              : missionActionText(action)}
                           </button>
                         ))}
                         {riskyDisabledReason && (
@@ -4439,16 +4700,18 @@ export function MissionIntelligence({
         <Panel
           id="recent-artifacts"
           visible={panelVisible('recent-artifacts')}
-          title="Recent Artifacts"
+          title={mt('chronos_recent_artifacts', 'Recent artifacts')}
         >
           <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            Outcomes should stay attributable. This panel shows the latest recorded artifacts with
-            their project, mission, task, and storage placement.
+            {mt(
+              'chronos_recent_artifacts_description',
+              'This panel shows the latest recorded artifacts with their project, mission, task, and storage location.'
+            )}
           </div>
           <div className="space-y-3">
             {filteredRecentArtifactsByTrack.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">
-                No governed artifacts recorded yet.
+                {mt('chronos_no_recent_artifacts', 'No recorded artifacts yet.')}
               </div>
             ) : (
               filteredRecentArtifactsByTrack.map((artifact) => (
@@ -4799,12 +5062,12 @@ export function MissionIntelligence({
         <Panel
           id="recent-control-actions"
           visible={panelVisible('recent-control-actions')}
-          title="Recent Control Actions"
+          title={mt('chronos_recent_control_actions', 'Recent control actions')}
         >
           <div className="space-y-3">
             {data.controlActions.length === 0 ? (
               <div className="text-[11px] italic kb-status-warning">
-                No recent mission or surface control actions.
+                {mt('chronos_no_recent_control_actions', 'No recent mission or screen actions.')}
               </div>
             ) : (
               data.controlActions.map((action, index) => (
@@ -4820,7 +5083,7 @@ export function MissionIntelligence({
                   </div>
                   <div className="mt-2 text-[11px] kb-text-primary">{action.target}</div>
                   <div className="mt-1 text-[10px] kb-text-muted">
-                    requested_by:{' '}
+                    {mt('chronos_requested_by', 'Requested by')}:{' '}
                     <span className="font-mono kb-text-secondary">{action.requested_by}</span>
                   </div>
                   {action.event_id && (
@@ -4834,7 +5097,9 @@ export function MissionIntelligence({
                         }
                         className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
                       >
-                        {expandedActionId === action.event_id ? 'hide details' : 'show details'}
+                        {expandedActionId === action.event_id
+                          ? mt('chronos_hide_details', 'Hide details')
+                          : mt('chronos_show_details', 'Show details')}
                       </button>
                       {action.target !== 'surface-runtime' && (
                         <button
@@ -4842,7 +5107,7 @@ export function MissionIntelligence({
                           onClick={() => jumpToTarget(action)}
                           className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
                         >
-                          jump to target
+                          {mt('chronos_jump_to_target', 'Jump to target')}
                         </button>
                       )}
                     </div>
@@ -4901,11 +5166,13 @@ export function MissionIntelligence({
         <Panel
           id="owner-summaries"
           visible={panelVisible('owner-summaries')}
-          title="Owner Summaries"
+          title={mt('chronos_owner_summaries', 'Owner summaries')}
         >
           <div className="space-y-3">
             {data.ownerSummaries.length === 0 ? (
-              <div className="text-[11px] italic kb-status-warning">No owner summaries yet.</div>
+              <div className="text-[11px] italic kb-status-warning">
+                {mt('chronos_no_owner_summaries', 'No owner summaries yet.')}
+              </div>
             ) : (
               data.ownerSummaries.map((summary, index) => (
                 <div
@@ -5690,10 +5957,10 @@ export function MissionIntelligence({
             <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
               <span>
                 {effectiveMissionId
-                  ? `thread · ${effectiveMissionId}`
+                  ? `${mt('chronos_selected_mission_label', 'Selected mission')} · ${effectiveMissionId}`
                   : mt(
                       'chronos_select_mission_to_inspect_thread',
-                      'select a mission to inspect the thread'
+                      'Select a mission to inspect its related messages.'
                     )}
               </span>
               <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[9px] tracking-[0.16em] kb-text-muted">
@@ -5717,9 +5984,23 @@ export function MissionIntelligence({
             <div className="space-y-3">
               {!effectiveMissionId || missionThread.length === 0 ? (
                 <SurfaceStatusPanel
-                  eyebrow="Selected Mission Thread"
-                  title="No thread yet"
-                  detail="Select a mission to inspect its unified message thread and handoffs."
+                  eyebrow={mt('chronos_selected_mission_thread', 'Mission messages')}
+                  title={
+                    effectiveMissionId
+                      ? mt('chronos_no_mission_thread', 'This mission has no messages yet')
+                      : mt('chronos_select_mission_to_inspect_thread', 'Select a mission')
+                  }
+                  detail={
+                    effectiveMissionId
+                      ? mt(
+                          'chronos_no_mission_thread_hint',
+                          'Execution records and handoffs will appear here when they are added.'
+                        )
+                      : mt(
+                          'chronos_select_mission_to_inspect_thread',
+                          'Select a mission to inspect its related messages.'
+                        )
+                  }
                   tone="info"
                 />
               ) : (

@@ -6,10 +6,13 @@ import {
   guardRequest,
   roleToMissionRole,
 } from '../../../lib/api-guard';
-import { pathResolver } from '@agent/core/path-resolver';
+import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { loadArtifactRecord } from '@agent/core/artifact-record';
 import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
+  ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -59,6 +62,27 @@ function isAllowedRepoAssetPath(relativePath: string): boolean {
   return ALLOWED_REPO_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
 }
 
+function artifactTenant(artifact: {
+  tenant_slug?: string;
+  mission_id?: string;
+}): string | undefined {
+  if (artifact.tenant_slug) return artifact.tenant_slug;
+  if (!artifact.mission_id) return undefined;
+  const missionPath = findMissionPath(artifact.mission_id);
+  if (!missionPath) return undefined;
+  const statePath = path.join(missionPath, 'mission-state.json');
+  if (!safeExistsSync(statePath)) return undefined;
+  try {
+    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+      tenant_slug?: string;
+      tenant_id?: string;
+    };
+    return state.tenant_slug || state.tenant_id;
+  } catch {
+    return undefined;
+  }
+}
+
 function contentTypeFor(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {
@@ -106,6 +130,24 @@ export async function GET(req: NextRequest) {
 
     const missionId = req.nextUrl.searchParams.get('missionId') || '';
     const relativePath = req.nextUrl.searchParams.get('path') || '';
+    const artifactId = req.nextUrl.searchParams.get('artifactId') || '';
+    const tenantSlugs = strictViewerScopeTenantSlugs(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('tenant') || undefined
+    );
+    if (artifactId) {
+      const artifact = loadArtifactRecord(artifactId);
+      if (!artifact) return NextResponse.json({ error: 'Artifact not found' }, { status: 404 });
+      if (
+        tenantSlugs !== 'all' &&
+        (!artifactTenant(artifact) || !tenantSlugs.includes(artifactTenant(artifact)!))
+      ) {
+        return NextResponse.json(
+          { error: 'Asset is outside the viewer tenant scope' },
+          { status: 403 }
+        );
+      }
+    }
 
     let assetPath: string;
     if (missionId) {
@@ -150,7 +192,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to load mission asset' },
-      { status: 500 }
+      { status: err instanceof ViewerContextError ? err.status : 500 }
     );
   }
 }
