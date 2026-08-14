@@ -567,7 +567,7 @@
     {
       "path": "product/architecture/mission-team-composition-model.md",
       "tier": "public",
-      "size": 4093,
+      "size": 5309,
       "type": "md"
     },
     {
@@ -1875,7 +1875,7 @@
     {
       "path": "product/governance/organization-team-template-catalogs/consulting-firm.json",
       "tier": "public",
-      "size": 675,
+      "size": 781,
       "type": "json"
     },
     {
@@ -1893,31 +1893,31 @@
     {
       "path": "product/governance/organization-team-template-catalogs/financial-services-backoffice.json",
       "tier": "public",
-      "size": 727,
+      "size": 923,
       "type": "json"
     },
     {
       "path": "product/governance/organization-team-template-catalogs/it-managed-services.json",
       "tier": "public",
-      "size": 1859,
+      "size": 1907,
       "type": "json"
     },
     {
       "path": "product/governance/organization-team-template-catalogs/marketing-agency.json",
       "tier": "public",
-      "size": 673,
+      "size": 689,
       "type": "json"
     },
     {
       "path": "product/governance/organization-team-template-catalogs/ops-org.json",
       "tier": "public",
-      "size": 973,
+      "size": 909,
       "type": "json"
     },
     {
       "path": "product/governance/organization-team-template-catalogs/saas-product-company.json",
       "tier": "public",
-      "size": 810,
+      "size": 1006,
       "type": "json"
     },
     {
@@ -2193,7 +2193,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3370,
+      "size": 3480,
       "type": "json"
     },
     {
@@ -2211,7 +2211,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20489,
+      "size": 20599,
       "type": "json"
     },
     {
@@ -3633,7 +3633,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 5891,
+      "size": 6157,
       "type": "json"
     },
     {
@@ -4593,7 +4593,7 @@
     {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
-      "size": 15379,
+      "size": 15403,
       "type": "json"
     },
     {
@@ -4659,7 +4659,7 @@
     {
       "path": "product/orchestration/team-roles/owner.json",
       "tier": "public",
-      "size": 971,
+      "size": 925,
       "type": "json"
     },
     {

@@ -199,6 +199,7 @@
     "mission:prewarm": "node dist/scripts/mission_controller.js prewarm",
     "create:actuator": "node --import ./scripts/ts-loader.mjs scripts/create_actuator.ts",
     "mission:team": "node dist/scripts/compose_mission_team.js",
+    "model:feedback": "node dist/scripts/model_feedback.js",
     "agent-runtime:supervisor": "node dist/scripts/run_agent_runtime_supervisor.js",
     "agent-runtime:daemon": "node dist/scripts/agent_runtime_supervisor_daemon.js",
     "agent-runtime:status": "node dist/scripts/agent_runtime_supervisor_status.js",
