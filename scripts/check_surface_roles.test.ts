@@ -8,6 +8,7 @@ interface SurfaceRole {
   id: string;
   role_ja: string;
   tagline_ja: string;
+  tagline_key?: string;
   dir: string;
   port: number;
   // SO-03: 'orchestrator' is a vocabulary addition (a surface with an active
@@ -62,7 +63,11 @@ describe('surface roles contract', () => {
       const source = IDENTITY_SOURCES[role.id];
       expect(source, `identity source registered for ${role.id}`).toBeTruthy();
       const content = safeReadFile(path.join(ROOT, source), { encoding: 'utf8' }) as string;
-      expect(content, `${role.id} tagline in ${source}`).toContain(role.tagline_ja);
+      if (role.tagline_key) {
+        expect(content, `${role.id} tagline key in ${source}`).toContain(role.tagline_key);
+      } else {
+        expect(content, `${role.id} tagline in ${source}`).toContain(role.tagline_ja);
+      }
     }
   });
 

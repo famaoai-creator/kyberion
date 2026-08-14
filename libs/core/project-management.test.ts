@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
+  safeMkdir,
   safeReaddir,
   safeRmSync,
   safeUnlinkSync,
@@ -42,6 +43,10 @@ function cleanup(): void {
   const foreignMissionPath = pathResolver.missionDir('MSN-PMC-FOREIGN', 'confidential');
   if (safeExistsSync(foreignMissionPath))
     safeRmSync(foreignMissionPath, { recursive: true, force: true });
+  for (const tier of ['personal', 'confidential'] as const) {
+    const collisionPath = pathResolver.missionDir('MSN-PMC-TIER-COLLISION', tier);
+    if (safeExistsSync(collisionPath)) safeRmSync(collisionPath, { recursive: true, force: true });
+  }
   const workspace = pathResolver.projectWorkspaceDir(
     BOOTSTRAP_PROJECT_ID,
     'confidential',
@@ -203,6 +208,50 @@ describe('project-management facade', () => {
         kind: 'out_of_scope_task_session',
         actual: [session.session_id],
       })
+    );
+  });
+
+  it('loads project missions from the project tier when mission ids collide across tiers', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-TIER-SCOPE',
+      name: 'Tier Scoped Mission Project',
+      summary: 'The project view must not fall back to another tier.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const mission: MissionState = {
+      mission_id: 'MSN-PMC-TIER-COLLISION',
+      mission_type: 'development',
+      tier: 'confidential',
+      status: 'active',
+      tenant_slug: 'tenant-pmc-test',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      relationships: { project: { project_id: project.project_id } },
+      git: {
+        branch: 'mission/tier-collision',
+        start_commit: 'fixture',
+        latest_commit: 'fixture',
+        checkpoints: [],
+      },
+      history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
+    };
+    const personalPath = pathResolver.missionDir(mission.mission_id, 'personal');
+    const confidentialPath = pathResolver.missionDir(mission.mission_id, 'confidential');
+    safeMkdir(personalPath, { recursive: true });
+    safeMkdir(confidentialPath, { recursive: true });
+    safeWriteFile(
+      `${personalPath}/mission-state.json`,
+      JSON.stringify({ ...mission, tier: 'personal', tenant_slug: undefined })
+    );
+    safeWriteFile(`${confidentialPath}/mission-state.json`, JSON.stringify(mission));
+
+    const view = getProjectManagementView(project.project_id);
+    expect(view.lineage.missions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ mission_id: mission.mission_id })])
     );
   });
 

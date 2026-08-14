@@ -7,7 +7,10 @@ import {
   buildOrganizationOperationRecord,
   buildOrganizationProjectLink,
   buildOrganizationScaffold,
+  buildOrganizationCadence,
+  buildOrganizationDecision,
   buildOrganizationServiceAddition,
+  buildOrganizationServiceState,
   saveProjectRecord,
   loadOrganizationCatalog,
   loadOrganizationOperatingModelCatalog,
@@ -29,6 +32,7 @@ import {
   saveOrganizationOperationState,
   saveOrganizationLearningCandidate,
   saveOrganizationIncident,
+  saveOrganizationCadence,
   saveOrganizationDecision,
   t,
   type OrganizationCapabilityRecord,
@@ -684,6 +688,89 @@ describe('organization operating model', () => {
     saveOrganizationService(addition.service);
     saveOrganizationDomain(addition.domain);
 
+    // A service with no state is reported as services_without_state and blocks
+    // reconciliation: "no state" must never be summarised as "healthy". Until
+    // this builder existed, an authored service could only leave that blocked
+    // state behind — save/load existed in core but no facade reached them.
+    expect(
+      reconcileOrganizationState({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      }).reconciliation.services_without_state
+    ).toContain('svc-authoring');
+
+    expect(() =>
+      buildOrganizationServiceState(
+        {
+          organizationId,
+          serviceId: 'svc-never-defined',
+          tier: 'confidential',
+          tenantSlug,
+          health: 'healthy',
+        },
+        now
+      )
+    ).toThrow(/service add/);
+
+    expect(() =>
+      buildOrganizationServiceState(
+        {
+          organizationId,
+          serviceId: 'svc-authoring',
+          tier: 'confidential',
+          tenantSlug,
+          health: 'healthy',
+          confidence: 1.5,
+        },
+        now
+      )
+    ).toThrow(/--confidence/);
+
+    expect(() =>
+      buildOrganizationServiceState(
+        {
+          organizationId,
+          serviceId: 'svc-authoring',
+          tier: 'confidential',
+          tenantSlug,
+          health: 'healthy',
+          freshnessSeconds: -1,
+        },
+        now
+      )
+    ).toThrow(/--freshness-seconds/);
+
+    const serviceState = buildOrganizationServiceState(
+      {
+        organizationId,
+        serviceId: 'svc-authoring',
+        tier: 'confidential',
+        tenantSlug,
+        health: 'degraded',
+      },
+      now
+    );
+    // Defaults describe an operator declaration: the declarer IS the source, so
+    // it is current, zero-age and fully trusted until a telemetry feed says otherwise.
+    expect(serviceState).toMatchObject({
+      service_id: 'svc-authoring',
+      health: 'degraded',
+      reconcile_status: 'current',
+      freshness_seconds: 0,
+      confidence: 1,
+      source_timestamp: now,
+      observed_at: now,
+    });
+    saveOrganizationServiceState(serviceState);
+    expect(
+      reconcileOrganizationState({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      }).reconciliation.services_without_state
+    ).not.toContain('svc-authoring');
+
     const operation = buildOrganizationOperationRecord(
       {
         organizationId,
@@ -701,6 +788,106 @@ describe('organization operating model', () => {
     );
     expect(operation.trigger).toEqual({ kind: 'schedule', expression: '0 9 * * 1' });
     saveOrganizationOperation(operation);
+
+    // A decision must be traceable to the body that made it: reconciliation
+    // reports an orphan decision as missing_decision_cadences, so the cadence
+    // has to exist first.
+    expect(() =>
+      buildOrganizationDecision(
+        {
+          organizationId,
+          decisionId: 'dec-authoring-1',
+          cadenceId: 'cad-never-defined',
+          title: 'Orphan decision',
+          decisionOwner: 'organization_owner',
+          dueAt: now,
+          options: ['approve', 'reject'],
+          tier: 'confidential',
+          tenantSlug,
+        },
+        now
+      )
+    ).toThrow(/cadence add/);
+
+    const cadence = buildOrganizationCadence(
+      {
+        organizationId,
+        cadenceId: 'cad-authoring-monthly',
+        name: 'Monthly authoring review',
+        cadenceType: 'monthly',
+        schedule: '第3月曜 10:00',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+      },
+      now
+    );
+    expect(cadence.decision_ids).toEqual([]);
+    saveOrganizationCadence(cadence);
+
+    expect(() =>
+      buildOrganizationDecision(
+        {
+          organizationId,
+          decisionId: 'dec-authoring-1',
+          cadenceId: 'cad-authoring-monthly',
+          title: 'Chosen option must be declared',
+          decisionOwner: 'organization_owner',
+          dueAt: now,
+          options: ['approve', 'reject'],
+          chosenOption: 'defer',
+          tier: 'confidential',
+          tenantSlug,
+        },
+        now
+      )
+    ).toThrow(/--chosen-option/);
+
+    const decisionAddition = buildOrganizationDecision(
+      {
+        organizationId,
+        decisionId: 'dec-authoring-1',
+        cadenceId: 'cad-authoring-monthly',
+        title: 'Adopt the authoring facade',
+        decisionOwner: 'organization_owner',
+        dueAt: now,
+        options: ['approve', 'reject'],
+        chosenOption: 'approve',
+        rationale: 'The facade is the only audited write path.',
+        tier: 'confidential',
+        tenantSlug,
+      },
+      now
+    );
+    expect(decisionAddition.decision.status).toBe('proposed');
+    // The cadence is the durable index of what that body decided.
+    expect(decisionAddition.cadence.decision_ids).toEqual(['dec-authoring-1']);
+    saveOrganizationDecision(decisionAddition.decision);
+    saveOrganizationCadence(decisionAddition.cadence);
+
+    // Re-authoring the cadence must not erase the decision history it indexes.
+    const reAdded = buildOrganizationCadence(
+      {
+        organizationId,
+        cadenceId: 'cad-authoring-monthly',
+        name: 'Monthly authoring review (renamed)',
+        cadenceType: 'monthly',
+        schedule: '第3月曜 11:00',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+      },
+      now
+    );
+    expect(reAdded.decision_ids).toEqual(['dec-authoring-1']);
+
+    expect(
+      reconcileOrganizationState({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      }).reconciliation.missing_decision_cadences
+    ).toEqual([]);
 
     expect(() =>
       buildOrganizationProjectLink(
