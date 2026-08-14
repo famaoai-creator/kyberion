@@ -1,4 +1,5 @@
 import { performanceScoreAdjustment } from './agent-performance-index.js';
+import { modelPerformanceScoreAdjustment } from './model-performance-index.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import {
   resolveAgentProviderTarget,
@@ -171,6 +172,10 @@ export function selectAgentForTeamRole(
       // Retrospective feedback: measured agent×role outcomes adjust the
       // score within ±8 (operator preferred_agents bonus of 20 still wins).
       const performanceBonus = performanceScoreAdjustment(agentId, teamRole);
+      const modelPerformanceBonus = modelPerformanceScoreAdjustment(
+        resolvedTarget.modelId,
+        teamRole
+      );
       const separationPenalty =
         (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
         (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
@@ -180,7 +185,8 @@ export function selectAgentForTeamRole(
         preferredAgentBonus +
         preferredModelBonus +
         providerBonus +
-        performanceBonus -
+        performanceBonus +
+        modelPerformanceBonus -
         separationPenalty;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);

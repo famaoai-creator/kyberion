@@ -12,6 +12,7 @@ import { logger } from './core.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
+import { recordModelRoleOutcomes } from './model-performance-index.js';
 
 /**
  * Mission Retrospective Loop — the self-improvement back-edge for PROCESS and
@@ -45,6 +46,8 @@ export interface MissionExecutionStats {
     team_role: string;
     assignee: string;
     final_status: string;
+    provider?: string;
+    model_id?: string;
   }>;
 }
 
@@ -178,6 +181,8 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
       item_id?: string;
       team_role?: string;
       assignee_peer_id?: string;
+      provider?: string;
+      model_id?: string;
       work_item_status_after?: string;
       notes?: string[];
       response_excerpt?: string;
@@ -191,6 +196,8 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
         team_role: String(record.team_role),
         assignee: String(record.assignee_peer_id),
         final_status: String(record.work_item_status_after || 'unknown'),
+        ...(record.provider ? { provider: String(record.provider) } : {}),
+        ...(record.model_id ? { model_id: String(record.model_id) } : {}),
       });
     }
     if (notes.some((note) => note.includes('empty subagent response'))) {
@@ -360,6 +367,21 @@ export async function runMissionRetrospective(
         mission_id: missionId,
         recorded_at: new Date().toISOString(),
       }))
+    );
+    recordModelRoleOutcomes(
+      stats.item_outcomes
+        .filter((outcome): outcome is typeof outcome & { model_id: string } =>
+          Boolean(outcome.model_id)
+        )
+        .map((outcome) => ({
+          mission_id: missionId,
+          task_id: outcome.task_id,
+          team_role: outcome.team_role,
+          ...(outcome.provider ? { provider: outcome.provider } : {}),
+          model_id: outcome.model_id,
+          final_status: outcome.final_status,
+          recorded_at: new Date().toISOString(),
+        }))
     );
   } catch (err) {
     logger.warn(

@@ -112,6 +112,7 @@ export * from './customer-conversation-modes.js';
 export * from './operator-notifications.js';
 export * from './deal-documents.js';
 export * from './mission-retrospective.js';
+export * from './model-performance-index.js';
 export * from './working-principles.js';
 export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
