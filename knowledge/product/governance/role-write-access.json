@@ -37,7 +37,8 @@
         "knowledge/evolution/",
         "knowledge/personal/governance/",
         "active/shared/coordination/",
-        "active/shared/observability/mission-control/"
+        "active/shared/observability/mission-control/",
+        "active/shared/observability/retrospectives/"
       ]
     },
     "infrastructure_sentinel": {
@@ -100,6 +101,7 @@
         "active/shared/coordination/channels/imessage/",
         "active/shared/coordination/channels/discord/",
         "active/shared/coordination/channels/telegram/",
+        "active/shared/observability/retrospectives/",
         "active/audit/"
       ]
     },

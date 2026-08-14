@@ -3,7 +3,7 @@
   "organization_id": "marketing-agency",
   "templates": {
     "default": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer"],
       "optional_roles": ["experience_designer", "relationship_curator", "scribe"],
       "lifecycle": {
         "max_parallel_members": 5,

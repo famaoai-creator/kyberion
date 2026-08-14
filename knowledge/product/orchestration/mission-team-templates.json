@@ -2,11 +2,11 @@
   "version": "1.0.0",
   "templates": {
     "default": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer"],
       "optional_roles": ["tester"],
       "lifecycle": {
-        "max_parallel_members": 4,
-        "max_members": 5,
+        "max_parallel_members": 5,
+        "max_members": 6,
         "max_messages_per_run": 40,
         "max_wall_clock_minutes": 120,
         "max_member_turns": 8,
@@ -16,11 +16,11 @@
       }
     },
     "development": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer", "tester"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer", "tester"],
       "optional_roles": ["operator", "surface_liaison"],
       "lifecycle": {
-        "max_parallel_members": 5,
-        "max_members": 7,
+        "max_parallel_members": 6,
+        "max_members": 8,
         "max_messages_per_run": 60,
         "max_wall_clock_minutes": 180,
         "max_member_turns": 10,
@@ -32,6 +32,7 @@
     "product_development": {
       "required_roles": [
         "owner",
+        "orchestrator",
         "product_strategist",
         "planner",
         "implementer",
@@ -40,8 +41,8 @@
       ],
       "optional_roles": ["experience_designer", "operator", "surface_liaison"],
       "lifecycle": {
-        "max_parallel_members": 6,
-        "max_members": 9,
+        "max_parallel_members": 7,
+        "max_members": 10,
         "max_messages_per_run": 80,
         "max_wall_clock_minutes": 240,
         "max_member_turns": 12,
@@ -51,11 +52,11 @@
       }
     },
     "operations": {
-      "required_roles": ["owner", "planner", "operator", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "operator", "reviewer"],
       "optional_roles": ["tester", "surface_liaison"],
       "lifecycle": {
-        "max_parallel_members": 4,
-        "max_members": 6,
+        "max_parallel_members": 5,
+        "max_members": 7,
         "max_messages_per_run": 50,
         "max_wall_clock_minutes": 180,
         "max_member_turns": 8,
@@ -65,11 +66,11 @@
       }
     },
     "surface_concierge": {
-      "required_roles": ["owner", "planner", "operator", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "operator", "reviewer"],
       "optional_roles": ["tester", "surface_liaison", "experience_designer"],
       "lifecycle": {
-        "max_parallel_members": 4,
-        "max_members": 7,
+        "max_parallel_members": 5,
+        "max_members": 8,
         "max_messages_per_run": 30,
         "max_wall_clock_minutes": 120,
         "max_member_turns": 6,
@@ -79,11 +80,19 @@
       }
     },
     "meeting_operations": {
-      "required_roles": ["owner", "planner", "facilitator", "scribe", "tracker", "reviewer"],
+      "required_roles": [
+        "owner",
+        "orchestrator",
+        "planner",
+        "facilitator",
+        "scribe",
+        "tracker",
+        "reviewer"
+      ],
       "optional_roles": ["executor", "decision_maker", "surface_liaison"],
       "lifecycle": {
-        "max_parallel_members": 6,
-        "max_members": 9,
+        "max_parallel_members": 7,
+        "max_members": 10,
         "max_messages_per_run": 100,
         "max_wall_clock_minutes": 180,
         "max_member_turns": 4,
@@ -93,10 +102,10 @@
       }
     },
     "meeting_facilitation": {
-      "required_roles": ["owner", "planner", "operator", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "operator", "reviewer"],
       "optional_roles": [],
       "lifecycle": {
-        "max_parallel_members": 4,
+        "max_parallel_members": 5,
         "max_members": 5,
         "max_messages_per_run": 60,
         "max_wall_clock_minutes": 180,
@@ -107,11 +116,11 @@
       }
     },
     "system_query": {
-      "required_roles": ["owner", "planner", "operator"],
+      "required_roles": ["owner", "orchestrator", "planner", "operator"],
       "optional_roles": ["reviewer", "surface_liaison"],
       "lifecycle": {
-        "max_parallel_members": 3,
-        "max_members": 5,
+        "max_parallel_members": 4,
+        "max_members": 6,
         "max_messages_per_run": 20,
         "max_wall_clock_minutes": 60,
         "max_member_turns": 4,
@@ -121,11 +130,11 @@
       }
     },
     "research": {
-      "required_roles": ["owner", "researcher", "planner", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "researcher", "planner", "reviewer"],
       "optional_roles": ["operator", "tester"],
       "lifecycle": {
-        "max_parallel_members": 4,
-        "max_members": 6,
+        "max_parallel_members": 5,
+        "max_members": 7,
         "max_messages_per_run": 50,
         "max_wall_clock_minutes": 180,
         "max_member_turns": 8,
@@ -135,10 +144,10 @@
       }
     },
     "incident": {
-      "required_roles": ["owner", "operator", "reviewer", "surface_liaison"],
+      "required_roles": ["owner", "orchestrator", "operator", "reviewer", "surface_liaison"],
       "optional_roles": ["planner", "tester"],
       "lifecycle": {
-        "max_parallel_members": 5,
+        "max_parallel_members": 6,
         "max_members": 7,
         "max_messages_per_run": 60,
         "max_wall_clock_minutes": 120,
@@ -149,10 +158,10 @@
       }
     },
     "security_scan": {
-      "required_roles": ["owner", "planner", "reviewer", "attacker", "defender"],
+      "required_roles": ["owner", "orchestrator", "planner", "reviewer", "attacker", "defender"],
       "optional_roles": ["simulator"],
       "lifecycle": {
-        "max_parallel_members": 5,
+        "max_parallel_members": 6,
         "max_members": 8,
         "max_messages_per_run": 60,
         "max_wall_clock_minutes": 180,
@@ -163,7 +172,7 @@
       }
     },
     "security_audit": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer"],
       "optional_roles": ["devils_advocate", "scribe", "tracker"],
       "lifecycle": {
         "max_parallel_members": 6,

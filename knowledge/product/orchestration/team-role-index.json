@@ -140,6 +140,7 @@
       "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
       "allowed_delegate_team_roles": [
         "planner",
+        "orchestrator",
         "implementer",
         "reviewer",
         "tester",

@@ -19,6 +19,11 @@ describe('mission-team-composer classification integration', () => {
 
     expect(plan.mission_type).toBe('product_development');
     expect(plan.template).toBe('product_development');
+    expect(plan.team_governance?.composition.required_roles).toContain('orchestrator');
+    expect(
+      plan.assignments.find((assignment) => assignment.team_role === 'owner')?.delegation_contract
+        ?.allowed_delegate_team_roles
+    ).toContain('orchestrator');
     expect(plan.mission_classification?.mission_class).toBe('product_delivery');
     expect(plan.mission_classification?.stage).toBe('classification');
 

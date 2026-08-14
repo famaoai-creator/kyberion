@@ -3,7 +3,7 @@
   "organization_id": "it-managed-services",
   "templates": {
     "operations": {
-      "required_roles": ["owner", "operator"],
+      "required_roles": ["owner", "orchestrator", "operator"],
       "optional_roles": ["planner", "tester", "tracker", "surface_liaison"],
       "lifecycle": {
         "max_parallel_members": 6,
@@ -17,7 +17,7 @@
       }
     },
     "incident": {
-      "required_roles": ["owner", "operator"],
+      "required_roles": ["owner", "orchestrator", "operator"],
       "optional_roles": ["planner", "reviewer", "surface_liaison"],
       "lifecycle": {
         "max_parallel_members": 6,
@@ -34,7 +34,7 @@
       "optional_roles": ["reviewer", "tracker"]
     },
     "security_audit": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer"],
       "optional_roles": ["devils_advocate", "scribe", "tracker"],
       "role_hints": {
         "owner": "cyber_security",
