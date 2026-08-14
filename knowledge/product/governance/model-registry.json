@@ -113,6 +113,28 @@
       "notes": "Claude Code 2.1.214 exposes fable as the latest-model alias and documents claude-fable-5 as a full model name."
     },
     {
+      "model_id": "anthropic:claude-opus-5",
+      "provider": "anthropic",
+      "family": "claude-opus",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
+      "notes": "Current Claude Opus for complex agentic coding and enterprise work; drop-in successor to claude-opus-4-8 at the same price band. Adaptive thinking is on by default (disabling it is rejected above effort=high)."
+    },
+    {
       "model_id": "anthropic:claude-opus-4-8",
       "provider": "anthropic",
       "family": "claude-opus",
@@ -132,7 +154,7 @@
       "multilingual_confidence": "high",
       "reasoning_confidence": "high",
       "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
-      "notes": "Current Claude model for complex agentic coding and enterprise work."
+      "notes": "Previous-generation Opus, still served. Retained as the pin/fallback target for claude-opus-5 (including refusal fallbacks)."
     },
     {
       "model_id": "anthropic:claude-sonnet-5",
@@ -245,6 +267,34 @@
       "notes": "Standard Anthropic option for balanced reasoning and analysis."
     },
     {
+      "model_id": "gemini:gemini-3.7-flash",
+      "provider": "gemini",
+      "family": "gemini-3.7",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "medium",
+      "latency_band": "low",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "balanced_reasoning",
+        "tool_use",
+        "multimodal",
+        "hybrid_reasoning"
+      ],
+      "notes": "Google Gemini 3.7 Flash model for agentic coding, hybrid reasoning, and multimodal workflows."
+    },
+    {
       "model_id": "gemini:gemini-3.6-flash",
       "provider": "gemini",
       "family": "gemini-3.6",
@@ -331,6 +381,72 @@
       "reasoning_confidence": "high",
       "capability_tags": ["long_context_analysis", "strategy_review", "artifact_planning"],
       "notes": "Candidate for shadow evaluation in analysis-heavy flows."
+    },
+    {
+      "model_id": "xai:grok-4.6",
+      "provider": "xai",
+      "family": "grok-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "long_context"],
+      "notes": "xAI Grok 4.6 flagship for Grok Build CLI and the xAI API reasoning backend."
+    },
+    {
+      "model_id": "xai:grok-4.5",
+      "provider": "xai",
+      "family": "grok-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "long_context"],
+      "notes": "Previous Grok 4.5 id kept for hosts that have not moved to grok-4.6."
+    },
+    {
+      "model_id": "xai:grok-4.5-build",
+      "provider": "xai",
+      "family": "grok-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "long_context"],
+      "notes": "Grok Build CLI model identifier for hosts that expose the build-specific alias."
     }
   ]
 }

@@ -45,6 +45,27 @@
       "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
+    "grok-api": {
+      "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "xAI Grok API",
+        "model_provider": "xai",
+        "availability": {
+          "kind": "env_any",
+          "names": ["XAI_API_KEY", "KYBERION_GROK_API_KEY"]
+        }
+      },
+      "endpoint_policy": "public",
+      "model_policy": "approved",
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
     "gemini-cli": {
       "adapter": "gemini-cli",
       "selection": {
@@ -308,6 +329,7 @@
     },
     "claude-cli-default": {
       "mode": "claude-cli",
+      "model_ref": "anthropic:claude-opus-5",
       "capabilities": ["text", "structured_output", "tools"]
     },
     "gemini-cli-default": {
@@ -320,6 +342,7 @@
     },
     "anthropic-default": {
       "mode": "anthropic",
+      "model_ref": "anthropic:claude-opus-5",
       "capabilities": ["text", "structured_output", "tools", "vision"]
     },
     "gemini-api-default": {
@@ -344,6 +367,18 @@
     "agy-default": {
       "mode": "agy-cli",
       "capabilities": ["text", "structured_output", "tools"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "grok-cli-default": {
+      "mode": "grok-cli",
+      "model_ref": "xai:grok-4.6",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "grok-api-default": {
+      "mode": "grok-api",
+      "model_ref": "xai:grok-4.6",
+      "capabilities": ["text", "structured_output", "tools", "vision"],
       "tools_enabled": true,
       "allowed_tools": ["read_file", "list_directory"]
     },

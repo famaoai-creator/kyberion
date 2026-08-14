@@ -2,9 +2,10 @@
   "version": "1.0.0",
   "currency": "USD",
   "unit": "per_1k_tokens",
-  "note": "Per-1k-token prompt/completion rates used by MetricsCollector to attribute usage cost. EDIT THIS FILE to add models or update prices — no code change/redeploy needed. 'aliases' map SDK short names (e.g. the Agent SDK's 'opus') to a model id. 'default' is the fallback. resolveCostRates() also substring-matches versioned ids (e.g. claude-opus-4-8-YYYYMMDD → claude-opus-4-8).",
+  "note": "Per-1k-token prompt/completion rates used by MetricsCollector to attribute usage cost. EDIT THIS FILE to add models or update prices — no code change/redeploy needed. 'aliases' map SDK short names (e.g. the Agent SDK's 'opus') to a model id. 'default' is the fallback. resolveCostRates() also substring-matches versioned ids (e.g. claude-opus-5-YYYYMMDD → claude-opus-5).",
   "models": {
     "claude-fable-5": { "prompt": 0.01, "completion": 0.05 },
+    "claude-opus-5": { "prompt": 0.005, "completion": 0.025 },
     "claude-opus-4-8": { "prompt": 0.005, "completion": 0.025 },
     "claude-sonnet-5": { "prompt": 0.003, "completion": 0.015 },
     "claude-haiku-4-5-20251001": { "prompt": 0.001, "completion": 0.005 },
@@ -14,13 +15,14 @@
     "gpt-4o-mini": { "prompt": 0.00015, "completion": 0.0006 },
     "gpt-4.1": { "prompt": 0.002, "completion": 0.008 },
     "gemini-2.0-flash": { "prompt": 0.0001, "completion": 0.0004 },
+    "gemini-3.7-flash": { "prompt": 0.0015, "completion": 0.0075 },
     "gemini-3.6-flash": { "prompt": 0.0015, "completion": 0.0075 },
     "gemini-1.5-pro": { "prompt": 0.00125, "completion": 0.00375 },
     "gemini-1.5-flash": { "prompt": 0.000075, "completion": 0.0003 }
   },
   "aliases": {
     "fable": "claude-fable-5",
-    "opus": "claude-opus-4-8",
+    "opus": "claude-opus-5",
     "sonnet": "claude-sonnet-5",
     "haiku": "claude-haiku-4-5-20251001"
   },

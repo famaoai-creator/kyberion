@@ -1,8 +1,21 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeReadFile, safeReaddir, safeWriteFile, validateUrl } from './secure-io.js';
+import {
+  safeExec,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+  safeWriteFile,
+  validateUrl,
+} from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
+import {
+  MAX_REASONING_IMAGE_BYTES_TOTAL,
+  MAX_REASONING_IMAGES,
+  validateReasoningImageAttachmentPaths,
+  type ReasoningImageAttachment,
+} from './reasoning-backend.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -46,6 +59,8 @@ export interface OpenAiCompatibleBackendOptions {
   endpointPolicy?: 'local' | 'public';
   toolsEnabled?: boolean;
   allowedTools?: ReasoningToolName[];
+  /** The selected public model is known to accept OpenAI vision message parts. */
+  supportsVision?: boolean;
   timeoutMs?: number;
   /** KC-09: model context window in tokens; unset = unknown → no max_tokens sent. */
   contextWindowTokens?: number;
@@ -83,9 +98,15 @@ export interface OpenAiCompatibleBackendOverrides {
 
 type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
+type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
+
+type ChatMessageContent = string | null | ChatContentPart[];
+
 interface ChatMessage {
   role: ChatRole;
-  content?: string | null;
+  content?: ChatMessageContent;
   tool_call_id?: string;
   tool_calls?: Array<{
     id: string;
@@ -215,7 +236,55 @@ function buildAbortSignal(
 function extractTextContent(content: ChatMessage['content']): string {
   if (typeof content === 'string') return content;
   if (content === null || content === undefined) return '';
+  if (Array.isArray(content)) {
+    return content
+      .filter((part): part is Extract<ChatContentPart, { type: 'text' }> => part.type === 'text')
+      .map((part) => part.text)
+      .join('');
+  }
   return String(content);
+}
+
+function imageContentParts(images: readonly ReasoningImageAttachment[]): ChatContentPart[] {
+  if (images.length > MAX_REASONING_IMAGES) {
+    throw new Error(
+      `[VISION_TOO_MANY_IMAGES] ${images.length} images exceeds the ${MAX_REASONING_IMAGES} per-call limit`
+    );
+  }
+  validateReasoningImageAttachmentPaths(images);
+
+  let totalBytes = 0;
+  return images.map((image) => {
+    const size = safeStat(image.path).size;
+    if (size > 5 * 1024 * 1024) {
+      throw new Error(`[VISION_IMAGE_TOO_LARGE] ${image.path} exceeds the 5MB per-image limit`);
+    }
+    totalBytes += size;
+    if (totalBytes > MAX_REASONING_IMAGE_BYTES_TOTAL) {
+      throw new Error('[VISION_PAYLOAD_TOO_LARGE] image payload exceeds the 20MB aggregate limit');
+    }
+
+    const raw = safeReadFile(image.path, { encoding: null }) as Buffer;
+    const signature = raw.subarray(0, 12);
+    const validSignature =
+      (image.media_type === 'image/png' &&
+        signature.length >= 8 &&
+        signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+      (image.media_type === 'image/jpeg' && signature[0] === 0xff && signature[1] === 0xd8) ||
+      (image.media_type === 'image/gif' &&
+        /^GIF8[79]a$/u.test(signature.subarray(0, 6).toString('ascii'))) ||
+      (image.media_type === 'image/webp' &&
+        signature.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        signature.subarray(8, 12).toString('ascii') === 'WEBP');
+    if (!validSignature) {
+      throw new Error(`[VISION_MEDIA_TYPE_MISMATCH] image bytes do not match ${image.media_type}`);
+    }
+
+    return {
+      type: 'image_url' as const,
+      image_url: { url: `data:${image.media_type};base64,${raw.toString('base64')}` },
+    };
+  });
 }
 
 function createToolDefinitions(
@@ -382,6 +451,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   readonly name = 'openai-compatible';
   readonly egressEndpoint: string;
   readonly providerPreset: LocalLlmProviderPreset;
+  readonly supportsVision: boolean;
   private readonly baseURL: string;
   private readonly apiKey: string;
   private readonly model: string;
@@ -394,6 +464,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   constructor(options: OpenAiCompatibleBackendOptions) {
     this.providerPreset = options.providerPreset ?? 'generic';
+    this.supportsVision = options.supportsVision === true;
     const normalizedBaseURL = normalizeBaseUrl(options.baseURL, this.providerPreset);
     if ((options.endpointPolicy ?? 'local') === 'local')
       assertLocalCompatibleEndpoint(normalizedBaseURL);
@@ -595,39 +666,11 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     }
   }
 
-  async prompt(
-    prompt: string,
-    contextOrOptions?: unknown,
-    options?: ReasoningCallOptions
+  private async completePromptMessages(
+    messages: ChatMessage[],
+    signal?: AbortSignal
   ): Promise<string> {
-    const optionsWithSignal =
-      options ??
-      (contextOrOptions && typeof contextOrOptions === 'object' && 'signal' in contextOrOptions
-        ? (contextOrOptions as ReasoningCallOptions)
-        : undefined);
-    const context = optionsWithSignal === contextOrOptions ? undefined : contextOrOptions;
-    const redactedContext = context === undefined ? undefined : redactSensitiveObject(context);
-    const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'You are Kyberion. Use the provided tools for workspace file operations. ' +
-          'Prefer governed, minimal edits and explain the reasoning when useful.',
-      },
-      {
-        role: 'user',
-        content: [
-          prompt,
-          redactedContext
-            ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n\n'),
-      },
-    ];
-
-    let response = await this.fetchChatCompletion(messages, { signal: optionsWithSignal?.signal });
+    let response = await this.fetchChatCompletion(messages, { signal });
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
     // KD-08: record the stable-prefix baseline for this turn before any tool
@@ -664,11 +707,68 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         });
       }
       prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
-      response = await this.fetchChatCompletion(messages, { signal: optionsWithSignal?.signal });
+      response = await this.fetchChatCompletion(messages, { signal });
       message = response.choices[0].message;
     }
 
     return extractTextContent(message.content);
+  }
+
+  async prompt(
+    prompt: string,
+    contextOrOptions?: unknown,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const optionsWithSignal =
+      options ??
+      (contextOrOptions && typeof contextOrOptions === 'object' && 'signal' in contextOrOptions
+        ? (contextOrOptions as ReasoningCallOptions)
+        : undefined);
+    const context = optionsWithSignal === contextOrOptions ? undefined : contextOrOptions;
+    const redactedContext = context === undefined ? undefined : redactSensitiveObject(context);
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are Kyberion. Use the provided tools for workspace file operations. ' +
+          'Prefer governed, minimal edits and explain the reasoning when useful.',
+      },
+      {
+        role: 'user',
+        content: [
+          prompt,
+          redactedContext
+            ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+      },
+    ];
+    return this.completePromptMessages(messages, optionsWithSignal?.signal);
+  }
+
+  async promptWithImages(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    if (!this.supportsVision) {
+      throw new Error('[VISION_UNSUPPORTED] this OpenAI-compatible backend is text-only');
+    }
+    if (images.length === 0) return this.prompt(prompt, options);
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          "You are Kyberion's multimodal reasoning backend. Analyze the supplied images and answer the user's request directly.",
+      },
+      {
+        role: 'user',
+        content: [...imageContentParts(images), { type: 'text', text: prompt }],
+      },
+    ];
+    return this.completePromptMessages(messages, options?.signal);
   }
 
   async *streamPrompt(prompt: string, options?: ReasoningCallOptions): AsyncGenerator<string> {
