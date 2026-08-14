@@ -1167,6 +1167,30 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GROK_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "xAI Grok API key for the grok-api reasoning backend. `XAI_API_KEY` is also accepted for compatibility.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_GROK_API_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "xAI Grok API model id. Defaults to grok-4.6 when omitted.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_GROK_API_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional xAI-compatible API base URL; defaults to https://api.x.ai/v1.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_GROK_CLI_BIN",
       "category": "path",
       "type": "path",
@@ -2270,7 +2294,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, agy-cli (Antigravity CLI), openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests). gemini-cli remains available for explicit Enterprise configurations.",
+      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, agy-cli (Antigravity CLI), grok-cli (Grok Build CLI), grok-api (XAI_API_KEY or KYBERION_GROK_API_KEY), openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests). gemini-cli remains available for explicit Enterprise configurations.",
       "documented": true,
       "subsystem": "reasoning"
     },

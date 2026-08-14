@@ -23,6 +23,8 @@ const ENV_WHITELIST = [
   'GEMINI_API_KEY',
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
+  'XAI_API_KEY',
+  'KYBERION_GROK_API_KEY',
   'MISSION_ID',
   'MISSION_ROLE',
   'KYBERION_PERSONA',
@@ -179,6 +181,12 @@ function isNativeSubagentToolCall(toolCall: any): boolean {
   return [toolCall.name, toolCall.title, toolCall.toolName, toolCall.tool_name]
     .filter((value): value is string => typeof value === 'string')
     .some((value) => /(?:^|[_:.-])spawn[_:.-]?subagent(?:$|[_:.-])/i.test(value));
+}
+
+function firstStringValue(...values: unknown[]): string | undefined {
+  return values.find(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0
+  );
 }
 
 async function applyEnhancersBeforeAsk(
@@ -574,7 +582,6 @@ export class GrokAdapter extends BaseACPAdapter {
   }
 
   protected async requestPermission(params: any): Promise<any> {
-    if (isNativeSubagentToolCall(params.toolCall)) this.nativeSubagentObserved = true;
     if (this.activePermissionMode === 'workspace-write') {
       const option = params.options?.find((candidate: any) =>
         ['allow_once', 'allow_always'].includes(candidate?.kind || candidate?.optionId)
@@ -587,6 +594,8 @@ export class GrokAdapter extends BaseACPAdapter {
   }
 
   private nativeSubagentObserved = false;
+  private nativeSubagentCompleted = false;
+  private nativeSubagentChildId: string | undefined;
 
   protected handleSessionUpdate(params: any): void {
     const update = params?.update ?? params;
@@ -596,7 +605,21 @@ export class GrokAdapter extends BaseACPAdapter {
       isNativeSubagentToolCall(update?.tool_call)
     ) {
       this.nativeSubagentObserved = true;
-      return;
+      this.nativeSubagentChildId =
+        firstStringValue(
+          params?.subagentId,
+          params?.subagent_id,
+          params?.childSessionId,
+          params?.child_session_id,
+          params?.toolCall?.subagentId,
+          params?.toolCall?.subagent_id,
+          update?.subagentId,
+          update?.subagent_id,
+          update?.childSessionId,
+          update?.child_session_id,
+          update?.threadId,
+          update?.thread_id
+        ) ?? this.nativeSubagentChildId;
     }
 
     // The available-commands notification advertises `spawn_subagent` in a
@@ -605,8 +628,30 @@ export class GrokAdapter extends BaseACPAdapter {
     const updateKind = String(update?.sessionUpdate ?? params?._meta?.updateType ?? '');
     if (!/(tool|subagent)/i.test(updateKind)) return;
     const serialized = JSON.stringify(update);
-    if (/spawn[_-]?subagent|subagent[_-]?(?:id|completed)/i.test(serialized)) {
+    if (/spawn[_-]?subagent/i.test(serialized)) {
       this.nativeSubagentObserved = true;
+    }
+    if (
+      /(?:subagent|spawn[_-]?subagent).*(?:completed|complete|finished|result|returned)|(?:completed|complete|finished|result|returned).*(?:subagent|spawn[_-]?subagent)/i.test(
+        serialized
+      )
+    ) {
+      this.nativeSubagentCompleted = true;
+      this.nativeSubagentChildId =
+        firstStringValue(
+          params?.subagentId,
+          params?.subagent_id,
+          params?.childSessionId,
+          params?.child_session_id,
+          params?.toolCall?.subagentId,
+          params?.toolCall?.subagent_id,
+          update?.subagentId,
+          update?.subagent_id,
+          update?.childSessionId,
+          update?.child_session_id,
+          update?.threadId,
+          update?.thread_id
+        ) ?? this.nativeSubagentChildId;
     }
   }
 
@@ -626,6 +671,8 @@ export class GrokAdapter extends BaseACPAdapter {
     const parentSessionId = this.acpSessionId;
     const previousPermissionMode = this.activePermissionMode;
     this.nativeSubagentObserved = false;
+    this.nativeSubagentCompleted = false;
+    this.nativeSubagentChildId = undefined;
     this.activePermissionMode = options.profile === 'implementer' ? 'workspace-write' : 'read-only';
     try {
       const response = await super.ask(
@@ -636,18 +683,18 @@ export class GrokAdapter extends BaseACPAdapter {
         ].join('\n\n'),
         { ...options, subagent: true }
       );
-      if (!this.nativeSubagentObserved) {
+      if (!this.nativeSubagentObserved || !this.nativeSubagentCompleted) {
         throw new Error(
-          '[SUBAGENT_UNAVAILABLE] Grok completed without an observable native spawn_subagent event.'
+          '[SUBAGENT_UNAVAILABLE] Grok did not provide both native spawn_subagent invocation and completion evidence.'
         );
       }
       this.lastNativeSubagentInfo = {
         provider: 'grok',
         parentThreadId: parentSessionId,
-        threadId: parentSessionId,
-        forked: false,
         mode: 'acp-native-subagent',
         effort: options.effort ?? 'medium',
+        proof: 'spawn_subagent_invoked_and_completed',
+        ...(this.nativeSubagentChildId ? { threadId: this.nativeSubagentChildId } : {}),
       };
       return {
         ...response,

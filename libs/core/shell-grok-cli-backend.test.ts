@@ -152,6 +152,101 @@ describe('shell-grok-cli-backend', () => {
       expect.objectContaining({ profile: 'explorer', subagent: true, effort: 'medium' })
     );
     expect(backend.requiresNativeSubagent?.()).toBe(true);
+    expect(adopter?.id).toBe('grok-acp');
+    expect(adopter?.getInfo?.()).toMatchObject({
+      provider: 'grok',
+      mode: 'acp-native-subagent',
+    });
+  });
+
+  it('rejects a harness response that does not prove native delegation', async () => {
+    const harnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({ text: 'prompt-only', stopReason: 'completed' })),
+    };
+    const backend = new ShellGrokCliBackend({ harnessSession });
+
+    await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
+      '[SUBAGENT_UNAVAILABLE] Grok ACP returned no native subagent metadata.'
+    );
+  });
+
+  it('rejects an error stopReason as unavailable rather than a native result', async () => {
+    const harnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({
+        text: 'boom',
+        stopReason: 'error',
+        metadata: { nativeSubagent: { provider: 'grok' } },
+      })),
+    };
+    const backend = new ShellGrokCliBackend({ harnessSession });
+
+    await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
+      '[SUBAGENT_UNAVAILABLE] Grok ACP returned an error response.'
+    );
+  });
+
+  it('does not treat runtimeInfo as proof when the response has no native metadata', async () => {
+    const harnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({ text: 'parent-only', stopReason: 'completed' })),
+      getRuntimeInfo: vi.fn(() => ({
+        lastNativeSubagent: { provider: 'grok', mode: 'stale' },
+      })),
+    };
+    const backend = new ShellGrokCliBackend({ harnessSession });
+
+    await expect(backend.getNativeSubagentAdopter()?.dispatch('task')).rejects.toThrow(
+      '[SUBAGENT_UNAVAILABLE] Grok ACP returned no native subagent metadata.'
+    );
+  });
+
+  it('resets harness session on resetSession (QM-06)', async () => {
+    const shutdownMock = vi.fn(async () => undefined);
+    const harnessSession = {
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({
+        text: 'res',
+        metadata: { nativeSubagent: { provider: 'grok' } },
+      })),
+      shutdown: shutdownMock,
+    };
+    const injected = new ShellGrokCliBackend({ harnessSession });
+    await injected.resetSession();
+    expect(shutdownMock).not.toHaveBeenCalled();
+
+    const owned = new ShellGrokCliBackend({ bin: 'grok' });
+    (owned as unknown as { harnessSession: { shutdown: () => Promise<void> } }).harnessSession = {
+      shutdown: shutdownMock,
+    };
+    await owned.resetSession();
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets harnessBoot cache on boot rejection to allow subsequent retries', async () => {
+    let bootCount = 0;
+    const harnessSession = {
+      boot: vi.fn(async () => {
+        bootCount += 1;
+        if (bootCount === 1) throw new Error('transient boot error');
+      }),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(async () => ({
+        text: 'recovered',
+        metadata: { nativeSubagent: { provider: 'grok' } },
+      })),
+    };
+    const backend = new ShellGrokCliBackend({ harnessSession });
+    const adopter = backend.getNativeSubagentAdopter();
+
+    await expect(adopter.dispatch('task 1')).rejects.toThrow('transient boot error');
+    await expect(adopter.dispatch('task 2')).resolves.toBe('recovered');
+    expect(harnessSession.boot).toHaveBeenCalledTimes(2);
   });
 
   describe('spawnCli env allowlisting (XP-02)', () => {

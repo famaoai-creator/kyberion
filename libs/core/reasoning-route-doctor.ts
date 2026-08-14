@@ -11,6 +11,7 @@ import {
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
+import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
 import {
   loadReasoningRoutePolicy,
   resolveReasoningRoute,
@@ -47,6 +48,7 @@ function cliProviderForMode(mode: string): string | undefined {
       'claude-cli': 'claude',
       'claude-agent': 'claude',
       'gemini-cli': 'gemini',
+      'grok-cli': 'grok',
       copilot: 'copilot',
     } as Record<string, string>
   )[mode];
@@ -69,6 +71,15 @@ async function probeMode(
           reason: 'Google AI Studio API reachable; model-specific completion not consumed',
         }
       : { status: 'not_configured', reason: result.reason || 'Google AI Studio API probe failed' };
+  }
+  if (mode === 'grok-api') {
+    const result = await probeGrokApiBackendAvailability();
+    return result.available
+      ? {
+          status: 'ready',
+          reason: 'xAI Grok API reachable; model-specific completion not consumed',
+        }
+      : { status: 'not_configured', reason: result.reason || 'xAI Grok API probe failed' };
   }
   const provider = cliProviderForMode(mode);
   if (provider) {

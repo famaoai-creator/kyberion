@@ -13,6 +13,7 @@ export type ReasoningBackendMode =
   | 'gemini-api'
   | 'agy-cli'
   | 'grok-cli'
+  | 'grok-api'
   | 'copilot'
   | 'local'
   | 'ollama'
@@ -77,6 +78,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     nemotron: 'nemotron-api',
     grok: 'grok-cli',
     'grok-build': 'grok-cli',
+    xai: 'grok-api',
   },
   allowed_modes: [
     'claude-cli',
@@ -87,6 +89,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'gemini-api',
     'agy-cli',
     'grok-cli',
+    'grok-api',
     'copilot',
     'local',
     'ollama',
@@ -103,6 +106,8 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
     { env: 'GEMINI_API_KEY', mode: 'gemini-api' },
     { env: 'GOOGLE_API_KEY', mode: 'gemini-api' },
+    { env: 'XAI_API_KEY', mode: 'grok-api' },
+    { env: 'KYBERION_GROK_API_KEY', mode: 'grok-api' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_OLLAMA_URL', mode: 'ollama' },
     { env: 'KYBERION_VLLM_URL', mode: 'vllm' },

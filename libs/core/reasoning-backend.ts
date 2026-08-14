@@ -582,6 +582,8 @@ export interface ReasoningBackend {
     images: ReasoningImageAttachment[],
     options?: ReasoningCallOptions
   ): Promise<string>;
+  /** Explicit capability override for adapters that expose an optional image path. */
+  supportsVision?: boolean;
 }
 
 /** A local image file to attach to a reasoning call. */
@@ -593,9 +595,9 @@ export interface ReasoningImageAttachment {
 
 /** True when this backend can actually look at images. */
 export function backendSupportsVision(
-  backend: Pick<ReasoningBackend, 'promptWithImages'>
+  backend: Pick<ReasoningBackend, 'promptWithImages' | 'supportsVision'>
 ): boolean {
-  return typeof backend.promptWithImages === 'function';
+  return backend.supportsVision !== false && typeof backend.promptWithImages === 'function';
 }
 
 /** Images larger than this are refused rather than silently truncated. */
