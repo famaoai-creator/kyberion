@@ -1,17 +1,11 @@
 {
   "role": "owner",
   "description": "Mission owner with final accountability, checkpoint, verify, and finish authority.",
-  "required_capabilities": [
-    "reasoning",
-    "coordination",
-    "analysis"
-  ],
-  "compatible_authority_roles": [
-    "mission_controller",
-    "ecosystem_architect"
-  ],
+  "required_capabilities": ["reasoning", "coordination", "analysis"],
+  "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
   "allowed_delegate_team_roles": [
     "planner",
+    "orchestrator",
     "implementer",
     "reviewer",
     "tester",
@@ -25,18 +19,11 @@
     "relationship_curator"
   ],
   "escalation_parent_team_role": null,
-  "required_scope_classes": [
-    "mission_state"
-  ],
+  "required_scope_classes": ["mission_state"],
   "ownership_scope": "Owns end-to-end mission objective, integration, and final acceptance.",
   "selection_hints": {
-    "preferred_agents": [
-      "nerve-agent",
-      "sovereign-brain"
-    ],
-    "preferred_models": [
-      "auto-gemini-3"
-    ]
+    "preferred_agents": ["nerve-agent", "sovereign-brain"],
+    "preferred_models": ["auto-gemini-3"]
   },
   "autonomy_level": "high"
 }

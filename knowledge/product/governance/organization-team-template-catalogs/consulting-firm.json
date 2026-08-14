@@ -3,11 +3,11 @@
   "organization_id": "consulting-firm",
   "templates": {
     "default": {
-      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer"],
       "optional_roles": ["devils_advocate", "counterparty_persona", "scribe"],
       "lifecycle": {
-        "max_parallel_members": 4,
-        "max_members": 7,
+        "max_parallel_members": 5,
+        "max_members": 8,
         "max_messages_per_run": 70,
         "max_wall_clock_minutes": 240,
         "max_member_turns": 10,
@@ -17,7 +17,11 @@
       }
     },
     "operations": {
-      "optional_roles": ["scribe", "tracker", "surface_liaison"]
+      "optional_roles": ["scribe", "tracker", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 8
+      }
     }
   }
 }
