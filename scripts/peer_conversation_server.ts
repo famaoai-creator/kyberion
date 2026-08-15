@@ -69,18 +69,24 @@ async function main(): Promise<void> {
   const host = String(argv.host);
   const port = Number(argv.port);
   const tenantId = String(argv['tenant-id'] || '').trim();
+  if (!tenantId) {
+    throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
+  }
   const meshNamespace = String(argv['mesh-namespace'] || '').trim() || undefined;
   const meshAdapter = createMeshHubPeerMessagingAdapter({
     peerId,
+    tenantId,
     sharedSecret,
     namespace: meshNamespace,
   });
 
   const server = createPeerMessagingServer({
     peerId,
+    tenantId,
     sharedSecret,
     responder: createPeerConversationResponder({
       peerId,
+      tenantId,
       onMessage: ({ message, envelope }) => {
         const candidate = message.metadata?.collaboration_request as MeshRequest | undefined;
         if (!candidate || message.kind !== 'handoff') return;

@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto';
 
 import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
@@ -119,16 +119,27 @@ function meshHubObservabilityRoot(namespace?: string): string {
     : 'active/shared/observability/mesh-hub';
 }
 
-function deliveriesPath(namespace?: string): string {
-  return `${meshHubRoot(namespace)}/deliveries.jsonl`;
+function tenantRoot(namespace: string | undefined, tenantId: string): string {
+  if (!isValidTenantSlug(tenantId)) throw new Error(`mesh_hub_invalid_tenant_id:${tenantId}`);
+  return `${meshHubRoot(namespace)}/tenants/${tenantId}`;
 }
 
-function deadLettersPath(namespace?: string): string {
-  return `${meshHubRoot(namespace)}/dead-letter.jsonl`;
+function tenantIds(namespace?: string): string[] {
+  const root = `${meshHubRoot(namespace)}/tenants`;
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root).filter((entry) => isValidTenantSlug(entry));
 }
 
-function eventsPath(namespace?: string): string {
-  return `${meshHubObservabilityRoot(namespace)}/events.jsonl`;
+function deliveriesPath(namespace: string | undefined, tenantId: string): string {
+  return `${tenantRoot(namespace, tenantId)}/deliveries.jsonl`;
+}
+
+function deadLettersPath(namespace: string | undefined, tenantId: string): string {
+  return `${tenantRoot(namespace, tenantId)}/dead-letter.jsonl`;
+}
+
+function eventsPath(namespace: string | undefined, tenantId: string): string {
+  return `${meshHubObservabilityRoot(namespace)}/tenants/${tenantId}/events.jsonl`;
 }
 
 function payloadReference(payload: MeshRequest['payload']): MeshDeadLetterRecord['payload'] {
@@ -184,15 +195,25 @@ function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: u
   return appendGovernedArtifactJsonl(role, logicalPath, record);
 }
 
-function loadCurrentDeliveries(namespace?: string): MeshHubDeliveryRecord[] {
-  return latestByKey(readJsonl<MeshHubDeliveryRecord>(deliveriesPath(namespace)), 'delivery_id');
+function loadCurrentDeliveries(namespace?: string, tenantId?: string): MeshHubDeliveryRecord[] {
+  const tenants = tenantId ? [tenantId] : tenantIds(namespace);
+  return latestByKey(
+    tenants.flatMap((id) => readJsonl<MeshHubDeliveryRecord>(deliveriesPath(namespace, id))),
+    'delivery_id'
+  );
 }
 
-function loadCurrentDelivery(deliveryId: string, namespace?: string): MeshHubDeliveryRecord | null {
+function loadCurrentDelivery(
+  deliveryId: string,
+  namespace?: string,
+  tenantId?: string
+): MeshHubDeliveryRecord | null {
   const normalized = String(deliveryId || '').trim();
   if (!normalized) return null;
   return (
-    loadCurrentDeliveries(namespace).find((record) => record.delivery_id === normalized) || null
+    loadCurrentDeliveries(namespace, tenantId).find(
+      (record) => record.delivery_id === normalized
+    ) || null
   );
 }
 
@@ -213,26 +234,32 @@ function findCurrentDeliveryByIdempotency(
   namespace?: string
 ): MeshHubDeliveryRecord | null {
   const deliveryId = deliveryIdForRequest(request);
-  const current = loadCurrentDelivery(deliveryId, namespace);
+  const current = loadCurrentDelivery(deliveryId, namespace, request.tenant_scope.tenant_id);
   if (current) return current;
   return (
-    loadCurrentDeliveries(namespace).find(
+    loadCurrentDeliveries(namespace, request.tenant_scope.tenant_id).find(
       (record) => record.idempotency_key === request.idempotency_key
     ) || null
   );
 }
 
-function loadCurrentDeadLetters(namespace?: string): MeshDeadLetterRecord[] {
-  return latestByKey(readJsonl<MeshDeadLetterRecord>(deadLettersPath(namespace)), 'dead_letter_id');
+function loadCurrentDeadLetters(namespace?: string, tenantId?: string): MeshDeadLetterRecord[] {
+  const tenants = tenantId ? [tenantId] : tenantIds(namespace);
+  return latestByKey(
+    tenants.flatMap((id) => readJsonl<MeshDeadLetterRecord>(deadLettersPath(namespace, id))),
+    'dead_letter_id'
+  );
 }
 
 function recordEvent(
   namespace: string | undefined,
+  tenantId: string,
   event: Record<string, unknown>,
   role: GovernedArtifactRole
 ): string {
-  return appendRecord(role, eventsPath(namespace), {
+  return appendRecord(role, eventsPath(namespace, tenantId), {
     ts: nowIso(),
+    tenant_id: tenantId,
     ...event,
   });
 }
@@ -385,6 +412,7 @@ function writeDeliveryEvent(
 ): string {
   return recordEvent(
     namespace,
+    snapshot.tenant_scope.tenant_id,
     {
       type: eventType,
       delivery_id: snapshot.delivery_id,
@@ -509,14 +537,22 @@ export class MeshMessageBroker {
         idempotency_key: request.idempotency_key,
         expires_at: expiresAt,
       });
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), accepted);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, accepted.tenant_scope.tenant_id),
+        accepted
+      );
       writeDeliveryEvent(namespace, accepted, 'delivery_accepted', this.loop.getWriterRole());
 
       const queued = buildDeliverySnapshot({
         ...accepted,
         status: 'queued',
       });
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), queued);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, queued.tenant_scope.tenant_id),
+        queued
+      );
       writeDeliveryEvent(namespace, queued, 'delivery_queued', this.loop.getWriterRole());
 
       return {
@@ -556,7 +592,11 @@ export class MeshMessageBroker {
         idempotency_key: routeDecision.request.idempotency_key,
         expires_at: expiresAt,
       });
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), accepted);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, accepted.tenant_scope.tenant_id),
+        accepted
+      );
       writeDeliveryEvent(namespace, accepted, 'delivery_accepted', this.loop.getWriterRole());
 
       const queued = buildDeliverySnapshot({
@@ -564,7 +604,11 @@ export class MeshMessageBroker {
         route,
         status: 'queued',
       });
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), queued);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, queued.tenant_scope.tenant_id),
+        queued
+      );
       writeDeliveryEvent(namespace, queued, 'delivery_queued', this.loop.getWriterRole());
       return queued;
     });
@@ -593,7 +637,11 @@ export class MeshMessageBroker {
           status: 'dispatched',
           attempt_count: record.attempt_count + 1,
         };
-        appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deliveriesPath(namespace, next.tenant_scope.tenant_id),
+          next
+        );
         writeDeliveryEvent(namespace, next, 'delivery_dispatched', this.loop.getWriterRole());
         claimed.push(next);
       }
@@ -618,7 +666,11 @@ export class MeshMessageBroker {
         ...current,
         status: receipt.completed ? 'completed' : 'acknowledged',
       };
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, next.tenant_scope.tenant_id),
+        next
+      );
       writeDeliveryEvent(
         namespace,
         next,
@@ -657,9 +709,17 @@ export class MeshMessageBroker {
         status: 'rejected',
         failure_class: failureClass,
       };
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, next.tenant_scope.tenant_id),
+        next
+      );
       const deadLetter = buildDeadLetter(next, failureClass, reason);
-      appendRecord(this.loop.getWriterRole(), deadLettersPath(namespace), deadLetter);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deadLettersPath(namespace, deadLetter.tenant_scope.tenant_id),
+        deadLetter
+      );
       writeDeliveryEvent(namespace, next, 'delivery_rejected', this.loop.getWriterRole());
       return next;
     });
@@ -682,9 +742,17 @@ export class MeshMessageBroker {
           status: 'expired',
           failure_class: 'expired',
         };
-        appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), expired);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deliveriesPath(namespace, expired.tenant_scope.tenant_id),
+          expired
+        );
         const deadLetter = buildDeadLetter(expired, 'expired', 'expired');
-        appendRecord(this.loop.getWriterRole(), deadLettersPath(namespace), deadLetter);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deadLettersPath(namespace, deadLetter.tenant_scope.tenant_id),
+          deadLetter
+        );
         writeDeliveryEvent(namespace, expired, 'delivery_expired', this.loop.getWriterRole());
         return expired;
       }
@@ -706,9 +774,17 @@ export class MeshMessageBroker {
           attempt_count: nextAttempt,
           failure_class: 'transport_error',
         };
-        appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deliveriesPath(namespace, next.tenant_scope.tenant_id),
+          next
+        );
         const deadLetter = buildDeadLetter(next, 'transport_error', 'retry_exhausted');
-        appendRecord(this.loop.getWriterRole(), deadLettersPath(namespace), deadLetter);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deadLettersPath(namespace, deadLetter.tenant_scope.tenant_id),
+          deadLetter
+        );
         writeDeliveryEvent(namespace, next, 'delivery_dead_lettered', this.loop.getWriterRole());
         return next;
       }
@@ -720,7 +796,11 @@ export class MeshMessageBroker {
         retry_at: retryAt,
         failure_class: 'transport_error',
       };
-      appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+      appendRecord(
+        this.loop.getWriterRole(),
+        deliveriesPath(namespace, next.tenant_scope.tenant_id),
+        next
+      );
       writeDeliveryEvent(namespace, next, 'delivery_requeued', this.loop.getWriterRole());
       return next;
     });
@@ -744,9 +824,17 @@ export class MeshMessageBroker {
           status: 'expired',
           failure_class: 'expired',
         };
-        appendRecord(this.loop.getWriterRole(), deliveriesPath(namespace), next);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deliveriesPath(namespace, next.tenant_scope.tenant_id),
+          next
+        );
         const deadLetter = buildDeadLetter(next, 'expired', 'expired');
-        appendRecord(this.loop.getWriterRole(), deadLettersPath(namespace), deadLetter);
+        appendRecord(
+          this.loop.getWriterRole(),
+          deadLettersPath(namespace, deadLetter.tenant_scope.tenant_id),
+          deadLetter
+        );
         writeDeliveryEvent(namespace, next, 'delivery_expired', this.loop.getWriterRole());
         expired.push(next);
       }
@@ -852,8 +940,11 @@ export async function listMeshDeadLetters(
   });
 }
 
-export async function listMeshDeliveries(namespace?: string): Promise<MeshHubDeliveryRecord[]> {
-  return loadCurrentDeliveries(namespace);
+export async function listMeshDeliveries(
+  namespace?: string,
+  tenantId?: string
+): Promise<MeshHubDeliveryRecord[]> {
+  return loadCurrentDeliveries(namespace, tenantId);
 }
 
 export function clearMeshMessageBrokerNamespace(namespace?: string): void {

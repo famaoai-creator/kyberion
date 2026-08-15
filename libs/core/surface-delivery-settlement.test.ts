@@ -16,7 +16,11 @@ vi.mock('./surface-coordination-store.js', () => ({
 }));
 vi.mock('./ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
-import { recordSurfaceDeliverySuccess, settleSurfaceOutboxFailure } from './surface-delivery.js';
+import {
+  assertSurfaceOutboxDeliveryAuthorized,
+  recordSurfaceDeliverySuccess,
+  settleSurfaceOutboxFailure,
+} from './surface-delivery.js';
 
 const message = {
   message_id: 'SLACK-OUTBOX-1',
@@ -79,5 +83,18 @@ describe('surface delivery settlement', () => {
   it('clears a dead-target marker after successful delivery', () => {
     recordSurfaceDeliverySuccess('slack', 'C123');
     expect(mocks.clearSurfaceDeadTarget).toHaveBeenCalledWith('slack', 'C123');
+  });
+
+  it('rejects tenant delivery without an active channel binding', () => {
+    expect(() =>
+      assertSurfaceOutboxDeliveryAuthorized({
+        ...message,
+        scope: {
+          scope_kind: 'tenant',
+          tier: 'confidential',
+          tenant_slug: 'tenant-a',
+        },
+      })
+    ).toThrow('SURFACE_OUTBOX_SCOPE_BINDING_REQUIRED');
   });
 });

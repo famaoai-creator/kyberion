@@ -442,6 +442,41 @@ KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
   pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
 ```
 
+For a tenant export, repeat the scope and tenant explicitly during restore so
+the archive boundary is checked before extraction:
+
+```bash
+KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
+  pnpm backup restore /Volumes/backup/tenant-acme.tar.gz.enc \
+    --scope tenant --tenant acme --target /path/to/clean/kyberion
+```
+
+Tenant restores quarantine peer messaging, conversation, and Mesh Hub runtime
+state. Run the following from the restored checkout only after re-enrolling the
+peer and confirming a fresh healthy heartbeat. The request creates a human
+approval record; it does not resume runtime by itself:
+
+```bash
+pnpm peer:runtime-recovery request \
+  --tenant-id acme \
+  --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/acme/<restore-id> \
+  --requested-by <operator>
+pnpm cli approve <approval-id> peer-recovery
+pnpm peer:runtime-recovery resume \
+  --tenant-id acme \
+  --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/acme/<restore-id> \
+  --approval-id <approval-id>
+```
+
+If a pre-tenant migration checkout still contains flat peer/Mesh records, use
+the dry-run plan first and review its manifest. Records without an explicit
+valid tenant are quarantined rather than guessed:
+
+```bash
+pnpm migrate:peer-tenant-runtime
+pnpm migrate:peer-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
+```
+
 Backups containing `vault/`, `knowledge/confidential/`, or confidential
 mission/project state must remain encrypted. Do not store
 `KYBERION_BACKUP_PASSPHRASE`, audit-chain keys, or SaaS auth encryption keys in

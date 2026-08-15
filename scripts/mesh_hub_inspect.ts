@@ -67,12 +67,19 @@ async function main(): Promise<void> {
       describe: 'Which read-only mesh hub view to render',
     })
     .option('json', { type: 'boolean', default: false })
+    .option('tenant-id', {
+      type: 'string',
+      default: process.env.KYBERION_TENANT_ID || '',
+      demandOption: true,
+      describe: 'Tenant whose Mesh Hub view is being inspected',
+    })
     .option('namespace', { type: 'string', describe: 'Optional mesh hub runtime namespace' })
     .parseSync();
 
   const requestedSection = argv._[0] || argv.section || 'all';
   const section = String(requestedSection) as MeshHubInspectionSection;
   const report = await inspectMeshHub({
+    tenantId: String(argv['tenant-id']).trim(),
     namespace:
       typeof argv.namespace === 'string' && argv.namespace.trim()
         ? argv.namespace.trim()

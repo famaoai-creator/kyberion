@@ -20,6 +20,7 @@ import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const SHARED_SECRET = 'peer-message-test-secret';
+const TENANT_ID = 'tenant-acme';
 const REGISTRY_TENANT = 'peer-registry-test';
 const REGISTRY_TEST_CATALOG = pathResolver.sharedTmp('peer-network-registration.test.json');
 
@@ -33,8 +34,8 @@ async function listenOnEphemeralPort(
 }
 
 afterEach(() => {
-  clearPeerRuntime('peer-a-test');
-  clearPeerRuntime('peer-b-test');
+  clearPeerRuntime(TENANT_ID, 'peer-a-test');
+  clearPeerRuntime(TENANT_ID, 'peer-b-test');
   const catalogPath = pathResolver.sharedTmp('peer-network-catalog.test.json');
   try {
     safeRmSync(catalogPath, { force: true });
@@ -77,6 +78,7 @@ describe('peer messaging', () => {
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-a-test',
       recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       subject: 'handoff',
       type: 'handoff',
       payload: { summary: 'transfer this task' },
@@ -90,9 +92,34 @@ describe('peer messaging', () => {
     ).toBe(false);
   });
 
+  it('rejects a correctly signed envelope from another tenant', async () => {
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+    });
+    const envelope = buildPeerMessageEnvelope({
+      senderPeerId: 'peer-a-test',
+      recipientPeerId: 'peer-b-test',
+      tenantId: 'tenant-bravo',
+      subject: 'cross-tenant',
+      type: 'request',
+      payload: { secret: 'must-not-be-processed' },
+      sharedSecret: SHARED_SECRET,
+    });
+
+    const result = await server.processEnvelope(envelope);
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({ ok: false, error: 'tenant_mismatch' });
+    expect(JSON.stringify(listPeerInboxRecords(TENANT_ID, 'peer-b-test'))).not.toContain(
+      'must-not-be-processed'
+    );
+  });
+
   it('delivers a localhost peer message and persists inbox/outbox logs', async () => {
     const server = createPeerMessagingServer({
       peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       responder: async ({ envelope }) => ({
         received: true,
@@ -120,6 +147,7 @@ describe('peer messaging', () => {
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-a-test',
       recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       subject: 'status_request',
       type: 'request',
       payload: { ask: 'are you there?' },
@@ -144,8 +172,8 @@ describe('peer messaging', () => {
       reply_to: envelope.message_id,
     });
 
-    const inbox = listPeerInboxRecords('peer-b-test');
-    const outbox = listPeerOutboxRecords('peer-a-test');
+    const inbox = listPeerInboxRecords(TENANT_ID, 'peer-b-test');
+    const outbox = listPeerOutboxRecords(TENANT_ID, 'peer-a-test');
     expect(inbox).toHaveLength(1);
     expect(outbox).toHaveLength(1);
     expect((inbox[0] as any).envelope.message_id).toBe(envelope.message_id);
@@ -229,6 +257,7 @@ describe('peer messaging', () => {
   it('requires a valid HMAC request signature for inbox and outbox reads', async () => {
     const server = createPeerMessagingServer({
       peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
     });
     const port = await listenOnEphemeralPort(server);
@@ -264,6 +293,7 @@ describe('peer messaging', () => {
   it('rejects oversized request bodies from content-length and streamed bytes', async () => {
     const server = createPeerMessagingServer({
       peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
     });
     const port = await listenOnEphemeralPort(server);

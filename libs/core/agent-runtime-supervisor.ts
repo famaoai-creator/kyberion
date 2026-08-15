@@ -24,10 +24,17 @@ import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
 import { metrics, resolveCostRates } from './metrics.js';
+import type { EventScope, EventScopeInput } from './event-scope.js';
+import {
+  assertRuntimeNhiScope,
+  assertRuntimeScopeCompatible,
+  resolveRuntimeScope,
+} from './runtime-scope.js';
 
 export interface AgentRuntimeEnsureRequest {
   request_id: string;
   mission_id: string;
+  scope: EventScope;
   team_roles?: string[];
   requested_by: string;
   reason?: string;
@@ -37,6 +44,7 @@ export interface AgentRuntimeEnsureRequest {
 export interface AgentRuntimeEnsureResult {
   request_id: string;
   mission_id: string;
+  scope: EventScope;
   team_roles?: string[];
   requested_by: string;
   created_at: string;
@@ -54,6 +62,7 @@ export interface EnsureAgentRuntimeOptions extends SpawnOptions {
 
 interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeamRuntimeOptions {
   requestedBy: string;
+  scope?: EventScopeInput;
   reason?: string;
   timeoutMs?: number;
   pollIntervalMs?: number;
@@ -152,12 +161,14 @@ export function enqueueMissionTeamPrewarmRequest(input: {
   missionId: string;
   teamRoles?: string[];
   requestedBy: string;
+  scope?: EventScopeInput;
   reason?: string;
 }): AgentRuntimeEnsureRequest {
   ensureQueueDirs();
   const request: AgentRuntimeEnsureRequest = {
     request_id: `AR-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId.toUpperCase(),
+    scope: resolveRuntimeScope({ missionId: input.missionId, scope: input.scope }),
     team_roles: input.teamRoles?.length ? [...input.teamRoles] : undefined,
     requested_by: input.requestedBy,
     reason: input.reason,
@@ -171,6 +182,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
     decision: 'agent_runtime_prewarm_requested',
     request_id: request.request_id,
     mission_id: request.mission_id,
+    scope: request.scope,
     requested_by: request.requested_by,
     team_roles: request.team_roles || [],
   });
@@ -178,9 +190,14 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  return JSON.parse(
+  const request = JSON.parse(
     safeReadFile(requestPath, { encoding: 'utf8' }) as string
   ) as AgentRuntimeEnsureRequest;
+  return {
+    ...request,
+    mission_id: request.mission_id.toUpperCase(),
+    scope: resolveRuntimeScope({ missionId: request.mission_id, scope: request.scope }),
+  };
 }
 
 export async function processMissionTeamPrewarmRequest(
@@ -191,12 +208,14 @@ export async function processMissionTeamPrewarmRequest(
     decision: 'agent_runtime_prewarm_started',
     request_id: request.request_id,
     mission_id: request.mission_id,
+    scope: request.scope,
     requested_by: request.requested_by,
   });
 
   const runtime_plan = await ensureMissionTeamRuntime({
     missionId: request.mission_id,
     teamRoles: request.team_roles,
+    scope: request.scope,
   });
 
   const result: AgentRuntimeEnsureResult = {
@@ -213,6 +232,7 @@ export async function processMissionTeamPrewarmRequest(
     decision: 'agent_runtime_prewarm_completed',
     request_id: request.request_id,
     mission_id: request.mission_id,
+    scope: request.scope,
     requested_by: request.requested_by,
     assignment_count: runtime_plan.assignments.length,
   });
@@ -277,6 +297,7 @@ export async function ensureMissionTeamRuntimeViaSupervisor(
     teamRoles: options.teamRoles,
     requestedBy: options.requestedBy,
     reason: options.reason,
+    scope: options.scope,
   });
   startAgentRuntimeSupervisorForRequest(request);
   return waitForMissionTeamPrewarmResult(
@@ -287,17 +308,25 @@ export async function ensureMissionTeamRuntimeViaSupervisor(
 }
 
 export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Promise<AgentHandle> {
+  const runtimeScope = resolveRuntimeScope({
+    missionId: options.missionId,
+    scope: options.scope,
+  });
+  assertRuntimeNhiScope(runtimeScope);
+  const existing = getAgentRuntimeHandle(options.agentId || '');
+  assertRuntimeScopeCompatible(existing?.getRecord()?.scope, runtimeScope);
   const taskModelHint = options.runtimeMetadata?.task_model_hint;
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_requested',
     agent_id: options.agentId,
     mission_id: options.missionId,
+    scope: runtimeScope,
     requested_by: options.requestedBy,
     provider: options.provider,
     model_id: options.modelId,
     task_model_hint: taskModelHint,
   });
-  const handle = await agentLifecycle.spawn(options);
+  const handle = await agentLifecycle.spawn({ ...options, scope: runtimeScope });
   const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
   const snapshot = getAgentRuntimeSnapshot(options.agentId || handle.agentId, 20);
   const actualModelId = snapshot?.agent.modelId || handle.getRecord()?.modelId || options.modelId;
@@ -316,6 +345,7 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
     decision: 'agent_runtime_ensure_completed',
     agent_id: options.agentId || handle.agentId,
     mission_id: options.missionId,
+    scope: runtimeScope,
     requested_by: options.requestedBy,
     provider: options.provider,
     model_id: actualModelId,
@@ -325,16 +355,19 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
 }
 
 export async function stopAgentRuntime(agentId: string, requestedBy: string): Promise<void> {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
   appendSupervisorEvent({
     decision: 'agent_runtime_stop_requested',
     agent_id: agentId,
     requested_by: requestedBy,
+    scope,
   });
   await agentLifecycle.shutdown(agentId);
   appendSupervisorEvent({
     decision: 'agent_runtime_stopped',
     agent_id: agentId,
     requested_by: requestedBy,
+    scope,
   });
 }
 
@@ -395,22 +428,30 @@ export async function askAgentRuntime(
     taskModelHint?: TaskModelHint;
     correlationId?: string;
     missionId?: string;
+    scope?: EventScopeInput;
     /** SO-05 / OP-01: declared reasoning tier for this ask, recorded on both events below. */
     modelTier?: 'fast' | 'standard' | 'deep';
   } = {}
 ): Promise<string> {
   const startedAt = Date.now();
+  const handle = getAgentRuntimeHandle(agentId);
+  const record = handle?.getRecord();
+  const runtimeScope = resolveRuntimeScope({
+    missionId: options.missionId || record?.missionId,
+    scope: options.scope || record?.scope,
+  });
+  assertRuntimeNhiScope(runtimeScope);
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_requested',
     agent_id: agentId,
     requested_by: requestedBy,
     correlation_id: options.correlationId,
-    mission_id: options.missionId,
+    mission_id: options.missionId || record?.missionId,
+    scope: runtimeScope,
     task_model_hint: options.taskModelHint,
     declared_model_tier: options.modelTier,
   });
   try {
-    const handle = getAgentRuntimeHandle(agentId);
     if (!handle) {
       throw new Error(`Agent ${agentId} not found or not ready`);
     }
@@ -444,7 +485,8 @@ export async function askAgentRuntime(
       total_tokens: inputTokens + outputTokens,
       usage_estimated: usageEstimated,
       correlation_id: options.correlationId,
-      mission_id: options.missionId,
+      mission_id: options.missionId || record?.missionId,
+      scope: runtimeScope,
       task_model_hint: options.taskModelHint,
       declared_model_tier: options.modelTier,
     });
@@ -458,7 +500,8 @@ export async function askAgentRuntime(
           agent: agentId,
           provider,
           model,
-          mission_id: options.missionId,
+          mission_id: options.missionId || record?.missionId,
+          scope: runtimeScope,
           correlation_id: options.correlationId,
           usage: {
             prompt_tokens: promptTokens,
@@ -471,12 +514,13 @@ export async function askAgentRuntime(
           metrics.recordResourceUsage({
             resource_kind: 'llm',
             actor_id: agentId,
-            mission_id: options.missionId,
+            mission_id: options.missionId || record?.missionId,
             quantity: promptTokens,
             unit: 'input_token',
             unit_cost_usd: rates.prompt,
             status: usageStatus,
             source: 'agent-runtime-supervisor',
+            scope: runtimeScope,
             metadata: {
               model,
               provider,
@@ -489,12 +533,13 @@ export async function askAgentRuntime(
           metrics.recordResourceUsage({
             resource_kind: 'llm',
             actor_id: agentId,
-            mission_id: options.missionId,
+            mission_id: options.missionId || record?.missionId,
             quantity: completionTokens,
             unit: 'output_token',
             unit_cost_usd: rates.completion,
             status: usageStatus,
             source: 'agent-runtime-supervisor',
+            scope: runtimeScope,
             metadata: {
               model,
               provider,
@@ -517,7 +562,8 @@ export async function askAgentRuntime(
       requested_by: requestedBy,
       duration_ms: Date.now() - startedAt,
       correlation_id: options.correlationId,
-      mission_id: options.missionId,
+      mission_id: options.missionId || record?.missionId,
+      scope: runtimeScope,
       task_model_hint: options.taskModelHint,
       declared_model_tier: options.modelTier,
       error: error instanceof Error ? error.message : String(error),
@@ -527,10 +573,12 @@ export async function askAgentRuntime(
 }
 
 export async function refreshAgentRuntime(agentId: string, requestedBy: string) {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
   appendSupervisorEvent({
     decision: 'agent_runtime_refresh_requested',
     agent_id: agentId,
     requested_by: requestedBy,
+    scope,
   });
   const result = await agentLifecycle.refreshContext(agentId);
   appendSupervisorEvent({
@@ -538,6 +586,7 @@ export async function refreshAgentRuntime(agentId: string, requestedBy: string) 
     agent_id: agentId,
     requested_by: requestedBy,
     mode: result.mode,
+    scope,
   });
   return result;
 }
@@ -546,16 +595,19 @@ export async function restartAgentRuntime(
   agentId: string,
   requestedBy: string
 ): Promise<AgentHandle> {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
   appendSupervisorEvent({
     decision: 'agent_runtime_restart_requested',
     agent_id: agentId,
     requested_by: requestedBy,
+    scope,
   });
   const handle = await agentLifecycle.restart(agentId);
   appendSupervisorEvent({
     decision: 'agent_runtime_restarted',
     agent_id: agentId,
     requested_by: requestedBy,
+    scope,
   });
   return handle;
 }

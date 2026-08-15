@@ -2176,6 +2176,16 @@
         "ja": "ミッション数",
         "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
       },
+      "chronos_diagnostics_generation_actual": {
+        "en": "Generation actual",
+        "ja": "生成実コスト",
+        "qps-ploc": "⟦Ɠėñėřȧŧïőñ ȧƈŧůȧŀ ŀőřėɱ⟧"
+      },
+      "chronos_diagnostics_generation_pending": {
+        "en": "Awaiting provider cost",
+        "ja": "プロバイダ実額待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ṗřőṽïḓėř ƈőşŧ ŀőřėɱ ï⟧"
+      },
       "chronos_diagnostics_attention_eyebrow": {
         "en": "What needs checking",
         "ja": "確認が必要なもの",
