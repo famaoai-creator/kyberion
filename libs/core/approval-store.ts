@@ -729,6 +729,7 @@ export function listApprovalRequests(params?: {
   const kinds = params?.kind
     ? new Set(Array.isArray(params.kind) ? params.kind : [params.kind])
     : null;
+  const requestedScopeKind = params?.scope?.scope_kind;
   const scopeFilter = params?.scope ? normalizeEventScope(params.scope) : undefined;
   const storageChannels = params?.storageChannels?.length
     ? params.storageChannels.map((channel) => normalizeApprovalChannel(channel, 'storage channel'))
@@ -751,18 +752,20 @@ export function listApprovalRequests(params?: {
       if (!record) continue;
       if (statuses && !statuses.has(record.status)) continue;
       if (kinds && !kinds.has(record.kind)) continue;
-      if (
-        scopeFilter &&
-        !eventScopeMatches(record.scope, {
-          scope_kind: scopeFilter.scope_kind,
-          tenant_slug: scopeFilter.tenant_slug,
-          organization_id: scopeFilter.organization_id,
-          project_id: scopeFilter.project_id,
-          mission_id: scopeFilter.mission_id,
-          task_id: scopeFilter.task_id,
-        })
-      )
-        continue;
+      if (scopeFilter) {
+        if (record.scope?.tier !== scopeFilter.tier) continue;
+        if (
+          !eventScopeMatches(record.scope, {
+            ...(requestedScopeKind ? { scope_kind: requestedScopeKind } : {}),
+            tenant_slug: scopeFilter.tenant_slug,
+            organization_id: scopeFilter.organization_id,
+            project_id: scopeFilter.project_id,
+            mission_id: scopeFilter.mission_id,
+            task_id: scopeFilter.task_id,
+          })
+        )
+          continue;
+      }
       records.push(record);
     }
   }

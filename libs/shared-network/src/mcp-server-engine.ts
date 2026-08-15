@@ -36,6 +36,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   resolveMcpRequestContext,
+  assertProtocolServiceRegistered,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
@@ -335,6 +336,7 @@ function createMission(brief: string, title: string, tenant: string): string {
 // ─── Server factory ───────────────────────────────────────────────────────────
 
 export function createKyberionMcpServer(): McpServer {
+  assertProtocolServiceRegistered('mcp-server-cowork');
   const catalog = loadCatalog();
 
   const server = new McpServer(
@@ -772,7 +774,11 @@ export function createKyberionMcpServer(): McpServer {
     {},
     async () => {
       try {
-        const pending = listPendingApprovalsForCowork();
+        const context = resolveMcpRequestContext();
+        const scope = context.scope.tenant_slug
+          ? { tenant_slug: context.scope.tenant_slug, tier: context.scope.tier }
+          : undefined;
+        const pending = listPendingApprovalsForCowork(scope);
         return { content: [{ type: 'text' as const, text: JSON.stringify(pending, null, 2) }] };
       } catch (err) {
         return {
@@ -801,11 +807,16 @@ export function createKyberionMcpServer(): McpServer {
     },
     async ({ request_id, decision, decided_by, note }) => {
       try {
+        const context = resolveMcpRequestContext();
+        const scope = context.scope.tenant_slug
+          ? { tenant_slug: context.scope.tenant_slug, tier: context.scope.tier }
+          : undefined;
         const result = decideApprovalFromCowork({
           requestId: request_id,
           decision,
           decidedBy: decided_by,
           note,
+          scope,
         });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
