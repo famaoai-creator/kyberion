@@ -771,7 +771,7 @@
     {
       "path": "product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md",
       "tier": "public",
-      "size": 47277,
+      "size": 47364,
       "type": "md"
     },
     {
@@ -969,31 +969,31 @@
     {
       "path": "product/config-missions/README.md",
       "tier": "public",
-      "size": 1554,
+      "size": 2441,
       "type": "md"
     },
     {
       "path": "product/config-missions/new-service-integration.json",
       "tier": "public",
-      "size": 1644,
+      "size": 1723,
       "type": "json"
     },
     {
       "path": "product/config-missions/surface-registration.json",
       "tier": "public",
-      "size": 1595,
+      "size": 1668,
       "type": "json"
     },
     {
       "path": "product/config-missions/tenant-onboarding.json",
       "tier": "public",
-      "size": 1369,
+      "size": 1448,
       "type": "json"
     },
     {
       "path": "product/config-missions/voice-engine-setup.json",
       "tier": "public",
-      "size": 1697,
+      "size": 1776,
       "type": "json"
     },
     {
@@ -1431,7 +1431,7 @@
     {
       "path": "product/governance/gateway-onboarding-protocol.md",
       "tier": "public",
-      "size": 4320,
+      "size": 4880,
       "type": "md"
     },
     {
@@ -1851,7 +1851,7 @@
     {
       "path": "product/governance/onboarding-flow.md",
       "tier": "public",
-      "size": 10828,
+      "size": 11827,
       "type": "md"
     },
     {
@@ -2122,6 +2122,12 @@
       "path": "product/governance/promoted-report-template-policy.json",
       "tier": "public",
       "size": 207,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/protocol-service-registry.json",
+      "tier": "public",
+      "size": 2233,
       "type": "json"
     },
     {

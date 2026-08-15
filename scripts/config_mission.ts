@@ -23,6 +23,13 @@ import {
   safeExistsSync,
   safeReaddir,
   auditChain,
+  assertConfigChangeApplyable,
+  computeConfigChangeFingerprint,
+  configChangeRequiresApproval,
+  normalizeConfigChangeEnvelope,
+  createApprovalRequest,
+  loadApprovalRequest,
+  recordApprovalApplyResult,
 } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';
 
@@ -47,6 +54,9 @@ interface ConfigMissionPreset {
   pipeline: string;
   write_targets: string[];
   authority_role: string;
+  target_kind?: import('@agent/core').ConfigChangeTargetKind;
+  scope_kind?: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task';
+  tier?: 'public' | 'confidential' | 'personal';
   notes?: string;
 }
 
@@ -59,6 +69,7 @@ interface ConfigMissionBrief {
   created_at: string;
   applied_at?: string;
   error?: string;
+  change: import('@agent/core').ConfigChangeEnvelope;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +121,84 @@ function parseInputArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+function parseProbeRefs(args: string[]): Record<string, string> {
+  const refs: Record<string, string> = {};
+  for (const arg of args) {
+    const eqIdx = arg.indexOf('=');
+    if (eqIdx <= 0) throw new Error(`Invalid --probe-ref format: "${arg}". Expected key=value`);
+    refs[arg.slice(0, eqIdx)] = arg.slice(eqIdx + 1);
+  }
+  return refs;
+}
+
+function getOption(argv: string[], flag: string): string | undefined {
+  const idx = argv.indexOf(flag);
+  return idx !== -1 ? argv[idx + 1] : undefined;
+}
+
+function getMultiOption(argv: string[], flag: string): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === flag && argv[i + 1]) values.push(argv[++i]);
+  }
+  return values;
+}
+
+function targetKindFor(
+  preset: ConfigMissionPreset,
+  value: string | undefined
+): import('@agent/core').ConfigChangeTargetKind {
+  const targetKind = value || preset.target_kind || 'tenant';
+  const allowed = new Set([
+    'system',
+    'tenant',
+    'organization',
+    'project',
+    'mission',
+    'task',
+    'surface',
+    'channel',
+    'personal',
+  ]);
+  if (!allowed.has(targetKind)) throw new Error(`Invalid --target-kind: ${targetKind}`);
+  return targetKind as import('@agent/core').ConfigChangeTargetKind;
+}
+
+function scopeKindFor(
+  preset: ConfigMissionPreset,
+  targetKind: import('@agent/core').ConfigChangeTargetKind
+): 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task' {
+  if (preset.scope_kind) return preset.scope_kind;
+  if (targetKind === 'system') return 'system';
+  if (
+    targetKind === 'organization' ||
+    targetKind === 'project' ||
+    targetKind === 'mission' ||
+    targetKind === 'task'
+  ) {
+    return targetKind;
+  }
+  return 'tenant';
+}
+
+function tierFor(
+  preset: ConfigMissionPreset,
+  scopeKind: string
+): 'public' | 'confidential' | 'personal' {
+  return preset.tier || (scopeKind === 'system' ? 'public' : 'confidential');
+}
+
+function riskFor(preset: ConfigMissionPreset): import('@agent/core').ConfigChangeRisk {
+  if (
+    preset.category === 'security' ||
+    preset.category === 'surface' ||
+    preset.category === 'service_integration'
+  )
+    return 'high';
+  if (preset.category === 'tenant') return 'high';
+  return 'medium';
+}
+
 function generateInstanceId(): string {
   return `cfg-${Date.now()}`;
 }
@@ -153,25 +242,13 @@ function cmdList(): void {
 }
 
 function cmdCreate(argv: string[]): void {
-  const getOpt = (flag: string): string | undefined => {
-    const idx = argv.indexOf(flag);
-    return idx !== -1 ? argv[idx + 1] : undefined;
-  };
-  const getMulti = (flag: string): string[] => {
-    const vals: string[] = [];
-    for (let i = 0; i < argv.length; i++) {
-      if (argv[i] === flag && argv[i + 1]) vals.push(argv[++i]);
-    }
-    return vals;
-  };
-
-  const presetId = getOpt('--preset');
-  const tenant = getOpt('--tenant');
+  const presetId = getOption(argv, '--preset');
+  const tenant = getOption(argv, '--tenant');
   if (!presetId) throw new Error('--preset is required');
   if (!tenant) throw new Error('--tenant is required');
 
   const preset = loadPreset(presetId);
-  const inputs = parseInputArgs(getMulti('--input'));
+  const inputs = parseInputArgs(getMultiOption(argv, '--input'));
 
   // Apply defaults
   for (const [key, def] of Object.entries(preset.inputs)) {
@@ -191,6 +268,40 @@ function cmdCreate(argv: string[]): void {
   const instanceId = generateInstanceId();
   inputs.instance_id = instanceId;
 
+  const targetKind = targetKindFor(preset, getOption(argv, '--target-kind'));
+  const risk = riskFor(preset);
+  const scopeKind = scopeKindFor(preset, targetKind);
+  const tier = tierFor(preset, scopeKind);
+  const scopeInput = {
+    scope_kind: scopeKind,
+    tier,
+    ...(scopeKind === 'system' ? {} : { tenant_slug: tenant }),
+    organization_id: getOption(argv, '--organization-id'),
+    project_id: getOption(argv, '--project-id'),
+    mission_id: getOption(argv, '--mission-id'),
+    task_id: getOption(argv, '--task-id'),
+    nhi_id: getOption(argv, '--nhi-id'),
+  };
+  const scope = normalizeConfigChangeEnvelope({
+    change_id: instanceId,
+    scope: scopeInput,
+    target_kind: targetKind,
+    requested_by: getOption(argv, '--requested-by') || process.env.KYBERION_PERSONA || 'operator',
+    nhi_id: getOption(argv, '--nhi-id'),
+    risk,
+    before_hash: getOption(argv, '--before-hash'),
+    desired_hash: computeConfigChangeFingerprint({
+      preset_id: presetId,
+      target_kind: targetKind,
+      scope: scopeInput,
+      inputs,
+      write_targets: preset.write_targets,
+    }),
+    approval_ref: getOption(argv, '--approval-ref'),
+    probe_refs: parseProbeRefs(getMultiOption(argv, '--probe-ref')),
+    rollback_ref: getOption(argv, '--rollback-ref'),
+  });
+
   const brief: ConfigMissionBrief = {
     instance_id: instanceId,
     preset_id: presetId,
@@ -198,6 +309,7 @@ function cmdCreate(argv: string[]): void {
     inputs,
     status: 'draft',
     created_at: new Date().toISOString(),
+    change: scope,
   };
 
   const dir = instanceDir(tenant, instanceId);
@@ -216,7 +328,60 @@ function cmdCreate(argv: string[]): void {
   console.log(`   Preset:  ${presetId}`);
   console.log(`   Tenant:  ${tenant}`);
   console.log(`   Brief:   ${briefPath(tenant, instanceId)}`);
+  console.log(`   Scope:   ${scope.scope.scope_kind}/${scope.scope.tenant_slug}`);
+  console.log(
+    `   Risk:    ${scope.risk} (approval required: ${configChangeRequiresApproval(scope)})`
+  );
+  console.log(`   Desired: ${scope.desired_hash}`);
+  if (configChangeRequiresApproval(scope) && !scope.approval_ref) {
+    console.log(
+      `\nNext: pnpm config-mission request-approval --tenant ${tenant} --id ${instanceId}`
+    );
+  }
   console.log(`\nTo apply: pnpm config-mission apply --tenant ${tenant} --id ${instanceId}`);
+}
+
+function cmdRequestApproval(argv: string[]): void {
+  const tenant = getOption(argv, '--tenant');
+  const id = getOption(argv, '--id');
+  if (!tenant) throw new Error('--tenant is required');
+  if (!id) throw new Error('--id is required');
+  const bPath = briefPath(tenant, id);
+  if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
+  const brief = JSON.parse(
+    safeReadFile(bPath, { encoding: 'utf8' }) as string
+  ) as ConfigMissionBrief;
+  const existing = brief.change.approval_ref
+    ? loadApprovalRequest('config-mission', brief.change.approval_ref)
+    : null;
+  if (existing) {
+    console.log(`Approval already requested: ${existing.id}`);
+    return;
+  }
+  const record = createApprovalRequest('mission_controller', {
+    channel: 'config-mission',
+    storageChannel: 'config-mission',
+    threadTs: id,
+    correlationId: `config-mission-${id}`,
+    requestedBy: brief.change.requested_by,
+    draft: {
+      title: `Configuration change: ${brief.preset_id}`,
+      summary: `Apply ${brief.preset_id} for tenant ${tenant}`,
+      details: `Desired configuration fingerprint: ${brief.change.desired_hash}`,
+      severity: brief.change.risk === 'critical' ? 'high' : brief.change.risk,
+    },
+    requestedByContext: {
+      surface: 'api',
+      actorId: brief.change.requested_by,
+      actorRole: 'system_configurator',
+      runtimeId: id,
+    },
+    accountability: { finalDecision: 'human_only', payloadHash: brief.change.desired_hash },
+  });
+  brief.change.approval_ref = record.id;
+  safeWriteFile(bPath, JSON.stringify(brief, null, 2));
+  console.log(`Approval requested: ${record.id}`);
+  console.log('Approve it through an existing governed approval surface before apply.');
 }
 
 function cmdStatus(argv: string[]): void {
@@ -267,13 +432,8 @@ function cmdStatus(argv: string[]): void {
 }
 
 async function cmdApply(argv: string[]): Promise<void> {
-  const getOpt = (flag: string): string | undefined => {
-    const idx = argv.indexOf(flag);
-    return idx !== -1 ? argv[idx + 1] : undefined;
-  };
-
-  const tenant = getOpt('--tenant');
-  const id = getOpt('--id');
+  const tenant = getOption(argv, '--tenant');
+  const id = getOption(argv, '--id');
   if (!tenant) throw new Error('--tenant is required');
   if (!id) throw new Error('--id is required');
 
@@ -282,6 +442,16 @@ async function cmdApply(argv: string[]): Promise<void> {
 
   const raw = safeReadFile(bPath, { encoding: 'utf8' }) as string;
   const brief = JSON.parse(raw) as ConfigMissionBrief;
+
+  const approval = brief.change.approval_ref
+    ? loadApprovalRequest('config-mission', brief.change.approval_ref)
+    : undefined;
+  assertConfigChangeApplyable({
+    envelope: normalizeConfigChangeEnvelope(brief.change),
+    approval: approval
+      ? { status: approval.status, payloadHash: approval.accountability?.payloadHash }
+      : undefined,
+  });
 
   if (brief.status === 'applied') {
     logger.info(`Config mission ${id} is already applied.`);
@@ -325,6 +495,19 @@ async function cmdApply(argv: string[]): Promise<void> {
       metadata: { preset_id: brief.preset_id, tenant, instance_id: id },
     });
 
+    if (approval) {
+      recordApprovalApplyResult('mission_controller', {
+        channel: 'config-mission',
+        storageChannel: 'config-mission',
+        requestId: approval.id,
+        applyResult: {
+          appliedAt: brief.applied_at,
+          appliedBy: 'config_mission',
+          result: 'success',
+        },
+      });
+    }
+
     console.log(`\n✅ Config mission ${id} applied successfully.`);
     if (preset.notes) console.log(`\n💡 ${preset.notes}`);
   } catch (err) {
@@ -340,6 +523,20 @@ async function cmdApply(argv: string[]): Promise<void> {
       metadata: { preset_id: brief.preset_id, tenant, instance_id: id, error: String(err) },
     });
 
+    if (approval) {
+      recordApprovalApplyResult('mission_controller', {
+        channel: 'config-mission',
+        storageChannel: 'config-mission',
+        requestId: approval.id,
+        applyResult: {
+          appliedAt: new Date().toISOString(),
+          appliedBy: 'config_mission',
+          result: 'failed',
+          auditRef: String(err),
+        },
+      });
+    }
+
     throw err;
   }
 }
@@ -349,12 +546,13 @@ async function cmdApply(argv: string[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function printUsage(): void {
-  console.error('Usage: pnpm config-mission <list|create|status|apply> [options]');
+  console.error('Usage: pnpm config-mission <list|create|status|request-approval|apply> [options]');
   console.error('  pnpm config-mission help');
   console.error(
     '  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]'
   );
   console.error('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
+  console.error('  pnpm config-mission request-approval --tenant <slug> --id <cfg-id>');
   console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
@@ -375,6 +573,9 @@ async function main(): Promise<void> {
       break;
     case 'status':
       cmdStatus(rest);
+      break;
+    case 'request-approval':
+      cmdRequestApproval(rest);
       break;
     case 'apply':
       await cmdApply(rest);

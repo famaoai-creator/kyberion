@@ -35,6 +35,7 @@ import {
   pathResolver,
   spawnManagedProcess,
   stopManagedProcess,
+  resolveMcpRequestContext,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
@@ -273,7 +274,7 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
   return results;
 }
 
-function getMissionStatus(missionId: string): string {
+function getMissionStatus(missionId: string, tenant: string): string {
   return safeExec(
     'node',
     [
@@ -281,6 +282,8 @@ function getMissionStatus(missionId: string): string {
       'status',
       '--mission-id',
       missionId,
+      '--tenant-slug',
+      tenant,
     ],
     {
       cwd: REPO_ROOT,
@@ -290,10 +293,16 @@ function getMissionStatus(missionId: string): string {
   );
 }
 
-function getMissionJournal(missionId: string): string {
+function getMissionJournal(missionId: string, tenant: string): string {
   return safeExec(
     'node',
-    [nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'), '--mission-id', missionId],
+    [
+      nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'),
+      '--mission-id',
+      missionId,
+      '--tenant-slug',
+      tenant,
+    ],
     {
       cwd: REPO_ROOT,
       timeoutMs: 15_000,
@@ -302,7 +311,7 @@ function getMissionJournal(missionId: string): string {
   );
 }
 
-function createMission(brief: string, title: string): string {
+function createMission(brief: string, title: string, tenant: string): string {
   return safeExec(
     'node',
     [
@@ -312,6 +321,8 @@ function createMission(brief: string, title: string): string {
       brief,
       '--title',
       title,
+      '--tenant-slug',
+      tenant,
     ],
     {
       cwd: REPO_ROOT,
@@ -549,6 +560,7 @@ export function createKyberionMcpServer(): McpServer {
     },
     async ({ service_id, action, params }) => {
       try {
+        resolveMcpRequestContext({ require_tenant: true });
         if (process.env.KYBERION_ENABLE_SERVICE_ACTUATE_TOOL !== '1') {
           return {
             content: [
@@ -578,10 +590,15 @@ export function createKyberionMcpServer(): McpServer {
     {
       title: z.string().describe('Short mission title'),
       brief: z.string().describe('Mission brief — describe the goal in plain language'),
+      tenant: z.string().describe('Server-bound tenant slug for the mission'),
     },
-    async ({ title, brief }) => {
+    async ({ title, brief, tenant }) => {
       try {
-        const output = createMission(brief, title);
+        const context = resolveMcpRequestContext({
+          requested_tenant: tenant,
+          require_tenant: true,
+        });
+        const output = createMission(brief, title, context.scope.tenant_slug!);
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
@@ -598,10 +615,16 @@ export function createKyberionMcpServer(): McpServer {
     'Get the current status of a Kyberion mission.',
     {
       mission_id: z.string().describe('The mission ID to query'),
+      tenant: z.string().describe('Server-bound tenant slug for the mission'),
     },
-    async ({ mission_id }) => {
+    async ({ mission_id, tenant }) => {
       try {
-        const output = getMissionStatus(mission_id);
+        const context = resolveMcpRequestContext({
+          requested_tenant: tenant,
+          require_tenant: true,
+          mission_id,
+        });
+        const output = getMissionStatus(mission_id, context.scope.tenant_slug!);
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
@@ -618,10 +641,16 @@ export function createKyberionMcpServer(): McpServer {
     'Read the journal log of a Kyberion mission.',
     {
       mission_id: z.string().describe('The mission ID whose journal to read'),
+      tenant: z.string().describe('Server-bound tenant slug for the mission'),
     },
-    async ({ mission_id }) => {
+    async ({ mission_id, tenant }) => {
       try {
-        const output = getMissionJournal(mission_id);
+        const context = resolveMcpRequestContext({
+          requested_tenant: tenant,
+          require_tenant: true,
+          mission_id,
+        });
+        const output = getMissionJournal(mission_id, context.scope.tenant_slug!);
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
@@ -804,6 +833,8 @@ export function createKyberionMcpServer(): McpServer {
     },
     async ({ from, to, tenant, requested_by }) => {
       try {
+        const context = resolveMcpRequestContext({ requested_tenant: tenant });
+        const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
           requestedBy: requested_by ?? 'cowork-operator',
           from,
@@ -824,7 +855,7 @@ export function createKyberionMcpServer(): McpServer {
         const args = [AUDIT_EXPORT_SCRIPT];
         if (from) args.push('--from', from);
         if (to) args.push('--to', to);
-        if (tenant) args.push('--tenant', tenant);
+        if (effectiveTenant) args.push('--tenant', effectiveTenant);
         const output = safeExec('node', args, {
           cwd: REPO_ROOT,
           timeoutMs: 30_000,
@@ -854,6 +885,8 @@ export function createKyberionMcpServer(): McpServer {
     },
     async ({ tenant, requested_by }) => {
       try {
+        const context = resolveMcpRequestContext({ requested_tenant: tenant });
+        const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
           requestedBy: requested_by ?? 'cowork-operator',
           verifyOnly: true,
@@ -870,7 +903,7 @@ export function createKyberionMcpServer(): McpServer {
           };
         }
         const args = [AUDIT_EXPORT_SCRIPT, '--verify-only'];
-        if (tenant) args.push('--tenant', tenant);
+        if (effectiveTenant) args.push('--tenant', effectiveTenant);
         const output = safeExec('node', args, {
           cwd: REPO_ROOT,
           timeoutMs: 30_000,

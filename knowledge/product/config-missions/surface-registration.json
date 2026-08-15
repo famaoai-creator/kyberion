@@ -43,5 +43,8 @@
     "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
   ],
   "authority_role": "system_configurator",
+  "target_kind": "system",
+  "scope_kind": "system",
+  "tier": "public",
   "notes": "After applying, run `pnpm surfaces:reconcile` to start the newly registered surface."
 }

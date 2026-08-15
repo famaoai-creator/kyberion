@@ -24,6 +24,8 @@ interface Mission {
   mission_id: string;
   status: string;
   tier: string;
+  tenant_slug?: string;
+  scope?: { tenant_slug?: string };
   history: MissionHistoryEntry[];
   relationships?: {
     prerequisites?: string[];
@@ -32,7 +34,7 @@ interface Mission {
   };
 }
 
-function scanMissions() {
+function scanMissions(tenantSlug?: string) {
   const searchDirs = [
     pathResolver.active('missions/public'),
     pathResolver.active('missions/confidential'),
@@ -49,7 +51,11 @@ function scanMissions() {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
         try {
-          missions.push(readJsonFile<Mission>(statePath));
+          const mission = readJsonFile<Mission>(statePath);
+          if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
+            continue;
+          }
+          missions.push(mission);
         } catch (err) {
           logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
         }
@@ -64,11 +70,11 @@ function scanMissions() {
   });
 }
 
-function renderJournal() {
+function renderJournal(tenantSlug?: string) {
   const policy = resolveMissionJournalPolicy();
   console.log(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
 
-  const missions = scanMissions();
+  const missions = scanMissions(tenantSlug);
 
   if (missions.length === 0) {
     console.log(policy.empty_message);
@@ -140,4 +146,6 @@ function renderJournal() {
   }
 }
 
-renderJournal();
+const tenantFlag = process.argv.indexOf('--tenant-slug');
+const tenantSlug = tenantFlag >= 0 ? process.argv[tenantFlag + 1]?.trim() : undefined;
+renderJournal(tenantSlug || undefined);
