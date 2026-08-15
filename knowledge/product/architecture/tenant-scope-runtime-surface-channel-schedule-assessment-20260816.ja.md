@@ -397,6 +397,163 @@ customer mode で binding がない channel は tenant request として扱わ�
 
 本書は調査・設計レポートであり、今回の実装では runtime、channel coordination、surface provider policy、schedule record、tenant registry validation、tenant delivery path / dependency scope check、media quota、provider 報告額の実コスト精算、resource usage / cost report、reader-side scope migration、主要 Chronos projection、tenant physical namespace resolver、migration dry-run/apply、tenant backup の physical namespace 対応、physical namespace を含む offboarding の第一段階までを反映した。残る provider invoice 再取得と全 viewer / その他 export 経路への接続は次の実装ミッションとする。
 
+## 9. Surface と surface 外サービスの境界
+
+今回追加で、外部入口だけでなく、peer-messaging、MCP、review check、report-review の
+責務も確認した。結論は、すべてを `surface` と呼ばず、次の三分類に分けることである。
+
+| 分類                   | 役割                                                               | tenant の扱い                                                       | 人間向け表示                                                  |
+| ---------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `surface`              | 人間または外部チャネルとの対話・表示・承認入口                     | viewer / channel binding / server binding から request scope を解決 | Presence、Chronos、Concierge、Slack 等                        |
+| `protocol gateway`     | MCP、peer、webhook 等の通信プロトコルを受け渡す                    | caller principal、binding、NHI、canonical scope を毎 request で検証 | 必要なら Chronos / Operator から health と delivery を表示    |
+| `control-plane worker` | review、scheduler、reconcile、backup、activation 等の durable 制御 | authority の scope を継承し、scope なしの tenant 処理を拒否         | 結果・gate・evidence を Chronos / Concierge / Operator が表示 |
+
+### 9.1 各 surface の target contract
+
+- Slack、Telegram、Discord、iMessage は `process_scope=system`、
+  `scope_mode=request-derived` の channel adapter とする。最初の inbound で認証済み
+  channel binding を解決し、`ChannelContext + EventScope` を coordination record、NHI、
+  outbound delivery へ固定する。binding がない customer mode は tenant と推測せず、拒否または
+  system/operator inbox に送る。
+- Presence Studio と Concierge は対話・承認の surface であり、tenant selector は
+  authorization ではない。server-side `ViewerContext` の許可集合を狭めるだけにする。
+- Chronos は control-surface であり、tenant、organization、project、mission を明示して
+  表示する。介入は mission controller、approval-store、runtime supervisor 等の authority
+  へ委譲し、route が状態を直接変更しない。
+- Operator Surface は read-only の監査表示、Computer Surface は実行中の手元ミラーである。
+  いずれも tenant を選択しただけで権限が広がらない。Computer Surface の表示対象も元の
+  request scope を引き継ぐ。
+- voice、terminal、MCP client などの入口は、会話を受けるかどうかではなく、どの port から
+  どの authority へ handoff したかで分類する。surface agent は対話品質と handoff を担当し、
+  durable mission owner にはならない。
+
+surface provider manifest の `process_scope` / `scope_mode` / `allowed_tiers` はこの契約の
+第一段階である。次の段階では各 manifest に `principal_resolution`、`write_authority`、
+`nhi_binding`、`approval_classes`、`data_residency` を必須化し、scope policy のない provider
+を登録できないようにする。
+
+### 9.2 peer-messaging は surface ではなく protocol gateway
+
+peer-messaging と Mesh Hub は Kyberion 間の transport / nerve であり、人間向け surface ではない。
+既に peer envelope は tenant ID と HMAC を要求し、runtime / observability も
+`tenants/{tenant}` 配下に分かれている。この方向は正しいが、次の envelope を共通契約にする。
+
+```json
+{
+  "principal": { "kind": "nhi", "id": "nhi://..." },
+  "scope": {
+    "scope_kind": "organization",
+    "tier": "confidential",
+    "tenant_slug": "tenant-a",
+    "organization_id": "org-a"
+  },
+  "peer_id": "peer-b",
+  "approval_ref": "apr-...",
+  "correlation_id": "..."
+}
+```
+
+同一 tenant は default allow としてよいが、tenant 間は brokered operation とし、許可 tenant
+集合、目的、NHI、承認、監査イベントを必須にする。peer listener の `--tenant-id` は process
+binding であって、受信 envelope の scope 検証を省略する理由にはならない。backup / restore
+では peer と Mesh の runtime を通常のデータと同時に active 化せず、restore quarantine →
+再認証 → 再接続の順にする。
+
+### 9.3 MCP は surface registry ではなく protocol gateway registry
+
+現在の `mcp-server-cowork` は lifecycle 管理上 `surface` として登録され、MCP tool catalog は
+tool、tier、caller role、approval の allowlist を持つ。運用上は起動・health を surface
+runtime で管理してよいが、意味論としては `gateway` として別 registry に分けるべきである。
+
+MCP request ごとに次を server-side で確定する。
+
+1. MCP session / client の認証済み principal と caller role
+2. tool が要求する tier、tenant、organization / project scope
+3. tool 実行に使う NHI と、その affiliation の一致
+4. read / write / external egress の approval class
+5. pipeline、job、audit、artifact の canonical scope
+
+tool 引数の `tenant` は認可情報ではなく narrowing hint とする。特に `audit.verify`、
+`audit.export`、`pipeline.run`、`service.actuate` は、client が tenant を指定しただけで
+実行できないようにする。MCP の default public-only は安全な既定値だが、confidential を
+許可する場合は `ViewerContext` または明示的な MCP grant と `RequestContext` を結合する必要がある。
+
+### 9.4 review check と report-review
+
+mission review gate、background review、visual review、report-review は同じものではない。
+
+- review gate / background review は `control-plane worker`。mission / task の authority を
+  継承して findings、decision、evidence を保存し、実行権限や承認権限を持たない。
+- Chronos、Concierge、Operator は review 結果を表示・承認する renderer であり、HTML や
+  ブラウザ local state を gate の正本にしない。判定の正本は approval-store と mission gate
+  record とする。
+- `scripts/report-review/server.ts` は localhost の一時的な artifact review port である。
+  起動時の target file、token、Origin 検査、backup は有効だが、現在は viewer / tenant / NHI /
+  approval context を持たない。confidential artifact を扱う場合は、起動時に
+  `artifact_ref + EventScope + viewer_principal` を受け、save をその artifact のみへ固定し、
+  save receipt と review comment を tenant-scoped evidence に記録する必要がある。
+
+したがって review check や report-review を `active-surfaces` に追加して対話 surface と
+同列に扱うのではなく、`review service` の lifecycle / port / evidence を別に登録し、必要な
+renderer からリンクする設計が適切である。
+
+## 10. Onboarding と設定変更の共通機構
+
+オンボーディングと日常の設定変更は、別々の JSON writer を増やさず、同じ
+**Scope Change / Configuration Mission** として扱う。既存の `tenant:activation` と
+`config-mission` はこの基礎になるため、置き換えではなく共通 envelope と gate を追加する。
+
+### 10.1 共通 lifecycle
+
+```text
+intent
+  → draft (target scope / diff / risk / owner)
+  → preflight (registry / viewer / NHI / service / isolation)
+  → approval (scope と payload hash に束縛)
+  → apply (governed writer / pipeline)
+  → reconcile (実状態・health・projection確認)
+  → receipt + audit + rollback point
+```
+
+`apply` は draft の存在だけでは実行できない。少なくとも target scope、before fingerprint、
+desired fingerprint、authority role、NHI、approval ref、preflight probe ref を検証し、
+失敗時は `failed` と recovery action を記録する。外部 credential、surface exposure、
+egress、cross-tenant binding、global policy は高リスク変更として human approval を必須にする。
+
+### 10.2 変更 scope と決裁者
+
+| target scope              | 例                                                  | default authority                        |
+| ------------------------- | --------------------------------------------------- | ---------------------------------------- |
+| system                    | provider catalog、global runtime、protocol registry | owner / system operator + human approval |
+| tenant                    | service binding、quota、egress、memory policy       | tenant owner / accountable human         |
+| organization              | team、NHI assignment、operating model               | organization owner                       |
+| project / mission         | worker roster、budget、review gate                  | project / mission owner                  |
+| surface / channel binding | Slack workspace、MCP grant、review port             | service owner + tenant owner             |
+| personal                  | user preference、voice、local review UI             | 本人。ただし external effect は別 gate   |
+
+`customer/{slug}` は stance の変更であり、tenant scope の変更とは別の change kind にする。
+tenant、organization、surface binding を一度に変更する onboarding でも、contained scope
+ごとの diff と probe を持つ一つの parent change に分解して、部分成功を曖昧にしない。
+
+### 10.3 実装候補
+
+1. `ConfigMissionBrief` に `scope`、`target_kind`、`requested_by`、`nhi_id`、
+   `before_hash`、`desired_hash`、`approval_ref`、`probe_refs`、`rollback_ref` を追加する。
+2. `config-mission apply` を `preflight → approval-store → governed pipeline → reconcile`
+   の順へ変更する。surface や MCP からも同じ command / library を呼び、直接 JSON を書かない。
+3. onboarding は identity、tenant registry、organization binding、NHI provision、
+   viewer scope、service/channel binding、first-work の各段階を child change として記録する。
+4. `service/protocol/review` の registry を追加し、各 entry に `process_scope`、
+   `request_scope_mode`、`health`、`owner`、`binding`、`approval`、`data_paths` を持たせる。
+5. `surfaces:reconcile`、peer listener、MCP server、review server、scheduler は registry の
+   lifecycle adapter とし、registry が許可しない状態では起動せず、停止・再接続・restore は
+   receipt を残す。
+
+最初の実装単位は、`ConfigMissionBrief` と MCP / report-review の request context を
+共通化する WorkItem がよい。物理 namespace をさらに増やす前に、同じ approval・audit・
+reconcile contract を全入口に通すことで、surface だけが安全で protocol gateway が抜け道に
+なる状態を防げる。
+
 ## 参照した正本・実装
 
 - `knowledge/product/architecture/entity-scope-hierarchy.md`
