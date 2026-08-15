@@ -82,7 +82,10 @@ mission/task/orchestration/worker/a2a/trace writers
 - `state_before`, `state_after`, `reason_code`, `summary`
 - `correlation_id`, `causation_id`, `related_ids`
 - `evidence_refs`: trace/span/artifact/review/approval の参照だけ。本文は含めない
-- `tier`, `tenant_slug`, `redaction`: shared index に出せる範囲を明示
+- `scope_kind`, `tier`, `tenant_slug`, `organization_id`, `project_id`, `scope`:
+  system-wide か tenant/entity 内かを明示し、shared index に出せる範囲を判定する。
+  shared observability へ出す `scope` は公開用射影とし、`customer_stance`、
+  `viewer_principal`、`nhi_id` などの identity / stance metadata を含めない。
 - `source`: `mission | task | worker | orchestration | a2a | trace | surface`
 
 `summary` も prompt や秘密値を含まない bounded text とし、raw model output、credential、confidential payload は保存・共有しない。欠落イベントを補うために UI が推測で状態を作ることは禁止し、`unknown`/`stale`/`sequence_gap` を明示する。
@@ -90,7 +93,17 @@ mission/task/orchestration/worker/a2a/trace writers
 ### 投影の責務
 
 - event log が唯一の書き込み正本で、projection は再生成可能な read model とする。
-- mission/tier/tenant の境界は event reader と API の両方で検証する。
+- tenant の境界は `tenant_slug → organization_id → project_id → mission_id → task_id`
+  の `scope` chain として event reader と API の両方で検証する。scope のない legacy
+  event は tenant view に推測で混ぜず、system view または unscoped として扱う。
+- `/api/collaboration` と `/api/collaboration/stream` は `tenant` / `mission` に加えて
+  `organization`、`project`、`task`、`session`、`scope_kind` で追加絞り込みできる。
+  これらは viewer の許可範囲を拡張せず、tenant scope をさらに狭めるだけにする。
+- shared task event は payload 本文を保存・配信せず、bounded metadata と evidence reference
+  のみを投影する。
+- orchestration queue は shared 側に payload 本文を置かず、mission の実 tier 配下に保存した
+  payload reference のみを持つ。worker event recorder と SSE も同じ metadata allowlist を通り、
+  raw payload は shared observability に保存・配信しない。
 - `current`, `attention`, `timeline`, `graph` の4投影を同じ cursor から生成し、表示ごとに別の意味論を持たせない。
 - operator action は projection に直接書かず、既存の mission controller、approval store、surface steering、review API へ戻す。
 

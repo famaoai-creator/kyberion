@@ -103,7 +103,10 @@ import {
   markPhaseTasksForRework,
   planProcessTemplateTasks,
 } from './refactor/mission-process-planning.js';
-import { runMissionControllerAction } from './refactor/mission-controller-router.js';
+import {
+  assertMissionIdArgument,
+  runMissionControllerAction,
+} from './refactor/mission-controller-router.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
 export {
@@ -1454,8 +1457,10 @@ Visibility Commands:
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
                                  Safely move a paused/planned mission to another project and reconcile both sides
-  team     <ID> [--refresh]      Show or regenerate mission team composition
-  staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
+  team     <ID> [--refresh] [--provider <ID>] [--model <ID>]
+                                 Show or regenerate mission team composition
+  staff    <ID> [--provider <ID>] [--model <ID>]
+                                 Spawn or verify runtime instances for assigned mission team roles
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
                                  Resolve workflow template from mission classification
@@ -1585,12 +1590,25 @@ function showHelp() {
   console.log(buildHelpText());
 }
 
-function showMissionTeam(id: string, refresh = false, organizationId?: string) {
-  return withOrganizationContext(organizationId, () => missionSystem.showMissionTeam(id, refresh));
+function showMissionTeam(
+  id: string,
+  refresh = false,
+  organizationId?: string,
+  providerPreference?: { provider: string; modelId?: string }
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionSystem.showMissionTeam(id, refresh, providerPreference)
+  );
 }
 
-async function staffMissionTeam(id: string, organizationId?: string) {
-  return withOrganizationContext(organizationId, () => missionLifecycleService.staff(id));
+async function staffMissionTeam(
+  id: string,
+  organizationId?: string,
+  providerPreference?: { provider: string; modelId?: string }
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionLifecycleService.staff(id, { providerPreference })
+  );
 }
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
@@ -1933,6 +1951,19 @@ async function approveScopeChange(
  * 7. Main Entry
  */
 export async function main() {
+  const requestedAction = process.argv[2];
+  const isHelpFlag = process.argv.includes('--help') || process.argv.includes('-h');
+  if (isHelpFlag && requestedAction !== 'help') {
+    showHelp();
+    return;
+  }
+
+  const earlyPositionalArgs = extractMissionControllerPositionalArgs(process.argv);
+  assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
+  if (earlyPositionalArgs[1]) {
+    process.env.MISSION_ID = earlyPositionalArgs[1].toUpperCase();
+  }
+
   // Self-identify as mission_controller role for tier-guard resolution.
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';

@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertMemoryScope,
+  memoryScopeAllowsRead,
+  type MemoryScopeEnvelope,
+} from './memory-scope.js';
 
 export type MissionWorkingMemoryScope = 'mission' | 'task' | 'agent';
 
@@ -13,13 +18,16 @@ export interface MissionWorkingMemoryEntry {
   value: string;
   writer_agent: string;
   task_id?: string;
+  /** Optional canonical tenant/org/mission scope; absent only for legacy rows. */
+  scope_context?: MemoryScopeEnvelope;
   created_at: string;
   metadata?: Record<string, unknown>;
 }
 
 function mwmPersistPath(missionId: string): string {
-  const missionPath = pathResolver.findMissionPath(missionId.toUpperCase())
-    ?? pathResolver.active(path.join('missions', 'confidential', missionId.toUpperCase()));
+  const missionPath =
+    pathResolver.findMissionPath(missionId.toUpperCase()) ??
+    pathResolver.active(path.join('missions', 'confidential', missionId.toUpperCase()));
   return path.join(missionPath, '.mwm-entries.json');
 }
 
@@ -27,7 +35,9 @@ function loadEntries(missionId: string): MissionWorkingMemoryEntry[] {
   const p = mwmPersistPath(missionId);
   if (!safeExistsSync(p)) return [];
   try {
-    return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string) as MissionWorkingMemoryEntry[];
+    return JSON.parse(
+      safeReadFile(p, { encoding: 'utf8' }) as string
+    ) as MissionWorkingMemoryEntry[];
   } catch {
     return [];
   }
@@ -52,7 +62,7 @@ export class MissionWorkingMemory {
     const key = missionId.toUpperCase();
     if (!this.persistedMissions.has(key)) {
       const persisted = loadEntries(key);
-      const existingIds = new Set(this.entries.map(e => e.entry_id));
+      const existingIds = new Set(this.entries.map((e) => e.entry_id));
       for (const e of persisted) {
         if (!existingIds.has(e.entry_id)) this.entries.push(e);
       }
@@ -67,10 +77,20 @@ export class MissionWorkingMemory {
     value: string;
     writer_agent: string;
     task_id?: string;
+    scope_context?: MemoryScopeEnvelope;
     metadata?: Record<string, unknown>;
   }): MissionWorkingMemoryEntry {
     const missionId = input.mission_id.toUpperCase();
     this.ensureLoaded(missionId);
+    let scopeContext: MemoryScopeEnvelope | undefined;
+    if (input.scope_context) {
+      scopeContext = assertMemoryScope(input.scope_context, input.scope_context.tier);
+      if (scopeContext.mission_id && scopeContext.mission_id !== missionId) {
+        throw new Error(
+          `[MEMORY_SCOPE_INVALID] scope_context.mission_id '${scopeContext.mission_id}' does not match '${missionId}'`
+        );
+      }
+    }
     const entry: MissionWorkingMemoryEntry = {
       entry_id: `MWM-${randomUUID().slice(0, 8).toUpperCase()}`,
       mission_id: missionId,
@@ -79,21 +99,35 @@ export class MissionWorkingMemory {
       value: input.value,
       writer_agent: input.writer_agent,
       task_id: input.task_id,
+      ...(scopeContext ? { scope_context: scopeContext } : {}),
       created_at: new Date().toISOString(),
       metadata: input.metadata,
     };
     this.entries.push(entry);
-    saveEntries(missionId, this.entries.filter(e => e.mission_id === missionId));
+    saveEntries(
+      missionId,
+      this.entries.filter((e) => e.mission_id === missionId)
+    );
     return entry;
   }
 
-  list(input: { missionId: string; scope?: MissionWorkingMemoryScope; taskId?: string; writerAgent?: string }): MissionWorkingMemoryEntry[] {
+  list(input: {
+    missionId: string;
+    scope?: MissionWorkingMemoryScope;
+    taskId?: string;
+    writerAgent?: string;
+    scopeContext?: MemoryScopeEnvelope;
+  }): MissionWorkingMemoryEntry[] {
     this.ensureLoaded(input.missionId);
     return this.entries.filter((entry) => {
       if (entry.mission_id !== input.missionId.toUpperCase()) return false;
       if (input.scope && entry.scope !== input.scope) return false;
       if (input.taskId && entry.task_id !== input.taskId) return false;
       if (input.writerAgent && entry.writer_agent !== input.writerAgent) return false;
+      if (input.scopeContext) {
+        if (!entry.scope_context) return input.scopeContext.tier === 'public';
+        if (!memoryScopeAllowsRead(entry.scope_context, input.scopeContext)) return false;
+      }
       return true;
     });
   }

@@ -98,6 +98,7 @@ export interface AgentRuntimeSupervisorAskPayload {
   agentId: string;
   prompt: string;
   requestedBy: string;
+  missionId?: string;
   correlationId?: string;
   /** Transport timeout for this ask; ordinary conversation asks use the default. */
   timeoutMs?: number;

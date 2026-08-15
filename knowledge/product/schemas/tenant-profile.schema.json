@@ -28,8 +28,8 @@
         "strict_isolation": { "type": "boolean", "default": true },
         "allow_cross_distillation": {
           "type": "boolean",
-          "default": true,
-          "description": "Allow abstract wisdom extraction to public tier."
+          "default": false,
+          "description": "Allow only explicitly brokered, redacted promotion to a broader tier."
         }
       }
     },

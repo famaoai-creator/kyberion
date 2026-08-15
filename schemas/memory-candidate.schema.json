@@ -47,7 +47,61 @@
     "last_seen": { "type": "string", "minLength": 1 },
     "ratified_at": { "type": "string", "minLength": 1 },
     "ratification_note": { "type": "string", "minLength": 1 },
-    "promoted_ref": { "type": "string", "minLength": 1 }
+    "promoted_ref": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier"],
+      "properties": {
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "customer_stance": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
+        "work_shape": { "type": "string", "minLength": 1 },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "viewer_principal": { "type": "string", "minLength": 1 },
+        "nhi_id": { "type": "string", "minLength": 1 },
+        "owner_nhi": { "type": "string", "minLength": 1 },
+        "retention_policy": { "type": "string", "minLength": 1 },
+        "allowed_audience": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "promotion_policy": { "enum": ["same_scope", "brokered", "human_review"] },
+        "provenance_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "redacted": { "type": "boolean" }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_tenant_slug", "target_tier", "redacted"],
+      "properties": {
+        "source_tenant_slug": { "type": "string", "minLength": 1 },
+        "target_tier": { "enum": ["public", "confidential", "personal"] },
+        "redacted": { "type": "boolean" },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "minLength": 1 }
+      }
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": { "tier": { "const": "confidential" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": { "type": "object", "required": ["tenant_slug"] }
+        }
+      }
+    }
+  ]
 }

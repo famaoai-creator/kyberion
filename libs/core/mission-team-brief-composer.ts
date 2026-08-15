@@ -29,6 +29,7 @@ export interface MissionTeamCompositionBriefInput {
   progressSignals?: string[];
   tier?: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
+  tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
   executionShape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
 }
@@ -90,6 +91,7 @@ export function composeMissionTeamBrief(
     progressSignals: input.progressSignals,
     tier,
     assignedPersona: input.assignedPersona,
+    tenantSlug: input.tenantSlug,
     organizationProfile: input.organizationProfile,
   });
   const workflowDesign = resolveMissionWorkflowDesign({

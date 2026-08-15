@@ -63,6 +63,8 @@ vi.mock('./ledger.js', () => ({
 
 vi.mock('./mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
+  missionTaskEventsPath: (missionId: string) =>
+    `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
 }));
 
 vi.mock('./distill-knowledge-injector.js', async (importOriginal) => {

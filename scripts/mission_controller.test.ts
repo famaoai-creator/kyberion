@@ -310,6 +310,44 @@ describe('mission_controller argument parsing', () => {
     }
   });
 
+  it('handles flag help before provider and kill-switch bootstrap', async () => {
+    const startSpy = vi.spyOn(killSwitch.killSwitch, 'startMonitor');
+    const routerSpy = vi
+      .spyOn(missionControllerRouter, 'runMissionControllerAction')
+      .mockResolvedValue(undefined as any);
+    const originalArgv = process.argv.slice();
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'dispatch-workitems', '--help'];
+
+    try {
+      await main();
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(routerSpy).not.toHaveBeenCalled();
+    } finally {
+      process.argv = originalArgv;
+      startSpy.mockRestore();
+      routerSpy.mockRestore();
+    }
+  });
+
+  it('rejects a missing mission ID before provider and kill-switch bootstrap', async () => {
+    const startSpy = vi.spyOn(killSwitch.killSwitch, 'startMonitor');
+    const routerSpy = vi
+      .spyOn(missionControllerRouter, 'runMissionControllerAction')
+      .mockResolvedValue(undefined as any);
+    const originalArgv = process.argv.slice();
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'dispatch-workitems'];
+
+    try {
+      await expect(main()).rejects.toThrow('dispatch-workitems requires a mission ID');
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(routerSpy).not.toHaveBeenCalled();
+    } finally {
+      process.argv = originalArgv;
+      startSpy.mockRestore();
+      routerSpy.mockRestore();
+    }
+  });
+
   it('treats --routing-decision as a named option instead of a positional argument', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
@@ -1362,4 +1400,49 @@ describe('mission controller router — archive verb (AL-03)', () => {
     ]);
     expect(positionalArgs).toEqual(['archive']);
   });
+});
+
+describe('mission controller router — mission ID and help guards', () => {
+  function makeGuardContext(argv: string[], action: string) {
+    return {
+      argv,
+      action,
+      hasRefresh: false,
+      hasDryRun: false,
+      getOptionValue: () => undefined,
+      parseCsvOption: (() => undefined) as any,
+      showHelp: vi.fn(),
+    } as any;
+  }
+
+  it('short-circuits dispatch help before requiring a mission ID', async () => {
+    const context = makeGuardContext(
+      ['node', 'dist/scripts/mission_controller.js', 'dispatch-workitems', '--help'],
+      'dispatch-workitems'
+    );
+
+    await missionControllerRouter.runMissionControllerAction(context);
+
+    expect(context.showHelp).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects dispatch-workitems without a mission ID', async () => {
+    const context = makeGuardContext(
+      ['node', 'dist/scripts/mission_controller.js', 'dispatch-workitems'],
+      'dispatch-workitems'
+    );
+
+    await expect(missionControllerRouter.runMissionControllerAction(context)).rejects.toThrow(
+      'dispatch-workitems requires a mission ID'
+    );
+  });
+
+  it.each(['status', 'team', 'staff', 'classify', 'workflow-select', 'plan-tasks', 'handoff'])(
+    'rejects %s without a mission ID',
+    (action) => {
+      expect(() => missionControllerRouter.assertMissionIdArgument(action, undefined)).toThrow(
+        `${action} requires a mission ID`
+      );
+    }
+  );
 });

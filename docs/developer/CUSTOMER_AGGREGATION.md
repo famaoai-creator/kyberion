@@ -93,16 +93,16 @@ Secrets must **never** live in the customer overlay, even though `customer/{slug
 
 ## 3. What Goes Where
 
-| File            | Customer overlay (`customer/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
-| --------------- | ------------------------------------- | ------------------------------------------------ | ------------------------------------ |
-| Identity        | `identity.json`                       | `my-identity.json`                               | —                                    |
-| Vision          | `vision.md`                           | `my-vision.md`                                   | —                                    |
-| Connections     | `connections/*.json`                  | `connections/*.json`                             | —                                    |
-| Tenants         | `tenants/*.json`                      | `tenants/*.json`                                 | —                                    |
-| Voice profile   | `voice/profile.json`                  | `voice/profile-registry.json`                    | `voice/*`                            |
-| Approval policy | `policy/approval-policy.json`         | —                                                | `governance/approval-policy.json`    |
-| Path scope      | `policy/path-scope-policy.json`       | —                                                | `governance/path-scope-policy.json`  |
-| Mission seeds   | `mission-seeds/*.json`                | —                                                | (additive only)                      |
+| File            | Customer overlay (`customer/{slug}/`)       | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
+| --------------- | ------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
+| Identity        | `identity.json`                             | `my-identity.json`                               | —                                    |
+| Vision          | `vision.md`                                 | `my-vision.md`                                   | —                                    |
+| Connections     | `connections/*.json`                        | `connections/*.json`                             | —                                    |
+| Tenant facet    | `tenants/*.json` (optional reference facet) | `tenants/*.json` (canonical registry)            | —                                    |
+| Voice profile   | `voice/profile.json`                        | `voice/profile-registry.json`                    | `voice/*`                            |
+| Approval policy | `policy/approval-policy.json`               | —                                                | `governance/approval-policy.json`    |
+| Path scope      | `policy/path-scope-policy.json`             | —                                                | `governance/path-scope-policy.json`  |
+| Mission seeds   | `mission-seeds/*.json`                      | —                                                | (additive only)                      |
 
 ## 4. Migration from Existing Single-User Setup
 

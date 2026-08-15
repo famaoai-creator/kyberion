@@ -17,6 +17,7 @@ const SOURCE_PATH = `active/projects/confidential/${TEST_TENANT}/${SOURCE_PROJEC
 const TARGET_PATH = `active/projects/confidential/${TEST_TENANT}/${TARGET_PROJECT_ID}`;
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
+const ORIGINAL_TENANT = process.env.KYBERION_TENANT;
 
 function cleanup(): void {
   const missionPath = pathResolver.missionDir(MISSION_ID, 'confidential');
@@ -37,8 +38,20 @@ function cleanup(): void {
   ]) {
     if (safeExistsSync(filePath)) safeRmSync(filePath);
   }
-  for (const workspace of [missionPath, sourceWorkspace, targetWorkspace]) {
+  const tenantMissionPaths = [TEST_TENANT, 'other-tenant'].map((tenant) =>
+    pathResolver.tenantMissionDir(MISSION_ID, tenant, 'confidential')
+  );
+  for (const [index, workspace] of [
+    missionPath,
+    ...tenantMissionPaths,
+    sourceWorkspace,
+    targetWorkspace,
+  ].entries()) {
+    const previousTenant = process.env.KYBERION_TENANT;
+    if (index === 2) process.env.KYBERION_TENANT = 'other-tenant';
     if (safeExistsSync(workspace)) safeRmSync(workspace);
+    if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = previousTenant;
   }
 }
 
@@ -78,6 +91,7 @@ describe('mission Project reassignment', () => {
   beforeEach(() => {
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
+    process.env.KYBERION_TENANT = TEST_TENANT;
     cleanup();
     saveProjectRecord({
       project_id: SOURCE_PROJECT_ID,
@@ -105,6 +119,8 @@ describe('mission Project reassignment', () => {
     cleanup();
     process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
+    if (ORIGINAL_TENANT === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = ORIGINAL_TENANT;
   });
 
   it('moves mission state and both project ledgers through one governed operation', async () => {
@@ -136,6 +152,7 @@ describe('mission Project reassignment', () => {
   });
 
   it('rejects reassignment across tenant scope even when the mission is paused', async () => {
+    process.env.KYBERION_TENANT = 'other-tenant';
     await saveState(MISSION_ID, { ...fixtureMission(), tenant_slug: 'other-tenant' });
 
     await expect(

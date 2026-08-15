@@ -7,6 +7,7 @@ import {
   type AgentProfileRecord,
   type MissionTeamAssignment,
   type RoleSeparationConstraints,
+  type TeamProviderPreference,
   type TeamRoleRecord,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
@@ -28,11 +29,19 @@ import {
   type OrganizationOrgChartSummary,
 } from './org-chart.js';
 import { resolveParticipantContext, type ParticipantRisk } from './participant-context-resolver.js';
+import { discoverProviders } from './provider-discovery.js';
+import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
 
 export interface MissionTeamPlan {
   mission_id: string;
   mission_type: string;
   tier: string;
+  tenant_slug?: string;
+  provider_selection?: {
+    requested_provider?: string;
+    requested_model_id?: string;
+    available_providers: string[];
+  };
   template: string;
   assigned_persona?: string;
   organization_profile?: MissionTeamOrganizationProfileSummary;
@@ -94,7 +103,52 @@ export interface ResolveMissionTeamOptions {
   progressSignals?: string[];
   tier?: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
+  tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
+  forceRefresh?: boolean;
+  providerPreference?: TeamProviderPreference;
+}
+
+function loadMissionTenantSlug(missionId: string): string | undefined {
+  const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
+  if (!missionPath) return undefined;
+  const statePath = path.join(missionPath, 'mission-state.json');
+  if (!safeExistsSync(statePath)) return undefined;
+  try {
+    const state = loadJson<{ tenant_slug?: unknown }>(statePath);
+    return typeof state?.tenant_slug === 'string' && state.tenant_slug.trim()
+      ? state.tenant_slug.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveAvailableTeamProviders(): string[] {
+  return discoverProviders()
+    .filter(
+      (entry) => entry.installed && entry.healthy && !isObsoleteAgentRuntimeProvider(entry.provider)
+    )
+    .map((entry) => entry.provider)
+    .sort();
+}
+
+function normalizeTeamProviderPreference(
+  preference?: TeamProviderPreference
+): TeamProviderPreference | undefined {
+  if (!preference?.provider?.trim()) return undefined;
+  const normalized: TeamProviderPreference = {
+    provider: preference.provider.trim().toLowerCase(),
+    ...(preference.modelId?.trim() ? { modelId: preference.modelId.trim() } : {}),
+    strategy: preference.strategy || 'strict',
+  };
+  const availableProviders = resolveAvailableTeamProviders();
+  if (!availableProviders.includes(normalized.provider)) {
+    throw new Error(
+      `[TEAM_PROVIDER_UNAVAILABLE] Requested provider '${normalized.provider}' is not available for team composition. Available providers: ${availableProviders.join(', ') || 'none'}.`
+    );
+  }
+  return normalized;
 }
 
 function buildTeamGovernance(
@@ -201,9 +255,14 @@ export function composeMissionTeamPlan(input: {
   progressSignals?: string[];
   tier: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
+  tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
+  providerPreference?: TeamProviderPreference;
 }): MissionTeamPlan {
   const organizationProfile = input.organizationProfile ?? loadOrganizationProfile();
+  const tenantSlug = input.tenantSlug?.trim() || 'default';
+  const providerPreference = normalizeTeamProviderPreference(input.providerPreference);
+  const availableProviders = providerPreference ? resolveAvailableTeamProviders() : [];
   const missionClassification = resolveMissionClassification({
     missionTypeHint: input.missionType,
     intentId: input.intentId,
@@ -329,7 +388,8 @@ export function composeMissionTeamPlan(input: {
       agents,
       missionTaskModelHint,
       separationForRole(role),
-      organizationProfile?.organization_id
+      organizationProfile?.organization_id,
+      providerPreference
     );
     recordAssignment(role, selectedRequired);
     assignments.push(
@@ -340,7 +400,7 @@ export function composeMissionTeamPlan(input: {
         },
         missionId: input.missionId,
         tier: input.tier,
-        tenantId: organizationProfile?.organization_id || 'default',
+        tenantId: tenantSlug,
         risk: missionClassification.risk_profile,
       })
     );
@@ -369,7 +429,8 @@ export function composeMissionTeamPlan(input: {
       agents,
       missionTaskModelHint,
       separationForRole(role),
-      organizationProfile?.organization_id
+      organizationProfile?.organization_id,
+      providerPreference
     );
     recordAssignment(role, assignment);
     assignment.required = false;
@@ -379,7 +440,7 @@ export function composeMissionTeamPlan(input: {
         assignment,
         missionId: input.missionId,
         tier: input.tier,
-        tenantId: organizationProfile?.organization_id || 'default',
+        tenantId: tenantSlug,
         risk: missionClassification.risk_profile,
       })
     );
@@ -389,6 +450,18 @@ export function composeMissionTeamPlan(input: {
     mission_id: input.missionId,
     mission_type: missionType,
     tier: input.tier,
+    tenant_slug: tenantSlug,
+    ...(providerPreference
+      ? {
+          provider_selection: {
+            requested_provider: providerPreference.provider,
+            ...(providerPreference.modelId
+              ? { requested_model_id: providerPreference.modelId }
+              : {}),
+            available_providers: availableProviders,
+          },
+        }
+      : {}),
     template: templates[missionType]
       ? missionType
       : organizationDefaultTemplate && templates[organizationDefaultTemplate]
@@ -456,13 +529,34 @@ export function getMissionTeamPlanPath(missionId: string): string | null {
 export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   const planPath = getMissionTeamPlanPath(missionId);
   if (!planPath || !safeExistsSync(planPath)) return null;
-  return loadJson<MissionTeamPlan>(planPath);
+  const plan = loadJson<MissionTeamPlan>(planPath);
+  const expectedTenant = loadMissionTenantSlug(missionId);
+  if (
+    expectedTenant &&
+    plan.assignments.some(
+      (assignment) =>
+        assignment.status === 'assigned' && assignment.security_scope?.tenant_id !== expectedTenant
+    )
+  ) {
+    return null;
+  }
+  if (
+    plan.assignments.some(
+      (assignment) =>
+        assignment.status === 'assigned' &&
+        isObsoleteAgentRuntimeProvider(assignment.provider || undefined)
+    )
+  ) {
+    return null;
+  }
+  return plan;
 }
 
 export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): MissionTeamPlan {
   const missionId = input.missionId.toUpperCase();
-  const existing = loadMissionTeamPlan(missionId);
-  if (existing) return existing;
+  const tenantSlug = input.tenantSlug?.trim() || loadMissionTenantSlug(missionId);
+  const existing = input.forceRefresh ? null : loadMissionTeamPlan(missionId);
+  if (existing && (!tenantSlug || existing.tenant_slug === tenantSlug)) return existing;
 
   return composeMissionTeamPlan({
     missionId,
@@ -475,7 +569,9 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
     progressSignals: input.progressSignals,
     tier: input.tier || 'public',
     assignedPersona: input.assignedPersona,
+    ...(tenantSlug ? { tenantSlug } : {}),
     organizationProfile: input.organizationProfile,
+    providerPreference: input.providerPreference,
   });
 }
 
@@ -551,7 +647,7 @@ export function resolveMissionTeamReceiver(input: {
     },
     missionId: plan.mission_id,
     tier: plan.tier as 'personal' | 'confidential' | 'public',
-    tenantId: plan.organization_profile?.organization_id || 'default',
+    tenantId: plan.tenant_slug || 'default',
     risk: plan.mission_classification?.risk_profile || 'low',
   });
 }

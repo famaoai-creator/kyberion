@@ -26,6 +26,7 @@ type ParsedArgs = {
   projectId?: string;
   projectName?: string;
   projectSummary?: string;
+  serviceId?: string;
   trackId?: string;
   trackName?: string;
   serviceBindings?: string[];
@@ -72,6 +73,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     projectId: value(argv, '--project-id'),
     projectName: value(argv, '--project-name'),
     projectSummary: value(argv, '--project-summary'),
+    serviceId: value(argv, '--service-id'),
     trackId: value(argv, '--track-id'),
     trackName: value(argv, '--track-name'),
     serviceBindings: value(argv, '--service-bindings')
@@ -101,7 +103,7 @@ function usage(): string {
     '',
     '  pnpm onboarding:context show --customer-slug <slug> [--root-dir <path>] [--json]',
     '  pnpm onboarding:context bind --customer-slug <slug> --tenant-slug <slug> [--organization-id <id>] [--root-dir <path>] [--apply] [--json]',
-    '  pnpm onboarding:context first-work --customer-slug <slug> --intent "<request>" [--root-dir <path>] [--apply --accept] [--bootstrap-project --project-id <id> --project-name <name> --project-summary <text>] [--json]',
+    '  pnpm onboarding:context first-work --customer-slug <slug> --intent "<request>" [--service-id <id>] [--root-dir <path>] [--apply --accept] [--bootstrap-project --project-id <id> --project-name <name> --project-summary <text>] [--json]',
     '',
     'Writes are dry-run by default. --apply is required for state changes.',
   ].join('\n');
@@ -145,6 +147,7 @@ function run(args = process.argv.slice(2)): void {
         customerSlug,
         intent: parsed.intent,
         rootDir: parsed.rootDir,
+        ...(parsed.serviceId ? { contextRefs: { service_id: parsed.serviceId } } : {}),
       })
     );
     return;
@@ -154,6 +157,7 @@ function run(args = process.argv.slice(2)): void {
       customerSlug,
       intent: parsed.intent,
       rootDir: parsed.rootDir,
+      ...(parsed.serviceId ? { contextRefs: { service_id: parsed.serviceId } } : {}),
       accept: parsed.accept,
       bootstrapProject: parsed.bootstrapProject
         ? {

@@ -33,6 +33,7 @@ import { releaseOrchestratorSessionForMissionBestEffort } from './orchestrator-s
 import { archiveMissionById } from './mission-maintenance.js';
 import type { ArchiveMissionByIdResult, PurgeMissionsResult } from './mission-maintenance.js';
 import type { MissionExecutionSurface } from './mission-execution-surface.js';
+import type { TeamProviderPreference } from './team-role-assignment-selection.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -41,6 +42,7 @@ export interface MissionLifecycleVerbOptions {
    * still the only caller today, so an unlabeled call is assumed to be it.
    */
   surface?: string;
+  providerPreference?: TeamProviderPreference;
 }
 
 export class MissionLifecycleGovernedError extends Error {
@@ -294,7 +296,7 @@ export function buildMissionLifecycleService(
 
     async staff(id: string, options?: MissionLifecycleVerbOptions) {
       return runGovernedVerb('staff', normalizeMissionId(id), options, () =>
-        resolveSystem(explicitSystem).staffMissionTeam(id)
+        resolveSystem(explicitSystem).staffMissionTeam(id, options?.providerPreference)
       );
     },
 

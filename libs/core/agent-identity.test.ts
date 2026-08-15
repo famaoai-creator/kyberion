@@ -209,6 +209,25 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
     ).toThrow(AgentIdentityFormatError);
   });
 
+  it('persists canonical tenant affiliation separately from the organization id', () => {
+    const record = issueTestIdentity('tenant-affiliated-agent', {
+      affiliation: { tenant_slug: 'acme-corp', project_id: 'project-x' },
+    });
+    expect(record.affiliation).toEqual({
+      organization_id: 'demo-org',
+      tenant_slug: 'acme-corp',
+      project_id: 'project-x',
+    });
+  });
+
+  it('rejects a reserved tenant affiliation slug', () => {
+    expect(() =>
+      issueTestIdentity('reserved-tenant-agent', {
+        affiliation: { tenant_slug: 'confidential' },
+      })
+    ).toThrow(AgentIdentityFormatError);
+  });
+
   it('re-issue with identical core params is idempotent; differing params conflict', () => {
     const first = issueTestIdentity('unique-agent');
     const second = issueTestIdentity('unique-agent');

@@ -20,6 +20,7 @@
 - [onboarding-surface-agent.agent](./product/agents/onboarding-surface-agent.agent.md) (public | Unknown)
 - [planner-agent.agent](./product/agents/planner-agent.agent.md) (public | Unknown)
 - [presence-surface-agent.agent](./product/agents/presence-surface-agent.agent.md) (public | Unknown)
+- [reasoning-worker.agent](./product/agents/reasoning-worker.agent.md) (public | Unknown)
 - [slack-gateway.agent](./product/agents/slack-gateway.agent.md) (public | Unknown)
 - [slack-surface-agent.agent](./product/agents/slack-surface-agent.agent.md) (public | Unknown)
 - [sovereign-brain.agent](./product/agents/sovereign-brain.agent.md) (public | Unknown)
@@ -190,6 +191,7 @@
 - [Wisdom Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
+- [オンボーディング標準フロー — Tenant / Organization / Activation](./product/governance/onboarding-flow.md) (public | Unknown)
 - [テナント追加手順 — 登録は1系統、検証は check:tenant-registry](./product/governance/tenant-onboarding-procedure.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
 
