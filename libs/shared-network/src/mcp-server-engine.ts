@@ -36,6 +36,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   resolveMcpRequestContext,
+  assertMcpCallerRole,
   assertProtocolServiceRegistered,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
@@ -77,6 +78,14 @@ const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.
 
 interface ToolCatalog {
   pipeline_run_allowlist: string[];
+  tools?: ToolCatalogEntry[];
+}
+
+interface ToolCatalogEntry {
+  name: string;
+  allowed_caller_roles?: string[];
+  allowed_tiers?: string[];
+  requires_approval?: boolean;
 }
 
 function loadCatalog(): ToolCatalog {
@@ -86,6 +95,45 @@ function loadCatalog(): ToolCatalog {
   } catch {
     return { pipeline_run_allowlist: [] };
   }
+}
+
+function catalogEntry(catalog: ToolCatalog, toolName: string): ToolCatalogEntry {
+  const entry = catalog.tools?.find((tool) => tool.name === toolName);
+  if (!entry || !entry.allowed_caller_roles?.length) {
+    throw new Error(`[MCP_TOOL_UNREGISTERED] tool '${toolName}' has no governed catalog entry`);
+  }
+  return entry;
+}
+
+function registerGovernedTool(
+  server: McpServer,
+  catalog: ToolCatalog,
+  name: string,
+  description: string,
+  schema: Record<string, unknown>,
+  handler: (args: any) => Promise<any>
+): void {
+  server.tool(name, description, schema, async (args: any) => {
+    try {
+      const entry = catalogEntry(catalog, name);
+      const context = resolveMcpRequestContext({
+        requested_tenant: typeof args?.tenant === 'string' ? args.tenant : undefined,
+        requested_tier:
+          args?.tier === 'public' || args?.tier === 'confidential' || args?.tier === 'personal'
+            ? args.tier
+            : undefined,
+        mission_id: typeof args?.mission_id === 'string' ? args.mission_id : undefined,
+        task_id: typeof args?.task_id === 'string' ? args.task_id : undefined,
+      });
+      assertMcpCallerRole(context, entry.allowed_caller_roles!, name);
+      return await handler(args);
+    } catch (err) {
+      return {
+        content: [{ type: 'text' as const, text: `MCP tool access denied: ${err}` }],
+        isError: true,
+      };
+    }
+  });
 }
 
 function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
@@ -353,7 +401,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.pipeline.list ────────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.pipeline.list',
     'List Kyberion pipeline definitions. Each entry carries `runnable_via_mcp`; ' +
       'only entries with `runnable_via_mcp: true` can be executed with kyberion.pipeline.run.',
@@ -379,7 +429,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.pipeline.run ─────────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.pipeline.run',
     'Execute a Kyberion pipeline. Only allowlisted pipelines may be run via MCP. ' +
       'Synchronous runs are killed after 60s; pass background: true for long pipelines ' +
@@ -468,7 +520,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.pipeline.job_status ──────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.pipeline.job_status',
     'Check a background pipeline job started with kyberion.pipeline.run background: true. ' +
       'Returns status, exit code, and the tail of the combined output.',
@@ -501,7 +555,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.knowledge.search ─────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.knowledge.search',
     'Search the Kyberion knowledge base (public tier). Returns ranked hints.',
     {
@@ -529,7 +585,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.capability.list ──────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.capability.list',
     'List all available Kyberion actuator capabilities.',
     {},
@@ -549,7 +607,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.service.actuate ──────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.service.actuate',
     'Execute a Kyberion service actuator (e.g. Notion API) operation.',
     {
@@ -586,7 +646,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.mission.create ───────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.mission.create',
     'Create a new Kyberion mission. Returns the mission ID.',
     {
@@ -612,7 +674,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.mission.status ───────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.mission.status',
     'Get the current status of a Kyberion mission.',
     {
@@ -638,7 +702,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.mission.journal ──────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.mission.journal',
     'Read the journal log of a Kyberion mission.',
     {
@@ -664,7 +730,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.surface.cowork.deliver ──────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.surface.cowork.deliver',
     'Deliver a Kyberion result artifact to the Cowork outbox. Cowork can then present it to the operator.',
     {
@@ -704,7 +772,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.surface.cowork.list ──────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.surface.cowork.list',
     'List pending artifact deliveries in the Cowork outbox.',
     {},
@@ -722,7 +792,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.knowledge.cowork_sync ───────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.knowledge.cowork_sync',
     [
       'Sync Kyberion knowledge with Cowork workspace.',
@@ -768,7 +840,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.approval.list_pending ────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.approval.list_pending',
     'List all pending Kyberion approval requests. Call this before kyberion.approval.decide.',
     {},
@@ -790,7 +864,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.approval.decide ──────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.approval.decide',
     [
       'Submit an approval decision (approved/rejected) for a pending Kyberion request.',
@@ -829,7 +905,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.audit.export ─────────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.audit.export',
     'Export the Kyberion audit chain log. Returns a path to the exported NDJSON bundle.',
     {
@@ -883,7 +961,9 @@ export function createKyberionMcpServer(): McpServer {
   );
 
   // ── kyberion.audit.verify ─────────────────────────────────────────────────
-  server.tool(
+  registerGovernedTool(
+    server,
+    catalog,
     'kyberion.audit.verify',
     'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail.',
     {

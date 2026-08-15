@@ -281,7 +281,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (162)
+## runtime (166)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -357,6 +357,10 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_LOCALE`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                 | string | no       | Allow loopback Chronos requests to use the compatibility localadmin principal when true or unset.       |
 | `KYBERION_MANAGED_PYTHON_VERSION`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MCP_CALLER_ROLE`                     | string | no       | Server-bound MCP caller role checked against mcp-tool-catalog.json; client arguments cannot elevate it. |
+| `KYBERION_MCP_NHI`                             | string | no       | Server-bound NHI used to bind MCP event and approval scope.                                             |
+| `KYBERION_MCP_PRINCIPAL`                       | string | no       | Server-bound principal name recorded for MCP request attribution.                                       |
+| `KYBERION_MCP_TENANT`                          | string | no       | Server-bound tenant slug; a client-supplied tenant may only narrow this binding.                        |
 | `KYBERION_MEMORY_AUTOPROMOTE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_NAMESPACE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_PEER_ID`                        | string | no       | _undocumented_                                                                                          |
