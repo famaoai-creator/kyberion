@@ -20,6 +20,30 @@ export interface McpRequestContextInput {
   env?: NodeJS.ProcessEnv;
 }
 
+/**
+ * Enforce the caller-role contract declared by the MCP tool catalog.
+ *
+ * The role is resolved from the server-side binding above. A client cannot
+ * promote itself by passing a role in tool arguments, and an unknown role is
+ * rejected rather than treated as a permissive default.
+ */
+export function assertMcpCallerRole(
+  context: Pick<McpRequestContext, 'caller_role'>,
+  allowedRoles: readonly string[],
+  toolName: string
+): void {
+  if (context.caller_role === 'unknown') {
+    throw new Error(
+      `[MCP_CALLER_ROLE_REQUIRED] server caller role is not established for ${toolName}`
+    );
+  }
+  if (!allowedRoles.includes(context.caller_role)) {
+    throw new Error(
+      `[MCP_CALLER_ROLE_DENIED] caller role '${context.caller_role}' is not allowed for ${toolName}`
+    );
+  }
+}
+
 function clean(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized || undefined;
