@@ -20,7 +20,9 @@ import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const SHARED_SECRET = 'peer-message-test-secret';
-const TENANT_ID = 'tenant-acme';
+// Keep this file's physical runtime namespace isolated from peer-conversation
+// tests, which exercise the same peer ids concurrently in Vitest.
+const TENANT_ID = 'tenant-peer-messaging-test';
 const REGISTRY_TENANT = 'peer-registry-test';
 const REGISTRY_TEST_CATALOG = pathResolver.sharedTmp('peer-network-registration.test.json');
 
@@ -86,10 +88,34 @@ describe('peer messaging', () => {
     });
 
     expect(envelope.signature).toBeTruthy();
+    expect(envelope.scope).toMatchObject({
+      scope_kind: 'tenant',
+      tier: 'confidential',
+      tenant_slug: TENANT_ID,
+    });
     expect(verifyPeerMessage(envelope, SHARED_SECRET)).toBe(true);
     expect(
       verifyPeerMessage({ ...envelope, payload: { summary: 'tampered' } }, SHARED_SECRET)
     ).toBe(false);
+  });
+
+  it('rejects an envelope scope that does not match its tenant binding', () => {
+    expect(() =>
+      buildPeerMessageEnvelope({
+        senderPeerId: 'peer-a-test',
+        recipientPeerId: 'peer-b-test',
+        tenantId: TENANT_ID,
+        scope: {
+          scope_kind: 'tenant',
+          tier: 'confidential',
+          tenant_slug: 'tenant-bravo',
+        },
+        subject: 'scope-mismatch',
+        type: 'request',
+        payload: {},
+        sharedSecret: SHARED_SECRET,
+      })
+    ).toThrow('peer_message_scope_tenant_mismatch');
   });
 
   it('rejects a correctly signed envelope from another tenant', async () => {

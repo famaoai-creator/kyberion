@@ -7,6 +7,7 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -36,6 +37,12 @@ export interface PeerMessageEnvelope<TPayload = unknown> {
   expires_at?: string;
   transport?: 'http';
   signature?: string;
+  /** Canonical request scope carried inside the signed peer envelope. */
+  scope: EventScope;
+  /** Optional NHI principal; peer identity alone is not an authority grant. */
+  principal?: { kind: 'nhi'; id: string };
+  /** Required for brokered cross-tenant extensions; same-tenant messages omit it. */
+  approval_ref?: string;
 }
 
 export interface PeerNetworkPeerRecord {
@@ -72,6 +79,9 @@ export interface BuildPeerMessageInput<TPayload = unknown> {
   replyToMessageId?: string;
   correlationId?: string;
   ttlMs?: number;
+  scope?: EventScopeInput;
+  principal?: { kind: 'nhi'; id: string };
+  approvalRef?: string;
 }
 
 export interface PeerMessageDispatchOptions {
@@ -159,6 +169,9 @@ function normalizeEnvelope<TPayload>(
     ...(envelope.expires_at ? { expires_at: envelope.expires_at } : {}),
     ...(envelope.transport ? { transport: envelope.transport } : {}),
     ...(envelope.signature ? { signature: envelope.signature } : {}),
+    scope: envelope.scope,
+    ...(envelope.principal ? { principal: envelope.principal } : {}),
+    ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
 }
 
@@ -181,6 +194,9 @@ function signaturePayload<TPayload>(
     ...(typeof envelope.ttl_ms === 'number' ? { ttl_ms: envelope.ttl_ms } : {}),
     ...(envelope.expires_at ? { expires_at: envelope.expires_at } : {}),
     ...(envelope.transport ? { transport: envelope.transport } : {}),
+    scope: envelope.scope,
+    ...(envelope.principal ? { principal: envelope.principal } : {}),
+    ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
 }
 
@@ -210,9 +226,16 @@ export function verifyPeerMessage<TPayload>(
 export function buildPeerMessageEnvelope<TPayload>(
   input: BuildPeerMessageInput<TPayload>
 ): PeerMessageEnvelope<TPayload> {
+  const tenantId = normalizeTenantId(input.tenantId);
+  const scope = normalizeEventScope(
+    input.scope || { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId }
+  );
+  if (scope.tenant_slug !== tenantId) {
+    throw new Error(`peer_message_scope_tenant_mismatch:${tenantId}`);
+  }
   const envelope: PeerMessageEnvelope<TPayload> = {
     version: '1',
-    tenant_id: normalizeTenantId(input.tenantId),
+    tenant_id: tenantId,
     message_id: randomId('PM'),
     conversation_id: input.conversationId || randomId('PC'),
     type: input.type,
@@ -227,6 +250,9 @@ export function buildPeerMessageEnvelope<TPayload>(
       ? { ttl_ms: input.ttlMs, expires_at: new Date(Date.now() + input.ttlMs).toISOString() }
       : {}),
     transport: 'http',
+    scope,
+    ...(input.principal ? { principal: input.principal } : {}),
+    ...(input.approvalRef ? { approval_ref: input.approvalRef } : {}),
   };
   envelope.signature = signPeerMessage(envelope, input.sharedSecret);
   return envelope;
@@ -647,6 +673,15 @@ export class PeerMessagingServer {
     }
     if (!normalized.tenant_id || !isValidTenantSlug(normalized.tenant_id)) {
       return { status: 400, body: { ok: false, error: 'invalid_tenant_id' } };
+    }
+    let scope: EventScope;
+    try {
+      scope = normalizeEventScope(normalized.scope);
+    } catch {
+      return { status: 400, body: { ok: false, error: 'invalid_scope' } };
+    }
+    if (scope.tenant_slug !== normalized.tenant_id) {
+      return { status: 403, body: { ok: false, error: 'scope_tenant_mismatch' } };
     }
     if (normalized.tenant_id !== this.options.tenantId) {
       recordPeerEvent(this.options.tenantId, this.options.peerId, {

@@ -13,6 +13,11 @@ export interface ProtocolServiceRegistryEntry {
   owner: string;
   binding: string;
   approval: string;
+  principal_resolution: string;
+  write_authority: string;
+  nhi_binding: string;
+  approval_classes: string[];
+  data_residency: string;
   data_paths: string[];
   lifecycle_compatibility?: string;
 }
@@ -40,6 +45,12 @@ export function loadProtocolServiceRegistry(): ProtocolServiceRegistryEntry[] {
       !entry.owner ||
       !entry.binding ||
       !entry.approval ||
+      !entry.principal_resolution ||
+      !entry.write_authority ||
+      !entry.nhi_binding ||
+      !Array.isArray(entry.approval_classes) ||
+      entry.approval_classes.length === 0 ||
+      !entry.data_residency ||
       !Array.isArray(entry.data_paths) ||
       entry.data_paths.length === 0
     ) {

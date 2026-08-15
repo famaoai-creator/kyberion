@@ -17,6 +17,7 @@ import {
   safeStat,
   safeSymlinkSync,
   safeWriteFile,
+  assertProtocolServiceRegistered,
 } from '@agent/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
@@ -1219,6 +1220,7 @@ export function summarizeBackupStatus(
 }
 
 export function main(argv = process.argv.slice(2)): void {
+  assertProtocolServiceRegistered('backup-restore');
   const options = parseBackupArgs(argv);
   if (options.command === 'create') {
     const result = createBackup(options);

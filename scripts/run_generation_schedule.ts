@@ -5,6 +5,7 @@ import {
   runGenerationScheduleAction as runGovernedGenerationScheduleAction,
   GENERATION_SCHEDULER_AUTHORITY,
   normalizeEventScope,
+  assertProtocolServiceRegistered,
   type EventScopeInput,
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
@@ -29,6 +30,7 @@ export async function runGenerationScheduleAction(argv: {
   schedule?: string;
   scope?: EventScopeInput;
 }) {
+  assertProtocolServiceRegistered('generation-scheduler');
   switch (argv.action) {
     case 'register': {
       if (!argv.input) throw new Error('register requires --input');

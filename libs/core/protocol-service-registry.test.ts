@@ -15,6 +15,12 @@ describe('protocol service registry loader', () => {
     expect(getProtocolServiceRegistryEntry('report-review').request_scope_mode).toBe(
       'artifact-derived'
     );
+    expect(getProtocolServiceRegistryEntry('mcp-server-cowork')).toMatchObject({
+      principal_resolution: 'server-bound-mcp-session',
+      write_authority: 'catalog-tool-and-approval-gate',
+      nhi_binding: 'server-bound-mcp-nhi',
+      approval_classes: ['tool-catalog', 'human-final'],
+    });
   });
 
   it('fails closed for an unknown service', () => {

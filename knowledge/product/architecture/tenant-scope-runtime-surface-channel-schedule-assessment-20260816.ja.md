@@ -427,10 +427,10 @@ customer mode で binding がない channel は tenant request として扱わ�
   どの authority へ handoff したかで分類する。surface agent は対話品質と handoff を担当し、
   durable mission owner にはならない。
 
-surface provider manifest の `process_scope` / `scope_mode` / `allowed_tiers` はこの契約の
-第一段階である。次の段階では各 manifest に `principal_resolution`、`write_authority`、
-`nhi_binding`、`approval_classes`、`data_residency` を必須化し、scope policy のない provider
-を登録できないようにする。
+surface provider manifest の `process_scope` / `scope_mode` / `allowed_tiers` と、protocol
+service registry の `principal_resolution`、`write_authority`、`nhi_binding`、
+`approval_classes`、`data_residency` を起動時の登録契約に含めた。scope policy または protocol
+authority のない provider / gateway は登録・起動できない。
 
 ### 9.2 peer-messaging は surface ではなく protocol gateway
 
@@ -488,10 +488,10 @@ mission review gate、background review、visual review、report-review は同�
   ブラウザ local state を gate の正本にしない。判定の正本は approval-store と mission gate
   record とする。
 - `scripts/report-review/server.ts` は localhost の一時的な artifact review port である。
-  起動時の target file、token、Origin 検査、backup は有効だが、現在は viewer / tenant / NHI /
-  approval context を持たない。confidential artifact を扱う場合は、起動時に
-  `artifact_ref + EventScope + viewer_principal` を受け、save をその artifact のみへ固定し、
-  save receipt と review comment を tenant-scoped evidence に記録する必要がある。
+  起動時に `artifact_ref + EventScope + viewer_principal` を受け、confidential / personal
+  artifact は tenant scope を必須にする。save はその artifact のみに固定し、review session、
+  scope、viewer principal、comment count を tenant-scoped receipt に記録する。local token は
+  viewer session の補助であり、人間の承認正本にはならない。
 
 したがって review check や report-review を `active-surfaces` に追加して対話 surface と
 同列に扱うのではなく、`review service` の lifecycle / port / evidence を別に登録し、必要な
@@ -543,16 +543,18 @@ tenant、organization、surface binding を一度に変更する onboarding で�
    の順へ変更する。surface や MCP からも同じ command / library を呼び、直接 JSON を書かない。
 3. onboarding は identity、tenant registry、organization binding、NHI provision、
    viewer scope、service/channel binding、first-work の各段階を child change として記録する。
-4. `knowledge/product/governance/protocol-service-registry.json` を追加し、各 entry に `process_scope`、
-   `request_scope_mode`、`health`、`owner`、`binding`、`approval`、`data_paths` を持たせる。
+4. `knowledge/product/governance/protocol-service-registry.json` に各 entry の `process_scope`、
+   `request_scope_mode`、`health`、`owner`、`binding`、`approval`、`principal_resolution`、
+   `write_authority`、`nhi_binding`、`approval_classes`、`data_residency`、`data_paths` を持たせる。
 5. `surfaces:reconcile`、peer listener、MCP server、review server、scheduler は registry の
    lifecycle adapter とし、registry が許可しない状態では起動せず、停止・再接続・restore は
    receipt を残す。
 
-最初の実装単位は、`ConfigMissionBrief` と MCP / report-review の request context を
-共通化する WorkItem がよい。物理 namespace をさらに増やす前に、同じ approval・audit・
-reconcile contract を全入口に通すことで、surface だけが安全で protocol gateway が抜け道に
-なる状態を防げる。
+`ConfigMissionBrief` と MCP / report-review の request context は共通化済みであり、MCP の
+高リスク tool は `approval_ref`、payload hash、effect binding、scope を同じ approval store
+へ束縛する。今後は `surfaces:reconcile`、peer listener、MCP server、review server、scheduler
+の停止・再接続・restore receipt を protocol registry の lifecycle adapter に統合することで、
+surface だけが安全で protocol gateway が抜け道になる状態を防ぐ。
 
 ## 参照した正本・実装
 
