@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionPort } from './agent-execution-port.js';
+import { logger } from './core.js';
 import {
   clearWorkCoordinationStore,
+  claimWorkItem,
   createWorkItem,
   getWorkItem,
   listActiveWorkLeases,
+  releaseWorkItem,
   setWorkCoordinationNamespace,
+  updateWorkItem,
 } from './work-coordination.js';
 import {
   CoordinatedAgentExecutionPort,
@@ -176,6 +180,124 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(listActiveWorkLeases()).toHaveLength(0);
   });
 
+  it('closes against the latest leased version after an observability metadata bump', async () => {
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-VERSION-BUMP',
+      title: 'version bump task',
+      description: 'runtime metadata changes while the provider is running',
+      projectId: 'MSN-COORDINATED-VERSION-BUMP',
+      status: 'ready',
+    });
+    const port = new CoordinatedAgentExecutionPort({
+      delegate: vi.fn(async () => {
+        const claimed = getWorkItem(item.item_id);
+        expect(claimed?.status).toBe('in_progress');
+        updateWorkItem({
+          itemId: item.item_id,
+          expectedVersion: claimed?.version,
+          metadata: { runtime_observation: 'provider response received' },
+        });
+        return {
+          execution_kind: 'agent_delegation' as const,
+          task_id: 'task-version-bump',
+          agent_id: 'agent-version-bump',
+          status: 'succeeded' as const,
+          output: 'done',
+        };
+      }),
+    });
+
+    await expect(
+      port.delegate({
+        work_item_id: item.item_id,
+        task_id: 'task-version-bump',
+        mission_id: 'MSN-COORDINATED-VERSION-BUMP',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-VERSION-BUMP',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'version bump test',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-version-bump',
+      })
+    ).resolves.toMatchObject({ status: 'succeeded' });
+
+    expect(getWorkItem(item.item_id)).toMatchObject({
+      status: 'done',
+      metadata: { runtime_observation: 'provider response received' },
+    });
+    expect(listActiveWorkLeases()).toHaveLength(0);
+  });
+
+  it('fails closed when the lease is transferred before the original worker closes the item', async () => {
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-LEASE-TRANSFER',
+      title: 'lease transfer task',
+      description: 'the provider returns after another worker owns the lease',
+      projectId: 'MSN-COORDINATED-LEASE-TRANSFER',
+      status: 'ready',
+    });
+    let transferredLeaseId: string | undefined;
+    const port = new CoordinatedAgentExecutionPort({
+      delegate: vi.fn(async () => {
+        const claimed = getWorkItem(item.item_id);
+        expect(claimed).toMatchObject({
+          status: 'in_progress',
+          lease_id: expect.any(String),
+        });
+        const released = releaseWorkItem({
+          itemId: item.item_id,
+          leaseId: claimed?.lease_id as string,
+          actorPeerId: 'coordinated-agent-execution-port',
+          nextStatus: 'ready',
+          expectedVersion: claimed?.version,
+        });
+        const transferred = claimWorkItem({
+          itemId: item.item_id,
+          actorPeerId: 'replacement-agent',
+          purpose: 'take over the transferred provider task',
+          expectedVersion: released.item.version,
+          idempotencyKey: 'coord-lease-transfer-replacement',
+        });
+        transferredLeaseId = transferred.lease.lease_id;
+        return {
+          execution_kind: 'agent_delegation' as const,
+          task_id: 'task-lease-transfer',
+          agent_id: 'agent-lease-transfer',
+          status: 'succeeded' as const,
+          output: 'late provider response',
+        };
+      }),
+    });
+
+    await expect(
+      port.delegate({
+        work_item_id: item.item_id,
+        task_id: 'task-lease-transfer',
+        mission_id: 'MSN-COORDINATED-LEASE-TRANSFER',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-LEASE-TRANSFER',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'lease transfer test',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-lease-transfer',
+      })
+    ).rejects.toThrow(/version conflict/i);
+
+    expect(transferredLeaseId).toEqual(expect.any(String));
+    expect(getWorkItem(item.item_id)).toMatchObject({
+      status: 'in_progress',
+      lease_id: transferredLeaseId,
+      claimed_by_peer_id: 'replacement-agent',
+    });
+    expect(listActiveWorkLeases()).toHaveLength(1);
+  });
+
   it('keeps review-required work items in review after successful execution', async () => {
     clearWorkCoordinationStore();
     const item = createWorkItem({
@@ -213,5 +335,95 @@ describe('CoordinatedAgentExecutionPort', () => {
       }
     );
     expect(getWorkItem(item.item_id)?.status).toBe('review');
+  });
+
+  it('logs a structured error and blocks the work item when the delegate throws (e.g. sandbox failure)', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-SANDBOX-THROW',
+      title: 'sandbox failure task',
+      description: 'provider CLI subagent rejects due to a sandbox restriction',
+      projectId: 'MSN-COORDINATED-SANDBOX-THROW',
+      status: 'ready',
+    });
+    const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const port = new CoordinatedAgentExecutionPort({
+      delegate: vi.fn(async () => {
+        throw new Error('sandbox denied: permission to spawn provider CLI was refused');
+      }),
+    });
+
+    await expect(
+      port.delegate({
+        work_item_id: item.item_id,
+        task_id: 'task-sandbox-throw',
+        mission_id: 'MSN-COORDINATED-SANDBOX-THROW',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-SANDBOX-THROW',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'sandbox failure test',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-sandbox-throw',
+      })
+    ).rejects.toThrow('sandbox denied');
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('sandbox denied: permission to spawn provider CLI was refused')
+    );
+    expect(getWorkItem(item.item_id)).toMatchObject({
+      status: 'blocked',
+      metadata: expect.objectContaining({
+        result: expect.objectContaining({
+          error: expect.stringContaining('sandbox denied'),
+        }),
+      }),
+    });
+    loggerErrorSpy.mockRestore();
+  });
+
+  it('logs a structured error when the delegate returns a failed receipt without throwing', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-SANDBOX-RECEIPT',
+      title: 'sandbox failure receipt task',
+      description: 'provider CLI subagent returns a failed receipt instead of throwing',
+      projectId: 'MSN-COORDINATED-SANDBOX-RECEIPT',
+      status: 'ready',
+    });
+    const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const port = new CoordinatedAgentExecutionPort({
+      delegate: vi.fn(async (request) => ({
+        execution_kind: 'agent_delegation' as const,
+        task_id: request.task_id,
+        agent_id: 'agent-sandbox',
+        status: 'failed' as const,
+        error: 'sandbox denied: no Bash/shell execution tool available in this session',
+      })),
+    });
+
+    const receipt = await port.delegate({
+      work_item_id: item.item_id,
+      task_id: 'task-sandbox-receipt',
+      mission_id: 'MSN-COORDINATED-SANDBOX-RECEIPT',
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: 'MSN-COORDINATED-SANDBOX-RECEIPT',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'sandbox failure receipt test',
+      },
+      instruction: 'execute the task',
+      idempotency_key: 'coord-sandbox-receipt',
+    });
+
+    expect(receipt.status).toBe('failed');
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('sandbox denied: no Bash/shell execution tool available')
+    );
+    expect(getWorkItem(item.item_id)?.status).toBe('blocked');
+    loggerErrorSpy.mockRestore();
   });
 });
