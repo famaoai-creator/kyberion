@@ -172,6 +172,24 @@ pnpm tenant:activation activate \
 owner、NHI、次の行動、および task lease / heartbeat watchdog / quota・budget /
 approval gate / pause・escalation / drift watcher の operation contract と、各 probe の監査証跡 ref が記録される。
 
+### Step 4.1: 設定変更と外部入口の追加
+
+オンボーディング後の service binding、surface、channel、MCP grant、quota、egress の変更も、
+直接 JSON を編集せず `config-mission` の scoped change として扱う。
+
+```bash
+pnpm config-mission create --preset <preset> --tenant <tenant> \
+  --probe-ref viewer_scope=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref>
+pnpm config-mission request-approval --tenant <tenant> --id <cfg-id>
+pnpm config-mission apply --tenant <tenant> --id <cfg-id>
+```
+
+`brief.json` の `change` は target scope、risk、desired fingerprint、probe refs、approval ref を
+保持する。system scope の surface exposure や external egress、credential、cross-tenant binding は
+human approval と payload hash 一致がなければ apply できない。apply 後は reconcile と receipt を
+確認し、失敗時は同じ change を無変更で再実行せず、recovery / rollback point を確認してから再開する。
+
 ### Step 5: first-work を洗い出し、レビュー後に実行する
 
 ```bash

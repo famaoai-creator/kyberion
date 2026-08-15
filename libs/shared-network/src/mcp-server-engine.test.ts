@@ -2,7 +2,7 @@
  * Tests for mcp-server-engine.ts (Phase 0/1/2 — Kyberion MCP Server)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 
 // ── vi.hoisted — must come before vi.mock factory references ──────────────────
@@ -122,6 +122,10 @@ describe('createKyberionMcpServer()', () => {
     vi.clearAllMocks();
     registeredTools.clear();
     setupCommonMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('サーバが作成されツールが登録される', () => {
@@ -369,7 +373,8 @@ describe('createKyberionMcpServer()', () => {
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.mission.status')!.handler;
-      const result = await handler({ mission_id: 'mission-abc' });
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+      const result = await handler({ mission_id: 'mission-abc', tenant: 'tenant-a' });
 
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toBe('Mission status: running');

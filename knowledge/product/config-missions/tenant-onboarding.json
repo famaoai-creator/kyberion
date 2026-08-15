@@ -34,5 +34,8 @@
     "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
   ],
   "authority_role": "system_configurator",
+  "target_kind": "tenant",
+  "scope_kind": "tenant",
+  "tier": "confidential",
   "notes": "Run `pnpm surfaces:reconcile` after applying to surface the new tenant in the operator dashboard."
 }
