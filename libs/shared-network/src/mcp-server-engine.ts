@@ -38,6 +38,10 @@ import {
   resolveMcpRequestContext,
   assertMcpCallerRole,
   assertProtocolServiceRegistered,
+  computeApprovalPayloadHash,
+  createApprovalRequest,
+  listApprovalRequests,
+  loadApprovalRequest,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
@@ -47,6 +51,7 @@ import {
   recordAuditExportRequest,
 } from '@agent/core/approval-cowork-adapter.js';
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
+import type { EventScope, McpRequestContext } from '@agent/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,6 +93,113 @@ interface ToolCatalogEntry {
   requires_approval?: boolean;
 }
 
+interface McpApprovalResult {
+  allowed: boolean;
+  request_id?: string;
+  status: 'approved' | 'approval_required';
+}
+
+const APPROVAL_SCOPE_KEYS = [
+  'scope_kind',
+  'tier',
+  'tenant_slug',
+  'organization_id',
+  'project_id',
+  'mission_id',
+  'task_id',
+  'nhi_id',
+] as const;
+
+/** Tools whose handler must call ensureMcpApproval before producing an effect. */
+const APPROVAL_GATED_MCP_TOOLS = new Set(['kyberion.mission.create', 'kyberion.service.actuate']);
+
+function exactMcpApprovalScopeMatches(
+  actual: EventScope | undefined,
+  expected: EventScope
+): boolean {
+  if (!actual) return false;
+  return APPROVAL_SCOPE_KEYS.every((key) => actual[key] === expected[key]);
+}
+
+function ensureMcpApproval(params: {
+  context: McpRequestContext;
+  approvalRef?: string;
+  payload: Record<string, unknown>;
+  effectBinding: string;
+  title: string;
+  summary: string;
+  details: string;
+}): McpApprovalResult {
+  const payloadHash = computeApprovalPayloadHash(params.payload);
+  const approvalChannel = 'mcp-approval';
+  const correlationId = `mcp:${params.effectBinding}:${payloadHash}`;
+
+  if (!params.approvalRef) {
+    const existing = listApprovalRequests({
+      storageChannels: [approvalChannel],
+      status: 'pending',
+      scope: params.context.scope,
+    }).find(
+      (request) =>
+        request.correlationId === correlationId &&
+        request.accountability?.payloadHash === payloadHash &&
+        request.accountability?.effectBinding === params.effectBinding
+    );
+    const record =
+      existing ||
+      createApprovalRequest('surface_runtime', {
+        channel: approvalChannel,
+        storageChannel: approvalChannel,
+        threadTs: correlationId,
+        correlationId,
+        requestedBy: params.context.principal,
+        draft: {
+          title: params.title,
+          summary: params.summary,
+          details: params.details,
+          severity: 'high',
+        },
+        requestedByContext: {
+          surface: 'api',
+          actorId: params.context.principal,
+          actorRole: params.context.caller_role,
+        },
+        justification: {
+          reason: 'MCP tool catalog marks this operation as requiring human approval.',
+          requestedEffects: [params.effectBinding],
+        },
+        risk: { level: 'high', restartScope: 'service', requiresStrongAuth: true },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash,
+          effectBinding: params.effectBinding,
+        },
+        scope: params.context.scope,
+      });
+    return { allowed: false, request_id: record.id, status: 'approval_required' };
+  }
+
+  const approval = loadApprovalRequest(approvalChannel, params.approvalRef);
+  if (!approval) {
+    throw new Error(`[MCP_APPROVAL_NOT_FOUND] approval '${params.approvalRef}' was not found`);
+  }
+  if (approval.status !== 'approved') {
+    throw new Error(
+      `[MCP_APPROVAL_REQUIRED] approval '${params.approvalRef}' is '${approval.status}', not approved`
+    );
+  }
+  if (!exactMcpApprovalScopeMatches(approval.scope, params.context.scope)) {
+    throw new Error('[MCP_APPROVAL_SCOPE_MISMATCH] approval scope does not match request scope');
+  }
+  if (approval.accountability?.payloadHash !== payloadHash) {
+    throw new Error('[MCP_APPROVAL_PAYLOAD_MISMATCH] approval payload does not match request');
+  }
+  if (approval.accountability?.effectBinding !== params.effectBinding) {
+    throw new Error('[MCP_APPROVAL_EFFECT_MISMATCH] approval effect does not match request');
+  }
+  return { allowed: true, status: 'approved' };
+}
+
 function loadCatalog(): ToolCatalog {
   try {
     const raw = safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string;
@@ -99,8 +211,13 @@ function loadCatalog(): ToolCatalog {
 
 function catalogEntry(catalog: ToolCatalog, toolName: string): ToolCatalogEntry {
   const entry = catalog.tools?.find((tool) => tool.name === toolName);
-  if (!entry || !entry.allowed_caller_roles?.length) {
+  if (!entry || !entry.allowed_caller_roles?.length || !entry.allowed_tiers?.length) {
     throw new Error(`[MCP_TOOL_UNREGISTERED] tool '${toolName}' has no governed catalog entry`);
+  }
+  if (entry.requires_approval === true && !APPROVAL_GATED_MCP_TOOLS.has(toolName)) {
+    throw new Error(
+      `[MCP_APPROVAL_GATE_MISSING] tool '${toolName}' declares requires_approval but has no approval gate`
+    );
   }
   return entry;
 }
@@ -125,6 +242,13 @@ function registerGovernedTool(
         mission_id: typeof args?.mission_id === 'string' ? args.mission_id : undefined,
         task_id: typeof args?.task_id === 'string' ? args.task_id : undefined,
       });
+      const requestedTier =
+        args?.tier === 'public' || args?.tier === 'confidential' || args?.tier === 'personal'
+          ? args.tier
+          : undefined;
+      if (requestedTier && !entry.allowed_tiers!.includes(requestedTier)) {
+        throw new Error(`[MCP_TIER_DENIED] tier '${requestedTier}' is not allowed for ${name}`);
+      }
       assertMcpCallerRole(context, entry.allowed_caller_roles!, name);
       return await handler(args);
     } catch (err) {
@@ -619,10 +743,14 @@ export function createKyberionMcpServer(): McpServer {
         .record(z.string(), z.any())
         .optional()
         .describe('Parameters for the operation (payload/query string)'),
+      approval_ref: z
+        .string()
+        .optional()
+        .describe('Approved request_id from kyberion.approval.list_pending'),
     },
-    async ({ service_id, action, params }) => {
+    async ({ service_id, action, params, approval_ref }) => {
       try {
-        resolveMcpRequestContext({ require_tenant: true });
+        const context = resolveMcpRequestContext({ require_tenant: true });
         if (process.env.KYBERION_ENABLE_SERVICE_ACTUATE_TOOL !== '1') {
           return {
             content: [
@@ -632,6 +760,29 @@ export function createKyberionMcpServer(): McpServer {
               },
             ],
             isError: true,
+          };
+        }
+        const approval = ensureMcpApproval({
+          context,
+          approvalRef: approval_ref,
+          payload: { operation: 'service.actuate', service_id, action, params: params ?? {} },
+          effectBinding: `service.actuate:${service_id}:${action}`,
+          title: `Execute service '${service_id}' action '${action}'`,
+          summary: `MCP caller '${context.principal}' requested a service actuator operation.`,
+          details: JSON.stringify(params ?? {}),
+        });
+        if (!approval.allowed) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(
+                  { status: approval.status, request_id: approval.request_id },
+                  null,
+                  2
+                ),
+              },
+            ],
           };
         }
         const result = await executeServicePreset(service_id, action, params ?? {}, 'secret-guard');
@@ -655,13 +806,40 @@ export function createKyberionMcpServer(): McpServer {
       title: z.string().describe('Short mission title'),
       brief: z.string().describe('Mission brief — describe the goal in plain language'),
       tenant: z.string().describe('Server-bound tenant slug for the mission'),
+      approval_ref: z
+        .string()
+        .optional()
+        .describe('Approved request_id from kyberion.approval.list_pending'),
     },
-    async ({ title, brief, tenant }) => {
+    async ({ title, brief, tenant, approval_ref }) => {
       try {
         const context = resolveMcpRequestContext({
           requested_tenant: tenant,
           require_tenant: true,
         });
+        const approval = ensureMcpApproval({
+          context,
+          approvalRef: approval_ref,
+          payload: { operation: 'mission.create', title, brief, tenant },
+          effectBinding: `mission.create:${tenant}`,
+          title: `Create mission in tenant '${tenant}'`,
+          summary: `MCP caller '${context.principal}' requested creation of mission '${title}'.`,
+          details: brief,
+        });
+        if (!approval.allowed) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(
+                  { status: approval.status, request_id: approval.request_id },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
         const output = createMission(brief, title, context.scope.tenant_slug!);
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
