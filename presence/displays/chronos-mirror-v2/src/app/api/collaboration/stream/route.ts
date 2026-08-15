@@ -6,6 +6,11 @@ import {
   safeReadFile,
   safeReaddir,
   workerEventEnvelopeSchema,
+  eventScopeFromRecord,
+  eventScopeMatches,
+  parseEventScopeFromRecord,
+  redactCollaborationMetadata,
+  type EventScopeFilter,
   type WorkerEventEnvelope,
 } from '@agent/core';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
@@ -51,7 +56,8 @@ function eventFiles(): string[] {
 function readEvents(
   afterId: string | null,
   missionId?: string,
-  tenantSlugs: string[] | 'all' = 'all'
+  tenantSlugs: string[] | 'all' = 'all',
+  scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {}
 ): { events: CollaborationStreamEvent[]; lastSeenId?: string } {
   const events: CollaborationStreamEvent[] = [];
   let lastSeenId: string | undefined;
@@ -72,31 +78,30 @@ function readEvents(
         const event = workerEventEnvelopeSchema.parse(JSON.parse(line)) as WorkerEventEnvelope;
         if (missionId && event.source?.mission_id !== missionId) continue;
         const normalized = normalizeWorkerEvent(event, id);
+        const scopeResult = parseEventScopeFromRecord(normalized.payload);
+        const normalizedScope = scopeResult.scope;
+        if (scopeResult.invalid) continue;
         if (tenantSlugs !== 'all') {
           const eventTenant =
-            typeof normalized.payload.tenant_slug === 'string'
+            normalizedScope?.tenant_slug ||
+            (typeof normalized.payload.tenant_slug === 'string'
               ? normalized.payload.tenant_slug
-              : normalized.mission_id
-                ? (() => {
-                    const missionPath = pathResolver.findMissionPath(normalized.mission_id);
-                    if (!missionPath) return undefined;
-                    try {
-                      const state = JSON.parse(
-                        String(
-                          safeReadFile(path.join(missionPath, 'mission-state.json'), {
-                            encoding: 'utf8',
-                          })
-                        )
-                      ) as { tenant_slug?: string };
-                      return state.tenant_slug;
-                    } catch {
-                      return undefined;
-                    }
-                  })()
-                : undefined;
+              : undefined);
           if (!eventTenant || !tenantSlugs.includes(eventTenant)) continue;
         }
-        events.push(normalized);
+        if (Object.keys(scopeFilter).length > 0 && !normalizedScope) continue;
+        if (
+          Object.keys(scopeFilter).length > 0 &&
+          !eventScopeMatches(normalizedScope, {
+            ...(tenantSlugs !== 'all' ? { tenant_slugs: tenantSlugs } : {}),
+            ...scopeFilter,
+          })
+        )
+          continue;
+        events.push({
+          ...normalized,
+          payload: redactCollaborationMetadata(normalized.payload),
+        });
       } catch {
         // Torn JSONL records are skipped; the next poll/reconnect can replay a
         // valid subsequent record without poisoning the stream.
@@ -106,7 +111,7 @@ function readEvents(
   // A browser can reconnect with a cursor from a rotated log file. In that
   // case replay the bounded tail instead of silently waiting forever for a
   // cursor that can no longer be found.
-  if (afterId && !foundCursor) return readEvents(null, missionId, tenantSlugs);
+  if (afterId && !foundCursor) return readEvents(null, missionId, tenantSlugs, scopeFilter);
   return { events: events.slice(-60), lastSeenId };
 }
 
@@ -120,6 +125,33 @@ export async function GET(req: NextRequest) {
 
   const encoder = new TextEncoder();
   const missionId = req.nextUrl.searchParams.get('mission') || undefined;
+  const scopeKind = req.nextUrl.searchParams.get('scope_kind') || undefined;
+  const allowedScopeKinds = new Set([
+    'system',
+    'tenant',
+    'organization',
+    'project',
+    'mission',
+    'task',
+    'session',
+  ]);
+  const scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {
+    ...(req.nextUrl.searchParams.get('organization')
+      ? { organization_id: req.nextUrl.searchParams.get('organization')! }
+      : {}),
+    ...(req.nextUrl.searchParams.get('project')
+      ? { project_id: req.nextUrl.searchParams.get('project')! }
+      : {}),
+    ...(req.nextUrl.searchParams.get('task')
+      ? { task_id: req.nextUrl.searchParams.get('task')! }
+      : {}),
+    ...(req.nextUrl.searchParams.get('session')
+      ? { session_id: req.nextUrl.searchParams.get('session')! }
+      : {}),
+    ...(scopeKind && allowedScopeKinds.has(scopeKind)
+      ? { scope_kind: scopeKind as EventScopeFilter['scope_kind'] }
+      : {}),
+  };
   let tenantSlugs: string[] | 'all';
   try {
     tenantSlugs = viewerScopeTenantSlugs(
@@ -160,7 +192,7 @@ export async function GET(req: NextRequest) {
       });
       const poll = () => {
         if (closed) return;
-        const result = readEvents(scanCursor, missionId, tenantSlugs);
+        const result = readEvents(scanCursor, missionId, tenantSlugs, scopeFilter);
         if (result.lastSeenId) scanCursor = result.lastSeenId;
         for (const event of result.events) batcher.push(event);
       };

@@ -54,8 +54,8 @@ describe('agent runtime observability', () => {
 
     const handle = await agentLifecycle.spawn({
       agentId: 'obs-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
     });
 
     await handle.ask('ping');
@@ -89,8 +89,8 @@ describe('agent runtime observability', () => {
 
     await agentLifecycle.spawn({
       agentId: 'refresh-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
     });
 
     const result = await agentLifecycle.refreshContext('refresh-agent');
@@ -115,8 +115,8 @@ describe('agent runtime observability', () => {
 
     await agentLifecycle.spawn({
       agentId: 'restart-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
     });
 
     await agentLifecycle.restart('restart-agent');
@@ -145,8 +145,8 @@ describe('agent runtime observability', () => {
 
     await agentLifecycle.spawn({
       agentId: 'preserve-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
     });
 
     const refreshed = await agentLifecycle.refreshContext('preserve-agent');
@@ -176,8 +176,8 @@ describe('agent runtime observability', () => {
 
     await agentLifecycle.spawn({
       agentId: 'dead-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
     });
 
     const health = await agentLifecycle.healthCheck();
@@ -238,8 +238,8 @@ describe('agent runtime observability', () => {
 
     await agentLifecycle.spawn({
       agentId: 'restart-agent',
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'copilot',
+      modelId: 'copilot',
       restartPolicy: {
         maxRestarts: 1,
         windowMs: 10 * 60 * 1000,

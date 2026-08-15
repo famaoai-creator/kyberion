@@ -101,6 +101,65 @@ describe('agent collaboration projection', () => {
     expect(projection.events[0]?.tenant_slug).toBe('client-a');
   });
 
+  it('carries the canonical entity scope into the collaboration projection', () => {
+    const projection = composeAgentCollaborationProjection([
+      event({
+        source_event_id: 'scoped-task',
+        tier: 'confidential',
+        tenant_slug: 'client-a',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+        mission_id: 'MSN-A',
+        task_id: 'task-a',
+      }),
+    ]);
+
+    expect(projection.events[0]).toMatchObject({
+      scope_kind: 'task',
+      scope: {
+        scope_kind: 'task',
+        tenant_slug: 'client-a',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+    });
+  });
+
+  it('filters collaboration events by organization, project and task scope', () => {
+    const projection = composeAgentCollaborationProjection(
+      [
+        event({
+          source_event_id: 'match',
+          tier: 'confidential',
+          tenant_slug: 'client-a',
+          organization_id: 'org-a',
+          project_id: 'project-a',
+          mission_id: 'MSN-A',
+          task_id: 'task-a',
+        }),
+        event({
+          source_event_id: 'other-project',
+          tier: 'confidential',
+          tenant_slug: 'client-a',
+          organization_id: 'org-a',
+          project_id: 'project-b',
+          mission_id: 'MSN-B',
+          task_id: 'task-b',
+        }),
+      ],
+      {
+        tenant: 'client-a',
+        scopeFilter: {
+          organization_id: 'org-a',
+          project_id: 'project-a',
+          task_id: 'task-a',
+        },
+      }
+    );
+
+    expect(projection.events.map((entry) => entry.source_event_id)).toEqual(['match']);
+  });
+
   it('surfaces sequence gaps and stale active runtime state', () => {
     const projection = composeAgentCollaborationProjection(
       [

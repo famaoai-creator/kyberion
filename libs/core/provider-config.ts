@@ -21,6 +21,7 @@ export interface ProviderLifecycleEntry {
 
 export interface ProviderConfigFile {
   default_priority: string[];
+  obsolete_agent_runtime_providers: string[];
   default_models: Record<string, string>;
   runtime_defaults: Partial<Record<ProviderConfigRuntimeRole, string>>;
   lifecycle: Record<string, ProviderLifecycleEntry>;
@@ -35,7 +36,8 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const FALLBACK: ProviderConfigFile = {
-  default_priority: ['agy', 'gemini', 'claude', 'codex', 'grok', 'copilot'],
+  default_priority: ['agy', 'claude', 'codex', 'grok', 'copilot'],
+  obsolete_agent_runtime_providers: ['gemini'],
   default_models: {
     gemini: 'gemini-3.6-flash',
     claude: 'claude-opus-5',
@@ -98,6 +100,7 @@ export function loadProviderConfig(): ProviderConfigFile {
     const validated = validateProviderConfig(parsed, PROVIDER_CONFIG_PATH);
     cachedProviderConfig = {
       default_priority: validated.default_priority,
+      obsolete_agent_runtime_providers: validated.obsolete_agent_runtime_providers || [],
       default_models: validated.default_models,
       runtime_defaults: validated.runtime_defaults,
       lifecycle: validated.lifecycle,
@@ -111,6 +114,14 @@ export function loadProviderConfig(): ProviderConfigFile {
     cachedProviderConfig = FALLBACK;
   }
   return cachedProviderConfig;
+}
+
+export function isObsoleteAgentRuntimeProvider(provider: string | undefined): boolean {
+  const normalized = provider?.trim().toLowerCase();
+  if (!normalized) return false;
+  return loadProviderConfig().obsolete_agent_runtime_providers.some(
+    (entry) => entry.trim().toLowerCase() === normalized
+  );
 }
 
 const RUNTIME_ROLE_PROVIDER_FALLBACK: Record<ProviderConfigRuntimeRole, string> = {

@@ -36,7 +36,10 @@ async function main() {
   const argv = await createStandardYargs()
     .option('mission-id', { type: 'string', demandOption: true })
     .option('mission-type', { type: 'string' })
-    .option('request', { type: 'string', description: 'Free-form user request to compile team composition brief' })
+    .option('request', {
+      type: 'string',
+      description: 'Free-form user request to compile team composition brief',
+    })
     .option('intent-id', { type: 'string' })
     .option('task-type', { type: 'string' })
     .option('shape', { type: 'string' })
@@ -58,6 +61,18 @@ async function main() {
       type: 'string',
       description: 'Explicit organization slug used to resolve organization defaults and catalogs',
     })
+    .option('tenant-slug', {
+      type: 'string',
+      description: 'Explicit tenant slug used for participant security scope',
+    })
+    .option('provider', {
+      type: 'string',
+      description: 'Preferred provider for all team roles (agy, claude, codex, copilot, ...)',
+    })
+    .option('model', {
+      type: 'string',
+      description: 'Optional model ID passed with the selected team provider',
+    })
     .option('write', { type: 'boolean', default: false })
     .parse();
 
@@ -66,13 +81,17 @@ async function main() {
 
   let tier = String(argv.tier || 'public') as 'personal' | 'confidential' | 'public';
   let assignedPersona = argv.persona ? String(argv.persona) : undefined;
+  let missionTenantSlug: string | undefined;
 
   if (missionPath) {
-    const state = readJsonFile<{ tier?: typeof tier; assigned_persona?: string }>(
-      path.join(missionPath, 'mission-state.json'),
-    );
+    const state = readJsonFile<{
+      tier?: typeof tier;
+      tenant_slug?: string;
+      assigned_persona?: string;
+    }>(path.join(missionPath, 'mission-state.json'));
     tier = state.tier || tier;
     assignedPersona = assignedPersona || state.assigned_persona;
+    missionTenantSlug = state.tenant_slug;
   }
 
   const artifactPaths = String(argv.artifacts || '')
@@ -86,6 +105,11 @@ async function main() {
   const missionTypeArg = argv['mission-type'] ? String(argv['mission-type']) : undefined;
   const request = argv.request ? String(argv.request) : '';
   const organizationId = argv['organization-id'] ? String(argv['organization-id']) : undefined;
+  if (argv.model && !argv.provider) {
+    throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
+  }
+  const tenantSlug =
+    missionTenantSlug || (argv['tenant-slug'] ? String(argv['tenant-slug']) : undefined);
 
   const { plan, brief } = withOrganizationContext(organizationId, () => {
     const organizationProfile = loadOrganizationProfile();
@@ -100,24 +124,35 @@ async function main() {
       progressSignals,
       tier,
       assignedPersona,
+      tenantSlug,
       organizationProfile,
+      ...(argv.provider
+        ? {
+            providerPreference: {
+              provider: String(argv.provider),
+              ...(argv.model ? { modelId: String(argv.model) } : {}),
+            },
+          }
+        : {}),
     });
 
     const nextBrief = request
       ? composeMissionTeamBrief({
-        missionId,
-        missionType: missionTypeArg,
-        request,
-        intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
-        taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
-        shape: argv.shape ? String(argv.shape) : undefined,
-        artifactPaths,
-        progressSignals,
-        tier,
-        assignedPersona,
-        organizationProfile,
-        executionShape: argv['execution-shape'] as 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap',
-      })
+          missionId,
+          missionType: missionTypeArg,
+          request,
+          intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
+          taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
+          shape: argv.shape ? String(argv.shape) : undefined,
+          artifactPaths,
+          progressSignals,
+          tier,
+          assignedPersona,
+          tenantSlug,
+          organizationProfile,
+          executionShape: argv['execution-shape'] as
+            'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap',
+        })
       : null;
     return { plan: nextPlan, brief: nextBrief };
   });

@@ -8,6 +8,7 @@ import {
   listActiveGrants,
   resolveGrantsForActor,
   revokeGrantsForTask,
+  revokeGrantsForTenantBestEffort,
   revokeTaskGrant,
   setTaskGrantAuditSinkForTests,
   TASK_GRANT_DEFAULT_TTL_MS,
@@ -53,6 +54,7 @@ const SAVED_ENV_KEYS = [
   'MISSION_ID',
   'TASK_ID',
   'KYBERION_NHI_ID',
+  'KYBERION_TENANT',
 ] as const;
 let savedEnv: Record<string, string | undefined> = {};
 
@@ -63,6 +65,7 @@ beforeEach(() => {
     delete process.env[key];
   }
   process.env[TASK_GRANTS_PATH_ENV] = nextStorePath();
+  process.env.KYBERION_TENANT = 'tenant-a';
 });
 
 afterEach(() => {
@@ -82,6 +85,7 @@ function issueGoverned(
     issueTaskGrant({
       granteeNhiId: GRANTEE,
       audience: { missionId: 'MSN-A', taskId: 'task-1' },
+      scope: { tenant_slug: 'tenant-a', ...(overrides.scope || {}) },
       ...overrides,
     })
   );
@@ -119,6 +123,15 @@ describe('task-scoped grants: issuance', () => {
     expect(() => issueGoverned({ granteeNhiId: 'sovereign-brain' })).toThrow(
       TaskGrantValidationError
     );
+  });
+
+  it('rejects a grant when no tenant binding is available', () => {
+    delete process.env.KYBERION_TENANT;
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        issueTaskGrant({ granteeNhiId: GRANTEE, audience: { missionId: 'MSN-A' } })
+      )
+    ).toThrow(/tenant-scoped task grant requires/);
   });
 
   it('clamps an excessive caller-supplied expiry to the 24h max TTL', () => {
@@ -235,6 +248,23 @@ describe('task-scoped grants: revocation', () => {
     expect(
       withExecutionContext('mission_controller', () => revokeTaskGrant('tg-unknown', 'x'))
     ).toBeNull();
+  });
+
+  it('tenant offboarding revokes only grants in the matching tenant', () => {
+    const acme = issueGoverned({ scope: { tenant_slug: 'tenant-a' } });
+    const beta = withExecutionContext('mission_controller', () =>
+      issueTaskGrant({
+        granteeNhiId: GRANTEE,
+        audience: { missionId: 'MSN-A', taskId: 'task-1' },
+        scope: { tenant_slug: 'tenant-b' },
+      })
+    );
+    expect(revokeGrantsForTenantBestEffort('tenant-a', 'offboarded')).toBe(1);
+    expect(listActiveGrants({ tenantSlug: 'tenant-a' })).toEqual([]);
+    expect(listActiveGrants({ tenantSlug: 'tenant-b' }).map((grant) => grant.grant_id)).toEqual([
+      beta.grant_id,
+    ]);
+    expect(acme.grant_id).not.toBe(beta.grant_id);
   });
 
   it('revokeGrantsForTask revokes only grants bound to that exact task audience', () => {

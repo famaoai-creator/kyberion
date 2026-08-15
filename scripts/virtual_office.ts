@@ -383,7 +383,9 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     }
     const rawTasks = (() => {
       try {
-        return readCanonicalWorkGraph(state.mission_id).items.map((item) => ({
+        return readCanonicalWorkGraph(state.mission_id, {
+          ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+        }).items.map((item) => ({
           task_id: item.context?.task_id || item.item_id,
           status: item.status,
           assigned_to: {

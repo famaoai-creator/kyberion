@@ -113,13 +113,13 @@ describe('meeting-to-value contract', () => {
   it('keeps the meeting follow-up pipeline wired to minutes and action-item extraction', () => {
     const pipeline = readPipeline();
 
-    expect(pipeline.context).not.toHaveProperty('mission_evidence_dir');
+    expect(pipeline.context).toHaveProperty('mission_evidence_dir', '');
     expect(pipeline.steps?.find((step) => step.id === 'write_minutes')?.params).toMatchObject({
-      path: 'active/missions/confidential/{{mission_id}}/evidence/minutes.md',
+      path: '{{mission_evidence_dir}}/minutes.md',
     });
     expect(pipeline.steps?.find((step) => step.id === 'write_delivery_pack')?.params).toMatchObject(
       {
-        path: 'active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json',
+        path: '{{mission_evidence_dir}}/meeting-followup-pack.json',
       }
     );
     expect(pipeline.steps?.map((step) => step.id)).toEqual([
@@ -141,7 +141,7 @@ describe('meeting-to-value contract', () => {
       pipeline.steps?.find((step) => step.id === 'extract_action_items')?.params
     ).toMatchObject({
       work_item_id: '{{work_item_id}}',
-      output_path: 'active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl',
+      output_path: '{{mission_evidence_dir}}/action-items.jsonl',
     });
   });
 

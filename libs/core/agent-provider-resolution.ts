@@ -1,5 +1,5 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
-import { loadProviderConfig } from './provider-config.js';
+import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from './provider-config.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { loadOperatorProviderPreferences } from './browser-onboarding.js';
@@ -130,11 +130,12 @@ export function resolveAgentProviderTarget(
   // degrade, not disable — with everything demoted, ignore it.
   const demotedProviders = new Set(listDemotedProviders(discoveredProviders));
   let installedProviders = discoveredProviders.filter(
-    (entry) => entry.installed && entry.healthy && !demotedProviders.has(entry.provider)
+    (entry) =>
+      entry.installed &&
+      entry.healthy &&
+      !demotedProviders.has(entry.provider) &&
+      !isObsoleteAgentRuntimeProvider(entry.provider)
   );
-  if (installedProviders.length === 0) {
-    installedProviders = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
-  }
   const availableProviders = installedProviders.map((entry) => entry.provider);
   const preferredProvider = options.preferredProvider;
   const requiredCapabilities = (options.requiredCapabilities || [])

@@ -10,6 +10,8 @@
 > - 監査記録に `tier`/`tenant`/`purpose` を付与(受入条件4)、confidential/personal のブロック時は operator へ warn ログ(Task 2 の明示警告)。
 > - reasoning backend は各 SDK 自前の HTTP クライアントを使い `secureFetch` を通らないため、共通の `withReasoningPayloadScope` と全 adapter の送信直前ゲートで同じ tier ポリシーを適用した。設定可能な OpenAI-compatible endpoint は endpoint 自体を評価し、未登録 backend は安全側の未知ホストとして拒否する。background review、video direction、Claude Agent/CLI、Gemini CLI、Copilot ACP もこの境界を継承する。
 
+> **将来候補(2026-08-15)**: 現在の `tenant_allowed_domains` は全体の `knowledge/product/governance/egress-policy.json` に置かれている。これは既定 deny と全体共通の安全制約を一元管理する点では有効だが、テナント固有の外部送信承認までグローバル knowledge が所有すると、テナント境界・責任主体・オンボーディングの概念とずれる。将来は「グローバルは最小の deny/安全上限」「テナント registry またはテナント管理領域は、その上限内での送信先承認」「実行時は両者を fail-closed に合成」という責任分離へ移行する。移行時も `*` の全テナント許可や、テナント設定によるグローバル deny の緩和は許可しない。
+
 ## 背景と課題
 
 機密データが任意ホストへ送信されるのを防ぐ仕組みに穴がある。`secureFetch`(`libs/core/network.ts:107-150`)が全アクチュエータ共通の送信路。

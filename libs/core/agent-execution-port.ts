@@ -86,6 +86,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
       const response = await askAgentRuntime(agentId, request.instruction, 'agent_execution_port', {
         timeoutMs: request.timeout_ms,
         correlationId: request.idempotency_key,
+        missionId: request.mission_id,
       });
       const snapshot = getAgentRuntimeSnapshot(agentId);
       return {

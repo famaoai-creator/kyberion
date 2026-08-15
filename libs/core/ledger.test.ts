@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { record, verifyIntegrity, verifyLedgerIntegrityDetailed } from './ledger.js';
+import { loadForScope, record, verifyIntegrity, verifyLedgerIntegrityDetailed } from './ledger.js';
 
 // We need to handle the hardcoded LEDGER_PATH in ledger.ts
 const LEDGER_FILE = path.join(process.cwd(), 'active/audit/system-ledger.jsonl');
@@ -89,5 +89,26 @@ describe('ledger core', () => {
     expect(report.ok).toBe(false);
     expect(report.total).toBe(1);
     expect(report.corrupted[0]).toContain('line:1');
+  });
+
+  it('stores system/entity scope and filters tenant views fail-closed', () => {
+    record('TENANT_EVENT', {
+      tenant_slug: 'client-a',
+      organization_id: 'org-a',
+      mission_id: 'MSN-A',
+      tier: 'confidential',
+      data: 'tenant-only',
+    });
+    record('SYSTEM_EVENT', { data: 'system-wide' });
+
+    const tenantEntries = loadForScope({ tenant_slug: 'client-a' });
+    expect(tenantEntries).toHaveLength(1);
+    expect(tenantEntries[0]?.scope).toMatchObject({
+      scope_kind: 'mission',
+      tenant_slug: 'client-a',
+      organization_id: 'org-a',
+    });
+    expect(loadForScope({ tenant_slug: 'client-b' })).toHaveLength(0);
+    expect(loadForScope({ scope_kind: 'system' })).toHaveLength(1);
   });
 });

@@ -508,6 +508,14 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
               continue;
             }
             const audience = grant.audience || {};
+            const grantTenant = String(grant.scope?.tenant_slug || '').trim();
+            const actorTenant = process.env.KYBERION_TENANT?.trim();
+            if (!grantTenant || !actorTenant || grantTenant !== actorTenant) {
+              logger.debug(
+                `task grant ${grant.grant_id} skipped: tenant scope ${grantTenant || '<missing>'} != ${actorTenant || '<missing>'}`
+              );
+              continue;
+            }
             if (audience.mission_id !== missionId) {
               logger.debug(
                 `task grant ${grant.grant_id} skipped: audience mission ${audience.mission_id} != ${missionId}`

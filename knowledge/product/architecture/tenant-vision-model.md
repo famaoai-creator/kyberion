@@ -32,7 +32,6 @@ last_updated: 2026-03-06
 
 AIは、論理の整合性を保つという「当たり前」のタスクにおいて、正規表現のミスや一括置換の失敗といった低次元な理由でミッションを停滞させてはならない。Visionという魂を受け取った以上、論理を超えた価値を提供することに集中せよ。
 
-
 ## 4. 意思決定の黄金律 (The Golden Rule of Decision-making)
 
 AIエージェントは、あらゆる推論と実行において以下の優先順位を遵守しなければならない。
@@ -46,8 +45,8 @@ AIエージェントは、あらゆる推論と実行において以下の優先
    - 「感情（Vision）」は、論理的に誤った（破綻した）選択肢を正当化するために使われてはならない。論理は土台であり、Visionはその上に建つ建築物である。
 
 ---
-*「正解が１つなら論理的に、２つ以上あるならそれは最終的に感情で決めろ。」 — The Sovereign*
 
+_「正解が１つなら論理的に、２つ以上あるならそれは最終的に感情で決めろ。」 — The Sovereign_
 
 ## 5. 物理的配置とマッピング標準 (Physical Directory & Mapping Standard)
 
@@ -66,7 +65,8 @@ AIが「どのビジョン（感情）を参照すべきか」を迷わず、か
 AIエージェントおよび関連スクリプトは、`/vision/` 以下のファイルを「推論の素材（Knowledge）」として扱うことを禁ずる。これらは**「推論の前提条件（Anchor）」**であり、論理的に正解が1つでない場合において、唯一の「決断」を決定づけるパラメータである。
 
 ---
-*この `/vision/` ディレクトリの独立そのものが、「論理（Knowledge）を超えた意志（Vision）が必要である」という主権者の決断の体現である。*
+
+_この `/vision/` ディレクトリの独立そのものが、「論理（Knowledge）を超えた意志（Vision）が必要である」という主権者の決断の体現である。_
 
 ### 5.2 ミッションとの紐付け (Mission-Tenant Anchor)
 
@@ -82,8 +82,10 @@ AIエージェントおよび関連スクリプトは、`/vision/` 以下のフ�
 AIは以下の順序で「今回の決断基準」を特定する。
 
 1. **Explicit Mission Override**: ミッションの `mission-state.json` に直接記述された `vision_ref`。
-2. **Tenant Vision**: `knowledge/tenants/{tenant_id}/vision.md`。
-3. **Global Vision (The Sovereign's Default)**: `/vision/_default.md`。
+2. **Customer stance overlay (optional)**: `customer/{customer_slug}/vision.md`。これは表示・運用スタンスであり、tenant registry や scope chain の代替ではない。
+3. **Tenant Vision**: `knowledge/confidential/{tenant_slug}/vision.md`。tenant registry が解決する canonical な tenant 境界に属する。
+4. **Global Vision (The Sovereign's Default)**: `/vision/_default.md`。
 
 ---
-*この配置ルールにより、AIは「感情（Vision）」を論理的な検索パスとして解決し、即座に決断に移行できる。*
+
+_この配置ルールにより、AIは「感情（Vision）」を論理的な検索パスとして解決し、即座に決断に移行できる。_

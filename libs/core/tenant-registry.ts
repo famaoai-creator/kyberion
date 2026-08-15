@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import AjvModule from 'ajv';
-import { customerDirForSlug, customerIsConfigured, customerRoot } from './customer-resolver.js';
+import { customerDirForSlug } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -121,11 +121,9 @@ function assertTenantGroupProfile(profile: TenantGroupProfile): void {
 
 export function tenantProfileDir(options: TenantRegistryPathOptions = {}): string {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
-  const env = options.env ?? process.env;
-  if (customerIsConfigured(env, rootDir)) {
-    const root = customerRoot('tenants', env, rootDir);
-    if (root) return root;
-  }
+  // The registry is durable authority, not a stance overlay. A customer stance
+  // may contain a tenant facet for presentation, but changing
+  // KYBERION_CUSTOMER must never change which tenant profile is authoritative.
   return path.join(rootDir, 'knowledge', 'personal', 'tenants');
 }
 
@@ -303,7 +301,7 @@ export function ensureDefaultTenantProfile(): TenantProfile {
     assigned_role: 'owner',
     isolation_policy: {
       strict_isolation: true,
-      allow_cross_distillation: true,
+      allow_cross_distillation: false,
     },
     metadata: {
       bootstrap_source: 'tenant-registry.ensureDefaultTenantProfile',

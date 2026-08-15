@@ -34,6 +34,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   let savedRole: string | undefined;
   let savedSudo: string | undefined;
   let savedMission: string | undefined;
+  let savedTenantScopeRequired: string | undefined;
   let savedUnitSharedGroup: string | null;
 
   beforeEach(() => {
@@ -42,6 +43,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     savedRole = process.env.MISSION_ROLE;
     savedSudo = process.env.KYBERION_SUDO;
     savedMission = process.env.MISSION_ID;
+    savedTenantScopeRequired = process.env.KYBERION_TENANT_SCOPE_REQUIRED;
     const groupPath = path.join(ROOT, 'knowledge/confidential/tenant-groups/unit-shared.json');
     savedUnitSharedGroup = fs.existsSync(groupPath) ? fs.readFileSync(groupPath, 'utf8') : null;
     delete process.env.MISSION_ID;
@@ -65,6 +67,8 @@ describe('tier-guard tenant scope (IP-1)', () => {
     else process.env.KYBERION_SUDO = savedSudo;
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
+    if (savedTenantScopeRequired === undefined) delete process.env.KYBERION_TENANT_SCOPE_REQUIRED;
+    else process.env.KYBERION_TENANT_SCOPE_REQUIRED = savedTenantScopeRequired;
   });
 
   it('allows write inside the same tenant prefix', () => {
@@ -86,7 +90,9 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.scope_violation/);
     expect(result.reason).toContain("tenant 'acme-corp'");
-    expect(result.reason).toContain("tenant 'other-tenant'");
+    if (result.reason?.includes('tenant.scope_violation')) {
+      expect(result.reason).toContain("tenant 'other-tenant'");
+    }
   });
 
   it('denies read from a different tenant prefix', () => {
@@ -126,14 +132,18 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
   });
 
-  it('persona without tenant binding is unaffected by tenant scope', () => {
+  it('fails closed when a protected tenant path has no tenant binding', async () => {
     delete process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT_SCOPE_REQUIRED = 'true';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/file.md');
     const result = validateWritePermission(target);
-    if (!result.allowed) {
-      expect(result.reason).not.toMatch(/tenant\.scope_violation/);
-    }
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/tenant\.scope_missing/);
+    const { auditChain } = await import('./audit-chain.js');
+    expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'tenant.scope_violation', result: 'denied' })
+    );
   });
 
   it('allows run_pipeline to persist traces and temp artifacts', () => {
@@ -191,6 +201,17 @@ describe('tier-guard tenant scope (IP-1)', () => {
     if (!result.allowed) {
       expect(result.reason).not.toMatch(/tenant\.scope_violation/);
     }
+  });
+
+  it('allows the bound legacy mission path during tenant storage migration', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.MISSION_ID = 'MSN-LEGACY-MISSION';
+    const target = path.join(
+      ROOT,
+      'active/missions/confidential/MSN-LEGACY-MISSION/team-composition.json'
+    );
+    expect(validateWritePermission(target).allowed).toBe(true);
   });
 
   it('rejects malformed tenant slug from env', async () => {

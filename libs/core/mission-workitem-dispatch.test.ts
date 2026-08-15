@@ -953,9 +953,8 @@ describe('mission work item dispatch', () => {
 
     const delegateTask = vi
       .fn()
-      // round 1: empty twice (initial + the empty-response retry) → blocked
-      .mockResolvedValueOnce('')
-      .mockResolvedValueOnce('')
+      // round 1: provider failure → blocked
+      .mockRejectedValueOnce(new Error('transient provider failure'))
       // round 2 succeeds
       .mockResolvedValue(
         makeTaskResultText({
@@ -973,13 +972,29 @@ describe('mission work item dispatch', () => {
       { delegateTask }
     );
 
-    // round1 (2 calls incl. retry) + round2 (1 call) — round3 skipped (no items left)
-    expect(delegateTask.mock.calls.length).toBeGreaterThanOrEqual(3);
+    // round1 (provider failure) + round2 (success) — round3 skipped (no items left)
+    expect(delegateTask.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(manifest.records[0]).toMatchObject({
       task_result: expect.objectContaining({
         summary: 'Completed on the second dispatch round.',
       }),
     });
+
+    const dispatchEvents = safeReadFile(
+      `${missionPath}/coordination/events/workitem-dispatch.jsonl`,
+      { encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    expect(dispatchEvents.filter((event) => event.event === 'dispatch_started')).toHaveLength(2);
+    expect(dispatchEvents.filter((event) => event.event === 'dispatch_completed')).toHaveLength(2);
+    expect(
+      dispatchEvents
+        .filter((event) => ['dispatch_started', 'dispatch_completed'].includes(event.event))
+        .map((event) => event.round)
+    ).toEqual([1, 1, 2, 2]);
   });
 
   it('re-requests task_result once when the initial response is unstructured', async () => {
@@ -1246,6 +1261,35 @@ describe('mission work item dispatch', () => {
       },
     });
 
+    safeWriteFile(
+      nodePath.join(missionPath, 'team-composition.json'),
+      JSON.stringify({
+        mission_id: missionId,
+        mission_type: 'development',
+        tier: 'public',
+        template: 'test',
+        generated_at: new Date().toISOString(),
+        assignments: [
+          {
+            team_role: 'implementer',
+            status: 'assigned',
+            agent_id: 'implementation-agent',
+            authority_role: 'software_developer',
+            provider: 'claude',
+            modelId: 'sonnet',
+          },
+          {
+            team_role: 'reviewer',
+            status: 'assigned',
+            agent_id: 'reviewer-agent',
+            authority_role: 'ruthless_auditor',
+            provider: 'claude',
+            modelId: 'sonnet',
+          },
+        ],
+      })
+    );
+
     const routeA2A = vi.fn(async (envelope: any) => ({
       a2a_version: '1.0',
       header: {
@@ -1284,6 +1328,9 @@ describe('mission work item dispatch', () => {
     expect(routeA2A).toHaveBeenCalledTimes(2);
     expect(routeA2A.mock.calls[0]?.[0]?.payload?.context).toMatchObject({
       security_scope: expect.objectContaining({ mission_id: missionId }),
+      provider: 'claude',
+      provider_model_id: 'sonnet',
+      dispatch_timeout_ms: expect.any(Number),
     });
     expect(manifest.records[0]).toMatchObject({
       execution_surface: 'agent_runtime',
@@ -2139,6 +2186,282 @@ describe('mission work item dispatch', () => {
     expect(response.response_text).toContain('linked project dispatch confirmed');
 
     safeRmSync(linkedMissionPath, { recursive: true, force: true });
+  });
+
+  it('does not fall back to tenant-wide selection when the mission has an explicit project_id', async () => {
+    const scopedMissionId = 'MSN-WORKITEM-EXPLICIT-SCOPE-001';
+    const scopedProjectId = 'PRJ-EXPLICIT-SCOPE-A';
+    const otherProjectId = 'PRJ-EXPLICIT-SCOPE-B';
+    const scopedMissionPath = pathResolver.missionDir(scopedMissionId, 'public');
+    if (!safeExistsSync(scopedMissionPath)) safeMkdir(scopedMissionPath, { recursive: true });
+    safeWriteFile(
+      `${scopedMissionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'scoped-task',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'sovereign-brain' },
+            description: 'Dispatch only the explicitly linked project work item.',
+            deliverable: 'evidence/explicit-scope.md',
+            target_path: 'evidence/explicit-scope.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    createWorkItem({
+      title: `${scopedMissionId}: In-scope work item`,
+      description: 'Belongs to the explicitly linked project and must be selected.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${scopedMissionId}:scoped-task`,
+      projectId: scopedProjectId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${scopedMissionId}`, 'team_role:implementer', 'ticket:workitem'],
+      context: {
+        tenant_slug: 'kyberion-service-studio',
+        project_id: scopedProjectId,
+        mission_id: scopedMissionId,
+        task_id: 'scoped-task',
+        work_shape: 'improvement_experiment',
+      },
+      metadata: {
+        mission_id: scopedMissionId,
+        task_id: 'scoped-task',
+        team_role: 'implementer',
+        deliverable: 'evidence/explicit-scope.md',
+        target_path: 'evidence/explicit-scope.md',
+      },
+    });
+
+    // Same tenant and same mission label, but under a *different* project.
+    // Once the mission has an explicit project_id, this item must never be
+    // picked up — picking it up would mean selection silently broadened to
+    // tenant-wide scope instead of staying pinned to the linked project.
+    createWorkItem({
+      title: `${scopedMissionId}: Out-of-scope work item from another project`,
+      description: 'Belongs to a different project under the same tenant and must be excluded.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${scopedMissionId}:other-project-task`,
+      projectId: otherProjectId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${scopedMissionId}`, 'team_role:implementer', 'ticket:workitem'],
+      context: {
+        tenant_slug: 'kyberion-service-studio',
+        project_id: otherProjectId,
+        mission_id: scopedMissionId,
+        task_id: 'other-project-task',
+        work_shape: 'improvement_experiment',
+      },
+      metadata: {
+        mission_id: scopedMissionId,
+        task_id: 'other-project-task',
+        team_role: 'implementer',
+        deliverable: 'evidence/other-project.md',
+        target_path: 'evidence/other-project.md',
+      },
+    });
+
+    try {
+      const manifest = await dispatchMissionWorkItems(
+        makeLinkedProjectMissionState({
+          missionId: scopedMissionId,
+          projectId: scopedProjectId,
+          projectPath: `active/projects/public/shared/${scopedProjectId}/project-os`,
+        }),
+        { mode: 'subagent', finalStatus: 'done' },
+        {
+          delegateTask: vi.fn(async () =>
+            makeTaskResultText({
+              summary: 'Completed the explicitly scoped work item only.',
+              artifacts: [{ path: 'evidence/explicit-scope.md', kind: 'markdown' }],
+              verification_done: ['Confirmed project scoping excluded the other project.'],
+              gaps: [],
+              needs: [],
+            })
+          ),
+        }
+      );
+
+      expect(manifest.work_item_count).toBe(1);
+      expect(manifest.records).toHaveLength(1);
+      expect(manifest.records[0]?.title).toContain('In-scope work item');
+      expect(manifest.records.some((record) => record.title.includes('Out-of-scope'))).toBe(false);
+    } finally {
+      safeRmSync(scopedMissionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers a project from typed WorkItem context for legacy missions without a project relationship', async () => {
+    const legacyMissionId = 'MSN-WORKITEM-LEGACY-PROJECT-001';
+    const legacyMissionPath = pathResolver.missionDir(legacyMissionId, 'public');
+    if (!safeExistsSync(legacyMissionPath)) safeMkdir(legacyMissionPath, { recursive: true });
+    safeWriteFile(
+      `${legacyMissionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'legacy-project-task',
+            status: 'planned',
+            deliverable: 'evidence/legacy-project.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    createWorkItem({
+      title: `${legacyMissionId}: Recover the legacy project context`,
+      description:
+        'Recover the project from typed WorkItem context before dispatching this legacy mission task.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${legacyMissionId}:legacy-project-task`,
+      projectId: 'default',
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${legacyMissionId}`, 'team_role:planner', 'ticket:workitem'],
+      context: {
+        tenant_slug: 'kyberion-service-studio',
+        project_id: 'default',
+        mission_id: legacyMissionId,
+        task_id: 'legacy-project-task',
+        work_shape: 'service_operation',
+      },
+      metadata: {
+        mission_id: legacyMissionId,
+        task_id: 'legacy-project-task',
+        team_role: 'planner',
+        deliverable: 'evidence/legacy-project.md',
+      },
+    });
+
+    try {
+      const dispatchManifest = await dispatchMissionWorkItems(
+        {
+          ...makeMissionState(),
+          mission_id: legacyMissionId,
+          tenant_slug: 'kyberion-service-studio',
+          relationships: {},
+        },
+        { mode: 'agent', finalStatus: 'review' },
+        {
+          routeA2A: vi.fn(async (envelope) => ({
+            a2a_version: '1.0',
+            header: {
+              msg_id: 'RES-LEGACY-PROJECT-1',
+              sender: 'sovereign-brain',
+              receiver: 'kyberion:workitem-dispatcher',
+              performative: 'result' as const,
+              timestamp: new Date().toISOString(),
+            },
+            payload: {
+              text: makeTaskResultText({
+                summary: 'Recovered the typed project context and dispatched the legacy task.',
+                artifacts: [{ path: 'evidence/legacy-project.md', kind: 'markdown' }],
+                verification_done: [
+                  'Confirmed fallback project recovery from the tenant-scoped WorkItem.',
+                ],
+                gaps: [],
+                needs: [],
+                extraText: String(envelope.payload?.text || ''),
+              }),
+            },
+          })),
+        }
+      );
+
+      expect(dispatchManifest.work_item_count).toBe(1);
+      expect(dispatchManifest.records[0]?.work_item_status_after).toBe('review');
+      expect(
+        listWorkItems({ projectId: 'default' }).find(
+          (item) => item.context?.mission_id === legacyMissionId
+        )?.status
+      ).toBe('review');
+    } finally {
+      safeRmSync(legacyMissionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when a legacy mission has no tenant scope', async () => {
+    const legacyMissionId = 'MSN-WORKITEM-MISSING-TENANT-001';
+    createWorkItem({
+      title: `${legacyMissionId}: Tenant scope is required`,
+      description: 'A legacy mission must not recover project context without tenant scope.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${legacyMissionId}:missing-tenant`,
+      projectId: 'PRJ-MISSING-TENANT',
+      labels: [`mission:${legacyMissionId}`, 'ticket:workitem'],
+      context: {
+        tenant_slug: 'tenant-a',
+        project_id: 'PRJ-MISSING-TENANT',
+        mission_id: legacyMissionId,
+        task_id: 'missing-tenant',
+        work_shape: 'improvement_experiment',
+      },
+    });
+
+    await expect(
+      dispatchMissionWorkItems(
+        { ...makeMissionState(), mission_id: legacyMissionId, relationships: {} },
+        { mode: 'agent', finalStatus: 'review' }
+      )
+    ).rejects.toThrow('[MISSION_WORKITEM_SCOPE_REQUIRED]');
+  });
+
+  it('fails closed when a tenant-scoped legacy mission has no WorkItem project context', async () => {
+    const legacyMissionId = 'MSN-WORKITEM-MISSING-PROJECT-001';
+
+    await expect(
+      dispatchMissionWorkItems(
+        {
+          ...makeMissionState(),
+          mission_id: legacyMissionId,
+          tenant_slug: 'tenant-a',
+          relationships: {},
+        },
+        { mode: 'agent', finalStatus: 'review' }
+      )
+    ).rejects.toThrow('[MISSION_PROJECT_CONTEXT_MISSING]');
+  });
+
+  it('fails closed when tenant-scoped legacy WorkItems resolve multiple projects', async () => {
+    const legacyMissionId = 'MSN-WORKITEM-AMBIGUOUS-PROJECT-001';
+    for (const projectId of ['PRJ-AMBIGUOUS-A', 'PRJ-AMBIGUOUS-B']) {
+      createWorkItem({
+        title: `${legacyMissionId}: ${projectId}`,
+        description: 'A legacy mission must not dispatch across ambiguous project context.',
+        status: 'ready',
+        source: 'local',
+        sourceRef: `mission:${legacyMissionId}:${projectId}`,
+        projectId,
+        labels: [`mission:${legacyMissionId}`, 'ticket:workitem'],
+        context: {
+          tenant_slug: 'tenant-a',
+          project_id: projectId,
+          mission_id: legacyMissionId,
+          task_id: projectId,
+          work_shape: 'improvement_experiment',
+        },
+      });
+    }
+
+    await expect(
+      dispatchMissionWorkItems(
+        {
+          ...makeMissionState(),
+          mission_id: legacyMissionId,
+          tenant_slug: 'tenant-a',
+          relationships: {},
+        },
+        { mode: 'agent', finalStatus: 'review' }
+      )
+    ).rejects.toThrow('[MISSION_PROJECT_CONTEXT_AMBIGUOUS]');
   });
 
   it('reflects completed work item results back onto ticket artifacts', async () => {

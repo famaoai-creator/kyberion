@@ -11,6 +11,14 @@ import {
   type ChainAlg,
 } from './chain-integrity.js';
 import { withLockSync } from './src/lock-utils.js';
+import {
+  eventScopeFromRecord,
+  eventScopeMatches,
+  normalizeEventScope,
+  parseEventScopeFromRecord,
+  type EventScope,
+  type EventScopeFilter,
+} from './event-scope.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -24,6 +32,7 @@ export const GLOBAL_LEDGER_PATH = pathResolver.resolve('active/audit/system-ledg
 export const record = (type: string, data: any) => {
   const timestamp = new Date().toISOString();
   const missionId = data.mission_id;
+  const scope = resolveLedgerScope(data);
 
   // 1. Determine Target Path
   let targetPath = GLOBAL_LEDGER_PATH;
@@ -41,6 +50,7 @@ export const record = (type: string, data: any) => {
   const detailHash = _writeToLedger(targetPath, {
     timestamp,
     type,
+    scope,
     role: data.role || 'Unknown',
     mission_id: missionId || 'None',
     payload: data,
@@ -51,6 +61,7 @@ export const record = (type: string, data: any) => {
     _writeToLedger(GLOBAL_LEDGER_PATH, {
       timestamp,
       type: `MISSION_EVENT:${type}`,
+      scope,
       role: data.role || 'Unknown',
       mission_id: missionId,
       detail_hash: detailHash, // Link to the detailed ledger
@@ -162,6 +173,69 @@ export const verifyLedgerIntegrityDetailed = (
     missingKey,
   };
 };
+
+/** Read the global ledger through the same explicit scope contract as events. */
+export const loadForScope = (
+  filter: EventScopeFilter,
+  ledgerPath: string = GLOBAL_LEDGER_PATH
+): Record<string, unknown>[] => {
+  if (!safeExistsSync(ledgerPath)) return [];
+  const content = String(safeReadFile(ledgerPath, { encoding: 'utf8' }) || '');
+  return content
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        const entry = JSON.parse(line) as Record<string, unknown>;
+        const payload =
+          entry.payload && typeof entry.payload === 'object' && !Array.isArray(entry.payload)
+            ? (entry.payload as Record<string, unknown>)
+            : undefined;
+        const entryScopeResult = parseEventScopeFromRecord(entry);
+        const payloadScopeResult = payload ? parseEventScopeFromRecord(payload) : undefined;
+        if (entryScopeResult.invalid || payloadScopeResult?.invalid) return [];
+        const scope = entryScopeResult.scope || payloadScopeResult?.scope;
+        return eventScopeMatches(scope, filter) ? [entry] : [];
+      } catch {
+        return [];
+      }
+    });
+};
+
+function resolveLedgerScope(data: Record<string, unknown>): EventScope {
+  const source =
+    data.scope && typeof data.scope === 'object' && !Array.isArray(data.scope)
+      ? (data.scope as Record<string, unknown>)
+      : data;
+  const candidate = {
+    ...source,
+    ...(typeof data.tenant_slug === 'string' ? { tenant_slug: data.tenant_slug } : {}),
+    ...(typeof data.organization_id === 'string' ? { organization_id: data.organization_id } : {}),
+    ...(typeof data.project_id === 'string' ? { project_id: data.project_id } : {}),
+    ...(typeof data.mission_id === 'string' ? { mission_id: data.mission_id } : {}),
+    ...(typeof data.task_id === 'string' ? { task_id: data.task_id } : {}),
+    tier: (source.tier as EventScope['tier'] | undefined) || 'public',
+  };
+  try {
+    return normalizeEventScope(candidate);
+  } catch {
+    // The system ledger is also used by legacy callers that only know a
+    // project or ticket id. Do not fail the business event; downgrade its
+    // scope to system rather than inventing a parent tenant/organization.
+    if (typeof data.tenant_slug === 'string') {
+      try {
+        return normalizeEventScope({
+          tier: candidate.tier,
+          tenant_slug: data.tenant_slug,
+        });
+      } catch {
+        /* fall through to an explicitly system-scoped record */
+      }
+    }
+    return normalizeEventScope({ tier: 'public', scope_kind: 'system' });
+  }
+}
 
 // Legacy support
 export const ledger = { record, verifyIntegrity };

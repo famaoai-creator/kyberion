@@ -40,6 +40,19 @@ describe('vision-resolver', () => {
     expect(resolveGoldenRulePriorityOrder(vision)[0]).toBe('logical_integrity');
   });
 
+  it('resolves the canonical confidential tenant vision when no customer stance overlay exists', () => {
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/knowledge/confidential/acme/vision.md`,
+      '# ACME Tenant Vision\n\n## Steering\n- Tenant boundary first\n'
+    );
+
+    const vision = resolveVision('acme', tmpRoot);
+
+    expect(vision.source_kind).toBe('tenant');
+    expect(vision.raw).toContain('Tenant boundary first');
+  });
+
   // CO-01: getGoldenRule() (libs/core/core.ts) calls resolveVision() with no
   // tenantSlug at all — it relies entirely on this env-var fallback to be
   // tenant-aware. That fallback path itself had no test coverage until now.

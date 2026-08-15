@@ -462,6 +462,7 @@ class A2ABridgeImpl {
           correlationId,
           ...(dispatchTimeoutMs ? { timeoutMs: dispatchTimeoutMs } : {}),
           ...(taskModelHint ? { taskModelHint } : {}),
+          ...(missionId ? { missionId } : {}),
         });
         responseText = result.text;
       } catch (err: any) {
@@ -493,6 +494,7 @@ class A2ABridgeImpl {
             correlationId,
             ...(dispatchTimeoutMs ? { timeoutMs: dispatchTimeoutMs } : {}),
             ...(taskModelHint ? { taskModelHint } : {}),
+            ...(missionId ? { missionId } : {}),
           });
           responseText = result.text;
         } else {
@@ -519,6 +521,7 @@ class A2ABridgeImpl {
             askAgentRuntime(agentId, runtimePrompt, 'a2a_bridge', {
               correlationId,
               ...(taskModelHint ? { taskModelHint } : {}),
+              ...(missionId ? { missionId } : {}),
             })
           )
         );
@@ -546,6 +549,7 @@ class A2ABridgeImpl {
               askAgentRuntime(agentId, retriedPrompt, 'a2a_bridge', {
                 correlationId,
                 ...(taskModelHint ? { taskModelHint } : {}),
+                ...(missionId ? { missionId } : {}),
               })
             )
           );

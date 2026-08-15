@@ -39,4 +39,25 @@ describe('runtime-supervisor core', () => {
     expect(runtimeSupervisor.get('test-manual-resource')?.resourceId).toBe('test-manual-resource');
     runtimeSupervisor.unregister('test-manual-resource');
   });
+
+  it('does not stop detached services during owner signal cleanup', async () => {
+    let cleaned = false;
+    runtimeSupervisor.register({
+      resourceId: 'test-detached-service',
+      kind: 'service',
+      ownerId: 'test-owner',
+      ownerType: 'cli',
+      shutdownPolicy: 'detached',
+      cleanup: () => {
+        cleaned = true;
+      },
+    });
+
+    await expect(runtimeSupervisor.cleanupAll('signal:143')).resolves.not.toContain(
+      'test-detached-service'
+    );
+    expect(cleaned).toBe(false);
+    expect(runtimeSupervisor.get('test-detached-service')).toBeDefined();
+    runtimeSupervisor.unregister('test-detached-service');
+  });
 });
