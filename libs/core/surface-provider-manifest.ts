@@ -30,6 +30,11 @@ export interface SurfaceProviderManifest {
     scopeMode: 'system' | 'server-bound-tenant' | 'viewer-derived' | 'request-derived';
     allowedTiers: TierLevel[];
     requiresChannelBindingForCustomerMode: boolean;
+    principalResolution: string;
+    writeAuthority: string;
+    nhiBinding: string;
+    approvalClasses: string[];
+    dataResidency: string;
   };
 }
 
@@ -57,6 +62,11 @@ export function listSurfaceProviderManifests(): SurfaceProviderManifest[] {
             allowedTiers: [...record.scope_policy.allowed_tiers],
             requiresChannelBindingForCustomerMode:
               record.scope_policy.requires_channel_binding_for_customer_mode,
+            principalResolution: record.scope_policy.principal_resolution,
+            writeAuthority: record.scope_policy.write_authority,
+            nhiBinding: record.scope_policy.nhi_binding,
+            approvalClasses: [...record.scope_policy.approval_classes],
+            dataResidency: record.scope_policy.data_residency,
           },
         }
       : {}),
