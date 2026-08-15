@@ -13,6 +13,7 @@ import type {
 } from './agent-execution-port.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent-execution-port.js';
+import { logger } from './core.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
   work_item_id: string;
@@ -63,16 +64,31 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       receipt = await this.delegatePort.delegate(request);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[coordinated-agent-execution-port] delegation threw for work_item_id=${request.work_item_id} task_id=${request.task_id}: ${message}`
+      );
       closeWorkItem(
         claimed.item,
         this.actorPeerId,
         'blocked',
         message,
         attemptId,
-        undefined,
+        {
+          execution_kind: 'agent_delegation',
+          task_id: request.task_id,
+          agent_id: request.agent_id || 'unknown',
+          status: 'failed',
+          error: message,
+        },
         request.security_scope
       );
       throw error;
+    }
+
+    if (receipt.status !== 'succeeded') {
+      logger.error(
+        `[coordinated-agent-execution-port] delegation failed for work_item_id=${request.work_item_id} task_id=${request.task_id} status=${receipt.status}: ${receipt.error || receipt.output || '(no error detail returned)'}`
+      );
     }
 
     const terminalStatus =
@@ -133,6 +149,17 @@ function closeWorkItem(
   receipt?: AgentExecutionReceipt,
   securityScope?: ContextSecurityScope
 ): void {
+  // A worker may legitimately update WorkItem metadata while its lease is
+  // active (for example, runtime/observability evidence arriving during the
+  // provider call). Re-read before closing so that an unrelated version bump
+  // does not strand the attempt in `running`. The lease identity remains the
+  // authority check; a transferred or released lease still fails closed in
+  // releaseWorkItem.
+  const current = getWorkItem(item.item_id);
+  if (!current) {
+    throw new Error(`[WORK_ITEM_NOT_FOUND] ${item.item_id}`);
+  }
+  const closeVersion = current.lease_id === item.lease_id ? current.version : item.version;
   const executionStatus = receipt?.status || status;
   const resultMetadata = {
     status: executionStatus,
@@ -144,7 +171,7 @@ function closeWorkItem(
       itemId: item.item_id,
       leaseId: item.lease_id,
       actorPeerId,
-      expectedVersion: item.version,
+      expectedVersion: closeVersion,
       nextStatus: status,
       summary,
       metadata: {
@@ -167,7 +194,7 @@ function closeWorkItem(
   }
   updateWorkItem({
     itemId: item.item_id,
-    expectedVersion: item.version,
+    expectedVersion: closeVersion,
     status,
     metadata: {
       ...(item.metadata || {}),
