@@ -52,7 +52,11 @@ describe('config change contract', () => {
     expect(() =>
       assertConfigChangeApplyable({
         envelope,
-        approval: { status: 'approved', payloadHash: 'b'.repeat(64) },
+        approval: {
+          status: 'approved',
+          payloadHash: 'b'.repeat(64),
+          scope,
+        },
       })
     ).toThrow('CONFIG_CHANGE_APPROVAL_MISMATCH');
   });
@@ -71,8 +75,31 @@ describe('config change contract', () => {
     expect(() =>
       assertConfigChangeApplyable({
         envelope,
-        approval: { status: 'approved', payloadHash: envelope.desired_hash },
+        approval: { status: 'approved', payloadHash: envelope.desired_hash, scope },
       })
     ).toThrow('CONFIG_CHANGE_PREFLIGHT_REQUIRED');
+  });
+
+  it('rejects an approval from another tenant even when the payload hash matches', () => {
+    const envelope = normalizeConfigChangeEnvelope({
+      change_id: 'cfg-3',
+      scope,
+      target_kind: 'tenant',
+      requested_by: 'operator',
+      risk: 'high',
+      desired_hash: 'a'.repeat(64),
+      approval_ref: 'apr-3',
+      probe_refs: { service_readiness: 'audit-3' },
+    });
+    expect(() =>
+      assertConfigChangeApplyable({
+        envelope,
+        approval: {
+          status: 'approved',
+          payloadHash: envelope.desired_hash,
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+        },
+      })
+    ).toThrow('CONFIG_CHANGE_APPROVAL_SCOPE_MISMATCH');
   });
 });
