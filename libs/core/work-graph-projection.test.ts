@@ -39,6 +39,26 @@ describe('work graph projection', () => {
     expect(safeExistsSync(nodePath.join(missionPath, 'NEXT_TASKS.json'))).toBe(false);
   });
 
+  it('keeps canonical reads tenant-scoped when project IDs overlap', () => {
+    const tenantA = createWorkItem({
+      itemId: 'canonical-tenant-a',
+      title: 'Tenant A task',
+      description: 'Tenant A task description.',
+      projectId: 'PRJ-SHARED-ID',
+      context: { project_id: 'PRJ-SHARED-ID', tenant_slug: 'tenant-a', task_id: 'task-a' },
+    });
+    createWorkItem({
+      itemId: 'canonical-tenant-b',
+      title: 'Tenant B task',
+      description: 'Tenant B task description.',
+      projectId: 'PRJ-SHARED-ID',
+      context: { project_id: 'PRJ-SHARED-ID', tenant_slug: 'tenant-b', task_id: 'task-b' },
+    });
+
+    const canonical = readCanonicalWorkGraph('PRJ-SHARED-ID', { tenantSlug: 'tenant-a' });
+    expect(canonical.items.map((entry) => entry.item_id)).toEqual([tenantA.item_id]);
+  });
+
   it('regenerates NEXT_TASKS from canonical WorkItems after the projection is deleted', () => {
     const item = createWorkItem({
       itemId: 'canonical-regeneration-item',
@@ -164,6 +184,57 @@ describe('work graph projection', () => {
         expect.objectContaining({ task_id: 'legacy-task', description: 'Keep me.' }),
       ])
     );
+  });
+
+  it('updates canonical execution facts without erasing process-template history', () => {
+    const item = createWorkItem({
+      itemId: 'process-template-item',
+      title: 'Canonical process item',
+      description: 'Canonical process item description.',
+      projectId: 'PRJ-PROJECTION',
+      status: 'done',
+      context: {
+        project_id: 'PRJ-PROJECTION',
+        tenant_slug: 'tenant-a',
+        task_id: 'process-task',
+        work_shape: 'solution_project',
+      },
+      metadata: { team_role: 'planner', acceptance_criteria: ['artifact exists'] },
+    });
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify([
+        {
+          task_id: 'process-task',
+          status: 'planned',
+          assigned_to: { role: 'planner' },
+          description: 'Template-owned description',
+          dependencies: [],
+          origin: 'process_template',
+          work_item_id: item.item_id,
+          context: { project_id: 'PRJ-PROJECTION', task_id: 'process-task' },
+          ticket_dispatch: { attempt_count: 2 },
+        },
+      ])
+    );
+
+    const result = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(result.applied).toBe(true);
+    const projected = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
+    );
+    expect(projected[0]).toMatchObject({
+      task_id: 'process-task',
+      status: 'completed',
+      dependencies: [],
+      description: 'Template-owned description',
+      ticket_dispatch: { attempt_count: 2 },
+    });
   });
 
   it('refuses to apply when an existing projection is malformed', () => {

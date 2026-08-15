@@ -120,6 +120,9 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     model_hint: z.record(z.string(), z.unknown()).optional(),
     provider: z.string().min(1).optional(),
     provider_model_id: z.string().min(1).optional(),
+    // WorkItem dispatch attribution. Optional for backward compatibility with
+    // surface-originated A2A tasks that are not backed by a WorkItem.
+    work_item_id: z.string().min(1).optional(),
     task_id: z.string().optional(),
     dispatch_timeout_ms: z.number().int().positive().optional(),
     context_mode: z.enum(AGENT_CONTEXT_MODES).optional(),

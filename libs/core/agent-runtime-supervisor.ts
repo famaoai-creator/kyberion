@@ -23,6 +23,7 @@ import {
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
+import { metrics, resolveCostRates } from './metrics.js';
 
 export interface AgentRuntimeEnsureRequest {
   request_id: string;
@@ -65,6 +66,44 @@ const EVENTS_PATH = pathResolver.shared(
 );
 const EVENTS_DIR = pathResolver.shared('observability/mission-control');
 let supervisorEventWriteWarned = false;
+
+function estimateRuntimeTokens(chars: unknown): number {
+  const count = Number(chars || 0);
+  return Number.isFinite(count) && count > 0 ? Math.ceil(count / 4) : 0;
+}
+
+export function resolveRuntimeTokenUsage(input: {
+  reportedInputTokens: number;
+  reportedOutputTokens: number;
+  promptChars: number;
+  responseChars: number;
+}): {
+  inputTokens: number;
+  outputTokens: number;
+  usageEstimated: boolean;
+  usageStatus: 'actual' | 'estimated';
+} {
+  const hasReportedUsage =
+    Number.isFinite(input.reportedInputTokens) &&
+    Number.isFinite(input.reportedOutputTokens) &&
+    (input.reportedInputTokens > 0 ||
+      input.reportedOutputTokens > 0 ||
+      (input.promptChars === 0 && input.responseChars === 0));
+  if (hasReportedUsage) {
+    return {
+      inputTokens: Math.max(0, input.reportedInputTokens),
+      outputTokens: Math.max(0, input.reportedOutputTokens),
+      usageEstimated: false,
+      usageStatus: 'actual',
+    };
+  }
+  return {
+    inputTokens: estimateRuntimeTokens(input.promptChars),
+    outputTokens: estimateRuntimeTokens(input.responseChars),
+    usageEstimated: true,
+    usageStatus: 'estimated',
+  };
+}
 
 function ensureQueueDirs(): void {
   safeMkdir(REQUESTS_DIR);
@@ -355,6 +394,7 @@ export async function askAgentRuntime(
     timeoutMs?: number;
     taskModelHint?: TaskModelHint;
     correlationId?: string;
+    missionId?: string;
     /** SO-05 / OP-01: declared reasoning tier for this ask, recorded on both events below. */
     modelTier?: 'fast' | 'standard' | 'deep';
   } = {}
@@ -365,32 +405,125 @@ export async function askAgentRuntime(
     agent_id: agentId,
     requested_by: requestedBy,
     correlation_id: options.correlationId,
+    mission_id: options.missionId,
     task_model_hint: options.taskModelHint,
     declared_model_tier: options.modelTier,
   });
-  const handle = getAgentRuntimeHandle(agentId);
-  if (!handle) {
-    throw new Error(`Agent ${agentId} not found or not ready`);
+  try {
+    const handle = getAgentRuntimeHandle(agentId);
+    if (!handle) {
+      throw new Error(`Agent ${agentId} not found or not ready`);
+    }
+    const response = await handle.ask(prompt, {
+      timeoutMs: options.timeoutMs,
+      model_tier: options.modelTier,
+    });
+    const snapshot = getAgentRuntimeSnapshot(agentId, 20);
+    const provider = snapshot?.agent.provider || handle.getRecord()?.provider;
+    const modelId = snapshot?.agent.modelId || handle.getRecord()?.modelId;
+    const usage = snapshot?.metrics.usage;
+    const durationMs = Date.now() - startedAt;
+    const rawInputTokens = Number(usage?.inputTokens);
+    const rawOutputTokens = Number(usage?.outputTokens);
+    const resolvedUsage = resolveRuntimeTokenUsage({
+      reportedInputTokens: rawInputTokens,
+      reportedOutputTokens: rawOutputTokens,
+      promptChars: snapshot?.metrics.lastPromptChars || prompt.length,
+      responseChars: snapshot?.metrics.lastResponseChars || response.length,
+    });
+    const { inputTokens, outputTokens, usageEstimated, usageStatus } = resolvedUsage;
+    appendSupervisorEvent({
+      decision: 'agent_runtime_ask_completed',
+      agent_id: agentId,
+      requested_by: requestedBy,
+      provider,
+      model_id: modelId,
+      duration_ms: durationMs,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      usage_estimated: usageEstimated,
+      correlation_id: options.correlationId,
+      mission_id: options.missionId,
+      task_model_hint: options.taskModelHint,
+      declared_model_tier: options.modelTier,
+    });
+
+    if (inputTokens > 0 || outputTokens > 0) {
+      const promptTokens = inputTokens;
+      const completionTokens = outputTokens;
+      const model = String(modelId || 'default');
+      try {
+        metrics.record('agent-runtime:ask', durationMs, 'success', {
+          agent: agentId,
+          provider,
+          model,
+          mission_id: options.missionId,
+          correlation_id: options.correlationId,
+          usage: {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+          },
+          estimated: usageEstimated,
+        });
+        const rates = resolveCostRates(model);
+        if (promptTokens > 0) {
+          metrics.recordResourceUsage({
+            resource_kind: 'llm',
+            actor_id: agentId,
+            mission_id: options.missionId,
+            quantity: promptTokens,
+            unit: 'input_token',
+            unit_cost_usd: rates.prompt,
+            status: usageStatus,
+            source: 'agent-runtime-supervisor',
+            metadata: {
+              model,
+              provider,
+              correlation_id: options.correlationId,
+              token_kind: 'input',
+            },
+          });
+        }
+        if (completionTokens > 0) {
+          metrics.recordResourceUsage({
+            resource_kind: 'llm',
+            actor_id: agentId,
+            mission_id: options.missionId,
+            quantity: completionTokens,
+            unit: 'output_token',
+            unit_cost_usd: rates.completion,
+            status: usageStatus,
+            source: 'agent-runtime-supervisor',
+            metadata: {
+              model,
+              provider,
+              correlation_id: options.correlationId,
+              token_kind: 'output',
+            },
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          `[agent-runtime-supervisor] usage persistence failed for ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+    return response;
+  } catch (error) {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_ask_failed',
+      agent_id: agentId,
+      requested_by: requestedBy,
+      duration_ms: Date.now() - startedAt,
+      correlation_id: options.correlationId,
+      mission_id: options.missionId,
+      task_model_hint: options.taskModelHint,
+      declared_model_tier: options.modelTier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
-  const response = await handle.ask(prompt, {
-    timeoutMs: options.timeoutMs,
-    model_tier: options.modelTier,
-  });
-  const snapshot = getAgentRuntimeSnapshot(agentId, 20);
-  appendSupervisorEvent({
-    decision: 'agent_runtime_ask_completed',
-    agent_id: agentId,
-    requested_by: requestedBy,
-    model_id: snapshot?.agent.modelId || handle.getRecord()?.modelId,
-    duration_ms: Date.now() - startedAt,
-    input_tokens: snapshot?.metrics.usage?.inputTokens,
-    output_tokens: snapshot?.metrics.usage?.outputTokens,
-    total_tokens: snapshot?.metrics.usage?.totalTokens,
-    correlation_id: options.correlationId,
-    task_model_hint: options.taskModelHint,
-    declared_model_tier: options.modelTier,
-  });
-  return response;
 }
 
 export async function refreshAgentRuntime(agentId: string, requestedBy: string) {

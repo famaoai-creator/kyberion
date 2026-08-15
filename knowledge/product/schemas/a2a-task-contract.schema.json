@@ -33,6 +33,7 @@
         "correlation_id": { "type": "string" },
         "task_model_hint": { "type": "object" },
         "model_hint": { "type": "object" },
+        "work_item_id": { "type": "string", "minLength": 1 },
         "context_mode": { "type": "string", "enum": ["fresh", "continue"] }
       },
       "additionalProperties": true

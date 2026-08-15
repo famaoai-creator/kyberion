@@ -186,6 +186,50 @@ describe('agent_runtime_supervisor_daemon', () => {
     });
   }, 90000);
 
+  it('keeps serving after a timed-out client closes before the provider replies', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    let resolveAsk!: (value: string) => void;
+    mocks.askAgentRuntime.mockImplementation(
+      () => new Promise<string>((resolve) => (resolveAsk = resolve))
+    );
+    const abandoned = net.createConnection(socketPath);
+    await new Promise<void>((resolve, reject) => {
+      abandoned.once('connect', async () => {
+        abandoned.write(
+          `${JSON.stringify({
+            id: 'abandoned',
+            method: 'ask',
+            payload: { agentId: 'agent-1', prompt: 'slow', requestedBy: 'test' },
+          })}\n`
+        );
+        for (let attempt = 0; attempt < 20 && !resolveAsk; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+        abandoned.destroy();
+        resolve();
+      });
+      abandoned.once('error', reject);
+    });
+    expect(resolveAsk).toBeTypeOf('function');
+    resolveAsk('late response');
+
+    mocks.askAgentRuntime.mockResolvedValue('healthy response');
+    await expect(
+      sendRequest(socketPath, {
+        id: 'after-abandon',
+        method: 'ask',
+        payload: { agentId: 'agent-1', prompt: 'healthy', requestedBy: 'test' },
+      })
+    ).resolves.toMatchObject({ ok: true, result: { text: 'healthy response' } });
+  });
+
   it('creates a private Unix socket', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
       transport: 'unix',
@@ -196,6 +240,27 @@ describe('agent_runtime_supervisor_daemon', () => {
     });
 
     expect(fs.statSync(socketPath).mode & 0o777).toBe(0o600);
+  });
+
+  it('does not replace an existing healthy daemon when a lock is ambiguous', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    await expect(
+      startAgentRuntimeSupervisorDaemon({
+        transport: 'unix',
+        socketPath,
+        lockPath,
+        exitOnFatalError: false,
+        exitOnExistingHealthyDaemon: false,
+      })
+    ).rejects.toThrow(/existing healthy daemon/);
+    expect(fs.existsSync(socketPath)).toBe(true);
   });
 
   it('rejects ask requests over the per-agent inflight limit and admits again once slots free up', async () => {

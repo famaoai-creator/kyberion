@@ -246,6 +246,9 @@ export interface A2ATaskContext {
   // separate from the advisory task_model_hint used for effort selection.
   provider?: string;
   provider_model_id?: string;
+  // Set by WorkItem dispatch so runtime results can be attributed to the
+  // canonical WorkItem without overloading the mission task id.
+  work_item_id?: string;
   // Set by dispatchMissionNextTasks so the worker runtime can attribute the
   // ask to a NEXT_TASKS entry; consumed by the a2a bridge for scoping.
   task_id?: string;
@@ -389,6 +392,8 @@ export interface SurfaceConversationResult {
   planningPackets?: PlanningPacket[];
   taskResults?: TaskResultBlock[];
   taskResultErrors?: string[];
+  taskResultRepairs?: string[];
+  taskResultRepairRequiresReview?: boolean;
   surfaceParseErrors?: string[];
   routingDecision?: AgentRoutingDecision;
   executionFeedbackRequest?: ExecutionFeedbackRequest;

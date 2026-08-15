@@ -53,6 +53,28 @@ function dependencyItemId(
   return byItemId.get(reference) || byTaskId.get(reference);
 }
 
+function dependenciesForItem(item: WorkItem): string[] {
+  const canonical = (item.dependencies || [])
+    .map(String)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (canonical.length > 0) return [...new Set(canonical)];
+  // Compatibility for items created before dependencies became a first-class
+  // WorkItem field. New writes always populate `dependencies`; this fallback
+  // lets the graph remain safe while legacy records are migrated.
+  const metadata = item.metadata?.dependencies;
+  return Array.isArray(metadata)
+    ? [
+        ...new Set(
+          metadata
+            .map(String)
+            .map((value) => value.trim())
+            .filter(Boolean)
+        ),
+      ]
+    : [];
+}
+
 /** Build a deterministic graph view from canonical WorkItems (never from NEXT_TASKS.json). */
 export function buildWorkGraph(items: ReadonlyArray<WorkItem>, projectId = ''): WorkGraph {
   const scoped = items.filter((item) => !projectId || item.project_id === projectId);
@@ -81,14 +103,7 @@ export function buildWorkGraph(items: ReadonlyArray<WorkItem>, projectId = ''): 
     task_id: taskIdForItem(item),
     title: item.title,
     status: item.status,
-    dependencies: [
-      ...new Set(
-        (item.dependencies || [])
-          .map(String)
-          .map((value) => value.trim())
-          .filter(Boolean)
-      ),
-    ],
+    dependencies: dependenciesForItem(item),
     dependency_item_ids: [],
     project_id: item.project_id,
     ...(item.assignee_peer_id ? { assignee_peer_id: item.assignee_peer_id } : {}),

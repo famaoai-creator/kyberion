@@ -127,7 +127,8 @@
         "pnpm-workspace.yaml",
         "tsconfig.json",
         "tsconfig.actuators.json",
-        "vitest.config.mts"
+        "vitest.config.mts",
+        ".env.local"
       ]
     },
     "ecosystem_architect": {
