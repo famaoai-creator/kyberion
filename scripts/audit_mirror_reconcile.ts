@@ -398,8 +398,11 @@ export function runAuditMirrorReconciliation(input: {
       'sovereign'
     );
   } else {
-    const receiptPath = pathResolver.sharedTmp(
-      path.join('audit-mirror-reconciliation', input.missionId, 'dry-run-receipt.json')
+    const receiptPath = path.join(
+      rootDir,
+      'active/missions/confidential',
+      input.missionId,
+      'evidence/audit-mirror-reconciliation-dry-run.json'
     );
     safeMkdir(path.dirname(receiptPath), { recursive: true });
     receipt.receipt_path = path.relative(rootDir, receiptPath).replaceAll(path.sep, '/');
