@@ -52,6 +52,86 @@ function safeEnv(): NodeJS.ProcessEnv {
 
 const PROJECT_ROOT = pathResolver.rootDir();
 
+interface SpawnedCliResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+let cliProcessSequence = 0;
+
+/**
+ * Keep provider CLI work off the supervisor event loop. A synchronous child
+ * process call makes health/status IPC unavailable for the entire provider
+ * timeout, which looks like a dead supervisor and can trigger duplicate
+ * daemons. The child remains killable on timeout while the daemon keeps
+ * serving unrelated requests.
+ */
+function runCliProcess(
+  command: string,
+  args: string[],
+  options: {
+    env: NodeJS.ProcessEnv;
+    cwd: string;
+    timeoutMs: number;
+    stdio: 'inherit' | ['ignore', 'pipe', 'pipe'];
+  }
+): Promise<SpawnedCliResult> {
+  return new Promise((resolve, reject) => {
+    const resourceId = `agent-adapter-cli:${process.pid}:${++cliProcessSequence}`;
+    const managed = spawnManagedProcess({
+      resourceId,
+      kind: 'agent',
+      ownerId: resourceId,
+      ownerType: 'agent-adapter-cli',
+      command,
+      args,
+      shutdownPolicy: 'manual',
+      spawnOptions: {
+        env: options.env,
+        cwd: options.cwd,
+        shell: false,
+        stdio: options.stdio,
+      },
+    });
+    const child = managed.child;
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timedOut = false;
+    const cleanup = (): void => {
+      clearTimeout(timeout);
+      stopManagedProcess(resourceId, child);
+    };
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      cleanup();
+      reject(new Error(`provider CLI timed out after ${options.timeoutMs}ms`));
+    }, options.timeoutMs);
+
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.once('error', (error) => {
+      finish(() => reject(error));
+    });
+    child.once('close', (status) => {
+      if (timedOut) return;
+      finish(() => resolve({ status, stdout, stderr }));
+    });
+  });
+}
+
 async function getACPSdk() {
   return await import('@agentclientprotocol/sdk');
 }
@@ -914,17 +994,16 @@ export class CodexAdapter implements AgentAdapter {
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
-    const { spawnSync } = await import('node:child_process');
 
     try {
       // Pass the text as a single argument to npx/codex exec
-      const res = spawnSync('npx', ['codex', 'exec', '--json', enhanced.prompt], {
-        encoding: 'utf8',
+      const res = await runCliProcess('npx', ['codex', 'exec', '--json', enhanced.prompt], {
         env: safeEnv(),
-        shell: false,
+        cwd: PROJECT_ROOT,
+        timeoutMs: 300000,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
-      if (res.error) throw res.error;
       if (res.status !== 0) {
         logger.error(`[UAA] Codex Exit Code: ${res.status}`);
         logger.error(`[UAA] Codex Stderr: ${res.stderr}`);
@@ -991,7 +1070,6 @@ export class AgyAdapter implements AgentAdapter {
       `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`
     );
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
-    const { spawnSync } = await import('node:child_process');
 
     try {
       const bin =
@@ -1039,16 +1117,12 @@ export class AgyAdapter implements AgentAdapter {
         args.push(...this.options.extraArgs);
       }
 
-      const res = spawnSync(bin, args, {
-        encoding: 'utf8',
+      const res = await runCliProcess(bin, args, {
         env: safeEnv(),
         cwd: this.options.cwd || PROJECT_ROOT,
-        shell: false,
-        timeout: this.options.timeoutMs || 300000,
-        stdio: isInteractive ? 'inherit' : 'pipe',
+        timeoutMs: this.options.timeoutMs || 300000,
+        stdio: isInteractive ? 'inherit' : ['ignore', 'pipe', 'pipe'],
       });
-
-      if (res.error) throw res.error;
 
       if (isInteractive) {
         return {
@@ -1846,8 +1920,6 @@ export class ClaudeAdapter implements AgentAdapter {
   public async ask(text: string): Promise<AgentResponse> {
     logger.info(`[UAA] Claude asking: "${text.slice(0, 80)}..."`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
-    const { spawnSync } = await import('node:child_process');
-
     try {
       const args = ['-p', text, '--output-format', 'json'];
 
@@ -1872,25 +1944,26 @@ export class ClaudeAdapter implements AgentAdapter {
 
       // Tool restrictions from manifest
       if (this.options.allowedTools && this.options.allowedTools.length > 0) {
+        // Claude CLI separates tool availability (--tools) from automatic
+        // permission approval (--allowedTools). Supplying only the latter
+        // can leave print-mode workers with no executable tools at all.
+        args.push('--tools', this.options.allowedTools.join(','));
         args.push('--allowedTools', ...this.options.allowedTools);
       }
       if (this.options.disallowedTools && this.options.disallowedTools.length > 0) {
         args.push('--disallowedTools', ...this.options.disallowedTools);
       }
 
-      const res = spawnSync('claude', args, {
-        encoding: 'utf8',
+      const result = await runCliProcess('claude', args, {
         env: safeEnv(),
         cwd: this.options.cwd || PROJECT_ROOT,
-        shell: false,
-        timeout: 300000, // 5 min for complex tasks
+        timeoutMs: 300000, // 5 min for complex tasks
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
-      if (res.error) throw res.error;
-
-      const output = (res.stdout || '').trim();
-      if (res.stderr)
-        this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
+      const output = result.stdout.trim();
+      if (result.stderr)
+        this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: result.stderr.trim() });
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       try {
@@ -1899,13 +1972,13 @@ export class ClaudeAdapter implements AgentAdapter {
         return {
           text: parsed.result || parsed.content || parsed.message || output,
           thought: parsed.thought,
-          stopReason: res.status === 0 ? 'completed' : 'error',
+          stopReason: result.status === 0 ? 'completed' : 'error',
         };
       } catch (_) {
         // Fallback: treat as plain text
         return {
-          text: output || res.stderr || '',
-          stopReason: res.status === 0 ? 'completed' : 'error',
+          text: output || result.stderr || '',
+          stopReason: result.status === 0 ? 'completed' : 'error',
         };
       }
     } catch (e: any) {
@@ -1944,7 +2017,15 @@ export class ClaudeAdapter implements AgentAdapter {
 
     for (const actuator of deniedActuators) {
       const tools = ACTUATOR_TO_CLAUDE_TOOLS[actuator];
-      if (tools) tools.forEach((t) => disallowedTools.add(t));
+      if (tools) {
+        for (const tool of tools) {
+          // Several Kyberion actuators intentionally share a Claude tool
+          // (for example code-actuator and system-actuator both map to
+          // Bash). An explicitly allowed, more specific actuator must not be
+          // erased merely because a broader actuator is denied.
+          if (!allowedTools.has(tool)) disallowedTools.add(tool);
+        }
+      }
     }
 
     return {

@@ -1558,14 +1558,18 @@ export async function finishMission(
     );
   }
 
-  // Retrospective Loop (⑤ Review の自動化): measure how the team worked and
-  // queue process/team improvement proposals for operator ratification.
-  // Fire-and-forget — the retrospective must never block delivery.
-  runMissionRetrospective(upperId).catch((err: unknown) => {
+  // Retrospective Loop (⑤ Review の自動化): measure how the team worked,
+  // persist token/cost statistics, and queue process/team improvement
+  // proposals for operator ratification. The mission is already completed
+  // above, so the caller receives a completed mission only after this
+  // post-success evidence has been attempted.
+  try {
+    await runMissionRetrospective(upperId);
+  } catch (err: unknown) {
     logger.warn(
       `⚠️ [RETROSPECTIVE] skipped for ${upperId}: ${err instanceof Error ? err.message : String(err)}`
     );
-  });
+  }
 
   traceCtx.startSpan('mission:customer-delivery');
   try {

@@ -28,6 +28,14 @@
       },
       "minItems": 1
     },
+    "obsolete_agent_runtime_providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
     "default_models": {
       "type": "object",
       "required": ["gemini", "claude", "codex", "copilot"],

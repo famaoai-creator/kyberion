@@ -7,7 +7,11 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
 import * as pathResolver from './path-resolver.js';
-import { findMissionPath, missionDir as resolveMissionDir } from './path-resolver.js';
+import {
+  findMissionPath,
+  missionDir as resolveMissionDir,
+  tenantMissionDir,
+} from './path-resolver.js';
 import { logger } from './core.js';
 import { safeExistsSync, safeLstat, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
@@ -223,7 +227,14 @@ export async function saveState(
   { alreadyLocked = false } = {}
 ): Promise<void> {
   assertMissionStateSchema(state);
-  const dir = findMissionPath(id) || resolveMissionDir(id, state.tier);
+  const tenantDir = state.tenant_slug
+    ? tenantMissionDir(id, state.tenant_slug, state.tier)
+    : undefined;
+  const dir =
+    (tenantDir && safeExistsSync(tenantDir) ? tenantDir : undefined) ||
+    findMissionPath(id) ||
+    tenantDir ||
+    resolveMissionDir(id, state.tier);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 
   const doWrite = async () => {

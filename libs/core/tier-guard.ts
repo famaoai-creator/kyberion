@@ -385,6 +385,15 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
+    // Pre-tenant migrations stored a mission directly under
+    // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
+    // only for an unmistakable legacy mission directory. A non-slug mission
+    // segment cannot name another tenant, while arbitrary malformed segments
+    // must still fail closed rather than becoming an implicit escape hatch.
+    const legacyMissionSegment = /^MSN-[A-Z0-9][A-Z0-9._-]{1,127}$/i.test(targetTenant);
+    if (scoped.prefix === 'active/missions/confidential/' && legacyMissionSegment) {
+      return null;
+    }
     return {
       allowed: false,
       reason: `[POLICY_VIOLATION] tenant.scope_invalid_prefix — '${relativePath}' is under protected prefix '${scoped.prefix}' but tenant segment '${targetTenant || '(missing)'}' is invalid.`,

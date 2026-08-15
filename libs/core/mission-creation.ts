@@ -8,7 +8,11 @@ import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-pla
 import * as customerResolver from './customer-resolver.js';
 import { resolveCompany, buildCompanyVisionRef } from './company.js';
 import * as pathResolver from './path-resolver.js';
-import { findMissionPath, missionDir as resolveMissionDir } from './path-resolver.js';
+import {
+  findMissionPath,
+  missionDir as resolveMissionDir,
+  tenantMissionDir,
+} from './path-resolver.js';
 import { initializeMissionTeamBindings } from './mission-team-binding.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
@@ -197,7 +201,9 @@ export async function createMission(args: {
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
   const missionBaseDir = isEphemeral
     ? pathResolver.active('missions/ephemeral')
-    : resolveMissionDir(upperId, finalTier);
+    : tenantSlug
+      ? tenantMissionDir(upperId, tenantSlug, finalTier)
+      : resolveMissionDir(upperId, finalTier);
   const missionDir = isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir;
 
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
@@ -231,6 +237,7 @@ export async function createMission(args: {
     missionType,
     tier: finalTier,
     assignedPersona: persona,
+    tenantSlug,
     organizationProfile,
   });
   writeMissionTeamPlan(missionDir, teamPlan);

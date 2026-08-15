@@ -201,7 +201,8 @@ export function capabilityEntry(capabilityName: string) {
 
 export function missionDir(
   missionId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+  tier: 'personal' | 'confidential' | 'public' = 'confidential',
+  tenantSlug?: string
 ) {
   assertMissionIdArgument(missionId);
   const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
@@ -216,7 +217,9 @@ export function missionDir(
     }
   }
 
-  const dir = path.join(PROJECT_ROOT_DIR, subPath, missionId);
+  const dir = tenantSlug
+    ? path.join(PROJECT_ROOT_DIR, subPath, normalizeTenantWorkspaceSegment(tenantSlug), missionId)
+    : path.join(PROJECT_ROOT_DIR, subPath, missionId);
   return dir;
 }
 

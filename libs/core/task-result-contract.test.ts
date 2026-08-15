@@ -100,6 +100,68 @@ describe('extractTaskResultBlocks — knowledge_feedback (KP-05)', () => {
   });
 });
 
+describe('extractTaskResultBlocks — conservative contract repair', () => {
+  it('does not require review when the only repair is a long summary', () => {
+    const raw = [
+      '```task_result',
+      JSON.stringify(baseTaskResult({ summary: 'x'.repeat(900) })),
+      '```',
+    ].join('\n');
+
+    const parsed = extractTaskResultBlocks(raw);
+    expect(parsed.taskResults).toHaveLength(1);
+    expect(parsed.taskResultErrors).toEqual([]);
+    expect(parsed.taskResultRepairRequiresReview).toBe(false);
+    expect(parsed.taskResultRepairs).toEqual([
+      'summary truncated to the 800-character contract limit',
+    ]);
+  });
+
+  it('bounds an overlong summary and marks an invalid acceptance status failed', () => {
+    const raw = [
+      '```task_result',
+      JSON.stringify(
+        baseTaskResult({
+          summary: 'x'.repeat(900),
+          acceptance_evidence: [
+            { criterion: 'criterion', status: 'unverified', evidence: 'No executable run.' },
+          ],
+        })
+      ),
+      '```',
+    ].join('\n');
+
+    const parsed = extractTaskResultBlocks(raw);
+    expect(parsed.taskResultErrors).toEqual([]);
+    expect(parsed.taskResults).toHaveLength(1);
+    expect(parsed.taskResults[0]?.summary).toHaveLength(800);
+    expect(parsed.taskResults[0]?.acceptance_evidence?.[0]?.status).toBe('failed');
+    expect(parsed.taskResultRepairRequiresReview).toBe(true);
+    expect(parsed.taskResultRepairs).toEqual([
+      'summary truncated to the 800-character contract limit',
+      'semantic: invalid acceptance_evidence status normalized to failed',
+    ]);
+  });
+
+  it('does not repair missing evidence fields into a valid result', () => {
+    const raw = [
+      '```task_result',
+      JSON.stringify(
+        baseTaskResult({
+          acceptance_evidence: [{ criterion: 'criterion', status: 'unverified' }],
+        })
+      ),
+      '```',
+    ].join('\n');
+
+    const parsed = extractTaskResultBlocks(raw);
+    expect(parsed.taskResults).toHaveLength(0);
+    expect(parsed.taskResultErrors[0]).toContain('task_result validation failed');
+    expect(parsed.taskResultRepairs).toEqual([]);
+    expect(parsed.taskResultRepairRequiresReview).toBe(false);
+  });
+});
+
 // XP-05: task_result gained an optional `provenance` field — which reasoning
 // provider/mode actually served the delegation, and whether that required a
 // failover switch. Same additive-only contract as KP-05's knowledge_feedback

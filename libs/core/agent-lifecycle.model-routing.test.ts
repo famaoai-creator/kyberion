@@ -95,8 +95,8 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     const agentId = 'ni01-wired-agent';
     await agentLifecycle.spawn({
       agentId,
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'agy',
+      modelId: 'Gemini 3.6 Flash (Medium)',
       missionId: 'MSN-NI01-WIRE-001',
       runtimeMetadata: { skip_provider_resolution: true },
     });
@@ -124,8 +124,8 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     const agentId = 'ni01-ungoverned-agent';
     const handle = await agentLifecycle.spawn({
       agentId,
-      provider: 'gemini',
-      modelId: 'gemini-2.5-flash',
+      provider: 'agy',
+      modelId: 'Gemini 3.6 Flash (Medium)',
       runtimeMetadata: { skip_provider_resolution: true },
     });
     expect(handle.agentId).toBe(agentId);
