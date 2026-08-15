@@ -196,7 +196,12 @@
         "process_scope",
         "scope_mode",
         "allowed_tiers",
-        "requires_channel_binding_for_customer_mode"
+        "requires_channel_binding_for_customer_mode",
+        "principal_resolution",
+        "write_authority",
+        "nhi_binding",
+        "approval_classes",
+        "data_residency"
       ],
       "properties": {
         "process_scope": {
@@ -218,6 +223,31 @@
         },
         "requires_channel_binding_for_customer_mode": {
           "type": "boolean"
+        },
+        "principal_resolution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "write_authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nhi_binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_classes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "data_residency": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
