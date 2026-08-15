@@ -190,6 +190,7 @@
 - [Wisdom Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
+- [オンボーディング標準フロー — Tenant / Organization / Activation](./product/governance/onboarding-flow.md) (public | Unknown)
 - [テナント追加手順 — 登録は1系統、検証は check:tenant-registry](./product/governance/tenant-onboarding-procedure.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
 

@@ -4,7 +4,7 @@ category: Orchestration
 tags: [onboarding, setup, concierge, identity]
 importance: 8
 related_roles: [Sovereign Concierge, Ecosystem Architect]
-last_updated: 2026-03-06
+last_updated: 2026-08-15
 kind: playbook
 scope: global
 authority: recipe
@@ -64,6 +64,8 @@ status: active
 - **UX**: `onboarding:context show --json` が返す `customer_slug`、`tenant_slug`、`organization_id`、tier、owner、first-work link を context card の入力として表示する。未解決または不一致の場合は実行を止める。各 surface のカード表示はこの stable JSON を投影し、表示文言を判定ロジックへ埋め込まない。
 - **成果物**: `customer/{slug}/onboarding/organization-context.json` と tenant-scoped organization state。
 
+binding は activation ではない。最初の仕事の apply 前に、[オンボーディング標準フロー](../governance/onboarding-flow.md) の tenant activation gate（viewer scope、NHI、service readiness、isolation probe、人間の受け入れ）を通過させる。
+
 ### Stage 3d: Style Sync (資料の見た目を先に覚える)
 
 - **役割**: 最初の資料作成で迷わないように、テーマと質問セットを先に保存する。
@@ -74,7 +76,7 @@ status: active
 ### Stage 4: Navigate & Execute (ナビゲーションと最初の任務)
 
 - **役割**: ナビゲーションを継続しながらの実務理解。
-- **アクション**: コンシェルジュがナビゲーションを提供し続け、主権者が操作に慣れるまで伴走しながら、最初のミッションを発火させる。
+- **アクション**: コンシェルジュがナビゲーションを提供し続け、主権者が操作に慣れるまで伴走する。activation receipt が `active` で、first-work の scope・budget・success condition・approval boundary を human が確認した後に、最初のミッションまたは organization work を発火させる。
 
 ### Stage 5: Refine (フィードバックと蒸留)
 

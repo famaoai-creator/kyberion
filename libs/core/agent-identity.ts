@@ -48,6 +48,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import { logger } from './core.js';
 import {
   EventSourcingKernel,
@@ -132,6 +133,8 @@ export type AgentIdentityLifecycleStatus = (typeof AGENT_IDENTITY_LIFECYCLE_STAT
 const agentIdentityAffiliationSchema = z
   .object({
     organization_id: z.string(),
+    /** Canonical tenant boundary; customer/{slug} is only a stance overlay. */
+    tenant_slug: z.string().refine(isValidTenantSlug, 'invalid tenant slug').optional(),
     project_id: z.string().optional(),
     mission_id: z.string().optional(),
     task_id: z.string().optional(),
@@ -657,6 +660,11 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
   assertAgentIdentityGovernedContext('issueAgentIdentity');
   const organizationId = resolveAgentIdentityOrganizationId(params.organizationId);
   const nhiId = buildNhiId(organizationId, params.slug);
+  if (params.affiliation?.tenant_slug && !isValidTenantSlug(params.affiliation.tenant_slug)) {
+    throw new AgentIdentityFormatError(
+      `invalid affiliation tenant slug "${params.affiliation.tenant_slug}"`
+    );
+  }
   if (!params.accountableHumanId?.trim()) {
     throw new AgentIdentityAccountabilityError(nhiId, params.kind);
   }

@@ -11,6 +11,7 @@ import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { loadState, readJsonFileSafe } from './mission-state.js';
 import { readTextFile } from './cli-input.js';
+import { normalizeEventScope } from './event-scope.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
@@ -127,6 +128,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   };
   jsonLedger.project_id = jsonLedger.project_id || projectId;
   jsonLedger.project_name = jsonLedger.project_name || projectId;
+  const projectScope = resolveProjectLedgerScope(state, projectId);
   const nextEntry = {
     mission_id: upperId,
     relationship_type: project.relationship_type,
@@ -137,6 +139,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
     traceability_refs: project.traceability_refs || [],
     owner: state.assigned_persona,
     last_updated: new Date().toISOString(),
+    ...(projectScope ? { scope: projectScope } : {}),
   };
   jsonLedger.entries = Array.isArray(jsonLedger.entries) ? jsonLedger.entries : [];
   jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
@@ -146,6 +149,25 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   logger.success(
     `🔗 Synced mission ${upperId} into project ledger: ${path.relative(rootDir, ledgerPath)} (+ ${path.relative(rootDir, ledgerJsonPath)})`
   );
+}
+
+function resolveProjectLedgerScope(
+  state: Record<string, any>,
+  projectId: string
+): ReturnType<typeof normalizeEventScope> | undefined {
+  try {
+    return normalizeEventScope({
+      scope_kind: 'project',
+      tier: (state.tier_scope || state.tier || 'public') as 'personal' | 'confidential' | 'public',
+      tenant_slug: state.tenant_slug,
+      organization_id: state.organization_id,
+      project_id: projectId,
+    });
+  } catch {
+    // Legacy shared/public project records remain valid but are deliberately
+    // untenantable until their owning tenant is declared.
+    return undefined;
+  }
 }
 
 export async function syncProjectLedgerIfLinked(id: string, rootDir: string): Promise<void> {

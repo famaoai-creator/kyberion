@@ -43,6 +43,11 @@
       "type": "object",
       "required": ["tenant_id", "mission_id", "read_tiers", "write_tier", "purpose"],
       "properties": {
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
         "tenant_id": {
           "type": "string",
           "minLength": 1,

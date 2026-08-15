@@ -303,6 +303,9 @@ public tier.
 The audit-chain emits one entry per event with these tenant-aware fields:
 
 - `tenant_slug` (string, optional — empty for cross-tenant tooling)
+- `scope` (`scope_kind` + `tier` + the applicable
+  `tenant_slug → organization_id → project_id → mission_id → task_id → session_id`
+  chain)
 - `mission_id`
 - `actor.persona`, `actor.authority_role`
 - `path_touched` (when applicable)
@@ -311,6 +314,23 @@ The audit-chain emits one entry per event with these tenant-aware fields:
 Per-tenant export to SIEM is achieved by routing through a
 `ChainAuditForwarder` whose first stage filters by `tenant_slug` and whose
 HTTP / shell sinks are tenant-specific.
+
+Ledger/event handling follows the same split:
+
+- **system plane**: system-wide audit and operational metadata may be stored in
+  the shared master chain, but it is explicitly `scope_kind: system`; a tier or
+  the `shared` partition is never used as a fake tenant.
+- **tenant/entity plane**: mission execution ledgers, task/orchestration events,
+  and collaboration projections carry the canonical `scope` envelope. A tenant
+  reader requires an explicit matching tenant scope and fails closed for
+  unscoped legacy records.
+- **projection plane**: read models are derived and rebuildable. They never
+  become a second source of truth and never authorize a cross-tenant query.
+
+The implementation seam is `libs/core/event-scope.ts`; `audit-chain`,
+`ledger`, mission task/orchestration events, and the collaboration projection
+use it. Flat fields remain during migration so old JSONL can be replayed, but
+new writers must emit `scope`.
 
 Compliance checks (e.g. weekly):
 

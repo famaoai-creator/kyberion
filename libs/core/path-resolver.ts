@@ -373,6 +373,7 @@ export function tenantMissionDir(
   tenantSlug: string,
   tier: 'personal' | 'confidential' | 'public' = 'confidential'
 ): string {
+  assertMissionIdArgument(missionId);
   const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   let subPath = 'active/missions';
   if (rawExistsSync(configPath)) {
@@ -512,6 +513,7 @@ export const pathResolver = {
   organizationStateDir,
   missionAuditDir,
   missionEvidenceDir,
+  tenantMissionDir,
   findMissionPath,
   volatile,
   resolve,

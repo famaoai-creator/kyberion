@@ -99,13 +99,21 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   const customerDir = path.join(rootDir, 'customer', normalized.slug);
   const readinessPath = path.join(customerDir, 'onboarding', 'ai-company-readiness.json');
   const firstWorkPath = path.join(customerDir, 'onboarding', 'first-work-plan.md');
+  const tenantSlug = normalized.tenantSlug || '<registered-tenant>';
+  const organizationId = normalized.tenantSlug ? normalized.slug : '<organization>';
   const nextCommands = [
     `export KYBERION_CUSTOMER=${normalized.slug}`,
+    'export KYBERION_TENANT_SCOPE_REQUIRED=true',
     'pnpm setup:report --persona first-time-user',
     normalized.tenantSlug
-      ? `pnpm onboarding:context show --customer-slug ${normalized.slug} --json`
-      : `pnpm onboarding:context bind --customer-slug ${normalized.slug} --tenant-slug <registered-tenant> --dry-run`,
-    `pnpm mission --start "${normalized.firstWork}"`,
+      ? `pnpm tenant show ${normalized.tenantSlug} --json`
+      : `pnpm tenant create ${tenantSlug} --display-name "${normalized.companyName}" --assigned-role owner --apply`,
+    `pnpm onboarding:context bind --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --dry-run --json`,
+    `pnpm onboarding:context bind --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --apply --json`,
+    `pnpm tenant:activation plan --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId}`,
+    `pnpm tenant:activation activate --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --owner-id ${normalized.accountableHumanId} --nhi-id <nhi-id> --check-viewer-scope --check-nhi --check-services --check-isolation --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> --probe-ref service_readiness=<audit-ref> --probe-ref isolation_probe=<audit-ref> --apply --accept`,
+    `pnpm onboarding:context first-work --customer-slug ${normalized.slug} --intent "${normalized.firstWork}" --dry-run --json`,
+    '# after human review: apply first-work, then create and start a governed mission when the work shape requires it',
   ];
 
   if (normalized.dryRun) {

@@ -31,7 +31,7 @@ describe('mission-orchestration-events', () => {
       eventType: 'mission_issue_requested',
       missionId: 'MSN-QUEUE',
       requestedBy: 'test',
-      payload: { channel: 'slack', threadTs: '123' },
+      payload: { channel: 'slack', threadTs: '123', sourceText: 'must stay mission-local' },
     });
 
     const eventPath = getMissionOrchestrationEventPath(event.event_id);
@@ -39,6 +39,13 @@ describe('mission-orchestration-events', () => {
     const stored = JSON.parse(safeReadFile(eventPath, { encoding: 'utf8' }) as string);
     expect(stored.event_type).toBe('mission_issue_requested');
     expect(stored.mission_id).toBe('MSN-QUEUE');
+    expect(stored.payload).toEqual({});
+    expect(stored.payload_ref).toContain('/coordination/orchestration/payloads/');
+    expect(JSON.stringify(stored)).not.toContain('must stay mission-local');
+    const loaded = (
+      await import('./mission-orchestration-events.js')
+    ).loadMissionOrchestrationEvent<typeof event.payload>(eventPath);
+    expect(loaded.payload.sourceText).toBe('must stay mission-local');
   });
 
   it('starts a detached worker for an orchestration event', async () => {
@@ -85,5 +92,75 @@ describe('mission-orchestration-events', () => {
     );
     const valid = validate(stored);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('rejects an orchestration scope that invents a different tenant lineage', async () => {
+    const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+
+    expect(() =>
+      enqueueMissionOrchestrationEvent({
+        eventType: 'mission_issue_requested',
+        missionId: 'MSN-QUEUE',
+        requestedBy: 'test',
+        scope: { tier: 'confidential', tenant_slug: 'other-tenant' },
+        payload: { channel: 'slack' },
+      })
+    ).toThrow(/EVENT_SCOPE_LINEAGE_CONFLICT/);
+  });
+
+  it('rejects a persisted orchestration event with an unknown event type', async () => {
+    const { loadMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    const { safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const eventPath = pathResolver.sharedTmp(`invalid-orchestration-${process.pid}.json`);
+    safeWriteFile(
+      eventPath,
+      JSON.stringify({
+        event_id: 'ME-INVALID',
+        event_type: 'forged_event',
+        mission_id: 'MSN-QUEUE',
+        requested_by: 'test',
+        payload: {},
+      })
+    );
+    try {
+      expect(() => loadMissionOrchestrationEvent(eventPath)).toThrow(
+        'MISSION_ORCHESTRATION_EVENT_INVALID'
+      );
+    } finally {
+      safeUnlinkSync(eventPath);
+    }
+  });
+
+  it('rejects a mission id before resolving a tenant payload path', async () => {
+    const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    expect(() =>
+      enqueueMissionOrchestrationEvent({
+        eventType: 'mission_issue_requested',
+        missionId: '../MSN-ESCAPE',
+        requestedBy: 'test',
+        payload: {},
+        scope: { tier: 'confidential', tenant_slug: 'client-a' },
+      })
+    ).toThrow(/invalid mission id/i);
+  });
+
+  it('accepts all runtime orchestration event types', async () => {
+    const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    expect(
+      enqueueMissionOrchestrationEvent({
+        eventType: 'mission_distillation_requested',
+        missionId: 'MSN-QUEUE',
+        requestedBy: 'test',
+        payload: {},
+      }).event_type
+    ).toBe('mission_distillation_requested');
+    expect(
+      enqueueMissionOrchestrationEvent({
+        eventType: 'mission_completion_requested',
+        missionId: 'MSN-QUEUE',
+        requestedBy: 'test',
+        payload: {},
+      }).event_type
+    ).toBe('mission_completion_requested');
   });
 });

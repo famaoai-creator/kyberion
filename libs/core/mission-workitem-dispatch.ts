@@ -2766,7 +2766,9 @@ async function dispatchMissionWorkItemsRound(
       const taskGrant = issueTaskGrantBestEffort({
         granteeNhiId,
         audience: { missionId, taskId: grantTaskId },
-        scope: {},
+        scope: {
+          ...(item.context?.tenant_slug ? { tenant_slug: item.context.tenant_slug } : {}),
+        },
         issuedBy: 'workitem-dispatch',
       });
       if (taskGrant) {

@@ -95,6 +95,38 @@ describe('memory-promotion-queue', () => {
     expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(/public-tier/i);
   });
 
+  it('requires brokered redaction before a tenant-scoped candidate can become public', () => {
+    const candidate = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-BROKERED-MEMORY',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A redacted reusable pattern.',
+      evidenceRefs: ['evidence:MSN-TEST-BROKERED-MEMORY'],
+      sensitivityTier: 'public',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        mission_id: 'MSN-TEST-BROKERED-MEMORY',
+        owner_nhi: 'kyberion://agent/org-a/planner',
+      },
+    });
+
+    expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(
+      /brokered, redacted promotion/
+    );
+    expect(() =>
+      enqueueMemoryPromotionCandidate({
+        ...candidate,
+        promotion: {
+          source_tenant_slug: 'acme-corp',
+          target_tier: 'public',
+          redacted: true,
+          approved_by: 'human:steward',
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('queues a mission candidate and supports status updates', () => {
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: 'MSN-TEST-STATUS',
@@ -184,5 +216,35 @@ describe('memory-promotion-queue', () => {
     expect(rows[0]?.content_hash).toBeTruthy();
     expect(rows[0]?.occurrences).toBe(2);
     expect(rows[0]?.last_seen).toBe('2026-07-03T00:00:00.000Z');
+  });
+
+  it('never deduplicates candidates across tenant scopes', () => {
+    const acme = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-CROSS-TENANT',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Same wording in separate tenants.',
+      evidenceRefs: ['knowledge/confidential/acme/evidence.jsonl'],
+      sensitivityTier: 'confidential',
+      scope: { tier: 'confidential', tenant_slug: 'acme-corp' },
+    });
+    const beta = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-CROSS-TENANT',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Same wording in separate tenants.',
+      evidenceRefs: ['knowledge/confidential/beta/evidence.jsonl'],
+      sensitivityTier: 'confidential',
+      scope: { tier: 'confidential', tenant_slug: 'beta-corp' },
+    });
+
+    enqueueMemoryPromotionCandidate(acme);
+    enqueueMemoryPromotionCandidate(beta);
+
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.scope?.tenant_slug)).toEqual(['acme-corp', 'beta-corp']);
+    expect(rows[0]?.evidence_refs).toEqual(['knowledge/confidential/acme/evidence.jsonl']);
+    expect(rows[1]?.evidence_refs).toEqual(['knowledge/confidential/beta/evidence.jsonl']);
   });
 });

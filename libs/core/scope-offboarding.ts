@@ -47,6 +47,7 @@ import {
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
+import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -283,6 +284,8 @@ export interface OffboardScopeResult {
   soft_deleted: string[];
   /** NI-05: identities auto-retired because their scope closed (execute mode only). */
   retired_identities?: number;
+  /** NI-04: live task grants revoked because the tenant closed. */
+  revoked_task_grants?: number;
   /** DA-08: dedup-registry prune summary (tenant scope only). */
   dedup_registry?: OffboardDedupRegistryResult;
   /** EG-10: registry-backed artifact ownership query for the offboarded scope. */
@@ -783,6 +786,12 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       reason: `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`,
     });
     result.retired_identities = retiredIdentities;
+    if (scopeType === 'tenant') {
+      result.revoked_task_grants = revokeGrantsForTenantBestEffort(
+        scopeId,
+        `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`
+      );
+    }
 
     // DA-08 acceptance: prove there is no trace left. Best-effort — a
     // verification failure is reported, never thrown.

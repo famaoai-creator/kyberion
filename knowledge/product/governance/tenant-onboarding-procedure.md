@@ -3,7 +3,7 @@ title: テナント追加手順 — 登録は1系統、検証は check:tenant-re
 category: Governance
 tags: [governance, tenant, onboarding, da-01, tenant-registry]
 importance: 8
-last_updated: 2026-08-09
+last_updated: 2026-08-15
 kind: governance
 scope: repository
 authority: standard
@@ -11,9 +11,13 @@ authority: standard
 
 # テナント追加手順（DA-01）
 
+この文書は registry profile の登録だけを扱う。organization の binding、activation probe、
+first-work の開始までを含む標準順序は [オンボーディング標準フロー](./onboarding-flow.md) を参照する。
+
 テナントの正本(背骨)は **テナントプロファイル**(`libs/core/tenant-registry.ts` が読む
-`knowledge/personal/tenants/{slug}.json`、`KYBERION_CUSTOMER` 設定時は
-`customer/{slug}/tenants/{slug}.json`)である。他の系統
+`knowledge/personal/tenants/{slug}.json`)である。`customer/{customer}/tenants/{tenant}.json`
+は customer stance 側の任意の参照ファセットであり、`KYBERION_CUSTOMER` の切替で正本が
+変わってはならない。他の系統
 (`knowledge/confidential/tenants/index.json`・`customer/{slug}/` ディレクトリ)は
 任意の付随ファセットであり、**登録はプロファイル1系統だけ**行い、残りは突合スクリプトで検証する。
 
