@@ -38,6 +38,10 @@ function mockSpawnedCli(stdout = 'Response', status = 0, stderr = '') {
     stderr: new PassThrough(),
     kill: vi.fn(),
   });
+  codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
+    resourceId: spec.resourceId,
+    child: spawn(spec.command, spec.args, spec.spawnOptions),
+  }));
   vi.mocked(spawn).mockImplementationOnce(() => {
     queueMicrotask(() => {
       child.stdout.end(stdout);
@@ -138,6 +142,10 @@ describe('AgyAdapter', () => {
       stderr: new PassThrough(),
       kill: vi.fn(),
     });
+    codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
+      resourceId: spec.resourceId,
+      child: spawn(spec.command, spec.args, spec.spawnOptions),
+    }));
     vi.mocked(spawn).mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.stdout.end(JSON.stringify({ result: 'ok' }));
