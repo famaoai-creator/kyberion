@@ -163,6 +163,7 @@ export function assertConfigChangeApplyable(input: {
       'project_id',
       'mission_id',
       'task_id',
+      'nhi_id',
     ] as const) {
       if (approvalScope[key] !== envelope.scope[key]) {
         throw new Error(
