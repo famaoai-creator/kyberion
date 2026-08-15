@@ -96,6 +96,21 @@ describe('a2a-task-contract schema', () => {
     expect(result.value?.context.context_mode).toBe('continue');
   });
 
+  it('accepts WorkItem attribution in the A2A context', () => {
+    const result = validateA2ATaskContract({
+      intent: 'workitem_execution',
+      text: 'execute the work item',
+      context: {
+        mission_id: 'MSN-schema-1',
+        team_role: 'worker',
+        work_item_id: 'WITEM-schema-1',
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.value?.context.work_item_id).toBe('WITEM-schema-1');
+  });
+
   it('rejects malformed task contract payloads through the helper', () => {
     const result = validateA2ATaskContract({
       intent: 'request_mission_work',

@@ -230,6 +230,8 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     planningPackets: planningPacketBlocks.planningPackets,
     taskResults: taskResultBlocks.taskResults,
     taskResultErrors: taskResultBlocks.taskResultErrors,
+    taskResultRepairs: taskResultBlocks.taskResultRepairs,
+    taskResultRepairRequiresReview: taskResultBlocks.taskResultRepairRequiresReview,
     surfaceParseErrors,
   };
 }

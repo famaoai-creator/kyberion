@@ -203,6 +203,17 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
   });
 
+  it('allows the bound legacy mission path during tenant storage migration', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.MISSION_ID = 'MSN-LEGACY-MISSION';
+    const target = path.join(
+      ROOT,
+      'active/missions/confidential/MSN-LEGACY-MISSION/team-composition.json'
+    );
+    expect(validateWritePermission(target).allowed).toBe(true);
+  });
+
   it('rejects malformed tenant slug from env', async () => {
     process.env.KYBERION_TENANT = 'Acme Corp!';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';

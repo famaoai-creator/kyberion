@@ -16,6 +16,7 @@ import {
   resolveMissionTeamPlan,
   writeMissionTeamPlan,
 } from './mission-team-plan-composer.js';
+import type { TeamProviderPreference } from './team-role-assignment-selection.js';
 import { logger } from './core.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { loadState } from './mission-state.js';
@@ -91,7 +92,8 @@ function emitRuntimeSummary(plan: {
 export function showMissionTeam(
   id: string,
   refresh = false,
-  rootDir?: string
+  rootDir?: string,
+  providerPreference?: TeamProviderPreference
 ): ReturnType<typeof resolveMissionTeamPlan> | undefined {
   if (!id) {
     logger.error('Usage: mission_controller team <MISSION_ID> [--refresh]');
@@ -112,14 +114,33 @@ export function showMissionTeam(
   }
 
   const organizationProfile = loadOrganizationProfile(rootDir);
-  let plan = refresh ? null : loadMissionTeamPlan(upperId);
-  if (!plan) {
+  const existingPlan = refresh ? null : loadMissionTeamPlan(upperId);
+  const tenantMismatch = Boolean(
+    existingPlan &&
+    state.tenant_slug &&
+    existingPlan.assignments.some(
+      (assignment) =>
+        assignment.status === 'assigned' &&
+        assignment.security_scope?.tenant_id !== state.tenant_slug
+    )
+  );
+  const providerMismatch = Boolean(
+    providerPreference &&
+    (!existingPlan ||
+      existingPlan.provider_selection?.requested_provider !== providerPreference.provider ||
+      existingPlan.provider_selection?.requested_model_id !== providerPreference.modelId)
+  );
+  let plan = existingPlan;
+  if (!plan || tenantMismatch || providerMismatch) {
     plan = resolveMissionTeamPlan({
       missionId: upperId,
       missionType: state.mission_type || 'development',
       tier: state.tier,
       assignedPersona: state.assigned_persona,
+      ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+      forceRefresh: refresh || tenantMismatch || providerMismatch,
       organizationProfile,
+      providerPreference,
     });
     writeMissionTeamPlan(missionPath, plan);
     initializeMissionTeamBindings(missionPath, plan);
@@ -141,7 +162,8 @@ export function showMissionTeam(
 
 export async function staffMissionTeam(
   id: string,
-  rootDir?: string
+  rootDir?: string,
+  providerPreference?: TeamProviderPreference
 ): Promise<
   Awaited<ReturnType<typeof ensureMissionTeamRuntimeViaSupervisor>>['runtime_plan'] | undefined
 > {
@@ -164,14 +186,33 @@ export async function staffMissionTeam(
   }
 
   const organizationProfile = loadOrganizationProfile(rootDir);
-  let plan = loadMissionTeamPlan(upperId);
-  if (!plan) {
+  const existingPlan = loadMissionTeamPlan(upperId);
+  const tenantMismatch = Boolean(
+    existingPlan &&
+    state.tenant_slug &&
+    existingPlan.assignments.some(
+      (assignment) =>
+        assignment.status === 'assigned' &&
+        assignment.security_scope?.tenant_id !== state.tenant_slug
+    )
+  );
+  const providerMismatch = Boolean(
+    providerPreference &&
+    (!existingPlan ||
+      existingPlan.provider_selection?.requested_provider !== providerPreference.provider ||
+      existingPlan.provider_selection?.requested_model_id !== providerPreference.modelId)
+  );
+  let plan = existingPlan;
+  if (!plan || tenantMismatch || providerMismatch) {
     plan = resolveMissionTeamPlan({
       missionId: upperId,
       missionType: state.mission_type || 'development',
       tier: state.tier,
       assignedPersona: state.assigned_persona,
+      ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+      ...(tenantMismatch || providerMismatch ? { forceRefresh: true } : {}),
       organizationProfile,
+      providerPreference,
     });
     writeMissionTeamPlan(missionPath, plan);
     initializeMissionTeamBindings(missionPath, plan);

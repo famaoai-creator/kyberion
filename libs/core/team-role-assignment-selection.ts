@@ -105,6 +105,12 @@ export interface RoleSeparationConstraints {
   avoidProviders?: Array<string | null | undefined>;
 }
 
+export interface TeamProviderPreference {
+  provider: string;
+  modelId?: string;
+  strategy?: 'preferred' | 'adaptive' | 'strict';
+}
+
 // Outweighs the operator preferred_agents bonus (20) so independence beats
 // habit, but stays under two capability hits (2×10 + provider bonus) so a
 // clearly better-qualified duplicate actor can still win.
@@ -119,7 +125,8 @@ export function selectAgentForTeamRole(
   routingHint?: { model_id: string },
   separation?: RoleSeparationConstraints,
   /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
-  organizationId?: string
+  organizationId?: string,
+  providerPreference?: TeamProviderPreference
 ): MissionTeamAssignment {
   const hardExcludedAgents = new Set(
     (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
@@ -147,8 +154,17 @@ export function selectAgentForTeamRole(
       );
       const routedModelId = routingHint?.model_id;
       const routedProvider = routedModelId ? resolveModelProvider(routedModelId) : undefined;
+      const agentSelectionHints = providerPreference?.provider
+        ? {
+            ...profile.selection_hints,
+            preferred_provider: providerPreference.provider,
+            ...(providerPreference.modelId
+              ? { preferred_modelId: providerPreference.modelId }
+              : {}),
+          }
+        : profile.selection_hints;
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
-        profile.selection_hints,
+        agentSelectionHints,
         routedProvider as any,
         selectionHints.preferred_models[0] || routedModelId,
         agentId
@@ -156,7 +172,7 @@ export function selectAgentForTeamRole(
       const resolvedTarget = resolveAgentProviderTarget({
         preferredProvider: selectionProvider,
         preferredModelId: selectionModel,
-        providerStrategy: profile.provider_strategy || 'adaptive',
+        providerStrategy: providerPreference?.strategy || profile.provider_strategy || 'adaptive',
         fallbackProviders: profile.fallback_providers || [],
         requiredCapabilities: profile.capabilities,
       });

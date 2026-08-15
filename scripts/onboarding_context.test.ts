@@ -20,6 +20,19 @@ describe('onboarding_context CLI', () => {
     expect(parsed.bootstrapProject).toBe(true);
   });
 
+  it('parses an explicit service context for service-shaped first work', () => {
+    const parsed = parseArgs([
+      'first-work',
+      '--customer-slug',
+      'acme-ai',
+      '--intent',
+      'Operate the customer service',
+      '--service-id',
+      'customer-operations',
+    ]);
+    expect(parsed.serviceId).toBe('customer-operations');
+  });
+
   it('keeps bind in dry-run unless apply is explicit', () => {
     const parsed = parseArgs(['bind', '--customer-slug', 'acme-ai', '--tenant-slug', 'acme-prod']);
     expect(parsed.command).toBe('bind');

@@ -330,6 +330,10 @@ export async function dispatchMissionTickets(
         status: 'ready',
         projectId: projectLink.project_id || missionId,
         assigneePeerId: resolvedAgentId,
+        // Keep process-template dependencies on the canonical WorkItem, not
+        // only in metadata. The latter is a compatibility echo consumed by
+        // older mission dispatch paths and must not be the only graph edge.
+        dependencies: task.dependencies || [],
         context: {
           ...(projectRecord?.organization_id
             ? { organization_id: projectRecord.organization_id }

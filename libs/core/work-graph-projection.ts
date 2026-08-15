@@ -1,6 +1,6 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { pathResolver } from './path-resolver.js';
+import { findMissionPath, pathResolver } from './path-resolver.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -8,6 +8,7 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure
 export interface WorkGraphProjectionOptions {
   missionId: string;
   projectId?: string;
+  tenantSlug?: string;
   apply?: boolean;
   /** Test seam; production callers should use the mission resolver. */
   missionPath?: string;
@@ -78,6 +79,25 @@ function stringListMetadata(item: WorkItem, key: string): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
+function dependenciesForItem(item: WorkItem): string[] {
+  const canonical = (item.dependencies || [])
+    .map(String)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (canonical.length > 0) return [...new Set(canonical)];
+  const metadata = item.metadata?.dependencies;
+  return Array.isArray(metadata)
+    ? [
+        ...new Set(
+          metadata
+            .map(String)
+            .map((value) => value.trim())
+            .filter(Boolean)
+        ),
+      ]
+    : [];
+}
+
 function roleForItem(item: WorkItem): string | undefined {
   const metadataRole = stringMetadata(item, 'team_role');
   if (metadataRole) return metadataRole;
@@ -95,9 +115,7 @@ function toProjectedTask(item: WorkItem): NextTask {
       ...(item.assignee_peer_id ? { agent_id: item.assignee_peer_id } : {}),
     },
     description: item.description || item.title,
-    dependencies: [
-      ...new Set(item.dependencies.map((dependency) => dependency.trim()).filter(Boolean)),
-    ],
+    dependencies: dependenciesForItem(item),
     acceptance_criteria: stringListMetadata(item, 'acceptance_criteria') || [
       'WorkItem reaches its governed terminal status with durable evidence.',
     ],
@@ -154,6 +172,22 @@ function comparableTask(task: Record<string, unknown>): Record<string, unknown> 
   return copy;
 }
 
+function isManagedProcessTask(task: NextTask): boolean {
+  const ticketDispatch = task.ticket_dispatch;
+  const ticketWorkItemId =
+    ticketDispatch && typeof ticketDispatch === 'object'
+      ? (ticketDispatch as Record<string, unknown>).work_item_id
+      : undefined;
+  return (
+    task.origin === 'process_template' &&
+    (typeof task.work_item_id === 'string' || typeof ticketWorkItemId === 'string')
+  );
+}
+
+function canonicalTaskFields(task: Record<string, unknown>): string[] {
+  return ['status', 'assigned_to', 'dependencies', 'work_item_id', 'context'];
+}
+
 function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProjectionDrift[] {
   const byId = new Map(existing.map((task) => [task.task_id, task]));
   const projectedIds = new Set(projected.map((task) => task.task_id));
@@ -164,7 +198,11 @@ function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProject
       drift.push({ task_id: task.task_id, kind: 'missing_from_projection', fields: ['task'] });
       continue;
     }
-    const fields = [...new Set([...Object.keys(current), ...Object.keys(task)])].filter(
+    const fields = (
+      isManagedProcessTask(current)
+        ? canonicalTaskFields(task)
+        : [...new Set([...Object.keys(current), ...Object.keys(task)])]
+    ).filter(
       (field) =>
         JSON.stringify(comparableTask(current)[field]) !==
         JSON.stringify(comparableTask(task)[field])
@@ -182,7 +220,21 @@ function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProject
 
 function mergedTasks(existing: NextTask[], projected: NextTask[]): NextTask[] {
   const projectedById = new Map(projected.map((task) => [task.task_id, task]));
-  const merged = existing.map((task) => projectedById.get(task.task_id) || task);
+  const merged = existing.map((task) => {
+    const projection = projectedById.get(task.task_id);
+    if (!projection) return task;
+    if (!isManagedProcessTask(task)) return projection;
+    // Process templates own the narrative and dispatch history. The Work
+    // Graph owns the execution facts that change at runtime.
+    return {
+      ...task,
+      status: projection.status,
+      assigned_to: projection.assigned_to,
+      dependencies: projection.dependencies,
+      work_item_id: projection.work_item_id,
+      context: projection.context,
+    };
+  });
   const existingIds = new Set(existing.map((task) => task.task_id));
   return [
     ...merged,
@@ -202,10 +254,17 @@ function assertMissionPathWithinRoot(missionPath: string): void {
 }
 
 /** Read dispatch/reconciliation state from canonical WorkItems, never NEXT_TASKS. */
-export function readCanonicalWorkGraph(projectId: string): CanonicalWorkGraphRead {
+export function readCanonicalWorkGraph(
+  projectId: string,
+  options: { tenantSlug?: string } = {}
+): CanonicalWorkGraphRead {
   const normalizedProjectId = projectId.trim();
   if (!normalizedProjectId) throw new Error('projectId is required');
-  const items = listWorkItems({ projectId: normalizedProjectId });
+  const tenantSlug = options.tenantSlug?.trim();
+  const items = listWorkItems({
+    projectId: normalizedProjectId,
+    ...(tenantSlug ? { tenantSlugs: [tenantSlug] } : {}),
+  });
   const graph = buildWorkGraph(items, normalizedProjectId);
   return { project_id: normalizedProjectId, items, graph };
 }
@@ -224,10 +283,20 @@ export function projectWorkGraphToNextTasks(
   const missionId = input.missionId.trim().toUpperCase();
   if (!missionId) throw new Error('missionId is required');
   const projectId = (input.projectId || missionId).trim();
-  const missionPath = input.missionPath || pathResolver.missionDir(missionId, 'public');
+  // A mission's tier is canonical state, not a presentation default. Resolve
+  // an existing mission first so a confidential tenant mission is never
+  // projected into the public compatibility path. The confidential fallback
+  // is only used for a not-yet-created mission and preserves the secure
+  // default for an apply operation.
+  const missionPath =
+    input.missionPath ||
+    findMissionPath(missionId) ||
+    pathResolver.missionDir(missionId, 'confidential', input.tenantSlug);
   assertMissionPathWithinRoot(missionPath);
   const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
-  const canonical = readCanonicalWorkGraph(projectId);
+  const canonical = readCanonicalWorkGraph(projectId, {
+    ...(input.tenantSlug?.trim() ? { tenantSlug: input.tenantSlug.trim() } : {}),
+  });
   const { items, graph } = canonical;
   const projectedTasks = items
     .map(toProjectedTask)
@@ -235,8 +304,13 @@ export function projectWorkGraphToNextTasks(
   const existingTasks = readExistingTasks(nextTasksPath);
   const drift = driftFor(existingTasks, projectedTasks);
   let applied = false;
+  const managedTaskIds = new Set(
+    existingTasks.filter(isManagedProcessTask).map((task) => task.task_id)
+  );
   const hasBlockingProjectionDrift = drift.some(
-    (entry) => entry.kind === 'different_from_projection' || entry.kind === 'stale_projection_entry'
+    (entry) =>
+      entry.kind === 'stale_projection_entry' ||
+      (entry.kind === 'different_from_projection' && !managedTaskIds.has(entry.task_id))
   );
   if (input.apply && graph.valid && !hasBlockingProjectionDrift) {
     withExecutionContext(

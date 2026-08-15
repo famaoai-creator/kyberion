@@ -210,6 +210,10 @@ function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp'): void {
 }
 
 function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
+  // A caller may time out while the provider is still working. The daemon
+  // must keep serving other requests when that caller has already closed its
+  // IPC socket; writing to it would otherwise surface an uncaught EPIPE.
+  if (socket.destroyed || socket.writableEnded || !socket.writable) return;
   socket.end(`${JSON.stringify(response)}\n`);
 }
 
@@ -250,6 +254,15 @@ async function handleRequest(
         logger.info(
           '[agent-runtime-supervisor-daemon] terminate requested (stale code stamp); shutting down.'
         );
+        appendSupervisorEvent({
+          decision: 'agent_runtime_supervisor_daemon_stopping',
+          pid: process.pid,
+          reason: 'stale_code_recycle',
+        });
+        recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+          status: 'stopping',
+          details: { reason: 'stale_code_recycle' },
+        });
         setImmediate(async () => {
           try {
             await shutdownAllAgentRuntimes('supervisor_daemon_terminate');
@@ -330,6 +343,7 @@ async function handleRequest(
               timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
               correlationId:
                 typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
+              missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
               taskModelHint: readTaskModelHint(payload.taskModelHint),
               // SO-05: optional field — tolerant decoding. Older clients that
               // omit model_tier simply get undefined here (no protocol break).
@@ -538,6 +552,16 @@ export async function startAgentRuntimeSupervisorDaemon(
         );
         process.exit(0);
       } catch (killErr: any) {
+        // EPERM means the process exists but this launcher cannot inspect it
+        // (common under a sandbox or across users). Treating that as ESRCH
+        // would delete a live daemon's lock and socket, creating a split-brain
+        // supervisor whose heartbeat PID changes underneath clients.
+        if (killErr?.code === 'EPERM') {
+          const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
+          logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
+          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          throw new Error(message);
+        }
         // Process does not exist, stale lock
         try {
           safeUnlinkSync(lockPath);
@@ -574,6 +598,13 @@ export async function startAgentRuntimeSupervisorDaemon(
   }
 
   if (transport === 'unix' && safeExistsSync(socketPath)) {
+    const healthy = await probeDaemonHealth(listenTarget);
+    if (healthy) {
+      const message = `an existing healthy daemon is already bound at ${socketPath}`;
+      logger.info(`[agent-runtime-supervisor-daemon] ${message}`);
+      if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+      throw new Error(message);
+    }
     try {
       safeUnlinkSync(socketPath);
     } catch (error: any) {
@@ -585,6 +616,11 @@ export async function startAgentRuntimeSupervisorDaemon(
 
   const server = net.createServer((socket) => {
     let buffer = '';
+    socket.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EPIPE' && error.code !== 'ECONNRESET') {
+        logger.warn(`[agent-runtime-supervisor-daemon] client socket error: ${error.message}`);
+      }
+    });
     socket.on('data', async (chunk) => {
       buffer += String(chunk);
       const newlineIndex = buffer.indexOf('\n');
@@ -699,17 +735,23 @@ export async function startAgentRuntimeSupervisorDaemon(
     timeout.unref?.();
   });
 
+  let cleanedUp = false;
   const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    appendSupervisorEvent({
+      decision: 'agent_runtime_supervisor_daemon_stopping',
+      pid: process.pid,
+      reason: 'process_exit',
+    });
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
       status: 'stopping',
+      details: { reason: 'process_exit' },
     });
-    try {
-      if (transport === 'unix' && safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
-    } catch (error: any) {
-      logger.warn(
-        `[agent-runtime-supervisor-daemon] failed to cleanup socket: ${error?.message || error}`
-      );
-    }
+    // Do not unlink the pathname here. A stale daemon can still receive a
+    // signal after a newer daemon has rebound the same path; unlinking from
+    // the old process would make the healthy daemon unreachable. Startup
+    // already probes health and removes only an unresponsive stale socket.
     try {
       if (safeExistsSync(lockPath)) {
         const currentPid = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
@@ -723,8 +765,21 @@ export async function startAgentRuntimeSupervisorDaemon(
       );
     }
   };
-  process.once('SIGINT', cleanup);
-  process.once('SIGTERM', cleanup);
+  const stopDaemon = (exitCode: number) => {
+    cleanup();
+    if (!server.listening) {
+      process.exit(exitCode);
+      return;
+    }
+    const forceExit = setTimeout(() => process.exit(exitCode), 1500);
+    forceExit.unref?.();
+    server.close(() => {
+      clearTimeout(forceExit);
+      process.exit(exitCode);
+    });
+  };
+  process.once('SIGINT', () => stopDaemon(130));
+  process.once('SIGTERM', () => stopDaemon(143));
   process.once('exit', cleanup);
 
   const address = server.address();
@@ -752,21 +807,33 @@ const isDirect =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   main().catch((error: any) => {
-    logger.error(error?.message || String(error));
+    const message = error?.message || String(error);
+    logger.error(message);
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
       status: 'error',
-      details: { error: error?.message || String(error) },
+      details: { error: message },
     });
-    sendOpsAlert({
-      severity: 'critical',
-      title: 'Agent runtime supervisor daemon fatal error',
-      context: {
-        daemon_id: 'agent-runtime-supervisor-daemon',
-        error: error?.message || String(error),
-      },
-      recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
-      dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+    appendSupervisorEvent({
+      decision: 'agent_runtime_supervisor_daemon_failed',
+      pid: process.pid,
+      error: message,
     });
+    try {
+      sendOpsAlert({
+        severity: 'critical',
+        title: 'Agent runtime supervisor daemon fatal error',
+        context: {
+          daemon_id: 'agent-runtime-supervisor-daemon',
+          error: message,
+        },
+        recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
+        dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+      });
+    } catch (alertError: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
+      );
+    }
     process.exit(1);
   });
 }

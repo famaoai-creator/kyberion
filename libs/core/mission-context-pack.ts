@@ -1843,6 +1843,7 @@ export async function resolveMissionContextPack(
         missionType: missionState.mission_type,
         tier,
         assignedPersona: missionState.assigned_persona,
+        ...(missionState.tenant_slug ? { tenantSlug: missionState.tenant_slug } : {}),
       })
     : null;
   const missionTeamAssignment =

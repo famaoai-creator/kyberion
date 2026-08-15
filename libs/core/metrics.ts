@@ -188,6 +188,7 @@ export class MetricsCollector {
     if (!Number.isFinite(cost) || cost < 0) {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
+    const missionId = input.mission_id || process.env.MISSION_ID || undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
       usage_id:
@@ -195,7 +196,7 @@ export class MetricsCollector {
       timestamp: input.timestamp || new Date().toISOString(),
       resource_kind: input.resource_kind,
       actor_id: input.actor_id,
-      mission_id: input.mission_id,
+      mission_id: missionId,
       customer_id: input.customer_id,
       cost_center: input.cost_center,
       quantity,
@@ -288,6 +289,12 @@ export class MetricsCollector {
       agg.cacheIntegrityFailures += extra.cacheStats.integrityFailures || 0;
     }
 
+    const missionId = extra.mission_id || process.env.MISSION_ID || undefined;
+    const persistedExtra = {
+      ...extra,
+      ...(missionId ? { mission_id: missionId } : {}),
+    };
+
     if (this._persist) {
       this._appendToFile({
         component: componentName,
@@ -295,7 +302,7 @@ export class MetricsCollector {
         status,
         timestamp: agg.lastRun,
         memory,
-        ...extra,
+        ...persistedExtra,
       });
     }
   }
