@@ -107,8 +107,34 @@ vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => {
 import { createKyberionMcpServer } from './mcp-server-engine.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const governedToolNames = [
+  'kyberion.pipeline.list',
+  'kyberion.pipeline.run',
+  'kyberion.pipeline.job_status',
+  'kyberion.knowledge.search',
+  'kyberion.capability.list',
+  'kyberion.mission.create',
+  'kyberion.mission.status',
+  'kyberion.mission.journal',
+  'kyberion.surface.cowork.deliver',
+  'kyberion.surface.cowork.list',
+  'kyberion.knowledge.cowork_sync',
+  'kyberion.approval.list_pending',
+  'kyberion.approval.decide',
+  'kyberion.audit.export',
+  'kyberion.audit.verify',
+  'kyberion.service.actuate',
+];
+
 const FAKE_CATALOG = JSON.stringify({
   pipeline_run_allowlist: ['pipelines/vital-check.json'],
+  tools: governedToolNames.map((name) => ({
+    name,
+    allowed_caller_roles:
+      name === 'kyberion.approval.decide' || name === 'kyberion.service.actuate'
+        ? ['operator']
+        : ['operator', 'agent', 'cowork'],
+  })),
 });
 
 function setupCommonMocks() {
@@ -122,6 +148,7 @@ describe('createKyberionMcpServer()', () => {
     vi.clearAllMocks();
     registeredTools.clear();
     setupCommonMocks();
+    vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'cowork');
   });
 
   afterEach(() => {
@@ -137,6 +164,31 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.mission.create')).toBe(true);
     expect(registeredTools.has('kyberion.mission.status')).toBe(true);
     expect(registeredTools.has('kyberion.mission.journal')).toBe(true);
+  });
+
+  it('サーバー側 caller role が未確定ならツール実行を拒否する', async () => {
+    vi.stubEnv('KYBERION_MCP_CALLER_ROLE', '');
+
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
+    const result = await handler({});
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_REQUIRED');
+  });
+
+  it('カタログで operator 限定のツールは cowork role から拒否する', async () => {
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.approval.decide')!.handler;
+    const result = await handler({
+      request_id: 'req-001',
+      decision: 'approved',
+      decided_by: 'cowork-client',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_DENIED');
+    expect(mockDecideApproval).not.toHaveBeenCalled();
   });
 
   describe('kyberion.pipeline.list', () => {
@@ -415,6 +467,7 @@ describe('createKyberionMcpServer()', () => {
 
   describe('kyberion.approval.decide', () => {
     it('valid な requestId で承認を適用する', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
       mockDecideApproval.mockReturnValue({
         request_id: 'req-001',
         decision: 'approved',
@@ -437,6 +490,7 @@ describe('createKyberionMcpServer()', () => {
     });
 
     it('decideApprovalFromCowork がエラーをスローした場合はエラーを返す', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
       mockDecideApproval.mockImplementation(() => {
         throw new Error('[APPROVAL_ERROR] Request not found');
       });
