@@ -1,7 +1,12 @@
 import { createStandardYargs, logger } from '@agent/core';
-import { createPeerMessagingServer, type PeerMessageEnvelope } from '@agent/core';
+import {
+  assertProtocolServiceRegistered,
+  createPeerMessagingServer,
+  type PeerMessageEnvelope,
+} from '@agent/core';
 
 async function main(): Promise<void> {
+  assertProtocolServiceRegistered('peer-messaging');
   const argv = await createStandardYargs()
     .option('peer-id', {
       type: 'string',

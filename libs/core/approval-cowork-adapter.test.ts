@@ -91,6 +91,18 @@ describe('listPendingApprovalsForCowork()', () => {
     listPendingApprovalsForCowork();
     expect(mockListApprovalRequests).toHaveBeenCalledWith({ status: 'pending' });
   });
+
+  it('tenant scope を approval projection に伝播する', () => {
+    const scope = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+    };
+    mockListApprovalRequests.mockReturnValue([makePendingRecord({ scope })]);
+    const result = listPendingApprovalsForCowork(scope);
+    expect(mockListApprovalRequests).toHaveBeenCalledWith({ status: 'pending', scope });
+    expect(result[0]?.scope).toEqual(scope);
+  });
 });
 
 describe('decideApprovalFromCowork()', () => {
