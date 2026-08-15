@@ -501,12 +501,16 @@ function printOffboardHelp(locale = resolveLocale()): void {
   console.log(
     '  npm run cli -- offboard tenant acme --execute --approved-by founder --purpose "contract ended"'
   );
-  console.log('  npm run cli -- offboard project proj-alpha --json');
+  console.log(
+    '  npm run cli -- offboard project PRJ-ALPHA --tenant-slug acme --organization-id ORG-ALPHA --json'
+  );
 }
 
 export interface ParsedOffboardCommand {
   scopeType: 'tenant' | 'project';
   scopeId: string;
+  tenantSlug?: string;
+  organizationId?: string;
   mode: 'dry_run' | 'execute';
   json: boolean;
   approval?: { approved_by: string; purpose: string };
@@ -532,11 +536,22 @@ export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
   const options = parseEmailWorkflowOptions(rest);
   const mode = options['--execute'] === true ? 'execute' : 'dry_run';
   const json = options['--json'] === true;
+  const tenantSlug =
+    typeof options['--tenant-slug'] === 'string' ? options['--tenant-slug'] : undefined;
+  const organizationId =
+    typeof options['--organization-id'] === 'string' ? options['--organization-id'] : undefined;
   const approvedBy = typeof options['--approved-by'] === 'string' ? options['--approved-by'] : '';
   const purpose = typeof options['--purpose'] === 'string' ? options['--purpose'] : '';
 
   if (mode === 'dry_run') {
-    return { scopeType, scopeId, mode, json };
+    return {
+      scopeType,
+      scopeId,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      ...(organizationId ? { organizationId } : {}),
+      mode,
+      json,
+    };
   }
   if (!approvedBy.trim() || !purpose.trim()) {
     throw new Error(
@@ -547,6 +562,8 @@ export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
   return {
     scopeType,
     scopeId,
+    ...(tenantSlug ? { tenantSlug } : {}),
+    ...(organizationId ? { organizationId } : {}),
     mode,
     json,
     approval: { approved_by: approvedBy.trim(), purpose: purpose.trim() },
@@ -568,6 +585,8 @@ async function handleOffboardCommand(
   const result = offboardScope({
     scopeType: parsed.scopeType,
     scopeId: parsed.scopeId,
+    tenantSlug: parsed.tenantSlug,
+    organizationId: parsed.organizationId,
     mode: parsed.mode,
     approval: parsed.approval
       ? { approved_by: parsed.approval.approved_by, purpose: parsed.approval.purpose }

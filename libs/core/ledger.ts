@@ -12,13 +12,12 @@ import {
 } from './chain-integrity.js';
 import { withLockSync } from './src/lock-utils.js';
 import {
-  eventScopeFromRecord,
   eventScopeMatches,
   normalizeEventScope,
-  parseEventScopeFromRecord,
   type EventScope,
   type EventScopeFilter,
 } from './event-scope.js';
+import { resolveScopeForRecord } from './scope-migration.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -188,14 +187,9 @@ export const loadForScope = (
     .flatMap((line) => {
       try {
         const entry = JSON.parse(line) as Record<string, unknown>;
-        const payload =
-          entry.payload && typeof entry.payload === 'object' && !Array.isArray(entry.payload)
-            ? (entry.payload as Record<string, unknown>)
-            : undefined;
-        const entryScopeResult = parseEventScopeFromRecord(entry);
-        const payloadScopeResult = payload ? parseEventScopeFromRecord(payload) : undefined;
-        if (entryScopeResult.invalid || payloadScopeResult?.invalid) return [];
-        const scope = entryScopeResult.scope || payloadScopeResult?.scope;
+        const scopeResult = resolveScopeForRecord(entry);
+        if (scopeResult.disposition === 'invalid') return [];
+        const scope = scopeResult.scope;
         return eventScopeMatches(scope, filter) ? [entry] : [];
       } catch {
         return [];

@@ -200,6 +200,7 @@ function toSnapshotResult(
     owner_id: lease?.owner_id,
     owner_type: lease?.owner_type,
     metadata: lease?.metadata,
+    scope: snapshot.agent.scope,
   };
 }
 
@@ -292,6 +293,10 @@ async function handleRequest(
           parentAgentId:
             typeof payload.parentAgentId === 'string' ? payload.parentAgentId : undefined,
           missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
+          scope:
+            payload.scope && typeof payload.scope === 'object'
+              ? (payload.scope as Record<string, unknown>)
+              : undefined,
           trustRequired:
             typeof payload.trustRequired === 'number' ? payload.trustRequired : undefined,
           requestedBy: String(payload.requestedBy || 'supervisor_daemon'),
@@ -344,6 +349,10 @@ async function handleRequest(
               correlationId:
                 typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
               missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
+              scope:
+                payload.scope && typeof payload.scope === 'object'
+                  ? (payload.scope as Record<string, unknown>)
+                  : undefined,
               taskModelHint: readTaskModelHint(payload.taskModelHint),
               // SO-05: optional field — tolerant decoding. Older clients that
               // omit model_tier simply get undefined here (no protocol break).

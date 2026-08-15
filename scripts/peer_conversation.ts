@@ -48,11 +48,14 @@ async function main(): Promise<void> {
     .parseSync();
 
   const command = String(argv._[0]);
+  const tenantId = String(argv['tenant-id'] || '').trim();
+  if (!tenantId) throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
   const relatedWorkItemIds = csv(argv['related-work-item-id']);
 
   switch (command) {
     case 'open-session': {
       const session = createPeerConversationSession({
+        tenantId,
         sessionId: argv['session-id'] ? String(argv['session-id']) : undefined,
         localPeerId: String(argv['local-peer-id'] || argv['peer-id'] || ''),
         remotePeerId: String(argv['remote-peer-id'] || ''),
@@ -66,6 +69,7 @@ async function main(): Promise<void> {
     }
     case 'send-message': {
       const outcome = await sendPeerConversationMessageToPeer({
+        tenantId,
         senderPeerId: String(argv['local-peer-id'] || argv['peer-id'] || ''),
         recipientPeerId: String(argv['remote-peer-id'] || ''),
         sessionId: argv['session-id'] ? String(argv['session-id']) : undefined,
@@ -77,7 +81,6 @@ async function main(): Promise<void> {
         metadata: argv.metadata ? JSON.parse(String(argv.metadata)) : undefined,
         timeoutMs: Number(argv['timeout-ms']),
         catalogPath: argv.catalog ? String(argv.catalog) : undefined,
-        tenantId: argv['tenant-id'] ? String(argv['tenant-id']) : undefined,
       });
       logger.success(
         `[peer-conversation] ${outcome.receipt.ok ? 'delivered' : 'failed'} ${outcome.session.session_id}`
@@ -87,14 +90,22 @@ async function main(): Promise<void> {
     }
     case 'list-sessions': {
       const peerId = String(argv['peer-id'] || argv['local-peer-id'] || '');
-      console.log(JSON.stringify({ sessions: listPeerConversationSessions(peerId) }, null, 2));
+      console.log(
+        JSON.stringify({ sessions: listPeerConversationSessions(tenantId, peerId) }, null, 2)
+      );
       break;
     }
     case 'show-session': {
       const peerId = String(argv['peer-id'] || argv['local-peer-id'] || '');
       console.log(
         JSON.stringify(
-          { session: loadPeerConversationSession(peerId, String(argv['session-id'] || '')) },
+          {
+            session: loadPeerConversationSession(
+              tenantId,
+              peerId,
+              String(argv['session-id'] || '')
+            ),
+          },
           null,
           2
         )
@@ -104,9 +115,10 @@ async function main(): Promise<void> {
     case 'close-session': {
       const peerId = String(argv['peer-id'] || argv['local-peer-id'] || '');
       const sessionId = String(argv['session-id'] || '');
-      const session = loadPeerConversationSession(peerId, sessionId);
+      const session = loadPeerConversationSession(tenantId, peerId, sessionId);
       if (!session) throw new Error(`Conversation session not found: ${peerId}/${sessionId}`);
       const closed = appendPeerConversationTranscript({
+        tenantId,
         sessionId,
         localPeerId: peerId,
         remotePeerId: session.remote_peer_id,

@@ -1525,7 +1525,10 @@ function summarizeCompany(company: CompanyAggregate): CompanySnapshot {
 }
 
 function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
-  return [...listSurfaceOutboxMessages('slack'), ...listSurfaceOutboxMessages('chronos')]
+  return [
+    ...listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }),
+    ...listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }),
+  ]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 8);
 }
@@ -1976,11 +1979,11 @@ export async function GET(req: NextRequest) {
       tenantSlugs
     );
     const scopedSurfaceOutbox = {
-      slack: listSurfaceOutboxMessages('slack').filter((message) =>
-        surfaceOutboxVisibleToTenant(message, tenantSlugs)
+      slack: listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }).filter(
+        (message) => surfaceOutboxVisibleToTenant(message, tenantSlugs)
       ),
-      chronos: listSurfaceOutboxMessages('chronos').filter((message) =>
-        surfaceOutboxVisibleToTenant(message, tenantSlugs)
+      chronos: listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }).filter(
+        (message) => surfaceOutboxVisibleToTenant(message, tenantSlugs)
       ),
     };
     const scopedBrowserSessions = tenantSlugs === 'all' ? collectBrowserSessions() : [];
@@ -2824,7 +2827,7 @@ export async function POST(req: NextRequest) {
       if (!surface || !messageId) {
         return NextResponse.json({ error: 'Missing surface or messageId' }, { status: 400 });
       }
-      const message = listSurfaceOutboxMessages(surface).find(
+      const message = listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true }).find(
         (entry) => entry.message_id === messageId
       );
       const allowedTenants = strictViewerScopeTenantSlugs(
@@ -2837,7 +2840,7 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-      clearSurfaceOutboxMessage(surface, messageId);
+      clearSurfaceOutboxMessage(surface, messageId, message.scope);
       emitMissionOrchestrationObservation({
         decision: 'surface_outbox_cleared',
         event_type: 'surface_outbox_cleared',

@@ -33,6 +33,26 @@
     "cost_usd": { "type": "number", "minimum": 0 },
     "status": { "type": "string", "enum": ["actual", "estimated", "committed"] },
     "source": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "required": ["scope_kind", "tier"],
+      "properties": {
+        "scope_kind": {
+          "type": "string",
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "nhi_id": { "type": "string" },
+        "work_shape": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "metadata": { "type": "object", "additionalProperties": true }
   }
 }

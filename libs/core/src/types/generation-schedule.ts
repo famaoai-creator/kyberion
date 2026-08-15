@@ -13,6 +13,19 @@ export interface GenerationSchedule {
   kind: 'generation-schedule';
   schedule_id: string;
   enabled: boolean;
+  scope?: {
+    scope_kind: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task' | 'session';
+    tier: 'public' | 'confidential' | 'personal';
+    tenant_slug?: string;
+    organization_id?: string;
+    project_id?: string;
+    mission_id?: string;
+    task_id?: string;
+    session_id?: string;
+    nhi_id?: string;
+    work_shape?: string;
+    [k: string]: unknown;
+  };
   trigger: {
     type: 'cron' | 'interval' | 'event';
     cron?: string;

@@ -5,6 +5,7 @@ import {
   formatCostReport,
   type CostLedgerEntry,
 } from './cost-report.js';
+import { normalizeEventScope } from './event-scope.js';
 
 const D1 = '2026-07-10T10:00:00.000Z';
 const D2 = '2026-07-11T10:00:00.000Z';
@@ -106,5 +107,32 @@ describe('buildCostReport', () => {
     expect(report.by_actor.find((bucket) => bucket.key === 'agent:ops')?.cost_usd).toBe(3);
     expect(report.by_customer[0]?.key).toBe('ACME');
     expect(report.by_cost_center[0]?.key).toBe('sales');
+  });
+
+  it('filters cost and resource usage reports by canonical tenant scope', () => {
+    const tenantA = normalizeEventScope({ tier: 'confidential', tenant_slug: 'client-a' });
+    const tenantB = normalizeEventScope({ tier: 'confidential', tenant_slug: 'client-b' });
+    const report = buildCostReport(
+      [
+        entry({ cost_usd: 2, scope: tenantA }),
+        entry({ cost_usd: 3, scope: tenantB }),
+        entry({ type: 'resource_usage', cost_usd: 4, scope: tenantA }),
+        entry({ cost_usd: 9 }),
+      ],
+      { scopeFilter: { tenant_slug: 'client-a' } }
+    );
+
+    expect(report.total_usd).toBe(6);
+    expect(report.calls).toBe(2);
+    expect(report.resource_usage_entries).toBe(1);
+    expect(report.by_tenant.map((bucket) => bucket.key)).toEqual(['client-a']);
+  });
+
+  it('keeps unscoped legacy records out of entity-scoped reports', () => {
+    const report = buildCostReport([entry({ cost_usd: 2 })], {
+      scopeFilter: { tenant_slug: 'client-a' },
+    });
+    expect(report.total_usd).toBe(0);
+    expect(report.calls).toBe(0);
   });
 });

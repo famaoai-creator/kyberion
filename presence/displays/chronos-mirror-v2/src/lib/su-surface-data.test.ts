@@ -67,6 +67,86 @@ describe('su surface data', () => {
     expect(summary.missionBreakdown).toHaveLength(1);
   });
 
+  it('excludes unscoped and cross-tenant usage from a tenant cost view', () => {
+    const summary = buildCostSummary({
+      history: [
+        {
+          mission_id: 'MSN-A',
+          timestamp: '2026-07-01T00:00:00.000Z',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+          cost_usd: 1,
+        },
+        {
+          mission_id: 'MSN-B',
+          timestamp: '2026-07-01T00:00:00.000Z',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+          cost_usd: 2,
+        },
+        {
+          mission_id: 'MSN-A',
+          timestamp: '2026-07-01T00:00:00.000Z',
+          cost_usd: 4,
+        },
+      ],
+      scopeFilter: { tenant_slugs: ['tenant-a'] },
+    });
+
+    expect(summary.totalUsd).toBe(1);
+    expect(summary.entryCount).toBe(1);
+  });
+
+  it('adds only scoped provider actuals and exposes unavailable generation costs separately', () => {
+    const summary = buildCostSummary({
+      history: [],
+      scopeFilter: { tenant_slugs: ['tenant-a'] },
+      generationSettlements: [
+        {
+          kind: 'generation-cost-settlement',
+          settlement_id: 'generation:video-a',
+          job_id: 'video-a',
+          action: 'generate_video',
+          status: 'settled',
+          currency: 'USD',
+          actual_cost_usd: 1.25,
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+          observed_at: '2026-08-16T00:00:00.000Z',
+          source: 'provider-reported',
+        },
+        {
+          kind: 'generation-cost-settlement',
+          settlement_id: 'generation:video-b',
+          job_id: 'video-b',
+          action: 'generate_video',
+          status: 'settled',
+          currency: 'USD',
+          actual_cost_usd: 9,
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+          observed_at: '2026-08-16T00:00:00.000Z',
+          source: 'provider-reported',
+        },
+        {
+          kind: 'generation-cost-settlement',
+          settlement_id: 'generation:video-pending',
+          job_id: 'video-pending',
+          action: 'generate_video',
+          status: 'unavailable',
+          currency: 'USD',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+          observed_at: '2026-08-16T00:00:00.000Z',
+          source: 'provider-reported',
+        },
+      ],
+    });
+
+    expect(summary.totalUsd).toBe(1.25);
+    expect(summary.entryCount).toBe(1);
+    expect(summary.generation).toEqual({
+      actualUsd: 1.25,
+      settledJobs: 1,
+      awaitingActualCost: 1,
+    });
+  });
+
   it('filters approval queue items by mission and query text', () => {
     const approvals = buildApprovalQueueItems({
       query: 'rotate',

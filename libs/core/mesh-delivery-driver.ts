@@ -159,10 +159,14 @@ async function runMeshDeliveryPassUnfenced(
   };
   const dispatcher =
     options.dispatcher ||
-    createMeshHubPeerMessagingAdapter({
-      peerId: options.senderPeerId,
-      sharedSecret: options.sharedSecret || '',
-    });
+    ({
+      dispatchToPeer: (input: MeshHubDispatchInput) =>
+        createMeshHubPeerMessagingAdapter({
+          peerId: options.senderPeerId,
+          tenantId: input.request.tenant_scope.tenant_id,
+          sharedSecret: options.sharedSecret || '',
+        }).dispatchToPeer(input),
+    } satisfies MeshDeliveryDispatcher);
   const resolvePeer =
     options.resolvePeer ||
     ((peerId: string, tenantId?: string) =>

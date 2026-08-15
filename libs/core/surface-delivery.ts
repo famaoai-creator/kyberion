@@ -11,12 +11,52 @@ import {
 } from './surface-coordination-store.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { withLock } from './src/lock-utils.js';
+import { resolveCustomerBinding } from './customer-channel-binding.js';
+import { resolveTenant } from './tenant-registry.js';
 
 export interface SurfaceOutboxRetryDecision {
   attempt_count: number;
   dead_letter: boolean;
   next_attempt_at?: string;
   failure: SurfaceDeliveryFailure;
+}
+
+/**
+ * A system bridge may drain multiple tenant namespaces, but a tenant-scoped
+ * message must still resolve to the same external customer-channel binding.
+ * This keeps aggregate reads brokered instead of turning them into implicit
+ * cross-tenant egress.
+ */
+export function assertSurfaceOutboxDeliveryAuthorized(message: SurfaceOutboxMessage): void {
+  const scope = message.scope;
+  if (!scope?.tenant_slug || scope.scope_kind === 'system') return;
+  const binding = resolveCustomerBinding(message.surface, message.channel);
+  if (!binding) {
+    throw Object.assign(
+      new Error(
+        `[SURFACE_OUTBOX_SCOPE_BINDING_REQUIRED] ${message.surface}:${message.channel} has no active customer binding for tenant '${scope.tenant_slug}'`
+      ),
+      { status: 403 }
+    );
+  }
+  if (binding.tenantSlug !== scope.tenant_slug) {
+    throw Object.assign(
+      new Error(
+        `[SURFACE_OUTBOX_SCOPE_BINDING_MISMATCH] ${message.surface}:${message.channel} is bound to '${binding.tenantSlug}', not '${scope.tenant_slug}'`
+      ),
+      { status: 403 }
+    );
+  }
+  try {
+    resolveTenant(scope.tenant_slug);
+  } catch (error) {
+    throw Object.assign(
+      new Error(
+        `[SURFACE_OUTBOX_TENANT_INACTIVE] tenant '${scope.tenant_slug}' is not operational for external delivery: ${error instanceof Error ? error.message : String(error)}`
+      ),
+      { status: 403 }
+    );
+  }
 }
 
 /**
@@ -177,12 +217,19 @@ export function settleSurfaceOutboxFailure(
   error: unknown,
   now = Date.now()
 ): SurfaceOutboxRetryDecision {
+  const deliveryScope = message.scope?.scope_kind === 'system' ? undefined : message.scope;
   const decision = planSurfaceOutboxRetry(message, classifySurfaceDeliveryError(error), now);
   if (decision.failure.kind === 'forbidden' || decision.failure.kind === 'not_found') {
-    markSurfaceDeadTarget(surface, message.channel, decision.failure);
+    if (deliveryScope)
+      markSurfaceDeadTarget(surface, message.channel, decision.failure, deliveryScope);
+    else markSurfaceDeadTarget(surface, message.channel, decision.failure);
   }
   if (decision.dead_letter) {
-    deadLetterSurfaceOutboxMessage(surface, message.message_id, decision.failure);
+    if (deliveryScope) {
+      deadLetterSurfaceOutboxMessage(surface, message.message_id, decision.failure, deliveryScope);
+    } else {
+      deadLetterSurfaceOutboxMessage(surface, message.message_id, decision.failure);
+    }
     sendOpsAlert({
       severity: 'critical',
       title: `Surface delivery dead-lettered: ${surface}`,
@@ -198,16 +245,25 @@ export function settleSurfaceOutboxFailure(
       dedupe_key: `surface-dead-letter:${surface}:${message.channel}`,
     });
   } else {
-    updateSurfaceOutboxMessage(surface, message.message_id, {
+    const patch = {
       attempt_count: decision.attempt_count,
       next_attempt_at: decision.next_attempt_at,
       last_error_kind: decision.failure.kind,
       last_error: decision.failure.reason,
-    });
+    };
+    if (deliveryScope)
+      updateSurfaceOutboxMessage(surface, message.message_id, patch, deliveryScope);
+    else updateSurfaceOutboxMessage(surface, message.message_id, patch);
   }
   return decision;
 }
 
-export function recordSurfaceDeliverySuccess(surface: SurfaceAsyncChannel, channel: string): void {
-  clearSurfaceDeadTarget(surface, channel);
+export function recordSurfaceDeliverySuccess(
+  surface: SurfaceAsyncChannel,
+  channel: string,
+  scope?: SurfaceOutboxMessage['scope']
+): void {
+  const deliveryScope = scope?.scope_kind === 'system' ? undefined : scope;
+  if (deliveryScope) clearSurfaceDeadTarget(surface, channel, deliveryScope);
+  else clearSurfaceDeadTarget(surface, channel);
 }

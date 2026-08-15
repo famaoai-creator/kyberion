@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   waitForJob,
   classifyError,
+  normalizeEventScope,
 } from '@agent/core';
 import type { GenerationJob } from '@agent/core';
 import { handleCaptureAction } from './capture-actions.js';
@@ -88,6 +89,7 @@ async function resumeRetriedGenerationJob(job: GenerationJob): Promise<Generatio
     existing_job_id: job.job_id,
     next_attempt: (job.attempts || 1) + 1,
     created_at: job.created_at,
+    scope: job.scope,
   });
   if (retried.status === 'failed' || !('job_id' in retried)) {
     return writeJob({
@@ -282,11 +284,25 @@ async function submitGenerationJob(params: any) {
     }
 
     const backend = resolveGenerationBackend(action, params.params || {});
+    const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
+    const resultRecord = result as Record<string, unknown>;
+    const providerMetadata = isPlainObject(resultRecord.provider_metadata)
+      ? resultRecord.provider_metadata
+      : isPlainObject(resultRecord.metadata)
+        ? resultRecord.metadata
+        : undefined;
+    const actualCost =
+      typeof resultRecord.actual_cost_usd === 'number' && resultRecord.actual_cost_usd >= 0
+        ? resultRecord.actual_cost_usd
+        : typeof resultRecord.provider_cost_usd === 'number' && resultRecord.provider_cost_usd >= 0
+          ? resultRecord.provider_cost_usd
+          : undefined;
     const job: GenerationJob = {
       kind: 'generation-job',
       job_id: params.existing_job_id || createGenerationJobId(action),
       action: action as GenerationJob['action'],
       status: 'submitted',
+      ...(scope ? { scope: scope as unknown as GenerationJob['scope'] } : {}),
       provider: {
         engine: backend.provider,
         provider_job_id: providerJobId,
@@ -307,6 +323,8 @@ async function submitGenerationJob(params: any) {
         backend_kind: backend.kind,
         backend_provider: backend.provider,
         modality: backend.modality,
+        ...(providerMetadata ? { provider_metadata: providerMetadata } : {}),
+        ...(actualCost === undefined ? {} : { actual_cost_usd: actualCost }),
       },
       retry_policy: params.retry_policy || {
         max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
@@ -365,6 +383,10 @@ async function getGenerationJob(params: any) {
     ) {
       const refreshed = await refreshDirectVideoGeneration(currentJob.request || {}, promptId);
       if (refreshed.status === 'failed' || refreshed.status === 'canceled') {
+        job = {
+          ...currentJob,
+          result: { ...currentJob.result, ...refreshed },
+        };
         throw new Error(String(refreshed.error || `video provider job ${promptId} failed`));
       }
       if (refreshed.status !== 'succeeded') {

@@ -243,7 +243,7 @@
     {
       "path": "product/architecture/channel-port-surface-model.md",
       "tier": "public",
-      "size": 7315,
+      "size": 7781,
       "type": "md"
     },
     {
@@ -465,7 +465,7 @@
     {
       "path": "product/architecture/kyberion-mesh-hub-implementation-instructions-5.4-mini.md",
       "tier": "public",
-      "size": 22039,
+      "size": 23672,
       "type": "md"
     },
     {
@@ -549,7 +549,7 @@
     {
       "path": "product/architecture/mission-orchestration-control-plane.md",
       "tier": "public",
-      "size": 6353,
+      "size": 6590,
       "type": "md"
     },
     {
@@ -729,7 +729,7 @@
     {
       "path": "product/architecture/slack-chronos-control-model.md",
       "tier": "public",
-      "size": 8815,
+      "size": 9222,
       "type": "md"
     },
     {
@@ -766,6 +766,12 @@
       "path": "product/architecture/surface-responsibility-model.md",
       "tier": "public",
       "size": 7328,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md",
+      "tier": "public",
+      "size": 36242,
       "type": "md"
     },
     {
@@ -1329,13 +1335,13 @@
     {
       "path": "product/governance/entity-governance-implementation-evidence.md",
       "tier": "public",
-      "size": 1865,
+      "size": 2049,
       "type": "md"
     },
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 81663,
+      "size": 81920,
       "type": "json"
     },
     {
@@ -1672,6 +1678,12 @@
       "path": "product/governance/media-drawio-tier-order.json",
       "tier": "public",
       "size": 153,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-generation-quota-policy.json",
+      "tier": "public",
+      "size": 476,
       "type": "json"
     },
     {
@@ -2223,7 +2235,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20658,
+      "size": 21312,
       "type": "json"
     },
     {
@@ -2331,7 +2343,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 17537,
+      "size": 18643,
       "type": "json"
     },
     {
@@ -2403,7 +2415,7 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 32855,
+      "size": 34181,
       "type": "json"
     },
     {
@@ -3573,7 +3585,7 @@
     {
       "path": "product/orchestration/mesh-hub-inspection.md",
       "tier": "public",
-      "size": 1079,
+      "size": 1306,
       "type": "md"
     },
     {
@@ -3897,7 +3909,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 4544,
+      "size": 6667,
       "type": "md"
     },
     {
@@ -4017,7 +4029,7 @@
     {
       "path": "product/orchestration/same-tenant-peer-quickstart.ja.md",
       "tier": "public",
-      "size": 6252,
+      "size": 6269,
       "type": "md"
     },
     {
@@ -4761,7 +4773,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 452720,
+      "size": 453155,
       "type": "json"
     },
     {
@@ -6525,13 +6537,13 @@
     {
       "path": "product/schemas/generation-job.schema.json",
       "tier": "public",
-      "size": 2949,
+      "size": 3423,
       "type": "json"
     },
     {
       "path": "product/schemas/generation-schedule.schema.json",
       "tier": "public",
-      "size": 2812,
+      "size": 3589,
       "type": "json"
     },
     {
@@ -6766,6 +6778,12 @@
       "path": "product/schemas/media-drawio-tier-order.schema.json",
       "tier": "public",
       "size": 357,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/media-generation-quota-policy.schema.json",
+      "tier": "public",
+      "size": 1260,
       "type": "json"
     },
     {
@@ -7347,13 +7365,13 @@
     {
       "path": "product/schemas/peer-conversation-message.schema.json",
       "tier": "public",
-      "size": 1172,
+      "size": 1356,
       "type": "json"
     },
     {
       "path": "product/schemas/peer-conversation-session.schema.json",
       "tier": "public",
-      "size": 2489,
+      "size": 2673,
       "type": "json"
     },
     {
@@ -7575,7 +7593,7 @@
     {
       "path": "product/schemas/resource-usage.schema.json",
       "tier": "public",
-      "size": 1326,
+      "size": 2075,
       "type": "json"
     },
     {
@@ -7743,7 +7761,7 @@
     {
       "path": "product/schemas/surface-provider-manifests.schema.json",
       "tier": "public",
-      "size": 9135,
+      "size": 10164,
       "type": "json"
     },
     {

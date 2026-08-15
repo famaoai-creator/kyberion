@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { pathResolver, findMissionPath } from './path-resolver.js';
+import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 import {
   collaborationKindFromEventType,
@@ -9,12 +9,8 @@ import {
   type CollaborationKind,
   type CollaborationSource,
 } from './agent-collaboration-events.js';
-import {
-  eventScopeMatches,
-  normalizeEventScope,
-  parseEventScopeFromRecord,
-  type EventScopeFilter,
-} from './event-scope.js';
+import { eventScopeMatches, type EventScopeFilter } from './event-scope.js';
+import { resolveScopeForRecord } from './scope-migration.js';
 import type { GraphRunArtifact } from './graph-run-artifact.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -124,15 +120,6 @@ function readJsonl(filePath: string): JsonRecord[] {
   }
 }
 
-function readJsonRecord(filePath: string): JsonRecord | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return asRecord(JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))));
-  } catch {
-    return null;
-  }
-}
-
 function stringValue(record: JsonRecord, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -162,22 +149,23 @@ function eventFromRecord(
   seq: number
 ): AgentCollaborationEvent | null {
   const payload = asRecord(record.payload) || {};
-  const recordScopeResult = parseEventScopeFromRecord(record);
-  const payloadScopeResult = parseEventScopeFromRecord(payload);
-  if (recordScopeResult.invalid || payloadScopeResult.invalid) return null;
-  const recordScope = recordScopeResult.scope;
-  const payloadScope = payloadScopeResult.scope;
-  const scope = mergeEventScopes(recordScope, payloadScope);
-  if (recordScope && payloadScope && !scope) return null;
   const eventType = stringValue(record, 'event_type', 'type', 'decision') || 'unknown';
   const sourceEventId =
     stringValue(record, 'event_id', 'source_event_id', 'request_id') || `${source}:${seq}`;
   const missionId = stringValue(record, 'mission_id')?.toUpperCase();
   const taskId = stringValue(record, 'task_id');
+  const scopeResult = resolveScopeForRecord({
+    ...record,
+    ...(missionId ? { mission_id: missionId } : {}),
+  });
+  if (scopeResult.disposition === 'invalid') return null;
+  const migratedScope = scopeResult.scope;
   if (
-    scope &&
-    ((missionId && scope.mission_id && missionId !== scope.mission_id.toUpperCase()) ||
-      (taskId && scope.task_id && taskId !== scope.task_id))
+    migratedScope &&
+    ((missionId &&
+      migratedScope.mission_id &&
+      missionId !== migratedScope.mission_id.toUpperCase()) ||
+      (taskId && migratedScope.task_id && taskId !== migratedScope.task_id))
   ) {
     return null;
   }
@@ -256,46 +244,8 @@ function eventFromRecord(
     evidence_refs: evidence,
     redaction: evidence.length > 0 ? 'reference_only' : 'summary',
     source,
-    ...(scope ? { scope } : {}),
+    ...(migratedScope ? { scope: migratedScope } : {}),
   });
-}
-
-function mergeEventScopes(
-  recordScope: AgentCollaborationEvent['scope'],
-  payloadScope: AgentCollaborationEvent['scope']
-): AgentCollaborationEvent['scope'] | null {
-  if (!recordScope) return payloadScope;
-  if (!payloadScope) return recordScope;
-  const comparableKeys = [
-    'tier',
-    'tenant_slug',
-    'organization_id',
-    'project_id',
-    'mission_id',
-    'task_id',
-    'session_id',
-    'work_shape',
-    'customer_stance',
-    'viewer_principal',
-    'nhi_id',
-  ] as const;
-  if (
-    comparableKeys.some(
-      (key) =>
-        recordScope[key] !== undefined &&
-        payloadScope[key] !== undefined &&
-        recordScope[key] !== payloadScope[key]
-    )
-  ) {
-    return null;
-  }
-  const { scope_kind: _recordKind, ...recordContext } = recordScope;
-  const { scope_kind: _payloadKind, ...payloadContext } = payloadScope;
-  try {
-    return normalizeEventScope({ ...payloadContext, ...recordContext });
-  } catch {
-    return null;
-  }
 }
 
 function readWorkerEvents(): AgentCollaborationEvent[] {
@@ -345,23 +295,13 @@ function readSourceEvents(): AgentCollaborationEvent[] {
   return [...events, ...readWorkerEvents()];
 }
 
-function readMissionTenant(missionId: string): string | undefined {
-  const missionPath = findMissionPath(missionId);
-  if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
-  return stringValue(readJsonRecord(statePath) || {}, 'tenant_slug', 'tenant_id');
-}
-
 function eventMatches(
   event: AgentCollaborationEvent,
   options: ComposeCollaborationProjectionOptions
 ): boolean {
   if (options.missionId && event.mission_id !== options.missionId.toUpperCase()) return false;
   if (options.tenant || (options.tenantSlugs && options.tenantSlugs !== 'all')) {
-    const eventTenant =
-      event.scope?.tenant_slug ||
-      event.tenant_slug ||
-      (event.mission_id ? readMissionTenant(event.mission_id) : undefined);
+    const eventTenant = event.scope?.tenant_slug || event.tenant_slug;
     // Tenant-scoped views must fail closed: an event without an explicit or
     // mission-derived tenant cannot be safely shown in a tenant projection.
     const allowed =
@@ -371,8 +311,8 @@ function eventMatches(
           ? [options.tenant]
           : [];
     if (!eventTenant || !allowed.includes(eventTenant)) return false;
-    // When a canonical envelope exists, the exact same tenant filter must
-    // match it as well. Legacy records use the mission-state fallback above.
+    // The resolved envelope is authoritative for both canonical and migrated
+    // records, so the exact same tenant filter must match it as well.
     if (
       event.scope &&
       !eventScopeMatches(event.scope, {

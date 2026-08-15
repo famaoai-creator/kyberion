@@ -8,14 +8,8 @@ import {
   recordMeshHeartbeat,
   registerMeshPeer,
 } from './mesh-peer-directory.js';
-import {
-  clearMeshMessageBrokerNamespace,
-  createMeshMessageBroker,
-} from './mesh-message-broker.js';
-import {
-  formatMeshHubInspectionReport,
-  inspectMeshHub,
-} from './mesh-hub-inspection.js';
+import { clearMeshMessageBrokerNamespace, createMeshMessageBroker } from './mesh-message-broker.js';
+import { formatMeshHubInspectionReport, inspectMeshHub } from './mesh-hub-inspection.js';
 import { clearMeshTopicRegistryNamespace, subscribeMeshTopic } from './mesh-topic-registry.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
 
@@ -59,7 +53,10 @@ describe('mesh-hub-inspection', () => {
 
   beforeEach(() => {
     process.env.KYBERION_MESH_HUB_RUNTIME_ROOT = TEST_RUNTIME_ROOT;
-    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace('runtime', 'observability');
+    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace(
+      'runtime',
+      'observability'
+    );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshMessageBrokerNamespace();
     clearMeshTopicRegistryNamespace();
@@ -143,14 +140,31 @@ describe('mesh-hub-inspection', () => {
     });
 
     const report = await inspectMeshHub({
+      tenantId: 'tenant-acme',
       now: '2026-06-24T00:03:00.000Z',
     });
 
-    expect(report.peers.some((peer) => peer.peer_id === 'peer-a1' && peer.heartbeat_state === 'healthy')).toBe(true);
-    expect(report.peers.some((peer) => peer.peer_id === 'peer-b1' && peer.heartbeat_state === 'expired')).toBe(true);
-    expect(report.routes.some((route) => route.delivery_id === accepted.delivery.delivery_id && route.route_explanation.includes('peer:peer-a1'))).toBe(true);
-    expect(report.dead_letters.some((deadLetter) => deadLetter.delivery_id === accepted.delivery.delivery_id)).toBe(true);
-    expect(report.topics.some((topic) => topic.topic === 'release.review' && topic.fan_out_count === 1)).toBe(true);
+    expect(
+      report.peers.some((peer) => peer.peer_id === 'peer-a1' && peer.heartbeat_state === 'healthy')
+    ).toBe(true);
+    expect(
+      report.peers.some((peer) => peer.peer_id === 'peer-b1' && peer.heartbeat_state === 'expired')
+    ).toBe(true);
+    expect(
+      report.routes.some(
+        (route) =>
+          route.delivery_id === accepted.delivery.delivery_id &&
+          route.route_explanation.includes('peer:peer-a1')
+      )
+    ).toBe(true);
+    expect(
+      report.dead_letters.some(
+        (deadLetter) => deadLetter.delivery_id === accepted.delivery.delivery_id
+      )
+    ).toBe(true);
+    expect(
+      report.topics.some((topic) => topic.topic === 'release.review' && topic.fan_out_count === 1)
+    ).toBe(true);
 
     const rendered = formatMeshHubInspectionReport(report);
     expect(rendered.join('\n')).toContain('peer-a1');
