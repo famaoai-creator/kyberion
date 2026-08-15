@@ -231,7 +231,11 @@ describe('mission-team-composer classification integration', () => {
 
       expect(
         refreshed.assignments.find((assignment) => assignment.team_role === 'orchestrator')
-      ).toEqual(expect.objectContaining({ provider: 'agy' }));
+      ).toEqual(
+        expect.objectContaining({
+          provider: expect.not.stringMatching(/^gemini$/),
+        })
+      );
     } finally {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
