@@ -26,6 +26,7 @@ const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
 const CALLBACK_ROOT = pathResolver.sharedTmp('project-management-callback-test');
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
+const ORIGINAL_TENANT = process.env.KYBERION_TENANT;
 
 function cleanupJsonFiles(directory: string, prefix: string): void {
   if (!safeExistsSync(directory)) return;
@@ -43,6 +44,20 @@ function cleanup(): void {
   const foreignMissionPath = pathResolver.missionDir('MSN-PMC-FOREIGN', 'confidential');
   if (safeExistsSync(foreignMissionPath))
     safeRmSync(foreignMissionPath, { recursive: true, force: true });
+  for (const tenant of ['tenant-pmc-test', 'other-tenant']) {
+    const tenantMissionPath = pathResolver.tenantMissionDir(
+      'MSN-PMC-FOREIGN',
+      tenant,
+      'confidential'
+    );
+    if (safeExistsSync(tenantMissionPath)) {
+      const previousTenant = process.env.KYBERION_TENANT;
+      process.env.KYBERION_TENANT = tenant;
+      safeRmSync(tenantMissionPath, { recursive: true, force: true });
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
+    }
+  }
   for (const tier of ['personal', 'confidential'] as const) {
     const collisionPath = pathResolver.missionDir('MSN-PMC-TIER-COLLISION', tier);
     if (safeExistsSync(collisionPath)) safeRmSync(collisionPath, { recursive: true, force: true });
@@ -65,6 +80,7 @@ describe('project-management facade', () => {
   beforeEach(() => {
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
+    process.env.KYBERION_TENANT = 'tenant-pmc-test';
     cleanup();
   });
 
@@ -74,6 +90,8 @@ describe('project-management facade', () => {
     cleanup();
     process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
+    if (ORIGINAL_TENANT === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = ORIGINAL_TENANT;
   });
 
   it('creates a managed Project and repairs registry drift', () => {
@@ -324,6 +342,7 @@ describe('project-management facade', () => {
       },
       history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
     };
+    process.env.KYBERION_TENANT = 'other-tenant';
     await saveState(mission.mission_id, mission);
 
     const view = getProjectManagementView(project.project_id);

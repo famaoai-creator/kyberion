@@ -198,6 +198,17 @@ function findMissionPathAtRoot(
   for (const directory of directories) {
     const candidate = path.join(directory, id);
     if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) return candidate;
+    if (!safeExistsSync(directory) || !safeLstat(directory).isDirectory()) continue;
+    try {
+      for (const scopeEntry of safeReaddir(directory)) {
+        const scopedCandidate = path.join(directory, scopeEntry, id);
+        if (safeExistsSync(scopedCandidate) && safeLstat(scopedCandidate).isDirectory()) {
+          return scopedCandidate;
+        }
+      }
+    } catch (err) {
+      logger.warn(`[mission-state] suppressed error in findMissionPathAtRoot: ${err}`);
+    }
   }
   return null;
 }
@@ -284,16 +295,21 @@ export function listMissionsInSearchDirs(
   options: { rootDir?: string; directories?: string[] } = {}
 ): Array<{ missionId: string; missionPath: string }> {
   const missions: Array<{ missionId: string; missionPath: string }> = [];
-  for (const dir of options.directories || getActiveMissionSearchDirs(options.rootDir)) {
-    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
+  const scan = (directory: string, depth: number): void => {
+    if (!safeExistsSync(directory) || !safeLstat(directory).isDirectory()) return;
     try {
-      for (const entry of safeReaddir(dir)) {
+      if (safeExistsSync(path.join(directory, 'mission-state.json'))) {
+        missions.push({
+          missionId: path.basename(directory),
+          missionPath: directory,
+        });
+        return;
+      }
+      if (depth >= 2) return;
+      for (const entry of safeReaddir(directory)) {
         try {
-          if (!safeLstat(path.join(dir, entry)).isDirectory()) continue;
-          missions.push({
-            missionId: entry,
-            missionPath: path.join(dir, entry),
-          });
+          const candidate = path.join(directory, entry);
+          if (safeLstat(candidate).isDirectory()) scan(candidate, depth + 1);
         } catch (err) {
           logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
         }
@@ -301,6 +317,9 @@ export function listMissionsInSearchDirs(
     } catch (err) {
       logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
     }
+  };
+  for (const dir of options.directories || getActiveMissionSearchDirs(options.rootDir)) {
+    scan(dir, 0);
   }
   return missions;
 }
