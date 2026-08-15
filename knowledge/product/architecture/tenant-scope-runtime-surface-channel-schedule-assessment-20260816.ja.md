@@ -543,7 +543,7 @@ tenant、organization、surface binding を一度に変更する onboarding で�
    の順へ変更する。surface や MCP からも同じ command / library を呼び、直接 JSON を書かない。
 3. onboarding は identity、tenant registry、organization binding、NHI provision、
    viewer scope、service/channel binding、first-work の各段階を child change として記録する。
-4. `service/protocol/review` の registry を追加し、各 entry に `process_scope`、
+4. `knowledge/product/governance/protocol-service-registry.json` を追加し、各 entry に `process_scope`、
    `request_scope_mode`、`health`、`owner`、`binding`、`approval`、`data_paths` を持たせる。
 5. `surfaces:reconcile`、peer listener、MCP server、review server、scheduler は registry の
    lifecycle adapter とし、registry が許可しない状態では起動せず、停止・再接続・restore は
@@ -584,6 +584,7 @@ reconcile contract を全入口に通すことで、surface だけが安全で p
 - `libs/core/surface-provider-policy.ts`
 - `libs/core/surface-provider-manifest.ts`
 - `knowledge/product/governance/surface-provider-manifests.json`
+- `knowledge/product/governance/protocol-service-registry.json`
 - `libs/core/channel-directory.ts`
 - `libs/core/customer-channel-binding.ts`
 - `knowledge/product/schemas/channel-port.schema.json`
