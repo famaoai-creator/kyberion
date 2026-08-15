@@ -176,7 +176,7 @@ export function redactCollaborationMetadata(value: unknown): Record<string, unkn
       }
     } else if (typeof candidate === 'string') {
       output[key] = ['decision', 'why', 'summary'].includes(key)
-        ? redactCollaborationSummary(candidate, 'イベントを受信しました')
+        ? redactCollaborationSummary(candidate, 'event received')
         : redactCollaborationSummary(candidate, '');
     } else if (typeof candidate === 'number' || typeof candidate === 'boolean') {
       output[key] = candidate;
