@@ -114,7 +114,7 @@ export function PanelView({ vm, loading, error, isActive, detailFor, onAction }:
         </Box>
       ) : null}
       {(vm.sections ?? []).map((section, idx) => (
-        <Box key={section.title ?? idx} flexDirection="column" marginTop={1}>
+        <Box key={`${section.title ?? 'section'}:${idx}`} flexDirection="column" marginTop={1}>
           {section.title ? (
             <Text bold color={theme.dim}>
               {section.title}

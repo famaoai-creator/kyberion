@@ -38,7 +38,7 @@ export function ListTable({ columns, rows, selectedIndex, maxVisible = 12 }: Lis
         const isSelected = absoluteIndex === selectedIndex;
         return (
           <Text
-            key={row.id}
+            key={`${row.id}:${absoluteIndex}`}
             color={isSelected ? 'black' : row.color}
             backgroundColor={isSelected ? theme.accent : undefined}
           >

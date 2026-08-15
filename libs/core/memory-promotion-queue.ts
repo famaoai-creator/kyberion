@@ -12,6 +12,8 @@ import {
 } from './secure-io.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
+import { scopeContextKey } from './scope-context.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
 export type MemoryCandidateKind =
@@ -36,6 +38,16 @@ export interface MemoryCandidate {
   ratified_at?: string;
   ratification_note?: string;
   promoted_ref?: string;
+  /** Scope envelope retained with the candidate; absent only for legacy records. */
+  scope?: MemoryScopeEnvelope;
+  /** Required when a tenant-scoped candidate is promoted to a broader tier. */
+  promotion?: {
+    source_tenant_slug: string;
+    target_tier: MemoryCandidateTier;
+    redacted: boolean;
+    approved_by?: string;
+    approved_at?: string;
+  };
 }
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -78,6 +90,17 @@ function resolveContentHash(candidate: Pick<MemoryCandidate, 'summary' | 'conten
   return String(candidate.content_hash || '').trim() || computeContentHash(candidate);
 }
 
+function resolveScopeKey(scope?: MemoryScopeEnvelope): string {
+  if (!scope) return 'legacy';
+  const normalized = assertMemoryScope(scope, scope.tier);
+  return JSON.stringify({
+    context: scopeContextKey(normalized),
+    owner_nhi: normalized.owner_nhi || null,
+    allowed_audience: normalized.allowed_audience || [],
+    promotion_policy: normalized.promotion_policy || null,
+  });
+}
+
 function normalizeOccurrenceCount(value: unknown): number {
   const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
   return Math.max(1, count);
@@ -92,7 +115,26 @@ function parseJsonl(raw: string): MemoryCandidate[] {
 }
 
 function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
+  // `sensitivity_tier` is the candidate's destination tier.  The envelope is
+  // the source scope and must be validated against its own tier so a
+  // confidential tenant cannot be made to look public merely by requesting a
+  // public promotion.
+  if (candidate.scope) assertMemoryScope(candidate.scope, candidate.scope.tier);
   if (candidate.sensitivity_tier !== 'public') return;
+  if (candidate.scope?.tenant_slug) {
+    const promotion = candidate.promotion;
+    if (
+      !promotion ||
+      promotion.target_tier !== 'public' ||
+      promotion.source_tenant_slug !== candidate.scope.tenant_slug ||
+      promotion.redacted !== true ||
+      !promotion.approved_by
+    ) {
+      throw new Error(
+        'Tenant-scoped public memory requires a brokered, redacted promotion with an approver.'
+      );
+    }
+  }
   const hasRestrictedRef = candidate.evidence_refs.some((ref) =>
     /(^|\/)(knowledge\/)?(confidential|personal)(\/|$)/iu.test(ref)
   );
@@ -119,6 +161,8 @@ export function createMemoryPromotionCandidate(input: {
   ratificationRequired?: boolean;
   status?: MemoryCandidateStatus;
   queuedAt?: string;
+  scope?: MemoryScopeEnvelope;
+  promotion?: MemoryCandidate['promotion'];
 }): MemoryCandidate {
   const now = input.queuedAt || new Date().toISOString();
   const summary = normalizeMemoryFact(String(input.summary || ''), Date.parse(now) || Date.now());
@@ -141,6 +185,8 @@ export function createMemoryPromotionCandidate(input: {
     content_hash: computeContentHash({ summary }),
     occurrences: 1,
     last_seen: now,
+    ...(input.scope ? { scope: assertMemoryScope(input.scope, input.scope.tier) } : {}),
+    ...(input.promotion ? { promotion: input.promotion } : {}),
   };
 }
 
@@ -173,12 +219,14 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   const rows = listMemoryPromotionCandidates();
   const contentHash = resolveContentHash(normalizedCandidate);
   const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
+  const normalizedScopeKey = resolveScopeKey(normalizedCandidate.scope);
   const now =
     normalizedCandidate.last_seen || normalizedCandidate.queued_at || new Date().toISOString();
   const existingIndex = rows.findIndex(
     (row) =>
       String(row.source_ref || '').trim() === normalizedSourceRef &&
-      resolveContentHash(row) === contentHash
+      resolveContentHash(row) === contentHash &&
+      resolveScopeKey(row.scope) === normalizedScopeKey
   );
   if (existingIndex >= 0) {
     const current = rows[existingIndex] as MemoryCandidate;
@@ -204,6 +252,8 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       content_hash: contentHash,
       occurrences: nextOccurrences,
       last_seen: now,
+      ...(current.scope ? { scope: current.scope } : {}),
+      ...(current.promotion ? { promotion: current.promotion } : {}),
     };
     const updatedValidation = validateMemoryPromotionCandidate(next);
     if (!updatedValidation.valid) {
@@ -277,6 +327,7 @@ export function queueMissionMemoryPromotionCandidate(input: {
   tier: MemoryCandidateTier;
   summary: string;
   evidenceRefs: string[];
+  scope?: MemoryScopeEnvelope;
 }): MemoryCandidate {
   const assessment = assessMissionMemoryCandidate({
     missionId: input.missionId,
@@ -295,6 +346,7 @@ export function queueMissionMemoryPromotionCandidate(input: {
     summary: input.summary,
     evidenceRefs: input.evidenceRefs,
     sensitivityTier: input.tier,
+    ...(input.scope ? { scope: input.scope } : {}),
   });
   enqueueMemoryPromotionCandidate(candidate);
   return candidate;

@@ -1,6 +1,7 @@
 # 🚀 Kyberion Ecosystem: Onboarding & Initialization Guide
 
 この文書は、Kyberion エコシステムの物理的起動と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）の完全なプロセスを定義します。
+tenant・organization・activation・最初の仕事までの業務フローは、[オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md)を正本とします。
 
 > **この文書がコールドスタート手順の唯一の正本です。** README / QUICKSTART / AGENTS.md は要約とここへのリンクのみを持ち、手順が食い違う場合は本書を正とします。
 
@@ -94,6 +95,30 @@ pnpm company:onboard --vertical saas-product-company --slug <company-slug> \
 ````
 
 dry-runで書き込み範囲を確認してから同じコマンドを実行してください。適用後は `customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を確認します。AI workerは作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。
+
+tenant を指定した場合でも、会社オンボーディングは activation を自動完了しません。次の
+context binding、readiness probe、人間の受け入れを完了してから最初の仕事を開始します。
+
+```bash
+pnpm onboarding:context show --customer-slug <company-slug> --json
+pnpm tenant:activation plan \
+  --customer-slug <company-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id>
+pnpm tenant:activation activate \
+  --customer-slug <company-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --nhi-id <nhi-id> \
+  --check-viewer-scope --check-nhi --check-services --check-isolation \
+  --probe-ref viewer_scope=<audit-ref> \
+  --probe-ref nhi_provisioned=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref> \
+  --probe-ref isolation_probe=<audit-ref> \
+  --apply --accept
+```
+
+その後に `onboarding:context first-work --dry-run --json` で管理単位を確認します。
 
 ````
 
@@ -233,10 +258,10 @@ dry-runで書き込み範囲を確認してから同じコマンドを実行し�
 - **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
 - **物理的変化**:
   - `customer/{slug}/connections/*.json` が候補として生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` になります。
-  - `customer/{slug}/tenants/*.json` が 1 件ずつ生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/*.json` になります。これは**テナントプロファイル**（機密境界が存在するという宣言 — slug・表示名・status・自分の役割・knowledge root の位置）であり、テナントのデータ自体ではありません。データは `knowledge/confidential/{tenant-slug}/` 側にあります。
+  - tenant 入力は onboarding artifact として保存されますが、候補または customer stance 側の facet として扱います。機密境界の正本プロファイルは `pnpm tenant create <tenant-slug> ... --apply` で `knowledge/personal/tenants/{tenant-slug}.json` に登録します。テナントのデータは `knowledge/confidential/{tenant-slug}/` 側にあります。
   - `customer/{slug}/onboarding/tutorial-plan.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/tutorial-plan.md` になります。
 
-### Stage 12: 運用コンテキストの確定
+### Stage 12: 運用コンテキストの確定と tenant activation
 
 会社・顧客オンボーディング後は、最初の仕事を作る前に customer・tenant・organization の対応を確認します。ここで 3 つの別物が結び付けられるので、先に区別しておきます:
 
@@ -262,7 +287,29 @@ pnpm onboarding:context first-work \
   --intent "<最初の依頼>" --dry-run --json
 ```
 
-`solution_project` の依頼だけが Project Bootstrap 候補になり、定常運用・サービス運用・インシデント・ガバナンスは対応する管理単位へ振り分けられます。
+binding の apply 後、最初の仕事を作る前に activation を完了させます。
+
+```bash
+pnpm tenant:activation plan \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id>
+pnpm tenant:activation activate \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --nhi-id <nhi-id> \
+  --check-viewer-scope --check-nhi --check-services --check-isolation \
+  --probe-ref viewer_scope=<audit-ref> \
+  --probe-ref nhi_provisioned=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref> \
+  --probe-ref isolation_probe=<audit-ref> \
+  --apply --accept
+```
+
+`--accept` は人間の受け入れを表します。activation receipt が `active` になるまで、
+first-work の apply と tenant-bound mission は実行されません。`solution_project` の依頼だけが
+Project Bootstrap 候補になり、定常運用・サービス運用・インシデント・ガバナンスは対応する管理単位へ振り分けられます。
 
 ---
 
@@ -285,4 +332,4 @@ pnpm vital
 ---
 
 _Status: Mandated by AGENTS.md — canonical cold-start source (ONB-02)_
-_Last Updated: 2026-07-05_
+_Last Updated: 2026-08-15_

@@ -9,6 +9,7 @@ import {
   resolveOnboardingFirstWork,
 } from './onboarding-context.js';
 import { writeTenantProfile } from './tenant-registry.js';
+import { applyTenantActivation } from './tenant-activation.js';
 import { loadProjectRecord } from './project-registry.js';
 import {
   safeExistsSync,
@@ -40,9 +41,41 @@ function seedFixture(): void {
       display_name: 'ACME Production',
       status: 'active',
       assigned_role: 'owner',
+      isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
     },
     { rootDir, env: { KYBERION_CUSTOMER: 'acme-ai' } }
   );
+}
+
+function bindAndActivate(): void {
+  applyOnboardingContextBinding({
+    customerSlug: 'acme-ai',
+    tenantSlug: 'acme-prod',
+    organizationId: 'org-acme-ai',
+    ownerId: 'human:founder',
+    rootDir,
+  });
+  applyTenantActivation({
+    customerSlug: 'acme-ai',
+    tenantSlug: 'acme-prod',
+    organizationId: 'org-acme-ai',
+    ownerId: 'human:founder',
+    rootDir,
+    accept: true,
+    checks: {
+      viewer_scope: true,
+      nhi_provisioned: true,
+      service_readiness: true,
+      isolation_probe: true,
+    },
+    nhiIds: ['kyberion://agent/org-acme-ai/planner'],
+    probeRefs: {
+      viewer_scope: 'probe://viewer-scope/acme-prod/1',
+      nhi_provisioned: 'probe://nhi/acme-prod/1',
+      service_readiness: 'probe://services/acme-prod/1',
+      isolation_probe: 'probe://isolation/acme-prod/1',
+    },
+  });
 }
 
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
@@ -68,12 +101,7 @@ describe('onboarding context binding', () => {
 
   it('routes a routine first work without requiring a project', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
 
     const result = resolveOnboardingFirstWork({
       customerSlug: 'acme-ai',
@@ -118,12 +146,7 @@ describe('onboarding context binding', () => {
 
   it('repairs a binding when its organization state was removed', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
     const statePath = path.join(
       rootDir,
       'active/organizations/confidential/acme-prod/org-acme-ai/state/organization-state.json'
@@ -149,12 +172,7 @@ describe('onboarding context binding', () => {
 
   it('rejects a first-work operation reference outside the organization context', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
 
     expect(() =>
       applyOnboardingFirstWork({
@@ -169,12 +187,7 @@ describe('onboarding context binding', () => {
 
   it('blocks first work after the bound tenant is suspended', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
     writeTenantProfile(
       {
         tenant_slug: 'acme-prod',
@@ -197,12 +210,7 @@ describe('onboarding context binding', () => {
 
   it('connects a routine first work to an operation and persists the typed link', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
 
     const result = applyOnboardingFirstWork({
       customerSlug: 'acme-ai',
@@ -224,12 +232,7 @@ describe('onboarding context binding', () => {
 
   it('bootstraps a project entirely under the supplied root', () => {
     seedFixture();
-    applyOnboardingContextBinding({
-      customerSlug: 'acme-ai',
-      tenantSlug: 'acme-prod',
-      organizationId: 'org-acme-ai',
-      rootDir,
-    });
+    bindAndActivate();
 
     const result = applyOnboardingFirstWork({
       customerSlug: 'acme-ai',
