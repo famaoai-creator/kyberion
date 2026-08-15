@@ -31,7 +31,8 @@
         "mission_followup_requested",
         "mission_followup_dispatched",
         "mission_reconciliation_completed",
-        "mission_owner_notified"
+        "mission_owner_notified",
+        "participant_context_resolved"
       ]
     },
     "mission_id": { "type": "string" },
@@ -40,6 +41,30 @@
     "resource_id": { "type": "string" },
     "correlation_id": { "type": "string" },
     "causation_id": { "type": "string" },
+    "scope": {
+      "type": "object",
+      "required": ["scope_kind", "tier"],
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": {
+          "type": "string",
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "decision": { "type": "string" },
     "why": { "type": "string" },
     "policy_used": { "type": "string" },

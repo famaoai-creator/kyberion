@@ -66,6 +66,20 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     fs.mkdirSync(path.join(fixtureRoot, 'customer', slug), { recursive: true });
   }
 
+  function seedCustomerTenantProfile(customerSlug: string, tenantSlug: string): void {
+    const dir = path.join(fixtureRoot, 'customer', customerSlug, 'tenants');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, `${tenantSlug}.json`),
+      JSON.stringify({
+        tenant_slug: tenantSlug,
+        display_name: `Tenant ${tenantSlug}`,
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+  }
+
   function seedExceptions(exceptions: Array<{ slug: string; reason: string }>): void {
     const file = path.join(fixtureRoot, EXCEPTIONS_RELATIVE_PATH);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -92,16 +106,24 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(exitCode).toBe(0);
   });
 
-  it('flags a customer/ directory with no tenant profile as drift', () => {
+  it('ignores top-level customer stance directories without tenant facets', () => {
     seedProfile('acme-corp');
     seedCustomerDir('acme-corp');
     seedCustomerDir('ghost-co');
     const { exitCode, output } = runCheck(options());
+    expect(exitCode).toBe(0);
+    expect(output).not.toContain('ghost-co');
+    expect(output).toContain('[check:tenant-registry] OK');
+  });
+
+  it('flags a customer tenant profile facet with no tenant profile as drift', () => {
+    seedProfile('acme-corp');
+    seedCustomerTenantProfile('acme-corp', 'ghost-co');
+    const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
     expect(output).toContain(
-      "'ghost-co' is known to customer/ directory but has no tenant profile"
+      "'ghost-co' is known to customer tenant profile but has no tenant profile"
     );
-    expect(output).toContain('DRIFT');
   });
 
   it('flags a confidential-index entry with no tenant profile as drift', () => {
@@ -113,7 +135,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   });
 
   it('flags an invalid slug (e.g. _template) without an exception as drift', () => {
-    seedCustomerDir('_template');
+    seedCustomerTenantProfile('acme-corp', '_template');
     const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
     expect(output).toContain("'_template' is not a valid tenant slug");
@@ -121,8 +143,8 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
 
   it('accepts documented exceptions for intentional asymmetries', () => {
     seedProfile('acme-corp');
-    seedCustomerDir('ghost-co');
-    seedCustomerDir('_template');
+    seedCustomerTenantProfile('acme-corp', 'ghost-co');
+    seedCustomerTenantProfile('acme-corp', '_template');
     seedExceptions([
       { slug: 'ghost-co', reason: 'demo fixture — not an operating tenant' },
       { slug: '_template', reason: 'customer scaffold template' },
@@ -134,7 +156,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   });
 
   it('rejects exceptions without a reason', () => {
-    seedCustomerDir('ghost-co');
+    seedCustomerTenantProfile('acme-corp', 'ghost-co');
     seedExceptions([{ slug: 'ghost-co', reason: '' }]);
     const { exitCode, output } = runCheck(options());
     expect(exitCode).toBe(1);
@@ -142,7 +164,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   });
 
   it('rejects duplicate exception entries', () => {
-    seedCustomerDir('ghost-co');
+    seedCustomerTenantProfile('acme-corp', 'ghost-co');
     seedExceptions([
       { slug: 'ghost-co', reason: 'first' },
       { slug: 'ghost-co', reason: 'second' },
@@ -176,12 +198,12 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     seedProfile('beta-co');
     seedProfile('acme-corp');
     seedConfidentialIndex(['zeta-co', 'acme-corp']);
-    seedCustomerDir('beta-co');
-    seedCustomerDir('acme-corp');
+    seedCustomerTenantProfile('beta-co', 'beta-co');
+    seedCustomerTenantProfile('acme-corp', 'acme-corp');
     const systems = collectTenantSystems(options());
     expect(systems.profiles).toEqual(['acme-corp', 'beta-co']);
     expect(systems.confidentialIndex).toEqual(['acme-corp', 'zeta-co']);
-    expect(systems.customerDirs).toEqual(['acme-corp', 'beta-co']);
+    expect(systems.customerTenantProfiles).toEqual(['acme-corp', 'beta-co']);
     expect(systems.notes.join('\n')).toContain('project registry');
   });
 

@@ -53,7 +53,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).** The commands below are a summary; if anything conflicts, INITIALIZATION.md wins.
+> **Canonical cold-start source: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).** The commands below are a summary; if anything conflicts, INITIALIZATION.md wins. tenant / organization / activation までの実行順は [`onboarding-flow.md`](./knowledge/product/governance/onboarding-flow.md) を参照してください。
 
 Kyberion's first visible result comes in three short paths:
 

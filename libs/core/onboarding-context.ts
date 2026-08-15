@@ -8,6 +8,7 @@ import {
   type TenantProfile,
 } from './tenant-registry.js';
 import { customerDirForSlug } from './customer-resolver.js';
+import { isTenantActivationActive } from './tenant-activation.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import {
   buildOrganizationScaffold,
@@ -515,6 +516,22 @@ function assertCurrentOnboardingContext(binding: OnboardingContextBinding, rootD
   if (state.status !== 'active') {
     throw new Error(
       `Organization '${binding.organization_id}' is ${state.status}; first work is blocked.`
+    );
+  }
+  if (
+    !isTenantActivationActive(
+      {
+        customerSlug: binding.customer_slug,
+        tenantSlug: binding.tenant_slug,
+        organizationId: binding.organization_id,
+        tier: binding.tier,
+      },
+      rootDir
+    )
+  ) {
+    throw new Error(
+      `Tenant activation is not active for '${binding.customer_slug}/${binding.tenant_slug}'. ` +
+        'Run tenant:activation plan, complete the readiness probes, and apply the activation receipt.'
     );
   }
 }

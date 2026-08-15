@@ -15,8 +15,8 @@ export function HelpOverlay({ panelHelp }: HelpOverlayProps) {
       <Text bold color={theme.accent}>
         {tr('tui:tui_help_title')}
       </Text>
-      {rows.map((row) => (
-        <Box key={`${row.keys}:${row.labelKey}`}>
+      {rows.map((row, idx) => (
+        <Box key={`${row.keys}:${row.labelKey}:${idx}`}>
           <Box width={12}>
             <Text color={theme.warn}>{row.keys}</Text>
           </Box>

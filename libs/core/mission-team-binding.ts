@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { findMissionPath, missionDir } from './path-resolver.js';
+import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
@@ -14,6 +14,12 @@ import type {
   MissionTeamGovernance,
   MissionTeamOrganizationProfileSummary,
 } from './mission-team-plan-composer.js';
+import {
+  normalizeEventScope,
+  resolveEventScopeAgainstAuthority,
+  type EventScope,
+  type EventScopeInput,
+} from './event-scope.js';
 
 export interface TeamBlueprintRole {
   team_role: string;
@@ -106,6 +112,8 @@ export interface MissionExecutionLedgerEntry {
   evidence?: string[];
   source_event_id?: string;
   payload?: Record<string, unknown>;
+  /** Canonical system/entity scope; legacy mission_id remains first-class. */
+  scope?: EventScope;
 }
 
 export interface AppendMissionExecutionLedgerEntryInput extends Omit<
@@ -132,6 +140,7 @@ function resolveMissionBindingPaths(
   missionPathHint?: string
 ): MissionBindingPaths {
   const normalizedMissionId = normalizeMissionId(missionId);
+  assertMissionIdArgument(normalizedMissionId);
   const missionPath =
     missionPathHint ||
     findMissionPath(normalizedMissionId) ||
@@ -421,11 +430,52 @@ function resolveLedgerDelegationChain(
   return parseDelegationChain(fromPayload) ?? undefined;
 }
 
+function resolveMissionLedgerScope(
+  input: AppendMissionExecutionLedgerEntryInput,
+  missionId: string,
+  missionPath: string
+): EventScope {
+  let state: Record<string, unknown> = {};
+  const statePath = path.join(missionPath, 'mission-state.json');
+  if (safeExistsSync(statePath)) {
+    try {
+      state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      state = {};
+    }
+  }
+  const candidate: EventScopeInput = {
+    tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
+    mission_id: missionId,
+    ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
+    ...(typeof state.organization_id === 'string'
+      ? { organization_id: state.organization_id }
+      : {}),
+    ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
+  };
+  let authority: EventScope;
+  try {
+    authority = normalizeEventScope(candidate);
+  } catch {
+    // Legacy public/shared missions remain queryable as mission-scoped but
+    // untenantable records; tenant readers must not infer a tenant from them.
+    authority = normalizeEventScope({ tier: 'public', mission_id: missionId });
+  }
+  return resolveEventScopeAgainstAuthority(authority, input.scope, {
+    mission_id: missionId,
+    ...(input.task_id ? { task_id: input.task_id, scope_kind: 'task' } : { scope_kind: 'mission' }),
+  });
+}
+
 export function appendMissionExecutionLedgerEntry(
   input: AppendMissionExecutionLedgerEntryInput
 ): string {
   const missionId = normalizeMissionId(input.mission_id);
   const missionPathHint = input.mission_path_hint;
+  const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   const entryPayload: Omit<MissionExecutionLedgerEntry, 'ts' | 'mission_id'> = {
     event_type: input.event_type,
     task_id: input.task_id,
@@ -438,8 +488,8 @@ export function appendMissionExecutionLedgerEntry(
     evidence: input.evidence,
     source_event_id: input.source_event_id,
     payload: input.payload,
+    scope: resolveMissionLedgerScope(input, missionId, paths.missionPath),
   };
-  const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   safeMkdir(paths.missionPath, { recursive: true });
   if (!safeExistsSync(paths.executionLedgerPath)) {
     safeWriteFile(paths.executionLedgerPath, '');

@@ -12,6 +12,7 @@ import {
   type MissionOrchestrationEvent,
   type MissionOrchestrationEventType,
 } from './mission-orchestration-events.js';
+import { eventScopeMatches, type EventScope } from './event-scope.js';
 
 export type MissionOrchestrationJournalStatus = 'enqueued' | 'completed' | 'failed';
 
@@ -25,6 +26,7 @@ export interface MissionOrchestrationJournalEntry {
   requested_by?: string;
   causation_id?: string;
   correlation_id?: string;
+  scope?: EventScope;
 }
 
 export interface MissionOrchestrationReplayPlan {
@@ -34,20 +36,30 @@ export interface MissionOrchestrationReplayPlan {
   replay_count: number;
 }
 
-function journalDir(missionId: string): string {
-  return `${pathResolver.missionDir(missionId, 'public')}/coordination`;
+function missionPathForScope(missionId: string, scope?: EventScope): string {
+  if (scope?.tenant_slug) {
+    return pathResolver.tenantMissionDir(missionId, scope.tenant_slug, scope.tier);
+  }
+  return (
+    pathResolver.findMissionPath(missionId) ||
+    pathResolver.missionDir(missionId, scope?.tier || 'public')
+  );
 }
 
-function journalPath(missionId: string): string {
-  return `${journalDir(missionId)}/orchestration-journal.jsonl`;
+function journalDir(missionId: string, scope?: EventScope): string {
+  return `${missionPathForScope(missionId, scope)}/coordination`;
 }
 
-function eventDir(missionId: string): string {
+function journalPath(missionId: string, scope?: EventScope): string {
+  return `${journalDir(missionId, scope)}/orchestration-journal.jsonl`;
+}
+
+function eventDir(): string {
   return pathResolver.shared(`coordination/orchestration/events`);
 }
 
-function ensureJournalDir(missionId: string): void {
-  safeMkdir(journalDir(missionId));
+function ensureJournalDir(missionId: string, scope?: EventScope): void {
+  safeMkdir(journalDir(missionId, scope));
 }
 
 function payloadHash(payload: unknown): string {
@@ -66,8 +78,12 @@ export function appendMissionOrchestrationJournalEntry(input: {
   requestedBy?: string;
   causationId?: string;
   correlationId?: string;
+  scope?: EventScope;
+  missionPathHint?: string;
 }): MissionOrchestrationJournalEntry {
-  ensureJournalDir(input.missionId);
+  const scope = input.scope;
+  const journalMissionPath = input.missionPathHint || missionPathForScope(input.missionId, scope);
+  ensureJournalDir(input.missionId, scope);
   const entry: MissionOrchestrationJournalEntry = {
     ts: new Date().toISOString(),
     event_id: input.eventId,
@@ -78,8 +94,12 @@ export function appendMissionOrchestrationJournalEntry(input: {
     ...(input.requestedBy ? { requested_by: input.requestedBy } : {}),
     ...(input.causationId ? { causation_id: input.causationId } : {}),
     ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
+    ...(scope ? { scope } : {}),
   };
-  safeAppendFileSync(journalPath(input.missionId), `${JSON.stringify(entry)}\n`);
+  safeAppendFileSync(
+    `${journalMissionPath}/coordination/orchestration-journal.jsonl`,
+    `${JSON.stringify(entry)}\n`
+  );
   return entry;
 }
 
@@ -92,14 +112,17 @@ export function appendMissionOrchestrationJournalStatus(input: {
   requestedBy?: string;
   causationId?: string;
   correlationId?: string;
+  scope?: EventScope;
+  missionPathHint?: string;
 }): MissionOrchestrationJournalEntry {
   return appendMissionOrchestrationJournalEntry(input);
 }
 
 export function loadMissionOrchestrationJournal(
-  missionId: string
+  missionId: string,
+  scope?: EventScope
 ): MissionOrchestrationJournalEntry[] {
-  const filePath = journalPath(missionId);
+  const filePath = journalPath(missionId, scope);
   if (!safeExistsSync(filePath)) return [];
   const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   return raw
@@ -110,9 +133,10 @@ export function loadMissionOrchestrationJournal(
 }
 
 export function loadMissionOrchestrationReplayPlan(
-  missionId: string
+  missionId: string,
+  scope?: EventScope
 ): MissionOrchestrationReplayPlan {
-  const eventsDirectory = eventDir(missionId);
+  const eventsDirectory = eventDir();
   const eventFiles = safeExistsSync(eventsDirectory)
     ? safeReaddir(eventsDirectory)
         .filter((name) => name.endsWith('.json'))
@@ -123,14 +147,19 @@ export function loadMissionOrchestrationReplayPlan(
     const eventPath = `${eventsDirectory}/${fileName}`;
     try {
       const event = loadMissionOrchestrationEvent(eventPath);
-      if (event.mission_id === missionId.toUpperCase()) events.push(event);
+      if (
+        event.mission_id === missionId.toUpperCase() &&
+        (!scope || (event.scope && eventScopeMatches(event.scope, scope)))
+      ) {
+        events.push(event);
+      }
     } catch {
       // Ignore unreadable legacy artifacts.
     }
   }
   events.sort((left, right) => left.created_at.localeCompare(right.created_at));
 
-  const journalEntries = loadMissionOrchestrationJournal(missionId);
+  const journalEntries = loadMissionOrchestrationJournal(missionId, scope);
   const latestStatusByEvent = new Map<string, MissionOrchestrationJournalEntry>();
   for (const entry of journalEntries) {
     latestStatusByEvent.set(entry.event_id, entry);

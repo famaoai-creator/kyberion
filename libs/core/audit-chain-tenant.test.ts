@@ -209,6 +209,83 @@ describe('audit-chain — tenant mirror', () => {
     expect(fs.existsSync(path.join(testRoot, 'customer', 'sbijsm', 'logs', 'audit'))).toBe(true);
   });
 
+  it('records canonical scope and exposes only the requested tenant view', async () => {
+    const { auditChain } = await import('./audit-chain.js');
+    auditChain.record({
+      agentId: 'a',
+      action: 'tenant-a',
+      operation: 'op',
+      result: 'completed',
+      scope: {
+        scope_kind: 'organization',
+        tier: 'confidential',
+        tenant_slug: 'sbiss',
+        organization_id: 'org-a',
+      },
+    });
+    auditChain.record({
+      agentId: 'system',
+      action: 'system',
+      operation: 'op',
+      result: 'completed',
+    });
+
+    expect(auditChain.loadAll().at(-2)?.scope).toMatchObject({
+      scope_kind: 'organization',
+      tenant_slug: 'sbiss',
+      organization_id: 'org-a',
+    });
+    expect(
+      auditChain
+        .loadForScope({ tenant_slug: 'sbiss' })
+        .filter((entry) => entry.action === 'tenant-a')
+    ).toHaveLength(1);
+    expect(
+      auditChain.loadForScope({ scope_kind: 'system' }).filter((entry) => entry.action === 'system')
+    ).toHaveLength(1);
+  });
+
+  it('rejects an explicit scope outside the active tenant context', async () => {
+    const previousTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = 'sbiss';
+    try {
+      const { auditChain } = await import('./audit-chain.js');
+      expect(() =>
+        auditChain.record({
+          agentId: 'a',
+          action: 'cross-tenant',
+          operation: 'op',
+          result: 'denied',
+          scope: {
+            scope_kind: 'tenant',
+            tier: 'confidential',
+            tenant_slug: 'sbijsm',
+          },
+        })
+      ).toThrow(/AUDIT_SCOPE_DENIED/);
+    } finally {
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
+    }
+  });
+
+  it('rejects an explicit malformed entity scope instead of downgrading it to tenant scope', async () => {
+    const { auditChain } = await import('./audit-chain.js');
+    expect(() =>
+      auditChain.record({
+        agentId: 'a',
+        action: 'malformed-scope',
+        operation: 'op',
+        result: 'denied',
+        scope: {
+          scope_kind: 'organization',
+          tier: 'confidential',
+          tenant_slug: 'sbiss',
+        },
+      })
+    ).toThrow(/AUDIT_SCOPE_INVALID/);
+  });
+
   it('seeds the next run from the last persisted hash across days', async () => {
     const firstRun = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
     const first = firstRun.auditChain.record({

@@ -51,3 +51,37 @@ tenant's seat, and a tenant's state falling into a partition's place).
 Every writer must validate the referenced parent records before committing a
 child. Readers must not create missing directories as a side effect; creation
 belongs to the governed writer and must use `secure-io`.
+
+## Events and ledgers
+
+イベントと ledger も同じ containment chain を持つ。新規レコードは flat な
+`tenant_slug` / `mission_id` だけでなく、次の `scope` を持つ。
+
+```json
+{
+  "scope_kind": "task",
+  "tier": "confidential",
+  "tenant_slug": "acme-corp",
+  "organization_id": "acme-platform",
+  "project_id": "PRJ-1",
+  "mission_id": "MSN-1",
+  "task_id": "TASK-1"
+}
+```
+
+`scope_kind: system` は tenant を持たないシステム全体の記録を表し、
+`public` や `shared` を擬似 tenant として利用しない。既存 JSONL の flat
+形式は読み取り互換とするが、tenant / organization / entity の viewer は
+canonical `scope` がない記録を自分の tenant の記録として推測してはならない。
+
+| 記録                  | 正本                                            | 表示・検索                                                  |
+| --------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
+| システム全体の監査    | `active/shared/logs/audit/` の hash chain       | system scope の audit reader                                |
+| tenant/entity の監査  | 上記 master chain + 既存 customer stance mirror | `tenant_slug` と `scope` の一致を検証                       |
+| ミッション実行 ledger | mission-local `execution-ledger.jsonl`          | mission/task scope、tenant view は scope 必須               |
+| 協調イベント          | mission-local / shared redacted event stream    | `agent-collaboration-projection` が scope filter 後に再生成 |
+
+projection は書き込み正本ではない。system view は system-wide metadata を表示できるが、
+tenant view は対象 tenant と scope chain が一致するレコードだけを表示し、cross-tenant
+集計は brokered read と audit event を経由する。offboarding では event/ledger を無断で
+消去せず、tenant の受け入れ停止・projection 停止・保持/Export を先に行う。

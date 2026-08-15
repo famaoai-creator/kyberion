@@ -214,6 +214,32 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
   });
 
+  it('keeps the tenant registry authoritative when customer stance changes', () => {
+    seedProfile('acme-corp');
+    const customerDir = path.join(fixtureRoot, 'customer', 'engagement-a', 'tenants');
+    fs.mkdirSync(customerDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(customerDir, 'acme-corp.json'),
+      JSON.stringify({
+        tenant_slug: 'acme-corp',
+        display_name: 'Stance facet',
+        status: 'active',
+        assigned_role: 'observer',
+      })
+    );
+    const resolved = resolveTenant('acme-corp', {
+      rootDir: fixtureRoot,
+      env: { KYBERION_CUSTOMER: 'engagement-a' },
+    });
+    expect(resolved.profile.display_name).toBe('Tenant acme-corp');
+    expect(
+      listTenantProfileSlugs({
+        rootDir: fixtureRoot,
+        env: { KYBERION_CUSTOMER: 'engagement-a' },
+      })
+    ).toEqual(['acme-corp']);
+  });
+
   // Acceptance (DA-01 #2): every tenant registered in THIS checkout resolves
   // uniquely. In CI checkouts the profile set is empty (gitignored personal
   // data) and this passes vacuously; on operator machines it pins the real set.

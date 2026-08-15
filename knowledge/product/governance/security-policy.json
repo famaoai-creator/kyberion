@@ -39,6 +39,7 @@
   },
   "tenant_scope": {
     "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
+    "require_tenant_binding": false,
     "protected_prefixes": [
       "knowledge/confidential/",
       "active/organizations/personal/",

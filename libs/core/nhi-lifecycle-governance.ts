@@ -37,6 +37,7 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
+import { readTenantProfile } from './tenant-registry.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import {
@@ -99,10 +100,9 @@ function recordGovernanceAudit(event: NhiGovernanceAuditEvent): void {
 /**
  * Scopes an identity's affiliation can bind it to.
  *
- * `tenant` has no dedicated affiliation field: a tenant slug occupies the same
- * workspace slot as a project (`active/projects/<tier>/<slug>`, path-resolver
- * `volatile('tenant'|'project', ref)`), so a tenant closure matches identities
- * affiliated by `project_id` OR by `organization_id`.
+ * Tenant is a first-class affiliation boundary.  The legacy project/org
+ * fallback is intentionally not used here: a customer stance or organization
+ * is not a tenant and must not cause unrelated identities to be retired.
  */
 export type NhiScopeKind = 'mission' | 'project' | 'tenant';
 
@@ -124,7 +124,7 @@ function affiliationMatches(
   const affiliation = record.affiliation;
   if (scope === 'mission') return affiliation.mission_id === scopeId;
   if (scope === 'project') return affiliation.project_id === scopeId;
-  return affiliation.project_id === scopeId || affiliation.organization_id === scopeId;
+  return affiliation.tenant_slug === scopeId;
 }
 
 /**
@@ -205,7 +205,8 @@ export function retireIdentitiesForScopeBestEffort(input: {
 // Orphan detection
 // ---------------------------------------------------------------------------
 
-export type NhiOrphanReason = 'mission_scope_missing' | 'project_scope_missing';
+export type NhiOrphanReason =
+  'mission_scope_missing' | 'project_scope_missing' | 'tenant_scope_missing';
 
 export interface NhiOrphanIdentity {
   nhi_id: string;
@@ -249,7 +250,18 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
     if (record.lifecycle_status === 'retired') continue;
     const missionId = record.affiliation.mission_id;
     const projectId = record.affiliation.project_id;
+    const tenantSlug = record.affiliation.tenant_slug;
     try {
+      if (tenantSlug && !readTenantProfile(tenantSlug)) {
+        orphans.push({
+          nhi_id: record.nhi_id,
+          lifecycle_status: record.lifecycle_status,
+          accountable_human_id: record.accountable_human_id,
+          reason: 'tenant_scope_missing',
+          missing_scope_id: tenantSlug,
+        });
+        continue;
+      }
       if (missionId && !findMissionPath(missionId)) {
         orphans.push({
           nhi_id: record.nhi_id,

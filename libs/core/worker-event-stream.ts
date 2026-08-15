@@ -15,6 +15,7 @@ import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { safeAppendFileSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
+import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 
 export const WORKER_EVENT_TYPES = [
   // turn/run lifecycle
@@ -240,6 +241,10 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     safeMkdir(dir);
     const day = new Date().toISOString().slice(0, 10);
     stream.subscribe((event) => {
+      const sharedEvent = {
+        ...event,
+        payload: redactCollaborationMetadata(event.payload),
+      };
       const missionId = event.source?.mission_id?.trim();
       if (missionId) {
         // Mission ids are data-derived path segments. Reject rather than
@@ -259,11 +264,11 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         safeMkdir(missionEventDir, { recursive: true });
         safeAppendFileSync(
           `${missionEventDir}/worker-events-${day}.jsonl`,
-          `${JSON.stringify(event)}\n`
+          `${JSON.stringify(sharedEvent)}\n`
         );
         return;
       }
-      safeAppendFileSync(`${dir}/worker-events-${day}.jsonl`, `${JSON.stringify(event)}\n`);
+      safeAppendFileSync(`${dir}/worker-events-${day}.jsonl`, `${JSON.stringify(sharedEvent)}\n`);
     });
   } catch {
     // Observability wiring is best-effort; never block stream creation.

@@ -84,6 +84,19 @@ describe('compileScopedContextPack', () => {
     );
   });
 
+  it('accepts canonical tenant_slug and rejects conflicting legacy aliases', () => {
+    const canonical: ContextSecurityScope = { ...scope, tenant_slug: 'tenant-a' };
+    delete canonical.tenant_id;
+    expect(() =>
+      compileScopedContextPack(canonical, [
+        fragment({ tenant_slug: 'tenant-a', tenant_id: undefined }),
+      ])
+    ).not.toThrow();
+    expect(() =>
+      compileScopedContextPack({ ...canonical, tenant_id: 'tenant-b' }, [fragment()])
+    ).toThrow(/tenant_slug and tenant_id must match/);
+  });
+
   it.each(['public', 'confidential', 'personal', 'shared'])(
     'rejects reserved scope name %s as a tenant',
     (tenant_id) => {

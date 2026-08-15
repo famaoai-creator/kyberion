@@ -8,7 +8,10 @@ const TIER_SENSITIVITY: Record<TierLevel, number> = {
 };
 
 export interface ContextSecurityScope {
-  tenant_id: string;
+  /** Canonical tenant boundary. */
+  tenant_slug?: string;
+  /** Compatibility alias; new producers should set tenant_slug. */
+  tenant_id?: string;
   organization_id?: string;
   project_id?: string;
   mission_id: string;
@@ -24,6 +27,7 @@ export interface GovernedContextFragment<T = unknown> {
   fragment_id: string;
   source_ref: string;
   source_tier: TierLevel;
+  tenant_slug?: string;
   tenant_id?: string;
   organization_id?: string;
   project_id?: string;
@@ -59,10 +63,26 @@ function nonEmpty(value: string | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function resolveTenantAlias(input: {
+  tenant_slug?: string;
+  tenant_id?: string;
+}): string | undefined {
+  const canonical = input.tenant_slug?.trim();
+  const legacy = input.tenant_id?.trim();
+  if (canonical && legacy && canonical !== legacy) return undefined;
+  return canonical || legacy;
+}
+
 export function validateContextSecurityScope(scope: ContextSecurityScope): string[] {
   const errors: string[] = [];
-  if (!nonEmpty(scope.tenant_id)) errors.push('tenant_id is required');
-  else if (!isValidTenantSlug(scope.tenant_id)) errors.push('tenant_id is invalid');
+  const tenantSlug = resolveTenantAlias(scope);
+  if (!tenantSlug) {
+    errors.push(
+      scope.tenant_slug && scope.tenant_id
+        ? 'tenant_slug and tenant_id must match'
+        : 'tenant_slug (or legacy tenant_id) is required'
+    );
+  } else if (!isValidTenantSlug(tenantSlug)) errors.push('tenant_slug is invalid');
   if (!nonEmpty(scope.mission_id)) errors.push('mission_id is required');
   if (!nonEmpty(scope.purpose)) errors.push('purpose is required');
   if (!Array.isArray(scope.read_tiers) || scope.read_tiers.length === 0) {
@@ -105,11 +125,13 @@ export function evaluateContextFragment<T>(
   }
 
   if (fragment.source_tier !== 'public') {
-    if (!nonEmpty(fragment.tenant_id) || fragment.tenant_id !== scope.tenant_id) {
+    const fragmentTenant = resolveTenantAlias(fragment);
+    const scopeTenant = resolveTenantAlias(scope);
+    if (!fragmentTenant || fragmentTenant !== scopeTenant) {
       return reject(
         fragment,
         'TENANT_SCOPE_MISMATCH',
-        'Non-public context requires an explicit matching tenant_id'
+        'Non-public context requires an explicit matching tenant_slug'
       );
     }
   }

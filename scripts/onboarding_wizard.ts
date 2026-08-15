@@ -931,7 +931,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
         created_at: createdAt,
         isolation_policy: {
           strict_isolation: true,
-          allow_cross_distillation: true,
+          allow_cross_distillation: false,
         },
         metadata: {
           onboarding_source: 'pnpm onboard',

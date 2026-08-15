@@ -51,7 +51,7 @@ The work loop is: **capture intent → agree on the goal before changing anythin
 | `all_clear`        | → ③ Alignment                                                                       |
 | `fatal_error`      | Pipeline itself failed — report to the user and halt; enter no phase until resolved |
 
-1. **Onboarding** — set up environment & identity: `pnpm install → build → surfaces:reconcile → onboard`. → [onboarding.md](./knowledge/product/governance/phases/onboarding.md)
+1. **Onboarding** — set up environment & identity: `pnpm install → build → surfaces:reconcile → onboard`, then resolve tenant / organization context and pass the activation gate before first work. → [onboarding.md](./knowledge/product/governance/phases/onboarding.md) · [onboarding-flow.md](./knowledge/product/governance/onboarding-flow.md)
 2. **Recovery** — restore prior state, resume from the suspension point. → [recovery.md](./knowledge/product/governance/phases/recovery.md)
 3. **Alignment** — interpret intent and agree on goals. No code changes until goals are agreed. → [alignment.md](./knowledge/product/governance/phases/alignment.md)
 4. **Execution** — change one thing, test immediately; on a major obstacle, return to ③. → [execution.md](./knowledge/product/governance/phases/execution.md)

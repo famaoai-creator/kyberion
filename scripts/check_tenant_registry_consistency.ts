@@ -5,10 +5,10 @@
  * systems and exits non-zero on drift:
  *
  *   (a) tenant profiles — the SPINE (libs/core/tenant-registry.ts:
- *       knowledge/personal/tenants/*.json, or customer/{slug}/tenants/*.json
- *       when KYBERION_CUSTOMER is set),
+ *       knowledge/personal/tenants/*.json). The customer/{slug}/tenants/*.json
+ *       tree is a stance facet only and never changes registry authority,
  *   (b) knowledge/confidential/tenants/index.json (design override index),
- *   (c) top-level customer/{slug}/ directories,
+ *   (c) customer/{customer}/tenants/{tenant}.json profile facets,
  *   (d) project registry — NOT APPLICABLE: libs/core/project-registry.ts
  *       ProjectRecord carries no tenant slug field (verified 2026-07-28), so
  *       there is nothing to cross-check; reported as a note.
@@ -57,8 +57,8 @@ export interface TenantSystemsSnapshot {
   profiles: string[];
   /** (b) ids in knowledge/confidential/tenants/index.json. */
   confidentialIndex: string[];
-  /** (c) top-level customer/{slug}/ directory names. */
-  customerDirs: string[];
+  /** (c) tenant slugs declared by customer/{customer}/tenants/*.json facets. */
+  customerTenantProfiles: string[];
   /** (d) tenant slugs declared by project registry records. */
   projectTenants: string[];
   notes: string[];
@@ -68,7 +68,7 @@ export interface TenantConsistencyRow {
   slug: string;
   profile: boolean;
   confidential_index: boolean;
-  customer_dir: boolean;
+  customer_tenant_profile: boolean;
   project_registry: boolean;
   exception: string | null;
 }
@@ -112,10 +112,10 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     notes.push(`(b) ${CONFIDENTIAL_INDEX_RELATIVE_PATH} not present — treated as empty set`);
   }
 
-  let customerDirs: string[] = [];
+  let customerTenantProfiles: string[] = [];
   const customerBase = path.join(rootDir, 'customer');
   if (safeExistsSync(customerBase)) {
-    customerDirs = safeReaddir(customerBase)
+    const customerDirs = safeReaddir(customerBase)
       .filter((entry) => {
         try {
           return safeStat(path.join(customerBase, entry)).isDirectory();
@@ -124,9 +124,21 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
         }
       })
       .sort();
+    customerTenantProfiles = customerDirs
+      .flatMap((customerSlug) => {
+        const tenantDir = path.join(customerBase, customerSlug, 'tenants');
+        if (!safeExistsSync(tenantDir)) return [];
+        return safeReaddir(tenantDir)
+          .filter((entry) => entry.endsWith('.json'))
+          .map((entry) => entry.slice(0, -'.json'.length));
+      })
+      .sort();
   } else {
-    notes.push('(c) customer/ directory not present — treated as empty set');
+    notes.push('(c) customer/ directory not present — treated as empty tenant facet set');
   }
+  notes.push(
+    '(c) top-level customer stance directories are not tenant references; nested tenant profiles are cross-checked'
+  );
 
   const projectTenants =
     path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
@@ -139,7 +151,7 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     '(d) project registry tenant_slug fields are included in the tenant spine cross-check'
   );
 
-  return { profiles, confidentialIndex, customerDirs, projectTenants, notes };
+  return { profiles, confidentialIndex, customerTenantProfiles, projectTenants, notes };
 }
 
 export function loadTenantRegistryExceptions(options: CheckOptions = {}): {
@@ -184,17 +196,17 @@ export function evaluateTenantConsistency(
 
   const profileSet = new Set(systems.profiles);
   const indexSet = new Set(systems.confidentialIndex);
-  const customerSet = new Set(systems.customerDirs);
+  const customerTenantSet = new Set(systems.customerTenantProfiles);
   const projectSet = new Set(systems.projectTenants);
   const allSlugs = Array.from(
-    new Set([...profileSet, ...indexSet, ...customerSet, ...projectSet])
+    new Set([...profileSet, ...indexSet, ...customerTenantSet, ...projectSet])
   ).sort();
 
   const rows: TenantConsistencyRow[] = allSlugs.map((slug) => ({
     slug,
     profile: profileSet.has(slug),
     confidential_index: indexSet.has(slug),
-    customer_dir: customerSet.has(slug),
+    customer_tenant_profile: customerTenantSet.has(slug),
     project_registry: projectSet.has(slug),
     exception: exceptionBySlug.get(slug) ?? null,
   }));
@@ -213,7 +225,7 @@ export function evaluateTenantConsistency(
       if (!excepted) {
         const knownTo = [
           row.confidential_index ? 'confidential index' : null,
-          row.customer_dir ? 'customer/ directory' : null,
+          row.customer_tenant_profile ? 'customer tenant profile' : null,
           row.project_registry ? 'project registry' : null,
         ]
           .filter((label) => label != null)
@@ -250,12 +262,12 @@ export function evaluateTenantConsistency(
 
 export function renderReport(report: TenantConsistencyReport): string {
   const lines: string[] = [];
-  const header = ['slug', 'profile', 'conf-index', 'customer-dir', 'project-reg', 'status'];
+  const header = ['slug', 'profile', 'conf-index', 'customer-tenant', 'project-reg', 'status'];
   const rowsAsText = report.rows.map((row) => [
     row.slug,
     row.profile ? 'yes' : '-',
     row.confidential_index ? 'yes' : '-',
-    row.customer_dir ? 'yes' : '-',
+    row.customer_tenant_profile ? 'yes' : '-',
     row.project_registry ? 'yes' : '-',
     row.exception != null ? `exception: ${row.exception}` : row.profile ? 'ok' : 'DRIFT',
   ]);

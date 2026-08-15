@@ -8,7 +8,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 ## 設計原則
 
 - **提案駆動**: 自動探索は候補の提示までに留め、保存や適用は明示承認で行う
-- **段階実行**: `identity -> services -> tenants -> tutorial` の順で進める
+- **段階実行**: `identity -> services -> tenant registry -> context binding -> activation -> first-work` の順で進める
 - **安全優先**: いきなり実ミッションを走らせず、まず `simulate` を実行する
 - **1件ずつ登録**: tenant は一括生成せず、1 tenant = 1 record で登録する
 - **Schema-first**: onboarding state、connection、tenant、tutorial すべてを schema で検証する
@@ -20,16 +20,19 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 目的は、操作者を「利用者」ではなく「主権的な共同設計者」として定義すること。
 
 収集する情報:
+
 - 表示名
 - 言語
 - 対話スタイル
 - コアビジョン
 
 成果物:
+
 - onboarding state の identity セクション
 - 初期プロフィール
 
 注意:
+
 - ここでは tenant やサービス設定を進めない
 - まず主体の定義を固定する
 
@@ -38,22 +41,26 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 目的は、ローカル/外部サービスの接続候補を収集し、承認付きで接続を確定すること。
 
 推奨フロー:
+
 1. `Smart Probe` が接続候補を収集する
 2. 候補は「提案」として提示する
 3. ユーザーが承認したものだけ `customer/{slug}/connections/*.json` に保存する。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` に保存する
 
 対象例:
+
 - ComfyUI
 - Whisper
 - TTS
 - Meeting
 
 注意:
+
 - `find` や shell ベース探索は補助に留める
 - 探索結果は再現可能な形式で記録する
 - 直接適用ではなく、まず差分提案にする
 
 成果物:
+
 - connection candidate report
 - approved connection records
 
@@ -62,23 +69,27 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 目的は、操作者が扱う複数組織を境界付きで登録すること。
 
 登録単位:
+
 - `tenant_slug`
 - 役割
 - 所有権 / 管轄
 - broker 条件
 
 推奨フロー:
+
 1. 1 tenant を入力
 2. schema を検証
 3. 必要に応じて broker 条件を確認
-4. `customer/{slug}/tenants/{tenant_slug}.json` を生成する。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/{tenant_slug}.json` を生成する
+4. `pnpm tenant create {tenant_slug} --display-name "..." --apply` で canonical registry に登録する。`customer/{slug}/tenants/{tenant_slug}.json` は必要な場合だけ stance 側の参照 facet として扱い、registry の代替にはしない
 
 注意:
+
 - 複数 tenant の一括投入はしない
 - cross-tenant は後段で明示承認に分離する
 - `tenant_id` ではなく `tenant_slug` を境界キーとして扱う
 
 成果物:
+
 - tenant profile
 - tenant scope validation result
 
@@ -87,21 +98,25 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 目的は、設定したサービスと tenant を使って小さな成功体験を作ること。
 
 推奨フロー:
-1. `simulate` で tutorial を dry-run する
-2. 成功したら `apply` を選ぶ
-3. 実ミッションを起動する
+
+1. `simulate` で tutorial / first-work を dry-run する
+2. tenant activation の readiness probe と human acceptance を完了する
+3. 成功したら `apply` を選び、必要な場合だけ governed mission を起動する
 
 例:
+
 - 音声で挨拶する
 - tenant 配下に最初のメモを残す
 - 5 分後の点検タスクを登録する
 
 注意:
+
 - 初回から音声再生やスケジュール登録を必須化しない
-- 接続未完了時は simulate で止める
+- 接続未完了、activation 未完了、scope 不一致時は simulate で止める
 - 成功条件を明示する
 
 成果物:
+
 - tutorial simulation report
 - optional mission execution
 
@@ -112,6 +127,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 既存ウィザードを、固定ステップではなく phase プラグイン形式にする。
 
 必要な要素:
+
 - `OnboardingState` schema
 - phase ごとの入力/出力定義
 - `simulate` と `apply` の分岐
@@ -127,6 +143,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 - `persist`: connection JSON 書き込み
 
 禁止事項:
+
 - 探索した瞬間に本番設定を書き換えること
 - 未承認のパスやコマンドを保存すること
 
@@ -135,6 +152,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 `MSN-ONBOARDING-WELCOME` のようなチュートリアルは、まず dry-run で生成して検証する。
 
 推奨構成:
+
 - `tutorial:suggest`
 - `tutorial:simulate`
 - `tutorial:apply`
@@ -144,6 +162,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 オンボーディング終了時に、接続状況・登録 tenant・未完了項目を要約する。
 
 出力例:
+
 - 接続済みサービス
 - 保留中の候補
 - 登録済み tenant

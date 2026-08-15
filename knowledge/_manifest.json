@@ -315,7 +315,7 @@
     {
       "path": "product/architecture/entity-scope-hierarchy.md",
       "tier": "public",
-      "size": 2877,
+      "size": 4947,
       "type": "md"
     },
     {
@@ -579,7 +579,7 @@
     {
       "path": "product/architecture/multi-tenant-operations.md",
       "tier": "public",
-      "size": 17131,
+      "size": 18218,
       "type": "md"
     },
     {
@@ -765,7 +765,7 @@
     {
       "path": "product/architecture/tenant-vision-model.md",
       "tier": "public",
-      "size": 5998,
+      "size": 6267,
       "type": "md"
     },
     {
@@ -1831,9 +1831,15 @@
       "type": "json"
     },
     {
+      "path": "product/governance/onboarding-flow.md",
+      "tier": "public",
+      "size": 10828,
+      "type": "md"
+    },
+    {
       "path": "product/governance/onboarding-protocol.md",
       "tier": "public",
-      "size": 3592,
+      "size": 3893,
       "type": "md"
     },
     {
@@ -1959,7 +1965,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 6158,
+      "size": 5731,
       "type": "md"
     },
     {
@@ -2211,7 +2217,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20599,
+      "size": 20636,
       "type": "json"
     },
     {
@@ -2499,7 +2505,7 @@
     {
       "path": "product/governance/tenant-onboarding-procedure.md",
       "tier": "public",
-      "size": 2952,
+      "size": 3305,
       "type": "md"
     },
     {
@@ -3837,7 +3843,7 @@
     {
       "path": "product/orchestration/onboarding-protocol.md",
       "tier": "public",
-      "size": 5827,
+      "size": 6274,
       "type": "md"
     },
     {
@@ -6135,7 +6141,7 @@
     {
       "path": "product/schemas/agent-collaboration-event.schema.json",
       "tier": "public",
-      "size": 2127,
+      "size": 3934,
       "type": "json"
     },
     {
@@ -6879,7 +6885,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 15262,
+      "size": 15430,
       "type": "json"
     },
     {
@@ -6891,7 +6897,7 @@
     {
       "path": "product/schemas/mission-event.schema.json",
       "tier": "public",
-      "size": 1522,
+      "size": 2462,
       "type": "json"
     },
     {
@@ -6921,7 +6927,7 @@
     {
       "path": "product/schemas/mission-orchestration-event.schema.json",
       "tier": "public",
-      "size": 1474,
+      "size": 2485,
       "type": "json"
     },
     {
@@ -7587,7 +7593,7 @@
     {
       "path": "product/schemas/security-scope.schema.json",
       "tier": "public",
-      "size": 1279,
+      "size": 1491,
       "type": "json"
     },
     {
@@ -7843,9 +7849,15 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-activation.schema.json",
+      "tier": "public",
+      "size": 3829,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/tenant-profile.schema.json",
       "tier": "public",
-      "size": 2073,
+      "size": 2095,
       "type": "json"
     },
     {

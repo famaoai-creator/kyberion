@@ -155,12 +155,16 @@ describe('NI-05 scope-closure retirement', () => {
     expect(second).toMatchObject({ status: 'noop', retired: [] });
   });
 
-  it('a tenant closure matches project_id or organization_id affiliation', () => {
-    const byProject = issue('worker-proj', {
+  it('a tenant closure matches only explicit tenant_slug affiliation', () => {
+    const byTenant = issue('worker-tenant', {
+      organization_id: 'demo-org',
+      tenant_slug: 'tenant-alpha',
+    });
+    const sameOrg = issue('worker-org', { organization_id: 'demo-org' });
+    const sameProjectName = issue('worker-proj', {
       organization_id: 'demo-org',
       project_id: 'tenant-alpha',
     });
-    const byOrg = issue('worker-org', { organization_id: 'tenant-alpha' }, 'tenant-alpha');
     const unrelated = issue('worker-elsewhere', {
       organization_id: 'demo-org',
       project_id: 'tenant-beta',
@@ -172,7 +176,9 @@ describe('NI-05 scope-closure retirement', () => {
       reason: 'tenant offboarded',
     });
 
-    expect(result.retired.sort()).toEqual([byOrg.nhi_id, byProject.nhi_id].sort());
+    expect(result.retired).toEqual([byTenant.nhi_id]);
+    expect(identity.getAgentIdentity(sameOrg.nhi_id)?.lifecycle_status).toBe('provisioned');
+    expect(identity.getAgentIdentity(sameProjectName.nhi_id)?.lifecycle_status).toBe('provisioned');
     expect(identity.getAgentIdentity(unrelated.nhi_id)?.lifecycle_status).toBe('provisioned');
   });
 
@@ -250,6 +256,30 @@ describe('NI-05 mission closure hook (AL-03 ceremony)', () => {
       if (previousMode === undefined) delete process.env.KYBERION_NHI_ACTOR;
       else process.env.KYBERION_NHI_ACTOR = previousMode;
     }
+  });
+});
+
+describe('NI-05 tenant closure', () => {
+  it('retires only identities explicitly affiliated with the tenant', () => {
+    const tenantIdentity = issue('worker-tenant-bound', {
+      organization_id: 'demo-org',
+      tenant_slug: 'acme-corp',
+    });
+    const organizationIdentity = issue('worker-org-bound', {
+      organization_id: 'demo-org',
+    });
+
+    const result = governance.retireIdentitiesForScope({
+      scope: 'tenant',
+      scopeId: 'acme-corp',
+      reason: 'tenant offboarding',
+    });
+
+    expect(result.retired).toEqual([tenantIdentity.nhi_id]);
+    expect(identity.getAgentIdentity(tenantIdentity.nhi_id)?.lifecycle_status).toBe('retired');
+    expect(identity.getAgentIdentity(organizationIdentity.nhi_id)?.lifecycle_status).toBe(
+      'provisioned'
+    );
   });
 });
 

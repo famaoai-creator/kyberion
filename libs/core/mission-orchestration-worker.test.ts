@@ -93,6 +93,8 @@ vi.mock('./ledger.js', () => ({
 
 vi.mock('./mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
+  missionTaskEventsPath: (missionId: string) =>
+    `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
 }));
 
 // Full dispatch flows through real module wiring — comfortably fast locally

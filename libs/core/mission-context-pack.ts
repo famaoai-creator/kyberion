@@ -1572,7 +1572,8 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(workItemId ? { work_item_id: workItemId } : {}),
   };
   const securityScope: ContextSecurityScope = {
-    tenant_id: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
+    tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
+    tenant_id: input.missionState.tenant_id || input.missionState.tenant_slug || 'default',
     ...(projectId ? { project_id: projectId } : {}),
     mission_id: input.missionState.mission_id,
     ...(recipient.agent_id ? { participant_id: recipient.agent_id } : {}),
