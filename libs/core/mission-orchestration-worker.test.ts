@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const FOLLOWUP_MISSION_ID = vi.hoisted(() => `MSN-FOLLOWUP-${process.pid}`);
+
 const mocks = vi.hoisted(() => {
   const route = vi.fn();
   const ensureMissionTeamRuntimeViaSupervisor = vi.fn();
@@ -21,6 +23,30 @@ const mocks = vi.hoisted(() => {
     buildMissionTeamView,
     record,
     emitMissionTaskEvent,
+  };
+});
+
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  const rewriteFixturePath = (value: string) =>
+    value.replaceAll('MSN-FOLLOWUP', FOLLOWUP_MISSION_ID);
+  const missionDir = (missionId: string, tier?: 'personal' | 'confidential' | 'public') =>
+    actual.missionDir(rewriteFixturePath(missionId), tier);
+  const rootResolve = (relativePath: string) =>
+    actual.rootResolve(rewriteFixturePath(relativePath));
+  const findMissionPath = (missionId: string) =>
+    actual.findMissionPath(rewriteFixturePath(missionId));
+  return {
+    ...actual,
+    missionDir,
+    rootResolve,
+    findMissionPath,
+    pathResolver: {
+      ...actual.pathResolver,
+      missionDir,
+      rootResolve,
+      findMissionPath,
+    },
   };
 });
 
@@ -94,7 +120,10 @@ vi.mock('./ledger.js', () => ({
 vi.mock('./mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   missionTaskEventsPath: (missionId: string) =>
-    `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
+    `active/missions/public/${missionId.replaceAll(
+      'MSN-FOLLOWUP',
+      FOLLOWUP_MISSION_ID
+    )}/coordination/events/task-events.jsonl`,
 }));
 
 // Full dispatch flows through real module wiring — comfortably fast locally
