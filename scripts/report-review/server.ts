@@ -19,6 +19,7 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { assertProtocolServiceRegistered } from '@agent/core';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 
@@ -36,6 +37,7 @@ if (!target) {
   );
   process.exit(1);
 }
+assertProtocolServiceRegistered('report-review');
 if (!safeExistsSync(target)) {
   console.error(`report not found: ${target}`);
   process.exit(1);
