@@ -102,4 +102,27 @@ describe('config change contract', () => {
       })
     ).toThrow('CONFIG_CHANGE_APPROVAL_SCOPE_MISMATCH');
   });
+
+  it('rejects an approval bound to another NHI', () => {
+    const envelope = normalizeConfigChangeEnvelope({
+      change_id: 'cfg-4',
+      scope: { ...scope, nhi_id: 'nhi://tenant-a/agent-a' },
+      target_kind: 'tenant',
+      requested_by: 'operator',
+      risk: 'high',
+      desired_hash: 'a'.repeat(64),
+      approval_ref: 'apr-4',
+      probe_refs: { nhi: 'audit-4' },
+    });
+    expect(() =>
+      assertConfigChangeApplyable({
+        envelope,
+        approval: {
+          status: 'approved',
+          payloadHash: envelope.desired_hash,
+          scope: { ...scope, nhi_id: 'nhi://tenant-a/agent-b' },
+        },
+      })
+    ).toThrow('CONFIG_CHANGE_APPROVAL_SCOPE_MISMATCH');
+  });
 });
