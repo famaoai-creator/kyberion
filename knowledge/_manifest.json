@@ -79,6 +79,12 @@
       "type": "md"
     },
     {
+      "path": "product/agents/reasoning-worker.agent.md",
+      "tier": "public",
+      "size": 1420,
+      "type": "md"
+    },
+    {
       "path": "product/agents/slack-gateway.agent.md",
       "tier": "public",
       "size": 1320,
@@ -1317,7 +1323,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 665,
+      "size": 659,
       "type": "json"
     },
     {
@@ -1329,7 +1335,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 80931,
+      "size": 81663,
       "type": "json"
     },
     {
@@ -2121,7 +2127,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1186,
+      "size": 1314,
       "type": "json"
     },
     {
@@ -2217,7 +2223,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 20636,
+      "size": 20658,
       "type": "json"
     },
     {
@@ -6105,7 +6111,7 @@
     {
       "path": "product/schemas/a2a-task-contract.schema.json",
       "tier": "public",
-      "size": 1325,
+      "size": 1387,
       "type": "json"
     },
     {
@@ -7527,7 +7533,7 @@
     {
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
-      "size": 3574,
+      "size": 3747,
       "type": "json"
     },
     {

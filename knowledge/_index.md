@@ -20,6 +20,7 @@
 - [onboarding-surface-agent.agent](./product/agents/onboarding-surface-agent.agent.md) (public | Unknown)
 - [planner-agent.agent](./product/agents/planner-agent.agent.md) (public | Unknown)
 - [presence-surface-agent.agent](./product/agents/presence-surface-agent.agent.md) (public | Unknown)
+- [reasoning-worker.agent](./product/agents/reasoning-worker.agent.md) (public | Unknown)
 - [slack-gateway.agent](./product/agents/slack-gateway.agent.md) (public | Unknown)
 - [slack-surface-agent.agent](./product/agents/slack-surface-agent.agent.md) (public | Unknown)
 - [sovereign-brain.agent](./product/agents/sovereign-brain.agent.md) (public | Unknown)

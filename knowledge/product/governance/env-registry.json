@@ -2030,6 +2030,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ORGANIZATION_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_OS_GUARDED_SURFACE_URL",
       "category": "provider",
       "type": "string",
@@ -2853,6 +2861,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TENANT_SCOPE_REQUIRED",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_TERMINAL_ALLOW_REMOTE",
       "category": "runtime",
       "type": "string",
@@ -2920,6 +2936,14 @@
       "name": "KYBERION_TEST_OBSERVABILITY_DIR",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_TIER",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
@@ -3040,6 +3064,14 @@
       "name": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_VIEWER_PRINCIPAL",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
