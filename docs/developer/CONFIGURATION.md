@@ -280,7 +280,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (158)
+## runtime (162)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -371,6 +371,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_NHI_ID`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_OAUTH_SERVICE_ID`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ONBOARDING_NON_INTERACTIVE_OK`       | string | no       | _undocumented_                                                                                          |
+| `KYBERION_ORGANIZATION_ID`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PEER_NETWORK_CATALOG`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PERSONA`                             | string | no       | Active persona for the policy engine (set by withExecutionContext; rarely set manually).                |
 | `KYBERION_PHASE_GATE_MODE`                     | string | no       | _undocumented_                                                                                          |
@@ -419,10 +420,12 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TEN_VAD_PYTHON`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TENANT`                              | string | no       | Active tenant slug for tenant-scoped writes and branding.                                               |
 | `KYBERION_TENANT_ID`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TENANT_SCOPE_REQUIRED`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TERMINAL_ALLOW_REMOTE`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TERMINAL_RESTORE_RUNTIME`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TEST_MARKER`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TEST_MISSING_ENV`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TIER`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TIMEZONE`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TTS_ARGS`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TUI_DISABLE_AUDIT`                   | string | no       | _undocumented_                                                                                          |
@@ -430,6 +433,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_UNDOCUMENTED`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VAD`                                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIDEO_RENDER_RUN_MODE`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VIEWER_PRINCIPAL`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIEWER_SCOPE`                        | string | no       | Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.                        |
 | `KYBERION_VITEST_NETWORK_ALLOWLIST`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_LANGUAGE`                      | string | no       | _undocumented_                                                                                          |
