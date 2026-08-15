@@ -45,6 +45,7 @@ vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
 vi.mock('../libs/core/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
+  missionTaskEventsPath: (missionId: string) => `/tmp/${missionId}/task-events.jsonl`,
 }));
 
 const MISSION = 'MSN-BESTOF-01';
