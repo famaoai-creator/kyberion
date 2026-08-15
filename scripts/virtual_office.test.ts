@@ -155,9 +155,10 @@ describe('virtual office surface', () => {
         2
       )
     );
-    fs.mkdirSync(path.join(customerRoot, 'tenants'), { recursive: true });
+    const tenantProfilesRoot = path.join(tmpRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(tenantProfilesRoot, { recursive: true });
     fs.writeFileSync(
-      path.join(customerRoot, 'tenants', 'acme-prod.json'),
+      path.join(tenantProfilesRoot, 'acme-prod.json'),
       JSON.stringify({
         tenant_slug: 'acme-prod',
         tenant_id: 'tenant-acme-prod',
@@ -167,7 +168,7 @@ describe('virtual office surface', () => {
       })
     );
     fs.writeFileSync(
-      path.join(customerRoot, 'tenants', 'acme-sandbox.json'),
+      path.join(tenantProfilesRoot, 'acme-sandbox.json'),
       JSON.stringify({
         tenant_slug: 'acme-sandbox',
         tenant_id: 'tenant-acme-sandbox',
