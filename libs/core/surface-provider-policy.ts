@@ -59,6 +59,11 @@ export interface SurfaceProviderManifestRecord {
     scope_mode: 'system' | 'server-bound-tenant' | 'viewer-derived' | 'request-derived';
     allowed_tiers: TierLevel[];
     requires_channel_binding_for_customer_mode: boolean;
+    principal_resolution: string;
+    write_authority: string;
+    nhi_binding: string;
+    approval_classes: string[];
+    data_residency: string;
   };
   intent_rules?: {
     rules?: Array<{
