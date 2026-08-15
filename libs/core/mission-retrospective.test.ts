@@ -82,6 +82,58 @@ describe('mission retrospective loop', () => {
       path.join(missionDir, 'mission-state.json'),
       JSON.stringify({ mission_id: MISSION, context: { goal_reconciliation_round: 1 } })
     );
+    fs.mkdirSync(path.join(tmpRoot, 'work', 'metrics'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpRoot, 'work', 'metrics', 'execution-metrics.jsonl'),
+      [
+        JSON.stringify({
+          mission_id: MISSION,
+          model: 'claude-fable-5',
+          usage: { prompt_tokens: 100, completion_tokens: 40 },
+          cost_usd: 0.0123,
+        }),
+        JSON.stringify({
+          mission_id: 'OTHER-MISSION',
+          model: 'codex',
+          usage: { prompt_tokens: 900, completion_tokens: 900 },
+          cost_usd: 9,
+        }),
+      ].join('\n') + '\n'
+    );
+    fs.writeFileSync(
+      path.join(tmpRoot, 'work', 'metrics', 'resource-usage.jsonl'),
+      [
+        JSON.stringify({
+          type: 'resource_usage',
+          mission_id: MISSION,
+          resource_kind: 'llm',
+          quantity: 1,
+          unit: 'call',
+          cost_usd: 0.02,
+        }),
+      ].join('\n') + '\n'
+    );
+    fs.mkdirSync(path.join(tmpRoot, 'active', 'shared', 'observability', 'mission-control'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(
+        tmpRoot,
+        'active',
+        'shared',
+        'observability',
+        'mission-control',
+        'agent-runtime-supervisor-events.jsonl'
+      ),
+      JSON.stringify({
+        decision: 'agent_runtime_ask_completed',
+        mission_id: MISSION,
+        correlation_id: 'runtime-correlation-1',
+        model_id: 'agy-runtime-model',
+        input_tokens: 10,
+        output_tokens: 5,
+      }) + '\n'
+    );
 
     vi.resetModules();
     mod = await import('./mission-retrospective.js');
@@ -105,6 +157,19 @@ describe('mission retrospective loop', () => {
     expect(stats.best_of_judgements).toBe(1);
     expect(stats.rework_events).toBe(1);
     expect(stats.goal_reconciliation_rounds).toBe(1);
+    expect(stats.token_usage).toMatchObject({
+      prompt_tokens: 110,
+      completion_tokens: 45,
+      total_tokens: 155,
+      cost_usd: 0.01233,
+      entries: 2,
+    });
+    expect(stats.token_usage.by_model['agy-runtime-model']).toMatchObject({
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: 15,
+    });
+    expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
   });
 
   it('queues LLM proposals for operator ratification and notifies', async () => {

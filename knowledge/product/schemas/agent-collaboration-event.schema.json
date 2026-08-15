@@ -28,6 +28,16 @@
     "agent_id": { "type": "string", "minLength": 1 },
     "parent_agent_id": { "type": "string", "minLength": 1 },
     "session_id": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "adopter_id": { "type": "string", "minLength": 1 },
+    "thread_id": { "type": "string", "minLength": 1 },
+    "parent_thread_id": { "type": "string", "minLength": 1 },
+    "turn_id": { "type": "string", "minLength": 1 },
+    "native": { "type": "boolean" },
+    "native_fork": { "type": "boolean" },
+    "native_mode": { "type": "string", "minLength": 1 },
+    "effort": { "enum": ["low", "medium", "high", "ultra"] },
+    "native_unavailable": { "type": "boolean" },
     "actor_type": { "enum": ["human", "agent", "surface", "system"] },
     "kind": {
       "enum": [
@@ -56,9 +66,38 @@
     "related_ids": { "type": "array", "items": { "type": "string" } },
     "evidence_refs": { "type": "array", "items": { "type": "string" } },
     "tier": { "enum": ["personal", "confidential", "public"] },
+    "scope_kind": {
+      "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+    },
     "tenant_slug": {
       "type": "string",
       "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
+    "organization_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope_kind", "tier"],
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": {
+          "type": "string",
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
+        "work_shape": { "type": "string", "minLength": 1 },
+        "customer_stance": { "type": "string", "minLength": 1 },
+        "viewer_principal": { "type": "string", "minLength": 1 },
+        "nhi_id": { "type": "string", "minLength": 1 }
+      }
     },
     "redaction": { "enum": ["summary", "reference_only", "redacted"] },
     "source": {

@@ -1,7 +1,8 @@
 {
   "version": "1.0.0",
-  "description": "Agent provider configuration. Defines default provider priority, default model IDs, and lifecycle boot commands. Read by agent-provider-resolution.ts and agent-lifecycle.ts. Edit here to change provider order or upgrade model IDs without code changes.",
-  "default_priority": ["agy", "gemini", "claude", "codex", "grok", "copilot"],
+  "description": "Agent provider configuration. Defines default provider priority, default model IDs, lifecycle boot commands, and providers that must not be selected for agent-runtime execution. Gemini ACP is obsolete for personal OAuth environments; Gemini API and agy remain separate surfaces. Read by agent-provider-resolution.ts and agent-lifecycle.ts.",
+  "default_priority": ["agy", "claude", "codex", "grok", "copilot"],
+  "obsolete_agent_runtime_providers": ["gemini"],
   "default_models": {
     "gemini": "gemini-3.6-flash",
     "claude": "claude-opus-5",

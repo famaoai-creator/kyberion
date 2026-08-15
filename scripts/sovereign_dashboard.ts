@@ -692,7 +692,9 @@ function drawMissions() {
           const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
           const nextTaskCount = (() => {
             try {
-              return readCanonicalWorkGraph(state.mission_id).items.length;
+              return readCanonicalWorkGraph(state.mission_id, {
+                ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+              }).items.length;
             } catch {
               return 0;
             }

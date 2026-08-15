@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/tenant-activation.schema.json",
+  "title": "Tenant Activation Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "kind",
+    "customer_slug",
+    "tenant_slug",
+    "organization_id",
+    "tier",
+    "owner_id",
+    "customer_stance",
+    "nhi_ids",
+    "next_actions",
+    "operation_contract",
+    "status",
+    "checks",
+    "probe_refs",
+    "blockers",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "kind": { "const": "tenant_activation" },
+    "customer_slug": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "organization_id": { "type": "string", "minLength": 1 },
+    "tier": { "enum": ["personal", "confidential", "public"] },
+    "owner_id": { "type": "string", "minLength": 1 },
+    "customer_stance": { "type": "string", "minLength": 1 },
+    "nhi_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "next_actions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "operation_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_leases",
+        "heartbeat_watchdog",
+        "quota_and_budget",
+        "approval_gate",
+        "pause_and_escalation",
+        "drift_watcher"
+      ],
+      "properties": {
+        "task_leases": { "type": "boolean" },
+        "heartbeat_watchdog": { "type": "boolean" },
+        "quota_and_budget": { "type": "boolean" },
+        "approval_gate": { "type": "boolean" },
+        "pause_and_escalation": { "type": "boolean" },
+        "drift_watcher": { "type": "boolean" }
+      }
+    },
+    "revoked_task_grants": { "type": "integer", "minimum": 0 },
+    "status": {
+      "enum": ["draft", "validating", "ready", "active", "suspended", "offboarding", "archived"]
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry",
+        "context_binding",
+        "organization_state",
+        "accountable_human",
+        "memory_policy",
+        "viewer_scope",
+        "nhi_provisioned",
+        "service_readiness",
+        "isolation_probe"
+      ],
+      "properties": {
+        "registry": { "type": "boolean" },
+        "context_binding": { "type": "boolean" },
+        "organization_state": { "type": "boolean" },
+        "accountable_human": { "type": "boolean" },
+        "memory_policy": { "type": "boolean" },
+        "viewer_scope": { "type": "boolean" },
+        "nhi_provisioned": { "type": "boolean" },
+        "service_readiness": { "type": "boolean" },
+        "isolation_probe": { "type": "boolean" }
+      }
+    },
+    "probe_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "viewer_scope": { "type": "string", "minLength": 1 },
+        "nhi_provisioned": { "type": "string", "minLength": 1 },
+        "service_readiness": { "type": "string", "minLength": 1 },
+        "isolation_probe": { "type": "string", "minLength": 1 }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "activated_at": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "active" } } },
+      "then": {
+        "required": ["activated_at"],
+        "properties": {
+          "nhi_ids": { "minItems": 1 },
+          "probe_refs": {
+            "required": ["viewer_scope", "nhi_provisioned", "service_readiness", "isolation_probe"]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -601,6 +601,7 @@ describe('mission-context-pack', () => {
       ])
     );
     expect(pack.security_scope).toEqual({
+      tenant_slug: 'acme',
       tenant_id: 'acme',
       project_id: 'PRJ-CONTEXT-PACK-001',
       mission_id: missionId,

@@ -4,8 +4,10 @@ import { safeMkdir, safeRmSync } from './secure-io.js';
 import {
   composeMissionTeamPlan,
   resolveMissionTeamReceiver,
+  resolveMissionTeamPlan,
   writeMissionTeamPlan,
 } from './mission-team-plan-composer.js';
+import { discoverProviders } from './provider-discovery.js';
 
 describe('mission-team-composer classification integration', () => {
   it('derives mission type from mission classification when missionType is omitted', () => {
@@ -92,6 +94,155 @@ describe('mission-team-composer classification integration', () => {
     expect(plan.team_governance?.lifecycle.max_messages_per_run).toBe(75);
     const planner = plan.assignments.find((assignment) => assignment.team_role === 'planner');
     expect(planner?.agent_id).toBe('planner-agent');
+  });
+
+  it('uses the mission tenant for every participant security scope', () => {
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-TENANT-SCOPE-001',
+      missionType: 'development',
+      tier: 'confidential',
+      tenantSlug: 'kyberion-service-studio',
+      organizationProfile: {
+        version: '1.0.0',
+        organization_id: 'kyberion-development-team',
+        name: 'Kyberion Development Team',
+        mission_defaults: { default_team_template: 'default' },
+        team_defaults: { default_team_template: 'default', team_template_catalog_id: 'saas' },
+        llm: {},
+      },
+    });
+
+    expect(plan.tenant_slug).toBe('kyberion-service-studio');
+    expect(
+      plan.assignments
+        .filter((assignment) => assignment.status === 'assigned')
+        .every((assignment) => assignment.security_scope?.tenant_id === 'kyberion-service-studio')
+    ).toBe(true);
+  });
+
+  it('honors an explicitly selected available provider for every team role', () => {
+    const available = discoverProviders()
+      .filter((entry) => entry.installed && entry.healthy && entry.provider !== 'gemini')
+      .map((entry) => entry.provider);
+    if (!available.includes('codex')) return;
+
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-PROVIDER-SELECTION-001',
+      missionType: 'development',
+      tier: 'confidential',
+      tenantSlug: 'kyberion-service-studio',
+      providerPreference: { provider: 'codex', modelId: 'codex' },
+    });
+
+    expect(plan.provider_selection).toEqual(
+      expect.objectContaining({
+        requested_provider: 'codex',
+        requested_model_id: 'codex',
+      })
+    );
+    expect(
+      plan.assignments
+        .filter((assignment) => assignment.status === 'assigned')
+        .every((assignment) => assignment.provider === 'codex' && assignment.modelId === 'codex')
+    ).toBe(true);
+  });
+
+  it('rejects obsolete Gemini ACP even when discovery still reports it installed', () => {
+    expect(() =>
+      composeMissionTeamPlan({
+        missionId: 'MSN-PROVIDER-SELECTION-GEMINI-001',
+        missionType: 'development',
+        tier: 'public',
+        providerPreference: { provider: 'gemini' },
+      })
+    ).toThrow(/TEAM_PROVIDER_UNAVAILABLE/);
+  });
+
+  it('refreshes an existing plan when an explicit tenant changes', () => {
+    const missionId = 'MSN-TENANT-RESELECT-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      const original = composeMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+        tenantSlug: 'tenant-a',
+      });
+      writeMissionTeamPlan(missionPath, original);
+
+      const refreshed = resolveMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+        tenantSlug: 'tenant-b',
+      });
+
+      expect(refreshed.tenant_slug).toBe('tenant-b');
+      expect(
+        refreshed.assignments
+          .filter((assignment) => assignment.status === 'assigned')
+          .every((assignment) => assignment.security_scope?.tenant_id === 'tenant-b')
+      ).toBe(true);
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('refreshes a persisted plan that uses an obsolete agent-runtime provider', () => {
+    const missionId = 'MSN-OBSOLETE-PROVIDER-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      const original = composeMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+        tenantSlug: 'tenant-a',
+      });
+      const stale = {
+        ...original,
+        assignments: original.assignments.map((assignment) =>
+          assignment.team_role === 'orchestrator'
+            ? { ...assignment, provider: 'gemini', modelId: 'auto-gemini-2.5' }
+            : assignment
+        ),
+      };
+      writeMissionTeamPlan(missionPath, stale);
+
+      const refreshed = resolveMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+        tenantSlug: 'tenant-a',
+      });
+
+      expect(
+        refreshed.assignments.find((assignment) => assignment.team_role === 'orchestrator')
+      ).toEqual(
+        expect.objectContaining({
+          provider: expect.not.stringMatching(/^gemini$/),
+        })
+      );
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
   });
 
   it('applies ops-oriented organization template overlays when composing an operations team plan', () => {

@@ -59,7 +59,7 @@ pnpm build
 
 ```bash
 pnpm surfaces:reconcile     # bring up background surfaces
-pnpm onboard                # interactive identity setup → customer/{slug}/ (fallback: knowledge/personal/)
+pnpm onboard                # interactive identity setup → active stance overlay / personal fallback
 ```
 
 ### 1.4 Configure (FDE / customer overlay)
@@ -74,6 +74,8 @@ pnpm customer:switch customer-slug
 source active/shared/runtime/customer.env
 pnpm onboard
 ```
+
+For tenant-bound work, continue with [the standard onboarding flow](../../knowledge/product/governance/onboarding-flow.md): register the canonical tenant profile, bind the organization context, complete the activation probes, and obtain human acceptance before starting first work.
 
 ### 1.5 Verify
 
@@ -241,6 +243,8 @@ pnpm build
 pnpm surfaces:reconcile
 pnpm onboard
 ```
+
+For tenant-bound work, do not start a mission immediately after `pnpm onboard`; follow [the standard onboarding flow](../../knowledge/product/governance/onboarding-flow.md) and pass the activation gate first.
 
 The same setup is available through the governed environment manifests. Use a dry run first, then apply operator-confirmed installs when a tool is missing:
 

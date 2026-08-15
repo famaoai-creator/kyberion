@@ -255,7 +255,9 @@ export async function applyTenants(
       assigned_role: t.assigned_role,
       purpose: t.purpose,
       created_at: now,
-      isolation_policy: { strict_isolation: true, allow_cross_distillation: true },
+      // Cross-tenant/public learning is an explicit brokered promotion, never
+      // an onboarding default. Strict isolation must remain meaningful.
+      isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
       metadata: { onboarding_source: 'pnpm onboard:apply' },
     };
     await writeJson(

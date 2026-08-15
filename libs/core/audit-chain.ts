@@ -20,6 +20,13 @@ import {
   type ChainAlg,
   verifyAuditEntryHash,
 } from './chain-integrity.js';
+import {
+  eventScopeMatches,
+  normalizeEventScope,
+  parseEventScopeFromRecord,
+  type EventScope,
+  type EventScopeFilter,
+} from './event-scope.js';
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -50,6 +57,8 @@ export interface AuditEntry {
    * Schema-additive: legacy entries without this field remain valid.
    */
   tenantSlug?: string;
+  /** Canonical system/tenant/entity scope; tenantSlug is a legacy flat alias. */
+  scope?: EventScope;
   chain_alg?: ChainAlg;
   chain_key_id?: string;
   previousHash: string;
@@ -85,6 +94,39 @@ class AuditChainImpl {
    * the caller has already supplied one.
    */
   record(entry: Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>): AuditEntry {
+    const activeTenantSlug = resolveCurrentTenantSlug();
+    if (entry.tenantSlug && activeTenantSlug && entry.tenantSlug !== activeTenantSlug) {
+      throw new Error(
+        `[AUDIT_SCOPE_DENIED] tenantSlug '${entry.tenantSlug}' conflicts with active tenant '${activeTenantSlug}'`
+      );
+    }
+    if (
+      entry.scope?.tenant_slug &&
+      activeTenantSlug &&
+      entry.scope.tenant_slug !== activeTenantSlug
+    ) {
+      throw new Error(
+        `[AUDIT_SCOPE_DENIED] scope tenant '${entry.scope.tenant_slug}' conflicts with active tenant '${activeTenantSlug}'`
+      );
+    }
+    if (
+      entry.tenantSlug &&
+      entry.scope?.tenant_slug &&
+      entry.tenantSlug !== entry.scope.tenant_slug
+    ) {
+      throw new Error(
+        `[AUDIT_SCOPE_DENIED] tenantSlug and scope.tenant_slug must identify the same tenant`
+      );
+    }
+    if (
+      entry.scope &&
+      !resolveAuditScope(
+        entry.scope,
+        entry.scope.tenant_slug ?? entry.tenantSlug ?? activeTenantSlug
+      )
+    ) {
+      throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
+    }
     const fullEntry = withLockSync('audit-chain-global', () => {
       // Refresh the in-memory cursor while holding the inter-process lock;
       // another process may have appended since this module was loaded.
@@ -93,7 +135,8 @@ class AuditChainImpl {
       const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
       const timestamp = new Date().toISOString();
 
-      const requestedTenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+      const requestedTenantSlug =
+        entry.tenantSlug ?? entry.scope?.tenant_slug ?? resolveCurrentTenantSlug();
       const tenantSlug =
         requestedTenantSlug && isValidTenantSlug(requestedTenantSlug)
           ? requestedTenantSlug
@@ -106,6 +149,9 @@ class AuditChainImpl {
       // in the master chain merely because their mirror is skipped.
       const entryWithoutTenantSlug = { ...entry };
       delete entryWithoutTenantSlug.tenantSlug;
+      delete entryWithoutTenantSlug.scope;
+
+      const scope = resolveAuditScope(entry.scope, tenantSlug);
 
       const nextEntry: AuditEntry = {
         id,
@@ -117,6 +163,7 @@ class AuditChainImpl {
             ? entry.metadata.correlationId
             : undefined),
         ...(tenantSlug ? { tenantSlug } : {}),
+        ...(scope ? { scope } : {}),
         chain_alg: 'hmac-sha256',
         chain_key_id: getAuditChainKeyId(chainKey),
         previousHash: this.lastHash,
@@ -348,6 +395,15 @@ class AuditChainImpl {
     return this.loadEntriesFromFiles(this.listAuditFiles());
   }
 
+  /** Read only records visible to an explicit system/entity scope filter. */
+  loadForScope(filter: EventScopeFilter): AuditEntry[] {
+    return this.loadAll().filter((entry) => {
+      const scope = scopeForAuditEntry(entry);
+      if (scope === null) return false;
+      return eventScopeMatches(scope, filter);
+    });
+  }
+
   private loadEntriesFromFiles(files: string[]): AuditEntry[] {
     const entries: AuditEntry[] = [];
     for (const fileName of files) {
@@ -459,6 +515,33 @@ class AuditChainImpl {
     const date = new Date().toISOString().slice(0, 10);
     return path.join(this.auditDir, `audit-${date}.jsonl`);
   }
+}
+
+function resolveAuditScope(
+  scope: EventScope | undefined,
+  tenantSlug: string | undefined
+): EventScope | undefined {
+  try {
+    return normalizeEventScope({
+      ...(scope || {}),
+      ...(tenantSlug && !scope?.tenant_slug ? { tenant_slug: tenantSlug } : {}),
+      tier: scope?.tier || (process.env.KYBERION_TIER as EventScope['tier']) || 'public',
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function scopeForAuditEntry(entry: AuditEntry): EventScope | null | undefined {
+  const parsedResult = parseEventScopeFromRecord(entry as unknown as Record<string, unknown>);
+  if (parsedResult.invalid) return null;
+  const parsed = parsedResult.scope;
+  if (parsed) return parsed;
+  if (entry.scope) return undefined;
+  if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
+    return resolveAuditScope(undefined, entry.tenantSlug);
+  }
+  return undefined;
 }
 
 /**

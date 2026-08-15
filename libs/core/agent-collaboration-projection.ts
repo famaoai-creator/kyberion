@@ -9,6 +9,12 @@ import {
   type CollaborationKind,
   type CollaborationSource,
 } from './agent-collaboration-events.js';
+import {
+  eventScopeMatches,
+  normalizeEventScope,
+  parseEventScopeFromRecord,
+  type EventScopeFilter,
+} from './event-scope.js';
 import type { GraphRunArtifact } from './graph-run-artifact.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -77,6 +83,8 @@ export interface ComposeCollaborationProjectionOptions {
   missionId?: string;
   tenant?: string;
   tenantSlugs?: string[] | 'all';
+  /** Additional entity narrowing; never expands the viewer tenant scope. */
+  scopeFilter?: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'>;
   limit?: number;
   now?: string;
   staleAfterMs?: number;
@@ -152,13 +160,27 @@ function eventFromRecord(
   record: JsonRecord,
   source: CollaborationSource,
   seq: number
-): AgentCollaborationEvent {
+): AgentCollaborationEvent | null {
   const payload = asRecord(record.payload) || {};
+  const recordScopeResult = parseEventScopeFromRecord(record);
+  const payloadScopeResult = parseEventScopeFromRecord(payload);
+  if (recordScopeResult.invalid || payloadScopeResult.invalid) return null;
+  const recordScope = recordScopeResult.scope;
+  const payloadScope = payloadScopeResult.scope;
+  const scope = mergeEventScopes(recordScope, payloadScope);
+  if (recordScope && payloadScope && !scope) return null;
   const eventType = stringValue(record, 'event_type', 'type', 'decision') || 'unknown';
   const sourceEventId =
     stringValue(record, 'event_id', 'source_event_id', 'request_id') || `${source}:${seq}`;
   const missionId = stringValue(record, 'mission_id')?.toUpperCase();
   const taskId = stringValue(record, 'task_id');
+  if (
+    scope &&
+    ((missionId && scope.mission_id && missionId !== scope.mission_id.toUpperCase()) ||
+      (taskId && scope.task_id && taskId !== scope.task_id))
+  ) {
+    return null;
+  }
   const agentId = stringValue(record, 'agent_id', 'requested_by', 'actor_id');
   const provider = stringValue(record, 'provider') || stringValue(payload, 'provider');
   const adopterId = stringValue(record, 'adopter_id') || stringValue(payload, 'adopter_id');
@@ -234,7 +256,46 @@ function eventFromRecord(
     evidence_refs: evidence,
     redaction: evidence.length > 0 ? 'reference_only' : 'summary',
     source,
+    ...(scope ? { scope } : {}),
   });
+}
+
+function mergeEventScopes(
+  recordScope: AgentCollaborationEvent['scope'],
+  payloadScope: AgentCollaborationEvent['scope']
+): AgentCollaborationEvent['scope'] | null {
+  if (!recordScope) return payloadScope;
+  if (!payloadScope) return recordScope;
+  const comparableKeys = [
+    'tier',
+    'tenant_slug',
+    'organization_id',
+    'project_id',
+    'mission_id',
+    'task_id',
+    'session_id',
+    'work_shape',
+    'customer_stance',
+    'viewer_principal',
+    'nhi_id',
+  ] as const;
+  if (
+    comparableKeys.some(
+      (key) =>
+        recordScope[key] !== undefined &&
+        payloadScope[key] !== undefined &&
+        recordScope[key] !== payloadScope[key]
+    )
+  ) {
+    return null;
+  }
+  const { scope_kind: _recordKind, ...recordContext } = recordScope;
+  const { scope_kind: _payloadKind, ...payloadContext } = payloadScope;
+  try {
+    return normalizeEventScope({ ...payloadContext, ...recordContext });
+  } catch {
+    return null;
+  }
 }
 
 function readWorkerEvents(): AgentCollaborationEvent[] {
@@ -253,10 +314,10 @@ function readWorkerEvents(): AgentCollaborationEvent[] {
     }
   }
   return files.flatMap((file, fileIndex) =>
-    readJsonl(file).map((record, index) => {
+    readJsonl(file).flatMap((record, index) => {
       const source = asRecord(record.source) || {};
       const payload = asRecord(record.payload) || {};
-      return eventFromRecord(
+      const event = eventFromRecord(
         {
           ...record,
           mission_id: record.mission_id || source.mission_id,
@@ -269,15 +330,17 @@ function readWorkerEvents(): AgentCollaborationEvent[] {
         'worker',
         fileIndex * 100000 + index
       );
+      return event ? [event] : [];
     })
   );
 }
 
 function readSourceEvents(): AgentCollaborationEvent[] {
   const events = JSONL_SOURCES.flatMap(({ file, source }) =>
-    readJsonl(path.join(OBSERVABILITY_DIR, file)).map((record, index) =>
-      eventFromRecord(record, source, index)
-    )
+    readJsonl(path.join(OBSERVABILITY_DIR, file)).flatMap((record, index) => {
+      const event = eventFromRecord(record, source, index);
+      return event ? [event] : [];
+    })
   );
   return [...events, ...readWorkerEvents()];
 }
@@ -296,7 +359,9 @@ function eventMatches(
   if (options.missionId && event.mission_id !== options.missionId.toUpperCase()) return false;
   if (options.tenant || (options.tenantSlugs && options.tenantSlugs !== 'all')) {
     const eventTenant =
-      event.tenant_slug || (event.mission_id ? readMissionTenant(event.mission_id) : undefined);
+      event.scope?.tenant_slug ||
+      event.tenant_slug ||
+      (event.mission_id ? readMissionTenant(event.mission_id) : undefined);
     // Tenant-scoped views must fail closed: an event without an explicit or
     // mission-derived tenant cannot be safely shown in a tenant projection.
     const allowed =
@@ -306,6 +371,32 @@ function eventMatches(
           ? [options.tenant]
           : [];
     if (!eventTenant || !allowed.includes(eventTenant)) return false;
+    // When a canonical envelope exists, the exact same tenant filter must
+    // match it as well. Legacy records use the mission-state fallback above.
+    if (
+      event.scope &&
+      !eventScopeMatches(event.scope, {
+        ...(options.tenant ? { tenant_slug: options.tenant } : {}),
+        ...(options.tenantSlugs && options.tenantSlugs !== 'all'
+          ? { tenant_slugs: options.tenantSlugs }
+          : {}),
+        ...(options.scopeFilter || {}),
+      })
+    ) {
+      return false;
+    }
+  }
+  if (
+    options.scopeFilter &&
+    !eventScopeMatches(event.scope, {
+      ...(options.tenant ? { tenant_slug: options.tenant } : {}),
+      ...(options.tenantSlugs && options.tenantSlugs !== 'all'
+        ? { tenant_slugs: options.tenantSlugs }
+        : {}),
+      ...options.scopeFilter,
+    })
+  ) {
+    return false;
   }
   return true;
 }

@@ -20,7 +20,7 @@ Actuator -> ADF -> internal runtime detail
 
 ## 1. Setup
 
-> **Canonical cold-start source: [docs/INITIALIZATION.md](./INITIALIZATION.md).** The block below is a summary; when in doubt (ordering, prerequisites, troubleshooting), follow INITIALIZATION.md.
+> **Canonical cold-start source: [docs/INITIALIZATION.md](./INITIALIZATION.md).** The block below is a summary; when in doubt (ordering, prerequisites, troubleshooting), follow INITIALIZATION.md. Tenant / organization / activation の業務順序は [オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md) を参照してください。
 
 Prerequisites:
 
@@ -57,9 +57,21 @@ pnpm company:onboard --vertical saas-product-company --slug acme-ai \
   --goal "Define the first customer outcome and launch plan"
 ```
 
-The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding.
+The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding. Tenant activation is still a separate human-accepted gate.
 
-Before starting the first work, review its management unit:
+Before starting the first work, activate the tenant after the readiness probes, then review its management unit:
+
+```bash
+pnpm tenant:activation activate \
+  --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
+  --nhi-id <nhi-id> \
+  --check-viewer-scope --check-nhi --check-services --check-isolation \
+  --probe-ref viewer_scope=<audit-ref> \
+  --probe-ref nhi_provisioned=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref> \
+  --probe-ref isolation_probe=<audit-ref> \
+  --apply --accept
+```
 
 ```bash
 pnpm onboarding:context first-work --customer-slug acme-ai \

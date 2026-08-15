@@ -1,6 +1,6 @@
 # @presence/terminal-hud — Kyberion Terminal HUD
 
-Kyberion のフルスクリーン対話型 TUI（Ink / React）。hermes-agent の JS TUI と同系のオペレーターコンソールで、9 領域を 1 画面で観測・操作する。
+Kyberion のフルスクリーン対話型 TUI（Ink / React）。画面の役割を「現在地」「状態」「次の操作」に分け、オペレーターが迷わず観測・操作できる 8 パネルのコンソールです。
 
 ## 起動
 
@@ -9,6 +9,10 @@ pnpm tui        # 本番 (dist から / 要 pnpm build)
 pnpm tui:once   # 非対話スナップショット (CI / non-TTY)
 pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必要)
 ```
+
+`pnpm tui` は実 TTY では対話画面を起動し、CI・パイプ・IDE のタスク実行など TTY がない場合は自動的に snapshot を表示して正常終了します。raw mode が使えない環境でも起動エラーにはなりません。
+
+画面上部は `KYBERION / Terminal HUD`、現在のパネル、デーモン状態を表示します。中央が選択中のデータ、下部が質問・コマンド入力とショートカットです。
 
 すべて `KYBERION_PERSONA=sovereign` で動作する（personal tier ミッションの読み取りに必要。書き込みは各公認 API 経由）。
 

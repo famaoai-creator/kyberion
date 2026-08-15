@@ -25,6 +25,16 @@ describe('agent collaboration event contract', () => {
         evidence_refs: [],
         redaction: 'summary',
         source: 'task',
+        provider: 'codex',
+        native: true,
+        native_mode: 'thread-fork',
+        scope: {
+          scope_kind: 'task',
+          tier: 'confidential',
+          tenant_slug: 'client-a',
+          mission_id: 'MSN-1',
+          task_id: 'TASK-1',
+        },
       })
     ).toBe(true);
   });

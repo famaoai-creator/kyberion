@@ -25,7 +25,7 @@ const MISSION_ID = 'MSN-MEETING-E2E-001';
 const WORK_ITEM_ID = 'WITEM-MEETING-E2E-001';
 const CUSTOMER_SLUG = 'demo';
 const ROOT = pathResolver.rootDir();
-const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', MISSION_ID);
+const MISSION_DIR = pathResolver.tenantMissionDir(MISSION_ID, CUSTOMER_SLUG, 'confidential');
 const CUSTOMER_ROOT = path.join(ROOT, 'customer', CUSTOMER_SLUG);
 const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcript-sample.md');
 const PIPELINE_PATH = pathResolver.rootResolve('pipelines/meeting-followup.json');
@@ -42,12 +42,14 @@ describe('meeting-to-value e2e', () => {
   const originalMissionRole = process.env.MISSION_ROLE;
   const originalPersona = process.env.KYBERION_PERSONA;
   const originalCustomer = process.env.KYBERION_CUSTOMER;
+  const originalTenant = process.env.KYBERION_TENANT;
   const originalReasoning = process.env.KYBERION_REASONING_BACKEND;
 
   beforeEach(async () => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    process.env.KYBERION_TENANT = CUSTOMER_SLUG;
     process.env.KYBERION_REASONING_BACKEND = 'stub';
     setWorkCoordinationNamespace(`meeting-to-value-e2e-${process.pid}`);
     clearWorkCoordinationStore();
@@ -110,6 +112,8 @@ describe('meeting-to-value e2e', () => {
     else process.env.KYBERION_PERSONA = originalPersona;
     if (originalCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
     else process.env.KYBERION_CUSTOMER = originalCustomer;
+    if (originalTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = originalTenant;
     if (originalReasoning === undefined) delete process.env.KYBERION_REASONING_BACKEND;
     else process.env.KYBERION_REASONING_BACKEND = originalReasoning;
   });
@@ -202,6 +206,7 @@ describe('meeting-to-value e2e', () => {
         ...(pipeline.context ?? {}),
         mission_id: MISSION_ID,
         work_item_id: WORK_ITEM_ID,
+        mission_evidence_dir: path.relative(ROOT, path.join(MISSION_DIR, 'evidence')),
         transcript_path: TRANSCRIPT_PATH,
         attendees: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Operator' }],
         operator_label: 'Operator',

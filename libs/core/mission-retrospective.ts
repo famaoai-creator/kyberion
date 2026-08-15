@@ -13,6 +13,7 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
+import { MetricsCollector, resolveCostRates } from './metrics.js';
 
 /**
  * Mission Retrospective Loop — the self-improvement back-edge for PROCESS and
@@ -41,6 +42,22 @@ export interface MissionExecutionStats {
   finish_gate_failures: Array<{ gate_id: string; reason: string }>;
   unstaffed_role_fallbacks: string[];
   clarifications: number;
+  token_usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    cost_usd: number;
+    estimated_entries: number;
+    entries: number;
+    by_model: Record<
+      string,
+      { prompt_tokens: number; completion_tokens: number; total_tokens: number; cost_usd: number }
+    >;
+  };
+  resource_usage: {
+    entries: number;
+    cost_usd: number;
+  };
   item_outcomes: Array<{
     task_id: string;
     team_role: string;
@@ -49,6 +66,100 @@ export interface MissionExecutionStats {
     provider?: string;
     model_id?: string;
   }>;
+}
+
+function collectMissionUsageStats(
+  missionId: string
+): Pick<MissionExecutionStats, 'token_usage' | 'resource_usage'> {
+  const tokenUsage: MissionExecutionStats['token_usage'] = {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+    cost_usd: 0,
+    estimated_entries: 0,
+    entries: 0,
+    by_model: {},
+  };
+  const resourceUsage = { entries: 0, cost_usd: 0 };
+  const metricsCollector = new MetricsCollector({ persist: false });
+  const metricCorrelationIds = new Set<string>();
+
+  for (const entry of metricsCollector.loadHistory()) {
+    if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
+    if (entry.correlation_id) metricCorrelationIds.add(String(entry.correlation_id));
+    const usage = entry.usage as Record<string, unknown> | undefined;
+    if (!usage) continue;
+    const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
+    const completionTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+    if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) continue;
+    const model = String(entry.model || 'default');
+    const rates = resolveCostRates(model);
+    const cost = Number(
+      entry.cost_usd ?? promptTokens * rates.prompt + completionTokens * rates.completion
+    );
+    const modelStats = tokenUsage.by_model[model] || {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+    };
+    modelStats.prompt_tokens += promptTokens;
+    modelStats.completion_tokens += completionTokens;
+    modelStats.total_tokens += promptTokens + completionTokens;
+    modelStats.cost_usd += Number.isFinite(cost) ? cost : 0;
+    tokenUsage.by_model[model] = modelStats;
+    tokenUsage.prompt_tokens += promptTokens;
+    tokenUsage.completion_tokens += completionTokens;
+    tokenUsage.total_tokens += promptTokens + completionTokens;
+    tokenUsage.cost_usd += Number.isFinite(cost) ? cost : 0;
+    tokenUsage.entries += 1;
+    if (entry.estimated === true) tokenUsage.estimated_entries += 1;
+  }
+
+  const supervisorEventsPath = pathResolver.shared(
+    'observability/mission-control/agent-runtime-supervisor-events.jsonl'
+  );
+  for (const entry of readJsonl(supervisorEventsPath)) {
+    if (entry.decision !== 'agent_runtime_ask_completed') continue;
+    if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
+    if (entry.correlation_id && metricCorrelationIds.has(String(entry.correlation_id))) continue;
+    if (entry.input_tokens === undefined && entry.output_tokens === undefined) continue;
+    const promptTokens = Number(entry.input_tokens || 0);
+    const completionTokens = Number(entry.output_tokens || 0);
+    if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) continue;
+    const model = String(entry.model_id || 'default');
+    const rates = resolveCostRates(model);
+    const cost = promptTokens * rates.prompt + completionTokens * rates.completion;
+    const modelStats = tokenUsage.by_model[model] || {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+    };
+    modelStats.prompt_tokens += promptTokens;
+    modelStats.completion_tokens += completionTokens;
+    modelStats.total_tokens += promptTokens + completionTokens;
+    modelStats.cost_usd += cost;
+    tokenUsage.by_model[model] = modelStats;
+    tokenUsage.prompt_tokens += promptTokens;
+    tokenUsage.completion_tokens += completionTokens;
+    tokenUsage.total_tokens += promptTokens + completionTokens;
+    tokenUsage.cost_usd += cost;
+    tokenUsage.entries += 1;
+  }
+
+  for (const entry of metricsCollector.loadResourceUsageHistory()) {
+    if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
+    resourceUsage.entries += 1;
+    resourceUsage.cost_usd += Number(entry.cost_usd) || 0;
+  }
+
+  tokenUsage.cost_usd = Math.round(tokenUsage.cost_usd * 100000) / 100000;
+  for (const modelStats of Object.values(tokenUsage.by_model)) {
+    modelStats.cost_usd = Math.round(modelStats.cost_usd * 100000) / 100000;
+  }
+  resourceUsage.cost_usd = Math.round(resourceUsage.cost_usd * 100000) / 100000;
+  return { token_usage: tokenUsage, resource_usage: resourceUsage };
 }
 
 export interface ProcessImprovementProposal {
@@ -132,8 +243,19 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     finish_gate_failures: [],
     unstaffed_role_fallbacks: [],
     clarifications: 0,
+    token_usage: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+      estimated_entries: 0,
+      entries: 0,
+      by_model: {},
+    },
+    resource_usage: { entries: 0, cost_usd: 0 },
     item_outcomes: [],
   };
+  Object.assign(stats, collectMissionUsageStats(missionId));
   if (!missionPath) return stats;
 
   const nextTasks =

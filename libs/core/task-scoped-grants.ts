@@ -59,6 +59,7 @@ import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
 import { AGENT_IDENTITY_WRITE_ROLES, NHI_ID_PATTERN } from './agent-identity.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 // ---------------------------------------------------------------------------
 // Record shape
@@ -69,6 +70,7 @@ export type TaskGrantTierAccess = (typeof TASK_GRANT_TIER_ACCESS)[number];
 
 export const taskGrantScopeSchema = z
   .object({
+    tenant_slug: z.string().refine(isValidTenantSlug, 'invalid tenant slug').optional(),
     /**
      * Capability names. Entries that name an `Authority` value (GIT_WRITE,
      * SECRET_READ, NETWORK_FETCH, SYSTEM_EXEC, KNOWLEDGE_WRITE — never SUDO)
@@ -342,6 +344,12 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
   if (!missionId) {
     throw new TaskGrantValidationError('audience.mission_id is required');
   }
+  const tenantSlug = params.scope?.tenant_slug?.trim() || process.env.KYBERION_TENANT?.trim();
+  if (!tenantSlug || !isValidTenantSlug(tenantSlug)) {
+    throw new TaskGrantValidationError(
+      'tenant-scoped task grant requires a valid tenant_slug (or server-resolved KYBERION_TENANT)'
+    );
+  }
 
   const now = Date.now();
   const requested = parseIsoMs('expiresAt', params.expiresAt) ?? now + TASK_GRANT_DEFAULT_TTL_MS;
@@ -361,7 +369,7 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
   const grant: TaskScopedGrant = {
     grant_id: `tg-${now.toString(36)}-${randomUUID().slice(0, 8)}`,
     grantee_nhi_id: granteeNhiId,
-    scope: params.scope ?? {},
+    scope: { ...(params.scope ?? {}), tenant_slug: tenantSlug },
     audience: { mission_id: missionId, ...(taskId ? { task_id: taskId } : {}) },
     expires_at: new Date(effective).toISOString(),
     issued_by: params.issuedBy?.trim() || resolveRole() || 'unknown',
@@ -455,6 +463,7 @@ export interface ListActiveGrantsFilter {
   granteeNhiId?: string;
   missionId?: string;
   taskId?: string;
+  tenantSlug?: string;
   /** Clock override for deterministic expiry tests. */
   now?: number;
 }
@@ -469,6 +478,7 @@ export function listActiveGrants(filter?: ListActiveGrantsFilter): TaskScopedGra
     if (filter?.granteeNhiId && grant.grantee_nhi_id !== filter.granteeNhiId) continue;
     if (filter?.missionId && grant.audience.mission_id !== filter.missionId) continue;
     if (filter?.taskId && grant.audience.task_id !== filter.taskId) continue;
+    if (filter?.tenantSlug && grant.scope.tenant_slug !== filter.tenantSlug) continue;
     results.push(grant);
   }
   return results.sort((a, b) => a.issued_at.localeCompare(b.issued_at));
@@ -498,15 +508,17 @@ export interface ResolveGrantsForActorOptions {
  */
 export function resolveGrantsForActor(
   nhiId: string,
-  audience: { missionId: string; taskId?: string },
+  audience: { missionId: string; taskId?: string; tenantSlug?: string },
   options?: ResolveGrantsForActorOptions
 ): TaskScopedGrant[] {
   const now = options?.now ?? Date.now();
+  const tenantSlug = audience.tenantSlug?.trim() || process.env.KYBERION_TENANT?.trim();
   const served: TaskScopedGrant[] = [];
   for (const grant of readGrantRecords().values()) {
     if (grant.grantee_nhi_id !== nhiId) continue;
     if (grant.revoked_at) continue;
     if (Date.parse(grant.expires_at) <= now) continue;
+    if (!tenantSlug || grant.scope.tenant_slug !== tenantSlug) continue;
     const missionMatch = grant.audience.mission_id === audience.missionId;
     const taskMatch =
       grant.audience.task_id === undefined || grant.audience.task_id === audience.taskId;
@@ -558,6 +570,29 @@ export function revokeGrantsForTaskBestEffort(
   } catch (error) {
     logger.warn(
       `[task-scoped-grants] best-effort revoke for mission ${missionId} task ${taskId} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return 0;
+  }
+}
+
+/** Best-effort tenant offboarding hook: revoke every live grant in one tenant. */
+export function revokeGrantsForTenantBestEffort(tenantSlug: string, reason: string): number {
+  try {
+    const normalized = tenantSlug?.trim() || '';
+    if (!isValidTenantSlug(normalized)) return 0;
+    return withExecutionContext('mission_controller', () => {
+      const grants = listActiveGrants({ tenantSlug: normalized });
+      let revoked = 0;
+      for (const grant of grants) {
+        if (revokeTaskGrant(grant.grant_id, reason)) revoked += 1;
+      }
+      return revoked;
+    });
+  } catch (error) {
+    logger.warn(
+      `[task-scoped-grants] best-effort tenant revoke failed for '${tenantSlug}': ${
         error instanceof Error ? error.message : String(error)
       }`
     );

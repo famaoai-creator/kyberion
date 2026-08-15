@@ -158,6 +158,7 @@ function hasAuthorityAccess(
 function tenantScopeConfig(policy: any): {
   protectedPrefixes: string[];
   sharedPrefixes: string[];
+  requireTenantBinding: boolean;
   slugPattern: RegExp;
   brokerRequirements: {
     requireApprovedBy: boolean;
@@ -181,6 +182,11 @@ function tenantScopeConfig(policy: any): {
     sharedPrefixes: Array.isArray(cfg.shared_prefixes)
       ? cfg.shared_prefixes
       : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
+    // Tenant-qualified protected paths and shared groups require a
+    // server-resolved binding. Unpartitioned legacy roots remain governed by
+    // the existing tier/persona checks until their storage migration lands.
+    requireTenantBinding:
+      cfg.require_tenant_binding === true || process.env.KYBERION_TENANT_SCOPE_REQUIRED === 'true',
     slugPattern,
     brokerRequirements: {
       requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
@@ -201,6 +207,20 @@ function extractTenantFromProtectedPrefix(
     return { tenant, prefix };
   }
   return null;
+}
+
+function isRegisteredActiveTenant(tenantSlug: string): boolean {
+  const profilePath = pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`);
+  if (!rawExistsSync(profilePath)) return false;
+  try {
+    const profile = JSON.parse(rawReadTextFile(profilePath)) as {
+      tenant_slug?: string;
+      status?: string;
+    };
+    return profile.tenant_slug === tenantSlug && profile.status === 'active';
+  } catch {
+    return false;
+  }
 }
 
 interface TenantGroupProfile {
@@ -326,11 +346,36 @@ function checkTenantScope(
   const cfg = tenantScopeConfig(policy);
   const groupDenial = checkTenantGroupScope(relativePath, tenantSlug, brokeredTenants);
   if (groupDenial) return groupDenial;
-  if (cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))) return null;
-
+  const isSharedPath = cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix));
   const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
+  const hasValidTenantSegment = Boolean(
+    scoped && cfg.slugPattern.test(scoped.tenant) && isValidTenantSlug(scoped.tenant)
+  );
+  if (
+    cfg.requireTenantBinding &&
+    !tenantSlug &&
+    !brokeredTenants?.length &&
+    (isSharedPath || hasValidTenantSegment)
+  ) {
+    const targetTenant =
+      scoped?.tenant || extractTenantGroupFromSharedPath(relativePath) || '(shared)';
+    const reason =
+      `[POLICY_VIOLATION] tenant.scope_missing — access to protected tenant path '${relativePath}' ` +
+      'requires a server-resolved tenant binding or an approved broker scope.';
+    void recordTenantScopeViolation({ relativePath, targetTenant, reason });
+    return { allowed: false, reason };
+  }
+  if (cfg.requireTenantBinding && tenantSlug && !isRegisteredActiveTenant(tenantSlug)) {
+    const reason =
+      `[POLICY_VIOLATION] tenant.inactive — tenant '${tenantSlug}' is not registered as active; ` +
+      'protected tenant access is denied until activation is reconciled.';
+    void recordTenantScopeViolation({ relativePath, tenantSlug, targetTenant: tenantSlug, reason });
+    return { allowed: false, reason };
+  }
+  if (isSharedPath) return null;
+
   if (!scoped) return null;
-  if (!tenantSlug && !brokeredTenants) return null;
+  if (!tenantSlug && !brokeredTenants?.length) return null;
   if (brokeredTenants?.some((tenant) => !isValidTenantSlug(tenant))) {
     return {
       allowed: false,
@@ -340,6 +385,15 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
+    // Pre-tenant migrations stored a mission directly under
+    // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
+    // only for an unmistakable legacy mission directory. A non-slug mission
+    // segment cannot name another tenant, while arbitrary malformed segments
+    // must still fail closed rather than becoming an implicit escape hatch.
+    const legacyMissionSegment = /^MSN-[A-Z0-9][A-Z0-9._-]{1,127}$/i.test(targetTenant);
+    if (scoped.prefix === 'active/missions/confidential/' && legacyMissionSegment) {
+      return null;
+    }
     return {
       allowed: false,
       reason: `[POLICY_VIOLATION] tenant.scope_invalid_prefix — '${relativePath}' is under protected prefix '${scoped.prefix}' but tenant segment '${targetTenant || '(missing)'}' is invalid.`,

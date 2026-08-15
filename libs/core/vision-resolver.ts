@@ -71,7 +71,7 @@ function buildCandidatePaths(
       kind: 'customer',
     });
     candidates.push({
-      path: path.join(baseDir, 'knowledge', 'tenants', tenantSlug, 'vision.md'),
+      path: path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'vision.md'),
       kind: 'tenant',
     });
   }

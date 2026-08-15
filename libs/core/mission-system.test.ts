@@ -9,6 +9,7 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
 }));
 
 import { buildMissionSystem } from './mission-system.js';
+import * as pathResolver from './path-resolver.js';
 import {
   claimWorkItem,
   clearWorkCoordinationNamespace,
@@ -19,6 +20,7 @@ import {
   listWorkItems,
   setWorkCoordinationNamespace,
 } from './work-coordination.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('mission system work-item handoff', () => {
   beforeEach(() => {
@@ -173,5 +175,78 @@ describe('mission system work-item handoff', () => {
       claimed_by_peer_id: 'peer-new',
     });
     expect(listCoordinationEvents({ event_type: 'handoff_consumed' })).toHaveLength(1);
+  });
+
+  it('filters mission handoff candidates by the mission tenant', async () => {
+    const missionId = 'MSN-HANDOFF-TENANT-TEST';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'sovereign';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      safeWriteFile(
+        `${missionPath}/mission-state.json`,
+        JSON.stringify({
+          mission_id: missionId,
+          tier: 'confidential',
+          tenant_slug: 'tenant-a',
+        })
+      );
+      const tenantItem = createWorkItem({
+        itemId: 'handoff-tenant-a',
+        title: 'Tenant A item',
+        description: 'Only the mission tenant item may be handed off.',
+        projectId: missionId,
+        status: 'ready',
+        context: {
+          tenant_slug: 'tenant-a',
+          mission_id: missionId,
+          project_id: missionId,
+          work_shape: 'improvement_experiment',
+        },
+      });
+      createWorkItem({
+        itemId: 'handoff-tenant-b',
+        title: 'Tenant B item',
+        description: 'A different tenant must remain outside the handoff.',
+        projectId: missionId,
+        status: 'ready',
+        context: {
+          tenant_slug: 'tenant-b',
+          mission_id: missionId,
+          project_id: missionId,
+          work_shape: 'improvement_experiment',
+        },
+      });
+      claimWorkItem({
+        itemId: tenantItem.item_id,
+        actorPeerId: 'peer-old',
+        purpose: 'tenant-scoped handoff',
+        expectedVersion: tenantItem.version,
+        idempotencyKey: 'claim-tenant-a',
+      });
+
+      const result = await buildMissionSystem().handoffMissionWorkItems({
+        missionId,
+        fromPeerId: 'peer-old',
+        toPeerId: 'peer-new',
+        purpose: 'tenant-scoped handoff',
+        ensureRuntime: false,
+      });
+
+      expect(result.handed_off.map((entry) => entry.item.item_id)).toEqual(['handoff-tenant-a']);
+      expect(listWorkItems().find((item) => item.item_id === 'handoff-tenant-b')).toMatchObject({
+        status: 'ready',
+        context: { tenant_slug: 'tenant-b' },
+      });
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
   });
 });

@@ -108,7 +108,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
-import { emitMissionTaskEvent } from './mission-task-events.js';
+import { emitMissionTaskEvent, missionTaskEventsPath } from './mission-task-events.js';
 import {
   enqueueMissionOrchestrationEvent,
   emitMissionOrchestrationObservation,
@@ -4667,7 +4667,7 @@ function restoreMissionGraphRunTaskSnapshots(
 }
 
 function readExistingTaskEventKeys(missionId: string): Set<string> {
-  const taskEventsPath = `${missionDir(missionId, 'public')}/coordination/events/task-events.jsonl`;
+  const taskEventsPath = missionTaskEventsPath(missionId);
   if (!safeExistsSync(taskEventsPath)) return new Set();
   const raw = safeReadFile(taskEventsPath, { encoding: 'utf8' }) as string;
   return new Set(
@@ -6129,6 +6129,7 @@ async function handleMissionIssueRequested(event: MissionOrchestrationEvent<Slac
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload: {
       ...payload,
       teamRoles: payload.teamRoles?.length ? payload.teamRoles : ['planner'],
@@ -6192,6 +6193,7 @@ async function handleMissionTeamPrewarmRequested(event: MissionOrchestrationEven
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload,
   });
   startMissionOrchestrationWorker(nextEvent);
@@ -6253,6 +6255,7 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload,
   });
   startMissionOrchestrationWorker(nextEvent);
@@ -6285,6 +6288,7 @@ async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<S
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload,
   });
   startMissionOrchestrationWorker(nextEvent);
@@ -6350,6 +6354,7 @@ async function handleMissionReconciliationRequested(
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload,
   });
   startMissionOrchestrationWorker(nextEvent);
@@ -6435,6 +6440,7 @@ async function handleMissionDistillationRequested(event: MissionOrchestrationEve
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
     causationId: event.event_id,
+    scope: event.scope,
     payload,
   });
   startMissionOrchestrationWorker(nextEvent2);
@@ -6532,7 +6538,7 @@ async function handleMissionControlRequested(
   switch (operation) {
     case 'resume':
       {
-        const replayPlan = loadMissionOrchestrationReplayPlan(missionId);
+        const replayPlan = loadMissionOrchestrationReplayPlan(missionId, event.scope);
         const recovery = recoverMissionRequestedTasks(missionId);
         if (replayPlan.next_event) {
           startMissionOrchestrationWorker(replayPlan.next_event);
@@ -6670,12 +6676,17 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       requestedBy: event.requested_by,
       causationId: event.causation_id,
       correlationId: event.correlation_id,
+      scope: event.scope,
+      missionPathHint: event.scope?.tenant_slug
+        ? pathResolver.tenantMissionDir(event.mission_id, event.scope.tenant_slug, event.scope.tier)
+        : undefined,
     });
     emitMissionOrchestrationObservation({
       decision: 'mission_orchestration_event_completed',
       event_id: event.event_id,
       event_type: event.event_type,
       mission_id: event.mission_id,
+      scope: event.scope,
     });
   } catch (error) {
     appendMissionOrchestrationJournalStatus({
@@ -6687,12 +6698,17 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       requestedBy: event.requested_by,
       causationId: event.causation_id,
       correlationId: event.correlation_id,
+      scope: event.scope,
+      missionPathHint: event.scope?.tenant_slug
+        ? pathResolver.tenantMissionDir(event.mission_id, event.scope.tenant_slug, event.scope.tier)
+        : undefined,
     });
     emitMissionOrchestrationObservation({
       decision: 'mission_orchestration_event_failed',
       event_id: event.event_id,
       event_type: event.event_type,
       mission_id: event.mission_id,
+      scope: event.scope,
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;

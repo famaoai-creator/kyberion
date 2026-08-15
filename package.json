@@ -80,6 +80,7 @@
     "sync:team-roles": "node --import ./scripts/ts-loader.mjs scripts/sync_team_roles.ts",
     "org": "node --import ./scripts/ts-loader.mjs scripts/org.ts",
     "tenant": "node --import ./scripts/ts-loader.mjs scripts/tenant.ts",
+    "tenant:activation": "node --import ./scripts/ts-loader.mjs scripts/tenant_activation.ts",
     "organization": "node --import ./scripts/ts-loader.mjs scripts/organization_operating_model.ts",
     "knowledge:rank": "node dist/scripts/context_ranker.js",
     "knowledge:sync": "node dist/scripts/run_pipeline.js --input pipelines/knowledge-sync.json",

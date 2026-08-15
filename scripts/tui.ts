@@ -11,7 +11,21 @@ import { fileURLToPath } from 'node:url';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runTui } from '@presence/terminal-hud';
 
+// Keep the interactive entrypoint in this process so stdin/stdout retain the
+// terminal's raw-mode capability. The old run_with_env wrapper used a
+// synchronous captured child process, which is correct for snapshots but not
+// for an Ink application.
+process.env.KYBERION_PERSONA = 'sovereign';
+const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
+
 export async function main(): Promise<void> {
+  const devMode = process.argv.includes('--dev');
+  if (devMode) {
+    process.argv = process.argv.filter((arg) => arg !== '--dev');
+    await import(SOURCE_ENTRY);
+    return;
+  }
+
   const argv = await createStandardYargs()
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })

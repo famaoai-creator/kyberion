@@ -69,6 +69,9 @@ import { issueTaskGrantBestEffort, revokeGrantsForTaskBestEffort } from './task-
 import { buildWorkingPrinciplesLines } from './working-principles.js';
 import type { MissionState } from './mission-types.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { checkProviderEgress } from './provider-egress-gate.js';
+import { evaluateEgressPolicy } from './egress-policy.js';
+import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 import {
   countWords as countWordsFromDispatchIO,
   readJsonFile as readJsonFileFromDispatchIO,
@@ -86,6 +89,42 @@ import {
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
 export type MissionWorkItemDispatchFinalStatus = 'review' | 'done' | 'blocked';
+
+/**
+ * Confidential missions default to external_egress=deny. A model-backed
+ * WorkItem may opt into one provider only when both provider-tier policy and
+ * tenant-specific domain policy approve it; all other providers remain denied.
+ */
+function resolveRuntimeSecurityScope(
+  scope: ContextSecurityScope,
+  provider?: string
+): ContextSecurityScope {
+  if (!provider || scope.external_egress !== 'deny') return scope;
+  const dataTier = scope.write_tier;
+  const providerDecision = checkProviderEgress({ provider, dataTier });
+  if (!providerDecision.allowed) return scope;
+  const endpointBackend =
+    provider === 'claude'
+      ? 'claude-cli'
+      : provider === 'agy'
+        ? 'agy-cli'
+        : provider === 'grok'
+          ? 'grok-cli'
+          : provider;
+  const endpointDecision = evaluateEgressPolicy(reasoningBackendEndpoint(endpointBackend), {
+    tier: dataTier,
+    tenant_slug: scope.tenant_slug || scope.tenant_id,
+    purpose: scope.purpose,
+  });
+  if (endpointDecision.verdict !== 'allow') return scope;
+  return {
+    ...scope,
+    external_egress: 'allow',
+    allowed_reasoning_backends: Array.from(
+      new Set([...(scope.allowed_reasoning_backends || []), provider])
+    ),
+  };
+}
 
 interface WorkItemExecutionOutcome {
   responseText: string;
@@ -137,6 +176,8 @@ export interface MissionWorkItemDispatchRecord {
   task_model_hint?: TaskModelHint;
   task_result?: TaskResultBlock;
   task_result_errors?: string[];
+  task_result_repairs?: string[];
+  task_result_repair_requires_review?: boolean;
   clarification_packet?: OperatorInteractionPacket;
   clarification_packet_path?: string;
   reflection_status?: 'done' | 'review' | 'blocked';
@@ -847,6 +888,8 @@ async function runIndependentReviewerReview(input: {
       item: input.item,
       teamRole: 'reviewer',
       assigneePeerId: reviewerAgentId,
+      provider: reviewerAssignment?.provider || undefined,
+      providerModelId: reviewerAssignment?.modelId || undefined,
       prompt: reviewerPrompt,
       taskModelHint: reviewerTaskModelHint,
       mode: hasReviewSurfaceConfiguration ? 'auto' : 'subagent',
@@ -1681,8 +1724,66 @@ function validateWorkItemGranularity(
   return { ok: notes.length === 0, notes };
 }
 
-function resolveWorkItemProjectId(state: MissionState): string {
-  return String(state.relationships?.project?.project_id || state.mission_id || '').trim();
+function resolveWorkItemProjectIds(state: MissionState): string[] {
+  const missionId = state.mission_id.toUpperCase();
+  const linkedProjectId = String(state.relationships?.project?.project_id || '').trim();
+  if (linkedProjectId) {
+    if (state.tier === 'confidential' && !state.tenant_slug?.trim()) {
+      throw new Error(
+        `[MISSION_WORKITEM_SCOPE_REQUIRED] Confidential mission ${missionId} needs tenant_slug before dispatch.`
+      );
+    }
+    return [linkedProjectId];
+  }
+
+  const tenantSlug = state.tenant_slug?.trim();
+  if (!tenantSlug) {
+    throw new Error(
+      `[MISSION_WORKITEM_SCOPE_REQUIRED] Mission ${missionId} needs tenant_slug before recovering a project from WorkItems.`
+    );
+  }
+
+  // Legacy/onboarding missions may predate the explicit mission→project
+  // relationship. Recover the project from the scoped canonical WorkItems so
+  // typed context remains the source of truth without broadening tenant scope.
+  const scopedItems = listWorkItems({
+    labels: [`mission:${missionId}`],
+    tenantSlugs: [tenantSlug],
+  });
+  const recoveredProjectIds = scopedItems
+    .filter(
+      (item) => getMissionLabel(item) === missionId && item.context?.tenant_slug === tenantSlug
+    )
+    .map((item) => String(item.context?.project_id || item.project_id || '').trim())
+    .filter(Boolean);
+  const uniqueProjectIds = [...new Set(recoveredProjectIds)];
+  if (uniqueProjectIds.length === 0) {
+    throw new Error(
+      `[MISSION_PROJECT_CONTEXT_MISSING] Mission ${missionId} has no tenant-scoped WorkItem project context.`
+    );
+  }
+  if (uniqueProjectIds.length > 1) {
+    throw new Error(
+      `[MISSION_PROJECT_CONTEXT_AMBIGUOUS] Mission ${missionId} resolved multiple project IDs: ${uniqueProjectIds.join(', ')}`
+    );
+  }
+  return uniqueProjectIds;
+}
+
+function readMissionWorkGraph(state: MissionState): {
+  items: WorkItem[];
+  readyItemIds: Set<string>;
+} {
+  const itemsById = new Map<string, WorkItem>();
+  const readyItemIds = new Set<string>();
+  for (const projectId of resolveWorkItemProjectIds(state)) {
+    const canonical = readCanonicalWorkGraph(projectId, {
+      ...(state.tenant_slug?.trim() ? { tenantSlug: state.tenant_slug.trim() } : {}),
+    });
+    for (const item of canonical.items) itemsById.set(item.item_id, item);
+    for (const itemId of canonical.graph.ready_item_ids) readyItemIds.add(itemId);
+  }
+  return { items: [...itemsById.values()], readyItemIds };
 }
 
 function areMissionTaskDependenciesSatisfied(state: MissionState, item: WorkItem): boolean {
@@ -1697,10 +1798,9 @@ function areMissionTaskDependenciesSatisfied(state: MissionState, item: WorkItem
         ? metadata.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
         : [];
   if (dependencies.length === 0) return true;
-  const projectId = resolveWorkItemProjectId(state);
   const missionId = state.mission_id.toUpperCase();
   const canonicalStatusById = new Map<string, WorkItemStatus>();
-  for (const candidate of readCanonicalWorkGraph(projectId).items) {
+  for (const candidate of readMissionWorkGraph(state).items) {
     if (getMissionLabel(candidate) !== missionId) continue;
     canonicalStatusById.set(candidate.item_id, candidate.status);
     const candidateTaskId = getWorkItemTaskId(candidate);
@@ -1714,7 +1814,6 @@ function areMissionTaskDependenciesSatisfied(state: MissionState, item: WorkItem
 
 function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOptions): WorkItem[] {
   const missionId = state.mission_id.toUpperCase();
-  const projectId = resolveWorkItemProjectId(state);
   const labels = [`mission:${missionId}`];
   const statuses =
     options.statuses && options.statuses.length > 0
@@ -1724,17 +1823,18 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     options.sources && options.sources.length > 0
       ? options.sources
       : (['local'] as WorkItemSource[]);
-  const canonical = readCanonicalWorkGraph(projectId);
+  const canonical = readMissionWorkGraph(state);
   const allMissionItems = canonical.items
     .filter((item) => sources.includes(item.source))
     .filter((item) => labels.every((label) => item.labels.includes(label)))
     .filter((item) => getMissionLabel(item) === missionId);
-  const readyIds = new Set(canonical.graph.ready_item_ids);
   return allMissionItems
     .filter((item) => statuses.includes(item.status))
     .filter((item) => {
       if (item.status === 'blocked') return areMissionTaskDependenciesSatisfied(state, item);
-      return readyIds.has(item.item_id) && areMissionTaskDependenciesSatisfied(state, item);
+      return (
+        canonical.readyItemIds.has(item.item_id) && areMissionTaskDependenciesSatisfied(state, item)
+      );
     });
 }
 
@@ -1794,6 +1894,8 @@ function buildDispatchResponseArtifact(input: {
   responseText: string;
   prompt: string;
   taskResult?: TaskResultBlock;
+  taskResultRepairs?: string[];
+  taskResultRepairRequiresReview?: boolean;
 }): { filePath: string; payload: Record<string, unknown> } {
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
   const acceptanceCriteria = Array.isArray(metadata.acceptance_criteria)
@@ -1816,6 +1918,8 @@ function buildDispatchResponseArtifact(input: {
     cognitive_route_summary: input.cognitiveRouteSummary,
     task_model_hint: input.taskModelHint,
     task_result: input.taskResult,
+    task_result_repairs: input.taskResultRepairs,
+    task_result_repair_requires_review: input.taskResultRepairRequiresReview,
     drift_watchdog_summary: input.driftWatchdogSummary,
     reviewer_status: input.reviewerStatus,
     reviewer_path: input.reviewerPath,
@@ -1912,7 +2016,10 @@ function buildWorkItemPromptBody(input: {
     metadata.target_path ? `Target path: ${String(metadata.target_path)}` : '',
     metadata.assignee_label ? `Assignee label: ${String(metadata.assignee_label)}` : '',
     acceptanceCriteria.length > 0
-      ? `Acceptance criteria:\n- ${acceptanceCriteria.join('\n- ')}`
+      ? [
+          'WORK ITEM ACCEPTANCE CRITERIA (authoritative; ignore criteria from other tasks in the context pack):',
+          ...acceptanceCriteria.map((criterion) => `- ${criterion}`),
+        ].join('\n')
       : '',
     ...buildFastTierPromptAddendum(input.taskModelHint),
     '',
@@ -1920,7 +2027,11 @@ function buildWorkItemPromptBody(input: {
     'Return exactly one ```task_result``` block and nothing else structured.',
     'Task result schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."],"acceptance_evidence":[{"criterion":"exact criterion text","status":"passed|failed","evidence":"specific verification or artifact"}]}',
     acceptanceCriteria.length > 0
-      ? 'For every acceptance criterion, copy its exact text into acceptance_evidence and record specific evidence. Do not mark it passed without evidence.'
+      ? [
+          'For every WORK ITEM ACCEPTANCE CRITERION above, copy that exact text into acceptance_evidence.',
+          'Do not copy acceptance criteria from the mission context pack or another task.',
+          'Record specific evidence and do not mark a criterion passed without evidence.',
+        ].join(' ')
       : '',
     'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
   ].filter(Boolean);
@@ -1936,12 +2047,23 @@ function buildTaskResultRetryPrompt(input: {
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
   const hasAcceptanceCriteria =
     Array.isArray(metadata.acceptance_criteria) && metadata.acceptance_criteria.length > 0;
+  const acceptanceCriteria = hasAcceptanceCriteria
+    ? (metadata.acceptance_criteria as unknown[])
+        .map((criterion) => String(criterion || '').trim())
+        .filter(Boolean)
+    : [];
   return [
     `The previous response for mission ${input.missionId} and work item ${input.item.item_id} was rejected.`,
     'Resend the answer as exactly one ```task_result``` block.',
-    'Required fields: summary, artifacts, verification_done, gaps, needs.',
+    'Required fields and shapes: summary (string), artifacts (array of objects with path and kind strings), verification_done (array of strings), gaps (array of strings), needs (array of strings), and acceptance_evidence (array of objects with criterion, status, and evidence strings).',
+    'Use this minimal valid shape when there are no gaps or needs: {"summary":"...","artifacts":[{"path":"evidence/example.json","kind":"json"}],"verification_done":["..."],"gaps":[],"needs":[],"acceptance_evidence":[{"criterion":"<exact WorkItem criterion>","status":"passed","evidence":"<specific evidence>"}]}',
+    'Every acceptance_evidence entry must include status exactly "passed" or "failed"; never omit it. Every artifacts entry must be an object, never a bare path string.',
     hasAcceptanceCriteria
-      ? 'Also include acceptance_evidence for every acceptance criterion, using the exact criterion text and specific evidence.'
+      ? [
+          'The only acceptance criteria for this retry are the following WorkItem criteria; ignore all criteria from the context pack or other tasks:',
+          ...acceptanceCriteria.map((criterion) => `- ${criterion}`),
+          'Include acceptance_evidence for every one using the exact text and specific evidence.',
+        ].join('\n')
       : '',
     'Do not include other structured blocks.',
     'Errors:',
@@ -2074,6 +2196,8 @@ function summarizeDispatchObservability(input: {
 function parseTaskResultResponse(responseText: string): {
   taskResult?: NonNullable<ReturnType<typeof extractSurfaceBlocks>['taskResults']>[number];
   parseErrors: string[];
+  repairs: string[];
+  repairRequiresReview: boolean;
   surfaceParseErrors: string[];
   plainText: string;
 } {
@@ -2081,6 +2205,8 @@ function parseTaskResultResponse(responseText: string): {
   return {
     taskResult: structured.taskResults?.[0],
     parseErrors: structured.taskResultErrors || [],
+    repairs: structured.taskResultRepairs || [],
+    repairRequiresReview: Boolean(structured.taskResultRepairRequiresReview),
     surfaceParseErrors: structured.surfaceParseErrors || [],
     plainText: structured.text,
   };
@@ -2128,6 +2254,8 @@ async function routeToAgentOrSubagent(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  provider?: string;
+  providerModelId?: string;
   prompt: string;
   taskModelHint: TaskModelHint;
   mode: MissionWorkItemDispatchMode;
@@ -2166,6 +2294,7 @@ async function routeToAgentOrSubagent(input: {
 
   const notes: string[] = [];
   const surfacePurpose = input.surfacePurpose || 'implementation';
+  const runtimeSecurityScope = resolveRuntimeSecurityScope(input.securityScope, input.provider);
   const surfaceDecision = resolveWorkItemExecutionSurface(
     input.item,
     surfacePurpose,
@@ -2253,7 +2382,11 @@ async function routeToAgentOrSubagent(input: {
   // keeps its compatibility fallback below; it must not claim an item before
   // deciding whether a failed runtime call may fall back to CLI.
   if (surfaceDecision.active_surface === 'agent_runtime') {
-    const routeA2A = input.adapters.routeA2A || a2aBridge.route;
+    // Keep the bridge receiver bound to its instance. Extracting
+    // `a2aBridge.route` directly loses `this` and only fails on the real
+    // agent-runtime path; mocked route adapters do not expose that defect.
+    const routeA2A =
+      input.adapters.routeA2A || ((envelope: A2AMessage) => a2aBridge.route(envelope));
     const runtimePort: AgentExecutionPort = {
       delegate: async (request) => {
         const startedAt = new Date().toISOString();
@@ -2287,9 +2420,12 @@ async function routeToAgentOrSubagent(input: {
                 mission_id: input.missionId,
                 work_item_id: input.item.item_id,
                 team_role: input.teamRole,
+                ...(input.provider ? { provider: input.provider } : {}),
+                ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
                 execution_mode: 'workitem',
+                dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
                 task_model_hint: input.taskModelHint,
-                security_scope: input.securityScope,
+                security_scope: runtimeSecurityScope,
                 context_mode: input.contextMode,
               },
             },
@@ -2328,7 +2464,7 @@ async function routeToAgentOrSubagent(input: {
         task_id: getWorkItemTaskId(input.item) || input.item.item_id,
         mission_id: input.missionId,
         agent_id: input.assigneePeerId,
-        security_scope: input.securityScope,
+        security_scope: runtimeSecurityScope,
         context_mode: input.contextMode,
         success_status:
           surfacePurpose === 'review' || isIndependentReviewRequired(input.item)
@@ -2387,9 +2523,12 @@ async function routeToAgentOrSubagent(input: {
               mission_id: input.missionId,
               work_item_id: input.item.item_id,
               team_role: input.teamRole,
+              ...(input.provider ? { provider: input.provider } : {}),
+              ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
               execution_mode: 'workitem',
+              dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
               task_model_hint: input.taskModelHint,
-              security_scope: input.securityScope,
+              security_scope: runtimeSecurityScope,
               context_mode: input.contextMode,
             },
           },
@@ -2422,9 +2561,12 @@ async function routeToAgentOrSubagent(input: {
               mission_id: input.missionId,
               work_item_id: input.item.item_id,
               team_role: input.teamRole,
+              ...(input.provider ? { provider: input.provider } : {}),
+              ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
               execution_mode: 'workitem',
               task_model_hint: input.taskModelHint,
-              security_scope: input.securityScope,
+              dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
+              security_scope: runtimeSecurityScope,
               context_mode: input.contextMode,
             },
           },
@@ -2466,6 +2608,8 @@ async function obtainTaskResultResponse(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  provider?: string;
+  providerModelId?: string;
   prompt: string;
   taskModelHint: TaskModelHint;
   mode: MissionWorkItemDispatchMode;
@@ -2479,6 +2623,8 @@ async function obtainTaskResultResponse(input: {
   } & WorkItemExecutionOutcome & {
       taskResult?: TaskResultBlock;
       parseErrors: string[];
+      repairs: string[];
+      repairRequiresReview: boolean;
       surfaceParseErrors: string[];
       notes: string[];
       retried: boolean;
@@ -2494,6 +2640,8 @@ async function obtainTaskResultResponse(input: {
         item: input.item,
         teamRole: input.teamRole,
         assigneePeerId: input.assigneePeerId,
+        provider: input.provider,
+        providerModelId: input.providerModelId,
         prompt,
         taskModelHint: input.taskModelHint,
         mode: input.mode,
@@ -2508,8 +2656,14 @@ async function obtainTaskResultResponse(input: {
   let parsed = parseTaskResultResponse(response.responseText);
   let taskResult = parsed.taskResult;
   let parseErrors = parsed.parseErrors;
+  let repairs = parsed.repairs;
+  let repairRequiresReview = parsed.repairRequiresReview;
   let surfaceParseErrors = parsed.surfaceParseErrors;
-  const needsRetry = !taskResult || parseErrors.length > 0 || (taskResult.needs || []).length > 0;
+  const needsRetry =
+    !taskResult ||
+    parseErrors.length > 0 ||
+    repairRequiresReview ||
+    (taskResult.needs || []).length > 0;
 
   if (needsRetry) {
     retried = true;
@@ -2518,6 +2672,9 @@ async function obtainTaskResultResponse(input: {
     }
     if (parseErrors.length > 0) {
       notes.push(`task_result parse errors: ${parseErrors.join('; ')}`);
+    }
+    if (repairRequiresReview) {
+      notes.push('task_result semantic repair requires a contract-correct retry');
     }
     if (surfaceParseErrors.length > 0) {
       notes.push(`surface parse errors: ${surfaceParseErrors.join('; ')}`);
@@ -2531,10 +2688,16 @@ async function obtainTaskResultResponse(input: {
         ...parseErrors,
       ],
     });
-    response = await route(attemptPrompt, 'continue');
+    // Contract repair retries should not inherit a model's prior structured
+    // output as conversational authority. The retry prompt carries the
+    // bounded evidence and exact WorkItem criteria explicitly; a fresh turn
+    // prevents unrelated criteria from the context pack from winning again.
+    response = await route(attemptPrompt, 'fresh');
     parsed = parseTaskResultResponse(response.responseText);
     taskResult = parsed.taskResult;
     parseErrors = parsed.parseErrors;
+    repairs = parsed.repairs;
+    repairRequiresReview = parsed.repairRequiresReview;
     surfaceParseErrors = parsed.surfaceParseErrors;
     if (!taskResult) {
       notes.push('task_result missing after retry');
@@ -2560,6 +2723,8 @@ async function obtainTaskResultResponse(input: {
     nativeSubagent: response.nativeSubagent,
     taskResult,
     parseErrors,
+    repairs,
+    repairRequiresReview,
     surfaceParseErrors,
     notes,
     retried,
@@ -2575,7 +2740,7 @@ export async function dispatchMissionWorkItems(
     1,
     Number(options.rounds ?? process.env.KYBERION_DISPATCH_MAX_ROUNDS ?? 1)
   );
-  let manifest = await dispatchMissionWorkItemsRound(state, options, adapters);
+  let manifest = await dispatchMissionWorkItemsRound(state, options, adapters, 1);
   let previousRemaining = Number.POSITIVE_INFINITY;
   for (let round = 2; round <= maxRounds; round += 1) {
     const retryStatuses: WorkItemStatus[] = Array.from(
@@ -2596,7 +2761,8 @@ export async function dispatchMissionWorkItems(
     manifest = await dispatchMissionWorkItemsRound(
       state,
       { ...options, statuses: retryStatuses },
-      adapters
+      adapters,
+      round
     );
   }
   return manifest;
@@ -2605,7 +2771,8 @@ export async function dispatchMissionWorkItems(
 async function dispatchMissionWorkItemsRound(
   state: MissionState,
   options: MissionWorkItemDispatchOptions = {},
-  adapters: WorkItemDispatchAdapters = {}
+  adapters: WorkItemDispatchAdapters = {},
+  round = 1
 ): Promise<MissionWorkItemDispatchManifest> {
   const missionId = state.mission_id.toUpperCase();
   const missionPath = findMissionPath(missionId) || pathResolver.missionDir(missionId, state.tier);
@@ -2620,6 +2787,22 @@ async function dispatchMissionWorkItemsRound(
   const mode = options.mode || 'auto';
   const limit =
     typeof options.limit === 'number' && options.limit > 0 ? options.limit : workItems.length;
+
+  // Keep the round boundary explicit in the mission event stream. The
+  // retrospective collector uses this event rather than inferring rounds
+  // from item outcomes, which would miss empty/deferred rounds and could
+  // double-count retries.
+  appendDispatchEvent(dispatchEventPath(missionPath), {
+    event: 'dispatch_started',
+    event_type: 'workitem_dispatch_started',
+    mission_id: missionId,
+    round,
+    mode,
+    execution_surface: options.executionSurface,
+    review_execution_surface: options.reviewExecutionSurface,
+    selected_count: Math.min(workItems.length, limit),
+    statuses: options.statuses || ['ready', 'backlog'],
+  });
 
   for (const item of workItems.slice(0, limit)) {
     const teamRole = getTeamRole(item);
@@ -2643,6 +2826,9 @@ async function dispatchMissionWorkItemsRound(
       ? artifactReviewContext.reviewerAgentId
       : resolveAssigneePeerId({ missionId, item, teamRole });
     const taskModelHint = getTaskModelHint(item);
+    const teamAssignment = teamRole
+      ? resolveMissionTeamReceiver({ missionId, teamRole })
+      : undefined;
     const validation = validateWorkItemGranularity(item, assigneePeerId);
     const record: MissionWorkItemDispatchRecord = {
       item_id: item.item_id,
@@ -2766,7 +2952,9 @@ async function dispatchMissionWorkItemsRound(
       const taskGrant = issueTaskGrantBestEffort({
         granteeNhiId,
         audience: { missionId, taskId: grantTaskId },
-        scope: {},
+        scope: {
+          ...(item.context?.tenant_slug ? { tenant_slug: item.context.tenant_slug } : {}),
+        },
         issuedBy: 'workitem-dispatch',
       });
       if (taskGrant) {
@@ -2781,6 +2969,8 @@ async function dispatchMissionWorkItemsRound(
         item,
         teamRole,
         assigneePeerId,
+        provider: teamAssignment?.provider || undefined,
+        providerModelId: teamAssignment?.modelId || undefined,
         prompt: dispatchPrompt,
         taskModelHint,
         mode,
@@ -2930,14 +3120,24 @@ async function dispatchMissionWorkItemsRound(
       ? 'blocked'
       : !response.taskResult || response.parseErrors.length > 0 || taskResultNeeds.length > 0
         ? 'blocked'
-        : artifactReviewReceipt && artifactReviewReceipt.receipt.verdict !== 'approved'
+        : response.repairRequiresReview
           ? 'review'
-          : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
+          : artifactReviewReceipt && artifactReviewReceipt.receipt.verdict !== 'approved'
             ? 'review'
-            : finalStatus;
+            : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
+              ? 'review'
+              : finalStatus;
     record.execution_mode = response.executionMode;
     record.execution_surface_used = response.executionSurfaceUsed;
     record.notes.push(...response.notes);
+    if (response.repairs.length > 0) {
+      record.task_result_repairs = response.repairs;
+      record.notes.push(`task_result repairs: ${response.repairs.join('; ')}`);
+    }
+    if (response.repairRequiresReview) {
+      record.task_result_repair_requires_review = true;
+      record.notes.push('task_result semantic repair remained after retry; review required');
+    }
     if (response.taskResult) {
       record.task_result = response.taskResult;
     }
@@ -3025,6 +3225,8 @@ async function dispatchMissionWorkItemsRound(
       reviewProvider: record.review_provider,
       responseText: response.responseText,
       prompt: dispatchPrompt,
+      taskResultRepairs: response.repairs,
+      taskResultRepairRequiresReview: response.repairRequiresReview,
     });
     writeDispatchArtifact(artifact.filePath, artifact.payload);
     record.response_path = artifact.filePath;
@@ -3233,6 +3435,20 @@ async function dispatchMissionWorkItemsRound(
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = dispatchEventPath(missionPath);
   writeJsonFileFromDispatchIO(manifestFilePath, manifest);
+
+  appendDispatchEvent(dispatchEventPath(missionPath), {
+    event: 'dispatch_completed',
+    event_type: 'workitem_dispatch_completed',
+    mission_id: missionId,
+    round,
+    mode,
+    selected_count: Math.min(workItems.length, limit),
+    processed_count: records.length,
+    status_counts: records.reduce<Record<string, number>>((counts, record) => {
+      counts[record.status] = (counts[record.status] || 0) + 1;
+      return counts;
+    }, {}),
+  });
 
   ledger.record('MISSION_WORKITEMS_DISPATCHED', {
     mission_id: missionId,

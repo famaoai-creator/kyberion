@@ -5,6 +5,7 @@ import { listDaemonHeartbeatStatuses } from '@agent/core';
 import { I18nContext, defaultLocale, makeI18n, toggleLocale } from './i18n.js';
 import { nextPanel, panelForDigit, type PanelId } from './keymap.js';
 import { TabBar } from './components/tab-bar.js';
+import { HudHeader } from './components/hud-header.js';
 import { StatusBar } from './components/status-bar.js';
 import { HelpOverlay } from './components/help-overlay.js';
 import { PanelBoundary } from './components/panel-boundary.js';
@@ -199,8 +200,13 @@ export function App({ initialPanel, initialLocale }: AppProps) {
   return (
     <I18nContext.Provider value={i18n}>
       <Box flexDirection="column">
+        <HudHeader
+          active={panel}
+          daemonsOnline={statusLine.data?.online}
+          daemonsTotal={statusLine.data?.total}
+        />
         <TabBar active={panel} />
-        <Box flexDirection="column" borderStyle="round" paddingX={1} minHeight={12}>
+        <Box flexDirection="column" borderStyle="round" paddingX={1} minHeight={8}>
           {showHelp ? (
             <HelpOverlay />
           ) : (
@@ -213,7 +219,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           <Box flexDirection="column" paddingX={1}>
             {recentConversation.map((line, idx) => (
               <Text
-                key={idx}
+                key={`${line.who}:${idx}`}
                 color={
                   line.who === 'you' ? theme.accent : line.who === 'sys' ? theme.dim : undefined
                 }

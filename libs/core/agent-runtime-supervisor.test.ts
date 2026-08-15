@@ -39,7 +39,9 @@ describe('agent-runtime-supervisor', () => {
       reason: 'unit test',
     });
 
-    const reloaded = loadMissionTeamPrewarmRequest(getAgentRuntimeEnsureRequestPath(request.request_id));
+    const reloaded = loadMissionTeamPrewarmRequest(
+      getAgentRuntimeEnsureRequestPath(request.request_id)
+    );
     expect(reloaded.mission_id).toBe('MSN-PREWARM');
     expect(reloaded.team_roles).toEqual(['planner']);
     expect(reloaded.requested_by).toBe('test');
@@ -71,7 +73,9 @@ describe('agent-runtime-supervisor', () => {
       teamRoles: ['planner'],
       requestedBy: 'test',
     });
-    const requestPath = (await import('./agent-runtime-supervisor.js')).getAgentRuntimeEnsureRequestPath(request.request_id);
+    const requestPath = (
+      await import('./agent-runtime-supervisor.js')
+    ).getAgentRuntimeEnsureRequestPath(request.request_id);
     const result = await processMissionTeamPrewarmRequest(requestPath);
 
     expect(mocks.ensureMissionTeamRuntime).toHaveBeenCalledWith({
@@ -87,10 +91,8 @@ describe('agent-runtime-supervisor', () => {
   });
 
   it('starts a detached supervisor process for a queued request', async () => {
-    const {
-      enqueueMissionTeamPrewarmRequest,
-      startAgentRuntimeSupervisorForRequest,
-    } = await import('./agent-runtime-supervisor.js');
+    const { enqueueMissionTeamPrewarmRequest, startAgentRuntimeSupervisorForRequest } =
+      await import('./agent-runtime-supervisor.js');
 
     const request = enqueueMissionTeamPrewarmRequest({
       missionId: 'MSN-PREWARM',
@@ -98,10 +100,50 @@ describe('agent-runtime-supervisor', () => {
     });
     startAgentRuntimeSupervisorForRequest(request);
 
-    expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(expect.objectContaining({
-      resourceId: expect.stringContaining(request.request_id),
-      command: 'node',
-      args: ['dist/scripts/run_agent_runtime_supervisor.js', '--request', expect.stringContaining(`${request.request_id}.json`)],
-    }));
+    expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceId: expect.stringContaining(request.request_id),
+        command: 'node',
+        args: [
+          'dist/scripts/run_agent_runtime_supervisor.js',
+          '--request',
+          expect.stringContaining(`${request.request_id}.json`),
+        ],
+      })
+    );
+  });
+
+  it('estimates usage when a provider exposes an empty placeholder usage object', async () => {
+    const { resolveRuntimeTokenUsage } = await import('./agent-runtime-supervisor.js');
+    expect(
+      resolveRuntimeTokenUsage({
+        reportedInputTokens: 0,
+        reportedOutputTokens: 0,
+        promptChars: 40,
+        responseChars: 20,
+      })
+    ).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      usageEstimated: true,
+      usageStatus: 'estimated',
+    });
+  });
+
+  it('preserves non-zero provider usage as actual usage', async () => {
+    const { resolveRuntimeTokenUsage } = await import('./agent-runtime-supervisor.js');
+    expect(
+      resolveRuntimeTokenUsage({
+        reportedInputTokens: 14,
+        reportedOutputTokens: 6,
+        promptChars: 40,
+        responseChars: 20,
+      })
+    ).toEqual({
+      inputTokens: 14,
+      outputTokens: 6,
+      usageEstimated: false,
+      usageStatus: 'actual',
+    });
   });
 });

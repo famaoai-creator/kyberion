@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgyAdapter, ClaudeAdapter, CodexAppServerAdapter } from './agent-adapter.js';
-import { spawnSync } from 'node:child_process';
+import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
+import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 
@@ -29,8 +29,28 @@ vi.mock('./managed-process.js', async () => {
 });
 
 vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+  spawn: vi.fn(),
 }));
+
+function mockSpawnedCli(stdout = 'Response', status = 0, stderr = '') {
+  const child = Object.assign(new EventEmitter(), {
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+    kill: vi.fn(),
+  });
+  codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
+    resourceId: spec.resourceId,
+    child: spawn(spec.command, spec.args, spec.spawnOptions),
+  }));
+  vi.mocked(spawn).mockImplementationOnce(() => {
+    queueMicrotask(() => {
+      child.stdout.end(stdout);
+      child.stderr.end(stderr);
+      child.emit('close', status, null);
+    });
+    return child as any;
+  });
+}
 
 describe('AgyAdapter', () => {
   let adapter: AgyAdapter;
@@ -41,42 +61,28 @@ describe('AgyAdapter', () => {
   });
 
   it('correctly executes a basic stateless single-prompt run', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'Hello World',
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    mockSpawnedCli('Hello World');
 
     const response = await adapter.ask('Say hello');
     expect(response.text).toBe('Hello World');
     expect(response.stopReason).toBe('completed');
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Say hello', '--dangerously-skip-permissions'],
-      expect.any(Object)
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
   });
 
   it('correctly passes conversationId for session persistence', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'Response',
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    mockSpawnedCli();
 
     await adapter.ask('Continuing...', { conversationId: 'session-123' });
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Continuing...', '--dangerously-skip-permissions', '--conversation', 'session-123'],
-      expect.any(Object)
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
 
     const runtimeInfo = adapter.getRuntimeInfo();
@@ -85,18 +91,11 @@ describe('AgyAdapter', () => {
   });
 
   it('correctly passes addDirs to mount dynamic directories', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'Response',
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    mockSpawnedCli();
 
     await adapter.ask('Check files', { addDirs: ['/path/to/dir1', '/path/to/dir2'] });
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'agy',
       [
         '-p',
@@ -107,44 +106,30 @@ describe('AgyAdapter', () => {
         '--add-dir',
         '/path/to/dir2',
       ],
-      expect.any(Object)
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
   });
 
   it('correctly passes sandbox flag', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'Response',
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    mockSpawnedCli();
 
     await adapter.ask('Risky run', { sandbox: true });
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Risky run', '--dangerously-skip-permissions', '--sandbox'],
-      expect.any(Object)
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
   });
 
   it('correctly executes in interactive mode with inherited stdio', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: '',
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    mockSpawnedCli('');
 
     const response = await adapter.ask('Interactive prompt', { interactive: true });
     expect(response.text).toBe('Interactive session completed.');
     expect(response.stopReason).toBe('completed');
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'agy',
       ['-i', 'Interactive prompt', '--dangerously-skip-permissions'],
       expect.objectContaining({ stdio: 'inherit' })
@@ -152,25 +137,34 @@ describe('AgyAdapter', () => {
   });
 
   it('passes effort to the Claude CLI when configured', async () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: JSON.stringify({ result: 'ok' }),
-      stderr: '',
-      output: [],
-      pid: 123,
-      signal: null,
-    } as any);
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+    });
+    codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
+      resourceId: spec.resourceId,
+      child: spawn(spec.command, spec.args, spec.spawnOptions),
+    }));
+    vi.mocked(spawn).mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        child.stdout.end(JSON.stringify({ result: 'ok' }));
+        child.emit('close', 0, null);
+      });
+      return child as any;
+    });
 
     const adapter = new ClaudeAdapter({
       model: 'sonnet',
       effort: 'high',
       systemPrompt: 'system',
+      allowedTools: ['Read', 'Bash'],
     });
 
     const response = await adapter.ask('Do the thing');
     expect(response.text).toBe('ok');
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       'claude',
       [
         '-p',
@@ -183,9 +177,42 @@ describe('AgyAdapter', () => {
         'sonnet',
         '--effort',
         'high',
+        '--tools',
+        'Read,Bash',
+        '--allowedTools',
+        'Read',
+        'Bash',
       ],
-      expect.any(Object)
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
+  });
+});
+
+describe('CodexAdapter', () => {
+  it('runs the legacy Codex CLI through an asynchronous child process', async () => {
+    mockSpawnedCli(JSON.stringify({ message: 'codex response' }));
+
+    const response = await new CodexAdapter().ask('Say hello');
+
+    expect(response.text).toBe('codex response');
+    expect(response.stopReason).toBe('completed');
+    expect(spawn).toHaveBeenCalledWith(
+      'npx',
+      ['codex', 'exec', '--json', expect.stringContaining('Say hello')],
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+    );
+  });
+});
+
+describe('ClaudeAdapter tool restrictions', () => {
+  it('keeps Bash available when code-actuator is allowed but system-actuator is denied', () => {
+    const restrictions = ClaudeAdapter.resolveToolRestrictions(
+      ['file-actuator', 'code-actuator'],
+      ['system-actuator']
+    );
+
+    expect(restrictions.allowedTools).toContain('Bash');
+    expect(restrictions.disallowedTools).not.toContain('Bash');
   });
 });
 

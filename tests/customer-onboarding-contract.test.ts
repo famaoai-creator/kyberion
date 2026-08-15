@@ -26,7 +26,7 @@ describe('Customer onboarding contract', () => {
     expect(readme).toContain('pnpm customer:switch acme-corp');
     expect(operator).toContain('pnpm customer:create customer-slug');
     expect(operator).toContain(
-      'interactive identity setup → customer/{slug}/ (fallback: knowledge/personal/)'
+      'interactive identity setup → active stance overlay / personal fallback'
     );
     expect(operator).toContain('/app/customer');
     expect(init).toContain('customer/{slug}/my-identity.json');

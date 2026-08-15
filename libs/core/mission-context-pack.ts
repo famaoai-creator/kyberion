@@ -1572,7 +1572,8 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(workItemId ? { work_item_id: workItemId } : {}),
   };
   const securityScope: ContextSecurityScope = {
-    tenant_id: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
+    tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
+    tenant_id: input.missionState.tenant_id || input.missionState.tenant_slug || 'default',
     ...(projectId ? { project_id: projectId } : {}),
     mission_id: input.missionState.mission_id,
     ...(recipient.agent_id ? { participant_id: recipient.agent_id } : {}),
@@ -1842,6 +1843,7 @@ export async function resolveMissionContextPack(
         missionType: missionState.mission_type,
         tier,
         assignedPersona: missionState.assigned_persona,
+        ...(missionState.tenant_slug ? { tenantSlug: missionState.tenant_slug } : {}),
       })
     : null;
   const missionTeamAssignment =

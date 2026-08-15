@@ -269,6 +269,7 @@ async function main(): Promise<void> {
         projectWorkGraphToNextTasks({
           missionId,
           projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+          tenantSlug: argv['tenant-slug'] ? String(argv['tenant-slug']) : undefined,
           apply: argv.apply === true,
         })
       );

@@ -86,12 +86,36 @@ describe.sequential('Channel surface agents', () => {
       'active/shared/coordination/channels/slack/onboarding'
     );
     process.env.MISSION_ROLE = 'slack_bridge';
-    if (safeExistsSync(slackDir)) safeRmSync(slackDir);
-    if (safeExistsSync(slackObsDir)) safeRmSync(slackObsDir);
-    if (safeExistsSync(onboardingDir)) safeRmSync(onboardingDir);
+    for (const subdir of [
+      'inbox',
+      'events',
+      'requests',
+      'notifications',
+      'dead-letter',
+      'dead-targets',
+      'onboarding',
+    ]) {
+      const path = `${slackDir}/${subdir}`;
+      if (safeExistsSync(path)) safeRmSync(path, { recursive: true, force: true });
+    }
+    if (safeExistsSync(slackObsDir)) {
+      for (const subdir of ['events', 'requests', 'notifications']) {
+        const path = `${slackObsDir}/${subdir}`;
+        if (safeExistsSync(path)) safeRmSync(path, { recursive: true, force: true });
+      }
+    }
+    if (safeExistsSync(onboardingDir)) safeRmSync(onboardingDir, { recursive: true, force: true });
     process.env.MISSION_ROLE = 'chronos_gateway';
-    if (safeExistsSync(chronosDir)) safeRmSync(chronosDir);
-    if (safeExistsSync(chronosObsDir)) safeRmSync(chronosObsDir);
+    for (const subdir of ['requests', 'notifications', 'dead-letter', 'dead-targets']) {
+      const path = `${chronosDir}/${subdir}`;
+      if (safeExistsSync(path)) safeRmSync(path, { recursive: true, force: true });
+    }
+    if (safeExistsSync(chronosObsDir)) {
+      for (const subdir of ['requests', 'notifications']) {
+        const path = `${chronosObsDir}/${subdir}`;
+        if (safeExistsSync(path)) safeRmSync(path, { recursive: true, force: true });
+      }
+    }
   };
 
   beforeEach(() => {
@@ -644,8 +668,8 @@ describe.sequential('Channel surface agents', () => {
               status: 'assigned',
               agent_id: 'implementation-architect',
               authority_role: 'ecosystem_architect',
-              provider: 'gemini',
-              modelId: 'gemini-2.5-pro',
+              provider: 'copilot',
+              modelId: 'copilot',
               required_capabilities: ['code'],
               notes: 'matched',
             },

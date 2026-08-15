@@ -10,8 +10,9 @@
     "attendees": [],
     "operator_label": "Operator",
     "language": "ja",
-    "minutes_path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
-    "delivery_pack_path": "active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json"
+    "mission_evidence_dir": "",
+    "minutes_path": "{{mission_evidence_dir}}/minutes.md",
+    "delivery_pack_path": "{{mission_evidence_dir}}/meeting-followup-pack.json"
   },
   "steps": [
     {
@@ -48,7 +49,7 @@
       "op": "system:write_artifact",
       "consumes": "minutes_markdown",
       "params": {
-        "path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
+        "path": "{{mission_evidence_dir}}/minutes.md",
         "content": "{{minutes_markdown}}"
       }
     },
@@ -65,7 +66,7 @@
         "attendees": "{{attendees}}",
         "operator_label": "{{operator_label}}",
         "language": "{{language}}",
-        "output_path": "active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl"
+        "output_path": "{{mission_evidence_dir}}/action-items.jsonl"
       }
     },
     {
@@ -74,13 +75,13 @@
       "op": "system:write_file",
       "consumes": "action_item_count",
       "params": {
-        "path": "active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json",
+        "path": "{{mission_evidence_dir}}/meeting-followup-pack.json",
         "content": {
           "kind": "meeting-followup-delivery-pack",
           "mission_id": "{{mission_id}}",
           "transcript_path": "{{transcript_path}}",
-          "minutes_path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
-          "action_items_path": "active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl",
+          "minutes_path": "{{mission_evidence_dir}}/minutes.md",
+          "action_items_path": "{{mission_evidence_dir}}/action-items.jsonl",
           "action_item_count": "{{action_item_count}}"
         }
       }
@@ -91,7 +92,7 @@
       "op": "system:log",
       "consumes": "action_item_count",
       "params": {
-        "message": "✅ Meeting follow-up complete: minutes=active/missions/confidential/{{mission_id}}/evidence/minutes.md, action-items=active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl (count={{action_item_count}}), delivery-pack=active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json"
+        "message": "✅ Meeting follow-up complete: minutes={{mission_evidence_dir}}/minutes.md, action-items={{mission_evidence_dir}}/action-items.jsonl (count={{action_item_count}}), delivery-pack={{mission_evidence_dir}}/meeting-followup-pack.json"
       }
     }
   ]

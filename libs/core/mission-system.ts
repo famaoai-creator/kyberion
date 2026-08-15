@@ -59,6 +59,7 @@ import {
 } from './work-coordination.js';
 import { appendCoordinationEvent } from './work-coordination.js';
 import { buildWorkItemHandoffPacket } from './handoff-packet.js';
+import type { TeamProviderPreference } from './team-role-assignment-selection.js';
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const missionFocusPath = pathResolver.shared('runtime/current_mission_focus.json');
@@ -279,11 +280,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     purgeMissions(dryRun = false) {
       return _purgeMissions(rootDir, dryRun);
     },
-    showMissionTeam(id: string, refresh = false) {
-      return _showMissionTeam(id, refresh, rootDir);
+    showMissionTeam(id: string, refresh = false, providerPreference?: TeamProviderPreference) {
+      return _showMissionTeam(id, refresh, rootDir, providerPreference);
     },
-    staffMissionTeam(id: string) {
-      return _staffMissionTeam(id, rootDir).then((result) =>
+    staffMissionTeam(id: string, providerPreference?: TeamProviderPreference) {
+      return _staffMissionTeam(id, rootDir, providerPreference).then((result) =>
         syncProjectOperationalStateIfLinked(id).then(() => result)
       );
     },
@@ -358,14 +359,27 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       runtime_error?: string;
     }> {
       const missionId = input.missionId.toUpperCase();
-      const unfinished = listWorkItems().filter((item) => {
-        const belongsToMission =
-          item.project_id.toUpperCase() === missionId ||
-          item.context?.mission_id?.toUpperCase() === missionId ||
-          (typeof item.metadata?.mission_id === 'string' &&
-            item.metadata.mission_id.toUpperCase() === missionId);
-        return belongsToMission && !['done', 'archived'].includes(item.status);
-      });
+      const missionState = loadState(missionId);
+      const tenantSlug = missionState?.tenant_slug?.trim();
+      if (missionState?.tier === 'confidential' && !tenantSlug) {
+        throw new Error(
+          `[MISSION_HANDOFF_SCOPE_REQUIRED] Confidential mission ${missionId} needs tenant_slug before handoff.`
+        );
+      }
+      const unfinished = listWorkItems(tenantSlug ? { tenantSlugs: [tenantSlug] } : {}).filter(
+        (item) => {
+          const belongsToMission =
+            item.project_id.toUpperCase() === missionId ||
+            item.context?.mission_id?.toUpperCase() === missionId ||
+            (typeof item.metadata?.mission_id === 'string' &&
+              item.metadata.mission_id.toUpperCase() === missionId);
+          return (
+            belongsToMission &&
+            (!tenantSlug || item.context?.tenant_slug === tenantSlug) &&
+            !['done', 'archived'].includes(item.status)
+          );
+        }
+      );
       let runtimeRequested = false;
       let runtimeError: string | undefined;
       if (input.ensureRuntime !== false) {

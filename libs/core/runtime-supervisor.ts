@@ -127,7 +127,13 @@ class RuntimeSupervisorImpl {
   }
 
   async cleanupAll(reason = 'manual'): Promise<string[]> {
-    const resourceIds = this.list().map((record) => record.resourceId);
+    // A detached service is deliberately owned by the host/service manager,
+    // not by the short-lived CLI that happened to bootstrap it. Do not tear
+    // it down when that CLI receives SIGINT/SIGTERM; doing so made the
+    // runtime supervisor disappear immediately after auto-spawn.
+    const resourceIds = this.list()
+      .filter((record) => !(reason.startsWith('signal:') && record.shutdownPolicy === 'detached'))
+      .map((record) => record.resourceId);
     const cleaned: string[] = [];
 
     for (const resourceId of resourceIds) {

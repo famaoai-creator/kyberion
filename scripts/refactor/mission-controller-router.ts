@@ -197,8 +197,17 @@ export interface MissionControllerRoutingContext {
       dryRun?: boolean;
     }
   ) => Awaitable<unknown>;
-  showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<unknown>;
-  staffMissionTeam: (id: string, organizationId?: string) => Awaitable<unknown>;
+  showMissionTeam: (
+    id: string,
+    refresh?: boolean,
+    organizationId?: string,
+    providerPreference?: { provider: string; modelId?: string }
+  ) => Awaitable<unknown>;
+  staffMissionTeam: (
+    id: string,
+    organizationId?: string,
+    providerPreference?: { provider: string; modelId?: string }
+  ) => Awaitable<unknown>;
   prewarmMissionTeam: (
     id: string,
     teamRolesArg?: string,
@@ -303,7 +312,10 @@ function parseIntentConfidence(value?: string): number {
   return confidence;
 }
 
-function assertMissionIdArgument(command: string | undefined, missionId: string | undefined): void {
+export function assertMissionIdArgument(
+  command: string | undefined,
+  missionId: string | undefined
+): void {
   const missionCommands = new Set([
     'create',
     'start',
@@ -320,6 +332,32 @@ function assertMissionIdArgument(command: string | undefined, missionId: string 
     'review-reenter',
     'review-worker-output',
   ]);
+  const requiredMissionIdCommands = new Set([
+    'create',
+    'start',
+    'status',
+    'pause',
+    'cancel',
+    'finish',
+    'verify',
+    'distill',
+    'sync-project-ledger',
+    'reassign-project',
+    'team',
+    'staff',
+    'classify',
+    'workflow-select',
+    'plan-tasks',
+    'dispatch-tickets',
+    'dispatch-workitems',
+    'reconcile-work',
+    'review-reenter',
+    'review-worker-output',
+    'handoff',
+  ]);
+  if (command && requiredMissionIdCommands.has(command) && !missionId) {
+    throw new Error(`${command} requires a mission ID: ${command} <MISSION_ID>`);
+  }
   if (
     command &&
     missionCommands.has(command) &&
@@ -460,6 +498,11 @@ export async function runMissionControllerAction(
   context: MissionControllerRoutingContext
 ): Promise<void> {
   const { action, arg1, arg2, arg3, arg4, hasDryRun, getOptionValue: getValue } = context;
+
+  if (context.argv.includes('--help') || context.argv.includes('-h')) {
+    context.showHelp();
+    return;
+  }
 
   assertMissionIdArgument(action, arg1);
 
@@ -891,10 +934,21 @@ export async function runMissionControllerAction(
       });
       break;
     case 'team': {
+      if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
+        throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
+      }
       const teamPlan = await context.showMissionTeam(
         arg1!,
         context.hasRefresh,
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+        getValue('--provider', context.argv)
+          ? {
+              provider: getValue('--provider', context.argv)!,
+              ...(getValue('--model', context.argv)
+                ? { modelId: getValue('--model', context.argv)! }
+                : {}),
+            }
+          : undefined
       );
       if (teamPlan !== undefined) {
         console.log(JSON.stringify(teamPlan, null, 2));
@@ -902,9 +956,20 @@ export async function runMissionControllerAction(
       break;
     }
     case 'staff': {
+      if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
+        throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
+      }
       const runtimePlan = await context.staffMissionTeam(
         arg1!,
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+        getValue('--provider', context.argv)
+          ? {
+              provider: getValue('--provider', context.argv)!,
+              ...(getValue('--model', context.argv)
+                ? { modelId: getValue('--model', context.argv)! }
+                : {}),
+            }
+          : undefined
       );
       if (runtimePlan !== undefined) {
         console.log(JSON.stringify(runtimePlan, null, 2));

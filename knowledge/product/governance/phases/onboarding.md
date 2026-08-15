@@ -1,99 +1,155 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-08-12
+last_updated: 2026-08-15
 runtime_stages: [intake, classification]
 ---
 
 # Phase Protocol: ① Onboarding (Ecosystem Initialization)
 
-## Goal
+## 目的
 
-Environment safety verification and identity synchronization via physical manifestation.
-This phase transforms the ecosystem from a "dormant state" to an "activated state" where the Sovereign's intent is physically manifest.
+環境、identity、tenant、organization、実行権限を順に準備し、最初の仕事を安全に開始できる
+状態へ進める。identity の保存だけではオンボーディング完了とはみなさない。
 
-## Directives
+エンドツーエンドの正本は [オンボーディング標準フロー](../onboarding-flow.md) である。
+この文書は lifecycle phase から参照する短い runbook とする。
 
-### Stage 1: Physical Foundation (物理的基盤の確立)
+## 実行順
 
-Establish the neurological link between modules.
+### 1. Baseline と環境
 
-- **Action**: `pnpm install`
-- **Effect**: All workspace dependencies and internal `@agent` links are realized.
+```bash
+pnpm pipeline --input pipelines/baseline-check.json
+pnpm install
+pnpm prereq:check
+pnpm build
+pnpm setup:report --persona first-time-user
+pnpm surfaces:reconcile
+```
 
-### Stage 2: System Manifestation (システムの具現化)
+baseline が `needs_recovery` または `fatal_error` の場合は、通常の onboarding を開始せず、
+それぞれ recovery または障害修復へ分岐する。
 
-Construct the physical structure and activate services based on governance.
+### 2. Identity と個人 onboarding
 
-- **Action**: `pnpm build`, then `pnpm onboard` (interactive) or `pnpm onboard:apply --identity path/to/identity.json` (non-interactive).
-- **Precondition**: `pnpm onboard` does NOT generate build artifacts — it refuses to run until `dist/` exists (`Run \`pnpm build\` first before onboarding.`). Always run `pnpm build` first.
-- **Effect**:
-  - `presence` (external interface) services are initialized.
-  - Personal Tier (`knowledge/personal/`) is physically secured.
-- **Redo**: `pnpm onboard:reset` removes onboarding state and generated identity/vision/agent artifacts so the flow can be restarted cleanly.
+対話環境では `pnpm onboard`、非対話環境では reviewed JSON を使う。
 
-### Stage 3: Soul Infusion (アイデンティティとビジョンの注入)
+```bash
+pnpm onboard
+# または
+pnpm onboard:apply --identity <reviewed-identity-json> --dry-run
+pnpm onboard:apply --identity <reviewed-identity-json>
+```
 
-Inject the Sovereign's unique "Soul" into the established vessel.
+成果物は identity、vision、agent identity、onboarding state / summary、connection 候補、
+tenant 候補、tutorial plan である。ここでは外部効果や mission を開始しない。
 
-#### Path A: Interactive Terminal (対話型ターミナル)
+### 3. Tenant registry
 
-- **Action**: `node dist/scripts/onboarding_wizard.js`
-- **Effect**: Wizard guides the Sovereign through identity, service readiness, tenant scope, and a safe first tutorial.
+tenant は `pnpm tenant create ... --apply` で登録する。正本は
+`knowledge/personal/tenants/{tenant-slug}.json` であり、`customer/{slug}` の tenant facet や
+`KYBERION_CUSTOMER` の切替に依存しない。登録後は次を実行する。
 
-#### Path B: Non-Interactive / Agent Environment (非対話環境)
+```bash
+pnpm tenant show <tenant-slug> --json
+pnpm run check:tenant-registry
+```
 
-When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, the wizard refuses to run by design — it would otherwise apply silent defaults. Pick one of:
+未登録、`suspended`、`archived`、または reserved scope 名の tenant は次へ進めない。
 
-1. **Sanctioned CLI**: `pnpm onboard:apply --identity path/to/identity.json` (or pipe JSON via stdin) — runs the same artifact-writing flow as `pnpm onboard` without prompts.
-2. **Agent conversation + direct write**:
-   - Agent reads `scripts/onboarding_wizard.ts` to understand the required schema.
-   - Agent conducts the hearing conversationally with the Sovereign.
-   - Agent writes output files directly, conforming to `knowledge/public/templates/my-identity.schema.json` and `knowledge/product/schemas/onboarding-state.schema.json`.
-3. **Defaults bypass** (evaluation only): `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — accepts every default. Use only when defaults are knowingly acceptable.
+### 4. Operating context binding
 
-- **Output** (出力ルート: `KYBERION_CUSTOMER` が設定されている場合は stance overlay である `customer/{slug}/` 配下、未設定時は `knowledge/personal/` 配下 — 詳細は `docs/INITIALIZATION.md` Stage 9-11):
-  - `knowledge/personal/my-identity.json`: Defines values, domain, and role.
-  - `knowledge/personal/my-vision.md`: Defines the "North Star" (Vision).
-  - `knowledge/personal/agent-identity.json`: Defines the Agent ID and trust tier.
-  - `knowledge/personal/onboarding/onboarding-state.json`: Persists the phased onboarding state.
-  - `knowledge/personal/onboarding/onboarding-summary.md`: Summarizes the captured setup.
-  - `knowledge/personal/connections/*.json`: Stores approved service connection drafts.
-  - `knowledge/personal/tenants/*.json`: Stores tenant profiles entered during onboarding.
-  - `knowledge/personal/onboarding/tutorial-plan.md`: Records the first tutorial plan.
-- **Post-onboarding context binding**: When a stance overlay (`customer/{slug}/`) and a tenant are
-  available, resolve `customer_slug → tenant_slug → organization_id` with
-  `pnpm onboarding:context bind --customer-slug <customer> --tenant-slug <tenant> --dry-run`.
-  Apply only after review with `--apply`; this creates or reuses the governed organization state.
-  Note the two different things being joined here: `customer_slug` names the **stance** you operate
-  from (runtime configuration), while `tenant_slug → organization_id` is the start of the
-  **containment hierarchy** the work will live in
-  ([entity-scope-hierarchy](../../architecture/entity-scope-hierarchy.md),
-  [stance-tenant-customer-model](../../architecture/stance-tenant-customer-model.md)). They are
-  often spelled the same and are still not the same thing.
-- **Effect**: The ecosystem aligns its autonomy with the Sovereign's personality.
+`customer_slug`（stance）と `tenant_slug → organization_id`（containment）を dry-run で
+確認してから binding を適用する。
 
-### Stage 4: Sensory & Re-configuration Options (任意・いつでも呼び出し可能)
+```bash
+pnpm onboarding:context bind \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --dry-run --json
+pnpm onboarding:context bind \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --apply --json
+```
 
-- **Avatar Generation**: `pnpm onboard:avatar` (captures camera reference & generates avatar)
-- **Voice Model Cloning**: `pnpm onboard:voice` (records voice sample & trains voice profile)
-- **Re-configuration**: Run `pnpm onboard` at any time to update or resume identity and service settings.
+binding は organization state を作成または再利用するが、tenant activation そのものではない。
 
-## Success Metrics [L3]
+### 5. Tenant activation
 
-1. **Physical Integrity**: `pnpm install` completed with no resolution errors.
-2. **Operational Status**: `pnpm onboard:apply` returns `status: "complete"` after persisting the onboarding state.
-3. **Identity Alignment**: `my-identity.json`, `my-vision.md`, and `agent-identity.json` all exist in the Personal Tier.
-4. **Onboarding Summary**: `onboarding/onboarding-state.json` and `onboarding/onboarding-summary.md` are persisted.
-5. **Operating Context**: Customer organizations have a reviewed context binding before first work is routed.
+activation plan で blockers を確認し、viewer scope、NHI、service readiness、isolation の
+成功 probe と、それぞれに対応する監査証跡 ref を揃えてから、人間の `--accept` 付き apply を行う。
 
-## Related Documents
+```bash
+pnpm tenant:activation plan \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id>
+pnpm tenant:activation activate \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --nhi-id <nhi-id> \
+  --check-viewer-scope --check-nhi --check-services --check-isolation \
+  --probe-ref viewer_scope=<audit-ref> \
+  --probe-ref nhi_provisioned=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref> \
+  --probe-ref isolation_probe=<audit-ref> \
+  --apply --accept
+```
 
-- **This file** (`governance/phases/onboarding.md`): Technical execution steps (Stage 1-3). **Primary reference from AGENTS.md.**
-- `governance/onboarding-protocol.md`: Sovereign Concierge の行動規範と5段階の体験設計 (UX-level protocol).
-- `orchestration/onboarding-directives/00_sovereign_onboarding.md`: 初回オンボーディングミッションの勝利条件と推奨アクション (Mission directive).
+`customer/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
+が `active` になるまで、first-work の apply と tenant-bound mission は fail-closed で停止する。
 
----
+### 6. First work と review
 
-_Status: Mandated by AGENTS.md (Consolidated with docs/INITIALIZATION.md)_
-_Last Updated: 2026-03-13 by KYBERION-PRIME_
+```bash
+pnpm onboarding:context first-work \
+  --customer-slug <customer-slug> \
+  --intent "<最初の依頼>" \
+  --dry-run --json
+```
+
+結果の work shape、管理単位、scope、budget、success condition、approval boundary を
+人間が確認する。`solution_project` だけが Project bootstrap 候補になり、
+`service_operation` / `routine_operation` / `incident_response` /
+`governance_cadence` / `improvement_experiment` は organization operating model の管理単位へ接続する。
+
+## 再開と失敗時の扱い
+
+```bash
+pnpm onboarding:context show --customer-slug <customer-slug> --json
+pnpm tenant:activation reconcile --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> --organization-id <organization-id>
+pnpm tenant:activation resume \
+  --customer-slug <customer-slug> \
+  --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> \
+  --nhi-id <nhi-id> \
+  --check-viewer-scope --check-nhi --check-services --check-isolation \
+  --probe-ref viewer_scope=<new-audit-ref> \
+  --probe-ref nhi_provisioned=<new-audit-ref> \
+  --probe-ref service_readiness=<new-audit-ref> \
+  --probe-ref isolation_probe=<new-audit-ref> \
+  --apply --accept
+```
+
+probe の再実行なしに activation を再開しない。停止・ロールバック・offboarding は
+`tenant:activation suspend|rollback` の governed command を使い、直接 state を編集しない。
+
+## 成功条件
+
+1. identity / onboarding summary が保存されている。
+2. tenant registry と consistency check が成功している。
+3. customer、tenant、organization の binding が一致している。
+4. activation receipt が `active` で、必須 probe と accountable human が記録されている。
+5. first-work がレビュー済みで、typed context と approval boundary が定まっている。
+
+## 関連文書
+
+- [オンボーディング標準フロー](../onboarding-flow.md)
+- [docs/INITIALIZATION.md](../../../../docs/INITIALIZATION.md)
+- [テナント追加手順](../tenant-onboarding-procedure.md)

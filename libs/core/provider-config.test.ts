@@ -3,7 +3,11 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { describe, expect, it } from 'vitest';
-import { loadProviderConfig, resolveRuntimeDefaultModelId } from './provider-config.js';
+import {
+  isObsoleteAgentRuntimeProvider,
+  loadProviderConfig,
+  resolveRuntimeDefaultModelId,
+} from './provider-config.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 
@@ -18,6 +22,9 @@ describe('provider-config', () => {
     expect(config.runtime_defaults['anthropic-default']).toBe('claude-opus-5');
     expect(config.runtime_defaults['anthropic-fast']).toBe('claude-haiku-4-5-20251001');
     expect(config.default_models.copilot).toBe('auto');
+    expect(config.obsolete_agent_runtime_providers).toEqual(['gemini']);
+    expect(isObsoleteAgentRuntimeProvider('gemini')).toBe(true);
+    expect(isObsoleteAgentRuntimeProvider('agy')).toBe(false);
     expect(config.runtime_defaults['copilot-default']).toBe('auto');
     expect(config.lifecycle.gemini.default_model).toBe('gemini-3.6-flash');
     expect(resolveRuntimeDefaultModelId('copilot-default')).toBe('auto');
