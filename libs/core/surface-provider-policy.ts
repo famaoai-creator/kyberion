@@ -7,11 +7,16 @@ import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
+import type { TierLevel } from './types.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-provider-manifests.schema.json');
-const SURFACE_PROVIDER_MANIFESTS_PATH = pathResolver.knowledge('product/governance/surface-provider-manifests.json');
+const SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-provider-manifests.schema.json'
+);
+const SURFACE_PROVIDER_MANIFESTS_PATH = pathResolver.knowledge(
+  'product/governance/surface-provider-manifests.json'
+);
 
 export type SurfaceDelegationReceiver = 'chronos-mirror' | 'nerve-agent';
 
@@ -49,6 +54,12 @@ export interface SurfaceProviderManifestRecord {
     supportsOutbox: boolean;
     supportsNotifications: boolean;
   };
+  scope_policy?: {
+    process_scope: 'system' | 'tenant-service';
+    scope_mode: 'system' | 'server-bound-tenant' | 'viewer-derived' | 'request-derived';
+    allowed_tiers: TierLevel[];
+    requires_channel_binding_for_customer_mode: boolean;
+  };
   intent_rules?: {
     rules?: Array<{
       id?: string;
@@ -83,10 +94,14 @@ function ensureValidator(): ValidateFunction {
 }
 
 export function loadSurfaceProviderManifestFile(): SurfaceProviderManifestFile {
-  const value = JSON.parse(safeReadFile(SURFACE_PROVIDER_MANIFESTS_PATH, { encoding: 'utf8' }) as string) as SurfaceProviderManifestFile;
+  const value = JSON.parse(
+    safeReadFile(SURFACE_PROVIDER_MANIFESTS_PATH, { encoding: 'utf8' }) as string
+  ) as SurfaceProviderManifestFile;
   const validate = ensureValidator();
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid surface provider manifests: ${errors}`);
   }
   return value;
@@ -96,15 +111,22 @@ export function listSurfaceProviderManifestRecords(): SurfaceProviderManifestRec
   return Object.values(loadSurfaceProviderManifestFile().providers);
 }
 
-export function getSurfaceProviderManifestRecord(surface: SurfaceAsyncChannel): SurfaceProviderManifestRecord {
+export function getSurfaceProviderManifestRecord(
+  surface: SurfaceAsyncChannel
+): SurfaceProviderManifestRecord {
   return loadSurfaceProviderManifestFile().providers[surface];
 }
 
-export function deriveSurfaceIntentLabelFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): string {
+export function deriveSurfaceIntentLabelFromProviderPolicy(
+  surface: SurfaceAsyncChannel,
+  text: string
+): string {
   const normalized = text.trim();
   const manifest = getSurfaceProviderManifestRecord(surface);
   if (!normalized) return manifest.intent_rules?.default_label || 'general_request';
-  const matchedRule = (manifest.intent_rules?.rules || []).find((rule) => matchesAnyTextRule(normalized, rule.patterns));
+  const matchedRule = (manifest.intent_rules?.rules || []).find((rule) =>
+    matchesAnyTextRule(normalized, rule.patterns)
+  );
   return matchedRule?.label || manifest.intent_rules?.default_label || 'request_deeper_reasoning';
 }
 
@@ -112,7 +134,10 @@ export function deriveSlackIntentLabelFromProviderPolicy(text: string): string {
   return deriveSurfaceIntentLabelFromProviderPolicy('slack', text);
 }
 
-export function deriveSurfaceExecutionModeFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): 'conversation' | 'task' {
+export function deriveSurfaceExecutionModeFromProviderPolicy(
+  surface: SurfaceAsyncChannel,
+  text: string
+): 'conversation' | 'task' {
   const normalized = text.trim();
   if (!normalized) return 'conversation';
   const rules = getSurfaceProviderManifestRecord(surface).surface_rules;
@@ -120,8 +145,9 @@ export function deriveSurfaceExecutionModeFromProviderPolicy(surface: SurfaceAsy
     return 'conversation';
   }
   const softRequestConversation =
-    /(作って|作成して).*(ください|下さい|ほしい|欲しい|くれない|もらえます|もらえる|お願い)/u.test(normalized) &&
-    !/(保存|実装|ファイル|ミッション|mission)/iu.test(normalized);
+    /(作って|作成して).*(ください|下さい|ほしい|欲しい|くれない|もらえます|もらえる|お願い)/u.test(
+      normalized
+    ) && !/(保存|実装|ファイル|ミッション|mission)/iu.test(normalized);
   if (softRequestConversation) return 'conversation';
   return matchesAnyTextRule(normalized, rules?.execution_mode?.durable_task_patterns)
     ? 'task'
@@ -132,7 +158,10 @@ export function deriveSlackExecutionModeFromProviderPolicy(text: string): 'conve
   return deriveSurfaceExecutionModeFromProviderPolicy('slack', text);
 }
 
-export function shouldForceSurfaceDelegationFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): boolean {
+export function shouldForceSurfaceDelegationFromProviderPolicy(
+  surface: SurfaceAsyncChannel,
+  text: string
+): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
   const rules = getSurfaceProviderManifestRecord(surface).surface_rules;
@@ -145,7 +174,7 @@ export function shouldForceSlackDelegationFromProviderPolicy(text: string): bool
 
 export function deriveSurfaceDelegationReceiverForProvider(
   surface: SurfaceAsyncChannel,
-  text: string,
+  text: string
 ): SurfaceDelegationReceiver | undefined {
   const normalized = text.trim();
   if (!normalized) return undefined;
@@ -154,14 +183,14 @@ export function deriveSurfaceDelegationReceiverForProvider(
     return undefined;
   }
   const matchedRule = (routing.text_routing?.receiver_rules || []).find((rule) =>
-    matchesAnyTextRule(normalized, rule.patterns),
+    matchesAnyTextRule(normalized, rule.patterns)
   );
   return matchedRule?.receiver;
 }
 
 export function resolveSurfaceConversationReceiverForProvider(
   surface: SurfaceAsyncChannel,
-  compiledFlow?: UserIntentFlow | null,
+  compiledFlow?: UserIntentFlow | null
 ): SurfaceDelegationReceiver | undefined {
   if (!compiledFlow) return undefined;
   if (compiledFlow.routingDecision?.mode === 'prompt') return undefined;

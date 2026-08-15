@@ -192,6 +192,13 @@
       "note": "Generation scheduler job queue (generation-scheduler.ts) — load-bearing while jobs are pending."
     },
     {
+      "path": "active/shared/runtime/media-generation/quota",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Per-tenant daily abstract generation-unit counters (generation-quota.ts); historical cost remains in the usage ledger, while only the current quota window is load-bearing."
+    },
+    {
       "path": "active/shared/runtime/memory",
       "artifact_class": "state",
       "action": "review_required",
@@ -360,6 +367,19 @@
       "ttl_days": 14,
       "action": "delete",
       "note": "EV-06: one JSON file per enqueued mission-orchestration event. The durable record is the orchestration journal (appendMissionOrchestrationJournalEntry), so the queue file is a work ticket, not evidence — 14d covers replay of a stalled worker without unbounded growth."
+    },
+    {
+      "path": "active/shared/coordination/channels",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tenant-aware surface coordination queues, notifications, outbox, dead-letter, dead-target, and physical tenant namespaces. Deletion is owned by delivery recovery or the audited tenant/project offboarding ceremony, never by TTL cleanup."
+    },
+    {
+      "path": "active/shared/runtime/migrations/physical-namespace",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "Physical namespace migration manifests and quarantined legacy records. Keep until the owner verifies the one-way cutover and explicitly decides whether quarantined records can be removed."
     },
     {
       "path": "presence/bridge/runtime",

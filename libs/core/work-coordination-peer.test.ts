@@ -14,6 +14,7 @@ import {
 } from './work-coordination-peer.js';
 
 const SHARED_SECRET = 'work-coordination-peer-secret';
+const TENANT_ID = 'tenant-acme';
 
 beforeEach(() => {
   setWorkCoordinationNamespace('work-coordination-peer-test');
@@ -35,6 +36,7 @@ describe('work coordination peer bridge', () => {
 
     const server = createPeerMessagingServer({
       peerId: 'peer-a',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       responder: createWorkCoordinationPeerResponder(),
     });
@@ -42,6 +44,7 @@ describe('work coordination peer bridge', () => {
     const claimEnvelope = buildWorkCoordinationPeerCommandEnvelope({
       senderPeerId: 'peer-a',
       recipientPeerId: 'peer-a',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       command: {
         command_type: 'claim_request',
@@ -62,11 +65,14 @@ describe('work coordination peer bridge', () => {
     });
     const claimed = (claimResult.body as any).response.result.item;
     expect(claimed.status).toBe('in_progress');
-    expect(getWorkItem(item.item_id)?.lease_id).toBe((claimResult.body as any).response.result.lease.lease_id);
+    expect(getWorkItem(item.item_id)?.lease_id).toBe(
+      (claimResult.body as any).response.result.lease.lease_id
+    );
 
     const updateEnvelope = buildWorkCoordinationPeerCommandEnvelope({
       senderPeerId: 'peer-a',
       recipientPeerId: 'peer-a',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       command: {
         command_type: 'status_update',
@@ -92,6 +98,7 @@ describe('work coordination peer bridge', () => {
 
     const server = createPeerMessagingServer({
       peerId: 'peer-a',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       responder: createWorkCoordinationPeerResponder(),
     });
@@ -99,6 +106,7 @@ describe('work coordination peer bridge', () => {
     const untrustedEnvelope = buildWorkCoordinationPeerCommandEnvelope({
       senderPeerId: 'untrusted-peer',
       recipientPeerId: 'peer-a',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       command: {
         command_type: 'claim_request',
@@ -111,6 +119,8 @@ describe('work coordination peer bridge', () => {
       },
     });
 
-    await expect(server.processEnvelope(untrustedEnvelope)).rejects.toThrow('untrusted_peer:untrusted-peer');
+    await expect(server.processEnvelope(untrustedEnvelope)).rejects.toThrow(
+      'untrusted_peer:untrusted-peer'
+    );
   });
 });

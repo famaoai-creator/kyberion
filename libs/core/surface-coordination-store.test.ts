@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { withExecutionContext } from './authority.js';
 import {
+  clearSurfaceOutboxMessage,
   deadLetterSurfaceOutboxMessage,
   clearSurfaceDeadTarget,
   enqueueSurfaceOutboxMessage,
@@ -12,6 +13,7 @@ import {
   listSurfaceDeadLetters,
   listSurfaceOutboxMessages,
   listSurfaceDeadTargets,
+  updateSurfaceOutboxMessage,
   markSurfaceDeadTarget,
   replaySurfaceDeadLetter,
 } from './surface-coordination-store.js';
@@ -316,5 +318,142 @@ describe('surface coordination outbox recovery', () => {
       last_replayed_by: 'operator-test-2',
       last_replay_message_id: path.basename(replayPath, '.json'),
     });
+  });
+
+  it('keeps tenant outbox deduplication and dead-target state separate', () => {
+    const scopeA = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+    };
+    const scopeB = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-b',
+    };
+    const channel = `${testPrefix}-tenant-channel`;
+    const deduplicationKey = `${testPrefix}-tenant-dedup`;
+    const firstPath = enqueueSurfaceOutboxMessage({
+      surface: testSurface,
+      correlationId: `${testPrefix}-tenant-a`,
+      channel,
+      threadTs: '',
+      text: 'tenant a',
+      deduplicationKey,
+      scope: scopeA,
+    });
+    const secondPath = enqueueSurfaceOutboxMessage({
+      surface: testSurface,
+      correlationId: `${testPrefix}-tenant-b`,
+      channel,
+      threadTs: '',
+      text: 'tenant b',
+      deduplicationKey,
+      scope: scopeB,
+    });
+    createdOutboxFiles.push(firstPath, secondPath);
+
+    expect(secondPath).not.toBe(firstPath);
+    expect(firstPath).toContain(
+      `/active/shared/coordination/channels/${testSurface}/tenants/tenant-a/outbox/`
+    );
+    expect(secondPath).toContain(
+      `/active/shared/coordination/channels/${testSurface}/tenants/tenant-b/outbox/`
+    );
+    expect(listSurfaceOutboxMessages(testSurface, { scope: scopeA })).toContainEqual(
+      expect.objectContaining({ text: 'tenant a', scope: scopeA })
+    );
+    expect(listSurfaceOutboxMessages(testSurface)).not.toContainEqual(
+      expect.objectContaining({ text: 'tenant a', scope: scopeA })
+    );
+    expect(
+      listSurfaceOutboxMessages(testSurface, { includeTenantNamespaces: true })
+    ).toContainEqual(expect.objectContaining({ text: 'tenant a', scope: scopeA }));
+    expect(listSurfaceOutboxMessages(testSurface, { scope: scopeA })).not.toContainEqual(
+      expect.objectContaining({ text: 'tenant b' })
+    );
+
+    markSurfaceDeadTarget(
+      testSurface,
+      channel,
+      {
+        kind: 'forbidden',
+        retryable: false,
+        reason: 'tenant a target blocked',
+      },
+      scopeA
+    );
+    expect(getSurfaceDeadTarget(testSurface, channel, scopeA)).toMatchObject({ scope: scopeA });
+    expect(getSurfaceDeadTarget(testSurface, channel, scopeB)).toBeNull();
+    expect(listSurfaceDeadTargets(testSurface, { scope: scopeA })).toContainEqual(
+      expect.objectContaining({ channel, scope: scopeA })
+    );
+    expect(listSurfaceDeadTargets(testSurface, { scope: scopeB })).not.toContainEqual(
+      expect.objectContaining({ channel })
+    );
+    expect(() =>
+      enqueueSurfaceOutboxMessage({
+        surface: testSurface,
+        correlationId: `${testPrefix}-tenant-a-blocked`,
+        channel,
+        threadTs: '',
+        text: 'blocked',
+        scope: scopeA,
+      })
+    ).toThrow('surface_target_dead');
+  });
+
+  it('rejects cross-tenant access to known outbox and dead-letter IDs', () => {
+    const scopeA = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+    };
+    const scopeB = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-b',
+    };
+    const channel = `${testPrefix}-tenant-isolation`;
+    const messagePath = enqueueSurfaceOutboxMessage({
+      surface: testSurface,
+      correlationId: `${testPrefix}-tenant-isolation`,
+      channel,
+      threadTs: '',
+      text: 'tenant a only',
+      scope: scopeA,
+    });
+    const messageId = path.basename(messagePath, '.json');
+    createdOutboxFiles.push(messagePath);
+
+    expect(
+      updateSurfaceOutboxMessage(testSurface, messageId, { text: 'cross-tenant edit' }, scopeB)
+    ).toBeNull();
+    clearSurfaceOutboxMessage(testSurface, messageId, scopeB);
+    expect(listSurfaceOutboxMessages(testSurface, { scope: scopeA })).toContainEqual(
+      expect.objectContaining({ message_id: messageId, text: 'tenant a only' })
+    );
+
+    const deadLetter = withExecutionContext('surface_runtime', () =>
+      deadLetterSurfaceOutboxMessage(
+        testSurface,
+        messageId,
+        { kind: 'transient', retryable: true, reason: 'tenant scoped test' },
+        scopeA
+      )
+    );
+    expect(deadLetter).not.toBeNull();
+    expect(listSurfaceDeadLetters(testSurface, { scope: scopeA })).toContainEqual(
+      expect.objectContaining({ dead_letter_id: deadLetter!.dead_letter_id })
+    );
+    expect(listSurfaceDeadLetters(testSurface, { scope: scopeB })).not.toContainEqual(
+      expect.objectContaining({ dead_letter_id: deadLetter!.dead_letter_id })
+    );
+    expect(() =>
+      replaySurfaceDeadLetter(testSurface, deadLetter!.dead_letter_id, {
+        operatorId: 'tenant-b-operator',
+        scope: scopeB,
+      })
+    ).toThrow('[NOT_FOUND]');
   });
 });

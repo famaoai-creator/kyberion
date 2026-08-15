@@ -41,6 +41,7 @@ export {
   listSurfaceOutboxMessages,
   updateSurfaceAsyncRequest,
 } from './surface-coordination-store.js';
+export type { SurfaceRecordListOptions } from './surface-coordination-store.js';
 export {
   deriveSlackDelegationReceiver,
   deriveSurfaceDelegationReceiver,

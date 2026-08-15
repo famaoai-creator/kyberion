@@ -18,7 +18,9 @@ import {
   createIMessageSurfaceMessage,
   createPresenceSurfaceMessage,
   createSlackSurfaceMessage,
+  createSurfaceMessageFromConversationInput,
   createSurfaceSpace,
+  resolveSurfaceIngressScope,
   SurfaceUnsupportedActionError,
 } from './surface-interaction-model.js';
 import { pathResolver } from './path-resolver.js';
@@ -140,6 +142,52 @@ describe('surface-interaction-model', () => {
     expect(telegramInput.surface).toBe('telegram');
     expect(telegramInput.agentId).toBe('telegram-surface-agent');
     expect(telegramInput.query).toBe('Telegramで会話して');
+  });
+
+  it('propagates an inbound tenant scope into surface coordination records', () => {
+    const message = createSurfaceMessageFromConversationInput({
+      surface: 'discord',
+      text: 'tenant scoped message',
+      channel: 'guild-tenant-a',
+      threadTs: 'thread-tenant-a',
+      senderAgentId: 'discord-bridge',
+      scope: {
+        scope_kind: 'tenant',
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+      },
+    });
+
+    const receipt = message.reply({ text: 'tenant scoped reply', source: 'surface' });
+    expect(receipt.mode).toBe('outbox');
+    expect(listSurfaceOutboxMessages('discord', { scope: message.scope })).toContainEqual(
+      expect.objectContaining({
+        text: 'tenant scoped reply',
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+      })
+    );
+    expect(
+      listSurfaceOutboxMessages('discord', {
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+      })
+    ).not.toContainEqual(expect.objectContaining({ text: 'tenant scoped reply' }));
+  });
+
+  it('enforces the provider scope policy before accepting an inbound scope', () => {
+    expect(
+      resolveSurfaceIngressScope({ surface: 'chronos', channel: 'chronos-1' })
+    ).toBeUndefined();
+    expect(() =>
+      resolveSurfaceIngressScope({
+        surface: 'chronos',
+        channel: 'chronos-1',
+        scope: {
+          scope_kind: 'tenant',
+          tier: 'personal',
+          tenant_slug: 'tenant-a',
+        },
+      })
+    ).toThrow('[SURFACE_SCOPE_TIER_DENIED]');
   });
 
   it('builds normalized surface conversation input from surface messages', () => {

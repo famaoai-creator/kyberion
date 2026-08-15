@@ -576,13 +576,23 @@ function listKnownSurfaceChannels(): string[] {
 
 export function listSurfaceAsyncRequestsAcrossChannels(): Array<Record<string, any>> {
   return listKnownSurfaceChannels()
-    .flatMap((surface) => listSurfaceAsyncRequests(surface).map((entry) => ({ ...entry, surface })))
+    .flatMap((surface) =>
+      listSurfaceAsyncRequests(surface, { includeTenantNamespaces: true }).map((entry) => ({
+        ...entry,
+        surface,
+      }))
+    )
     .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 }
 
 export function listSurfaceNotificationsAcrossChannels(): Array<Record<string, any>> {
   return listKnownSurfaceChannels()
-    .flatMap((surface) => listSurfaceNotifications(surface).map((entry) => ({ ...entry, surface })))
+    .flatMap((surface) =>
+      listSurfaceNotifications(surface, { includeTenantNamespaces: true }).map((entry) => ({
+        ...entry,
+        surface,
+      }))
+    )
     .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 }
 

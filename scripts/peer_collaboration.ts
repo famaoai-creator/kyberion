@@ -11,6 +11,11 @@ async function main(): Promise<void> {
     .command('accept', 'Accept a pending proposal', () => undefined)
     .command('reject', 'Reject a pending proposal', () => undefined)
     .option('peer-id', { type: 'string', demandOption: true })
+    .option('tenant-id', {
+      type: 'string',
+      default: process.env.KYBERION_TENANT_ID || '',
+      demandOption: true,
+    })
     .option('proposal-id', { type: 'string' })
     .option('actor-id', { type: 'string' })
     .option('reason', { type: 'string' })
@@ -24,10 +29,12 @@ async function main(): Promise<void> {
 
   const command = String(argv._[0]);
   const peerId = String(argv['peer-id']);
+  const tenantId = String(argv['tenant-id']).trim();
   const namespace = argv['mesh-namespace'] ? String(argv['mesh-namespace']) : undefined;
 
   if (command === 'list') {
     const proposals = listMeshHubRecipientProposals(peerId, {
+      tenantId,
       namespace,
       status: argv.status as 'pending' | 'accepted' | 'rejected' | undefined,
     });
@@ -46,6 +53,7 @@ async function main(): Promise<void> {
   }
   const decision = await decideMeshHubRecipientProposal({
     peerId,
+    tenantId,
     proposalId,
     decision: command === 'accept' ? 'accepted' : 'rejected',
     actorId,

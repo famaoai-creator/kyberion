@@ -20,6 +20,12 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true
+      },
       "intent_rules": {
         "rules": [
           {
@@ -571,6 +577,12 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "viewer-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": false
+      },
       "routing": {
         "text_routing": {
           "greeting_patterns": [],
@@ -646,6 +658,12 @@
         "directReply": "notification",
         "supportsOutbox": false,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "viewer-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": false
       },
       "routing": {
         "text_routing": {
@@ -731,6 +749,12 @@
         "directReply": "notification",
         "supportsOutbox": false,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true
       },
       "routing": {
         "text_routing": {
@@ -846,6 +870,12 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true
+      },
       "routing": {
         "text_routing": {
           "greeting_patterns": [
@@ -959,6 +989,12 @@
         "directReply": "outbox",
         "supportsOutbox": true,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true
       },
       "routing": {
         "text_routing": {

@@ -250,7 +250,7 @@ export function routeMeshRequest(
     return topicResolutionToRouteDecision(request, resolution, policyVersion);
   }
 
-  const directoryEntries = listMeshPeerDirectoryEntries(now);
+  const directoryEntries = listMeshPeerDirectoryEntries(request.tenant_scope.tenant_id, now);
   const eligiblePeers = listEligibleMeshPeers(selector, {
     tenant_id: request.tenant_scope.tenant_id,
     now,

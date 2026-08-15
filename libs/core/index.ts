@@ -11,6 +11,7 @@ export * from './core.js';
 export * from './skill-wrapper.js';
 export * from './capability-wrapper.js';
 export * from './metrics.js';
+export * from './generation-cost-settlement.js';
 export * from './error-codes.js';
 
 // Secure IO & Filesystem (Shield Layer)
@@ -124,6 +125,9 @@ export * from './mission-work-reconciliation.js';
 export * from './context-security-scope.js';
 export * from './scope-context.js';
 export * from './event-scope.js';
+export * from './runtime-scope.js';
+export * from './scope-migration.js';
+export * from './physical-namespace.js';
 export * from './memory-scope.js';
 export * from './reasoning-participant.js';
 export * from './participant-context-resolver.js';
@@ -320,6 +324,21 @@ export {
   signPeerMessage,
   verifyPeerMessage,
 } from './peer-messaging.js';
+export { buildPeerBackupArtifactReferenceNotification } from './peer-backup-reference.js';
+export {
+  createPeerRuntimeRecoveryApprovalRequest,
+  resumePeerRuntimeFromQuarantine,
+  RECOVERY_APPROVAL_CHANNEL,
+} from './peer-runtime-recovery.js';
+export type {
+  PeerRuntimeRecoveryApprovalInput,
+  PeerRuntimeRecoveryResumeInput,
+  PeerRuntimeRecoveryResult,
+} from './peer-runtime-recovery.js';
+export type {
+  BuildPeerBackupArtifactReferenceInput,
+  PeerBackupArtifactReference,
+} from './peer-backup-reference.js';
 export type {
   BuildPeerMessageInput,
   PeerMessageDispatchOptions,
@@ -838,6 +857,7 @@ export type {
   OffboardApproval,
   OffboardDedupRegistryResult,
   OffboardScopeInput,
+  PhysicalNamespaceFilter,
   OffboardScopeResult,
   OffboardScopeType,
   OffboardTarget,
@@ -2123,6 +2143,7 @@ export * from './native-op-mapping.js';
 export * from './trace-procedure-candidate.js';
 export * from './ingest-tier-gate.js';
 export * from './generation-scheduler.js';
+export * from './generation-quota.js';
 export * from './src/pipeline-scheduler.js';
 export * from './src/pipeline-preview.js';
 

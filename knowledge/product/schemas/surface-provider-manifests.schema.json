@@ -189,6 +189,38 @@
         }
       }
     },
+    "scopePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_scope",
+        "scope_mode",
+        "allowed_tiers",
+        "requires_channel_binding_for_customer_mode"
+      ],
+      "properties": {
+        "process_scope": {
+          "type": "string",
+          "enum": ["system", "tenant-service"]
+        },
+        "scope_mode": {
+          "type": "string",
+          "enum": ["system", "server-bound-tenant", "viewer-derived", "request-derived"]
+        },
+        "allowed_tiers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["public", "confidential", "personal"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requires_channel_binding_for_customer_mode": {
+          "type": "boolean"
+        }
+      }
+    },
     "intentRules": {
       "type": "object",
       "additionalProperties": false,
@@ -275,6 +307,9 @@
         "delivery": {
           "$ref": "#/$defs/delivery"
         },
+        "scope_policy": {
+          "$ref": "#/$defs/scopePolicy"
+        },
         "mcp": {
           "$ref": "#/$defs/mcpBinding"
         },
@@ -319,6 +354,9 @@
         },
         "delivery": {
           "$ref": "#/$defs/delivery"
+        },
+        "scope_policy": {
+          "$ref": "#/$defs/scopePolicy"
         },
         "routing": {
           "$ref": "#/$defs/routingPolicy"

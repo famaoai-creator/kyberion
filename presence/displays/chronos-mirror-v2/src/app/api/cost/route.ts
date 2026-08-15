@@ -34,6 +34,7 @@ export function GET(req: NextRequest) {
         missionIds,
         since: url.searchParams.get('since') || undefined,
         budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
+        ...(tenantSlugs !== 'all' ? { scopeFilter: { tenant_slugs: tenantSlugs } } : {}),
       });
     })()
   );

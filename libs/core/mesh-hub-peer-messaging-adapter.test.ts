@@ -20,6 +20,7 @@ import type { MeshRequest } from './mesh-hub-contract.js';
 const ROOT = pathResolver.rootDir();
 const TEST_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub-adapter-tests';
 const TEST_RUNTIME_ROOT_ABS = path.join(ROOT, TEST_RUNTIME_ROOT);
+const TENANT_ID = 'tenant-acme';
 
 function buildRequest(
   requestId: string,
@@ -62,11 +63,11 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshHubPeerMessagingAdapterNamespace();
-    clearPeerRuntime('peer-recipient');
+    clearPeerRuntime(TENANT_ID, 'peer-recipient');
   });
 
   afterEach(() => {
-    clearPeerRuntime('peer-recipient');
+    clearPeerRuntime(TENANT_ID, 'peer-recipient');
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshHubPeerMessagingAdapterNamespace();
     vi.unstubAllGlobals();
@@ -75,6 +76,7 @@ describe('mesh-hub-peer-messaging-adapter', () => {
   it('dispatches a signed mesh request through peer-messaging', async () => {
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace: 'mesh-hub-adapter-tests',
     });
@@ -129,17 +131,20 @@ describe('mesh-hub-peer-messaging-adapter', () => {
   it('stores validated review requests as A2A proposals without mission mutation', async () => {
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace: 'mesh-hub-adapter-tests',
     });
     const server = createPeerMessagingServer({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       responder: adapter.createResponder(),
     });
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-recipient',
       recipientPeerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       subject: 'mesh.review.request',
       type: 'request',
       payload: buildRequest('meshreq-review', 'review.request', {
@@ -167,13 +172,15 @@ describe('mesh-hub-peer-messaging-adapter', () => {
       },
     });
 
-    const inbox = listPeerInboxRecords('peer-recipient');
+    const inbox = listPeerInboxRecords(TENANT_ID, 'peer-recipient');
     expect(inbox).toHaveLength(1);
 
     const proposalsPath = path.join(
       ROOT,
       TEST_RUNTIME_ROOT,
       'mesh-hub-adapter-tests',
+      'tenants',
+      TENANT_ID,
       'adapters',
       'peer-recipient',
       'proposals.jsonl'
@@ -195,17 +202,20 @@ describe('mesh-hub-peer-messaging-adapter', () => {
   it('turns workitem requests into stored WorkItem proposals and never auto-executes missions', async () => {
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace: 'mesh-hub-adapter-tests',
     });
     const server = createPeerMessagingServer({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       responder: adapter.createResponder(),
     });
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-recipient',
       recipientPeerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       subject: 'mesh.workitem.claim',
       type: 'request',
       payload: buildRequest('meshreq-workitem', 'workitem.claim', {
@@ -239,6 +249,7 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     const namespace = 'mesh-hub-adapter-tests';
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace,
     });
@@ -251,7 +262,9 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     const proposal = adapter.proposeLocalRequest(request, 'peer-message-conversation-1');
     const duplicate = adapter.proposeLocalRequest(request, 'peer-message-conversation-retry');
     expect(duplicate.proposal_id).toBe(proposal.proposal_id);
-    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toMatchObject([
+    expect(
+      listMeshHubRecipientProposals('peer-recipient', { tenantId: TENANT_ID, namespace })
+    ).toMatchObject([
       {
         proposal_id: proposal.proposal_id,
         request_id: request.request_id,
@@ -262,6 +275,7 @@ describe('mesh-hub-peer-messaging-adapter', () => {
 
     const decision = await decideMeshHubRecipientProposal({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       proposalId: proposal.proposal_id,
       decision: 'accepted',
       actorId: 'operator-local',
@@ -273,12 +287,13 @@ describe('mesh-hub-peer-messaging-adapter', () => {
       decision: 'accepted',
       actor_id: 'operator-local',
     });
-    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toMatchObject([
-      { proposal_id: proposal.proposal_id, status: 'accepted' },
-    ]);
+    expect(
+      listMeshHubRecipientProposals('peer-recipient', { tenantId: TENANT_ID, namespace })
+    ).toMatchObject([{ proposal_id: proposal.proposal_id, status: 'accepted' }]);
     await expect(
       decideMeshHubRecipientProposal({
         peerId: 'peer-recipient',
+        tenantId: TENANT_ID,
         proposalId: proposal.proposal_id,
         decision: 'rejected',
         actorId: 'operator-local',
@@ -292,6 +307,7 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     const namespace = 'mesh-hub-adapter-tests';
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace,
     });
@@ -305,6 +321,8 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     expect(() => adapter.proposeLocalRequest(request, 'peer-message-expired')).toThrow(
       /mesh_hub_request_expired/
     );
-    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toHaveLength(0);
+    expect(
+      listMeshHubRecipientProposals('peer-recipient', { tenantId: TENANT_ID, namespace })
+    ).toHaveLength(0);
   });
 });

@@ -674,8 +674,8 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
       const missions = collectActiveMissions();
       const runtime = core.listAgentRuntimeSnapshots();
       const pendingOutbox = [
-        ...core.listSurfaceOutboxMessages('slack'),
-        ...core.listSurfaceOutboxMessages('chronos'),
+        ...core.listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }),
+        ...core.listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }),
       ].length;
 
       return {
@@ -826,8 +826,8 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
       const runtimes = core.listAgentRuntimeSnapshots();
       const readyCount = runtimes.filter((entry: any) => entry.agent.status === 'ready').length;
       const pendingOutbox =
-        core.listSurfaceOutboxMessages('slack').length +
-        core.listSurfaceOutboxMessages('chronos').length;
+        core.listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }).length +
+        core.listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }).length;
       return {
         status: 'ok',
         response: uxMessage(

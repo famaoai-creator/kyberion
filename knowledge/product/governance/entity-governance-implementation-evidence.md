@@ -32,7 +32,10 @@ Date: 2026-08-09
 - `pnpm run typecheck`: passed.
 - EG targeted regression set: 6 files, 72 tests passed.
 - `pnpm pipeline --input pipelines/baseline-check.json`: passed.
-- `pnpm run validate`: passed, including `check:entity-governance`.
+- `pnpm run validate`: `check:entity-governance` fails only for violations by default;
+  observed workspace findings remain visible as warnings. Use
+  `pnpm run check:entity-governance -- --strict-warnings` when warning-free
+  enforcement is required.
 - `git diff --check`: passed.
 
 ## Review and delivery boundary

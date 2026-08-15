@@ -34,12 +34,14 @@ const DEFAULT_WRITER_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 
 export interface MeshHubPeerMessagingAdapterOptions {
   peerId: string;
+  tenantId: string;
   sharedSecret: string;
   namespace?: string;
 }
 
 export interface MeshHubRecipientProposalRecord {
   kind: 'mesh-hub-recipient-proposal';
+  tenant_id: string;
   proposal_id: string;
   peer_id: string;
   request_id: string;
@@ -57,6 +59,7 @@ export interface MeshHubRecipientProposalRecord {
 
 export interface MeshHubRecipientProposalDecision {
   kind: 'mesh-hub-recipient-proposal-decision';
+  tenant_id: string;
   decision_id: string;
   proposal_id: string;
   peer_id: string;
@@ -89,28 +92,42 @@ function normalizeNamespace(namespace?: string): string {
     .slice(0, 64);
 }
 
-function meshHubRuntimeRoot(namespace?: string): string {
+function normalizeTenantId(tenantId: string): string {
+  const normalized = String(tenantId || '').trim();
+  if (!isValidTenantSlug(normalized)) {
+    throw new Error(`mesh_hub_invalid_tenant_id:${normalized}`);
+  }
+  return normalized;
+}
+
+function meshHubRuntimeRoot(namespace: string | undefined, tenantId: string): string {
   const baseRoot = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
   const suffix = normalizeNamespace(namespace);
-  return suffix ? `${baseRoot}/${suffix}` : baseRoot;
+  const namespaceRoot = suffix ? `${baseRoot}/${suffix}` : baseRoot;
+  return `${namespaceRoot}/tenants/${normalizeTenantId(tenantId)}`;
 }
 
-function meshHubObservabilityRoot(namespace?: string): string {
+function meshHubObservabilityRoot(namespace: string | undefined, tenantId: string): string {
   const baseRoot = process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
   const suffix = normalizeNamespace(namespace);
-  return suffix ? `${baseRoot}/${suffix}` : baseRoot;
+  const namespaceRoot = suffix ? `${baseRoot}/${suffix}` : baseRoot;
+  return `${namespaceRoot}/tenants/${normalizeTenantId(tenantId)}`;
 }
 
-function proposalsPath(namespace: string | undefined, peerId: string): string {
-  return `${meshHubRuntimeRoot(namespace)}/adapters/${peerId}/proposals.jsonl`;
+function proposalsPath(namespace: string | undefined, tenantId: string, peerId: string): string {
+  return `${meshHubRuntimeRoot(namespace, tenantId)}/adapters/${peerId}/proposals.jsonl`;
 }
 
-function proposalDecisionsPath(namespace: string | undefined, peerId: string): string {
-  return `${meshHubRuntimeRoot(namespace)}/adapters/${peerId}/proposal-decisions.jsonl`;
+function proposalDecisionsPath(
+  namespace: string | undefined,
+  tenantId: string,
+  peerId: string
+): string {
+  return `${meshHubRuntimeRoot(namespace, tenantId)}/adapters/${peerId}/proposal-decisions.jsonl`;
 }
 
-function eventsPath(namespace: string | undefined, peerId: string): string {
-  return `${meshHubObservabilityRoot(namespace)}/adapters/${peerId}/events.jsonl`;
+function eventsPath(namespace: string | undefined, tenantId: string, peerId: string): string {
+  return `${meshHubObservabilityRoot(namespace, tenantId)}/adapters/${peerId}/events.jsonl`;
 }
 
 function randomId(prefix: string): string {
@@ -133,12 +150,14 @@ function readJsonl<T>(logicalPath: string): T[] {
 
 function recordEvent(
   namespace: string | undefined,
+  tenantId: string,
   peerId: string,
   event: Record<string, unknown>
 ): string {
-  return appendRecord(DEFAULT_WRITER_ROLE, eventsPath(namespace, peerId), {
+  return appendRecord(DEFAULT_WRITER_ROLE, eventsPath(namespace, tenantId, peerId), {
     ts: nowIso(),
     peer_id: peerId,
+    tenant_id: normalizeTenantId(tenantId),
     ...event,
   });
 }
@@ -155,6 +174,7 @@ function buildWorkitemCommand(
         ? 'status_update'
         : 'claim_request';
   return buildWorkCoordinationPeerCommandEnvelope({
+    tenantId: request.tenant_scope.tenant_id,
     senderPeerId: peerId,
     recipientPeerId: peerId,
     sharedSecret,
@@ -218,6 +238,7 @@ function buildProposalRecord(
         };
   return {
     kind: 'mesh-hub-recipient-proposal',
+    tenant_id: request.tenant_scope.tenant_id,
     proposal_id: randomId('mhp'),
     peer_id: peerId,
     request_id: request.request_id,
@@ -234,6 +255,7 @@ function buildProposalRecord(
 function validateRequestEnvelope(
   envelope: PeerMessageEnvelope,
   peerId: string,
+  tenantId: string,
   sharedSecret: string
 ): MeshRequest {
   if (envelope.type !== 'request') {
@@ -248,6 +270,9 @@ function validateRequestEnvelope(
   const request = envelope.payload as MeshRequest;
   if (!request || request.kind !== 'mesh-request') {
     throw new Error(`mesh_hub_invalid_payload:${envelope.message_id}`);
+  }
+  if (request.tenant_scope.tenant_id !== tenantId || envelope.tenant_id !== tenantId) {
+    throw new Error(`mesh_hub_tenant_mismatch:${request.request_id}`);
   }
   if (!request.tenant_scope?.tenant_id || !isValidTenantSlug(request.tenant_scope.tenant_id)) {
     throw new Error(`mesh_hub_invalid_tenant_id:${String(request.tenant_scope?.tenant_id || '')}`);
@@ -264,7 +289,7 @@ function validateRequestEnvelope(
   return request;
 }
 
-function validateLocalRequest(request: MeshRequest, peerId: string): MeshRequest {
+function validateLocalRequest(request: MeshRequest, peerId: string, tenantId: string): MeshRequest {
   if (!request || request.kind !== 'mesh-request') {
     throw new Error('mesh_hub_invalid_local_request');
   }
@@ -273,6 +298,9 @@ function validateLocalRequest(request: MeshRequest, peerId: string): MeshRequest
   }
   if (request.tenant_scope.scope !== 'same_tenant') {
     throw new Error(`mesh_hub_invalid_scope:${String(request.tenant_scope?.scope || '')}`);
+  }
+  if (request.tenant_scope.tenant_id !== tenantId) {
+    throw new Error(`mesh_hub_tenant_mismatch:${request.request_id}`);
   }
   if (request.target.selector.kind === 'peer' && request.target.selector.peer_id !== peerId) {
     throw new Error(`mesh_hub_recipient_mismatch:${request.request_id}`);
@@ -300,12 +328,13 @@ export class MeshHubPeerMessagingAdapter {
     request: MeshRequest,
     messageId: string
   ): MeshHubRecipientProposalRecord {
-    const validated = validateLocalRequest(request, this.options.peerId);
+    const validated = validateLocalRequest(request, this.options.peerId, this.options.tenantId);
     const existing = listMeshHubRecipientProposals(this.options.peerId, {
+      tenantId: this.options.tenantId,
       namespace: this.options.namespace,
     }).find((proposal) => proposal.request_id === validated.request_id);
     if (existing) {
-      recordEvent(this.options.namespace, this.options.peerId, {
+      recordEvent(this.options.namespace, this.options.tenantId, this.options.peerId, {
         type: 'mesh_hub_request_proposal_deduplicated',
         request_id: validated.request_id,
         message_id: messageId,
@@ -322,10 +351,10 @@ export class MeshHubPeerMessagingAdapter {
     );
     appendRecord(
       DEFAULT_WRITER_ROLE,
-      proposalsPath(this.options.namespace, this.options.peerId),
+      proposalsPath(this.options.namespace, this.options.tenantId, this.options.peerId),
       proposal
     );
-    recordEvent(this.options.namespace, this.options.peerId, {
+    recordEvent(this.options.namespace, this.options.tenantId, this.options.peerId, {
       type: 'mesh_hub_request_proposed',
       request_id: validated.request_id,
       message_id: messageId,
@@ -339,15 +368,24 @@ export class MeshHubPeerMessagingAdapter {
 
   public createResponder(): PeerMessageResponder {
     return async ({ peerId, envelope }) => {
-      const request = validateRequestEnvelope(envelope, peerId, this.options.sharedSecret);
+      const request = validateRequestEnvelope(
+        envelope,
+        peerId,
+        this.options.tenantId,
+        this.options.sharedSecret
+      );
       const proposal = buildProposalRecord(
         peerId,
         envelope.message_id,
         request,
         this.options.sharedSecret
       );
-      appendRecord(DEFAULT_WRITER_ROLE, proposalsPath(this.options.namespace, peerId), proposal);
-      recordEvent(this.options.namespace, peerId, {
+      appendRecord(
+        DEFAULT_WRITER_ROLE,
+        proposalsPath(this.options.namespace, this.options.tenantId, peerId),
+        proposal
+      );
+      recordEvent(this.options.namespace, this.options.tenantId, peerId, {
         type: 'mesh_hub_request_proposed',
         request_id: request.request_id,
         message_id: envelope.message_id,
@@ -363,7 +401,11 @@ export class MeshHubPeerMessagingAdapter {
   }
 
   public async dispatchToPeer(input: MeshHubDispatchInput): Promise<PeerMessageDispatchReceipt> {
+    if (input.request.tenant_scope.tenant_id !== this.options.tenantId) {
+      throw new Error(`mesh_hub_tenant_mismatch:${input.request.request_id}`);
+    }
     const envelope = buildPeerMessageEnvelope({
+      tenantId: input.request.tenant_scope.tenant_id,
       senderPeerId: this.options.peerId,
       recipientPeerId: input.recipient.peer_id,
       subject: `mesh.${input.request.request_kind}`,
@@ -374,7 +416,7 @@ export class MeshHubPeerMessagingAdapter {
       correlationId: input.request.correlation_id,
       ttlMs: input.request.ttl_ms,
     });
-    recordEvent(this.options.namespace, input.recipient.peer_id, {
+    recordEvent(this.options.namespace, this.options.tenantId, input.recipient.peer_id, {
       type: 'mesh_hub_request_dispatched',
       request_id: input.request.request_id,
       message_id: envelope.message_id,
@@ -391,13 +433,18 @@ export class MeshHubPeerMessagingAdapter {
 
 export function listMeshHubRecipientProposals(
   peerId: string,
-  options: { namespace?: string; status?: MeshHubRecipientProposalView['status'] } = {}
+  options: {
+    tenantId: string;
+    namespace?: string;
+    status?: MeshHubRecipientProposalView['status'];
+  }
 ): MeshHubRecipientProposalView[] {
+  const tenantId = normalizeTenantId(options.tenantId);
   const proposals = readJsonl<MeshHubRecipientProposalRecord>(
-    proposalsPath(options.namespace, peerId)
+    proposalsPath(options.namespace, tenantId, peerId)
   );
   const decisions = readJsonl<MeshHubRecipientProposalDecision>(
-    proposalDecisionsPath(options.namespace, peerId)
+    proposalDecisionsPath(options.namespace, tenantId, peerId)
   );
   const latestDecision = new Map<string, MeshHubRecipientProposalDecision>();
   for (const decision of decisions) latestDecision.set(decision.proposal_id, decision);
@@ -417,6 +464,7 @@ export function listMeshHubRecipientProposals(
 
 export async function decideMeshHubRecipientProposal(input: {
   peerId: string;
+  tenantId: string;
   proposalId: string;
   decision: 'accepted' | 'rejected';
   actorId: string;
@@ -429,6 +477,7 @@ export async function decideMeshHubRecipientProposal(input: {
   const lockId = `mesh-proposal-decision-${normalizeNamespace(input.namespace)}-${input.peerId}`;
   return withLock(lockId, async () => {
     const proposal = listMeshHubRecipientProposals(input.peerId, {
+      tenantId: input.tenantId,
       namespace: input.namespace,
     }).find((entry) => entry.proposal_id === input.proposalId);
     if (!proposal) throw new Error(`proposal_not_found:${input.proposalId}`);
@@ -438,6 +487,7 @@ export async function decideMeshHubRecipientProposal(input: {
 
     const decision: MeshHubRecipientProposalDecision = {
       kind: 'mesh-hub-recipient-proposal-decision',
+      tenant_id: normalizeTenantId(input.tenantId),
       decision_id: randomId('mhd'),
       proposal_id: proposal.proposal_id,
       peer_id: input.peerId,
@@ -448,10 +498,10 @@ export async function decideMeshHubRecipientProposal(input: {
     };
     appendRecord(
       DEFAULT_WRITER_ROLE,
-      proposalDecisionsPath(input.namespace, input.peerId),
+      proposalDecisionsPath(input.namespace, input.tenantId, input.peerId),
       decision
     );
-    recordEvent(input.namespace, input.peerId, {
+    recordEvent(input.namespace, input.tenantId, input.peerId, {
       type: `mesh_hub_proposal_${input.decision}`,
       proposal_id: proposal.proposal_id,
       request_id: proposal.request_id,
@@ -470,10 +520,11 @@ export function createMeshHubPeerMessagingAdapter(
 
 export function clearMeshHubPeerMessagingAdapterNamespace(namespace?: string): void {
   const normalized = normalizeNamespace(namespace);
-  const root = normalized ? `${meshHubRuntimeRoot(normalized)}` : meshHubRuntimeRoot();
-  const obsRoot = normalized
-    ? `${meshHubObservabilityRoot(normalized)}`
-    : meshHubObservabilityRoot();
+  const runtimeBase = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const observabilityBase =
+    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
+  const root = normalized ? `${runtimeBase}/${normalized}` : runtimeBase;
+  const obsRoot = normalized ? `${observabilityBase}/${normalized}` : observabilityBase;
   withExecutionContext(DEFAULT_WRITER_ROLE, () => {
     if (safeExistsSync(root)) safeRmSync(root, { recursive: true, force: true });
     if (safeExistsSync(obsRoot)) safeRmSync(obsRoot, { recursive: true, force: true });

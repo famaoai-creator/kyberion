@@ -4,6 +4,8 @@ import {
   registerGenerationSchedule,
   runGenerationScheduleAction as runGovernedGenerationScheduleAction,
   GENERATION_SCHEDULER_AUTHORITY,
+  normalizeEventScope,
+  type EventScopeInput,
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -25,6 +27,7 @@ export async function runGenerationScheduleAction(argv: {
   action: string;
   input?: string;
   schedule?: string;
+  scope?: EventScopeInput;
 }) {
   switch (argv.action) {
     case 'register': {
@@ -48,6 +51,7 @@ export async function runGenerationScheduleAction(argv: {
       return runGovernedGenerationScheduleAction({
         action: argv.action,
         ...(argv.schedule ? { schedule: argv.schedule } : {}),
+        ...(argv.scope ? { scope: argv.scope } : {}),
       });
     }
     default:
@@ -60,11 +64,33 @@ async function main() {
     .option('action', { type: 'string', choices: ['register', 'list', 'tick'], demandOption: true })
     .option('input', { alias: 'i', type: 'string' })
     .option('schedule', { type: 'string' })
+    .option('scope-kind', { type: 'string' })
+    .option('tier', { type: 'string' })
+    .option('tenant-slug', { type: 'string' })
+    .option('organization-id', { type: 'string' })
+    .option('project-id', { type: 'string' })
+    .option('mission-id', { type: 'string' })
+    .option('task-id', { type: 'string' })
+    .option('session-id', { type: 'string' })
     .parseSync();
+  const scopeValues: EventScopeInput = {
+    ...(argv.scopeKind
+      ? { scope_kind: String(argv.scopeKind) as EventScopeInput['scope_kind'] }
+      : {}),
+    ...(argv.tier ? { tier: String(argv.tier) as EventScopeInput['tier'] } : {}),
+    ...(argv.tenantSlug ? { tenant_slug: String(argv.tenantSlug) } : {}),
+    ...(argv.organizationId ? { organization_id: String(argv.organizationId) } : {}),
+    ...(argv.projectId ? { project_id: String(argv.projectId) } : {}),
+    ...(argv.missionId ? { mission_id: String(argv.missionId) } : {}),
+    ...(argv.taskId ? { task_id: String(argv.taskId) } : {}),
+    ...(argv.sessionId ? { session_id: String(argv.sessionId) } : {}),
+  };
+  const scope = Object.keys(scopeValues).length > 0 ? normalizeEventScope(scopeValues) : undefined;
   const result = await runGenerationScheduleAction({
     action: String(argv.action),
     input: argv.input ? String(argv.input) : undefined,
     schedule: argv.schedule ? String(argv.schedule) : undefined,
+    ...(scope ? { scope } : {}),
   });
 
   console.log(JSON.stringify(result, null, 2));

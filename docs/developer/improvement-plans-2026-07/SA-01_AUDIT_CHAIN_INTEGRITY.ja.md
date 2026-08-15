@@ -30,8 +30,20 @@
 - **完了済み**: `scripts/audit_verify.ts` と `pnpm audit:verify` を追加し、audit chain と system ledger を検証して破損時に exit 1 で報告する。`--json`、`--since YYYY-MM-DD`、追加 `--ledger` に対応。
 - **完了済み**: `pipelines/audit-verify-daily.json` を追加し、Chronos の日次ジョブとして audit/ledger 検証を登録できるようにした。
 - **完了済み**: テナントミラー(`audit-chain.ts:213-228`)を master と照合する検査(`verifyTenantMirrors`)を verify に追加(件数・ハッシュ突合)。
+- **完了済み (2026-08-16)**: 既存 stance overlay に残った不一致ミラーを、master の監査記録を保持したまま recoverable archive へ退避し、master に残る tenant 分だけ再生成する `audit:mirror-reconcile` を追加。dry-run → terminal の Sovereign 承認 → apply の順で実行し、receipt を mission evidence に保存する。master に存在しない stale mirror は再生成しない。
 - **完了済み**: `pnpm validate` への軽量チェック(`check:audit-continuity`)とドキュメント記述の実力適正化を完了。
 - **観測モード(2026-07-04 時点)**: 実環境の監査データに **HMAC 硬化以前・並行 appender 由来の歴史的破損**が存在する(直近7日で 592/1547 entries corrupted、system-ledger に parent_hash_mismatch 8件、alpha-team tenant mirror 件数不一致)。このため `check:audit-continuity` は README §5 の方針(fail-closed 化は warn 観測期間を挟む)に従い `--warn-only` で運用中。`KYBERION_AUDIT_CONTINUITY_ENFORCE=true` で enforce に切替可。**残課題**: (1) 並行プロセスが同一日次ファイルへ追記する際にチェーンが分岐する競合の解消(appender の直列化 or fork 許容の検証)、(2) 歴史的破損エントリの棚卸しと known-good anchor からの再検証。
+
+### ミラー再同期の運用
+
+```bash
+pnpm audit:mirror-reconcile -- --mission-id MSN-SA-01-<DATE>
+pnpm audit:mirror-reconcile -- --request-approval --mission-id MSN-SA-01-<DATE> --requested-by <operator>
+pnpm cli approve <REQUEST_ID> terminal
+pnpm audit:mirror-reconcile -- --apply --mission-id MSN-SA-01-<DATE> --approval-request-id <REQUEST_ID>
+```
+
+対象は `customer/{slug}/logs/audit/` のみで、master (`active/shared/logs/audit/`) は変更しない。退避先は `active/archive/.trash/audit-mirror-<run>/` であり、復旧可能である。適用後は `pnpm audit:verify --days 7 --warn-only` と `pnpm run check:entity-governance -- --strict-warnings` を再実行する。
 
 ## 実装タスク
 

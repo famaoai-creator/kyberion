@@ -26,6 +26,7 @@ import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
 import { loadProviderConfig } from './provider-config.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
@@ -44,6 +45,7 @@ export interface SpawnOptions {
   cwd?: string;
   parentAgentId?: string;
   missionId?: string;
+  scope?: EventScopeInput;
   trustRequired?: number;
   turnTimeoutMs?: number;
   runtimeMetadata?: Record<string, unknown>;
@@ -338,6 +340,9 @@ class AgentLifecycleManagerImpl {
       provider: resolvedTarget.provider,
       modelId: resolvedTarget.modelId,
     };
+    const resolvedScope = resolvedOptions.scope
+      ? normalizeEventScope(resolvedOptions.scope)
+      : undefined;
 
     if (isObsoleteAgentRuntimeProvider(resolvedOptions.provider)) {
       throw new Error(
@@ -384,6 +389,7 @@ class AgentLifecycleManagerImpl {
       threadId: agentId,
       parentAgentId: resolvedOptions.parentAgentId,
       missionId: resolvedOptions.missionId,
+      scope: resolvedScope,
       metadata: {
         provider_resolution: {
           preferredProvider: options.provider,
@@ -393,6 +399,7 @@ class AgentLifecycleManagerImpl {
           requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
         },
         task_model_hint: runtimeMetadata.task_model_hint,
+        scope: resolvedScope,
       },
     });
 
@@ -496,6 +503,7 @@ class AgentLifecycleManagerImpl {
         metadata: {
           provider: resolvedOptions.provider,
           modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
+          scope: resolvedScope,
         },
         cleanup: async () => this.shutdown(agentId),
       });
@@ -591,7 +599,11 @@ class AgentLifecycleManagerImpl {
         ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
-        metadata: { provider: resolvedOptions.provider, modelId: mediatorOpts.modelId },
+        metadata: {
+          provider: resolvedOptions.provider,
+          modelId: mediatorOpts.modelId,
+          scope: resolvedScope,
+        },
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');

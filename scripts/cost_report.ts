@@ -8,7 +8,12 @@
  *   pnpm cost:report -- --json             # machine-readable
  */
 
-import { buildCostReportFromHistory, formatCostReport, logger } from '@agent/core';
+import {
+  buildCostReportFromHistory,
+  formatCostReport,
+  logger,
+  type EventScopeFilter,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 function main(): number {
@@ -16,6 +21,12 @@ function main(): number {
     .option('since', { type: 'string', describe: 'Window start (ISO date/time)' })
     .option('until', { type: 'string', describe: 'Window end (ISO date/time)' })
     .option('last-days', { type: 'number', describe: 'Shorthand: window = now minus N days' })
+    .option('tenant', { type: 'string', describe: 'Restrict to one tenant scope' })
+    .option('organization-id', { type: 'string', describe: 'Restrict to one organization scope' })
+    .option('project-id', { type: 'string', describe: 'Restrict to one project scope' })
+    .option('mission-id', { type: 'string', describe: 'Restrict to one mission scope' })
+    .option('task-id', { type: 'string', describe: 'Restrict to one task scope' })
+    .option('session-id', { type: 'string', describe: 'Restrict to one session scope' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
@@ -26,9 +37,18 @@ function main(): number {
       : Number.isFinite(lastDays) && lastDays > 0
         ? new Date(Date.now() - lastDays * 24 * 60 * 60 * 1000).toISOString()
         : undefined;
+  const scopeFilter: EventScopeFilter = {
+    ...(argv.tenant ? { tenant_slug: String(argv.tenant) } : {}),
+    ...(argv['organization-id'] ? { organization_id: String(argv['organization-id']) } : {}),
+    ...(argv['project-id'] ? { project_id: String(argv['project-id']) } : {}),
+    ...(argv['mission-id'] ? { mission_id: String(argv['mission-id']) } : {}),
+    ...(argv['task-id'] ? { task_id: String(argv['task-id']) } : {}),
+    ...(argv['session-id'] ? { session_id: String(argv['session-id']) } : {}),
+  };
   const report = buildCostReportFromHistory({
     since,
     until: argv.until ? String(argv.until) : undefined,
+    ...(Object.keys(scopeFilter).length > 0 ? { scopeFilter } : {}),
   });
 
   if (argv.json) {

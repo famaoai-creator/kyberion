@@ -19,12 +19,7 @@ export interface NarratedVideoPreferenceProfile {
     {
       label: string;
       video_purposes?: (
-        | 'tutorial'
-        | 'announcement'
-        | 'product_demo'
-        | 'marketing'
-        | 'onboarding'
-        | 'default'
+        'tutorial' | 'announcement' | 'product_demo' | 'marketing' | 'onboarding' | 'default'
       )[];
       /**
        * @minItems 1
@@ -35,12 +30,7 @@ export interface NarratedVideoPreferenceProfile {
     ...{
       label: string;
       video_purposes?: (
-        | 'tutorial'
-        | 'announcement'
-        | 'product_demo'
-        | 'marketing'
-        | 'onboarding'
-        | 'default'
+        'tutorial' | 'announcement' | 'product_demo' | 'marketing' | 'onboarding' | 'default'
       )[];
       /**
        * @minItems 1
@@ -56,12 +46,7 @@ export interface NarratedVideoPreferenceProfile {
     {
       label: string;
       video_purposes?: (
-        | 'tutorial'
-        | 'announcement'
-        | 'product_demo'
-        | 'marketing'
-        | 'onboarding'
-        | 'default'
+        'tutorial' | 'announcement' | 'product_demo' | 'marketing' | 'onboarding' | 'default'
       )[];
       theme_hint: string;
       visual_traits?: string[];
@@ -70,12 +55,7 @@ export interface NarratedVideoPreferenceProfile {
     ...{
       label: string;
       video_purposes?: (
-        | 'tutorial'
-        | 'announcement'
-        | 'product_demo'
-        | 'marketing'
-        | 'onboarding'
-        | 'default'
+        'tutorial' | 'announcement' | 'product_demo' | 'marketing' | 'onboarding' | 'default'
       )[];
       theme_hint: string;
       visual_traits?: string[];

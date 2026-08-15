@@ -1013,6 +1013,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Fail check:entity-governance when observed warnings exist.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
       "category": "runtime",
       "type": "string",

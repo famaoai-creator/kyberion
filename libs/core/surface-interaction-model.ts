@@ -11,6 +11,7 @@ import {
   enqueueSurfaceOutboxMessage,
   enqueueSurfaceNotification,
 } from './surface-coordination-store.js';
+import { resolveCustomerBinding } from './customer-channel-binding.js';
 import { renderStatus } from './ux-vocabulary.js';
 
 import type {
@@ -24,6 +25,7 @@ import type {
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
 import type { ExecutionFeedbackInput } from './execution-feedback.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 
 export type SurfaceProviderId = SurfaceAsyncChannel;
 export type SurfaceReplyMode = 'outbox' | 'notification';
@@ -77,6 +79,7 @@ export interface SurfaceSpaceContext {
   capabilities: SurfaceCapabilityContract;
   actorId?: string;
   locale?: string;
+  scope?: EventScope;
 }
 
 export interface SurfaceMessageContext {
@@ -89,6 +92,7 @@ export interface SurfaceMessageContext {
   receivedAt: string;
   actorId?: string;
   capabilities: SurfaceCapabilityContract;
+  scope?: EventScope;
 }
 
 export interface SurfaceSpace extends SurfaceSpaceContext {
@@ -114,6 +118,32 @@ export interface SurfaceMessage extends SurfaceMessageContext {
   reply: (input: SurfaceSpaceReplyInput) => SurfaceReplyReceipt;
 }
 
+/** Resolve the external channel binding before a surface message enters coordination. */
+export function resolveSurfaceIngressScope(input: {
+  surface: string;
+  channel: string;
+  scope?: EventScopeInput;
+}): EventScope | undefined {
+  const manifest = getSurfaceProviderManifest(input.surface as SurfaceProviderId);
+  if (input.scope) {
+    const normalized = normalizeEventScope(input.scope);
+    if (manifest.scopePolicy && !manifest.scopePolicy.allowedTiers.includes(normalized.tier)) {
+      throw new Error(
+        `[SURFACE_SCOPE_TIER_DENIED] ${input.surface} does not allow tier '${normalized.tier}'.`
+      );
+    }
+    return normalized;
+  }
+  if (manifest.scopePolicy?.scopeMode !== 'request-derived') return undefined;
+  const binding = resolveCustomerBinding(input.surface, input.channel);
+  if (!binding) return undefined;
+  return normalizeEventScope({
+    scope_kind: 'tenant',
+    tier: 'confidential',
+    tenant_slug: binding.tenantSlug,
+  });
+}
+
 export interface BuildSurfaceConversationInputOptions {
   agentId: string;
   senderAgentId: string;
@@ -124,6 +154,7 @@ export interface BuildSurfaceConversationInputOptions {
   teamRole?: string;
   delegationSummaryInstruction?: string;
   executionFeedback?: ExecutionFeedbackInput;
+  scope?: EventScopeInput;
   slack?: {
     user?: string;
     team?: string;
@@ -191,6 +222,7 @@ function createReplyHandler(
         title: 'Reply',
         text: input.text,
         status: 'info',
+        scope: space.scope,
       });
       return {
         surface: space.surface,
@@ -209,6 +241,7 @@ function createReplyHandler(
       threadTs: space.threadTs,
       text: input.text,
       source: input.source,
+      scope: space.scope,
     });
     return {
       surface: space.surface,
@@ -241,6 +274,7 @@ function createNotifyHandler(
       text: input.text,
       status: input.status,
       requestId: input.requestId,
+      scope: space.scope,
     });
   };
 }
@@ -260,6 +294,7 @@ function createAsyncRequestHandler(
       query: input.query,
       acceptedText: input.acceptedText,
       requestId: input.requestId,
+      scope: space.scope,
     });
   };
 }
@@ -311,9 +346,17 @@ export function createSurfaceSpace(
   context: Omit<SurfaceSpaceContext, 'capabilities'>
 ): SurfaceSpace {
   const capabilities = getSurfaceCapabilities(context.surface);
+  const scope = context.scope
+    ? resolveSurfaceIngressScope({
+        surface: context.surface,
+        channel: context.channel,
+        scope: context.scope,
+      })
+    : undefined;
   const base: SurfaceSpaceContext = {
     ...context,
     capabilities,
+    scope,
   };
   const space: SurfaceSpace = {
     ...base,
@@ -337,6 +380,7 @@ export function createSurfaceMessage(
     threadTs: context.threadTs,
     correlationId: context.correlationId,
     actorId: context.actorId,
+    scope: context.scope,
   });
   return {
     ...context,
@@ -592,6 +636,7 @@ export function buildSurfaceConversationInputFromMessage(
     teamRole: options.teamRole,
     delegationSummaryInstruction: options.delegationSummaryInstruction,
     executionFeedback: options.executionFeedback,
+    scope: message.scope,
   };
 }
 
@@ -603,8 +648,14 @@ export function createSurfaceMessageFromConversationInput(
   const correlationId = input.correlationId || randomUUID();
   const messageId = input.messageId || randomUUID();
   const receivedAt = input.receivedAt || new Date().toISOString();
+  const ingressScope = resolveSurfaceIngressScope({
+    surface: input.surface,
+    channel,
+    scope: input.scope,
+  });
+  let message: SurfaceMessage;
   if (input.surface === 'slack') {
-    return createSlackSurfaceMessage({
+    message = createSlackSurfaceMessage({
       user: input.metadata?.user || input.actorId,
       text: input.text,
       channel,
@@ -615,9 +666,8 @@ export function createSurfaceMessageFromConversationInput(
       correlationId,
       messageId,
     });
-  }
-  if (input.surface === 'chronos') {
-    return createChronosSurfaceMessage({
+  } else if (input.surface === 'chronos') {
+    message = createChronosSurfaceMessage({
       text: input.text,
       sessionId: input.threadTs,
       requesterId: input.actorId,
@@ -625,17 +675,30 @@ export function createSurfaceMessageFromConversationInput(
       messageId,
       receivedAt,
     });
+  } else {
+    message = createSurfaceMessage({
+      text: input.text,
+      channel,
+      threadTs,
+      surface: input.surface,
+      actorId: input.actorId,
+      correlationId,
+      messageId,
+      receivedAt,
+      scope: ingressScope,
+    });
   }
-  return createSurfaceMessage({
-    text: input.text,
-    channel,
-    threadTs,
-    surface: input.surface,
-    actorId: input.actorId,
-    correlationId,
-    messageId,
-    receivedAt,
+  if (!ingressScope || message.scope) return message;
+  const scope = ingressScope;
+  const space = createSurfaceSpace({
+    surface: message.surface,
+    channel: message.channel,
+    threadTs: message.threadTs,
+    correlationId: message.correlationId,
+    actorId: message.actorId,
+    scope,
   });
+  return { ...message, scope, space, reply: (replyInput) => space.reply(replyInput) };
 }
 
 export function buildSurfaceConversationInput(
@@ -653,6 +716,7 @@ export function buildSurfaceConversationInput(
     teamRole: input.teamRole,
     delegationSummaryInstruction: input.delegationSummaryInstruction,
     executionFeedback: input.executionFeedback,
+    scope: message.scope,
     slack:
       input.surface === 'slack'
         ? {

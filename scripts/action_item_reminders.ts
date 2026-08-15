@@ -49,7 +49,7 @@ export async function runActionItemReminderSweep(input?: {
   const sweepDayKey = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const sweepSentAt = `${sweepDayKey}T00:00:00.000Z`;
   const existingOutbox = new Set(
-    listSlackOutboxMessages()
+    listSlackOutboxMessages({ includeTenantNamespaces: true })
       .filter((message) => typeof message.correlation_id === 'string')
       .map((message) => message.correlation_id as string)
   );

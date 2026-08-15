@@ -316,6 +316,9 @@ Supporting runtime components:
 ### 7.3 Feedback and receipts
 
 - `active/shared/coordination/channels/<channel>/outbox/`
+- tenant-scoped records use `active/shared/coordination/channels/<channel>/tenants/<tenant>/outbox/` (with deeper organization/project/mission lineage when present)
+- Presence async requests/notifications use `active/shared/runtime/presence/{requests,notifications}/` and the same `tenants/<tenant>/...` lineage.
+- System aggregate readers must opt in explicitly and external bridge delivery must verify the tenant scope against the active customer-channel binding.
 - `active/shared/observability/channels/<channel>/events.jsonl`
 - `active/shared/observability/channels/<channel>/deliveries.jsonl`
 

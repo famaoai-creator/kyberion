@@ -25,6 +25,10 @@
 ### 実装メモ(2026-07-04)
 
 - **着手済み(Task 1/2/3 の基礎スライス)**: `scripts/backup.ts` を追加し、`pnpm backup create|restore|list|prune` を実体化。`--scope all|mission|tenant`、暗号化必須判定、`KYBERION_BACKUP_PASSPHRASE` による `openssl` 暗号化、同一ディスク警告、`scripts/tenant_export.ts` 互換入口を実装。
+- **更新(tenant physical namespace)**: `--scope tenant` は knowledge / project / mission / ingest cursor に加え、channel coordination、presence、generation schedule / artifact / provider cost settlement、および generation quota counter の明示した tenant subtree だけを収集する。tier 名、path traversal、別 tenant、symlink は tenant slug 検証または fail-closed 探索で除外する。export 前に tenant registry の profile が存在し、`active` であることも確認する。
+- **更新(tenant restore boundary)**: tenant archive は manifest と archive member を照合し、許可済み tenant subtree 以外を含む archive を展開しない。restore 時は `--scope tenant --tenant <slug>` を必須とし、manifest の tenant と一致しない場合は fail-closed で拒否する。
+- **更新(peer/Mesh restore boundary)**: tenant restore は peer messaging / conversation / Mesh Hub の tenant runtime と observability を `peer-recovery-quarantine` へ退避し、復元直後に stale presence / delivery lease / proposal を実行しない。`pnpm peer:runtime-recovery request|resume` は human approval、再 enrollment、fresh heartbeat を確認してから再配置する。
+- **更新(legacy peer migration)**: `pnpm migrate:peer-tenant-runtime` は flat peer/Mesh JSONL を明示された tenant ごとに split し、source hash を検証して source を quarantine する。tenant を安全に得られない record は推測せず quarantine に残す。
 - **着手済み(Task 1)**: per-mission git は `.git` を生 tar せず、`git bundle create --all` をアーカイブへ同梱し、restore 時に `git init` + bundle fetch で branch を再構成する。
 - **着手済み(Task 2)**: `pipelines/backup-daily.json` を追加し、KM-01 の cron 型スケジュールに載る日次バックアップ定義を作成。既定出力は timestamp 付きで、create 後に日次7+週次4の世代保持を適用する。
 - **着手済み(Task 2/4)**: `pnpm backup drill` と `pipelines/backup-restore-drill.json` を追加し、最新バックアップの復号・clean checkout への展開・manifest 検出を月次で検証できるようにした。`--prepare-checkout --verify-baseline` で依存 install/build 後の baseline まで実行可能。

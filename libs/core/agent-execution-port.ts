@@ -10,6 +10,7 @@ import {
   validateContextSecurityScope,
   type ContextSecurityScope,
 } from './context-security-scope.js';
+import type { EventScopeInput } from './event-scope.js';
 
 export interface AgentTaskEnvelope {
   task_id: string;
@@ -70,6 +71,15 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         modelId: request.model_id,
         missionId: request.mission_id,
         capabilities: request.capabilities,
+        scope: {
+          scope_kind: 'task',
+          tier: request.security_scope.write_tier,
+          tenant_slug: request.security_scope.tenant_slug || request.security_scope.tenant_id,
+          organization_id: request.security_scope.organization_id,
+          project_id: request.security_scope.project_id,
+          mission_id: request.security_scope.mission_id,
+          task_id: request.task_id,
+        } satisfies EventScopeInput,
         requestedBy: 'agent_execution_port',
         runtimeMetadata: {
           execution_kind: 'agent_delegation',
@@ -87,6 +97,15 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         timeoutMs: request.timeout_ms,
         correlationId: request.idempotency_key,
         missionId: request.mission_id,
+        scope: {
+          scope_kind: 'task',
+          tier: request.security_scope.write_tier,
+          tenant_slug: request.security_scope.tenant_slug || request.security_scope.tenant_id,
+          organization_id: request.security_scope.organization_id,
+          project_id: request.security_scope.project_id,
+          mission_id: request.security_scope.mission_id,
+          task_id: request.task_id,
+        },
       });
       const snapshot = getAgentRuntimeSnapshot(agentId);
       return {

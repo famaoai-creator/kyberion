@@ -70,6 +70,7 @@ async function main(): Promise<void> {
     .option('tenant-id', {
       type: 'string',
       default: process.env.KYBERION_TENANT_ID || '',
+      demandOption: true,
       description:
         'Tenant used to resolve knowledge/confidential/<tenant>/connections/peer-network.json',
     })
@@ -79,9 +80,11 @@ async function main(): Promise<void> {
     ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
     ...(argv['tenant-id'] ? { tenantId: String(argv['tenant-id']) } : {}),
   });
+  const tenantId = String(argv['tenant-id']);
   const target = resolvePeerDispatchTarget(String(argv['to-peer-id']), catalog);
   const payload = parseJsonPayload(String(argv.payload || '{}'));
   const envelope = buildPeerMessageEnvelope({
+    tenantId,
     senderPeerId: String(argv['from-peer-id']),
     recipientPeerId: target.peer.peer_id,
     subject: String(argv.subject),

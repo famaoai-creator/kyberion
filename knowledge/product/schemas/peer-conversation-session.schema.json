@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "tenant_id",
     "session_id",
     "local_peer_id",
     "remote_peer_id",
@@ -17,6 +18,11 @@
     "updated_at"
   ],
   "properties": {
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "session_id": { "type": "string", "minLength": 1 },
     "local_peer_id": { "type": "string", "minLength": 1 },
     "remote_peer_id": { "type": "string", "minLength": 1 },
