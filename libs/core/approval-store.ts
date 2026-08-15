@@ -8,6 +8,12 @@ import {
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
+import {
+  eventScopeMatches,
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from './event-scope.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
 import {
   getDefaultWorkerEventStream,
@@ -191,6 +197,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   track_name?: string;
   work_loop?: OrganizationWorkLoopSummary;
   accountability?: ApprovalAccountability;
+  /** Canonical authority scope of the effect being approved. */
+  scope?: EventScope;
 }
 
 export interface ApprovalDecisionPayload {
@@ -421,6 +429,7 @@ export function createApprovalRequest(
     accountability?: ApprovalAccountability;
     source?: ApprovalRequestSource;
     steering?: ApprovalSteeringAction;
+    scope?: EventScopeInput;
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
@@ -463,6 +472,7 @@ export function createApprovalRequest(
       }),
     accountability: params.accountability,
     steering: params.steering,
+    ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
@@ -473,6 +483,7 @@ export function createApprovalRequest(
     correlation_id: record.correlationId,
     requested_by: record.requestedBy,
     source: record.source,
+    scope: record.scope,
     channel: record.channel,
     thread_ts: record.threadTs,
   });
@@ -707,6 +718,7 @@ export function listApprovalRequests(params?: {
   storageChannels?: string[];
   status?: ApprovalRequestRecord['status'] | ApprovalRequestRecord['status'][];
   kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][];
+  scope?: EventScopeInput;
 }): ApprovalRequestRecord[] {
   const channelsRoot = pathResolver.shared('coordination/channels');
   if (!safeExistsSync(channelsRoot)) return [];
@@ -717,6 +729,7 @@ export function listApprovalRequests(params?: {
   const kinds = params?.kind
     ? new Set(Array.isArray(params.kind) ? params.kind : [params.kind])
     : null;
+  const scopeFilter = params?.scope ? normalizeEventScope(params.scope) : undefined;
   const storageChannels = params?.storageChannels?.length
     ? params.storageChannels.map((channel) => normalizeApprovalChannel(channel, 'storage channel'))
     : safeReaddir(channelsRoot).filter((entry) =>
@@ -738,6 +751,18 @@ export function listApprovalRequests(params?: {
       if (!record) continue;
       if (statuses && !statuses.has(record.status)) continue;
       if (kinds && !kinds.has(record.kind)) continue;
+      if (
+        scopeFilter &&
+        !eventScopeMatches(record.scope, {
+          scope_kind: scopeFilter.scope_kind,
+          tenant_slug: scopeFilter.tenant_slug,
+          organization_id: scopeFilter.organization_id,
+          project_id: scopeFilter.project_id,
+          mission_id: scopeFilter.mission_id,
+          task_id: scopeFilter.task_id,
+        })
+      )
+        continue;
       records.push(record);
     }
   }

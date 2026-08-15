@@ -377,6 +377,7 @@ function cmdRequestApproval(argv: string[]): void {
       runtimeId: id,
     },
     accountability: { finalDecision: 'human_only', payloadHash: brief.change.desired_hash },
+    scope: brief.change.scope,
   });
   brief.change.approval_ref = record.id;
   safeWriteFile(bPath, JSON.stringify(brief, null, 2));
@@ -449,7 +450,11 @@ async function cmdApply(argv: string[]): Promise<void> {
   assertConfigChangeApplyable({
     envelope: normalizeConfigChangeEnvelope(brief.change),
     approval: approval
-      ? { status: approval.status, payloadHash: approval.accountability?.payloadHash }
+      ? {
+          status: approval.status,
+          payloadHash: approval.accountability?.payloadHash,
+          scope: approval.scope,
+        }
       : undefined,
   });
 

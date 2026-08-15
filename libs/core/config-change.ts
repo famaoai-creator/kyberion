@@ -126,7 +126,7 @@ export function normalizeConfigChangeEnvelope(
 /** Fail closed before applying a configuration change or a drifted approval. */
 export function assertConfigChangeApplyable(input: {
   envelope: ConfigChangeEnvelope;
-  approval?: { status?: string; payloadHash?: string };
+  approval?: { status?: string; payloadHash?: string; scope?: EventScopeInput };
 }): void {
   const envelope = normalizeConfigChangeEnvelope(input.envelope);
   if (configChangeRequiresApproval(envelope)) {
@@ -150,6 +150,25 @@ export function assertConfigChangeApplyable(input: {
       throw new Error(
         '[CONFIG_CHANGE_APPROVAL_MISMATCH] approval payload does not match desired config'
       );
+    }
+    if (!input.approval.scope) {
+      throw new Error('[CONFIG_CHANGE_APPROVAL_SCOPE_MISSING] approval has no authority scope');
+    }
+    const approvalScope = normalizeEventScope(input.approval.scope);
+    for (const key of [
+      'scope_kind',
+      'tier',
+      'tenant_slug',
+      'organization_id',
+      'project_id',
+      'mission_id',
+      'task_id',
+    ] as const) {
+      if (approvalScope[key] !== envelope.scope[key]) {
+        throw new Error(
+          `[CONFIG_CHANGE_APPROVAL_SCOPE_MISMATCH] approval ${key} does not match change`
+        );
+      }
     }
   }
 }
