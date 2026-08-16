@@ -25,6 +25,7 @@ import {
   type GoldenRulePriority,
   curateBackgroundReviewProposals,
   generateKnowledgeCurationReport,
+  runKnowledgeValidationSweep,
   deriveExecutionGraph,
   executeGraph,
 } from '@agent/core';
@@ -1302,6 +1303,14 @@ export async function dispatchDecisionOp(
       // deleted, archived, or demoted here.
       const { report, reportPath } = generateKnowledgeCurationReport();
       return { handled: true, ctx: assign({ ...report, report_path: reportPath }) };
+    }
+
+    case 'knowledge_validation_sweep': {
+      // KO-17/19: read-only validation of feedback-derived heuristics and
+      // promotion candidates. Scope filtering is resolved in @agent/core;
+      // this op never changes queue status or knowledge tier.
+      const result = runKnowledgeValidationSweep();
+      return { handled: true, ctx: assign(result) };
     }
 
     case 'distill': {

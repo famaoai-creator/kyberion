@@ -47,6 +47,7 @@ import {
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { logger } from './core.js';
 import type { ScopeContext } from './scope-context.js';
+import { recordKnowledgeGap } from './src/knowledge-feedback-loop.js';
 
 const TENANT_CONFIDENTIAL_PREFIX = 'knowledge/confidential/';
 const EXCERPT_MAX_CHARS = 400;
@@ -234,9 +235,26 @@ export async function queryTenantKnowledge(
       }
     }
 
-    return Array.from(byPath.values())
+    const hits = Array.from(byPath.values())
       .sort((a, b) => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
       .slice(0, limit);
+    if (input.scope?.mission_id && (hits.length === 0 || (hits[0]?.score ?? 0) < 0.2)) {
+      try {
+        recordKnowledgeGap({
+          topic: input.topic,
+          sourceRef: `mission:${input.scope.mission_id}`,
+          scope: input.scope,
+          promoteOnCluster: true,
+        });
+      } catch (error) {
+        logger.warn(
+          `[DA-07] failed to record scoped knowledge gap for '${input.tenantSlug}': ${
+            (error as Error)?.message || String(error)
+          }`
+        );
+      }
+    }
+    return hits;
   } catch (error) {
     warnOncePerTenant(
       input.tenantSlug,

@@ -8,6 +8,9 @@ import {
 } from '../../../lib/trace-feed';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
+  viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -27,11 +30,27 @@ export async function GET(req: NextRequest) {
   const actuator = req.nextUrl.searchParams.get('actuator') || '';
   const query = req.nextUrl.searchParams.get('query') || '';
   const traceId = req.nextUrl.searchParams.get('traceId') || '';
+  let organizationIds: ReturnType<typeof strictViewerScopeOrganizationIds>;
+  let projectIds: ReturnType<typeof strictViewerScopeProjectIds>;
+  try {
+    organizationIds = strictViewerScopeOrganizationIds(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('organization_id') || undefined
+    );
+    projectIds = strictViewerScopeProjectIds(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('project_id') || undefined
+    );
+  } catch (error) {
+    return viewerErrorResponse(error);
+  }
   return withViewerExecutionContext(resolvedViewer.context, () => {
     if (traceId) {
       const trace = collectTraceDetail(traceId, {
         limit: Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 24,
         tenantSlugs: resolvedViewer.context.tenantSlugs,
+        organizationIds,
+        projectIds,
       });
 
       return NextResponse.json({
@@ -49,6 +68,8 @@ export async function GET(req: NextRequest) {
       actuator: actuator || undefined,
       query: query || undefined,
       tenantSlugs: resolvedViewer.context.tenantSlugs,
+      organizationIds,
+      projectIds,
     });
 
     return NextResponse.json({

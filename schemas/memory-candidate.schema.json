@@ -24,7 +24,14 @@
     "source_ref": { "type": "string", "minLength": 1 },
     "proposed_memory_kind": {
       "type": "string",
-      "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+      "enum": [
+        "sop",
+        "template",
+        "heuristic",
+        "risk_rule",
+        "clarification_prompt",
+        "archive_advisory"
+      ]
     },
     "summary": { "type": "string", "minLength": 1 },
     "evidence_refs": {
@@ -48,6 +55,7 @@
     "ratified_at": { "type": "string", "minLength": 1 },
     "ratification_note": { "type": "string", "minLength": 1 },
     "promoted_ref": { "type": "string", "minLength": 1 },
+    "audit_ref": { "type": "string", "minLength": 1 },
     "scope": {
       "type": "object",
       "additionalProperties": false,

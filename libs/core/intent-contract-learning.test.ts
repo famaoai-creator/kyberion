@@ -8,6 +8,10 @@ import {
 } from './intent-contract-learning.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
+const originalIntentContractMemoryRuntimePathEnv =
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH = `active/shared/tmp/test-intent-contract-memory/learning-${process.pid}.json`;
+
 describe('intent-contract-learning memory snapshot', () => {
   const { runtime: runtimePath } = resolveIntentContractMemoryPaths();
   let originalRuntimeRaw: string | null = null;
@@ -36,6 +40,11 @@ describe('intent-contract-learning memory snapshot', () => {
       safeRmSync(runtimePath);
     }
     refreshIntentContractMemorySnapshot();
+    if (originalIntentContractMemoryRuntimePathEnv === undefined)
+      delete process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+    else
+      process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH =
+        originalIntentContractMemoryRuntimePathEnv;
   });
 
   it('keeps the loaded snapshot stable until an explicit refresh', () => {
@@ -64,6 +73,16 @@ describe('intent-contract-learning memory snapshot', () => {
 
     const refreshed = refreshIntentContractMemorySnapshot();
     expect(refreshed.entries.some((entry) => entry.intent_id === markerIntentId)).toBe(true);
+  });
+
+  it('resolves tenant intent memory below the physical tenant namespace', () => {
+    const scoped = resolveIntentContractMemoryPaths({
+      tier: 'confidential',
+      tenant_slug: 'tenant-a',
+    });
+    expect(scoped.seed).not.toContain('/tenants/tenant-a/');
+    expect(scoped.runtime).toContain('/tenants/tenant-a/');
+    expect(scoped.runtime).toContain('learning-');
   });
 
   it('records correlation and mission ids when learning from an outcome', () => {

@@ -605,6 +605,7 @@
         "knowledge_export",
         "knowledge_import",
         "knowledge_inject",
+        "knowledge_validation_sweep",
         "log",
         "peer_advice",
         "perspective_fanout",

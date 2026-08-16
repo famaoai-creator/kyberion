@@ -5,6 +5,24 @@
   "default_tier_visibility": ["public"],
   "tools": [
     {
+      "name": "kyberion.scope.current",
+      "description": "Resolve the effective scope, provenance, and positive knowledge roots.",
+      "category": "governance",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.knowledge.feedback",
+      "description": "Record human usefulness feedback for a knowledge document in the current scope.",
+      "category": "knowledge",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "cowork"]
+    },
+    {
       "name": "kyberion.pipeline.list",
       "description": "List available Kyberion pipeline definitions.",
       "category": "pipeline",
