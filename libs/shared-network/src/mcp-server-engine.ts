@@ -1212,29 +1212,39 @@ export async function startMcpServerStdio(): Promise<void> {
   const principalId =
     String(process.env.KYBERION_MCP_NHI || process.env.KYBERION_MCP_PRINCIPAL || '').trim() ||
     'mcp-server-cowork';
-  recordProtocolServiceLifecycle({
-    serviceId: 'mcp-server-cowork',
-    action: 'start',
-    status: 'started',
-    scope,
-    actorRole: 'surface_runtime',
-    principal: { kind: 'service', id: principalId },
-    requestedBy: principalId,
-  });
-  let stopping = false;
-  const shutdown = async () => {
-    if (stopping) return;
-    stopping = true;
+  try {
     recordProtocolServiceLifecycle({
       serviceId: 'mcp-server-cowork',
-      action: 'stop',
-      status: 'stopped',
+      action: 'start',
+      status: 'started',
       scope,
       actorRole: 'surface_runtime',
       principal: { kind: 'service', id: principalId },
       requestedBy: principalId,
     });
+  } catch (error) {
     await transport.close();
+    throw error;
+  }
+  let stopping = false;
+  const shutdown = async () => {
+    if (stopping) return;
+    stopping = true;
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'mcp-server-cowork',
+        action: 'stop',
+        status: 'stopped',
+        scope,
+        actorRole: 'surface_runtime',
+        principal: { kind: 'service', id: principalId },
+        requestedBy: principalId,
+      });
+    } catch (error) {
+      console.error(`[MCP] stop lifecycle receipt unavailable: ${error}`);
+    } finally {
+      await transport.close();
+    }
   };
   process.once('SIGINT', () => void shutdown());
   process.once('SIGTERM', () => void shutdown());

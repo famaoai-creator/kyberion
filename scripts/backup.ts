@@ -18,7 +18,8 @@ import {
   safeSymlinkSync,
   safeWriteFile,
   assertProtocolServiceRegistered,
-  recordProtocolServiceLifecycle,
+  portableProtocolServicePathRef,
+  recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
@@ -1241,7 +1242,7 @@ export function main(argv = process.argv.slice(2)): void {
             tenant_slug: options.tenant,
           }
         : { scope_kind: 'system' as const, tier: 'public' as const };
-    recordProtocolServiceLifecycle({
+    const lifecycleReceipt = recordProtocolServiceLifecycleBestEffort({
       serviceId: 'backup-restore',
       action: 'restore',
       status: 'restored',
@@ -1249,10 +1250,14 @@ export function main(argv = process.argv.slice(2)): void {
       actorRole: 'infrastructure_sentinel',
       principal: { kind: 'service', id: 'backup-restore' },
       requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
-      metadata: { archive: result.archive, target: result.target },
+      metadata: {
+        archive: portableProtocolServicePathRef(result.archive),
+        target: portableProtocolServicePathRef(result.target),
+      },
     });
+    if (!lifecycleReceipt) console.warn('[backup] restore lifecycle receipt unavailable');
     if (result.quarantinePaths.length > 0) {
-      recordProtocolServiceLifecycle({
+      const quarantineReceipt = recordProtocolServiceLifecycleBestEffort({
         serviceId: 'backup-restore',
         action: 'restore_quarantine',
         status: 'quarantined',
@@ -1262,6 +1267,7 @@ export function main(argv = process.argv.slice(2)): void {
         requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
         metadata: { quarantine_count: result.quarantinePaths.length },
       });
+      if (!quarantineReceipt) console.warn('[backup] quarantine lifecycle receipt unavailable');
     }
     console.log(
       JSON.stringify(

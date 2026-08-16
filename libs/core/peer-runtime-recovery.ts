@@ -10,7 +10,7 @@ import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifa
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
-import { recordProtocolServiceLifecycle } from './protocol-service-lifecycle.js';
+import { recordProtocolServiceLifecycleBestEffort } from './protocol-service-lifecycle.js';
 import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeReaddir } from './secure-io.js';
 
 const RECOVERY_ROLE: GovernedArtifactRole = 'mission_controller';
@@ -265,7 +265,7 @@ export function resumePeerRuntimeFromQuarantine(
     verified_peers: peerIds,
     source_manifest_created_at: manifest.created_at,
   });
-  recordProtocolServiceLifecycle({
+  recordProtocolServiceLifecycleBestEffort({
     serviceId: 'peer-messaging',
     action: 'restore',
     status: 'restored',
