@@ -102,9 +102,13 @@ function compactDate(value: string): string {
 export function WorkItemsWorkspace({
   onOpenMission,
   tenant,
+  organizationId,
+  projectId,
 }: {
   onOpenMission?: (missionId: string) => void;
   tenant?: string;
+  organizationId?: string;
+  projectId?: string;
 }) {
   const locale = useChronosLocale();
   const [items, setItems] = React.useState<WorkItem[]>([]);
@@ -125,13 +129,14 @@ export function WorkItemsWorkspace({
 
   const refresh = React.useCallback(async () => {
     try {
+      const scopeParams = new URLSearchParams();
+      if (tenant) scopeParams.set('tenant', tenant);
+      if (organizationId) scopeParams.set('organization_id', organizationId);
+      if (projectId) scopeParams.set('project_id', projectId);
+      const scopeQuery = scopeParams.toString();
       const [response, intelligenceResponse] = await Promise.all([
-        fetch(`/api/workitems${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`, {
-          cache: 'no-store',
-        }),
-        fetch(`/api/intelligence${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}`, {
-          cache: 'no-store',
-        }),
+        fetch(`/api/workitems${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
+        fetch(`/api/intelligence${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
       ]);
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'work items failed');
@@ -151,7 +156,7 @@ export function WorkItemsWorkspace({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [tenant]);
+  }, [tenant, organizationId, projectId]);
 
   React.useEffect(() => {
     void refresh();

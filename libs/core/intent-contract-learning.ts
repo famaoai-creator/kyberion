@@ -99,9 +99,16 @@ let memoryValidateFn: ValidateFunction | null = null;
 let policyValidateFn: ValidateFunction | null = null;
 const memorySnapshotCache = new Map<string, IntentContractMemoryFile>();
 
+function globalRuntimeMemoryPath(): string {
+  const configured = process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH?.trim();
+  if (!configured) return MEMORY_RUNTIME_PATH;
+  return path.isAbsolute(configured) ? configured : pathResolver.rootResolve(configured);
+}
+
 function runtimeMemoryPath(scope?: ScopeContext): string {
-  if (!scope?.tenant_slug) return MEMORY_RUNTIME_PATH;
-  return `${physicalScopedPath(path.dirname(MEMORY_RUNTIME_PATH), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(MEMORY_RUNTIME_PATH)}`;
+  const base = globalRuntimeMemoryPath();
+  if (!scope?.tenant_slug) return base;
+  return `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
 }
 
 function ensureMemoryValidator(): ValidateFunction {
@@ -215,8 +222,11 @@ export function loadIntentContractSelectionPolicy(): IntentContractSelectionPoli
   return parsed;
 }
 
-export function resolveIntentContractMemoryPaths(): { seed: string; runtime: string } {
-  return { seed: MEMORY_SEED_PATH, runtime: MEMORY_RUNTIME_PATH };
+export function resolveIntentContractMemoryPaths(scope?: ScopeContext): {
+  seed: string;
+  runtime: string;
+} {
+  return { seed: MEMORY_SEED_PATH, runtime: runtimeMemoryPath(scope) };
 }
 
 function defaultContractForIntent(intentId: string): ContractCandidate | null {

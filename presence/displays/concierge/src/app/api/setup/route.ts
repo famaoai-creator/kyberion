@@ -52,10 +52,7 @@ export function GET(req: NextRequest) {
     const avatarPath = path.join(profileRoot, 'avatar.png');
     const activeVoiceSampleRoot = path.resolve(profileRoot, 'voice', 'samples');
     const activeTenantSlug = String(
-      identity.tenant_slug ||
-        process.env.KYBERION_TENANT ||
-        process.env.KYBERION_CUSTOMER ||
-        'default'
+      identity.tenant_slug || process.env.KYBERION_TENANT || 'default'
     );
     const tenantCatalog = withExecutionContext('sovereign_concierge', () =>
       listTenantProfileSlugs().flatMap((slug) => {
@@ -203,7 +200,7 @@ export function GET(req: NextRequest) {
         },
         tenant: {
           active_slug: activeTenantSlug,
-          runtime_bound: Boolean(process.env.KYBERION_TENANT || process.env.KYBERION_CUSTOMER),
+          runtime_bound: Boolean(process.env.KYBERION_TENANT),
           catalog: tenantCatalog,
         },
         agent_management: {
@@ -299,10 +296,7 @@ export async function POST(req: NextRequest) {
       const tenantInput = body.tenant || {};
       const agentInput = body.agent || {};
       const activeSlug = String(
-        tenantInput.slug ||
-          process.env.KYBERION_TENANT ||
-          process.env.KYBERION_CUSTOMER ||
-          'default'
+        tenantInput.slug || process.env.KYBERION_TENANT || 'default'
       ).trim();
       const profileRoot = resolveActiveProfileRoot();
       const identityPath = path.join(profileRoot, 'my-identity.json');

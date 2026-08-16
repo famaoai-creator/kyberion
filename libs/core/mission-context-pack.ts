@@ -85,6 +85,7 @@ export interface MissionStateSummary {
   relationships?: {
     project?: {
       project_id?: string;
+      organization_id?: string;
       project_path?: string;
       relationship_type?: string;
       affected_artifacts?: string[];
@@ -159,6 +160,7 @@ export interface MissionContextPackScope {
   tier: MissionTier;
   mission_id: string;
   tenant_slug?: string;
+  organization_id?: string;
   project_id?: string;
   track_id?: string;
   task_session_id?: string;
@@ -620,7 +622,7 @@ function buildRollupSummary(pack: MissionContextPack, prunedSections: string[]):
     `Mission context rollup for ${pack.scope.mission_id}`,
     `- Pack ID: ${pack.context_pack_id}`,
     `- Recipient: ${pack.recipient.kind}${pack.recipient.team_role ? ` / role=${pack.recipient.team_role}` : ''}`,
-    `- Scope: tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.track_id ? `; track=${pack.scope.track_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
+    `- Scope: tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.organization_id ? `; organization=${pack.scope.organization_id}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.track_id ? `; track=${pack.scope.track_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
     `- Pruned sections: ${prunedSections.length > 0 ? prunedSections.join(', ') : 'none'}`,
   ];
   if (pack.project?.summary)
@@ -1226,6 +1228,16 @@ function tenantSlugFromContext(input: {
   return slug;
 }
 
+function organizationIdFromContext(input: {
+  missionState: MissionStateSummary;
+  projectState?: ProjectOperationalState | null;
+}): string | undefined {
+  const fromMission = input.missionState.relationships?.project?.organization_id;
+  const fromProject = input.projectState?.metadata?.organization_id;
+  const value = String(fromMission || fromProject || '').trim();
+  return value || undefined;
+}
+
 /**
  * DA-07: gate tenant-knowledge retrieval by mission tier (fail-closed).
  * Tenant knowledge lives under the confidential tier; a public mission's
@@ -1366,6 +1378,7 @@ export async function loadKnowledgeHintsIfPossible(
       input.workItem?.project_id ||
       ''
   ).trim();
+  const sliceOrganization = organizationIdFromContext(input);
 
   const slice = resolveKnowledgeSlice({
     teamRole: input.teamRole,
@@ -1399,6 +1412,8 @@ export async function loadKnowledgeHintsIfPossible(
           scope: {
             tier: 'confidential' as const,
             tenant_slug: sliceTenant,
+            ...(sliceOrganization ? { organization_id: sliceOrganization } : {}),
+            ...(sliceProject ? { project_id: sliceProject } : {}),
             mission_id: input.missionState.mission_id,
           },
         }
@@ -1607,6 +1622,10 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     input.projectState?.project_id ||
     input.missionState.relationships?.project?.project_id ||
     input.workItem?.project_id;
+  const organizationId = organizationIdFromContext({
+    missionState: input.missionState,
+    projectState: input.projectState,
+  });
   const trackId =
     input.trackRecord?.track_id ||
     input.missionState.relationships?.track?.track_id ||
@@ -1640,6 +1659,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     tier: missionTier,
     mission_id: input.missionState.mission_id,
     ...(input.missionState.tenant_slug ? { tenant_slug: input.missionState.tenant_slug } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
     ...(projectId ? { project_id: projectId } : {}),
     ...(trackId ? { track_id: trackId } : {}),
     ...(taskSessionId ? { task_session_id: taskSessionId } : {}),
@@ -1648,6 +1668,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   const securityScope: ContextSecurityScope = {
     tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
     tenant_id: input.missionState.tenant_id || input.missionState.tenant_slug || 'default',
+    ...(organizationId ? { organization_id: organizationId } : {}),
     ...(projectId ? { project_id: projectId } : {}),
     mission_id: input.missionState.mission_id,
     ...(recipient.agent_id ? { participant_id: recipient.agent_id } : {}),
@@ -2015,7 +2036,7 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
   const lines: string[] = [
     'Mission context pack (scoped, minimal, role-specific).',
     `- Pack ID: ${pack.context_pack_id}`,
-    `- Scope: mission=${pack.scope.mission_id}; tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.track_id ? `; track=${pack.scope.track_id}` : ''}${pack.scope.task_session_id ? `; task_session=${pack.scope.task_session_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
+    `- Scope: mission=${pack.scope.mission_id}; tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.organization_id ? `; organization=${pack.scope.organization_id}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.task_session_id ? `; task_session=${pack.scope.task_session_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
     `- Recipient: ${pack.recipient.kind}${pack.recipient.team_role ? ` / role=${pack.recipient.team_role}` : ''}${pack.recipient.agent_id ? ` / agent=${pack.recipient.agent_id}` : ''}${pack.recipient.authority_role ? ` / authority=${pack.recipient.authority_role}` : ''}`,
     `- Mission: ${pack.mission.mission_id} | ${pack.mission.status}${pack.mission.mission_type ? ` | type=${pack.mission.mission_type}` : ''}${pack.mission.assigned_persona ? ` | persona=${pack.mission.assigned_persona}` : ''}`,
   ];
@@ -2086,6 +2107,20 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
       `  - Kept: ${pack.pruning.kept_sections.join(', ')}`,
       `  - Pruned: ${pack.pruning.pruned_sections.length > 0 ? pack.pruning.pruned_sections.join(', ') : 'none'}`,
       ...(pack.pruning.rollup_path ? [`  - Rollup: ${pack.pruning.rollup_path}`] : [])
+    );
+  }
+
+  if (pack.scope_audit) {
+    const counts = new Map<string, number>();
+    for (const rejection of pack.scope_audit.rejected) {
+      counts.set(rejection.code, (counts.get(rejection.code) || 0) + 1);
+    }
+    const summary = [...counts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([code, count]) => `${code}=${count}`)
+      .join(', ');
+    lines.push(
+      `- Scope-rejected knowledge: ${pack.scope_audit.rejected.length}${summary ? ` (${summary})` : ''}`
     );
   }
 

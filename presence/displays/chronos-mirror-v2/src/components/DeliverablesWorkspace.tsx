@@ -85,9 +85,13 @@ function reviewLabel(verdict: string | undefined, locale: string): string {
 
 export function DeliverablesWorkspace({
   tenant,
+  organizationId,
+  projectId,
   onOpenMission,
 }: {
   tenant?: string;
+  organizationId?: string;
+  projectId?: string;
   onOpenMission?: (missionId: string) => void;
 }) {
   const locale = useChronosLocale();
@@ -108,6 +112,8 @@ export function DeliverablesWorkspace({
     try {
       const query = new URLSearchParams({ limit: '50' });
       if (tenant) query.set('tenant', tenant);
+      if (organizationId) query.set('organization_id', organizationId);
+      if (projectId) query.set('project_id', projectId);
       const response = await fetch(`/api/deliverables?${query.toString()}`, { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Failed to load deliverables');
@@ -125,7 +131,7 @@ export function DeliverablesWorkspace({
     } finally {
       setLoading(false);
     }
-  }, [tenant]);
+  }, [tenant, organizationId, projectId]);
 
   React.useEffect(() => {
     void refresh();

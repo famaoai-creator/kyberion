@@ -1,23 +1,28 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeReaddir,
   safeReadFile,
+  safeStat,
   safeWriteFile,
 } from './secure-io.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { scopeContextKey } from './scope-context.js';
+import { auditChain } from './audit-chain.js';
+import { physicalScopedPath } from './physical-namespace.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
 export type MemoryCandidateKind =
-  'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
+  'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt' | 'archive_advisory';
 export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
 
@@ -38,6 +43,8 @@ export interface MemoryCandidate {
   ratified_at?: string;
   ratification_note?: string;
   promoted_ref?: string;
+  /** Hash-chain audit entry created when this candidate was first enqueued. */
+  audit_ref?: string;
   /** Scope envelope retained with the candidate; absent only for legacy records. */
   scope?: MemoryScopeEnvelope;
   /** Required when a tenant-scoped candidate is promoted to a broader tier. */
@@ -53,12 +60,54 @@ export interface MemoryCandidate {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const SCHEMA_PATH = pathResolver.rootResolve('schemas/memory-candidate.schema.json');
+const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
+const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
+
+function tenantQueueScope(scope: MemoryScopeEnvelope): {
+  tier: MemoryScopeEnvelope['tier'];
+  tenant_slug: string;
+  scope_kind: 'tenant';
+} {
+  if (!scope.tenant_slug) throw new Error('Tenant-scoped memory queue requires tenant_slug.');
+  // A promotion queue is owned by the tenant, even when the candidate was
+  // observed inside a project/mission. Do not let a deeper work scope create
+  // a separate queue or weaken the tenant boundary.
+  return { tier: scope.tier, tenant_slug: scope.tenant_slug, scope_kind: 'tenant' };
+}
+
 // Tests namespace the queue via KYBERION_MEMORY_QUEUE_PATH so parallel suites
-// never clobber each other's real queue file (resolved lazily per call).
-function resolveQueuePath(): string {
+// never clobber their real queue file (resolved lazily per call). In
+// production, tenant-scoped candidates are physically isolated under the
+// tenant runtime namespace; legacy/unscoped candidates remain in the global
+// queue until the migration steward adopts them.
+function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
   const override = process.env.KYBERION_MEMORY_QUEUE_PATH?.trim();
   if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/memory/promotion-queue.jsonl');
+  if (scope?.tenant_slug) {
+    return pathResolver.rootResolve(
+      physicalScopedPath(
+        'active/shared/runtime',
+        tenantQueueScope(scope),
+        'memory',
+        'promotion-queue.jsonl'
+      )
+    );
+  }
+  return pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
+}
+
+function queuePathsForAllScopes(): string[] {
+  if (process.env.KYBERION_MEMORY_QUEUE_PATH?.trim()) return [resolveQueuePath()];
+  const paths = [resolveQueuePath()];
+  const tenantRoot = pathResolver.rootResolve(TENANT_RUNTIME_ROOT);
+  if (!safeExistsSync(tenantRoot) || !safeStat(tenantRoot).isDirectory()) return paths;
+  for (const tenantSlug of safeReaddir(tenantRoot)) {
+    const tenantDir = path.join(tenantRoot, tenantSlug);
+    if (!safeStat(tenantDir).isDirectory()) continue;
+    const candidatePath = path.join(tenantDir, 'memory', 'promotion-queue.jsonl');
+    if (safeExistsSync(candidatePath)) paths.push(candidatePath);
+  }
+  return paths;
 }
 
 let validateFn: ValidateFunction | null = null;
@@ -145,8 +194,8 @@ function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   }
 }
 
-function ensureQueueDir(): void {
-  const dir = pathResolver.shared('runtime/memory');
+function ensureQueueDir(queuePath: string): void {
+  const dir = path.dirname(queuePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 }
 
@@ -215,8 +264,9 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!validation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${validation.errors.join('; ')}`);
   }
-  ensureQueueDir();
-  const rows = listMemoryPromotionCandidates();
+  const queuePath = resolveQueuePath(normalizedCandidate.scope);
+  ensureQueueDir(queuePath);
+  const rows = listMemoryPromotionCandidates(normalizedCandidate.scope);
   const contentHash = resolveContentHash(normalizedCandidate);
   const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
   const normalizedScopeKey = resolveScopeKey(normalizedCandidate.scope);
@@ -262,8 +312,8 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       );
     }
     rows[existingIndex] = next;
-    safeWriteFile(resolveQueuePath(), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
-    return resolveQueuePath();
+    safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return queuePath;
   }
   const nextCandidate: MemoryCandidate = {
     ...normalizedCandidate,
@@ -271,24 +321,54 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
     occurrences: normalizeOccurrenceCount(candidate.occurrences),
     last_seen: now,
   };
+  if (!nextCandidate.audit_ref && process.env.NODE_ENV !== 'test') {
+    try {
+      const audit = auditChain.record({
+        agentId: process.env.KYBERION_AGENT_ID || 'knowledge-promotion-queue',
+        action: 'knowledge_promotion_candidate',
+        operation: 'enqueue',
+        result: 'completed',
+        tenantSlug: nextCandidate.scope?.tenant_slug,
+        correlationId: nextCandidate.candidate_id,
+        metadata: {
+          candidate_id: nextCandidate.candidate_id,
+          source_ref: nextCandidate.source_ref,
+          sensitivity_tier: nextCandidate.sensitivity_tier,
+        },
+      });
+      nextCandidate.audit_ref = `audit:${audit.id}`;
+    } catch {
+      // Queue durability remains available during first-run/offline setup;
+      // the validation sweep reports the missing continuity link.
+    }
+  }
   const nextValidation = validateMemoryPromotionCandidate(nextCandidate);
   if (!nextValidation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${nextValidation.errors.join('; ')}`);
   }
-  safeAppendFileSync(resolveQueuePath(), `${JSON.stringify(nextCandidate)}\n`);
-  return resolveQueuePath();
+  safeAppendFileSync(queuePath, `${JSON.stringify(nextCandidate)}\n`);
+  return queuePath;
 }
 
-export function listMemoryPromotionCandidates(): MemoryCandidate[] {
-  if (!safeExistsSync(resolveQueuePath())) return [];
-  const raw = safeReadFile(resolveQueuePath(), { encoding: 'utf8' }) as string;
-  return parseJsonl(raw);
+export function listMemoryPromotionCandidates(scope?: MemoryScopeEnvelope): MemoryCandidate[] {
+  return (scope ? [resolveQueuePath(scope)] : queuePathsForAllScopes())
+    .filter((queuePath, index, all) => all.indexOf(queuePath) === index)
+    .filter((queuePath) => safeExistsSync(queuePath))
+    .flatMap((queuePath) => {
+      const raw = safeReadFile(queuePath, { encoding: 'utf8' }) as string;
+      return parseJsonl(raw);
+    });
 }
 
-export function loadMemoryPromotionCandidate(candidateId: string): MemoryCandidate | null {
+export function loadMemoryPromotionCandidate(
+  candidateId: string,
+  scope?: MemoryScopeEnvelope
+): MemoryCandidate | null {
   const normalized = String(candidateId || '').trim();
   if (!normalized) return null;
-  return listMemoryPromotionCandidates().find((row) => row.candidate_id === normalized) || null;
+  return (
+    listMemoryPromotionCandidates(scope).find((row) => row.candidate_id === normalized) || null
+  );
 }
 
 export function updateMemoryPromotionCandidateStatus(input: {
@@ -296,9 +376,24 @@ export function updateMemoryPromotionCandidateStatus(input: {
   status: MemoryCandidateStatus;
   ratificationNote?: string;
   promotedRef?: string;
+  scope?: MemoryScopeEnvelope;
 }): MemoryCandidate | null {
-  if (!safeExistsSync(resolveQueuePath())) return null;
-  const rows = listMemoryPromotionCandidates();
+  const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
+  const matchingQueuePaths = candidateQueuePath
+    ? [candidateQueuePath]
+    : queuePathsForAllScopes().filter((candidatePath) => {
+        if (!safeExistsSync(candidatePath)) return false;
+        const rows = parseJsonl(safeReadFile(candidatePath, { encoding: 'utf8' }) as string);
+        return rows.some((row) => row.candidate_id === input.candidateId);
+      });
+  if (!candidateQueuePath && matchingQueuePaths.length > 1) {
+    throw new Error(
+      `[MEMORY_PROMOTION_AMBIGUOUS] candidate '${input.candidateId}' exists in multiple scope queues; provide scope`
+    );
+  }
+  const queuePath = matchingQueuePaths[0];
+  if (!queuePath || !safeExistsSync(queuePath)) return null;
+  const rows = parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string);
   const index = rows.findIndex((row) => row.candidate_id === input.candidateId);
   if (index < 0) return null;
   const current = rows[index] as MemoryCandidate;
@@ -316,8 +411,8 @@ export function updateMemoryPromotionCandidateStatus(input: {
     throw new Error(`Invalid memory promotion candidate update: ${validation.errors.join('; ')}`);
   }
   rows[index] = next;
-  ensureQueueDir();
-  safeWriteFile(resolveQueuePath(), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+  ensureQueueDir(queuePath);
+  safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
   return next;
 }
 
@@ -352,6 +447,6 @@ export function queueMissionMemoryPromotionCandidate(input: {
   return candidate;
 }
 
-export function memoryPromotionQueuePath(): string {
-  return resolveQueuePath();
+export function memoryPromotionQueuePath(scope?: MemoryScopeEnvelope): string {
+  return resolveQueuePath(scope);
 }
