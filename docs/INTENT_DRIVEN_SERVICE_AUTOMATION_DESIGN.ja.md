@@ -18,7 +18,7 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
 > マスターで substrate 中立に凍結した **§6 共有契約・Layer①（意図解決）・Layer④（自己修復）・昇格機構（`distill-candidate-registry`）は再利用**し、本書は **service 固有のアダプタ（録画・コンパイル・実行・認証ゲート）だけ**を規定する。
 > 「勤怠承認」がブラウザ手順だったのに対し、本書が扱うのは例えば「**起票してSlack通知してBoxに格納しておいて**」のような**複数SaaSにまたがるAPI操作列**。
 
-> **実装状況（2026-08-17）**: service recording、secret redaction、ADFコンパイル、レビュー必須のpromotion、service actuator連携、ADF直接実行時の `core:await_decision` gate は実装済み。audit/traceからの自動取り込み、service専用distill評価器、認証grantの承認中継は未実装であり、下記では「残課題」として明示する。
+> **実装状況（2026-08-17）**: service recording、secret redaction、ADFコンパイル、レビュー必須のpromotion、service actuator連携、ADF直接実行時の `core:await_decision` gate、service recordingからの候補評価・レビュー用distill candidate生成は実装済み。audit/traceからの自動取り込み、service専用の差分修復、認証grantの承認中継は未実装であり、下記では「残課題」として明示する。
 
 ---
 
@@ -28,14 +28,14 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
 | --------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
 | §6 手順エントリ／`ProcedureResolution`／`ProcedureDelta`／Golden 契約 | マスター §6（substrate 中立）                         | **そのまま再利用**。`substrate:"service"` で埋める             |
 | Layer① 意図解決 `resolveProcedure()`                                  | マスター §7 Layer①                                    | **そのまま再利用**（service エントリも同じ resolver で引ける） |
-| Layer④ 自己修復・差分学習 / 昇格                                      | マスター §7 Layer④ ＋ `distill-candidate-registry.ts` | 共通registryは再利用。service専用評価器・delta学習は残課題     |
+| Layer④ 自己修復・差分学習 / 昇格                                      | マスター §7 Layer④ ＋ `distill-candidate-registry.ts` | service recordingから候補生成・評価まで実装。delta学習は残課題 |
 | パターンA/B 分岐・しきい値                                            | マスター §6.2                                         | **そのまま再利用**                                             |
 | **録画アダプタ（service-call 列の記録）**                             | `ServiceRecordingSession` / `service_recording` CLI   | **実装済み**。audit/trace自動取り込みは残課題                  |
 | **コンパイラ（param一般化・secret束縛）**                             | `service-recording-compiler.ts`                       | **実装済み**。ref→selector 解決は不要                          |
 | **実行アダプタ**                                                      | 既存 `service:preset` op / `service-engine.ts`        | **再利用**（本書 §7-C）                                        |
 | **認証ゲート（MFA相当＝OAuth/token grant）**                          | 既存 `secret-guard.ts`                                | **再利用**（本書 §7-⑤）                                        |
 
-**結論**：録画・コンパイル・昇格の最小経路は実装済み。実行時のservice approvalとsecret-guardは既存境界を再利用し、ADF直接実行には明示的な承認gateを追加した。audit/traceからのライブ録画とservice専用distill評価器は次段階で追加する。
+**結論**：録画・コンパイル・候補評価・レビュー用candidate生成・レビュー済み録画の昇格までの最小経路は実装済み。実行時のservice approvalとsecret-guardは既存境界を再利用し、ADF直接実行には明示的な承認gateを追加した。audit/traceからのライブ録画、候補の差分修復、grant承認中継は次段階で追加する。
 
 ---
 
@@ -82,7 +82,7 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
    │                                  service:preset を順に実行
    │                                  (jira.create_issue → slack.post → box.upload)
    │                                  各 external-effect step は approval-gate
-   │                                  権限不足 → §7-⑤ grant 承認中継
+   │                                  権限不足 → §7-⑤ grant 承認中継（残課題）
    │                                            ▼
    │                                  Golden 検証（レスポンス表明）→ receipt
    └─ unmatched (A) ──┐
@@ -91,7 +91,7 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
                       ▼
         [§7-③ コンパイラ] param 一般化 + secret 束縛 → draft pipeline
                       ▼
-        人間レビュー → service procedure/catalog 昇格
+        人間レビュー → distill candidate保存 → service procedure/catalog 昇格
                       （= 次回からパターンB）
 ```
 
@@ -100,18 +100,19 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
 ```text
 pnpm service:recording -- capture --target-name <name> --calls <json|@path>
 pnpm service:recording -- compile --recording <path> --procedure-id <id> --intent-phrases '[...]'
+pnpm service:recording -- candidate --recording <path> --procedure-id <id> --intent-phrases '[...]' [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>]
 pnpm service:recording -- review --recording <path> --approve|--reject
 pnpm service:recording -- promote --recording <path> --procedure-id <id> --intent-phrases '[...]'
 ```
 
-`compile` は `_draft: true` のADFを生成し、`promote` は承認済み録画だけを受け付ける。high-risk stepのADFには `core:await_decision` が前置されるため、ADFを直接実行する経路でも承認前に `service:preset` は実行されない。
+`compile` は `_draft: true` のADFを生成する。`candidate` は同じADFとGolden情報を `active/shared/runtime/distill-candidates/` にレビュー用として保存するが、catalogや実行pipelineは書き換えない。confidential candidateには `--tenant-slug` が必要で、public candidateはbrokered publication未実装のため拒否する。`promote` は承認済み録画だけを受け付ける。high-risk stepのADFには `core:await_decision` が前置されるため、ADFを直接実行する経路でも承認前に `service:preset` は実行されない。
 
 ---
 
 ## 5. 不変条件（マスター §5 を継承）
 
 - File I/O は `@agent/core/secure-io` のみ。
-- 保存先：現在の録画・draftは `active/shared/runtime/recordings/` と `active/shared/tmp/`、promotion先は `knowledge/personal/procedures.json` と `pipelines/service/`。組織業務の `confidential/{tenant-slug}` への保存・昇格は残課題であり、現状のCLIは個人/fixture用途に限定する。
+- 保存先：現在の録画・draftは `active/shared/runtime/recordings/` と `active/shared/tmp/`、candidateは `active/shared/runtime/distill-candidates/`、promotion先は `knowledge/personal/procedures.json` と `pipelines/service/`。candidateのconfidential scope表現は実装済みだが、組織業務のtenant catalogへの実昇格は残課題であり、現状のpromotion CLIは個人/fixture用途に限定する。
 - external-effect の service action は approval-gate を必ず通す（§8）。
 - 秘密は `secret-guard` 経由でのみ解決し、値は手順/録画/trace に出さない。
 - 本番のライブ録画・昇格はミッションとtenant scopeに束縛する。fixture capture/compileは外部副作用を持たないため、ローカル改善ループとして実行できる。
@@ -172,7 +173,7 @@ pnpm service:recording -- promote --recording <path> --procedure-id <id> --inten
   ```
 - **取得方法**：現在は `ServiceRecordingSession` に明示的な `service_recording_session_id` を渡した `service:preset` 呼び出しと、fixtureを受け取る `service_recording capture` CLIを実装済み。audit-chain/traceからの自動正規化は残課題。
 - **redaction**：`params` は固定値・`{{input.*}}`・`{{channel.*}}`・`{{secret.*}}` のいずれかとして保存する。raw secretは保存せず、結果もshape（kind/keys/array_length）のみ保存する。
-- **対象ファイル**：`libs/core/service-recording.ts`, `libs/core/service-recording-session.ts`, `libs/core/service-recording-compiler.ts`, `scripts/service_recording.ts`, `knowledge/product/schemas/service-recording.schema.json`
+- **対象ファイル**：`libs/core/service-recording.ts`, `libs/core/service-recording-session.ts`, `libs/core/service-recording-compiler.ts`, `libs/core/service-distill-candidate.ts`, `scripts/service_recording.ts`, `knowledge/product/schemas/service-recording.schema.json`
 - **受入条件**：未定義 actionは記録できず、secret binding・入力不足・channel順序不整合はwarning/validationで昇格を止める。token/clientSecret等がrecording/traceに残らず、produces/consumesがADFへ連結される。
 
 ---
@@ -230,10 +231,10 @@ pnpm service:recording -- promote --recording <path> --procedure-id <id> --inten
 - **現状**：`secret-guard` とsecret placeholder拒否は再利用するが、grant不足をユーザ承認へ中継して再開するservice専用フローは未実装。録画からのraw secret除去と、未束縛secretの実行拒否は実装済み。
 - **残課題**：`getSecret(key, scope)` → `grantAccessGuarded` → approval-store → 再開の一連のservice adapter接続。
 
-### Layer④ 自己修復・差分学習 — **共通部品は存在、service専用評価器は残課題**
+### Layer④ 自己修復・差分学習 — **候補生成は実装済み、評価器・修復は残課題**
 
-- `distill-candidate-registry.ts` と背景レビューは存在するが、service録画からdistill candidateを生成し、失敗差分を再コンパイルするservice専用評価器は未実装。
-- **残課題**：`assessServiceDistillCandidate`、`ProcedureDelta`への変換、人間レビュー後の再コンパイル回帰。
+- `assessServiceDistillCandidate` が、preset operation・intent phrase・観測時validation errorを確認する。通過した recordingだけを `service-distill-candidate.ts` がADF/Golden/preflight付きの procedure candidateへ変換し、`distill-candidate-registry.ts` に保存する。candidateは常に `status:"proposed"`、`metadata.executable:false` である。
+- **残課題**：実行trace/auditからの自動候補化、`ProcedureDelta`への変換、人間レビュー後の再コンパイル回帰。
 
 ---
 
@@ -251,23 +252,23 @@ service harnessのoperation契約は `read` / `write` / `destructive` を持ち�
 
 service アダプタは browser とファイルが分離されるので、**browser チームと並行可**。共有契約（§6）の owner は同一。
 
-| Agent                           | 担当     | owns（書き換え可）                                                                            | 依存（読むだけ）                                                   | 成果物                                 |
-| ------------------------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
-| **Agent-S1（Recorder）**        | §6 録画  | `service-recording.ts`, `service-recording.schema.json`                                       | §6 契約, `audit-chain.ts`, preset registry                         | service-call 列の記録＋redaction       |
-| **Agent-S2（Compiler）**        | §7-③     | `service-recording-compiler.ts`, `scripts/service_recording.ts`                               | §6 契約, service harness の operations                             | param一般化/secret束縛/Golden/ADF gate |
-| **Agent-S3（Dispatcher/Auth）** | §7-C, ⑤  | `procedure-dispatcher.ts` の service 分岐                                                     | A の `ProcedureResolution`, `service-engine.ts`, `secret-guard.ts` | 実行＋grant 中継                       |
-| **Agent-S4（Risk/Distill）**    | §8, §7-④ | `service-distill-candidate.ts`, `approval-policy.json`/`risky-op-registry.ts` の service 追加 | `distill-candidate-registry.ts`                                    | external-effect 分類＋差分学習         |
-| **Agent-R（Reviewers）**        | 横断     | （指摘のみ）                                                                                  | 全PR                                                               | §10 レビュー                           |
+| Agent                           | 担当     | owns（書き換え可）                                                                            | 依存（読むだけ）                                                   | 成果物                                   |
+| ------------------------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+| **Agent-S1（Recorder）**        | §6 録画  | `service-recording.ts`, `service-recording.schema.json`                                       | §6 契約, `audit-chain.ts`, preset registry                         | service-call 列の記録＋redaction         |
+| **Agent-S2（Compiler）**        | §7-③     | `service-recording-compiler.ts`, `scripts/service_recording.ts`                               | §6 契約, service harness の operations                             | param一般化/secret束縛/Golden/ADF gate   |
+| **Agent-S3（Dispatcher/Auth）** | §7-C, ⑤  | `procedure-dispatcher.ts` の service 分岐                                                     | A の `ProcedureResolution`, `service-engine.ts`, `secret-guard.ts` | 実行＋grant 中継                         |
+| **Agent-S4（Risk/Distill）**    | §8, §7-④ | `service-distill-candidate.ts`, `approval-policy.json`/`risky-op-registry.ts` の service 追加 | `distill-candidate-registry.ts`                                    | external-effect 分類＋候補評価・差分学習 |
+| **Agent-R（Reviewers）**        | 横断     | （指摘のみ）                                                                                  | 全PR                                                               | §10 レビュー                             |
 
 現在の実装ファイルと残課題の対応は次のとおり。
 
-| 領域               | 現在の実装                                                                                                   | 状態                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| Recorder           | `libs/core/service-recording-session.ts`, `scripts/service_recording.ts`, service actuatorの明示session hook | 実装済み。audit/trace自動取り込みは未実装 |
-| Compiler/Promotion | `libs/core/service-recording-compiler.ts`, `libs/core/service-procedure-promotion.ts`                        | 実装済み。承認gate付きADFを生成           |
-| Dispatcher/Risk    | `libs/core/procedure-dispatcher.ts`, `service:external_effect`, `core:await_decision`                        | 実装済み                                  |
-| Distill/Repair     | `libs/core/distill-candidate-registry.ts`                                                                    | 共通部品のみ。service専用評価器は未実装   |
-| Auth relay         | `secret-guard` placeholder拒否                                                                               | grant承認中継・再開は未実装               |
+| 領域               | 現在の実装                                                                                                   | 状態                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Recorder           | `libs/core/service-recording-session.ts`, `scripts/service_recording.ts`, service actuatorの明示session hook | 実装済み。audit/trace自動取り込みは未実装   |
+| Compiler/Promotion | `libs/core/service-recording-compiler.ts`, `libs/core/service-procedure-promotion.ts`                        | 実装済み。承認gate付きADFを生成             |
+| Dispatcher/Risk    | `libs/core/procedure-dispatcher.ts`, `service:external_effect`, `core:await_decision`                        | 実装済み                                    |
+| Distill/Repair     | `libs/core/service-distill-candidate.ts`, `libs/core/distill-candidate-registry.ts`                          | 候補評価・生成は実装済み。delta修復は未実装 |
+| Auth relay         | `secret-guard` placeholder拒否                                                                               | grant承認中継・再開は未実装                 |
 
 > Layer①/④ 本体は browser チーム（Agent-A/D）が実装する共有層。service チームは**その上に乗るアダプタだけ**を作る。`procedure-dispatcher.ts` は browser(Agent-C) と service(Agent-S3) が触るため、**substrate 分岐で関数を分け、同一ブロックを編集しない**こと（衝突回避はマスター §9 に従う）。
 
@@ -298,7 +299,7 @@ service アダプタは browser とファイルが分離されるので、**brow
 | **S1 録画**             | Agent-S1                                                                                        | **部分完了**：明示session/fixture captureは実装。audit/trace自動取り込みは残課題                           |
 | **S2 コンパイラ**       | Agent-S2                                                                                        | **完了**：draft、required param warning、secret binding、Golden、ADF preflight                             |
 | **S3 実行＋認証**       | Agent-S3                                                                                        | **部分完了**：procedure/ADFのapproval gateは実装。grant中継・3サービス実E2Eは残課題                        |
-| **S4 リスク＋自己修復** | Agent-S4                                                                                        | **部分完了**：risk/approval分類は実装。service専用差分学習は残課題                                         |
+| **S4 リスク＋自己修復** | Agent-S4                                                                                        | **部分完了**：risk/approval分類・候補評価・recording→candidate生成は実装。差分学習は残課題                 |
 | **S5 昇格**             | owner                                                                                           | **部分完了**：レビュー済み録画からpersonal catalogとpipelineへ昇格。tenant/mission bound promotionは残課題 |
 
 ---

@@ -2373,6 +2373,16 @@ export type { ServiceRecording, ServiceRecordingStep } from './service-recording
 export { compileServiceRecording } from './service-recording-compiler.js';
 export type { CompileServiceOptions, CompileServiceResult } from './service-recording-compiler.js';
 export {
+  assessServiceDistillCandidate,
+  buildServiceProcedureCandidate,
+} from './service-distill-candidate.js';
+export type {
+  BuildServiceProcedureCandidateOptions,
+  ServiceDistillCandidateAssessment,
+  ServiceDistillCandidateAssessmentInput,
+  ServiceProcedureCandidateResult,
+} from './service-distill-candidate.js';
+export {
   ServiceRecordingSession,
   getServiceRecordingSession,
   recordServiceCall,
