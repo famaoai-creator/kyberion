@@ -71,7 +71,6 @@
     "libs/core/src/pipeline-fragments-catalog.test.ts",
     "libs/core/src/pipeline-preview.test.ts",
     "libs/core/src/pipeline-scheduler.test.ts",
-    "libs/core/src/trace.test.ts",
     "libs/core/storage-janitor.test.ts",
     "libs/core/storage-retention-catalog.test.ts",
     "libs/core/tenant-registry.test.ts",

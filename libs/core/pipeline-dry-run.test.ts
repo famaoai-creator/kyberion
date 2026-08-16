@@ -13,6 +13,26 @@ describe('pipeline dry-run assessment', () => {
     expect(report.side_effects).toBe('none');
   });
 
+  it('treats TAKT control stages as executable control, not missing actuators', () => {
+    const report = assessPipelineDryRun({
+      pipeline_id: 'takt-control-dry-run',
+      steps: [
+        {
+          id: 'judge',
+          op: 'core:judge_route',
+          params: { routes: [{ when: { label: 'ok' }, next: 'COMPLETE' }] },
+        },
+        {
+          id: 'approval',
+          op: 'core:await_decision',
+          params: { approval: { summary: 'human decision' } },
+        },
+      ],
+    });
+
+    expect(report.verdict).toBe('ready');
+  });
+
   it('blocks an unknown actuator operation', () => {
     const report = assessPipelineDryRun({
       ...base,

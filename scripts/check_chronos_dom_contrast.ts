@@ -2,6 +2,7 @@
 
 /* eslint-disable no-restricted-imports -- The contrast gate needs a long-lived local Next server; safeExec is synchronous and cannot provide a lifecycle handle. */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
 const DEFAULT_PORT = 3317;
@@ -61,9 +62,19 @@ function parsePort(url: string): number {
   return parsed.port ? Number(parsed.port) : parsed.protocol === 'https:' ? 443 : 80;
 }
 
-async function waitForServer(url: string): Promise<void> {
+async function waitForServer(
+  url: string,
+  server: ChildProcess,
+  getStartupOutput: () => string
+): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
+    if (server.exitCode !== null) {
+      const startupOutput = getStartupOutput();
+      throw new Error(
+        `Chronos exited before becoming ready (code ${server.exitCode}).${startupOutput ? `\n${startupOutput.trim()}` : ''}`
+      );
+    }
     try {
       const response = await fetch(url);
       if (response.ok || response.status < 500) return;
@@ -72,18 +83,26 @@ async function waitForServer(url: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Chronos did not become ready at ${url}`);
+  const startupOutput = getStartupOutput();
+  throw new Error(
+    `Chronos did not become ready at ${url}.${startupOutput ? `\n${startupOutput.trim()}` : ''}`
+  );
 }
 
-function startChronos(port: number): ChildProcess {
-  return spawn(
-    'pnpm',
-    ['--dir', 'presence/displays/chronos-mirror-v2', 'start', '--port', String(port)],
-    {
-      stdio: 'ignore',
-      env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1' },
-    }
-  );
+function startChronos(port: number): { child: ChildProcess; getStartupOutput: () => string } {
+  const chronosRoot = resolve(process.cwd(), 'presence/displays/chronos-mirror-v2');
+  let startupOutput = '';
+  const child = spawn('pnpm', ['start', '--port', String(port)], {
+    cwd: chronosRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1' },
+  });
+  const capture = (chunk: Buffer) => {
+    startupOutput = `${startupOutput}${chunk.toString()}`.slice(-4000);
+  };
+  child.stdout?.on('data', capture);
+  child.stderr?.on('data', capture);
+  return { child, getStartupOutput: () => startupOutput };
 }
 
 async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> {
@@ -185,8 +204,9 @@ async function main(): Promise<void> {
   let server: ChildProcess | undefined;
   try {
     if (shouldStart) {
-      server = startChronos(parsePort(url));
-      await waitForServer(url);
+      const started = startChronos(parsePort(url));
+      server = started.child;
+      await waitForServer(url, server, started.getStartupOutput);
     }
     const requestedMode = argument('--mode');
     const modes: Array<'light' | 'dark'> =

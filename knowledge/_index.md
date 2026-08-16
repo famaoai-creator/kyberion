@@ -164,6 +164,18 @@
 ## 📁 product/config-missions
 - [Config Mission Presets](./product/config-missions/README.md) (public | Unknown)
 
+## 📁 product/facets/instructions
+- [Evidence-first instruction](./product/facets/instructions/evidence-first.md) (public | Unknown)
+
+## 📁 product/facets/output-contracts
+- [Operation result contract](./product/facets/output-contracts/operation-result.md) (public | Unknown)
+
+## 📁 product/facets/personas
+- [Orchestrator persona](./product/facets/personas/orchestrator.md) (public | Unknown)
+
+## 📁 product/facets/policies
+- [Fail-closed workflow policy](./product/facets/policies/fail-closed.md) (public | Unknown)
+
 ## 📁 product/governance
 - [Active Inquiry Protocol: The Power of Questioning](./product/governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Adapter-First Extension Policy](./product/governance/adapter-first-extension-policy.md) (public | Unknown)
@@ -357,6 +369,7 @@
 - [Voice Interface Protocol (VIP)](./product/orchestration/voice-interface-protocol.md) (public | Ecosystem Architect)
 - [Work Coordination Platform](./product/orchestration/work-coordination-platform.md) (public | Unknown)
 - [Work Coordination Platform Implementation Plan](./product/orchestration/work-coordination-platform-plan.md) (public | Unknown)
+- [takt Clean-Room Notes](./product/orchestration/takt-clean-room-notes.md) (public | Unknown)
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./product/orchestration/quality-management-flow.md) (public | Ecosystem Architect)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./product/orchestration/context-extraction-rules.md) (public | Ecosystem Architect)
 - [スキル間データ受け渡し仕様 (Data Handover Specs)](./product/orchestration/data-handover-specs.md) (public | Ecosystem Architect)

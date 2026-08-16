@@ -1,0 +1,6 @@
+{
+  "kind": "policy",
+  "name": "fail-closed",
+  "must_include": ["reject unknown scopes", "invalid contracts", "unapproved external effects"],
+  "must_not_include": ["response format"]
+}
