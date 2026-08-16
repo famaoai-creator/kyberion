@@ -19,7 +19,20 @@ interface ActuatorOpRegistryFile {
 }
 
 let _cachedOpRegistry: ActuatorOpRegistryFile | null = null;
-const DEFAULT_CONTROL_OPS = ['if', 'while'];
+const DEFAULT_CONTROL_OPS = [
+  'if',
+  'while',
+  'loop_until',
+  'retry_until_quality',
+  'foreach',
+  'parallel_foreach',
+  'team_lead',
+  'parallel_calls',
+  'accumulate',
+  'include',
+  'judge_route',
+  'await_decision',
+];
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];

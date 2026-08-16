@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { resolveFacets, validateFacetPurity } from './facet-registry.js';
+
+describe('facet-registry', () => {
+  it('keeps legacy role procedures resolvable as product persona facets', () => {
+    const facets = resolveFacets(
+      { persona: 'product_manager', instructions: ['default'] },
+      { tier: 'public' }
+    );
+    expect(facets.persona?.source).toBe('legacy');
+    expect(facets.persona?.content).toMatch(/Product Orchestrator/);
+    expect(facets.instructions[0]?.source).toBe('builtin');
+  });
+
+  it('fails closed when a public pipeline tries to select a tenant facet', () => {
+    expect(() =>
+      resolveFacets({ persona: 'product_manager' }, { tier: 'public', tenantSlug: 'tenant-a' })
+    ).toThrow(/FACET_TIER_DENIED/);
+  });
+
+  it('does not turn a misspelled facet name into an unrelated default', () => {
+    expect(() => resolveFacets({ policies: ['misspelled-policy'] }, { tier: 'public' })).toThrow(
+      /FACET_NOT_FOUND/
+    );
+  });
+
+  it('resolves only declared facets from an approved managed pack', () => {
+    const root = pathResolver.rootResolve(`active/shared/tmp/facet-pack-test-${Date.now()}`);
+    const pluginRoot = path.join(root, 'pack-one');
+    try {
+      safeMkdir(path.join(pluginRoot, 'facets', 'personas'), { recursive: true });
+      safeWriteFile(
+        path.join(pluginRoot, 'plugin.json'),
+        JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['pack-persona'] } })
+      );
+      safeWriteFile(
+        path.join(pluginRoot, '.kyberion-managed-plugin.json'),
+        JSON.stringify({
+          pluginId: 'pack-one',
+          trust: 'official',
+          trustReason: 'test',
+          resolvedSourcePath: pluginRoot,
+          managedPath: pluginRoot,
+          manifest: {
+            pluginId: 'pack-one',
+            raw: { plugin_id: 'pack-one', facets: { persona: ['pack-persona'] } },
+          },
+          diagnostics: [],
+          activationStatus: 'activatable',
+          installedAt: new Date().toISOString(),
+        })
+      );
+      safeWriteFile(
+        path.join(pluginRoot, 'facets', 'personas', 'pack-persona.md'),
+        'Managed pack persona content.'
+      );
+      const resolved = resolveFacets(
+        { persona: 'pack-persona' },
+        { tier: 'public', managedRoot: root }
+      );
+      expect(resolved.persona?.source).toBe('managed');
+      expect(resolved.persona?.content).toContain('Managed pack');
+    } finally {
+      safeRmSync(root);
+    }
+  });
+
+  it('detects impurity by facet kind', () => {
+    expect(
+      validateFacetPurity({ kind: 'persona', content: 'Standard Procedures\n1. do this' })
+    ).toContain('persona facet contains procedural instructions');
+    expect(validateFacetPurity({ kind: 'policy', content: 'Response format: JSON' })).toContain(
+      'policy facet contains output-format instructions'
+    );
+  });
+});

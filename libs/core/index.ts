@@ -117,6 +117,9 @@ export * from './deal-documents.js';
 export * from './mission-retrospective.js';
 export * from './model-performance-index.js';
 export * from './working-principles.js';
+export * from './reasoning-runtime-instructions.js';
+export * from './report-contract.js';
+export * from './facet-registry.js';
 export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
 export * from './apple-speech-file-stt-bridge.js';
@@ -977,6 +980,7 @@ export * from './organization-profile.js';
 export * from './organization-operating-model.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
+export * from './judge-route.js';
 export * from './plugin-source-trust.js';
 export * from './plugin-managed-install.js';
 export * from './skill-plugin-loader.js';
@@ -2223,7 +2227,13 @@ export * from './src/pfc/ServiceValidator.js';
 export * from './src/pfc/SovereignSentinel.js';
 
 // Observability (Unified Trace Model)
-export { TraceContext, persistTrace, finalizeAndPersist, traceLogDir } from './src/trace.js';
+export {
+  TraceContext,
+  persistTrace,
+  finalizeAndPersist,
+  traceLogDir,
+  exportTraceOtlp,
+} from './src/trace.js';
 export { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
 export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js';
 

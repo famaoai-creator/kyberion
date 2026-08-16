@@ -179,6 +179,15 @@ export function deriveExecutionGraph<T>(
       const dependency = step.depends_on?.[0] || (index > 0 ? ids[index - 1] : undefined);
       if (dependency && seen.has(dependency))
         addEdge(edges, { from: dependency, to: id, kind: 'when' });
+      const conditionFrom =
+        step.when && typeof step.when === 'object' && 'from' in step.when
+          ? (step.when as { from?: unknown }).from
+          : undefined;
+      if (typeof conditionFrom === 'string') {
+        for (const producer of producers.get(conditionFrom) || []) {
+          addEdge(edges, { from: producer, to: id, kind: 'when', channel: conditionFrom });
+        }
+      }
     }
   });
 
@@ -400,10 +409,15 @@ export async function executeGraph<T, C>(
       const run = () => execute(node, nodeContext);
       const delegated = options.delegationProvider?.(node as GraphNode<unknown>, nodeContext);
       const promise = (delegated ? withDelegationSlot({ provider: delegated }, run) : run()).catch(
-        (error: unknown) => ({
-          status: 'failed' as const,
-          error: error instanceof Error ? error.message : String(error),
-        })
+        (error: unknown) => {
+          if ((error as { adfControlFlow?: string } | null)?.adfControlFlow === 'suspend') {
+            throw error;
+          }
+          return {
+            status: 'failed' as const,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
       );
       active.set(node.id, { promise, claims });
       progressed = true;

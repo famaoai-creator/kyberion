@@ -105,6 +105,88 @@
           },
           "additionalProperties": false
         },
+        "reasoning": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "minLength": 1 },
+            "mode": { "type": "string", "minLength": 1 },
+            "profile": { "type": "string", "minLength": 1 },
+            "model": { "type": "string", "minLength": 1 },
+            "model_tier": { "type": "string", "enum": ["fast", "standard", "deep"] },
+            "permission_mode": { "type": "string", "enum": ["readonly", "edit", "full"] },
+            "capability_profile": { "type": "string", "minLength": 1 },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "promotion": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "after_failures": { "type": "integer", "minimum": 1 },
+                  "after_iterations": { "type": "integer", "minimum": 1 },
+                  "provider": { "type": "string", "minLength": 1 },
+                  "mode": { "type": "string", "minLength": 1 },
+                  "profile": { "type": "string", "minLength": 1 },
+                  "model": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false,
+                "minProperties": 2
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "facets": {
+          "type": "object",
+          "properties": {
+            "persona": { "type": "string", "minLength": 1 },
+            "policies": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "instructions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "output_contract": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "report": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["schema_ref"],
+              "properties": {
+                "schema_ref": { "type": "string", "minLength": 1 },
+                "use_judge": { "type": "boolean" },
+                "order": { "type": "integer", "minimum": 0 },
+                "export_as": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["schema_ref"],
+                "properties": {
+                  "schema_ref": { "type": "string", "minLength": 1 },
+                  "use_judge": { "type": "boolean" },
+                  "order": { "type": "integer", "minimum": 0 },
+                  "export_as": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
         "params": { "type": "object" },
         "produces": {
           "oneOf": [
@@ -165,7 +247,12 @@
             "from": { "type": "string" },
             "operator": { "type": "string" },
             "value": {},
-            "conditions": { "type": "array" }
+            "conditions": { "type": "array" },
+            "label": { "type": "string" },
+            "field": { "type": "string" },
+            "eq": {},
+            "in": { "type": "array" },
+            "matches": { "type": "string" }
           },
           "additionalProperties": false
         },
@@ -174,7 +261,35 @@
       "patternProperties": {
         "^_": {}
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": { "enum": ["judge_route", "core:judge_route"] }
+            }
+          },
+          "then": {
+            "required": ["params"],
+            "properties": {
+              "params": { "$ref": "#/definitions/judgeRouteParams" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": { "enum": ["await_decision", "core:await_decision"] }
+            }
+          },
+          "then": {
+            "required": ["params"],
+            "properties": {
+              "params": { "$ref": "#/definitions/awaitDecisionParams" }
+            }
+          }
+        }
+      ]
     },
     "hookList": {
       "type": "array",
@@ -195,6 +310,83 @@
         },
         "additionalProperties": false
       }
+    },
+    "judgeRouteParams": {
+      "type": "object",
+      "required": ["routes"],
+      "properties": {
+        "judge": {
+          "type": "object",
+          "properties": {
+            "role": { "type": "string" },
+            "persona": { "type": "string" },
+            "schema_ref": { "type": "string" },
+            "prompt": { "type": "string" },
+            "instruction_ref": { "type": "string" },
+            "inputs": {}
+          },
+          "additionalProperties": false
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["next"],
+            "properties": {
+              "when": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string" },
+                  "field": { "type": "string" },
+                  "eq": {},
+                  "in": { "type": "array" },
+                  "matches": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "next": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "on_no_match": { "enum": ["abort", "complete", "continue"] },
+        "max_route_hops": { "type": "integer", "minimum": 1 },
+        "fixture": { "type": "boolean" },
+        "verdict": { "type": "object" },
+        "export_as": { "type": "string", "minLength": 1 },
+        "verdict_as": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "awaitDecisionParams": {
+      "type": "object",
+      "required": ["approval"],
+      "properties": {
+        "approval": {
+          "type": "object",
+          "required": ["summary"],
+          "properties": {
+            "kind": { "type": "string" },
+            "title": { "type": "string" },
+            "summary": { "type": "string", "minLength": 1 },
+            "details": { "type": "string" },
+            "options": { "type": "array" },
+            "decision_rights_ref": { "type": "string" },
+            "severity": { "enum": ["low", "medium", "high"] }
+          },
+          "additionalProperties": true
+        },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "timeout": { "type": "integer", "minimum": 1 },
+        "on_timeout": { "enum": ["abort", "deny", "escalate"] },
+        "non_interactive": { "enum": ["deny", "allow"] },
+        "storage_channel": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "thread_ts": { "type": "string" },
+        "export_as": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
     }
   },
   "patternProperties": {

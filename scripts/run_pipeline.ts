@@ -20,6 +20,22 @@ import {
   missionEvidenceDir,
   pathResolver,
   installReasoningBackends,
+  getReasoningBackend,
+  getReasoningRuntimeInstructions,
+  renderRuntimeInstructions,
+  buildWorkingPrinciplesLines,
+  executeReportContract,
+  getReasoningPayloadScope,
+  delegateStructured,
+  createApprovalRequest,
+  loadApprovalRequest,
+  isApprovalRequestExpired,
+  selectJudgeRoute,
+  resolveMaxRouteHops,
+  detectRouteCycle,
+  resolveFacets,
+  renderFacets,
+  resolveStepReasoningRoute,
   runFeedbackLoop,
   determineActuatorStepType,
   getSemanticDecideDegradations,
@@ -42,6 +58,7 @@ import {
   type AdfStepHooks,
   type AdfRunResult,
   type AdfSkippedStep,
+  type ReasoningCallOptions,
   executeProgrammaticToolCall,
   getDefaultWorkerEventStream,
   getDefaultLifecycleHookEngine,
@@ -61,6 +78,7 @@ import {
   hashPipelineOutput,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
+  type PipelineRunSuspendedPayload,
   deriveExecutionGraph,
   createGraphRunArtifact,
   recordGraphRunNode,
@@ -68,6 +86,7 @@ import {
   type GraphRunArtifact,
   assessPipelineDryRun,
 } from '@agent/core';
+import { z } from 'zod';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
@@ -79,6 +98,7 @@ import * as nodePath from 'node:path';
 import {
   derivePipelineStatus,
   type PipelineAdfStep,
+  type PipelineStepReasoning,
   ROLE_FROM_TYPE,
 } from '@agent/core/pipeline-contract';
 
@@ -231,6 +251,7 @@ export interface NormalizedStepBudget {
 export interface ReasoningStepPolicy {
   effort?: 'low' | 'medium' | 'high';
   budget?: NormalizedStepBudget;
+  reasoning?: PipelineStepReasoning;
 }
 
 export function normalizeStepBudget(raw: unknown): NormalizedStepBudget | undefined {
@@ -263,6 +284,7 @@ export function normalizeReasoningPolicy(step: PipelineAdfStep): ReasoningStepPo
         ? step.effort
         : undefined,
     budget: normalizeStepBudget(step.budget),
+    reasoning: step.reasoning,
   };
 }
 
@@ -295,7 +317,148 @@ export function buildReasoningPolicyNote(policy: ReasoningStepPolicy): string {
   if (policy.budget?.max_combined_chars !== undefined)
     parts.push(`max_combined_chars=${policy.budget.max_combined_chars}`);
   if (policy.budget?.approval_required) parts.push('approval_required=true');
+  if (policy.reasoning?.profile) parts.push(`profile=${policy.reasoning.profile}`);
+  if (policy.reasoning?.provider) parts.push(`provider=${policy.reasoning.provider}`);
+  if (policy.reasoning?.model) parts.push(`model=${policy.reasoning.model}`);
+  if (policy.reasoning?.permission_mode)
+    parts.push(`permission=${policy.reasoning.permission_mode}`);
   return parts.length > 0 ? `\n\n[policy ${parts.join(' ')}]` : '';
+}
+
+function resolvePipelineReasoningOptions(
+  policy: ReasoningStepPolicy,
+  ctx: Record<string, unknown>,
+  stepId: string,
+  trace?: TraceContext
+): ReasoningCallOptions {
+  const reasoning = policy.reasoning;
+  const persona =
+    (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
+    (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
+    process.env.KYBERION_PERSONA ||
+    'default';
+  const route = resolveStepReasoningRoute({
+    stepId,
+    persona,
+    ...(reasoning ? { step: reasoning } : {}),
+    ...(reasoning?.tags ? { tags: reasoning.tags } : {}),
+    ...(typeof ctx.__pipeline_reasoning_profile === 'string'
+      ? { pipelineProfile: ctx.__pipeline_reasoning_profile }
+      : {}),
+    env: process.env,
+  });
+  trace?.addEvent('reasoning.route_selected', {
+    step_id: stepId,
+    profile: route.profile || 'default',
+    mode: route.mode || 'default',
+    ...(route.model ? { model: route.model } : {}),
+    permission_mode: route.permission_mode,
+    source: route.source,
+    provenance: route.provenance.join(','),
+  });
+  return {
+    ...(route.profile ? { route_profile: route.profile } : {}),
+    ...(route.model ? { model: route.model } : {}),
+    ...(reasoning?.model_tier ? { model_tier: reasoning.model_tier } : {}),
+    ...(route.capability_profile ? { profile: route.capability_profile } : {}),
+    permission_mode: route.permission_mode,
+    ...(persona !== 'default' ? { role: persona } : {}),
+  } satisfies ReasoningCallOptions;
+}
+
+function resolvePipelineFacetNote(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): string {
+  const raw = params._facets ?? params.facets;
+  if (!raw || typeof raw !== 'object') return '';
+  const request = raw as {
+    persona?: string;
+    policies?: string[];
+    instructions?: string[];
+    output_contract?: string;
+  };
+  const tierValue =
+    ctx.__knowledge_tier ?? ctx.knowledge_tier ?? process.env.KYBERION_KNOWLEDGE_TIER ?? 'public';
+  const tier = tierValue === 'personal' || tierValue === 'confidential' ? tierValue : 'public';
+  const requestedTenantSlug =
+    typeof ctx.tenant_slug === 'string'
+      ? ctx.tenant_slug
+      : typeof ctx.tenant_id === 'string'
+        ? ctx.tenant_id
+        : undefined;
+  const payloadScope = getReasoningPayloadScope();
+  const identityTenant = resolveIdentityContext().tenantSlug;
+  const authorizedTenant = payloadScope?.tenant_slug || identityTenant;
+  if (requestedTenantSlug && authorizedTenant && requestedTenantSlug !== authorizedTenant) {
+    throw new Error(
+      `[FACET_SCOPE_DENIED] requested tenant '${requestedTenantSlug}' does not match the authorized tenant scope`
+    );
+  }
+  if (requestedTenantSlug && !authorizedTenant) {
+    throw new Error(
+      '[FACET_SCOPE_DENIED] tenant facet resolution requires an authorized tenant scope'
+    );
+  }
+  return renderFacets(
+    resolveFacets(request, { tier, ...(authorizedTenant ? { tenantSlug: authorizedTenant } : {}) })
+  );
+}
+
+async function runPipelineReportPhase(
+  step: PipelineAdfStep,
+  ctx: Record<string, unknown>,
+  trace?: TraceContext
+): Promise<Record<string, unknown>> {
+  const reports = step.report
+    ? (Array.isArray(step.report) ? step.report : [step.report])
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : [];
+  if (reports.length === 0) return ctx;
+  const backend = getReasoningBackend();
+  let workingCtx = ctx;
+  for (const contract of reports) {
+    let reportSucceeded = false;
+    trace?.startSpan(`phase.report.${step.id || step.op}`, {
+      phase: 'report',
+      schema_ref: contract.schema_ref,
+      ...(contract.use_judge ? { use_judge: true } : {}),
+      order: contract.order ?? 0,
+    });
+    try {
+      const report = await executeReportContract(
+        backend,
+        contract,
+        [
+          `Summarize the completed perform phase for step ${step.id || step.op}.`,
+          'The report phase is read-only. Do not request or perform external side effects.',
+          `Perform context:\n${JSON.stringify(workingCtx)}`,
+        ].join('\n\n')
+      );
+      const exportKey = contract.export_as || 'last_report';
+      trace?.addEvent('report.completed', {
+        step_id: step.id || step.op,
+        schema_ref: contract.schema_ref,
+        export_as: exportKey,
+        order: contract.order ?? 0,
+        ...(contract.use_judge ? { use_judge: true } : {}),
+      });
+      workingCtx = { ...workingCtx, [exportKey]: report };
+      reportSucceeded = true;
+    } catch (error) {
+      trace?.addEvent('report.failed', {
+        step_id: step.id || step.op,
+        schema_ref: contract.schema_ref,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      trace?.endSpan('error', error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally {
+      if (reportSucceeded) trace?.endSpan('ok');
+    }
+  }
+  return workingCtx;
 }
 
 export function isReasoningBudgetExceeded(
@@ -401,6 +564,17 @@ interface RunStepsOptions {
   runId?: string;
 }
 
+class PipelineSuspendedError extends Error {
+  readonly adfControlFlow = 'suspend' as const;
+  readonly suspension: PipelineRunSuspendedPayload;
+
+  constructor(suspension: PipelineRunSuspendedPayload) {
+    super(`[PIPELINE_SUSPENDED] awaiting approval ${suspension.approval_request_id}`);
+    this.name = 'PipelineSuspendedError';
+    this.suspension = suspension;
+  }
+}
+
 function resolveParamsRecursive(params: any, ctx: any): any {
   if (Array.isArray(params)) {
     return params.map((item) => resolveParamsRecursive(item, ctx));
@@ -441,11 +615,27 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             : params.context || ctx;
         const reasoningPolicy =
           (params._reasoning_policy as ReasoningStepPolicy | undefined) ?? policy;
-        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(reasoningPolicy || {})}`;
+        const routeOptions = resolvePipelineReasoningOptions(
+          reasoningPolicy || {},
+          ctx,
+          String(params.step_id || params.op || 'reasoning'),
+          _trace
+        );
+        const facetNote = resolvePipelineFacetNote(params, ctx);
         const reasoningCallOptions = {
           effort: reasoningPolicy?.effort,
           budget: reasoningPolicy?.budget,
+          ...routeOptions,
         };
+        const runtimeNote = renderRuntimeInstructions(
+          getReasoningRuntimeInstructions(backend, reasoningCallOptions)
+        );
+        const workingPrinciples = buildWorkingPrinciplesLines(
+          typeof (reasoningCallOptions as { role?: unknown }).role === 'string'
+            ? (reasoningCallOptions as unknown as { role: string }).role
+            : undefined
+        ).join('\n');
+        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${facetNote ? `\n\n${facetNote}` : ''}\n\n${workingPrinciples}${runtimeNote ? `\n\n${runtimeNote}` : ''}${buildReasoningPolicyNote(reasoningPolicy || {})}`;
         const preCallBudgetError = isReasoningBudgetExceeded(reasoningPolicy || {}, prompt, '');
         if (preCallBudgetError) {
           throw new Error(
@@ -454,7 +644,13 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
         }
         const rawResponse = shouldUseSubagentForReasoningStep(params)
           ? await backend.delegateTask(
-              String(resolvedInstruction || 'Analyze the context.'),
+              [
+                String(resolvedInstruction || 'Analyze the context.'),
+                workingPrinciples,
+                runtimeNote,
+              ]
+                .filter(Boolean)
+                .join('\n\n'),
               JSON.stringify(resolvedContext),
               reasoningCallOptions as any
             )
@@ -648,8 +844,11 @@ export function normalizePipelineOp(op: string): string {
   if (op === 'while' || op === 'loop_until') return 'core:while';
   if (op === 'retry_until_quality') return 'core:retry_until_quality';
   if (op === 'parallel_foreach') return 'core:parallel_foreach';
+  if (op === 'team_lead') return 'core:team_lead';
   if (op === 'parallel_calls') return 'core:parallel_calls';
   if (op === 'accumulate') return 'core:accumulate';
+  if (op === 'judge_route') return 'core:judge_route';
+  if (op === 'await_decision') return 'core:await_decision';
   return `system:${op}`;
 }
 
@@ -1005,8 +1204,11 @@ const CONTROL_ACTIONS = new Set([
   'retry_until_quality',
   'foreach',
   'parallel_foreach',
+  'team_lead',
   'parallel_calls',
   'accumulate',
+  'judge_route',
+  'await_decision',
   'include',
 ]);
 
@@ -1072,8 +1274,27 @@ async function dispatchReasoningLeaf(
     : typeof params.context === 'string'
       ? resolveVars(params.context, ctx)
       : params.context || ctx;
-  const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy)}`;
-  const reasoningCallOptions = { effort: stepPolicy.effort, budget: stepPolicy.budget };
+  const routeOptions = resolvePipelineReasoningOptions(
+    stepPolicy,
+    ctx,
+    String(params._step_id || params.step_id || 'reasoning'),
+    undefined
+  );
+  const facetNote = resolvePipelineFacetNote(params, ctx);
+  const reasoningCallOptions = {
+    effort: stepPolicy.effort,
+    budget: stepPolicy.budget,
+    ...routeOptions,
+  };
+  const runtimeNote = renderRuntimeInstructions(
+    getReasoningRuntimeInstructions(backend, reasoningCallOptions)
+  );
+  const workingPrinciples = buildWorkingPrinciplesLines(
+    typeof (reasoningCallOptions as { role?: unknown }).role === 'string'
+      ? (reasoningCallOptions as unknown as { role: string }).role
+      : undefined
+  ).join('\n');
+  const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${facetNote ? `\n\n${facetNote}` : ''}\n\n${workingPrinciples}${runtimeNote ? `\n\n${runtimeNote}` : ''}${buildReasoningPolicyNote(stepPolicy)}`;
   const preCallBudgetError = isReasoningBudgetExceeded(stepPolicy, prompt, '');
   if (preCallBudgetError) {
     throw new Error(
@@ -1082,7 +1303,9 @@ async function dispatchReasoningLeaf(
   }
   const rawResponse = shouldUseSubagentForReasoningStep(params)
     ? await backend.delegateTask(
-        String(resolvedInstruction || 'Analyze the context.'),
+        [String(resolvedInstruction || 'Analyze the context.'), workingPrinciples, runtimeNote]
+          .filter(Boolean)
+          .join('\n\n'),
         JSON.stringify(resolvedContext),
         reasoningCallOptions as any
       )
@@ -1220,7 +1443,11 @@ async function dispatchLeafOp(
     domain === 'reasoning' &&
     (action === 'analyze' || action === 'transform' || action === 'synthesize')
   ) {
-    return dispatchReasoningLeaf(params, ctx, stepPolicy);
+    return dispatchReasoningLeaf(
+      { ...params, _facets: step.facets, _step_id: step.id || step.op },
+      ctx,
+      stepPolicy
+    );
   }
 
   // Emit capability.missing before dispatch so the trace records the gap
@@ -1242,7 +1469,12 @@ async function dispatchLeafOp(
   const dispatch = await loadActuatorDispatch(domain);
   const result = await dispatch(
     action,
-    { ...params, _reasoning_policy: stepPolicy },
+    {
+      ...params,
+      _reasoning_policy: stepPolicy,
+      _facets: step.facets,
+      _step_id: step.id || step.op,
+    },
     ctx,
     effectiveType,
     opts.trace,
@@ -1462,6 +1694,250 @@ async function runStepsInternal(
     const normalizedOp = normalizePipelineOp(rawOp);
     const [, action] = normalizedOp.split(':');
     const params = (rawParams || {}) as Record<string, any>;
+    const currentStep = stepRefStack[stepRefStack.length - 1];
+
+    if (action === 'judge_route') {
+      const judge = (params.judge || {}) as Record<string, unknown>;
+      const exportKey = String(
+        params.export_as ||
+          (currentStep?.produces
+            ? typeof currentStep.produces === 'string'
+              ? currentStep.produces
+              : currentStep.produces.channel
+            : 'judge_route')
+      );
+      const verdictKey = String(params.verdict_as || 'judge_verdict');
+      const fixtureVerdict =
+        params.fixture === true && params.verdict && typeof params.verdict === 'object'
+          ? (resolveVars(params.verdict, ctx) as Record<string, unknown>)
+          : undefined;
+      const schemaRef = String(judge.schema_ref || params.schema_ref || 'judge_route_verdict');
+      const verdict = fixtureVerdict
+        ? fixtureVerdict
+        : await delegateStructured(
+            getReasoningBackend(),
+            [
+              String(
+                resolveVars(
+                  judge.prompt ||
+                    judge.instruction_ref ||
+                    params.prompt ||
+                    'Classify the current pipeline context.',
+                  ctx
+                )
+              ),
+              `Return a route verdict compatible with schema_ref=${schemaRef}.`,
+              `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
+            ].join('\n\n'),
+            z
+              .object({
+                label: z.string().min(1),
+                reason: z.string().optional(),
+                value: z.unknown().optional(),
+              })
+              .passthrough(),
+            { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
+          );
+      const routes = Array.isArray(params.routes)
+        ? (params.routes as Array<{
+            when?: Record<string, unknown>;
+            next: string;
+            reason?: string;
+          }>)
+        : [];
+      const decision = selectJudgeRoute(
+        verdict as Record<string, unknown>,
+        routes,
+        (params.on_no_match as 'abort' | 'complete' | 'continue' | undefined) || 'abort'
+      );
+      opts.trace?.addEvent('judge.route_selected', {
+        step_id: currentStep?.id || rawOp,
+        route_index: decision.selection.route_index,
+        next: decision.selection.next,
+        matched: decision.selection.matched,
+        reason: decision.selection.reason,
+        schema_ref: schemaRef,
+        source: fixtureVerdict ? 'fixture' : 'reasoning_backend',
+      });
+      if (decision.selection.next === 'ABORT') {
+        throw new Error(`[JUDGE_ROUTE_ABORT] ${decision.selection.reason}`);
+      }
+      const history = Array.isArray(ctx.__judge_route_history)
+        ? [...ctx.__judge_route_history.map(String)]
+        : [];
+      if (decision.selection.next !== 'COMPLETE' && decision.selection.next !== 'CONTINUE') {
+        const next = decision.selection.next;
+        const currentIndex = currentStep?.id
+          ? steps.findIndex((candidate) => candidate.id === currentStep.id)
+          : -1;
+        const targetIndex = steps.findIndex((candidate) => candidate.id === next);
+        if (currentIndex >= 0 && targetIndex >= 0 && targetIndex <= currentIndex) {
+          throw new Error(
+            `[JUDGE_ROUTE_BACK_EDGE_UNSUPPORTED] route from '${currentStep?.id}' to '${next}' would rewind a linear pipeline`
+          );
+        }
+        const nextHistory = [...history, next];
+        const cycle = detectRouteCycle(
+          nextHistory,
+          resolveMaxRouteHops(totalTopLevelSteps, params.max_route_hops)
+        );
+        if (cycle.detected) {
+          throw new Error(`[JUDGE_ROUTE_LOOP] ${cycle.reason}`);
+        }
+        return {
+          ...ctx,
+          [verdictKey]: verdict,
+          [exportKey]: decision.selection,
+          __judge_route_history: nextHistory,
+          __pipeline_route_next: next,
+        };
+      }
+      const nextContext = {
+        ...ctx,
+        [verdictKey]: verdict,
+        [exportKey]: decision.selection,
+        __judge_route_history: history,
+      };
+      if (decision.selection.next === 'COMPLETE') {
+        return { ...nextContext, __adf_terminal: true };
+      }
+      return nextContext;
+    }
+
+    if (action === 'await_decision') {
+      const approval = (params.approval || {}) as Record<string, unknown>;
+      const stepId = currentStep?.id;
+      if (!stepId) throw new Error('core:await_decision requires a step id for durable resume');
+      const storageChannel = String(params.storage_channel || 'pipeline-approval');
+      const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
+        params.on_timeout as 'abort' | 'deny' | 'escalate'
+      )
+        ? (params.on_timeout as 'abort' | 'deny' | 'escalate')
+        : 'abort';
+      const suspended = opts.resumeState?.suspended;
+      if (suspended && suspended.step_id === stepId) {
+        const existing = loadApprovalRequest(
+          suspended.storage_channel,
+          suspended.approval_request_id
+        );
+        if (existing?.status === 'approved') {
+          return {
+            ...ctx,
+            [String(params.export_as || 'decision')]: {
+              status: 'approved',
+              approval_request_id: existing.id,
+              decided_by: existing.decidedBy,
+            },
+          };
+        }
+        if (existing?.status === 'rejected' || existing?.status === 'cancelled') {
+          throw new Error(
+            `[AWAIT_DECISION_DENIED] approval ${suspended.approval_request_id} is ${existing.status}`
+          );
+        }
+        const expired = suspended.timeout_at && Date.parse(suspended.timeout_at) <= Date.now();
+        if (expired || (existing && isApprovalRequestExpired(existing))) {
+          if (suspended.on_timeout === 'deny') {
+            return {
+              ...ctx,
+              [String(params.export_as || 'decision')]: {
+                status: 'denied',
+                timed_out: true,
+                approval_request_id: suspended.approval_request_id,
+              },
+            };
+          }
+          if (suspended.on_timeout === 'escalate') {
+            const escalationTimeoutMs = coercePositiveInt(params.escalation_timeout_ms, 86_400_000);
+            const escalation = createApprovalRequest('mission_controller', {
+              channel: suspended.storage_channel,
+              threadTs: String(params.thread_ts || `${stepId}:escalation`),
+              correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}:escalation`,
+              requestedBy: `pipeline:${opts.runId || 'pending'}`,
+              kind: 'mission_gate',
+              expiresAt: new Date(Date.now() + escalationTimeoutMs).toISOString(),
+              requestedByContext: {
+                surface: 'system',
+                actorId: `pipeline:${opts.runId || 'pending'}`,
+                actorRole: 'pipeline',
+                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+              },
+              source: {
+                ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+                agentId: process.env.KYBERION_AGENT_ID || 'pipeline-orchestrator',
+              },
+              draft: {
+                title: `Escalated pipeline decision: ${stepId}`,
+                summary: `The original decision ${suspended.approval_request_id} timed out and requires escalation.`,
+                severity: 'high',
+              },
+              justification: {
+                reason: 'TAKT await_decision timeout escalation',
+                impactSummary: `Original approval ${suspended.approval_request_id} expired without a decision.`,
+              },
+            });
+            throw new PipelineSuspendedError({
+              step_id: stepId,
+              approval_request_id: escalation.id,
+              storage_channel: suspended.storage_channel,
+              on_timeout: 'abort',
+              timeout_at: escalation.expiresAt,
+              reason: `escalated from expired approval ${suspended.approval_request_id}`,
+            });
+          }
+          throw new Error(`[AWAIT_DECISION_TIMEOUT] on_timeout=${suspended.on_timeout}`);
+        }
+        throw new PipelineSuspendedError(suspended);
+      }
+      if (process.env.KYBERION_NON_INTERACTIVE === '1' && params.non_interactive !== 'allow') {
+        throw new Error('[AWAIT_DECISION_DENIED] non-interactive execution defaults to deny');
+      }
+      const timeoutMs = coercePositiveInt(params.timeout_ms ?? params.timeout, 86_400_000);
+      const timeoutAt = new Date(Date.now() + timeoutMs).toISOString();
+      const record = createApprovalRequest('mission_controller', {
+        channel: storageChannel,
+        threadTs: String(params.thread_ts || stepId),
+        correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}`,
+        requestedBy: `pipeline:${opts.runId || 'pending'}`,
+        kind: 'mission_gate',
+        expiresAt: timeoutAt,
+        requestedByContext: {
+          surface: 'system',
+          actorId: `pipeline:${opts.runId || 'pending'}`,
+          actorRole: 'pipeline',
+          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+        },
+        source: {
+          ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
+          agentId: process.env.KYBERION_AGENT_ID || 'pipeline-orchestrator',
+        },
+        draft: {
+          title: String(approval.title || `Pipeline decision: ${stepId}`),
+          summary: String(
+            approval.summary || params.summary || 'Pipeline execution requires a human decision.'
+          ),
+          details: typeof approval.details === 'string' ? approval.details : undefined,
+          severity:
+            approval.severity === 'high' ? 'high' : approval.severity === 'low' ? 'low' : 'medium',
+        },
+        justification: {
+          reason: 'TAKT await_decision control stage',
+          impactSummary: String(
+            approval.summary ||
+              params.summary ||
+              'Pipeline execution is suspended until a decision arrives.'
+          ),
+        },
+      });
+      throw new PipelineSuspendedError({
+        step_id: stepId,
+        approval_request_id: record.id,
+        storage_channel: storageChannel,
+        on_timeout: onTimeout,
+        timeout_at: timeoutAt,
+        reason: String(approval.summary || params.summary || 'human decision required'),
+      });
+    }
 
     const runBody = async (
       body: PipelineAdfStep[],
@@ -1569,7 +2045,52 @@ async function runStepsInternal(
     }
 
     if (action === 'parallel_foreach') {
-      const items = resolveVars(params.items, ctx);
+      const itemsFrom = params.items_from as Record<string, unknown> | undefined;
+      let items = resolveVars(params.items, ctx);
+      if (itemsFrom && !Array.isArray(items)) {
+        const poolRef = typeof itemsFrom.pool_ref === 'string' ? itemsFrom.pool_ref : undefined;
+        const pool = poolRef ? (resolveVars(`{{${poolRef}}}`, ctx) as unknown) : undefined;
+        if (!Array.isArray(pool)) {
+          throw new Error('[PARALLEL_POOL_INVALID] items_from.pool_ref must resolve to an array');
+        }
+        const selection = itemsFrom.selection as Record<string, unknown> | undefined;
+        const fixture = selection?.fixture;
+        if (Array.isArray(fixture)) {
+          const indices = fixture.map((entry) => Number(entry));
+          items = indices.every(
+            (index) => Number.isInteger(index) && index >= 0 && index < pool.length
+          )
+            ? indices.map((index) => pool[index])
+            : fixture;
+        } else if (selection?.judge && typeof selection.judge === 'object') {
+          const judge = selection.judge as Record<string, unknown>;
+          const selected = await delegateStructured(
+            getReasoningBackend(),
+            [
+              String(judge.prompt || 'Select the pool items that satisfy the current task.'),
+              `Pool:\n${JSON.stringify(pool)}`,
+              'Return zero-based selected_indices only; do not invent indices.',
+            ].join('\n\n'),
+            z.object({ selected_indices: z.array(z.number().int().nonnegative()) }).strict(),
+            {
+              context: `pipeline:parallel_foreach:selection:${currentStep?.id || rawOp}`,
+              maxRetries: 2,
+            }
+          );
+          const indices = selected.selected_indices;
+          if (
+            new Set(indices).size !== indices.length ||
+            indices.some((index) => index < 0 || index >= pool.length)
+          ) {
+            throw new Error(
+              '[PARALLEL_SELECTION_INVALID] judge selected an out-of-range or duplicate pool index'
+            );
+          }
+          items = indices.map((index) => pool[index]);
+        } else {
+          items = pool;
+        }
+      }
       const subSteps = params.do as PipelineAdfStep[];
       if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
       const itemName = (params.as as string) || 'item';
@@ -1622,6 +2143,59 @@ async function runStepsInternal(
         workingCtx = { ...workingCtx, ...perItemContexts[perItemContexts.length - 1] };
       }
       return workingCtx;
+    }
+
+    if (action === 'team_lead') {
+      const subSteps = params.do as PipelineAdfStep[];
+      if (!Array.isArray(subSteps)) {
+        throw new Error('[TEAM_LEAD_INVALID] team_lead requires params.do');
+      }
+      let tasks = resolveVars(params.tasks, ctx);
+      if (!Array.isArray(tasks)) {
+        const fixtureTasks = params.fixture_tasks;
+        if (Array.isArray(fixtureTasks)) tasks = fixtureTasks;
+        else {
+          const plan = await delegateStructured(
+            getReasoningBackend(),
+            String(
+              params.instruction || 'Decompose the current context into bounded parallel tasks.'
+            ) + `\nContext:\n${JSON.stringify(params.context || ctx)}`,
+            z.object({ tasks: z.array(z.record(z.string(), z.unknown())).min(1) }),
+            { context: `pipeline:team_lead:${currentStep?.id || rawOp}`, maxRetries: 2 }
+          );
+          tasks = plan.tasks;
+        }
+      }
+      const itemName = typeof params.as === 'string' ? params.as : 'task';
+      const concurrency = Math.min(
+        coercePositiveInt(params.max_concurrency ?? params.concurrency, 2),
+        3
+      );
+      const exportKey = resolveExportKey(
+        { op: rawOp, params } as PipelineAdfStep,
+        'last_team_lead'
+      );
+      const outputs: Array<{
+        index: number;
+        item: unknown;
+        context: Record<string, unknown>;
+        results: RunStepResult[];
+      }> = [];
+      await runParallelBatches(tasks, concurrency, async (task, index) => {
+        const nested = await runBody(
+          subSteps,
+          { ...ctx, [itemName]: task },
+          'core:team_lead worker failed'
+        );
+        if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
+        outputs[index] = {
+          index,
+          item: task,
+          context: nested.context,
+          results: nested.results as RunStepResult[],
+        };
+      });
+      return { ...ctx, [exportKey]: { tasks, outputs, max_concurrency: concurrency } };
     }
 
     if (action === 'parallel_calls') {
@@ -1843,6 +2417,19 @@ async function runStepsInternal(
       return { ...ctx };
     }
 
+    // A judge_route target is a declarative step id, not an instruction to
+    // execute arbitrary code. Until the selected target is reached, steps in
+    // the linear frontier are skipped. The selected step consumes the marker
+    // so a later step cannot accidentally inherit an old decision.
+    const selectedRouteTarget = ctx.__pipeline_route_next;
+    if (selectedRouteTarget && normalizePipelineOp(step.op) !== 'core:judge_route') {
+      if (step.id !== selectedRouteTarget) {
+        return skipAdfStep(ctx, `judge_route selected ${selectedRouteTarget}`);
+      }
+      const { __pipeline_route_next: _routeNext, ...withoutRouteMarker } = ctx;
+      ctx = withoutRouteMarker;
+    }
+
     if (step.hooks?.before?.length) {
       const decision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
       if (decision === 'abort') throw new Error('aborted by before hook');
@@ -1904,8 +2491,7 @@ async function runStepsInternal(
         logger.info(`[step ${stepNumber}/${totalTopLevelSteps}] ${step.op} …`);
       }
     },
-    afterStep: (rawStep, stepNumber, ctx, outcome) => {
-      stepRefStack.pop();
+    afterStep: async (rawStep, stepNumber, ctx, outcome) => {
       lastKnownCtx = ctx;
       const step = rawStep as unknown as PipelineAdfStep;
       const normalizedOp = normalizePipelineOp(String(step.op));
@@ -1920,6 +2506,10 @@ async function runStepsInternal(
         ...(step.role ? { step_role: step.role } : step.type ? { step_type: step.type } : {}),
         ...summarizeReasoningPolicy(stepPolicy),
       };
+      if (outcome.status === 'success' && step.report) {
+        ctx = await runPipelineReportPhase(step, ctx, opts.trace);
+        lastKnownCtx = ctx;
+      }
       const failureInfo =
         outcome.status === 'failed' && outcome.error
           ? formatPipelineFailure(outcome.error)
@@ -1983,13 +2573,19 @@ async function runStepsInternal(
             : step.produces.channel
           : typeof step.params?.export_as === 'string'
             ? step.params.export_as
-            : undefined;
+            : normalizePipelineOp(step.op) === 'core:judge_route'
+              ? 'judge_route'
+              : undefined;
         const snapshot: Record<string, unknown> = {};
         if (
           journalDeclaredChannel &&
           Object.prototype.hasOwnProperty.call(ctx, journalDeclaredChannel)
         ) {
           snapshot[journalDeclaredChannel] = ctx[journalDeclaredChannel];
+        }
+        const controlStateSnapshot: Record<string, unknown> = {};
+        for (const key of ['__pipeline_route_next', '__judge_route_history', '__adf_terminal']) {
+          if (Object.prototype.hasOwnProperty.call(ctx, key)) controlStateSnapshot[key] = ctx[key];
         }
         if (outcome.status === 'failed') {
           opts.runJournal.append('node_failed', {
@@ -2001,6 +2597,9 @@ async function runStepsInternal(
           opts.runJournal.append('node_completed', {
             step_id: step.id,
             output_channels_snapshot: snapshot,
+            ...(Object.keys(controlStateSnapshot).length > 0
+              ? { control_state_snapshot: controlStateSnapshot }
+              : {}),
             output_hash: hashPipelineOutput(snapshot),
             duration_ms: durationMs,
           });
@@ -2046,6 +2645,7 @@ async function runStepsInternal(
         outcome.status === 'failed' ? 'error' : 'ok',
         outcome.status === 'failed' ? (failureInfo?.summary ?? outcome.error) : undefined
       );
+      stepRefStack.pop();
       return nextCtx;
     },
   };
@@ -2124,6 +2724,7 @@ async function runStepsInternal(
     }
     return { status: derivePipelineStatus(results), results, context: engineResult.context };
   } catch (err: any) {
+    if (err?.adfControlFlow === 'suspend') throw err;
     // Only the engine's own pre-step safety-limit checks (max_steps /
     // timeout_ms) throw out of executeAdfSteps directly — every per-step
     // failure is already caught and returned as a 'failed' result entry by
@@ -2319,6 +2920,7 @@ export async function main() {
   // journal never carries the full mutable context.
   for (const node of resumeState?.completed_nodes.values() || []) {
     Object.assign(mergedContext, node.output_channels_snapshot);
+    Object.assign(mergedContext, node.control_state_snapshot || {});
   }
 
   logger.info(
@@ -2491,6 +3093,33 @@ export async function main() {
       process.exit(1);
     }
   } catch (err: any) {
+    if (err instanceof PipelineSuspendedError) {
+      trace.addEvent('pipeline.suspended', {
+        step_id: err.suspension.step_id,
+        approval_request_id: err.suspension.approval_request_id,
+        on_timeout: err.suspension.on_timeout,
+        ...(err.suspension.timeout_at ? { timeout_at: err.suspension.timeout_at } : {}),
+      });
+      if (runJournal) runJournal.append('run_suspended', { ...err.suspension });
+      getDefaultWorkerEventStream().emit(
+        'turn_end',
+        {
+          kind: 'pipeline',
+          pipeline_id: pipelineId,
+          status: 'suspended',
+          approval_request_id: err.suspension.approval_request_id,
+        },
+        { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+      );
+      const persisted = finalizeAndPersist(trace);
+      logger.info(
+        `   [PIPELINE] Suspended: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
+      );
+      logger.warn(
+        `⏸️ [PIPELINE] Awaiting decision ${err.suspension.approval_request_id}. Resume with --resume ${runJournal?.runId || 'the run id'}.`
+      );
+      process.exit(0);
+    }
     const failure = formatPipelineFailure(err);
     const recovered = tryPermissionFallback(pipeline, failure, trace);
     getDefaultWorkerEventStream().emit(

@@ -3,11 +3,12 @@
  * OpenTelemetry-inspired tracing with artifact and knowledge references.
  */
 
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
+import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
 
 export interface TraceEvent {
   name: string;
@@ -249,7 +250,95 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
   const file = path.join(dir, `traces-${day}.jsonl`);
   const record = { ...trace, _persistedAt: new Date().toISOString() };
   safeAppendFileSync(file, JSON.stringify(record) + '\n');
+  // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
+  // and authoritative; exporter failure must never change pipeline outcome.
+  void exportTraceOtlp(trace).catch(() => undefined);
   return file;
+}
+
+function otlpId(value: string, length: number): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, length);
+}
+
+function unixNano(iso: string | undefined): string {
+  const ms = Date.parse(iso || new Date().toISOString());
+  return (BigInt(Math.max(0, Math.floor(ms))) * 1_000_000n).toString();
+}
+
+function otlpHeaders(raw: string | undefined): Record<string, string> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  for (const entry of String(raw || '').split(',')) {
+    const separator = entry.indexOf('=');
+    if (separator <= 0) continue;
+    const key = entry.slice(0, separator).trim();
+    const value = entry.slice(separator + 1).trim();
+    if (key && value) headers[key] = value;
+  }
+  return headers;
+}
+
+/** Export the stable Kyberion trace projection as OTLP/HTTP JSON when enabled. */
+export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
+  const configured = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  if (!configured) return false;
+  const base = configured.replace(/\/$/u, '');
+  const endpoint = /\/v1\/traces$/u.test(base) ? base : `${base}/v1/traces`;
+  assertReasoningEgressAllowedAtEndpoint('otel', endpoint);
+  const spans: Array<Record<string, unknown>> = [];
+  const visit = (span: TraceSpan, parentSpanId?: string): void => {
+    const spanId = otlpId(span.spanId, 16);
+    spans.push({
+      traceId: otlpId(trace.traceId, 32),
+      spanId,
+      ...(parentSpanId ? { parentSpanId } : {}),
+      name: span.name,
+      startTimeUnixNano: unixNano(span.startTime),
+      endTimeUnixNano: unixNano(span.endTime || span.startTime),
+      attributes: Object.entries({
+        ...(trace.metadata.pipelineId ? { pipeline_id: trace.metadata.pipelineId } : {}),
+        ...(trace.metadata.missionId ? { mission_id: trace.metadata.missionId } : {}),
+        ...(span.attributes || {}),
+      }).map(([key, value]) => ({
+        key,
+        value:
+          typeof value === 'boolean'
+            ? { boolValue: value }
+            : typeof value === 'number'
+              ? { intValue: value }
+              : { stringValue: String(value) },
+      })),
+      events: span.events.map((event) => ({
+        name: event.name,
+        timeUnixNano: unixNano(event.timestamp),
+        attributes: Object.entries(event.attributes || {}).map(([key, value]) => ({
+          key,
+          value:
+            typeof value === 'boolean'
+              ? { boolValue: value }
+              : typeof value === 'number'
+                ? { intValue: value }
+                : { stringValue: String(value) },
+        })),
+      })),
+      status: span.status === 'error' ? { code: 2, message: span.error } : { code: 1 },
+    });
+    for (const child of span.children) visit(child, spanId);
+  };
+  visit(trace.rootSpan);
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: otlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
+    body: JSON.stringify({
+      resourceSpans: [
+        {
+          resource: { attributes: [{ key: 'service.name', value: { stringValue: 'kyberion' } }] },
+          scopeSpans: [{ scope: { name: 'kyberion.trace' }, spans }],
+        },
+      ],
+    }),
+  });
+  if (!response.ok) throw new Error(`OTLP export failed with HTTP ${response.status}`);
+  return true;
 }
 
 /**

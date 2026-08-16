@@ -209,7 +209,12 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
 
   // Control flow children: while / loop-until / retry-until-quality
   if (
-    (step.op === 'while' || step.op === 'loop_until' || step.op === 'retry_until_quality') &&
+    (step.op === 'while' ||
+      step.op === 'core:while' ||
+      step.op === 'loop_until' ||
+      step.op === 'core:loop_until' ||
+      step.op === 'retry_until_quality' ||
+      step.op === 'core:retry_until_quality') &&
     step.params?.pipeline
   ) {
     const children = step.params.pipeline.map((s: any, j: number) => previewStep(s, j, ctx));
@@ -218,7 +223,10 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   }
 
   // Control flow children: parallel foreach / accumulate
-  if ((step.op === 'parallel_foreach' || step.op === 'accumulate') && step.params?.do) {
+  if (
+    (step.op === 'parallel_foreach' || step.op === 'accumulate' || step.op === 'team_lead') &&
+    step.params?.do
+  ) {
     const children = step.params.do.map((s: any, j: number) => previewStep(s, j, ctx));
     ps.children = children;
     if (step.op === 'parallel_foreach') {
@@ -245,6 +253,12 @@ function describeStep(step: any): string {
   const op = step.op || '?';
   const type = step.type || '?';
   switch (op) {
+    case 'judge_route':
+    case 'core:judge_route':
+      return `Judge route (${Array.isArray(step.params?.routes) ? step.params.routes.length : 0} routes; unmatched=${step.params?.on_no_match || 'abort'})`;
+    case 'await_decision':
+    case 'core:await_decision':
+      return `Await human decision: ${step.params?.approval?.summary || step.params?.summary || '?'}`;
     case 'goto':
       return `Navigate to ${step.params?.url || '?'}`;
     case 'click':

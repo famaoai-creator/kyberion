@@ -1,0 +1,6 @@
+{
+  "kind": "persona",
+  "name": "orchestrator",
+  "must_include": ["coordinate", "judgments", "acceptance contract"],
+  "must_not_include": ["step-by-step procedure"]
+}

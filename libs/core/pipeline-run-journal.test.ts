@@ -18,6 +18,7 @@ describe('pipeline run journal', () => {
     journal.append('node_completed', {
       step_id: 'source',
       output_channels_snapshot: { records: [{ id: 1 }] },
+      control_state_snapshot: { __pipeline_route_next: 'sink' },
       output_hash: hashPipelineOutput({ records: [{ id: 1 }] }),
     });
     journal.append('run_finished', { status: 'succeeded' });
@@ -26,6 +27,9 @@ describe('pipeline run journal', () => {
     expect(restored.started?.pipeline_id).toBe('journal-test');
     expect(restored.completed_nodes.get('source')?.output_channels_snapshot).toEqual({
       records: [{ id: 1 }],
+    });
+    expect(restored.completed_nodes.get('source')?.control_state_snapshot).toEqual({
+      __pipeline_route_next: 'sink',
     });
     expect(restored.finished?.status).toBe('succeeded');
     safeRmSync(journal.path);
@@ -61,6 +65,30 @@ describe('pipeline run journal', () => {
       .split('\n');
     expect(after).toHaveLength(before.length);
     expect(journal.append('run_finished', { status: 'succeeded' }).sequence).toBe(2);
+    safeRmSync(journal.path);
+  });
+
+  it('persists suspension and clears it on a process-boundary resume', () => {
+    const runId = `test-suspended-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'journal-suspended-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['judge', 'approval', 'sink'],
+    });
+    journal.append('run_suspended', {
+      step_id: 'approval',
+      approval_request_id: 'approval-1',
+      storage_channel: 'pipeline-approval',
+      on_timeout: 'deny',
+      timeout_at: '2026-08-16T06:00:00.000Z',
+    });
+    expect(loadPipelineRunJournal(runId).suspended).toMatchObject({
+      step_id: 'approval',
+      approval_request_id: 'approval-1',
+    });
+
+    journal.append('run_resumed', { resumed_at: '2026-08-16T05:59:00.000Z' });
+    expect(loadPipelineRunJournal(runId).suspended).toBeUndefined();
     safeRmSync(journal.path);
   });
 });

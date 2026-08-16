@@ -82,6 +82,7 @@ describe('generate_subagent_definitions', () => {
       '## Working principles (apply mechanically; they override style preferences)'
     );
     expect(source).toContain('Make the smallest diff that satisfies the acceptance criteria');
+    expect(source).toContain('## Provider runtime instructions');
     expect(source).toContain('## secure-io constraint');
     expect(source).toContain('never call `node:fs` directly');
     expect(source).toContain('GENERATED FILE — DO NOT EDIT BY HAND');

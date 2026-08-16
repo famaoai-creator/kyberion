@@ -39,9 +39,17 @@ const CONTROL_OPS = new Set([
   'core:while',
   'core:foreach',
   'core:parallel',
+  'core:parallel_foreach',
+  'parallel_foreach',
+  'core:team_lead',
+  'team_lead',
   'core:accumulate',
   'core:include',
   'core:llm_decide',
+  'judge_route',
+  'core:judge_route',
+  'await_decision',
+  'core:await_decision',
 ]);
 
 function collectSteps(steps: PipelineAdfStep[], output: PipelineAdfStep[] = []): PipelineAdfStep[] {

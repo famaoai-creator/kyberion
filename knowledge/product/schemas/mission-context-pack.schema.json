@@ -408,6 +408,17 @@
       },
       "additionalProperties": true
     },
+    "facets": {
+      "type": "object",
+      "properties": {
+        "persona": { "$ref": "#/$defs/facetContent" },
+        "policies": { "type": "array", "items": { "$ref": "#/$defs/facetContent" } },
+        "instructions": { "type": "array", "items": { "$ref": "#/$defs/facetContent" } },
+        "output_contract": { "$ref": "#/$defs/facetContent" }
+      },
+      "required": ["policies", "instructions"],
+      "additionalProperties": false
+    },
     "sources": {
       "type": "array",
       "items": {
@@ -480,5 +491,17 @@
     },
     "context_pack_path": { "type": "string", "minLength": 1 }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "facetContent": {
+      "type": "object",
+      "required": ["name", "source", "content"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "content": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
 }

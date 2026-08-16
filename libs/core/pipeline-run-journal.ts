@@ -16,11 +16,12 @@ import {
 } from './worker-state-journal.js';
 import { z } from 'zod';
 
-export const PIPELINE_RUN_JOURNAL_VERSION = 2;
+export const PIPELINE_RUN_JOURNAL_VERSION = 3;
 
 export type PipelineRunEventType =
   | 'run_started'
   | 'run_resumed'
+  | 'run_suspended'
   | 'node_completed'
   | 'node_failed'
   | 'run_finished';
@@ -44,8 +45,19 @@ export interface PipelineRunStartedPayload {
 export interface PipelineRunNodeCompletedPayload {
   step_id: string;
   output_channels_snapshot: Record<string, unknown>;
+  /** Durable control markers required to resume a declarative route safely. */
+  control_state_snapshot?: Record<string, unknown>;
   output_hash: string;
   duration_ms?: number;
+}
+
+export interface PipelineRunSuspendedPayload {
+  step_id: string;
+  approval_request_id: string;
+  storage_channel: string;
+  on_timeout: 'abort' | 'deny' | 'escalate';
+  timeout_at?: string;
+  reason?: string;
 }
 
 export interface PipelineRunJournalState {
@@ -54,6 +66,7 @@ export interface PipelineRunJournalState {
   events: PipelineRunJournalEvent[];
   started?: PipelineRunStartedPayload;
   completed_nodes: Map<string, PipelineRunNodeCompletedPayload>;
+  suspended?: PipelineRunSuspendedPayload;
   finished?: { status: string; error?: string };
 }
 
@@ -67,6 +80,7 @@ export interface PipelineRunJournalHandle {
 interface PipelineJournalProjection {
   started?: PipelineRunStartedPayload;
   completed_nodes: Record<string, PipelineRunNodeCompletedPayload>;
+  suspended?: PipelineRunSuspendedPayload;
   finished?: { status: string; error?: string };
 }
 
@@ -84,6 +98,7 @@ const pipelineStartedSchema = z.object({
 const pipelineNodeCompletedSchema = z.object({
   step_id: z.string(),
   output_channels_snapshot: z.record(z.string(), z.unknown()),
+  control_state_snapshot: z.record(z.string(), z.unknown()).optional(),
   output_hash: z.string(),
   duration_ms: z.number().optional(),
 });
@@ -96,7 +111,19 @@ pipelineJournalKernel.defineOp('pipeline.run_started', {
 pipelineJournalKernel.defineOp('pipeline.run_resumed', {
   model: pipelineJournalModel,
   schema: z.record(z.string(), z.unknown()),
-  apply: (state) => state,
+  apply: (state) => ({ ...state, suspended: undefined }),
+});
+pipelineJournalKernel.defineOp('pipeline.run_suspended', {
+  model: pipelineJournalModel,
+  schema: z.object({
+    step_id: z.string(),
+    approval_request_id: z.string(),
+    storage_channel: z.string(),
+    on_timeout: z.enum(['abort', 'deny', 'escalate']),
+    timeout_at: z.string().optional(),
+    reason: z.string().optional(),
+  }),
+  apply: (state, payload) => ({ ...state, suspended: payload }),
 });
 pipelineJournalKernel.defineOp('pipeline.node_completed', {
   model: pipelineJournalModel,
@@ -229,6 +256,7 @@ function migrateEvent(raw: unknown): PipelineRunJournalEvent {
   const validEvents: PipelineRunEventType[] = [
     'run_started',
     'run_resumed',
+    'run_suspended',
     'node_completed',
     'node_failed',
     'run_finished',
@@ -300,6 +328,7 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
     completed_nodes: new Map(Object.entries(projection.completed_nodes)),
   };
   state.started = projection.started;
+  state.suspended = projection.suspended;
   state.finished = projection.finished;
   if (!state.started) throw new Error('[PIPELINE_JOURNAL] missing run_started; refusing to resume');
   return state;

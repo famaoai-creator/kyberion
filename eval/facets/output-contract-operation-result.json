@@ -1,0 +1,6 @@
+{
+  "kind": "output-contract",
+  "name": "operation-result",
+  "must_include": ["outcome", "evidence", "gaps", "needs"],
+  "must_not_include": []
+}
