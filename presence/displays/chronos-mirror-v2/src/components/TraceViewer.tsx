@@ -2,6 +2,7 @@
 
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
@@ -141,7 +142,8 @@ function gapPhaseBreakdown(span: TraceSpanDetail): Array<{ phase: string; ms: nu
 export function buildTraceFeedUrl(
   limit: number,
   filters: TraceFilters,
-  refreshTick: number
+  refreshTick: number,
+  scope: { tenant?: string; organizationId?: string; projectId?: string } = {}
 ): string {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -152,6 +154,9 @@ export function buildTraceFeedUrl(
   if (filters.pipelineId.trim()) params.set('pipelineId', filters.pipelineId.trim());
   if (filters.actuator.trim()) params.set('actuator', filters.actuator.trim());
   if (filters.query.trim()) params.set('query', filters.query.trim());
+  if (scope.tenant) params.set('tenant', scope.tenant);
+  if (scope.organizationId) params.set('organization_id', scope.organizationId);
+  if (scope.projectId) params.set('project_id', scope.projectId);
   return `/api/traces?${params.toString()}`;
 }
 
@@ -547,7 +552,21 @@ function TraceSpanTree({
   );
 }
 
-export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: boolean }) {
+export function TraceViewer({
+  autoOpenRawTrace = false,
+  tenant,
+  organizationId,
+  projectId,
+}: {
+  autoOpenRawTrace?: boolean;
+  tenant?: string;
+  organizationId?: string;
+  projectId?: string;
+}) {
+  const searchParams = useSearchParams();
+  const activeTenant = tenant || searchParams.get('tenant') || undefined;
+  const activeOrganizationId = organizationId || searchParams.get('organization_id') || undefined;
+  const activeProjectId = projectId || searchParams.get('project_id') || undefined;
   const [data, setData] = useState<TraceFeedResponse | null>(null);
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<TraceDetailRecord | null>(null);
@@ -596,10 +615,17 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       try {
         setLoadingList(true);
         setListError(null);
-        const response = await fetch(buildTraceFeedUrl(12, filters, refreshTick), {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          buildTraceFeedUrl(12, filters, refreshTick, {
+            tenant: activeTenant,
+            organizationId: activeOrganizationId,
+            projectId: activeProjectId,
+          }),
+          {
+            signal: controller.signal,
+            cache: 'no-store',
+          }
+        );
         if (!response.ok) {
           throw new Error(`Trace feed request failed (${response.status})`);
         }
@@ -615,7 +641,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
 
     loadTraceFeed();
     return () => controller.abort();
-  }, [filters, refreshTick]);
+  }, [activeOrganizationId, activeProjectId, activeTenant, filters, refreshTick]);
 
   useEffect(() => {
     if (!data?.traces.length) {
@@ -644,7 +670,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         setLoadingDetail(true);
         setDetailError(null);
         const response = await fetch(
-          `/api/traces?traceId=${encodeURIComponent(selectedTraceId)}&_=${refreshTick}`,
+          `/api/traces?traceId=${encodeURIComponent(selectedTraceId)}&_=${refreshTick}${activeTenant ? `&tenant=${encodeURIComponent(activeTenant)}` : ''}${activeOrganizationId ? `&organization_id=${encodeURIComponent(activeOrganizationId)}` : ''}${activeProjectId ? `&project_id=${encodeURIComponent(activeProjectId)}` : ''}`,
           {
             signal: controller.signal,
             cache: 'no-store',
@@ -665,7 +691,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
 
     loadTraceDetail();
     return () => controller.abort();
-  }, [refreshTick, selectedTraceId]);
+  }, [activeOrganizationId, activeProjectId, activeTenant, refreshTick, selectedTraceId]);
 
   useEffect(() => {
     if (

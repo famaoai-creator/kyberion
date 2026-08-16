@@ -32,6 +32,8 @@ import {
   resolveKnowledgeScopeSet,
   assertKnowledgePathInScope,
   knowledgeScopeProximityScore,
+  loadKnowledgeUsageAggregate,
+  loadKnowledgeRankingWeights,
 } from '@agent/core';
 import type { ScopeContext } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
@@ -57,6 +59,7 @@ export interface KnowledgeEntry {
   owner?: string;
   knowledge_type?: string;
   intelligence_layer?: string;
+  usage_yield?: number;
 }
 
 export interface RankingWeights {
@@ -70,6 +73,10 @@ export interface RankingWeights {
   kind: number;
   /** Weight for docAuthority ranking (policy > standard > recipe > reference > advisory). */
   authority: number;
+  /** Weight for containment proximity (task > mission > project > org > tenant). */
+  proximity: number;
+  /** Small configurable boost for documents that users marked useful. */
+  usage_yield: number;
 }
 
 interface ScoredEntry extends KnowledgeEntry {
@@ -84,6 +91,7 @@ interface ScoredEntry extends KnowledgeEntry {
     importance: number;
     recency: number;
     proximity: number;
+    usageYield: number;
   };
 }
 
@@ -102,6 +110,13 @@ interface TaxonomyManifest {
     scope: string;
   }>;
   retrieval_priority?: Record<string, string[]>;
+}
+
+export interface KnowledgeScanStats {
+  scanned_files: number;
+  in_scope_files: number;
+  excluded_by_scope: number;
+  knowledge_roots: string[];
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -196,10 +211,17 @@ export function parseFrontmatter(content: string): Record<string, any> {
 // Knowledge Scanner
 // ---------------------------------------------------------------------------
 export function scanKnowledgeFiles(
-  scopeSet = resolveKnowledgeScopeSet(currentScope())
+  scopeSet = resolveKnowledgeScopeSet(currentScope()),
+  stats?: KnowledgeScanStats
 ): KnowledgeEntry[] {
   const knowledgeRoot = pathResolver.knowledge();
   const entries: KnowledgeEntry[] = [];
+  if (stats) {
+    stats.knowledge_roots = [...scopeSet.roots];
+    stats.scanned_files = 0;
+    stats.in_scope_files = 0;
+    stats.excluded_by_scope = 0;
+  }
 
   function walk(dir: string) {
     if (!safeExistsSync(dir)) return;
@@ -223,10 +245,15 @@ export function scanKnowledgeFiles(
         walk(fullPath);
       } else if (stat.isFile() && item.endsWith('.md') && !item.startsWith('_')) {
         try {
+          const relativePath = path.relative(knowledgeRoot, fullPath);
+          if (stats) stats.scanned_files += 1;
+          if (!assertKnowledgePathInScope(relativePath, scopeSet)) {
+            if (stats) stats.excluded_by_scope += 1;
+            continue;
+          }
+          if (stats) stats.in_scope_files += 1;
           const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
           const fm = parseFrontmatter(content);
-          const relativePath = path.relative(knowledgeRoot, fullPath);
-          if (!assertKnowledgePathInScope(relativePath, scopeSet)) continue;
           const tier = relativePath.startsWith('personal/')
             ? 'personal'
             : relativePath.startsWith('confidential/')
@@ -282,7 +309,8 @@ export function scoreEntry(
   currentScope: string,
   weights: RankingWeights,
   now: number,
-  currentScopeContext?: ScopeContext
+  currentScopeContext?: ScopeContext,
+  usageYield = 0
 ): ScoredEntry {
   // 1. Intent Match — title + tags
   const titleTokens = tokenize(entry.title);
@@ -316,7 +344,8 @@ export function scoreEntry(
   }
 
   const scopeScore = scopeAffinityScore(currentScope, entry.scope, weights.scope);
-  const proximityScore = knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext);
+  const proximityScore =
+    knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext) * weights.proximity;
 
   let kindScore = 0;
   if (phaseSlug) {
@@ -328,6 +357,7 @@ export function scoreEntry(
   }
 
   const authorityScore = docAuthorityScore(entry.docAuthority, weights.authority);
+  const usageYieldScore = usageYield * weights.usage_yield;
 
   // 3. Importance (normalize to 0-10 scale)
   const importanceScore = entry.importance;
@@ -344,7 +374,8 @@ export function scoreEntry(
     kindScore +
     authorityScore +
     importanceScore +
-    recencyScore;
+    recencyScore +
+    usageYieldScore;
 
   return {
     ...entry,
@@ -359,6 +390,7 @@ export function scoreEntry(
       docAuthority: authorityScore,
       importance: importanceScore,
       recency: Math.round(recencyScore * 100) / 100,
+      usageYield: Math.round(usageYieldScore * 100) / 100,
     },
   };
 }
@@ -366,7 +398,7 @@ export function scoreEntry(
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-function loadWeights(): RankingWeights {
+function loadWeights(scope?: ScopeContext): RankingWeights {
   const configPath = pathResolver.knowledge('product/governance/analysis-config.json');
   const defaults: RankingWeights = {
     title: 10,
@@ -378,13 +410,19 @@ function loadWeights(): RankingWeights {
     scope: 12,
     kind: 10,
     authority: 8,
+    proximity: 1,
+    usage_yield: 4,
   };
-  if (!safeExistsSync(configPath)) return defaults;
+  if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
     const config = readJsonFile<any>(configPath);
-    return { ...defaults, ...config.algorithms?.ranking?.weights };
+    return {
+      ...defaults,
+      ...config.algorithms?.ranking?.weights,
+      ...loadKnowledgeRankingWeights(scope),
+    };
   } catch (_) {
-    return defaults;
+    return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   }
 }
 
@@ -401,6 +439,7 @@ async function main() {
   const taskIdx = args.indexOf('--task');
   const limitIdx = args.indexOf('--limit');
   const jsonFlag = args.includes('--json');
+  const explainFlag = args.includes('--explain');
 
   const intent = intentIdx >= 0 ? args[intentIdx + 1] : '';
   const role = roleIdx >= 0 ? args[roleIdx + 1] : '';
@@ -415,7 +454,7 @@ async function main() {
 
   if (!intent) {
     console.log(
-      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--json]'
+      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--explain] [--json]'
     );
     process.exit(1);
   }
@@ -424,7 +463,6 @@ async function main() {
     `🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`
   );
 
-  const weights = loadWeights();
   const resolvedScope = currentScope({
     tier: tenant ? 'confidential' : currentScope().tier,
     ...(tenant ? { tenant_slug: tenant } : {}),
@@ -433,8 +471,38 @@ async function main() {
     ...(mission ? { mission_id: mission } : {}),
     ...(task ? { task_id: task } : {}),
   });
+  const weights = loadWeights(resolvedScope);
   const knowledgeScope = resolveKnowledgeScopeSet(resolvedScope);
-  const entries = scanKnowledgeFiles(knowledgeScope);
+  const scanStats: KnowledgeScanStats = {
+    scanned_files: 0,
+    in_scope_files: 0,
+    excluded_by_scope: 0,
+    knowledge_roots: [],
+  };
+  const entries = scanKnowledgeFiles(knowledgeScope, scanStats);
+  const usageByPath = new Map(
+    loadKnowledgeUsageAggregate(resolvedScope).map((entry) => {
+      const total = entry.used_count + entry.not_used_count;
+      return [entry.document_path, total > 0 ? entry.used_count / total : 0] as const;
+    })
+  );
+  const scopeWarnings: string[] = [];
+  if (resolvedScope.tier === 'confidential' && !resolvedScope.tenant_slug) {
+    scopeWarnings.push(
+      'confidential scope has no tenant_slug; tenant knowledge roots are unavailable'
+    );
+  }
+  if (
+    resolvedScope.tier !== 'public' &&
+    resolvedScope.tenant_slug &&
+    !knowledgeScope.roots.some((root) =>
+      root.startsWith(`${resolvedScope.tier}/${resolvedScope.tenant_slug}`)
+    )
+  ) {
+    scopeWarnings.push(
+      `no ${resolvedScope.tier} knowledge root resolved for tenant '${resolvedScope.tenant_slug}'`
+    );
+  }
   const intentTokens = tokenize(intent);
   const roleSlug = role.toLowerCase().replace(/\s+/g, '_');
   const phaseSlug = phase.toLowerCase().trim();
@@ -442,7 +510,17 @@ async function main() {
 
   const scored = entries
     .map((e) =>
-      scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now, resolvedScope)
+      scoreEntry(
+        e,
+        intentTokens,
+        roleSlug,
+        phaseSlug,
+        scope,
+        weights,
+        now,
+        resolvedScope,
+        usageByPath.get(e.path) || 0
+      )
     )
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -451,13 +529,28 @@ async function main() {
   if (jsonFlag) {
     console.log(
       JSON.stringify(
-        { intent, role, phase, scope, limit, knowledge_scope: knowledgeScope, results: scored },
+        {
+          intent,
+          role,
+          phase,
+          scope,
+          limit,
+          knowledge_scope: knowledgeScope,
+          ...(explainFlag ? { scope_explain: { ...scanStats, warnings: scopeWarnings } } : {}),
+          results: scored,
+        },
         null,
         2
       )
     );
   } else {
     logger.info(`📊 TOP-${limit} Results (${scored.length} matches from ${entries.length} files):`);
+    if (explainFlag) {
+      logger.info(
+        `🔐 Scope: scanned=${scanStats.scanned_files} in_scope=${scanStats.in_scope_files} excluded=${scanStats.excluded_by_scope} roots=${scanStats.knowledge_roots.join(',') || '(none)'}`
+      );
+      for (const warning of scopeWarnings) logger.warn(`⚠️ ${warning}`);
+    }
     for (let i = 0; i < scored.length; i++) {
       const e = scored[i];
       const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} proximity=${e.breakdown.proximity} kind=${e.breakdown.kind} auth=${e.breakdown.docAuthority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;

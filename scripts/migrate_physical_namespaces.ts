@@ -8,6 +8,8 @@
  * Usage:
  *   pnpm migrate:physical-namespaces -- --dry-run
  *   pnpm migrate:physical-namespaces -- --kind surface --apply
+ *   pnpm migrate:physical-namespaces -- --kind intent --dry-run
+ *   pnpm migrate:physical-namespaces -- --kind promotion --apply
  */
 
 import * as path from 'node:path';
@@ -16,6 +18,7 @@ import {
   physicalScopedPath,
   resolveScopeForRecord,
   normalizeEventScope,
+  pathResolver,
   type EventScope,
   safeExistsSync,
   safeMkdir,
@@ -33,8 +36,14 @@ const QUARANTINE_ROOT = `${MIGRATION_ROOT}/quarantine`;
 const SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
 const SURFACE_ROOT = 'active/shared/coordination/channels';
 const PRESENCE_ROOT = 'active/shared/runtime/presence';
+const FEEDBACK_ROOT = 'active/shared/runtime/feedback-loop';
+const INTENT_ROOT = 'active/shared/runtime';
+const INTENT_FILE = 'intent-contract-memory.json';
+const PROMOTION_FILE = 'promotion-queue.jsonl';
+const LEDGER_ROOT = 'knowledge/confidential';
+const LEDGER_FILE = '_ledger/assets.jsonl';
 
-type MigrationKind = 'schedule' | 'surface';
+type MigrationKind = 'schedule' | 'surface' | 'feedback' | 'intent' | 'ledger' | 'promotion';
 type MigrationSelection = MigrationKind | 'all';
 type PlanDisposition = 'unchanged' | 'move' | 'quarantine' | 'conflict';
 
@@ -64,6 +73,10 @@ interface MigrationPlan {
   generated_at: string;
   apply: boolean;
   items: PlanItem[];
+  summary: {
+    by_disposition: Record<PlanDisposition, number>;
+    by_scope_disposition: Record<string, number>;
+  };
   status?: 'planned' | 'applying' | 'completed' | 'failed';
   completed_at?: string;
   failure?: string;
@@ -107,17 +120,66 @@ function listSurfaceFiles(): string[] {
   return files;
 }
 
+function listFeedbackFiles(root: string): string[] {
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root)
+    .sort()
+    .flatMap((name) => {
+      if (name === 'tenants' || name === '.quarantine') return [];
+      const logicalPath = path.join(root, name);
+      const stat = safeStat(logicalPath);
+      if (stat.isDirectory()) return listFeedbackFiles(logicalPath);
+      return stat.isFile() && name.endsWith('.jsonl') ? [logicalPath] : [];
+    });
+}
+
+function listIntentFiles(): string[] {
+  const source = path.join(INTENT_ROOT, INTENT_FILE);
+  return safeExistsSync(source) ? [source] : [];
+}
+
+function listLedgerFiles(): string[] {
+  const source = path.join(LEDGER_ROOT, LEDGER_FILE);
+  return safeExistsSync(source) ? [source] : [];
+}
+
+function listPromotionFiles(): string[] {
+  const source = pathResolver.rootResolve(`active/shared/runtime/memory/${PROMOTION_FILE}`);
+  return safeExistsSync(source) ? [source] : [];
+}
+
 function candidates(kind: MigrationKind): Candidate[] {
   const roots =
     kind === 'schedule'
       ? [{ root: SCHEDULE_ROOT, files: listJsonFiles(SCHEDULE_ROOT) }]
-      : [{ root: SURFACE_ROOT, files: listSurfaceFiles() }];
+      : kind === 'surface'
+        ? [{ root: SURFACE_ROOT, files: listSurfaceFiles() }]
+        : kind === 'feedback'
+          ? [{ root: FEEDBACK_ROOT, files: listFeedbackFiles(FEEDBACK_ROOT) }]
+          : kind === 'intent'
+            ? [{ root: INTENT_ROOT, files: listIntentFiles() }]
+            : kind === 'ledger'
+              ? [{ root: LEDGER_ROOT, files: listLedgerFiles() }]
+              : [
+                  {
+                    root: path.dirname(pathResolver.rootResolve('active/shared/runtime/memory')),
+                    files: listPromotionFiles(),
+                  },
+                ];
   return roots.flatMap(({ root, files }) =>
     files.map((source) => ({
       kind,
       source,
-      base: kind === 'schedule' ? root : path.dirname(path.dirname(source)),
+      base:
+        kind === 'schedule' || kind === 'intent'
+          ? root
+          : kind === 'ledger'
+            ? LEDGER_ROOT
+            : kind === 'promotion'
+              ? path.dirname(pathResolver.rootResolve('active/shared/runtime/memory'))
+              : path.dirname(path.dirname(source)),
       ...(kind === 'surface' ? { record_dir: path.basename(path.dirname(source)) } : {}),
+      ...(kind === 'ledger' ? { record_dir: '_ledger' } : {}),
       role: AUTHORITY_ROLE,
     }))
   );
@@ -142,6 +204,17 @@ function scopeFromRecord(record: unknown): ReturnType<typeof resolveScopeForReco
 
 function destinationFor(item: Candidate, scope: EventScope): string {
   if (scope.tenant_slug) {
+    // Knowledge tenant roots are the canonical logical namespace
+    // knowledge/confidential/{tenant}; runtime/surface records use the
+    // physical `tenants/{tenant}` namespace instead.
+    if (item.kind === 'ledger') {
+      return path.posix.join(
+        LEDGER_ROOT,
+        scope.tenant_slug,
+        ...(item.record_dir ? [item.record_dir] : []),
+        path.basename(item.source)
+      );
+    }
     return physicalScopedPath(
       item.base,
       scope,
@@ -150,6 +223,206 @@ function destinationFor(item: Candidate, scope: EventScope): string {
     );
   }
   return item.source;
+}
+
+function feedbackScopes(source: string): {
+  disposition: 'canonical' | 'unscoped-legacy' | 'invalid';
+  scope?: EventScope;
+  reason?: string;
+} {
+  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { disposition: 'invalid', reason: 'feedback file is empty' };
+  const scopes: EventScope[] = [];
+  let unscoped = 0;
+  for (const line of lines) {
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      const result = scopeFromRecord(record);
+      if (result.disposition === 'canonical' || result.disposition === 'mission-derived') {
+        if (!result.scope?.tenant_slug) {
+          return {
+            disposition: 'invalid',
+            reason: 'feedback record has a scope but no tenant_slug',
+          };
+        }
+        scopes.push(normalizeEventScope(result.scope));
+      } else if (result.disposition === 'unscoped-legacy') {
+        unscoped += 1;
+      } else {
+        return { disposition: 'invalid', reason: 'feedback record has invalid scope' };
+      }
+    } catch (error) {
+      return {
+        disposition: 'invalid',
+        reason: `feedback record unreadable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+  if (unscoped > 0 && scopes.length > 0) {
+    return {
+      disposition: 'invalid',
+      reason: 'feedback file mixes scoped and unscoped records; refusing partial migration',
+    };
+  }
+  if (unscoped === lines.length) {
+    return {
+      disposition: 'unscoped-legacy',
+      reason: 'legacy feedback has no authoritative tenant scope; quarantine required',
+    };
+  }
+  const tenantSlugs = new Set(scopes.map((scope) => scope.tenant_slug));
+  if (tenantSlugs.size !== 1) {
+    return {
+      disposition: 'invalid',
+      reason: 'feedback file contains multiple tenants; refusing to merge them into one file',
+    };
+  }
+  return { disposition: 'canonical', scope: scopes[0] };
+}
+
+function intentScopes(source: string): {
+  disposition: 'canonical' | 'unscoped-legacy' | 'invalid';
+  scope?: EventScope;
+  reason?: string;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(safeReadFile(source, { encoding: 'utf8' })));
+  } catch (error) {
+    return {
+      disposition: 'invalid',
+      reason: `intent memory unreadable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as any).entries)) {
+    return { disposition: 'invalid', reason: 'intent memory entries array is missing' };
+  }
+  const entries = (parsed as { entries: unknown[] }).entries;
+  if (entries.length === 0) {
+    return {
+      disposition: 'unscoped-legacy',
+      reason: 'intent memory has no tenant-bearing entries; global seed remains authoritative',
+    };
+  }
+  const scopes: EventScope[] = [];
+  let unscoped = 0;
+  for (const entry of entries) {
+    const result = scopeFromRecord(entry);
+    if (result.disposition === 'canonical' || result.disposition === 'mission-derived') {
+      if (!result.scope?.tenant_slug) {
+        return { disposition: 'invalid', reason: 'intent entry scope has no tenant_slug' };
+      }
+      scopes.push(normalizeEventScope(result.scope));
+    } else if (result.disposition === 'unscoped-legacy') {
+      unscoped += 1;
+    } else {
+      return { disposition: 'invalid', reason: 'intent entry has invalid scope' };
+    }
+  }
+  if (unscoped > 0 && scopes.length > 0) {
+    return { disposition: 'invalid', reason: 'intent memory mixes scoped and unscoped entries' };
+  }
+  if (unscoped === entries.length) {
+    return {
+      disposition: 'unscoped-legacy',
+      reason: 'intent memory entries have no authoritative tenant scope; quarantine required',
+    };
+  }
+  const tenants = new Set(scopes.map((scope) => scope.tenant_slug));
+  if (tenants.size !== 1) {
+    return { disposition: 'invalid', reason: 'intent memory contains multiple tenants' };
+  }
+  return { disposition: 'canonical', scope: scopes[0] };
+}
+
+function ledgerScopes(source: string): {
+  disposition: 'canonical' | 'unscoped-legacy' | 'invalid';
+  scope?: EventScope;
+  reason?: string;
+} {
+  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { disposition: 'invalid', reason: 'ledger is empty' };
+  const scopes: EventScope[] = [];
+  let unscoped = 0;
+  for (const line of lines) {
+    let record: Record<string, unknown>;
+    try {
+      record = JSON.parse(line) as Record<string, unknown>;
+    } catch (error) {
+      return {
+        disposition: 'invalid',
+        reason: `ledger record unreadable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    const target = typeof record.target_path === 'string' ? record.target_path : '';
+    const match = target.replace(/\\/g, '/').match(/^knowledge\/confidential\/([^/]+)\//u);
+    const visibleTo = Array.isArray(record.visible_to)
+      ? record.visible_to.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+    const tenant = match?.[1] || (visibleTo.length === 1 ? visibleTo[0] : undefined);
+    if (tenant) {
+      scopes.push(normalizeEventScope({ tier: 'confidential', tenant_slug: tenant }));
+    } else {
+      unscoped += 1;
+    }
+  }
+  if (unscoped > 0 && scopes.length > 0) {
+    return { disposition: 'invalid', reason: 'ledger mixes scoped and unscoped records' };
+  }
+  if (unscoped === lines.length) {
+    return {
+      disposition: 'unscoped-legacy',
+      reason: 'ledger records have no authoritative tenant scope',
+    };
+  }
+  const tenants = new Set(scopes.map((scope) => scope.tenant_slug));
+  if (tenants.size !== 1)
+    return { disposition: 'invalid', reason: 'ledger contains multiple tenants' };
+  return { disposition: 'canonical', scope: scopes[0] };
+}
+
+function promotionScopes(source: string): {
+  disposition: 'canonical' | 'unscoped-legacy' | 'invalid';
+  scope?: EventScope;
+  reason?: string;
+} {
+  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { disposition: 'invalid', reason: 'promotion queue is empty' };
+  let unscoped = 0;
+  let scoped = 0;
+  for (const line of lines) {
+    try {
+      const candidate = JSON.parse(line) as Record<string, unknown>;
+      if (candidate.scope && typeof candidate.scope === 'object') scoped += 1;
+      else unscoped += 1;
+    } catch (error) {
+      return {
+        disposition: 'invalid',
+        reason: `promotion record unreadable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+  if (unscoped > 0 && scoped > 0) {
+    return {
+      disposition: 'invalid',
+      reason: 'promotion queue mixes scoped and unscoped records; refusing partial migration',
+    };
+  }
+  return unscoped > 0
+    ? {
+        disposition: 'unscoped-legacy',
+        reason: 'promotion candidates have no authoritative tenant scope; quarantine required',
+      }
+    : { disposition: 'canonical' };
 }
 
 function quarantineFor(item: Candidate, migrationId: string): string {
@@ -169,6 +442,66 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
     .slice(0, 14)}-${randomUUID().slice(0, 8)}`;
   const items: PlanItem[] = [];
   for (const candidate of candidates(kind)) {
+    if (
+      candidate.kind === 'feedback' ||
+      candidate.kind === 'intent' ||
+      candidate.kind === 'ledger' ||
+      candidate.kind === 'promotion'
+    ) {
+      const result =
+        candidate.kind === 'feedback'
+          ? feedbackScopes(candidate.source)
+          : candidate.kind === 'intent'
+            ? intentScopes(candidate.source)
+            : candidate.kind === 'ledger'
+              ? ledgerScopes(candidate.source)
+              : promotionScopes(candidate.source);
+      if (candidate.kind === 'promotion' && result.disposition === 'canonical') {
+        items.push({
+          kind,
+          source: candidate.source,
+          destination: candidate.source,
+          disposition: 'unchanged',
+          scope_disposition: result.disposition,
+          sha256: hashFile(candidate.source),
+          reason: 'all promotion candidates already carry a scope envelope',
+        });
+        continue;
+      }
+      if (result.disposition === 'canonical' && result.scope) {
+        const scope = result.scope;
+        const destination = destinationFor(candidate, scope);
+        const disposition: PlanDisposition =
+          destination === candidate.source
+            ? 'unchanged'
+            : safeExistsSync(destination)
+              ? 'conflict'
+              : 'move';
+        items.push({
+          kind,
+          source: candidate.source,
+          destination,
+          disposition,
+          scope_disposition: result.disposition,
+          ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+          sha256: hashFile(candidate.source),
+          ...(disposition === 'conflict'
+            ? { reason: 'destination already exists; no overwrite performed' }
+            : {}),
+        });
+        continue;
+      }
+      items.push({
+        kind,
+        source: candidate.source,
+        destination: quarantineFor(candidate, migrationId),
+        disposition: 'quarantine',
+        scope_disposition: result.disposition,
+        sha256: hashFile(candidate.source),
+        reason: result.reason || `${candidate.kind} scope could not be migrated safely`,
+      });
+      continue;
+    }
     let record: unknown;
     try {
       record = JSON.parse(String(safeReadFile(candidate.source, { encoding: 'utf8' })));
@@ -179,6 +512,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
         destination: quarantineFor(candidate, migrationId),
         disposition: 'quarantine',
         scope_disposition: 'invalid',
+        sha256: hashFile(candidate.source),
         reason: `record unreadable: ${error instanceof Error ? error.message : String(error)}`,
       });
       continue;
@@ -215,6 +549,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
       destination: quarantineFor(candidate, migrationId),
       disposition: 'quarantine',
       scope_disposition: scopeResult.disposition,
+      sha256: hashFile(candidate.source),
       reason: 'scope is absent or invalid; tenant ownership was not inferred',
     });
   }
@@ -224,6 +559,18 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
     apply,
     status: 'planned',
     items,
+    summary: {
+      by_disposition: {
+        unchanged: items.filter((item) => item.disposition === 'unchanged').length,
+        move: items.filter((item) => item.disposition === 'move').length,
+        quarantine: items.filter((item) => item.disposition === 'quarantine').length,
+        conflict: items.filter((item) => item.disposition === 'conflict').length,
+      },
+      by_scope_disposition: items.reduce<Record<string, number>>((counts, item) => {
+        counts[item.scope_disposition] = (counts[item.scope_disposition] || 0) + 1;
+        return counts;
+      }, {}),
+    },
   };
   if (apply) applyPlan(plan);
   return plan;
@@ -274,11 +621,29 @@ function applyPlan(plan: MigrationPlan): void {
 
 function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean } {
   const kindValue = argv[argv.indexOf('--kind') + 1];
-  if (kindValue && kindValue !== 'schedule' && kindValue !== 'surface' && kindValue !== 'all') {
+  if (
+    kindValue &&
+    kindValue !== 'schedule' &&
+    kindValue !== 'surface' &&
+    kindValue !== 'feedback' &&
+    kindValue !== 'intent' &&
+    kindValue !== 'ledger' &&
+    kindValue !== 'promotion' &&
+    kindValue !== 'all'
+  ) {
     throw new Error(`Unsupported --kind: ${kindValue}`);
   }
   return {
-    kind: kindValue === 'schedule' || kindValue === 'surface' ? kindValue : 'all',
+    kind:
+      kindValue === 'schedule' ||
+      kindValue === 'surface' ||
+      kindValue === 'feedback' ||
+      kindValue === 'intent' ||
+      kindValue === 'ledger'
+        ? kindValue
+        : kindValue === 'promotion'
+          ? kindValue
+          : 'all',
     apply: argv.includes('--apply'),
   };
 }
@@ -286,11 +651,14 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
 const isDirect = process.argv[1] && /migrate_physical_namespaces\.(ts|js)$/.test(process.argv[1]);
 if (isDirect) {
   const options = parseArgs(process.argv.slice(2));
-  const kinds: MigrationKind[] = options.kind === 'all' ? ['schedule', 'surface'] : [options.kind];
+  const kinds: MigrationKind[] =
+    options.kind === 'all'
+      ? ['schedule', 'surface', 'feedback', 'intent', 'ledger', 'promotion']
+      : [options.kind];
   const plans = withExecutionContext(AUTHORITY_ROLE, () =>
     kinds.map((kind) => buildPlan(kind, options.apply))
   );
   console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
 }
 
-export { buildPlan, parseArgs };
+export { buildPlan, feedbackScopes, intentScopes, ledgerScopes, promotionScopes, parseArgs };

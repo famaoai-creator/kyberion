@@ -153,6 +153,7 @@ function makePack(): MissionContextPack {
       relationships: {
         project: {
           project_id: 'PRJ-CONTEXT-PACK-001',
+          organization_id: 'ORG-CONTEXT-PACK-001',
           project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-001/project-os',
           relationship_type: 'supports',
           affected_artifacts: ['knowledge/product/architecture/mission-context-injection-model.md'],
@@ -603,6 +604,7 @@ describe('mission-context-pack', () => {
     expect(pack.security_scope).toEqual({
       tenant_slug: 'acme',
       tenant_id: 'acme',
+      organization_id: 'ORG-CONTEXT-PACK-001',
       project_id: 'PRJ-CONTEXT-PACK-001',
       mission_id: missionId,
       participant_id: 'implementation-architect',
@@ -614,6 +616,7 @@ describe('mission-context-pack', () => {
 
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('Mission context pack (scoped, minimal, role-specific).');
+    expect(rendered).toContain('organization=ORG-CONTEXT-PACK-001');
     expect(rendered).toContain('Use only the facts in this pack');
     expect(rendered).toContain('Fast-lane guidance: model_tier=fast');
     expect(rendered).toContain('schema-forced result');
