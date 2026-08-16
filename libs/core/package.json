@@ -647,6 +647,10 @@
       "types": "./dist/distill-candidate-registry.d.ts",
       "default": "./dist/distill-candidate-registry.js"
     },
+    "./service-distill-candidate": {
+      "types": "./dist/service-distill-candidate.d.ts",
+      "default": "./dist/service-distill-candidate.js"
+    },
     "./mission-ledger-policy": {
       "types": "./dist/mission-ledger-policy.d.ts",
       "default": "./dist/mission-ledger-policy.js"

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   compileServiceRecording,
+  buildServiceProcedureCandidate,
   promoteServiceProcedure,
   resolveAllowlistedRecordingRef,
   safeExistsSync,
@@ -65,6 +66,7 @@ function printUsage(): void {
   console.log(`Usage:
   service_recording capture --target-name <name> --calls <json|@path> [--recording-id <id>]
   service_recording compile --recording <path> --procedure-id <id> --intent-phrases <json> [--output <path>] [--dry-run]
+  service_recording candidate --recording <path> --procedure-id <id> --intent-phrases <json> [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>] [--title <text>]
   service_recording review --recording <path> --approve|--reject [--reviewer <id>] [--note <text>]
   service_recording promote --recording <path> --procedure-id <id> --intent-phrases <json>`);
 }
@@ -150,6 +152,45 @@ function capture(args: Record<string, string>): void {
   );
 }
 
+function candidate(args: Record<string, string>): void {
+  if (!args.recording || !args['procedure-id'] || !args['intent-phrases']) {
+    throw new Error('candidate requires --recording, --procedure-id, and --intent-phrases');
+  }
+  const loaded = loadRecording(args.recording);
+  const intentPhrases = readJsonArgument(args['intent-phrases'], 'intent-phrases');
+  if (!Array.isArray(intentPhrases) || intentPhrases.some((phrase) => typeof phrase !== 'string')) {
+    throw new Error('--intent-phrases must be a JSON array of strings');
+  }
+  const result = withExecutionContext('surface_runtime', () =>
+    buildServiceProcedureCandidate(loaded.value, {
+      procedureId: args['procedure-id'],
+      intentPhrases,
+      recordingRef: pathResolver.toRepoRelative(loaded.absolute),
+      ...(args.title ? { title: args.title } : {}),
+      ...(args['mission-id'] ? { missionId: args['mission-id'] } : {}),
+      ...(args['task-session-id'] ? { taskSessionId: args['task-session-id'] } : {}),
+      ...(args['tenant-slug'] ? { tenantSlug: args['tenant-slug'] } : {}),
+      ...(args['project-id'] ? { projectId: args['project-id'] } : {}),
+      ...(args['owner-nhi'] ? { ownerNhi: args['owner-nhi'] } : {}),
+      ...(args.tier ? { tier: args.tier as 'personal' | 'confidential' } : {}),
+    })
+  );
+  console.log(
+    JSON.stringify(
+      {
+        status: 'candidate-created',
+        candidate_id: result.candidate.candidate_id,
+        procedure_id: result.procedure_id,
+        preflight: result.preflight,
+        candidate: result.candidate,
+      },
+      null,
+      2
+    )
+  );
+  if (!result.preflight.ok) process.exitCode = 2;
+}
+
 function review(args: Record<string, string>): void {
   if (!args.recording || (args.approve !== 'true' && args.reject !== 'true')) {
     throw new Error('review requires --recording and exactly one of --approve/--reject');
@@ -209,6 +250,7 @@ async function main(): Promise<void> {
   const args = argMap(process.argv.slice(offset));
   if (command === 'capture') return capture(args);
   if (command === 'compile') return compile(args);
+  if (command === 'candidate') return candidate(args);
   if (command === 'review') return review(args);
   if (command === 'promote') return promote(args);
   throw new Error(`unknown command: ${command}`);
