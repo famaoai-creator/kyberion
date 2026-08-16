@@ -27,6 +27,12 @@ import {
   CloudflareOsControlPlane,
   withEgressPayloadContext,
   validateContextSecurityScope,
+  describeServiceHarness,
+  planServiceOperation,
+  verifyServiceOperationResult,
+  createServiceExecutionReceipt,
+  persistServiceExecutionReceipt,
+  type ServiceExecutionReceipt,
   type ContextSecurityScope,
   type EgressPayloadContext,
   type IntroductionMode,
@@ -39,7 +45,7 @@ import * as crypto from 'node:crypto';
 
 export interface ServiceAction {
   service_id: string;
-  mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP';
+  mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP' | 'HARNESS';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
@@ -299,6 +305,9 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       case 'RECONCILE':
         return await reconcileServices(input);
 
+      case 'HARNESS':
+        return await executeHarnessRequest(input);
+
       case 'API':
         return await executeApiRequest(input);
 
@@ -316,6 +325,66 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
   recordServiceObservation(preparedObservation, result);
   return result;
+}
+
+async function executeHarnessRequest(input: ServiceAction): Promise<unknown> {
+  const params = input.params && typeof input.params === 'object' ? input.params : {};
+  switch (input.action) {
+    case 'describe':
+      return describeServiceHarness(input.service_id, {
+        detail: params.detail !== false,
+      });
+    case 'plan': {
+      const action = String(params.operation || params.action || '').trim();
+      if (!action) throw new Error('HARNESS plan requires params.operation');
+      const inputs =
+        params.inputs && typeof params.inputs === 'object' && !Array.isArray(params.inputs)
+          ? params.inputs
+          : {};
+      return planServiceOperation(input.service_id, action, inputs);
+    }
+    case 'verify': {
+      const action = String(params.operation || '').trim();
+      if (!action) throw new Error('HARNESS verify requires params.operation');
+      const descriptor = describeServiceHarness(input.service_id, { detail: true });
+      const operation = descriptor.operations.find((candidate) => candidate.action === action);
+      if (!operation)
+        throw new Error(`Operation "${action}" not found for service ${input.service_id}`);
+      return verifyServiceOperationResult(operation, params.result);
+    }
+    case 'receipt': {
+      const requestedServiceId = String(params.service_id || input.service_id).trim();
+      if (requestedServiceId !== input.service_id) {
+        throw new Error('HARNESS receipt plan service_id must match the request service_id');
+      }
+      if (
+        params.plan &&
+        typeof params.plan === 'object' &&
+        String(params.plan.service_id || '').trim() !== input.service_id
+      ) {
+        throw new Error('HARNESS receipt plan service_id must match the request service_id');
+      }
+      const plan =
+        params.plan && typeof params.plan === 'object'
+          ? params.plan
+          : planServiceOperation(
+              input.service_id,
+              String(params.operation || '').trim(),
+              params.inputs && typeof params.inputs === 'object' ? params.inputs : {}
+            );
+      const receipt = createServiceExecutionReceipt(
+        plan as Parameters<typeof createServiceExecutionReceipt>[0],
+        params.result,
+        {
+          status: params.status as ServiceExecutionReceipt['status'] | undefined,
+          error: typeof params.error === 'string' ? params.error : undefined,
+        }
+      );
+      return params.persist === true ? persistServiceExecutionReceipt(receipt) : receipt;
+    }
+    default:
+      throw new Error(`Unsupported HARNESS action: ${input.action}`);
+  }
 }
 
 interface PreparedObservation {

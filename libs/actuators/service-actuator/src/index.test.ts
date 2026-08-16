@@ -140,6 +140,57 @@ describe('service-actuator handleAction', () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it('exposes side-effect-free Service Harness describe and plan actions', async () => {
+    const { handleAction } = await import('./index.js');
+
+    const descriptor = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'describe',
+      params: { detail: false },
+    });
+    expect(descriptor).toMatchObject({
+      kind: 'service-harness-descriptor.v1',
+      service_id: 'github',
+    });
+
+    const plan = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'plan',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion' },
+      },
+    });
+    expect(plan).toMatchObject({
+      kind: 'service-operation-plan.v1',
+      service_id: 'github',
+      action: 'create_issue',
+      valid: false,
+      approval_required: true,
+    });
+
+    const receipt = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'receipt',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion', access_token: 'hidden' },
+        result: { id: 42 },
+        error: 'token=hidden',
+      },
+    });
+    expect(receipt).toMatchObject({
+      kind: 'service-execution-receipt.v1',
+      status: 'succeeded',
+      inputs: { access_token: '[REDACTED]' },
+      error: 'token=[REDACTED]',
+    });
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+  });
+
   it('enforces an explicitly requested resource introduction before service execution', async () => {
     process.env.MISSION_ID = 'mission-introduction-test';
     mocks.controlPlane.enforceIntroduction.mockImplementation(() => {
@@ -379,6 +430,15 @@ describe('service-actuator handleAction', () => {
         args: ['-y', '@modelcontextprotocol/server-github'],
       },
     };
+    const harnessRequest = {
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'plan',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion' },
+      },
+    };
     const pipelineRequest = {
       action: 'pipeline',
       context: {
@@ -408,6 +468,7 @@ describe('service-actuator handleAction', () => {
 
     expect(validate(directRequest), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(mcpRequest), JSON.stringify(validate.errors || [])).toBe(true);
+    expect(validate(harnessRequest), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(pipelineRequest), JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

@@ -672,6 +672,7 @@ export * as serviceEngine from './service-engine.js';
 export { executeServicePreset, executeMcp } from './service-engine.js';
 export * from './service-preset-registry.js';
 export * from './service-preset-policy.js';
+export * from './service-harness.js';
 export {
   getServiceEndpointRecord,
   loadServiceEndpointsCatalog,
