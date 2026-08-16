@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
   registerGenerationSchedule: vi.fn(),
   runGovernedGenerationScheduleAction: vi.fn(),
+  recordProtocolServiceLifecycle: vi.fn(),
 }));
 
 vi.mock('@agent/core', async () => {
@@ -30,6 +31,7 @@ vi.mock('@agent/core', async () => {
     safeExistsSync: mocks.safeExistsSync,
     registerGenerationSchedule: mocks.registerGenerationSchedule,
     runGenerationScheduleAction: mocks.runGovernedGenerationScheduleAction,
+    recordProtocolServiceLifecycle: mocks.recordProtocolServiceLifecycle,
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
   };
 });

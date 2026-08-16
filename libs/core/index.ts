@@ -131,6 +131,7 @@ export * from './physical-namespace.js';
 export * from './config-change.js';
 export * from './mcp-request-context.js';
 export * from './protocol-service-registry.js';
+export * from './protocol-service-lifecycle.js';
 export * from './memory-scope.js';
 export * from './reasoning-participant.js';
 export * from './participant-context-resolver.js';

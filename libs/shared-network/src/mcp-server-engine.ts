@@ -38,6 +38,8 @@ import {
   resolveMcpRequestContext,
   assertMcpCallerRole,
   assertProtocolServiceRegistered,
+  normalizeEventScope,
+  recordProtocolServiceLifecycle,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -1201,4 +1203,49 @@ export async function startMcpServerStdio(): Promise<void> {
   const server = createKyberionMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  const tenant = String(process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || '').trim();
+  const scope = normalizeEventScope(
+    tenant
+      ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
+      : { scope_kind: 'system', tier: 'public' }
+  );
+  const principalId =
+    String(process.env.KYBERION_MCP_NHI || process.env.KYBERION_MCP_PRINCIPAL || '').trim() ||
+    'mcp-server-cowork';
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: 'mcp-server-cowork',
+      action: 'start',
+      status: 'started',
+      scope,
+      actorRole: 'surface_runtime',
+      principal: { kind: 'service', id: principalId },
+      requestedBy: principalId,
+    });
+  } catch (error) {
+    await transport.close();
+    throw error;
+  }
+  let stopping = false;
+  const shutdown = async () => {
+    if (stopping) return;
+    stopping = true;
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'mcp-server-cowork',
+        action: 'stop',
+        status: 'stopped',
+        scope,
+        actorRole: 'surface_runtime',
+        principal: { kind: 'service', id: principalId },
+        requestedBy: principalId,
+      });
+    } catch (error) {
+      console.error(`[MCP] stop lifecycle receipt unavailable: ${error}`);
+    } finally {
+      await transport.close();
+    }
+  };
+  process.once('SIGINT', () => void shutdown());
+  process.once('SIGTERM', () => void shutdown());
 }
