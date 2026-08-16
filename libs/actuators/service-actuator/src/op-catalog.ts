@@ -7,7 +7,7 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
-export const SERVICE_ACTUATOR_CAPTURE_OPS = ['preset'] as const;
+export const SERVICE_ACTUATOR_CAPTURE_OPS = ['preset', 'harness'] as const;
 
 export const SERVICE_ACTUATOR_TRANSFORM_OPS = [] as const;
 
