@@ -112,6 +112,7 @@ personal procedure catalog + pipelines/service/*.json
 - `service_recording capture|compile|review|promote` CLIで、録画、ADFドラフト、レビュー、カタログ昇格を段階的に実行できる。
 - `service-actuator` は明示的な `context.service_recording_session_id` がある場合だけ記録する。記録失敗は外部副作用後の再実行を誘発しないようwarning扱いにする。
 - promotionは録画レビューを必須とし、生成ADFにはhigh-risk stepの `approval_required` を残す。secret bindingや契約検証エラーは昇格を停止する。
+- high-risk stepの前にはADF自身の `core:await_decision` gateも生成する。service procedure dispatcher経由だけでなく、ADFを直接実行する経路でも承認なしに `service:preset` へ到達しない。
 - 実サービスcredentialを必要としない fixture capture、compile、preflight、dry-runを改善ループの受入テストとする。実書き込みのE2Eは承認・credential・tenant scopeが揃った別段階で行う。
 
 検証コマンド:

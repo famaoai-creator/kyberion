@@ -153,11 +153,29 @@ export function validateServiceRecording(input: unknown): {
     };
     scanParams(step.params);
   }
-  if (
-    recording.review?.status === 'approved' &&
-    recording.review.decisions.some((d) => d.status !== 'approved')
-  ) {
-    errors.push('approved review cannot contain pending or rejected decisions');
+  if (recording.review) {
+    const stepIds = new Set(recording.steps.map((step) => step.step_id));
+    const reviewedIds = new Set<string>();
+    for (const decision of recording.review.decisions) {
+      if (!stepIds.has(decision.step_id)) {
+        errors.push(`review decision references unknown step ${decision.step_id}`);
+      }
+      if (reviewedIds.has(decision.step_id)) {
+        errors.push(`review contains duplicate decision for ${decision.step_id}`);
+      }
+      reviewedIds.add(decision.step_id);
+    }
+    if (recording.review.status === 'approved') {
+      const missing = recording.steps
+        .filter((step) => !reviewedIds.has(step.step_id))
+        .map((step) => step.step_id);
+      if (missing.length > 0) {
+        errors.push(`approved review is missing decisions for: ${missing.join(', ')}`);
+      }
+      if (recording.review.decisions.some((d) => d.status !== 'approved')) {
+        errors.push('approved review cannot contain pending or rejected decisions');
+      }
+    }
   }
 
   if (errors.length > 0) return { valid: false, errors };
