@@ -302,22 +302,25 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                   {promotedBody || `${uxText('chronos_loading', locale)}…`}
                 </pre>
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t kb-border-subtle pt-3">
-                  <span className="text-[10px] kb-text-muted">このナレッジは役立ちましたか？</span>
+                  <span className="text-[10px] kb-text-muted">
+                    {uxText('chronos_knowledge_feedback_prompt', locale)}
+                  </span>
                   <button
                     type="button"
-                    aria-label="ナレッジは役立った"
+                    aria-label={uxText('chronos_knowledge_feedback_useful', locale)}
                     onClick={() => void recordFeedback('useful')}
                     className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
                   >
-                    <ThumbsUp size={12} /> 役立った
+                    <ThumbsUp size={12} /> {uxText('chronos_knowledge_feedback_useful', locale)}
                   </button>
                   <button
                     type="button"
-                    aria-label="ナレッジは役立たなかった"
+                    aria-label={uxText('chronos_knowledge_feedback_not_useful', locale)}
                     onClick={() => void recordFeedback('not_useful')}
                     className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'not_useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
                   >
-                    <ThumbsDown size={12} /> 改善が必要
+                    <ThumbsDown size={12} />{' '}
+                    {uxText('chronos_knowledge_feedback_not_useful', locale)}
                   </button>
                 </div>
               </div>
