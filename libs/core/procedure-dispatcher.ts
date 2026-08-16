@@ -16,7 +16,11 @@ import {
   segmentRecording,
   subRecordingForSegment,
 } from './browser-extension-bridge.js';
-import { isExternalEffectStep, type ServiceRecording } from './service-recording.js';
+import {
+  isExternalEffectStep,
+  type ServiceRecording,
+  validateServiceRecording,
+} from './service-recording.js';
 import {
   executeServiceProcedure,
   type ServicePresetRunner,
@@ -825,6 +829,14 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   if (!serviceRecording) {
     recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_missing_recording', true);
     return { status: 'blocked', errors: ['service:preset executor requires a serviceRecording'] };
+  }
+  const recordingValidation = validateServiceRecording(serviceRecording);
+  if (!recordingValidation.value) {
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_invalid_recording', true);
+    return {
+      status: 'blocked',
+      errors: [`service recording failed validation: ${recordingValidation.errors.join('; ')}`],
+    };
   }
   if (serviceRecording.review?.status !== 'approved') {
     recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_unapproved_recording', true);

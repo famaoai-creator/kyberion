@@ -99,6 +99,9 @@ export function compileServiceRecording(
 
   const inputNames = collectServiceInputNames(recording);
   const requiredInputs = inputNames.map((name) => ({ name, label: name, type: 'string' as const }));
+  const approvalChannel = `service-recording-${recording.recording_id
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/gu, '-')}`.slice(0, 64);
 
   const procedureEntry: ProcedureEntry = {
     procedure_id: procedureId,
@@ -129,14 +132,25 @@ export function compileServiceRecording(
     version: '1.0.0',
   };
 
-  const pipeline = {
-    action: 'pipeline' as const,
-    pipeline_id: procedureId,
-    name: procedureId,
-    version: '2.0.0' as const,
-    description: `Draft service procedure for ${recording.target.name}.`,
-    _draft: true as const,
-    steps: recording.steps.map((step) => ({
+  const pipelineSteps: Array<Record<string, unknown>> = [];
+  for (const step of recording.steps) {
+    if (step.risk_class === 'high') {
+      pipelineSteps.push({
+        id: `${step.step_id}-approval`,
+        role: 'gate',
+        op: 'core:await_decision',
+        params: {
+          approval: {
+            title: `Service execution: ${recording.target.name}`,
+            summary: `Approve ${step.service_id}.${step.action} before external execution.`,
+            severity: 'high',
+          },
+          storage_channel: approvalChannel,
+          export_as: `${step.step_id}_approval`,
+        },
+      });
+    }
+    pipelineSteps.push({
       id: step.step_id,
       role: step.risk_class === 'read' ? 'source' : 'sink',
       op: 'service:preset',
@@ -149,7 +163,17 @@ export function compileServiceRecording(
         auth: 'secret-guard',
         params: step.params || {},
       },
-    })),
+    });
+  }
+
+  const pipeline = {
+    action: 'pipeline' as const,
+    pipeline_id: procedureId,
+    name: procedureId,
+    version: '2.0.0' as const,
+    description: `Draft service procedure for ${recording.target.name}.`,
+    _draft: true as const,
+    steps: pipelineSteps,
   };
 
   return { procedureEntry, pipeline, goldenScenario, isReadOnly, warnings };

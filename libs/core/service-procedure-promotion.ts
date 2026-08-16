@@ -66,7 +66,8 @@ export function promoteServiceProcedure(
   if (blockingWarnings.length > 0) {
     throw new Error(`recording has unresolved promotion warnings: ${blockingWarnings.join('; ')}`);
   }
-  const pipeline = validatePipelineAdf(compiled.pipeline);
+  const { _draft: _draftMarker, ...promotedDraft } = compiled.pipeline;
+  const pipeline = validatePipelineAdf(promotedDraft);
   const guardrails = validatePipelineGuardrails(pipeline, `service:${procedureId}`);
   if (!guardrails.ok) {
     throw new Error(

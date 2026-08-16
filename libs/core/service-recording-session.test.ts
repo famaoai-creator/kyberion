@@ -4,6 +4,16 @@ import { validateServiceRecording } from './service-recording.js';
 import { compileServiceRecording } from './service-recording-compiler.js';
 
 describe('ServiceRecordingSession', () => {
+  it('rejects recording ids that could escape the runtime recording store', () => {
+    expect(
+      () =>
+        new ServiceRecordingSession({
+          target_name: 'Issue intake',
+          recording_id: '../escape',
+        })
+    ).toThrow('recording_id');
+  });
+
   it('records canonical service calls as redacted reviewable steps', () => {
     const session = new ServiceRecordingSession({
       recording_id: 'svc-session-test',
@@ -45,9 +55,13 @@ describe('ServiceRecordingSession', () => {
       intentPhrases: ['GitHub issueを作成'],
     });
     expect(compiled.pipeline._draft).toBe(true);
-    expect(compiled.pipeline.steps[0]).toMatchObject({
+    expect(compiled.pipeline.steps[1]).toMatchObject({
       op: 'service:preset',
       params: { service_id: 'github', action: 'create_issue', auth: 'secret-guard' },
+    });
+    expect(compiled.pipeline.steps[0]).toMatchObject({
+      role: 'gate',
+      op: 'core:await_decision',
     });
     expect(compiled.warnings).toContain('step-001 requires human secret binding: authorization');
   });
