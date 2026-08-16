@@ -4327,6 +4327,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-harness-registry.json",
+      "tier": "public",
+      "size": 62635,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-presets/asana.json",
       "tier": "public",
       "size": 1592,
@@ -7684,6 +7690,12 @@
       "path": "product/schemas/service-endpoints.schema.json",
       "tier": "public",
       "size": 1755,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/service-harness-registry.schema.json",
+      "tier": "public",
+      "size": 1727,
       "type": "json"
     },
     {
