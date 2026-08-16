@@ -2211,6 +2211,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PROJECT_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PROJECT_NAME",
       "category": "runtime",
       "type": "string",
@@ -2843,6 +2851,14 @@
       "name": "KYBERION_TASK_GRANTS_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_TASK_ID",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false

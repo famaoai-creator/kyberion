@@ -36,6 +36,8 @@ import {
   enqueueMemoryPromotionCandidate,
 } from '../memory-promotion-queue.js';
 import type { TaskResultKnowledgeFeedback } from '../channel-surface-types.js';
+import type { ScopeContext } from '../scope-context.js';
+import { physicalScopedPath } from '../physical-namespace.js';
 
 export interface DeliveredKnowledgeRef {
   path: string;
@@ -50,10 +52,13 @@ export interface KnowledgeDeliveryRecord {
   recipient_kind?: string;
   delivered_at: string;
   refs: DeliveredKnowledgeRef[];
+  scope_context?: ScopeContext;
+  scope_disposition?: 'canonical' | 'unscoped-legacy';
 }
 
 export interface KnowledgeUsageAggregateEntry {
   document_path: string;
+  scope_context_key?: string;
   delivered_count: number;
   used_count: number;
   not_used_count: number;
@@ -62,25 +67,54 @@ export interface KnowledgeUsageAggregateEntry {
   last_seen: string;
 }
 
-function deliveryLogDir(): string {
+function scopedRuntimePath(base: string, scope?: ScopeContext): string {
+  if (!scope?.tenant_slug) return base;
+  try {
+    return pathResolver.rootResolve(
+      physicalScopedPath(base.replace(/^.*?(?=active\/shared\/runtime)/, ''), {
+        ...scope,
+        scope_kind: scope.session_id
+          ? 'session'
+          : scope.task_id
+            ? 'task'
+            : scope.mission_id
+              ? 'mission'
+              : scope.project_id
+                ? 'project'
+                : scope.organization_id
+                  ? 'organization'
+                  : 'tenant',
+      })
+    );
+  } catch {
+    return base;
+  }
+}
+
+function deliveryLogDir(scope?: ScopeContext): string {
   const override = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR?.trim();
-  return override
+  const base = override
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('runtime/feedback-loop/knowledge-delivery');
+  return scopedRuntimePath(base, scope);
 }
 
-function usageAggregatePath(): string {
+function usageAggregatePath(scope?: ScopeContext): string {
   const override = process.env.KYBERION_KNOWLEDGE_USAGE_PATH?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json');
+  const base = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json');
+  if (!scope?.tenant_slug) return base;
+  const directory = scopedRuntimePath(path.dirname(base), scope);
+  return path.join(directory, path.basename(base));
 }
 
-export function knowledgeDeliveryLogDir(): string {
-  return deliveryLogDir();
+export function knowledgeDeliveryLogDir(scope?: ScopeContext): string {
+  return deliveryLogDir(scope);
 }
 
-export function knowledgeUsageAggregatePath(): string {
-  return usageAggregatePath();
+export function knowledgeUsageAggregatePath(scope?: ScopeContext): string {
+  return usageAggregatePath(scope);
 }
 
 function normalizeRefs(refs: DeliveredKnowledgeRef[]): DeliveredKnowledgeRef[] {
@@ -112,8 +146,8 @@ function normalizeTopicList(value: string[] | undefined): string[] {
   return normalized;
 }
 
-function loadUsageAggregate(): KnowledgeUsageAggregateEntry[] {
-  const filePath = usageAggregatePath();
+function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {
+  const filePath = usageAggregatePath(scope);
   if (!safeExistsSync(filePath)) return [];
   try {
     const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
@@ -124,8 +158,8 @@ function loadUsageAggregate(): KnowledgeUsageAggregateEntry[] {
   }
 }
 
-function saveUsageAggregate(entries: KnowledgeUsageAggregateEntry[]): void {
-  const filePath = usageAggregatePath();
+function saveUsageAggregate(entries: KnowledgeUsageAggregateEntry[], scope?: ScopeContext): void {
+  const filePath = usageAggregatePath(scope);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(filePath, JSON.stringify(entries, null, 2));
@@ -142,9 +176,10 @@ function bumpUsageAggregate(
   delta: Partial<
     Pick<KnowledgeUsageAggregateEntry, 'delivered_count' | 'used_count' | 'not_used_count'>
   >,
-  at: string
+  at: string,
+  scope?: ScopeContext
 ): void {
-  const entries = loadUsageAggregate();
+  const entries = loadUsageAggregate(scope);
   const index = entries.findIndex((entry) => entry.document_path === documentPath);
   if (index >= 0) {
     const current = entries[index];
@@ -166,7 +201,7 @@ function bumpUsageAggregate(
       last_seen: at,
     });
   }
-  saveUsageAggregate(entries);
+  saveUsageAggregate(entries, scope);
 }
 
 /**
@@ -192,11 +227,12 @@ export function recordKnowledgeDelivery(input: {
   teamRole?: string;
   recipientKind?: string;
   refs: DeliveredKnowledgeRef[];
+  scope?: ScopeContext;
 }): { deliveryRecordPath: string; refs: DeliveredKnowledgeRef[] } | undefined {
   const refs = normalizeRefs(input.refs || []);
   if (refs.length === 0) return undefined;
 
-  const dir = deliveryLogDir();
+  const dir = deliveryLogDir(input.scope);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const now = new Date().toISOString();
   const day = now.slice(0, 10);
@@ -208,12 +244,15 @@ export function recordKnowledgeDelivery(input: {
     ...(input.recipientKind ? { recipient_kind: input.recipientKind } : {}),
     delivered_at: now,
     refs,
+    ...(input.scope
+      ? { scope_context: input.scope, scope_disposition: 'canonical' as const }
+      : { scope_disposition: 'unscoped-legacy' as const }),
   };
 
   try {
     safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`);
     for (const ref of refs) {
-      bumpUsageAggregate(ref.path, { delivered_count: 1 }, now);
+      bumpUsageAggregate(ref.path, { delivered_count: 1 }, now, input.scope);
     }
   } catch (error: any) {
     // Delivery telemetry must never block task dispatch (fail-open, same
@@ -235,6 +274,7 @@ export function recordKnowledgeUsageFeedback(input: {
   missionId: string;
   taskId?: string;
   feedback: TaskResultKnowledgeFeedback | undefined;
+  scope?: ScopeContext;
 }): { usageUpdated: boolean; promotionCandidateIds: string[] } {
   const feedback = input.feedback;
   if (!feedback) return { usageUpdated: false, promotionCandidateIds: [] };
@@ -247,11 +287,11 @@ export function recordKnowledgeUsageFeedback(input: {
   let usageUpdated = false;
   try {
     for (const documentPath of used) {
-      bumpUsageAggregate(documentPath, { used_count: 1 }, now);
+      bumpUsageAggregate(documentPath, { used_count: 1 }, now, input.scope);
       usageUpdated = true;
     }
     for (const documentPath of notUsed) {
-      bumpUsageAggregate(documentPath, { not_used_count: 1 }, now);
+      bumpUsageAggregate(documentPath, { not_used_count: 1 }, now, input.scope);
       usageUpdated = true;
     }
   } catch (error: any) {
@@ -277,6 +317,16 @@ export function recordKnowledgeUsageFeedback(input: {
         evidenceRefs: [sourceRef],
         sensitivityTier: 'confidential',
         ratificationRequired: true,
+        ...(input.scope
+          ? {
+              scope: {
+                ...input.scope,
+                tier: 'confidential',
+                promotion_policy: 'same_scope' as const,
+                provenance_refs: [sourceRef],
+              },
+            }
+          : {}),
       });
       enqueueMemoryPromotionCandidate(candidate);
       promotionCandidateIds.push(candidate.candidate_id);
@@ -290,6 +340,6 @@ export function recordKnowledgeUsageFeedback(input: {
   return { usageUpdated, promotionCandidateIds };
 }
 
-export function loadKnowledgeUsageAggregate(): KnowledgeUsageAggregateEntry[] {
-  return loadUsageAggregate();
+export function loadKnowledgeUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {
+  return loadUsageAggregate(scope);
 }

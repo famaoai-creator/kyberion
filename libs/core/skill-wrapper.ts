@@ -14,8 +14,10 @@ import * as path from 'node:path';
 import {
   fireSkillPluginHook,
   loadAuthorizedSkillPlugins,
+  isSkillAllowed,
   type LoadedSkillPlugin,
 } from './skill-plugin-loader.js';
+import { currentScope } from './scope-context.js';
 
 function buildOutput<T>(
   skillName: string,
@@ -133,9 +135,18 @@ async function runSkillWithPlugins<T>(
   skillName: string,
   fn: () => Promise<T>
 ): Promise<SkillOutput<T>> {
+  const skillDecision = isSkillAllowed(skillName, currentScope());
+  if (!skillDecision.allowed) {
+    return buildOutput<T>(
+      skillName,
+      'error',
+      new Error(`[SKILL_RESTRICTED] ${skillDecision.reason || 'skill is not allowed'}`),
+      Date.now()
+    );
+  }
   let plugins: LoadedSkillPlugin[] = [];
   try {
-    plugins = (await loadAuthorizedSkillPlugins()).loaded;
+    plugins = (await loadAuthorizedSkillPlugins(process.cwd(), undefined, currentScope())).loaded;
   } catch (err) {
     // Plugin loading itself must never block a skill run.
     console.error(

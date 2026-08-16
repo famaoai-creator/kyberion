@@ -3,6 +3,7 @@ import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode,
   resolveReasoningBackendModeFromContext,
+  resolveScopedBackendPolicy,
 } from './reasoning-backend-policy.js';
 
 describe('reasoning-backend-policy', () => {
@@ -34,6 +35,38 @@ describe('reasoning-backend-policy', () => {
   it('keeps the Google AI Studio REST mode distinct from the CLI mode', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-api');
     expect(normalizeReasoningBackendMode('codex-cli')).toBe('codex-cli');
+  });
+
+  it('applies project over organization over tenant backend overrides', () => {
+    const policy = loadReasoningBackendPolicy();
+    const scoped = resolveScopedBackendPolicy(
+      {
+        ...policy,
+        allowed_modes: ['stub'],
+        tenant_overrides: { tenant_a: { allowed_modes: ['ollama'] } },
+        organization_overrides: { org_a: { allowed_modes: ['codex-cli'] } },
+        project_overrides: { project_a: { default_mode: 'claude-cli' } },
+      },
+      {
+        tier: 'confidential',
+        tenant_slug: 'tenant_a',
+        organization_id: 'org_a',
+        project_id: 'project_a',
+      }
+    );
+    expect(scoped.allowed_modes).toEqual(['codex-cli']);
+    expect(scoped.default_mode).toBe('claude-cli');
+  });
+
+  it('does not select a backend denied by the scoped allow list', () => {
+    const policy = loadReasoningBackendPolicy();
+    expect(() =>
+      resolveReasoningBackendModeFromContext({
+        policy: { ...policy, allowed_modes: ['stub'], default_mode: 'claude-cli' },
+        env: {},
+        providers: [],
+      })
+    ).toThrow(/REASONING_MODE_DENIED/);
   });
 
   it('resolves explicit and env-driven backend selection using policy order', () => {

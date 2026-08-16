@@ -113,6 +113,35 @@ describe('recordKnowledgeDelivery', () => {
     expect(result!.refs).toHaveLength(1);
     expect(result!.refs[0]?.score).toBe(0.1);
   });
+
+  it('partitions delivery and usage telemetry by the canonical tenant namespace', () => {
+    const scope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+      mission_id: 'MSN-SCOPED',
+    };
+    const result = recordKnowledgeDelivery({
+      missionId: 'MSN-SCOPED',
+      taskId: 'T1',
+      refs: [{ path: 'knowledge/confidential/tenant-a/runbook.md' }],
+      scope,
+    });
+
+    expect(result?.deliveryRecordPath).toContain('/tenants/tenant-a/');
+    expect(loadKnowledgeUsageAggregate(scope)).toMatchObject([
+      { document_path: 'knowledge/confidential/tenant-a/runbook.md', delivered_count: 1 },
+    ]);
+    expect(loadKnowledgeUsageAggregate()).toEqual([]);
+
+    const feedback = recordKnowledgeUsageFeedback({
+      missionId: 'MSN-SCOPED',
+      taskId: 'T1',
+      scope,
+      feedback: { missing_topics: ['tenant-specific rollback'] },
+    });
+    expect(feedback.promotionCandidateIds).toHaveLength(1);
+    expect(loadKnowledgeUsageAggregate(scope)[0]).toMatchObject({ occurrences: 1 });
+  });
 });
 
 describe('recordKnowledgeUsageFeedback', () => {

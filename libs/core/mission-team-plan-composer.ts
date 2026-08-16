@@ -31,6 +31,7 @@ import {
 import { resolveParticipantContext, type ParticipantRisk } from './participant-context-resolver.js';
 import { discoverProviders } from './provider-discovery.js';
 import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
+import type { ScopeContext } from './scope-context.js';
 
 export interface MissionTeamPlan {
   mission_id: string;
@@ -105,6 +106,7 @@ export interface ResolveMissionTeamOptions {
   assignedPersona?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
+  scope?: ScopeContext;
   forceRefresh?: boolean;
   providerPreference?: TeamProviderPreference;
 }
@@ -257,12 +259,24 @@ export function composeMissionTeamPlan(input: {
   assignedPersona?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
+  scope?: ScopeContext;
   providerPreference?: TeamProviderPreference;
 }): MissionTeamPlan {
   const organizationProfile = input.organizationProfile ?? loadOrganizationProfile();
   const tenantSlug = input.tenantSlug?.trim() || 'default';
   const providerPreference = normalizeTeamProviderPreference(input.providerPreference);
   const availableProviders = providerPreference ? resolveAvailableTeamProviders() : [];
+  const compositionScope =
+    input.scope ??
+    (tenantSlug !== 'default'
+      ? {
+          tier: input.tier,
+          tenant_slug: tenantSlug,
+          ...(organizationProfile?.organization_id
+            ? { organization_id: organizationProfile.organization_id }
+            : {}),
+        }
+      : undefined);
   const missionClassification = resolveMissionClassification({
     missionTypeHint: input.missionType,
     intentId: input.intentId,
@@ -274,7 +288,7 @@ export function composeMissionTeamPlan(input: {
   });
   const missionType =
     input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
-  const templates = loadMissionTeamTemplates(organizationProfile);
+  const templates = loadMissionTeamTemplates(organizationProfile, compositionScope);
   const teamRoles = loadTeamRoleIndex();
   const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();

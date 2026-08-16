@@ -25,6 +25,9 @@ import { safeMkdir, safeWriteFile } from './secure-io.js';
 import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import type { ScopeContext } from './scope-context.js';
+import { physicalScopedPath } from './physical-namespace.js';
+import { checkProviderEgress } from './provider-egress-gate.js';
 
 export type WorkerContextRole = 'system' | 'user' | 'assistant' | 'tool_use' | 'tool_result';
 
@@ -90,6 +93,10 @@ export interface CompactWorkerContextOptions {
   recordArtifact?: (artifactPath: string, description: string) => void;
   /** Compact even when under threshold (reactive prompt-too-long path). */
   force?: boolean;
+  /** Canonical scope for summary persistence and tenant egress. */
+  scope?: ScopeContext;
+  /** Provider used by the summary callback, when known. */
+  summaryProvider?: string;
 }
 
 export interface CompactWorkerContextResult {
@@ -304,6 +311,7 @@ function persistSummaryArtifact(input: {
   missionId?: string;
   summaryDir?: string;
   recordArtifact?: (artifactPath: string, description: string) => void;
+  scope?: ScopeContext;
 }): string | undefined {
   try {
     const missionSlug =
@@ -311,7 +319,16 @@ function persistSummaryArtifact(input: {
         .trim()
         .replace(/[^a-zA-Z0-9._-]+/g, '-') || 'shared';
     const dir =
-      input.summaryDir || pathResolver.sharedTmp(path.join('context-compaction', missionSlug));
+      input.summaryDir ||
+      (input.scope?.tenant_slug
+        ? pathResolver.rootResolve(
+            physicalScopedPath('active/shared/tmp/context-compaction', {
+              ...input.scope,
+              mission_id: input.scope.mission_id || missionSlug,
+              scope_kind: input.scope.task_id ? 'task' : 'mission',
+            })
+          )
+        : pathResolver.sharedTmp(path.join('context-compaction', missionSlug)));
     const absolutePath = path.join(dir, `compaction-summary-${crypto.randomUUID()}.md`);
     safeMkdir(path.dirname(absolutePath), { recursive: true });
     const body = [
@@ -411,6 +428,14 @@ export async function compactWorkerContext(
     const tail = flow.slice(tailStart);
     if (head.length > 0) {
       try {
+        if (options.summaryProvider && options.scope) {
+          const egress = checkProviderEgress({
+            provider: options.summaryProvider,
+            dataTier: options.scope.tier,
+            ...(options.scope.tenant_slug ? { tenant_slug: options.scope.tenant_slug } : {}),
+          });
+          if (!egress.allowed) throw new Error(egress.reason || 'summary egress denied');
+        }
         const summary = await options.summarize(renderTranscriptForSummary(head));
         summaryArtifactPath = persistSummaryArtifact({
           summary,
@@ -418,6 +443,7 @@ export async function compactWorkerContext(
           missionId: options.missionId,
           summaryDir: options.summaryDir,
           recordArtifact: options.recordArtifact,
+          scope: options.scope,
         });
         const summaryMessage: WorkerContextMessage = {
           role: 'user',

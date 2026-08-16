@@ -1,7 +1,13 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { secretGuard } from '@agent/core/secret-guard';
-import { isValidTenantSlug, pathResolver, safeExistsSync, type OsKnowledgeTier } from '@agent/core';
+import {
+  consumeTenantBudget,
+  isValidTenantSlug,
+  pathResolver,
+  safeExistsSync,
+  type OsKnowledgeTier,
+} from '@agent/core';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -14,6 +20,11 @@ const API_TOKEN = process.env.KYBERION_API_TOKEN;
 const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
 const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
 const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false';
+const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
+
+function isValidScopeId(value: unknown): value is string {
+  return typeof value === 'string' && SCOPE_ID_PATTERN.test(value);
+}
 
 export type ChronosAccessRole = 'readonly' | 'localadmin';
 
@@ -21,6 +32,8 @@ export interface ChronosTokenRegistration {
   token_hash: string;
   role: ChronosAccessRole;
   tenant_slugs: string[];
+  organization_ids?: string[];
+  project_ids?: string[];
   tier_access?: OsKnowledgeTier[];
   label?: string;
 }
@@ -48,6 +61,11 @@ function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
         value.tenant_slugs.every(
           (tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)
         ) &&
+        (value.organization_ids === undefined ||
+          (Array.isArray(value.organization_ids) &&
+            value.organization_ids.every(isValidScopeId))) &&
+        (value.project_ids === undefined ||
+          (Array.isArray(value.project_ids) && value.project_ids.every(isValidScopeId))) &&
         (value.tier_access === undefined ||
           (Array.isArray(value.tier_access) &&
             value.tier_access.every(
@@ -173,6 +191,19 @@ export function guardRequest(req: NextRequest): NextResponse | null {
           'Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN.',
       },
       { status: 401 }
+    );
+  }
+
+  const registration = resolveChronosTokenRegistration(resolveChronosToken(req) || '');
+  const tenantSlugs = registration?.tenant_slugs || [];
+  const budget = consumeTenantBudget({
+    op: 'surface:chronos_request',
+    ...(tenantSlugs.length === 1 ? { tenantSlug: tenantSlugs[0] } : {}),
+  });
+  if (!budget.allowed) {
+    return NextResponse.json(
+      { error: 'Tenant rate limit exceeded.', retry_after_ms: budget.retry_after_ms },
+      { status: 429 }
     );
   }
 

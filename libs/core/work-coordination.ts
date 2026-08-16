@@ -310,6 +310,10 @@ export interface WorkItemFilter {
   tenantSlugs?: string[];
   /** JSON/API spelling retained for cross-process work-item filters. */
   tenant_slugs?: string[];
+  organizationIds?: string[];
+  organization_ids?: string[];
+  projectIds?: string[];
+  project_ids?: string[];
   source?: WorkItemSource | WorkItemSource[];
   status?: WorkItemStatus | WorkItemStatus[];
   assigneePeerId?: string;
@@ -722,14 +726,25 @@ function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkIt
   const query = filter.text ? filter.text.trim().toLowerCase() : '';
 
   return items.filter((item) => {
+    const metadata = item.metadata || {};
+    const context = item.context || {};
+    const organizationId =
+      context.organization_id ||
+      (typeof metadata.organization_id === 'string' ? metadata.organization_id : undefined);
+    const projectId = context.project_id || item.project_id;
     const tenantSlugs = filter.tenantSlugs || filter.tenant_slugs;
     if (tenantSlugs) {
       const tenantSlug = item.context?.tenant_slug;
       if (!tenantSlug || !tenantSlugs.includes(tenantSlug)) return false;
     }
+    const organizationIds = filter.organizationIds || filter.organization_ids;
+    if (organizationIds && (!organizationId || !organizationIds.includes(organizationId)))
+      return false;
+    const projectIds = filter.projectIds || filter.project_ids;
+    if (projectIds && (!projectId || !projectIds.includes(projectId))) return false;
     if (
       (filter.projectId || (filter as any).project_id) &&
-      item.project_id !== (filter.projectId || (filter as any).project_id)
+      projectId !== (filter.projectId || (filter as any).project_id)
     )
       return false;
     if (sources.length > 0 && !sources.includes(item.source)) return false;

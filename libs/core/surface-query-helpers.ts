@@ -17,6 +17,7 @@ import { recordContextualIntentLearning } from './contextual-intent-learning.js'
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from './router-contract.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
+import { currentScope } from './scope-context.js';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import type {
@@ -410,7 +411,7 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
   let latitude: number | undefined;
   let longitude: number | undefined;
   let label = locationHint || '';
-  const providerConfig = getSurfaceQueryProviderConfig();
+  const providerConfig = getSurfaceQueryProviderConfig({ scope: currentScope() });
   const weatherConfig = providerConfig.weather || {};
   const geocodingUrl = weatherConfig.geocodingUrl;
   const forecastUrl = weatherConfig.forecastUrl;

@@ -1,6 +1,7 @@
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
+import { consumeTenantBudget, TenantRateLimitExceededError } from './tenant-rate-limiter.js';
 
 /**
  * SA-05: fire the declarative policy engine for operation types beyond
@@ -55,6 +56,13 @@ export function assertOperationPolicy(input: {
     });
     throw new Error(
       `[POLICY_BLOCKED] ${input.operation} denied: ${decision.message || 'policy violation'}`
+    );
+  }
+  const budget = consumeTenantBudget({ op: input.operation });
+  if (!budget.allowed) {
+    throw new TenantRateLimitExceededError(
+      budget,
+      process.env.KYBERION_TENANT?.trim() || 'unknown'
     );
   }
   return decision;

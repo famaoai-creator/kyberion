@@ -129,15 +129,38 @@ export function resolveScopeContext(
     tenant_slug: input.tenant_slug || env.KYBERION_TENANT,
     tenant_id: input.tenant_id,
     organization_id: input.organization_id || env.KYBERION_ORGANIZATION_ID,
-    project_id: input.project_id,
+    project_id: input.project_id || env.KYBERION_PROJECT_ID,
     mission_id: input.mission_id || env.MISSION_ID,
-    task_id: input.task_id,
+    task_id: input.task_id || env.KYBERION_TASK_ID,
     session_id: input.session_id,
     work_shape: input.work_shape,
     customer_stance: input.customer_stance || env.KYBERION_CUSTOMER,
     viewer_principal: input.viewer_principal || env.KYBERION_VIEWER_PRINCIPAL,
     nhi_id: input.nhi_id || env.KYBERION_NHI_ACTOR,
   });
+}
+
+let cachedCurrentScope: ScopeContext | undefined;
+
+/** Resolve the process scope once for the current CLI/runtime session. */
+export function currentScope(
+  input: ScopeContextInput = {},
+  env: NodeJS.ProcessEnv = process.env
+): ScopeContext {
+  if (Object.keys(input).length === 0 && env === process.env && cachedCurrentScope) {
+    return cachedCurrentScope;
+  }
+  const resolved = resolveScopeContext(input, env);
+  const scope = assertScopeContext(
+    { ...resolved, tier: resolved.tier || 'public' },
+    { requireTenant: false, allowShared: true }
+  );
+  if (Object.keys(input).length === 0 && env === process.env) cachedCurrentScope = scope;
+  return scope;
+}
+
+export function resetCurrentScope(): void {
+  cachedCurrentScope = undefined;
 }
 
 export function scopeContextKey(context: ScopeContext): string {

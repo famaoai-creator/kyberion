@@ -1451,6 +1451,7 @@ async function buildNeedsKnowledgeReinforcementLines(input: {
   teamRole?: string;
   needs: string[];
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
 }): Promise<string[]> {
   if (input.needs.length === 0) return [];
   try {
@@ -1470,6 +1471,16 @@ async function buildNeedsKnowledgeReinforcementLines(input: {
       taskId: input.taskId,
       teamRole: input.teamRole,
       recipientKind: 'agent',
+      ...(input.securityScope?.tenant_slug
+        ? {
+            scope: {
+              tier: input.securityScope.write_tier,
+              tenant_slug: input.securityScope.tenant_slug,
+              mission_id: input.securityScope.mission_id,
+              task_id: input.taskId,
+            },
+          }
+        : {}),
       refs: fresh.map((entry) => ({
         path: entry.path,
         ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
@@ -3702,6 +3713,7 @@ async function obtainTaskResultResponse(input: {
       teamRole: input.teamRole,
       needs: taskResult?.needs || [],
       deliveredKnowledgeRefs: input.deliveredKnowledgeRefs || [],
+      securityScope: input.securityScope,
     });
     response = await a2aBridge.route({
       a2a_version: '1.0',
@@ -3780,6 +3792,16 @@ async function obtainTaskResultResponse(input: {
       missionId: input.missionId,
       taskId: input.task.task_id,
       feedback: taskResult.knowledge_feedback,
+      ...(input.securityScope?.tenant_slug
+        ? {
+            scope: {
+              tier: input.securityScope.write_tier,
+              tenant_slug: input.securityScope.tenant_slug,
+              mission_id: input.securityScope.mission_id,
+              task_id: input.task.task_id,
+            },
+          }
+        : {}),
     });
   }
 

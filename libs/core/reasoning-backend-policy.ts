@@ -3,6 +3,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
   | 'claude-cli'
@@ -58,6 +59,18 @@ export interface ReasoningBackendPolicy {
   }>;
   default_mode: ReasoningBackendMode;
   openrouter?: ReasoningBackendOpenRouterPolicy;
+  tenant_overrides?: Record<
+    string,
+    Partial<Pick<ReasoningBackendPolicy, 'allowed_modes' | 'default_mode'>>
+  >;
+  organization_overrides?: Record<
+    string,
+    Partial<Pick<ReasoningBackendPolicy, 'allowed_modes' | 'default_mode'>>
+  >;
+  project_overrides?: Record<
+    string,
+    Partial<Pick<ReasoningBackendPolicy, 'allowed_modes' | 'default_mode'>>
+  >;
 }
 
 export interface ReasoningBackendProviderSnapshot {
@@ -228,13 +241,21 @@ export function resolveReasoningBackendModeFromContext(input: {
   env?: NodeJS.ProcessEnv;
   providers?: ReasoningBackendProviderSnapshot[];
   policy?: ReasoningBackendPolicy;
+  scope?: ScopeContext;
 }): ReasoningBackendMode {
-  const policy = input.policy ?? loadReasoningBackendPolicy();
+  const policy = resolveScopedBackendPolicy(
+    input.policy ?? loadReasoningBackendPolicy(),
+    input.scope ?? currentScope()
+  );
   const env = input.env ?? process.env;
   const providers = input.providers ?? [];
 
   if (input.requestedMode) {
-    return normalizeReasoningBackendMode(input.requestedMode, policy);
+    const requested = normalizeReasoningBackendMode(input.requestedMode, policy);
+    if (!policy.allowed_modes.includes(requested)) {
+      throw new Error(`[REASONING_MODE_DENIED] mode '${requested}' is not allowed in this scope`);
+    }
+    return requested;
   }
 
   const envMode = env.KYBERION_REASONING_BACKEND as ReasoningBackendMode | undefined;
@@ -255,18 +276,50 @@ export function resolveReasoningBackendModeFromContext(input: {
 
   for (const rule of policy.cli_preference_rules) {
     if (!matchesSelectionRule(env, rule)) continue;
-    if (rule.provider && isHealthyProvider(providers, rule.provider)) {
-      return rule.mode;
+    const normalizedRuleMode = normalizeReasoningBackendMode(rule.mode, policy);
+    if (
+      rule.provider &&
+      policy.allowed_modes.includes(normalizedRuleMode) &&
+      isHealthyProvider(providers, rule.provider)
+    ) {
+      return normalizedRuleMode;
     }
   }
 
   for (const rule of policy.provider_fallback_order) {
-    if (rule.provider && isHealthyProvider(providers, rule.provider)) {
-      return rule.mode;
+    const normalizedRuleMode = normalizeReasoningBackendMode(rule.mode, policy);
+    if (
+      rule.provider &&
+      policy.allowed_modes.includes(normalizedRuleMode) &&
+      isHealthyProvider(providers, rule.provider)
+    ) {
+      return normalizedRuleMode;
     }
   }
 
-  return policy.default_mode;
+  const defaultMode = normalizeReasoningBackendMode(policy.default_mode, policy);
+  if (!policy.allowed_modes.includes(defaultMode)) {
+    throw new Error(
+      `[REASONING_MODE_DENIED] default mode '${defaultMode}' is not allowed in this scope`
+    );
+  }
+  return defaultMode;
+}
+
+/** Resolve global policy plus tenant -> organization -> project overlays. */
+export function resolveScopedBackendPolicy(
+  policy: ReasoningBackendPolicy,
+  scope?: ScopeContext
+): ReasoningBackendPolicy {
+  const layers = [
+    scope?.tenant_slug ? policy.tenant_overrides?.[scope.tenant_slug] : undefined,
+    scope?.organization_id ? policy.organization_overrides?.[scope.organization_id] : undefined,
+    scope?.project_id ? policy.project_overrides?.[scope.project_id] : undefined,
+  ].filter(Boolean);
+  return layers.reduce<ReasoningBackendPolicy>(
+    (resolved, layer) => ({ ...resolved, ...layer }),
+    policy
+  );
 }
 
 export function resetReasoningBackendPolicyCache(): void {

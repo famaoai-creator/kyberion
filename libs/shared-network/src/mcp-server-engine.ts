@@ -1004,10 +1004,12 @@ export function createKyberionMcpServer(): McpServer {
     },
     async ({ direction, cowork_artifact_paths, max_hints }) => {
       try {
+        const context = resolveMcpRequestContext();
         const result = runCoworkKnowledgeSync({
           direction: direction ?? 'both',
           coworkArtifactPaths: cowork_artifact_paths ?? [],
           maxHints: max_hints ?? 50,
+          ...(context.scope.tenant_slug ? { scope: context.scope } : {}),
         });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
