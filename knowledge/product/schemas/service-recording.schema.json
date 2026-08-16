@@ -5,7 +5,15 @@
   "description": "A recorded sequence of service:preset action calls. Substrate adapter for the intent-driven automation master contract. params carry only literals or {{input.*}}/{{channel.*}} placeholders — never secret values (auth is request-level via secret-guard).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "recording_id", "source", "created_at", "target", "steps", "risk_summary"],
+  "required": [
+    "schema_version",
+    "recording_id",
+    "source",
+    "created_at",
+    "target",
+    "steps",
+    "risk_summary"
+  ],
   "properties": {
     "schema_version": { "const": "service-recording.v1" },
     "recording_id": { "type": "string", "minLength": 1 },
@@ -17,7 +25,11 @@
       "required": ["name", "services"],
       "properties": {
         "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "services": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+        "services": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "steps": {
@@ -40,7 +52,9 @@
       "required": ["status", "decisions"],
       "properties": {
         "status": { "enum": ["pending", "in_review", "approved", "rejected"] },
+        "reviewer": { "type": "string", "minLength": 1, "maxLength": 200 },
         "reviewed_at": { "type": "string", "format": "date-time" },
+        "note": { "type": "string", "maxLength": 1000 },
         "decisions": {
           "type": "array",
           "items": {
@@ -70,7 +84,31 @@
         "risk_class": { "enum": ["read", "low", "high"] },
         "params": { "type": "object", "additionalProperties": true },
         "produces": { "type": "string", "minLength": 1 },
-        "consumes": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        "consumes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "param_bindings": {
+          "type": "object",
+          "additionalProperties": { "enum": ["fixed", "input", "template", "secret"] }
+        },
+        "secret_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "result_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["null", "string", "number", "boolean", "object", "array"] },
+            "keys": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "array_length": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "validation_errors": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 240 },
+          "maxItems": 32
+        }
       }
     }
   }

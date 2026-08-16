@@ -24,6 +24,18 @@ export interface ServiceRecordingStep {
   produces?: string;
   /** Channel names this step reads from prior steps. */
   consumes?: string[];
+  /** Classification of each recorded parameter path; raw secrets are never persisted. */
+  param_bindings?: Record<string, 'fixed' | 'input' | 'template' | 'secret'>;
+  /** Parameter paths that require a human to bind a secret before execution. */
+  secret_refs?: string[];
+  /** Bounded result shape used for review and Golden Scenario extraction. */
+  result_summary?: {
+    kind: 'null' | 'string' | 'number' | 'boolean' | 'object' | 'array';
+    keys?: string[];
+    array_length?: number;
+  };
+  /** Validation findings captured at observation time; never a reason to execute. */
+  validation_errors?: string[];
 }
 
 export interface ServiceRecording {
@@ -36,8 +48,14 @@ export interface ServiceRecording {
   risk_summary: { requires_manual_review: boolean; approval_required_count: number };
   review?: {
     status: 'pending' | 'in_review' | 'approved' | 'rejected';
+    reviewer?: string;
     reviewed_at?: string;
-    decisions: Array<{ step_id: string; status: 'pending' | 'approved' | 'rejected'; reason?: string }>;
+    note?: string;
+    decisions: Array<{
+      step_id: string;
+      status: 'pending' | 'approved' | 'rejected';
+      reason?: string;
+    }>;
   };
 }
 
@@ -56,6 +74,9 @@ export function isExternalEffectStep(step: ServiceRecordingStep): boolean {
 
 const INPUT_PLACEHOLDER = /\{\{input\.([a-z][a-z0-9_]{0,63})\}\}/g;
 const CHANNEL_PLACEHOLDER = /\{\{channel\.([a-zA-Z0-9_]+)\}\}/g;
+const SECRET_PLACEHOLDER = /^\{\{secret\.([a-zA-Z0-9_.-]+)\}\}$/u;
+const SENSITIVE_KEY =
+  /(token|secret|password|authorization|api[_-]?key|credential|cookie|private[_-]?key|otp|one[_-]?time|passphrase)/iu;
 
 /** Collect distinct `{{input.NAME}}` placeholders referenced across all steps. */
 export function collectServiceInputNames(recording: ServiceRecording): string[] {
@@ -74,18 +95,28 @@ export function collectServiceInputNames(recording: ServiceRecording): string[] 
 }
 
 /** Validate a service recording against the schema + structural invariants. */
-export function validateServiceRecording(input: unknown): { valid: boolean; errors: string[]; value?: ServiceRecording } {
+export function validateServiceRecording(input: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: ServiceRecording;
+} {
   const validate = getValidator();
   if (!validate(input)) {
-    return { valid: false, errors: (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`) };
+    return {
+      valid: false,
+      errors: (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`),
+    };
   }
   const recording = input as ServiceRecording;
   const errors: string[] = [];
 
   const highRisk = recording.steps.filter(isExternalEffectStep);
-  if (!recording.risk_summary.requires_manual_review) errors.push('service recordings must require manual review');
+  if (!recording.risk_summary.requires_manual_review)
+    errors.push('service recordings must require manual review');
   if (recording.risk_summary.approval_required_count !== highRisk.length) {
-    errors.push('risk_summary.approval_required_count must match high-risk (external-effect) steps');
+    errors.push(
+      'risk_summary.approval_required_count must match high-risk (external-effect) steps'
+    );
   }
 
   const stepIds = new Set<string>();
@@ -98,12 +129,35 @@ export function validateServiceRecording(input: unknown): { valid: boolean; erro
     }
     // consumes must reference a channel produced by an earlier step (ordering).
     for (const channel of step.consumes ?? []) {
-      if (!produced.has(channel)) errors.push(`step ${step.step_id} consumes channel "${channel}" before it is produced`);
+      if (!produced.has(channel))
+        errors.push(`step ${step.step_id} consumes channel "${channel}" before it is produced`);
     }
     if (step.produces) produced.add(step.produces);
+    const scanParams = (value: unknown, path = ''): void => {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => scanParams(item, `${path}.${index}`));
+        return;
+      }
+      if (!value || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value)) {
+        const childPath = path ? `${path}.${key}` : key;
+        if (SENSITIVE_KEY.test(key)) {
+          if (typeof child !== 'string' || !SECRET_PLACEHOLDER.test(child)) {
+            errors.push(
+              `step ${step.step_id} contains an unbound sensitive parameter: ${childPath}`
+            );
+          }
+        }
+        scanParams(child, childPath);
+      }
+    };
+    scanParams(step.params);
   }
-  if (recording.review?.status === 'approved' && recording.review.decisions.some((d) => d.status === 'pending')) {
-    errors.push('approved review cannot contain pending decisions');
+  if (
+    recording.review?.status === 'approved' &&
+    recording.review.decisions.some((d) => d.status !== 'approved')
+  ) {
+    errors.push('approved review cannot contain pending or rejected decisions');
   }
 
   if (errors.length > 0) return { valid: false, errors };

@@ -94,6 +94,26 @@ CLI-Anythingのローカルプロジェクト向けundo/redoは、外部サー�
 
 本変更ではPhase 1〜5の基盤を実装した。実サービスへの外部副作用を伴うE2E、ComfyUI等のtrajectory拡張、capability bundleやSKILLへの詳細なoperation参照の展開は、既存の実行境界を維持したまま次段階で追加する。
 
+## Service recording → ADF pipeline の追加実装
+
+CLI-Anything / Codex Desktop の「操作を観測して再利用可能な手順へ昇格する」流れに対応するため、次の経路を追加した。
+
+```text
+service:preset + recording_session_id
+    ↓ bounded observation / secret redaction
+service-recording.v1
+    ↓ compile + ADF/guardrail preflight
+draft service:preset pipeline
+    ↓ human step review + external-effect approval
+personal procedure catalog + pipelines/service/*.json
+```
+
+- `ServiceRecordingSession` が canonicalな `service:preset` 呼び出しを記録する。結果は生payloadではなくbounded shapeのみ保存し、sensitive parameterはsecret bindingへ変換する。
+- `service_recording capture|compile|review|promote` CLIで、録画、ADFドラフト、レビュー、カタログ昇格を段階的に実行できる。
+- `service-actuator` は明示的な `context.service_recording_session_id` がある場合だけ記録する。記録失敗は外部副作用後の再実行を誘発しないようwarning扱いにする。
+- promotionは録画レビューを必須とし、生成ADFにはhigh-risk stepの `approval_required` を残す。secret bindingや契約検証エラーは昇格を停止する。
+- 実サービスcredentialを必要としない fixture capture、compile、preflight、dry-runを改善ループの受入テストとする。実書き込みのE2Eは承認・credential・tenant scopeが揃った別段階で行う。
+
 検証コマンド:
 
 - `pnpm vitest run libs/core/service-harness.test.ts libs/actuators/service-actuator/src/index.test.ts`

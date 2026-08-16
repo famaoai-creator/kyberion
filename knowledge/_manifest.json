@@ -7713,7 +7713,7 @@
     {
       "path": "product/schemas/service-recording.schema.json",
       "tier": "public",
-      "size": 3139,
+      "size": 4226,
       "type": "json"
     },
     {

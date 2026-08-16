@@ -64,6 +64,7 @@
     "check:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate_vocabulary_types.ts --check",
     "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts",
     "service:harness": "node --import ./scripts/ts-loader.mjs scripts/service_harness.ts",
+    "service:recording": "node --import ./scripts/ts-loader.mjs scripts/service_recording.ts",
     "check:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts --check",
     "check:deprecated-wisdom-ops": "node --import ./scripts/ts-loader.mjs scripts/check_deprecated_wisdom_ops.ts --fail",
     "check:wisdom-forwarders": "node --import ./scripts/ts-loader.mjs scripts/check_wisdom_forwarders.ts",
