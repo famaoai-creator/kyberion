@@ -312,7 +312,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 ### ViewerContext / Viewer Scope
 
-The request-scoped principal resolved server-side by Chronos API routes: a viewer role (`readonly` | `localadmin`) plus an allowed tenant set (`tenant_slugs`). Tenant query parameters may only narrow the viewer's allowed set, never widen it. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
+The request-scoped principal resolved server-side by Chronos API routes: a viewer role (`readonly` | `localadmin`) plus allowed tenant, organization, and project sets (`tenant_slugs`, `organization_ids`, `project_ids`). Query parameters may only narrow the viewer's allowed set, never widen it. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel
 

@@ -64,15 +64,33 @@ export interface WorkVisibilityProjection {
 
 export interface WorkVisibilityViewer {
   tenantSlugs: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
 }
 
 export class WorkVisibilityScopeError extends Error {
   readonly status = 403;
 
-  constructor(public readonly requestedTenant: string) {
-    super(`viewer is not authorized for tenant '${requestedTenant}'`);
+  constructor(
+    public readonly requestedTenant: string,
+    public readonly kind: 'tenant' | 'organization' | 'project' = 'tenant'
+  ) {
+    super(`viewer is not authorized for ${kind} '${requestedTenant}'`);
     this.name = 'WorkVisibilityScopeError';
   }
+}
+
+export function resolveWorkVisibilityIds(
+  kind: 'organization' | 'project',
+  allowed: string[] | 'all' | undefined,
+  requested?: string
+): string[] | 'all' {
+  const normalized = requested?.trim() || undefined;
+  if (normalized && allowed !== 'all' && allowed && !allowed.includes(normalized)) {
+    throw new WorkVisibilityScopeError(normalized, kind);
+  }
+  if (normalized) return [normalized];
+  return allowed ?? 'all';
 }
 
 export function resolveWorkVisibilityTenants(
@@ -268,6 +286,16 @@ export function buildWorkVisibilityProjection(input: {
   const scope = input.scope || 'work_items';
   const view = input.view || 'all';
   const tenantScope = resolveWorkVisibilityTenants(input.viewer, input.tenantSlug);
+  const organizationScope = resolveWorkVisibilityIds(
+    'organization',
+    input.viewer.organizationIds,
+    input.organizationId
+  );
+  const projectScope = resolveWorkVisibilityIds(
+    'project',
+    input.viewer.projectIds,
+    input.projectId
+  );
   const projected = input.items
     .map((item) => ({ ...item, context: resolveWorkItemContext(item) }))
     .filter((item) => matchesScope(item, scope) && matchesView(item, view))
@@ -277,10 +305,18 @@ export function buildWorkVisibilityProjection(input: {
         : Boolean(item.context.tenant_slug && tenantScope.includes(item.context.tenant_slug))
     )
     .filter(
-      (item) => !input.organizationId || item.context.organization_id === input.organizationId
+      (item) =>
+        organizationScope === 'all' ||
+        Boolean(
+          item.context.organization_id && organizationScope.includes(item.context.organization_id)
+        )
     )
     .filter((item) => !input.missionId || item.context.mission_id === input.missionId)
-    .filter((item) => !input.projectId || item.context.project_id === input.projectId)
+    .filter(
+      (item) =>
+        projectScope === 'all' ||
+        Boolean(item.context.project_id && projectScope.includes(item.context.project_id))
+    )
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
   const statuses: WorkItemStatus[] = [
     'backlog',

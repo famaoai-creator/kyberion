@@ -15,9 +15,14 @@ import {
 } from './api-guard';
 import type { OsKnowledgeTier } from '@agent/core';
 
+const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
+
 export interface ViewerContext {
   role: ChronosAccessRole;
   tenantSlugs: string[] | 'all';
+  /** Optional for compatibility with pre-organization token fixtures. */
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
   tierAccess?: OsKnowledgeTier[];
   source: 'token' | 'loopback' | 'anonymous';
   principalId?: string;
@@ -59,6 +64,17 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
         !value.tenant_slugs.every(
           (tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)
         ) ||
+        (value.organization_ids !== undefined &&
+          (!Array.isArray(value.organization_ids) ||
+            !value.organization_ids.every(
+              (organization) =>
+                typeof organization === 'string' && SCOPE_ID_PATTERN.test(organization)
+            ))) ||
+        (value.project_ids !== undefined &&
+          (!Array.isArray(value.project_ids) ||
+            !value.project_ids.every(
+              (project) => typeof project === 'string' && SCOPE_ID_PATTERN.test(project)
+            ))) ||
         (value.tier_access !== undefined &&
           (!Array.isArray(value.tier_access) ||
             value.tier_access.length === 0 ||
@@ -72,6 +88,16 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
         token_hash: value.token_hash,
         role: value.role,
         tenant_slugs: value.tenant_slugs.map((tenant) => String(tenant).trim()),
+        ...(Array.isArray(value.organization_ids)
+          ? {
+              organization_ids: value.organization_ids.map((organization) =>
+                String(organization).trim()
+              ),
+            }
+          : {}),
+        ...(Array.isArray(value.project_ids)
+          ? { project_ids: value.project_ids.map((project) => String(project).trim()) }
+          : {}),
         ...(Array.isArray(value.tier_access)
           ? {
               tier_access: value.tier_access.filter(
@@ -103,6 +129,8 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
       return {
         role: registration.role,
         tenantSlugs: registration.tenant_slugs,
+        organizationIds: registration.organization_ids ?? 'all',
+        projectIds: registration.project_ids ?? 'all',
         tierAccess: resolveViewerTierAccess(registration.role, registration.tier_access),
         source: 'token',
         principalId: registration.label,
@@ -110,14 +138,28 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
     }
     const role = resolveChronosAccessRole(req);
     if (role) {
-      return { role, tenantSlugs: 'all', tierAccess: defaultTierAccess(role), source: 'token' };
+      return {
+        role,
+        tenantSlugs: 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+        tierAccess: defaultTierAccess(role),
+        source: 'token',
+      };
     }
     throw new ViewerContextError(401, 'Unknown Chronos viewer token.');
   }
 
   const role = resolveChronosAccessRole(req);
   if (role && isChronosLoopbackRequest(req)) {
-    return { role, tenantSlugs: 'all', tierAccess: defaultTierAccess(role), source: 'loopback' };
+    return {
+      role,
+      tenantSlugs: 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: defaultTierAccess(role),
+      source: 'loopback',
+    };
   }
   throw new ViewerContextError(401, 'A Chronos viewer principal is required.');
 }
@@ -216,6 +258,36 @@ export function strictViewerScopeTenantSlugs(
   }
   if (normalized) return [normalized];
   return viewer.tenantSlugs;
+}
+
+function strictViewerScopeIds(
+  kind: 'organization' | 'project',
+  allowed: string[] | 'all',
+  requested?: string
+): string[] | 'all' {
+  const normalized = requested?.trim() || undefined;
+  if (normalized && !SCOPE_ID_PATTERN.test(normalized)) {
+    throw new ViewerContextError(403, `invalid viewer ${kind} scope: ${normalized}`);
+  }
+  if (normalized && allowed !== 'all' && !allowed.includes(normalized)) {
+    throw new ViewerContextError(403, `viewer ${kind} scope denied: ${normalized}`);
+  }
+  if (normalized) return [normalized];
+  return allowed;
+}
+
+export function strictViewerScopeOrganizationIds(
+  viewer: ViewerContext,
+  requested?: string
+): string[] | 'all' {
+  return strictViewerScopeIds('organization', viewer.organizationIds ?? 'all', requested);
+}
+
+export function strictViewerScopeProjectIds(
+  viewer: ViewerContext,
+  requested?: string
+): string[] | 'all' {
+  return strictViewerScopeIds('project', viewer.projectIds ?? 'all', requested);
 }
 
 /** Propagate the request-derived tenant into tier-guard identity resolution. */

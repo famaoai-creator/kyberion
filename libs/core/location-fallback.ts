@@ -1,5 +1,6 @@
 import { secureFetch } from './network.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
+import { currentScope } from './scope-context.js';
 
 type LocationSummaryData = {
   city?: string;
@@ -23,7 +24,7 @@ function compactStrings(values: Array<string | undefined>): string[] {
 export async function resolveFallbackLocationSummary(
   fetchLocation: FetchLocationProvider = secureFetch as FetchLocationProvider
 ): Promise<string> {
-  const providerConfig = getSurfaceQueryProviderConfig();
+  const providerConfig = getSurfaceQueryProviderConfig({ scope: currentScope() });
   const providers = providerConfig.location?.providers || [];
 
   for (const provider of providers) {
@@ -34,7 +35,11 @@ export async function resolveFallbackLocationSummary(
       const parts =
         provider.provider === 'ipwho'
           ? compactStrings([data?.city, data?.region, data?.country || data?.country_name])
-          : compactStrings([data?.city, data?.region || data?.region_code, data?.country_name || data?.country]);
+          : compactStrings([
+              data?.city,
+              data?.region || data?.region_code,
+              data?.country_name || data?.country,
+            ]);
       if (parts.length > 0) return parts.join(', ');
     } catch {
       // Try the next location provider.
@@ -47,7 +52,7 @@ export async function resolveFallbackLocationSummary(
 export async function resolveFallbackLocationCoordinates(
   fetchLocation: FetchLocationProvider = secureFetch as FetchLocationProvider
 ): Promise<{ latitude?: number; longitude?: number; label: string }> {
-  const providerConfig = getSurfaceQueryProviderConfig();
+  const providerConfig = getSurfaceQueryProviderConfig({ scope: currentScope() });
   const providers = providerConfig.location?.providers || [];
 
   for (const provider of providers) {

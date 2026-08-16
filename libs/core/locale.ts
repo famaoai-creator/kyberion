@@ -4,6 +4,7 @@ import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
+import { assertScopeContext, type ScopeContext } from './scope-context.js';
 
 /**
  * I18N-01: single source of truth for locale *resolution*.
@@ -31,6 +32,8 @@ export interface LocaleContext {
   /** Browser `navigator.language`, supplied by a browser caller. This
    *  module never reads `window` itself — Node callers omit this. */
   navigatorLanguage?: string | null;
+  /** Tenant/entity scope used to resolve locale overlays. */
+  scope?: Pick<ScopeContext, 'tenant_slug' | 'organization_id' | 'project_id'>;
 }
 
 const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
@@ -105,6 +108,41 @@ function readDeprecatedUiLocaleAlias(): SupportedLocale | null {
   return normalizeLocale(raw);
 }
 
+function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | null {
+  if (!scope?.tenant_slug) return null;
+  const normalizedScope = assertScopeContext(
+    { ...scope, tier: 'confidential' },
+    { requireTenant: true }
+  );
+  const candidates = [
+    normalizedScope.project_id
+      ? pathResolver.knowledge(
+          `confidential/${normalizedScope.tenant_slug}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/locale.json`
+        )
+      : null,
+    normalizedScope.organization_id
+      ? pathResolver.knowledge(
+          `confidential/${normalizedScope.tenant_slug}/organizations/${normalizedScope.organization_id}/locale.json`
+        )
+      : null,
+    pathResolver.knowledge(`confidential/${normalizedScope.tenant_slug}/locale.json`),
+  ].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    try {
+      if (!safeExistsSync(candidate)) continue;
+      const parsed = JSON.parse(String(safeReadFile(candidate, { encoding: 'utf8' }) || '{}')) as {
+        locale?: string;
+        default_locale?: string;
+      };
+      const locale = normalizeLocale(parsed.locale || parsed.default_locale);
+      if (locale) return locale;
+    } catch {
+      // A malformed overlay must not widen scope or crash locale resolution.
+    }
+  }
+  return null;
+}
+
 /**
  * The single locale-resolution entry point for the whole codebase.
  * Fixed precedence (highest to lowest):
@@ -147,6 +185,9 @@ export function resolveLocale(ctx: LocaleContext = {}): SupportedLocale {
 function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const surfacePreference = normalizeLocale(ctx.surfacePreference);
   if (surfacePreference) return surfacePreference;
+
+  const scopedLocale = resolveScopedLocale(ctx.scope);
+  if (scopedLocale) return scopedLocale;
 
   const identityLocale = resolveIdentityLocale(ctx.identityPath);
   if (identityLocale) return identityLocale;

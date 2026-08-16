@@ -15,6 +15,8 @@ import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
   strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
   ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
@@ -59,11 +61,23 @@ export function GET(req: NextRequest) {
       viewer,
       req.nextUrl.searchParams.get('tenant') || undefined
     );
+    const organizationIds = strictViewerScopeOrganizationIds(
+      viewer,
+      req.nextUrl.searchParams.get('organization_id') || undefined
+    );
+    const projectIds = strictViewerScopeProjectIds(
+      viewer,
+      req.nextUrl.searchParams.get('project_id') || undefined
+    );
     const projection = buildWorkVisibilityProjection({
       items: withViewerExecutionContext(viewer, () =>
-        listWorkItems({ tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs })
+        listWorkItems({
+          tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs,
+          organizationIds: organizationIds === 'all' ? undefined : organizationIds,
+          projectIds: projectIds === 'all' ? undefined : projectIds,
+        })
       ),
-      viewer: { tenantSlugs },
+      viewer: { tenantSlugs, organizationIds, projectIds },
       scope,
       view,
       organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
@@ -111,11 +125,28 @@ export async function POST(req: NextRequest) {
       (typeof current.metadata?.tenant_slug === 'string'
         ? current.metadata.tenant_slug
         : undefined);
+    const currentOrganization =
+      current.context?.organization_id ||
+      (typeof current.metadata?.organization_id === 'string'
+        ? current.metadata.organization_id
+        : undefined);
+    const currentProject = current.context?.project_id || current.project_id;
     if (
       viewer.tenantSlugs !== 'all' &&
       (!currentTenant || !viewer.tenantSlugs.includes(currentTenant))
     ) {
       throw new Error('viewer is not authorized for this work item tenant');
+    }
+    const organizationIds = strictViewerScopeOrganizationIds(viewer);
+    if (
+      organizationIds !== 'all' &&
+      (!currentOrganization || !organizationIds.includes(currentOrganization))
+    ) {
+      throw new Error('viewer is not authorized for this work item organization');
+    }
+    const projectIds = strictViewerScopeProjectIds(viewer);
+    if (projectIds !== 'all' && (!currentProject || !projectIds.includes(currentProject))) {
+      throw new Error('viewer is not authorized for this work item project');
     }
     const updated = withViewerExecutionContext(viewer, () => updateWorkItem({ itemId, status }));
     return NextResponse.json({ ok: true, item: updated });

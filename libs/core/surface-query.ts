@@ -3,7 +3,11 @@ import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { listSurfaceQueryOverlayCatalogEntries, loadSurfaceQueryOverlayCatalog } from './surface-query-overlay-catalog.js';
+import {
+  listSurfaceQueryOverlayCatalogEntries,
+  loadSurfaceQueryOverlayCatalog,
+} from './surface-query-overlay-catalog.js';
+import { assertScopeContext, scopeContextKey, type ScopeContext } from './scope-context.js';
 
 export interface SurfaceQueryProviderConfig {
   web_search?: {
@@ -41,13 +45,18 @@ export interface SurfaceQueryProviderConfig {
 export interface SurfaceQueryProviderContext {
   role?: string;
   phase?: string;
+  scope?: ScopeContext;
 }
 
 export type SurfaceQueryIntent = 'weather' | 'location' | 'web_search' | 'knowledge_search' | null;
 
 const DEFAULT_CONFIG_PATH = pathResolver.knowledge('product/presence/surface-query-providers.json');
-const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/presence/surface-query-providers.json');
-const CONFIG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-query-providers.schema.json');
+const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge(
+  'personal/presence/surface-query-providers.json'
+);
+const CONFIG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-query-providers.schema.json'
+);
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -71,7 +80,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateConfig(value: unknown, label: string): SurfaceQueryProviderConfig {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid surface query provider config at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid surface query provider config at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as SurfaceQueryProviderConfig;
 }
@@ -128,8 +139,46 @@ function getPersonalOverlayPath(): string | null {
   const catalog = loadSurfaceQueryOverlayCatalog();
   return (
     process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH?.trim() ||
-    (catalog?.personal_overlay_path ? pathResolver.knowledge(catalog.personal_overlay_path) : DEFAULT_PERSONAL_OVERLAY_PATH)
+    (catalog?.personal_overlay_path
+      ? pathResolver.knowledge(catalog.personal_overlay_path)
+      : DEFAULT_PERSONAL_OVERLAY_PATH)
   );
+}
+
+function getTenantOverlayPath(scope?: ScopeContext): string | null {
+  const tenant = scope?.tenant_slug?.trim();
+  if (!tenant) return null;
+  const normalizedScope = assertScopeContext(scope!, { requireTenant: true });
+  const normalizedTenant = normalizedScope.tenant_slug!;
+  const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
+    (entry) => entry.kind === 'tenant' && entry.tenant === normalizedTenant
+  );
+  if (catalogEntry) return pathResolver.knowledge(catalogEntry.path);
+  return pathResolver.knowledge(
+    `confidential/${normalizedTenant}/presence/surface-query-providers.json`
+  );
+}
+
+function getEntityOverlayPath(scope?: ScopeContext): string[] {
+  if (!scope?.tenant_slug) return [];
+  const normalizedScope = assertScopeContext(scope, { requireTenant: true });
+  const tenant = normalizedScope.tenant_slug!;
+  const paths: string[] = [];
+  if (normalizedScope.organization_id) {
+    paths.push(
+      pathResolver.knowledge(
+        `confidential/${tenant}/organizations/${normalizedScope.organization_id}/presence/surface-query-providers.json`
+      )
+    );
+  }
+  if (normalizedScope.project_id) {
+    paths.push(
+      pathResolver.knowledge(
+        `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/presence/surface-query-providers.json`
+      )
+    );
+  }
+  return paths;
 }
 
 function getRequestedRole(context: SurfaceQueryProviderContext): string | undefined {
@@ -146,13 +195,19 @@ export function getSurfaceQueryProviderConfig(
   const configPath = process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH || DEFAULT_CONFIG_PATH;
   loadSurfaceQueryOverlayCatalog();
   const overlayPaths = [
+    getTenantOverlayPath(context.scope),
+    ...getEntityOverlayPath(context.scope),
     getPhaseOverlayPathForPhase(getRequestedPhase(context)),
     getRoleOverlayPathForRole(getRequestedRole(context)),
     getPersonalOverlayPath(),
   ]
     .filter((path): path is string => Boolean(path))
     .filter((path, index, self) => self.indexOf(path) === index);
-  const cacheKey = [configPath, ...overlayPaths].join('::');
+  const cacheKey = [
+    configPath,
+    scopeContextKey(context.scope || { tier: 'public' }),
+    ...overlayPaths,
+  ].join('::');
   if (cachedConfig && cachedConfigPath === cacheKey) return cachedConfig;
 
   if (!safeExistsSync(configPath)) {
@@ -188,11 +243,15 @@ export function resetSurfaceQueryProviderConfigCache(): void {
 }
 
 export function isSurfaceLocationQuery(text: string): boolean {
-  return /(今の場所|現在地|いまどこ|どこにいる|ここはどこ|where am i|my location|current location)/i.test(text.trim());
+  return /(今の場所|現在地|いまどこ|どこにいる|ここはどこ|where am i|my location|current location)/i.test(
+    text.trim()
+  );
 }
 
 export function isSurfaceWeatherQuery(text: string): boolean {
-  return /(今日の天気|天気教えて|weather|forecast|気温|降水確率|雨降る|晴れ|天候)/i.test(text.trim());
+  return /(今日の天気|天気教えて|weather|forecast|気温|降水確率|雨降る|晴れ|天候)/i.test(
+    text.trim()
+  );
 }
 
 export function extractSurfaceWebSearchQuery(text: string): string | null {
@@ -203,24 +262,37 @@ export function extractSurfaceWebSearchQuery(text: string): string | null {
     /^(検索|search)(して|してください|してくれる|して)?\s*/i,
     /^(調べて|調べると|look up|find)\s*/i,
     /^(web\s*search|internet\s*search)\s*/i,
-  ]).replace(/\s*(を)?(検索|search|調べて|調べる|look up|find)(して|してください)?\s*$/i, '').trim();
+  ])
+    .replace(/\s*(を)?(検索|search|調べて|調べる|look up|find)(して|してください)?\s*$/i, '')
+    .trim();
   return stripped || null;
 }
 
 export function extractSurfaceKnowledgeQuery(text: string): string | null {
   const trimmed = normalizeQuery(text);
-  if (!/(ナレッジ|knowledge|docs?|ドキュメント|仕様|手順|context[_ -]?ranker|knowledge base)/i.test(trimmed)) return null;
+  if (
+    !/(ナレッジ|knowledge|docs?|ドキュメント|仕様|手順|context[_ -]?ranker|knowledge base)/i.test(
+      trimmed
+    )
+  )
+    return null;
   const stripped = stripLeadingPhrases(trimmed, [
     /^(ナレッジ|knowledge|knowledge base)(で|から|を)?\s*/i,
     /^(docs?|ドキュメント|仕様|手順)(で|から|を)?\s*/i,
     /^(調べて|検索して|search|look up)\s*/i,
-  ]).replace(/\s*(を)?(調べて|検索して|search|look up)\s*$/i, '').trim();
+  ])
+    .replace(/\s*(を)?(調べて|検索して|search|look up)\s*$/i, '')
+    .trim();
   return stripped || trimmed;
 }
 
 export function classifySurfaceQueryIntent(text: string): SurfaceQueryIntent {
   const packet = resolveIntentResolutionPacket(text);
-  if (packet.selected_intent_id === 'knowledge-query' || packet.selected_intent_id === 'query-knowledge') return 'knowledge_search';
+  if (
+    packet.selected_intent_id === 'knowledge-query' ||
+    packet.selected_intent_id === 'query-knowledge'
+  )
+    return 'knowledge_search';
   if (packet.selected_intent_id === 'live-query') {
     if (isSurfaceLocationQuery(text)) return 'location';
     if (isSurfaceWeatherQuery(text)) return 'weather';

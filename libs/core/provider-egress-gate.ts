@@ -139,6 +139,8 @@ export interface ProviderEgressCheckInput {
   dataTier: TierLevel;
   /** Optional tenant profile upper bound; it can only narrow global policy. */
   tenant_slug?: string;
+  /** Alternate repository root used by hermetic tenant registries. */
+  tenant_registry_root_dir?: string;
 }
 
 /**
@@ -204,7 +206,9 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
 
   if (input.tenant_slug?.trim()) {
     try {
-      const profile = resolveTenant(input.tenant_slug.trim()).profile;
+      const profile = resolveTenant(input.tenant_slug.trim(), {
+        ...(input.tenant_registry_root_dir ? { rootDir: input.tenant_registry_root_dir } : {}),
+      }).profile;
       const allowed = profile.allowed_reasoning_backends;
       if (allowed?.length && !allowed.includes(provider)) {
         return denyAndAlert(

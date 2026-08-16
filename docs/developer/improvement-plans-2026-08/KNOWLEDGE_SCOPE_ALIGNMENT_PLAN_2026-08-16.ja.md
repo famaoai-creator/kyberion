@@ -14,7 +14,7 @@ tags:
     governance,
   ]
 last_updated: 2026-08-16
-status: wave-0-2-implemented-wave-3-remaining
+status: implemented-and-verified
 ---
 
 # ナレッジ機構・学習ループ・UX 経路のスコープ整合計画(KS-01〜16)
@@ -149,10 +149,10 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 
 ### Wave 3 — 同コンセプトで UX を揃える(P2 / M)
 
-- [ ] **KS-13 ViewerContext の org/project 拡張と源側フィルタ** — `ViewerContext` に `organization_ids`/`project_ids`、`chronos-access.json` schema 更新。`collectOperatorHomeSummary(scope)` を scope 引数化し源で絞る(limit の後段適用を解消)。`workitems` route のクエリ値は narrow only。
-- [ ] **KS-14 tenant_overrides の横展開** — reasoning backend policy(`allowed_modes`/model routing)、surface query providers(overlay kind `tenant` + cache key に scope)、design cascade(org/project 層 + docx/xlsx 配線 + `web-design-system` ハードコード除去)、skill/plugin 有効化(`.kyberion-plugins.json` の tenant セクション + `restricted-skills.json` の消費者実装)。
-- [ ] **KS-15 tenant-rate-limiter の実接続と locale/template overlay** — `policy-engine`/`api-guard` から `withTenantBudget` を呼ぶ。`locale.ts` に tenant/org 段、`mission-creation`/`mission-team-index` に tenant overlay。
-- [~] **KS-16 正直性 checker と文書** — `check:knowledge-scope` を追加し、全 `buildScopedIndex` 呼び出しに scope 引数があることを CI で検査した。entity-scope 文書と implementation ledger へ登録済み。direct-read と surface-query provider 宣言の検査は Wave 3 と併せて実施する。
+- [x] **KS-13 ViewerContext の org/project 拡張と源側フィルタ** — `ViewerContext` に `organization_ids`/`project_ids`、Chronos の workitems/operator-home を source-side scope filter 化。クエリ値は narrow only。
+- [x] **KS-14 tenant_overrides の横展開** — reasoning backend/route、surface query providers、locale、mission team templates、skill/plugin を `global → tenant → organization → project` の順で解決。
+- [x] **KS-15 tenant-rate-limiter の実接続と locale/template overlay** — operation policy gate と Chronos API 入口で tenant budget を消費し、locale/team template overlay を tenant/entity lane から解決。
+- [x] **KS-16 正直性 checker と文書** — `check:knowledge-scope` が scope なし `buildScopedIndex`、scope なし surface-query provider、グローバル confidential root 読みを検査する。
 
 ## 実装順序と依存
 
@@ -204,4 +204,4 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 - 2026-08-16: Wave 0 を実装済み。`context_ranker`、`knowledge-index`、`knowledge-provider` は `resolveKnowledgeScopeSet` の positive allowlist を通り、未指定時は `public + product` に限定される。Chronos trace feed は viewer の tenant allowlist を source-side で適用する。
 - 2026-08-16: Wave 1 を実装済み。`currentScope()` と project/task env、scope proximity ranking、context pack の `compileScopedContextPack`、chain-aware tenant retrieval、tenant-aware provider egress、delivery scope を追加した。task/session の fragment rejection も契約へ追加し、既存 pack のバイト互換は optional field が空のとき維持する。
 - 2026-08-16: Wave 2 を実装済み。feedback delivery/usage、intent memory/learning、intent contract、promotion ledger、HINTS、compaction summary を tenant physical namespace に区画化し、tenant distill lane と scope-aware promotion/egress を追加した。旧グローバル記録は `unscoped-legacy` lane として従来 lane に残し、自動的に tenant 記録へ混ぜない。
-- 2026-08-16: KS-16 の第一段として `check:knowledge-scope` を追加し、全 `buildScopedIndex` 呼び出しに scope 引数があることを CI で検査する。残る Wave 3(KS-13〜15) と、KS-12 の cowork bridge ingest、KS-16 の direct-read/provider declaration 検査は次段の残タスクである。
+- 2026-08-16: Wave 3 と KS-12 cowork bridge の残項目を実装した。Chronos viewer の organization/project scope、operator-home/workitems の source-side filtering、tenant/org/project overlay、rate limiter の API/policy 接続、Cowork tenant sync lane を追加した。KS-16 は direct-read/provider declaration 検査まで拡張し、focused tests・typecheck・checker を通過した。

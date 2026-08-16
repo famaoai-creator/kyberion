@@ -18,6 +18,9 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/role" }
     },
+    "tenant_overrides": { "$ref": "#/$defs/overrides" },
+    "organization_overrides": { "$ref": "#/$defs/overrides" },
+    "project_overrides": { "$ref": "#/$defs/overrides" },
     "fallback": { "$ref": "#/$defs/fallback" }
   },
   "$defs": {
@@ -116,6 +119,48 @@
         "requires": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "sampling": { "$ref": "#/$defs/sampling" }
       }
+    },
+    "overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/$defs/roleOverlay" }
+          },
+          "profiles": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/$defs/profileOverlay" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "roleOverlay": {
+      "type": "object",
+      "properties": {
+        "candidates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "requires": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "sampling": { "$ref": "#/$defs/sampling" }
+      },
+      "additionalProperties": false
+    },
+    "profileOverlay": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "model_ref": { "type": "string", "minLength": 1 },
+        "capabilities": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "tools_enabled": { "type": "boolean" },
+        "allowed_tools": { "type": "array", "items": { "type": "string" } },
+        "context_window_tokens": { "type": "integer", "minimum": 1 },
+        "max_completion_tokens": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "sampling": { "$ref": "#/$defs/sampling" }
+      },
+      "additionalProperties": false
     },
     "fallback": {
       "type": "object",

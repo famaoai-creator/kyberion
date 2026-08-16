@@ -2169,7 +2169,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2840,
+      "size": 2925,
       "type": "json"
     },
     {
@@ -2181,7 +2181,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 13252,
+      "size": 13337,
       "type": "json"
     },
     {
@@ -2205,7 +2205,7 @@
     {
       "path": "product/governance/restricted-skills.json",
       "tier": "public",
-      "size": 263,
+      "size": 348,
       "type": "json"
     },
     {
@@ -7575,7 +7575,7 @@
     {
       "path": "product/schemas/reasoning-backend-policy.schema.json",
       "tier": "public",
-      "size": 2534,
+      "size": 3141,
       "type": "json"
     },
     {
@@ -7587,7 +7587,7 @@
     {
       "path": "product/schemas/reasoning-route-policy.schema.json",
       "tier": "public",
-      "size": 4890,
+      "size": 6635,
       "type": "json"
     },
     {
@@ -7773,7 +7773,7 @@
     {
       "path": "product/schemas/surface-query-overlay-catalog.schema.json",
       "tier": "public",
-      "size": 1082,
+      "size": 1150,
       "type": "json"
     },
     {

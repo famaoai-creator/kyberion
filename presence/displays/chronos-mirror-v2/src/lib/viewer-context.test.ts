@@ -59,4 +59,25 @@ describe('viewer-context', () => {
       'exceeds the readonly role policy'
     );
   });
+
+  it('only allows organization and project selections inside the registered sets', async () => {
+    const { strictViewerScopeOrganizationIds, strictViewerScopeProjectIds } =
+      await import('./viewer-context.js');
+    const viewer = {
+      role: 'readonly' as const,
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+      source: 'token' as const,
+    };
+
+    expect(strictViewerScopeOrganizationIds(viewer, 'org-a')).toEqual(['org-a']);
+    expect(strictViewerScopeProjectIds(viewer, 'project-a')).toEqual(['project-a']);
+    expect(() => strictViewerScopeOrganizationIds(viewer, 'org-b')).toThrow(
+      'viewer organization scope denied'
+    );
+    expect(() => strictViewerScopeProjectIds(viewer, 'project-b')).toThrow(
+      'viewer project scope denied'
+    );
+  });
 });
