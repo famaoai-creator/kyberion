@@ -19,6 +19,14 @@
       "data_paths": [
         "active/shared/runtime/peer-messaging/tenants/{tenant}/",
         "active/shared/observability/peer-messaging/tenants/{tenant}/"
+      ],
+      "lifecycle_actions": [
+        "start",
+        "stop",
+        "reconnect",
+        "restore",
+        "restore_quarantine",
+        "health_check"
       ]
     },
     {
@@ -39,6 +47,7 @@
         "knowledge/product/governance/mcp-tool-catalog.json",
         "active/shared/coordination/"
       ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"],
       "lifecycle_compatibility": "surface-provider-manifest:mcp-server-cowork"
     },
     {
@@ -58,7 +67,8 @@
       "data_paths": [
         "active/missions/{tier}/{mission}/",
         "active/shared/coordination/channels/{channel}/approvals/"
-      ]
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
       "id": "report-review",
@@ -77,7 +87,8 @@
       "data_paths": [
         "active/shared/observability/review-service/tenants/{tenant}/receipts/",
         "<target-artifact>"
-      ]
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
       "id": "generation-scheduler",
@@ -97,7 +108,8 @@
         "active/shared/runtime/media-generation/schedules/",
         "active/shared/runtime/media-generation/tenants/{tenant}/",
         "active/shared/observability/media-generation/tenants/{tenant}/"
-      ]
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
       "id": "backup-restore",
@@ -116,6 +128,14 @@
       "data_paths": [
         "active/shared/backup/",
         "active/shared/runtime/peer-recovery-quarantine/tenants/{tenant}/"
+      ],
+      "lifecycle_actions": [
+        "start",
+        "stop",
+        "reconnect",
+        "restore",
+        "restore_quarantine",
+        "health_check"
       ]
     }
   ]

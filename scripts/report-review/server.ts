@@ -19,7 +19,7 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
-import { assertProtocolServiceRegistered } from '@agent/core';
+import { assertProtocolServiceRegistered, recordProtocolServiceLifecycle } from '@agent/core';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 
@@ -176,6 +176,17 @@ const server = http.createServer((req, res) => {
   }
 });
 server.listen(port, '127.0.0.1', () => {
+  recordProtocolServiceLifecycle({
+    serviceId: 'report-review',
+    action: 'start',
+    status: 'started',
+    scope: reviewContext.scope,
+    actorRole: 'surface_runtime',
+    principal: { kind: 'human', id: reviewContext.viewer_principal },
+    requestedBy: reviewContext.viewer_principal,
+    correlationId: reviewContext.review_session_id,
+    metadata: { port, artifact_ref: reviewContext.artifact_ref },
+  });
   console.log(`Report review server → http://127.0.0.1:${port}/`);
   console.log(`  target : ${target}`);
   console.log(`  artifact: ${reviewContext.artifact_ref}`);
@@ -185,3 +196,22 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
   console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
 });
+
+let stopping = false;
+const shutdown = () => {
+  if (stopping) return;
+  stopping = true;
+  recordProtocolServiceLifecycle({
+    serviceId: 'report-review',
+    action: 'stop',
+    status: 'stopped',
+    scope: reviewContext.scope,
+    actorRole: 'surface_runtime',
+    principal: { kind: 'human', id: reviewContext.viewer_principal },
+    requestedBy: reviewContext.viewer_principal,
+    correlationId: reviewContext.review_session_id,
+  });
+  server.close(() => process.exit(0));
+};
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);

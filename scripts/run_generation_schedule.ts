@@ -6,6 +6,7 @@ import {
   GENERATION_SCHEDULER_AUTHORITY,
   normalizeEventScope,
   assertProtocolServiceRegistered,
+  recordProtocolServiceLifecycle,
   type EventScopeInput,
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
@@ -31,6 +32,18 @@ export async function runGenerationScheduleAction(argv: {
   scope?: EventScopeInput;
 }) {
   assertProtocolServiceRegistered('generation-scheduler');
+  const lifecycleScope = argv.scope || { scope_kind: 'system' as const, tier: 'public' as const };
+  const recordHealthy = () =>
+    recordProtocolServiceLifecycle({
+      serviceId: 'generation-scheduler',
+      action: 'health_check',
+      status: 'healthy',
+      scope: lifecycleScope,
+      actorRole: 'infrastructure_sentinel',
+      principal: { kind: 'service', id: 'generation-scheduler' },
+      requestedBy: 'generation-scheduler',
+      metadata: { action: argv.action },
+    });
   switch (argv.action) {
     case 'register': {
       if (!argv.input) throw new Error('register requires --input');
@@ -39,7 +52,9 @@ export async function runGenerationScheduleAction(argv: {
         const logicalPath = resolveCliInputPath(String(argv.input));
         if (!safeExistsSync(logicalPath))
           throw new Error(`schedule file not found: ${logicalPath}`);
-        return registerGenerationSchedule(logicalPath);
+        const result = registerGenerationSchedule(logicalPath);
+        recordHealthy();
+        return result;
       });
     }
     case 'list':
@@ -50,11 +65,13 @@ export async function runGenerationScheduleAction(argv: {
         process.env,
         buildExecutionEnv(process.env, GENERATION_SCHEDULER_AUTHORITY.authority_role)
       );
-      return runGovernedGenerationScheduleAction({
+      const result = await runGovernedGenerationScheduleAction({
         action: argv.action,
         ...(argv.schedule ? { schedule: argv.schedule } : {}),
         ...(argv.scope ? { scope: argv.scope } : {}),
       });
+      recordHealthy();
+      return result;
     }
     default:
       throw new Error(`Unsupported action: ${argv.action}`);

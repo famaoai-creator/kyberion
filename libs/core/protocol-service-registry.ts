@@ -19,6 +19,7 @@ export interface ProtocolServiceRegistryEntry {
   approval_classes: string[];
   data_residency: string;
   data_paths: string[];
+  lifecycle_actions: string[];
   lifecycle_compatibility?: string;
 }
 
@@ -52,7 +53,9 @@ export function loadProtocolServiceRegistry(): ProtocolServiceRegistryEntry[] {
       entry.approval_classes.length === 0 ||
       !entry.data_residency ||
       !Array.isArray(entry.data_paths) ||
-      entry.data_paths.length === 0
+      entry.data_paths.length === 0 ||
+      !Array.isArray(entry.lifecycle_actions) ||
+      entry.lifecycle_actions.length === 0
     ) {
       throw new Error(
         `[PROTOCOL_SERVICE_REGISTRY_INVALID] entry '${String(entry?.id || 'unknown')}' is incomplete`
