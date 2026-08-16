@@ -374,6 +374,7 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
       // by covering the whole tenant knowledge root.
       `knowledge/confidential/${tenant}`,
       `knowledge/personal/${tenant}`,
+      `knowledge/personal/tenants/${tenant}`,
       `knowledge/personal/customers/${tenant}`,
       `customer/${tenant}`,
       `customers/${tenant}`,
@@ -754,6 +755,10 @@ const TENANT_PHYSICAL_BACKUP_ROOTS = [
   'active/shared/observability/peer-conversations',
   'active/shared/runtime/mesh-hub',
   'active/shared/observability/mesh-hub',
+  'active/shared/runtime/feedback-loop',
+  'active/shared/runtime/tenants',
+  'active/shared/observability/tenants',
+  'active/shared/coordination/tenants',
 ] as const;
 
 function normalizeArchiveMember(member: string): string {
@@ -837,6 +842,7 @@ function isTenantBackupEntry(entry: string, tenant: string): boolean {
   const exactRoots = [
     `knowledge/confidential/${tenant}`,
     `knowledge/personal/${tenant}`,
+    `knowledge/personal/tenants/${tenant}`,
     `knowledge/personal/customers/${tenant}`,
     `customer/${tenant}`,
     `customers/${tenant}`,

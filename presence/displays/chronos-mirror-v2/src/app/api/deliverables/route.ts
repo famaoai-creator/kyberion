@@ -4,6 +4,8 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { collectDeliverableInbox } from '../../../lib/deliverable-inbox';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
   withViewerExecutionContext,
@@ -18,10 +20,20 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   let tenantSlugs: string[] | 'all';
+  let organizationIds: string[] | 'all';
+  let projectIds: string[] | 'all';
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
       req.nextUrl.searchParams.get('tenant') || undefined
+    );
+    organizationIds = strictViewerScopeOrganizationIds(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('organization_id') || undefined
+    );
+    projectIds = strictViewerScopeProjectIds(
+      resolvedViewer.context,
+      req.nextUrl.searchParams.get('project_id') || undefined
     );
   } catch (error) {
     return viewerErrorResponse(error);
@@ -36,6 +48,8 @@ export async function GET(req: NextRequest) {
         '' | 'personal' | 'confidential' | 'public',
       limit: Number.isFinite(limit) ? limit : 50,
       tenantSlugs,
+      organizationIds,
+      projectIds,
     })
   );
 

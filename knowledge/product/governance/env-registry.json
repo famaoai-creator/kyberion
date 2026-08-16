@@ -764,6 +764,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CURATION_ARCHIVE_HISTORY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CURATION_REPORT_PATH",
       "category": "path",
       "type": "path",
@@ -1423,7 +1431,39 @@
       "documented": false
     },
     {
+      "name": "KYBERION_KNOWLEDGE_FEEDBACK_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Override for scoped human-feedback and knowledge-gap JSONL storage (default active/shared/runtime/feedback-loop).",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_KNOWLEDGE_ROOT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH",
       "category": "path",
       "type": "path",
       "required": false,
@@ -2511,6 +2551,14 @@
       "required": false,
       "description": "Optional base URL override for the Runway video-generation API.",
       "subsystem": "media-generation",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_SCOPE_ENV_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Override for the persisted operator scope binding file (default active/shared/runtime/scope.env).",
       "documented": true
     },
     {

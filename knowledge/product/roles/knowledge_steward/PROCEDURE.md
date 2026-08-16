@@ -3,7 +3,7 @@ title: Role Procedure: Infinite Librarian
 tags: [role, knowledge-steward, governance, distillation, taxonomy]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-07-25
+last_updated: 2026-08-17
 kind: role
 scope: global
 authority: advisory
@@ -50,3 +50,10 @@ You are the keeper of wisdom, ensuring that information is categorized, discover
   - **Freshness SLO breaches**: documents whose frontmatter `last_updated` is older than the re-verify deadline for their `kind`, per `knowledge/product/governance/knowledge-curation-slo.json` (defaults: governance 90d / playbook 60d / knowledge_hint 30d; other kinds fall back to `default_freshness_days`). Re-verify the content and bump `last_updated`, or flag for supersession.
 - **Approval boundary (KM-03 guardrail)**: `curation_report` only proposes candidates — it never deletes, archives, or demotes anything. If you agree a document should be retired, process it by hand through the existing supersede/archive machinery (`promoted-memory.ts`'s `supersedes`/`superseded_by` backlink, or archive it under `knowledge/product/hints/archive/` for promoted hints). Promotion and demotion both require steward approval; neither happens automatically.
 - **Tuning the thresholds**: edit `knowledge/product/governance/knowledge-curation-slo.json` (validated against `knowledge/product/schemas/knowledge-curation-slo.schema.json`) — never hardcode a new deadline in code.
+
+### D. Tenant Scope Reconciliation (KO-19)
+
+- Run `pnpm knowledge:scope-reconcile` weekly (or from the tenant scheduler). The report combines tenant-root health, feedback/intent/ledger/promotion migration dry-runs, the semantic/tier-hygiene checks, tenant weight proposals, and promotion audit continuity.
+- Treat `unscoped-legacy` as a quarantine candidate, not as evidence for assigning a tenant. Use `pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --dry-run` first; apply only after the owner and hash-bound manifest are reviewed.
+- Weight proposals are advisory and contain `approval_required: true`; approving one uses the governed configuration change path and must not be replaced by directly editing the generated runtime proposal. The explicit apply ceremony is `pnpm knowledge weights apply --proposal <path> --approval-ref <ref> --approved-by <principal> [--dry-run]`; it rejects insufficient-data or stale proposals, creates a `.previous`/history snapshot, writes only the changed tenant override, and records the apply in the audit chain.
+- Legacy feedback/intent/ledger/promotion records without authoritative tenant scope are never assigned by inference. After reviewing the reconciliation report, quarantine them with `pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --apply`; the migration manifest and per-file hash verification are the audit evidence. A growing or expired legacy lane is surfaced by `pnpm knowledge:scope-health -- --alert`.

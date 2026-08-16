@@ -404,6 +404,8 @@ export function FocusedOperatorView({
   focusedMissionId?: string | null;
   onOpenMissionThread?: (missionId: string) => void;
   tenant?: string;
+  organizationId?: string;
+  projectId?: string;
 }) {
   const locale = resolveChronosLocale();
   const ft = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
@@ -1501,7 +1503,14 @@ export function FocusedOperatorView({
         </div>
       )}
 
-      {viewId === 'trace-viewer' && <TraceViewer autoOpenRawTrace />}
+      {viewId === 'trace-viewer' && (
+        <TraceViewer
+          autoOpenRawTrace
+          tenant={tenant}
+          organizationId={organizationId}
+          projectId={projectId}
+        />
+      )}
 
       {viewId === 'owner-summaries' && (
         <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">

@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "description": "Governed caps for per-scope knowledge usage aggregates. Delivery and feedback JSONL remain the durable event evidence; the aggregate is bounded for ranking and curation.",
+  "defaults": {
+    "max_usage_entries": 10000,
+    "max_usage_bytes": 10485760
+  },
+  "tenant_overrides": {}
+}

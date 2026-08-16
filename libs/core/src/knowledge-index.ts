@@ -15,7 +15,12 @@ import {
   cosineSimilarity,
   reciprocalRankFusion,
 } from '../embedding-backend.js';
-import { knowledgeMetadataScore, type KnowledgeRankingMetadata } from '../ranking-signals.js';
+import {
+  knowledgeMetadataScore,
+  loadKnowledgeRankingWeights,
+  type KnowledgeRankingMetadata,
+} from '../ranking-signals.js';
+import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
 
@@ -61,6 +66,8 @@ export interface KnowledgeHint {
   last_updated?: string;
   doc_authority?: string;
   scope?: string;
+  /** Explicit useful-feedback yield, when already available on a hint. */
+  usage_yield?: number;
 }
 
 export interface KnowledgeQueryOptions {
@@ -80,11 +87,133 @@ export interface KnowledgeQueryOptions {
   includeScores?: boolean;
 }
 
+const USAGE_YIELD_CACHE_TTL_MS = 15_000;
+const usageYieldCache = new Map<string, { expiresAt: number; values: Map<string, number> }>();
+
+function usageAggregatePath(scope?: ScopeContext): string {
+  const resolver = pathResolver as typeof pathResolver & {
+    pathResolver?: typeof pathResolver;
+  };
+  let nestedResolver: typeof pathResolver | undefined;
+  try {
+    nestedResolver = resolver.pathResolver;
+  } catch {
+    nestedResolver = undefined;
+  }
+  let shared: ((subPath?: string) => string) | undefined;
+  try {
+    const candidate = resolver.shared;
+    if (typeof candidate === 'function') shared = candidate.bind(resolver);
+  } catch {
+    shared = undefined;
+  }
+  if (!shared) shared = nestedResolver?.shared?.bind(nestedResolver);
+  if (!shared) return '';
+  const configured = process.env.KYBERION_KNOWLEDGE_USAGE_PATH?.trim();
+  let base: string;
+  if (configured) {
+    if (path.isAbsolute(configured)) {
+      base = configured;
+    } else {
+      let rootResolve: ((relativePath: string) => string) | undefined;
+      try {
+        const candidate = resolver.rootResolve;
+        if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+      } catch {
+        rootResolve = undefined;
+      }
+      base = rootResolve ? rootResolve(configured) : shared(configured);
+    }
+  } else {
+    base = shared('runtime/feedback-loop/knowledge-usage/usage.json');
+  }
+  if (!scope?.tenant_slug) return base;
+  const scopeKind = scope.session_id
+    ? 'session'
+    : scope.task_id
+      ? 'task'
+      : scope.mission_id
+        ? 'mission'
+        : scope.project_id
+          ? 'project'
+          : scope.organization_id
+            ? 'organization'
+            : 'tenant';
+  const relative = base.replace(/^.*?(?=active\/shared\/runtime)/, '');
+  const feedbackRoot = 'active/shared/runtime/feedback-loop';
+  const scopedScope = { ...scope, scope_kind: scopeKind } as const;
+  const relativeBase = relative.replace(/^\/+/, '');
+  const scoped =
+    relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)
+      ? path.posix.join(
+          physicalScopedPath(feedbackRoot, scopedScope),
+          ...relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '').split('/').filter(Boolean)
+        )
+      : physicalScopedPath(relativeBase, scopedScope);
+  let rootResolve: ((relativePath: string) => string) | undefined;
+  try {
+    const candidate = resolver.rootResolve;
+    if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+  } catch {
+    rootResolve = undefined;
+  }
+  if (rootResolve) return rootResolve(scoped);
+  const rootDir = nestedResolver?.rootDir?.();
+  return rootDir ? path.join(rootDir, scoped) : scoped;
+}
+
+function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
+  const values = new Map<string, number>();
+  const filePath = usageAggregatePath(scope);
+  if (!filePath || !safeExistsSync(filePath)) return values;
+  try {
+    const entries = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+    if (!Array.isArray(entries)) return values;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      const row = entry as {
+        document_path?: unknown;
+        used_count?: unknown;
+        not_used_count?: unknown;
+      };
+      if (typeof row.document_path !== 'string') continue;
+      const used = typeof row.used_count === 'number' ? row.used_count : 0;
+      const notUsed = typeof row.not_used_count === 'number' ? row.not_used_count : 0;
+      if (used + notUsed > 0) values.set(row.document_path, used / (used + notUsed));
+    }
+  } catch {
+    // Ranking is fail-open when the optional feedback aggregate is absent/corrupt.
+  }
+  return values;
+}
+
+function usageYieldFor(source: string, scope?: ScopeContext): number | undefined {
+  const cacheKey = `${process.env.KYBERION_KNOWLEDGE_USAGE_PATH || 'default'}:${JSON.stringify(scope || {})}`;
+  const now = Date.now();
+  let cached = usageYieldCache.get(cacheKey);
+  if (!cached || cached.expiresAt <= now) {
+    const values = new Map<string, number>();
+    for (const [documentPath, yieldValue] of loadUsageYieldValues(scope)) {
+      values.set(documentPath, yieldValue);
+    }
+    cached = { expiresAt: now + USAGE_YIELD_CACHE_TTL_MS, values };
+    usageYieldCache.set(cacheKey, cached);
+  }
+  const parent = source.split('#chunk', 1)[0] || source;
+  return cached.values.get(source) ?? cached.values.get(parent);
+}
+
 function metadataScore(hint: KnowledgeHint, options: KnowledgeQueryOptions): number {
+  const usageYield =
+    hint.usage_yield ?? usageYieldFor(hint.parentSource || hint.source, options.scopeContext);
   return knowledgeMetadataScore(
-    { ...hint, source: hint.source },
+    {
+      ...hint,
+      source: hint.source,
+      ...(usageYield === undefined ? {} : { usage_yield: usageYield }),
+    },
     options.scope,
-    {},
+    loadKnowledgeRankingWeights(options.scopeContext),
     Date.now(),
     options.scopeContext
   );

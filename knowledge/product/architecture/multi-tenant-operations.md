@@ -3,7 +3,7 @@ title: Multi-Tenant Operations
 category: Architecture
 tags: [multi-tenant, isolation, tier, governance, audit, operations]
 importance: 8
-last_updated: 2026-08-12
+last_updated: 2026-08-17
 ---
 
 # Multi-Tenant Operations
@@ -46,6 +46,32 @@ on the wrong side of this boundary
 Inside the boundary, the containment order is
 `tenant_slug → organization_id → project_id → mission_id → task_id → session`
 ([entity-scope-hierarchy](./entity-scope-hierarchy.md)).
+
+Runtime scope is resolved through `ScopeResolution`, which reports both the
+effective scope and each field's provenance. Operators can inspect or switch
+the persisted focus with `pnpm scope show --json`, `pnpm scope use ...`, and
+`pnpm scope clear`; `kyberion.scope.current` exposes the same read-only view to
+MCP callers. `KYBERION_CUSTOMER` remains a stance selector and must not be used
+as a tenant fallback. Knowledge writes use `pnpm knowledge place` so the
+containment chain is materialized in the path and frontmatter.
+
+Knowledge feedback and runtime learning follow the same boundary. Delivery,
+human feedback, knowledge gaps, usage aggregates, archive-advisory history, and
+promotion candidates are written below
+`active/shared/runtime/feedback-loop/tenants/{tenant-slug}/` when a tenant
+scope is resolved. The unscoped legacy lane is read-only for tenant retrieval;
+`pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --dry-run`
+plans only whole records/files whose contents carry one authoritative tenant,
+and quarantines mixed or unscoped data instead of guessing ownership. The weekly
+curation report requires two weekly low-yield plus freshness observations
+before it queues an `archive_advisory`; a knowledge steward must approve any
+archival action.
+
+Chronos routes and panels carry the resolved tenant › organization › project
+chain server-side. A client parameter can narrow a viewer's allowed set but
+cannot broaden it. Slack reactions are accepted as feedback only when the
+message includes governed knowledge metadata (or a repository-relative marker)
+and the channel binding supplies the tenant for confidential content.
 
 ## 2. Isolation Layers
 
@@ -338,6 +364,23 @@ Compliance checks (e.g. weekly):
 - No event for tenant X appears in tenant Y's forwarder
 - `tier-hygiene` passes on all public-tier files
 - `check:contract-schemas` passes
+
+Knowledge-scope operations use the same split. `pnpm knowledge:scope-reconcile`
+does a non-mutating dry-run for feedback, intent-contract, the DA-05 asset
+ledger, and the promotion queue, runs the semantic scope checker and tier-hygiene scan, and writes one
+operator report under `active/shared/runtime/reports/`. A record without an
+authoritative tenant is reported as `unscoped-legacy` and is eligible for
+quarantine; `pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --apply`
+moves it to the hash-verified quarantine namespace without assigning a tenant.
+The health watcher also reports legacy-file growth and quarantine TTL breaches.
+Tenant weight changes are emitted as `approval_required` proposals below the physical
+tenant runtime and do not edit `knowledge-weights.json` automatically. A
+knowledge steward may apply a reviewed proposal with
+`pnpm knowledge weights apply --proposal <path> --approval-ref <ref>
+--approved-by <principal>`; the command rejects stale or insufficient-data
+proposals, snapshots the governance file, writes only the changed tenant
+override, and records the apply in the audit chain. The promotion queue's `audit_ref` is checked against the hash-chained audit master;
+legacy candidates without a link remain visible as observations.
 
 ## 9. Operational Failure Modes
 

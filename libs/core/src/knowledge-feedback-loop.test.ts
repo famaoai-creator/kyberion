@@ -7,6 +7,7 @@ import {
   knowledgeUsageAggregatePath,
   loadKnowledgeUsageAggregate,
   recordKnowledgeDelivery,
+  recordKnowledgeGap,
   recordKnowledgeUsageFeedback,
 } from './knowledge-feedback-loop.js';
 import {
@@ -26,14 +27,17 @@ const queuePathOverride = `${suiteRoot}/promotion-queue.jsonl`;
 let originalDeliveryDir: string | undefined;
 let originalUsagePath: string | undefined;
 let originalQueuePath: string | undefined;
+let originalFeedbackDir: string | undefined;
 
 beforeEach(() => {
   originalDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
   originalUsagePath = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
   originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
+  originalFeedbackDir = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
   process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = deliveryDirOverride;
   process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePathOverride;
   process.env.KYBERION_MEMORY_QUEUE_PATH = queuePathOverride;
+  process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = `${suiteRoot}/feedback`;
   safeRmSync(suiteRoot, { recursive: true, force: true });
   // enqueueMemoryPromotionCandidate only ensures the DEFAULT queue dir
   // exists, not an overridden one — pre-create the parent dir ourselves.
@@ -48,6 +52,8 @@ afterEach(() => {
   else process.env.KYBERION_KNOWLEDGE_USAGE_PATH = originalUsagePath;
   if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
   else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
+  if (originalFeedbackDir === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+  else process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = originalFeedbackDir;
 });
 
 describe('recordKnowledgeDelivery', () => {
@@ -141,6 +147,37 @@ describe('recordKnowledgeDelivery', () => {
     });
     expect(feedback.promotionCandidateIds).toHaveLength(1);
     expect(loadKnowledgeUsageAggregate(scope)[0]).toMatchObject({ occurrences: 1 });
+  });
+
+  it('promotes the third repeated gap only inside the same tenant scope', () => {
+    const scope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+      mission_id: 'MSN-SCOPED-GAP',
+    };
+    for (let index = 0; index < 2; index += 1) {
+      expect(
+        recordKnowledgeGap({
+          topic: 'tenant rollback procedure',
+          sourceRef: `mission:MSN-SCOPED-GAP:${index}`,
+          scope,
+          promoteOnCluster: true,
+        })
+      ).toContain('/tenants/tenant-a/');
+    }
+    expect(
+      recordKnowledgeGap({
+        topic: 'tenant rollback procedure',
+        sourceRef: 'mission:MSN-SCOPED-GAP:2',
+        scope,
+        promoteOnCluster: true,
+      })
+    ).toContain('/tenants/tenant-a/');
+    expect(listMemoryPromotionCandidates()).toHaveLength(1);
+    expect(listMemoryPromotionCandidates()[0]).toMatchObject({
+      proposed_memory_kind: 'clarification_prompt',
+      sensitivity_tier: 'confidential',
+    });
   });
 });
 
