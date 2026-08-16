@@ -9,6 +9,11 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
 
+// Keep the aggregate read from discovering the repository's real tenant
+// shards during this queue-unit suite.
+process.env.KYBERION_MEMORY_QUEUE_PATH =
+  'active/shared/tmp/test-memory-queue-memory-promotion-queue.jsonl';
+
 describe('memory-promotion-queue', () => {
   const queuePath = memoryPromotionQueuePath();
   let originalQueueRaw: string | null = null;
@@ -246,5 +251,21 @@ describe('memory-promotion-queue', () => {
     expect(rows.map((row) => row.scope?.tenant_slug)).toEqual(['acme-corp', 'beta-corp']);
     expect(rows[0]?.evidence_refs).toEqual(['knowledge/confidential/acme/evidence.jsonl']);
     expect(rows[1]?.evidence_refs).toEqual(['knowledge/confidential/beta/evidence.jsonl']);
+  });
+
+  it('resolves tenant-scoped queues below the physical tenant runtime namespace', () => {
+    const originalOverride = process.env.KYBERION_MEMORY_QUEUE_PATH;
+    delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    try {
+      expect(
+        memoryPromotionQueuePath({ tier: 'confidential', tenant_slug: 'acme-corp' })
+      ).toContain('active/shared/runtime/tenants/acme-corp/memory/promotion-queue.jsonl');
+      expect(memoryPromotionQueuePath()).toContain(
+        'active/shared/runtime/memory/promotion-queue.jsonl'
+      );
+    } finally {
+      if (originalOverride === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+      else process.env.KYBERION_MEMORY_QUEUE_PATH = originalOverride;
+    }
   });
 });

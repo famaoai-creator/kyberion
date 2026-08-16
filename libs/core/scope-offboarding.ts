@@ -252,7 +252,9 @@ export type OffboardTargetKind =
   /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
   | 'ingest_cursors_tree'
   /** DA-08: one data-vault cache entry whose projectId equals the scope id. */
-  | 'data_vault_entry';
+  | 'data_vault_entry'
+  /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
+  | 'tenant_learning_tree';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -489,6 +491,12 @@ function collectDataVaultEntryTargets(
 const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
 const PHYSICAL_CHANNEL_ROOT = 'active/shared/coordination/channels';
 const PHYSICAL_PRESENCE_ROOT = 'active/shared/runtime/presence';
+const PHYSICAL_TENANT_LEARNING_ROOTS = [
+  'active/shared/runtime/feedback-loop',
+  'active/shared/runtime/tenants',
+  'active/shared/observability/tenants',
+  'active/shared/coordination/tenants',
+] as const;
 
 export interface PhysicalNamespaceFilter {
   tenantSlug?: string;
@@ -585,6 +593,12 @@ function collectPhysicalNamespaceTargets(
           path: repoRelativePosix(tenantRoot),
           kind: 'tenant_physical_namespace',
         });
+      }
+    }
+    for (const root of PHYSICAL_TENANT_LEARNING_ROOTS) {
+      const tenantRoot = path.join(pathResolver.rootResolve(root), 'tenants', scopeId);
+      if (safeExistsSync(tenantRoot)) {
+        targets.push({ path: repoRelativePosix(tenantRoot), kind: 'tenant_learning_tree' });
       }
     }
     return targets;
@@ -704,6 +718,7 @@ export function collectScopeTargets(
     for (const subtree of [
       `${INGEST_CURSORS_REPO_SUBPATH}/${id}`,
       `${INGEST_QUOTA_REPO_SUBPATH}/${id}`,
+      `knowledge/personal/tenants/${id}`,
     ]) {
       if (safeExistsSync(pathResolver.rootResolve(subtree))) {
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });

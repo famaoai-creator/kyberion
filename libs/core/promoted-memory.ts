@@ -79,11 +79,12 @@ const validatorCache = new Map<string, ValidateFunction>();
 function tenantEvolutionRoot(scope?: MemoryScopeEnvelope): string | undefined {
   const tenant = scope?.tier === 'confidential' ? scope.tenant_slug?.trim() : undefined;
   if (!tenant || tenant.includes('/') || tenant.includes('\\')) return undefined;
-  const override = process.env.KYBERION_HINTS_PATH?.trim();
-  const base = override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.knowledge('confidential');
-  return `${base}/${tenant}/evolution`;
+  // KYBERION_HINTS_PATH is a legacy/global file override used by tests and
+  // the shared governance lane. It must never become the parent of a tenant
+  // namespace (a file path would otherwise turn into
+  // `<HINTS_PATH>/<tenant>/evolution`). Tenant promotion always resolves from
+  // the authoritative confidential knowledge root.
+  return `${pathResolver.knowledge('confidential')}/${tenant}/evolution`;
 }
 
 function resolveHintsPath(scope?: MemoryScopeEnvelope): string {

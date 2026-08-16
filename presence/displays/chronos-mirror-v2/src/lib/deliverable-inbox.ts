@@ -46,6 +46,8 @@ export interface DeliverableInboxQuery {
   kind?: string;
   tier?: 'personal' | 'confidential' | 'public' | '';
   tenantSlugs?: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
   limit?: number;
 }
 
@@ -220,6 +222,16 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
     .filter((item) =>
       input.tenantSlugs && input.tenantSlugs !== 'all'
         ? Boolean(item.tenantSlug && input.tenantSlugs.includes(item.tenantSlug))
+        : true
+    )
+    .filter((item) =>
+      input.organizationIds && input.organizationIds !== 'all'
+        ? Boolean(item.organizationId && input.organizationIds.includes(item.organizationId))
+        : true
+    )
+    .filter((item) =>
+      input.projectIds && input.projectIds !== 'all'
+        ? Boolean(item.projectId && input.projectIds.includes(item.projectId))
         : true
     )
     .filter((item) => (kind ? item.kind.toLowerCase().includes(kind) : true))

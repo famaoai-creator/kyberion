@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "description": "Governed, rollbackable knowledge ranking weights. Tenant overrides apply only after viewer or mission scope resolution.",
+  "defaults": {
+    "proximity": 1,
+    "usage_yield": 4
+  },
+  "tenant_overrides": {}
+}

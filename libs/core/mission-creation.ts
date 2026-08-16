@@ -160,6 +160,14 @@ export async function createMission(args: {
     intentGoal,
   } = args;
   const tenantSlug = normalizeTenantSlug(rawTenantSlug);
+  if (tier === 'confidential' && !tenantSlug) {
+    const policy = process.env.KYBERION_TENANT_SCOPE_REQUIRED || 'strict';
+    const message =
+      `[SCOPE_CONTEXT_INVALID] Confidential mission '${id}' requires --tenant-slug (registered tenant). ` +
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+    if (policy === 'strict') throw new Error(message);
+    if (policy === 'warn') logger.warn(message);
+  }
   if (rawTenantSlug && !tenantSlug) {
     throw new Error(
       `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
@@ -494,6 +502,14 @@ export async function startMission(args: {
 
   let state = loadState(upperId);
   const finalTier = state ? state.tier : tier;
+  if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
+    const policy = process.env.KYBERION_TENANT_SCOPE_REQUIRED || 'strict';
+    const message =
+      `[SCOPE_CONTEXT_INVALID] Confidential mission '${upperId}' requires --tenant-slug (registered tenant) before start. ` +
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+    if (policy === 'strict') throw new Error(message);
+    if (policy === 'warn') logger.warn(message);
+  }
 
   if (!force) {
     const prereqs = state?.relationships?.prerequisites || normalizedRelationships?.prerequisites;

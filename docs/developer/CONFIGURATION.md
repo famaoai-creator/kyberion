@@ -52,7 +52,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                       | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (82)
+## path (88)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -70,6 +70,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH`                       | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH`                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_COPILOT_CLI_BIN`                                       | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_CURATION_ARCHIVE_HISTORY_PATH`                         | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CURATION_REPORT_PATH`                                  | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CURATION_SLO_CONFIG_PATH`                              | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CURATION_TAXONOMY_PATH`                                | path | no       | _undocumented_                                                                                                                |
@@ -89,7 +90,11 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH`                      | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_KI_CACHE_DIR`                                          | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_KNOWLEDGE_DELIVERY_DIR`                                | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_KNOWLEDGE_FEEDBACK_DIR`                                | path | no       | Override for scoped human-feedback and knowledge-gap JSONL storage (default active/shared/runtime/feedback-loop).             |
+| `KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH`                        | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_KNOWLEDGE_ROOT`                                        | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH`                   | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH`                   | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_KNOWLEDGE_USAGE_PATH`                                  | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_MEMORY_QUEUE_PATH`                                     | path | no       | _undocumented_                                                                                                                |
@@ -110,6 +115,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PYTHON`                                                | path | no       | Python interpreter override for python-backed bridges.                                                                        |
 | `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).                                                |
 | `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root).                                            |
+| `KYBERION_SCOPE_ENV_PATH`                                        | path | no       | Override for the persisted operator scope binding file (default active/shared/runtime/scope.env).                             |
 | `KYBERION_SECURITY_QUARANTINE_DIR`                               | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | _undocumented_                                                                                                                |

@@ -105,7 +105,7 @@
       "note": "Distill candidate staging (distill-candidate-registry.ts) — candidates either promote into knowledge/ or expire; previously unbounded (~97 files)."
     },
     {
-      "path": "active/shared/runtime/feedback-loop",
+      "path": "active/shared/runtime/feedback-loop/tenants",
       "artifact_class": "cache",
       "ttl_days": 30,
       "action": "delete",
@@ -202,7 +202,7 @@
       "path": "active/shared/runtime/memory",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Memory promotion queue (memory-promotion-queue.ts) — pending promotions are un-regenerable learning."
+      "note": "Memory promotion queue (memory-promotion-queue.ts) — pending promotions are un-regenerable learning. Tenant-scoped candidates live under active/shared/runtime/tenants/<tenant>/memory; the global path is retained for legacy/unscoped records until reviewed."
     },
     {
       "path": "active/shared/runtime/oauth",
@@ -275,6 +275,56 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Terminal bridge session state (terminal-bridge.ts)."
+    },
+    {
+      "path": "active/shared/runtime/feedback-loop",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tenant-sharded knowledge delivery, usage aggregate, human feedback, gap, and promotion telemetry. Tenant subtrees are removed only through audited offboarding; the unscoped legacy lane remains review-only.",
+      "audit": true
+    },
+    {
+      "path": "active/shared/runtime/tenants",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Physical tenant runtime namespaces for scoped intent, cowork, and other load-bearing state. Never TTL-delete; remove only through audited tenant offboarding.",
+      "audit": true
+    },
+    {
+      "path": "active/shared/runtime/intent-contract-memory.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "audit": true,
+      "note": "System-level intent contract seed/runtime snapshot. Tenant-scoped entries must migrate to active/shared/runtime/tenants/<tenant>; the global snapshot is never TTL-deleted."
+    },
+    {
+      "path": "active/shared/runtime/cowork-sync-state.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "audit": true,
+      "note": "Cowork synchronization checkpoint. Preserve as load-bearing state until a tenant-specific replacement is verified."
+    },
+    {
+      "path": "active/shared/observability/tenants",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "audit": true,
+      "note": "Tenant-sharded observability streams. Keep a quarterly audit window; tenant offboarding exports and removes the matching namespace first."
+    },
+    {
+      "path": "active/shared/coordination/tenants",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tenant-sharded coordination state not covered by a surface-specific root. Removal is owned by audited offboarding.",
+      "audit": true
+    },
+    {
+      "path": "knowledge/personal/tenants",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "Tenant-bound personal knowledge overlay. Never TTL-delete; offboarding must export and remove only the matching tenant subtree."
     },
     {
       "path": "active/shared/runtime/voice-profiles",

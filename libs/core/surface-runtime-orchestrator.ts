@@ -1202,6 +1202,7 @@ function recordLearningOutcomeSafely(
     const surfaceInput = surfaceRuntimeContextStore.getStore();
     recordIntentContractOutcome({
       ...params,
+      ...(params.scope ? {} : { scope: currentScope() }),
       ...(surfaceInput?.missionId ? { mission_id: surfaceInput.missionId } : {}),
       ...(surfaceInput?.correlationId ? { correlation_id: surfaceInput.correlationId } : {}),
     });
@@ -1411,7 +1412,7 @@ async function handleGovernedExecutionHint(
 ): Promise<SurfaceConversationResult> {
   const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
   const intentId = resolved.intentId;
-  const candidates = intentId ? selectContractCandidates(intentId, 3) : [];
+  const candidates = intentId ? selectContractCandidates(intentId, 3, currentScope()) : [];
   const routingDecisionArgs = context.compiledFlow?.routingDecision
     ? ['--routing-decision', JSON.stringify(context.compiledFlow.routingDecision)]
     : [];

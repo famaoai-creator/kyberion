@@ -32,6 +32,7 @@
           "minLength": 1,
           "not": { "enum": ["public", "confidential", "personal", "shared"] }
         },
+        "organization_id": { "type": "string", "minLength": 1 },
         "project_id": { "type": "string", "minLength": 1 },
         "track_id": { "type": "string", "minLength": 1 },
         "task_session_id": { "type": "string", "minLength": 1 },

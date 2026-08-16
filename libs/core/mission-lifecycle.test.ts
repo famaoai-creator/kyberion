@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // finishMission fires real operator notifications (deliverable_ready /
 // mission_completed); without this mock every battery run appends phantom
@@ -44,6 +44,10 @@ const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
 const personalRepairMissionId = 'MSN-LIFECYCLE-REPAIR-PERSONAL-001';
 const personalRepairMissionPath = pathResolver.missionDir(personalRepairMissionId, 'personal');
+const promotionQueuePath = pathResolver.sharedTmp(
+  `test-memory-queue-mission-lifecycle/${process.pid}/promotion-queue.jsonl`
+);
+const originalPromotionQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
 
 interface MissionTaskSnapshot {
   task_id?: string;
@@ -111,6 +115,13 @@ function seedMissionEvidence(fileName: string, contents: string): void {
   safeWriteFile(`${evidenceDir}/${fileName}`, contents);
 }
 
+beforeAll(() => {
+  // finishMission queues a memory candidate on successful completion. Keep
+  // this lifecycle fixture hermetic so a full core test run never mutates the
+  // repository's global promotion queue.
+  process.env.KYBERION_MEMORY_QUEUE_PATH = promotionQueuePath;
+});
+
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
@@ -122,6 +133,12 @@ afterEach(() => {
   safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(personalRepairMissionPath, { recursive: true, force: true });
+});
+
+afterAll(() => {
+  safeRmSync(promotionQueuePath, { force: true });
+  if (originalPromotionQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+  else process.env.KYBERION_MEMORY_QUEUE_PATH = originalPromotionQueuePath;
 });
 
 describe('mission lifecycle finish gate', () => {
