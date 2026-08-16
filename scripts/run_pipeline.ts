@@ -86,6 +86,7 @@ import {
   type GraphRunArtifact,
   assessPipelineDryRun,
 } from '@agent/core';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import { z } from 'zod';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1414,10 +1415,39 @@ async function dispatchLeafOp(
       ? step.produces
       : step.produces.channel
     : undefined;
-  const params =
+  let params =
     _producedChannel && !rawParams.export_as
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
+
+  const approvalGranted =
+    params._approval_granted === true ||
+    Object.values(ctx).some(
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        (value as Record<string, unknown>).status === 'approved'
+    );
+  const preflight = await runOpPreflight({
+    op: normalizedOp,
+    params,
+    context: ctx,
+    source: 'pipeline',
+    requiresApproval: step.budget?.approval_required === true,
+    approvalGranted,
+  });
+  opts.trace?.addEvent('op.preflight', {
+    op: normalizedOp,
+    decision: preflight.decision,
+    listener_count: preflight.listener_ids.length,
+    guard_count: preflight.guard_ids.length,
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${normalizedOp} was not admitted.`}`
+    );
+  }
+  params = preflight.input;
 
   if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
     return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
