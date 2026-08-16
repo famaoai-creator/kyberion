@@ -3,6 +3,7 @@ import {
   resolveReasoningRoute,
   resolveSamplingParams,
   normalizeReasoningRole,
+  resolveStepReasoningRoute,
   resetReasoningRoutePolicyCache,
 } from './reasoning-route-resolver.js';
 
@@ -208,5 +209,80 @@ describe('reasoning-route-resolver', () => {
         },
       })
     ).toThrow(/missing capabilities: vision/);
+  });
+
+  it('resolves step routing by tag and records the winning layer', () => {
+    const policy = {
+      version: 'test',
+      runtime_adapters: {
+        stub: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+      },
+      profiles: {
+        cheap: { mode: 'stub', model: 'cheap' },
+        deep: { mode: 'stub', model: 'deep' },
+      },
+      roles: { default: { candidates: ['cheap'] } },
+      routing: { tags: { judge: { profile: 'deep', permission_mode: 'readonly' as const } } },
+      permission_floor: 'readonly' as const,
+      fallback: {
+        max_attempts: 1,
+        max_in_place_retries: 0,
+        on_unsupported_parameter: 'reject' as const,
+      },
+    };
+    const route = resolveStepReasoningRoute({
+      stepId: 'classify',
+      tags: ['judge'],
+      policy,
+      env: {},
+    });
+    expect(route.profile).toBe('deep');
+    expect(route.source).toBe('routing.tag');
+    expect(route.provenance).toContain('routing.tags.judge');
+  });
+
+  it('promotes only after the declared failure threshold and enforces the permission floor', () => {
+    const policy = {
+      version: 'test',
+      runtime_adapters: {
+        stub: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+      },
+      profiles: { base: { mode: 'stub' }, promoted: { mode: 'stub', model: 'promoted' } },
+      roles: { default: { candidates: ['base'] } },
+      permission_floor: 'edit' as const,
+      fallback: {
+        max_attempts: 1,
+        max_in_place_retries: 0,
+        on_unsupported_parameter: 'reject' as const,
+      },
+    };
+    const step = {
+      permission_mode: 'edit' as const,
+      promotion: [{ after_failures: 2, profile: 'promoted', permission_mode: 'edit' as const }],
+    };
+    expect(
+      resolveStepReasoningRoute({ stepId: 'x', step, failures: 1, policy, env: {} }).profile
+    ).toBe('base');
+    expect(
+      resolveStepReasoningRoute({ stepId: 'x', step, failures: 2, policy, env: {} }).profile
+    ).toBe('promoted');
+    expect(() =>
+      resolveStepReasoningRoute({
+        stepId: 'x',
+        step: { profile: 'base', permission_mode: 'readonly' },
+        policy,
+        env: {},
+      })
+    ).toThrow(/PERMISSION_FLOOR/);
   });
 });

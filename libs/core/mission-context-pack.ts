@@ -39,6 +39,7 @@ import {
   type ContextFragmentRejection,
   type ContextSecurityScope,
 } from './context-security-scope.js';
+import { resolveFacets, type FacetRequest, type ResolvedFacets } from './facet-registry.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -197,6 +198,13 @@ export interface MissionContextPackTaskGuidance {
   seed?: string[];
 }
 
+export interface MissionContextPackFacets {
+  persona?: { name: string; source: string; content: string };
+  policies: Array<{ name: string; source: string; content: string }>;
+  instructions: Array<{ name: string; source: string; content: string }>;
+  output_contract?: { name: string; source: string; content: string };
+}
+
 export interface MissionContextPackPruningSummary {
   budget_chars: number;
   estimated_chars: number;
@@ -310,6 +318,7 @@ export interface MissionContextPack {
   knowledge_hints?: MissionContextPackKnowledgeHint[];
   artifact_hints?: MissionContextPackArtifactHint[];
   task_guidance?: MissionContextPackTaskGuidance;
+  facets?: MissionContextPackFacets;
   sources: MissionContextPackSource[];
   redactions: string[];
   pruning?: MissionContextPackPruningSummary;
@@ -340,6 +349,7 @@ export interface BuildMissionContextPackInput {
    * = `M` (pre-KP-04 default of 6000), so existing callers are unaffected.
    */
   estimatedScope?: 'S' | 'M' | 'L';
+  facets?: FacetRequest;
 }
 
 export interface ResolveMissionContextPackInput {
@@ -367,6 +377,7 @@ export interface ResolveMissionContextPackInput {
    * Omitted = `M`, matching pre-KP-04 behavior byte-for-byte.
    */
   estimatedScope?: 'S' | 'M' | 'L';
+  facets?: FacetRequest;
   /**
    * DA-07 test seam, forwarded to `loadKnowledgeHintsIfPossible`: repo root
    * containing fixture `knowledge/`, `customer/`, and tenant profile
@@ -813,6 +824,20 @@ function defaultRedactions(): string[] {
     'cross-tier data outside the current scope',
     'other team roles and non-selected runtime logs',
   ];
+}
+
+function serializeFacets(facets: ResolvedFacets): MissionContextPackFacets {
+  const serialize = (facet: { name: string; source: string; content: string }) => ({
+    name: facet.name,
+    source: facet.source,
+    content: facet.content,
+  });
+  return {
+    ...(facets.persona ? { persona: serialize(facets.persona) } : {}),
+    policies: facets.policies.map(serialize),
+    instructions: facets.instructions.map(serialize),
+    ...(facets.output_contract ? { output_contract: serialize(facets.output_contract) } : {}),
+  };
 }
 
 function missionSources(input: {
@@ -1636,6 +1661,14 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     purpose: input.teamRole || input.recipientKind || 'mission-execution',
     external_egress: missionTier === 'public' ? 'allow' : 'deny',
   };
+  const facets = input.facets
+    ? serializeFacets(
+        resolveFacets(input.facets, {
+          tier: missionTier,
+          ...(input.missionState.tenant_slug ? { tenantSlug: input.missionState.tenant_slug } : {}),
+        })
+      )
+    : undefined;
 
   const mission: MissionContextPackMissionSummary = {
     mission_id: input.missionState.mission_id,
@@ -1848,6 +1881,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(governedKnowledgeHints.length > 0 ? { knowledge_hints: governedKnowledgeHints } : {}),
     ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
     ...(taskGuidance ? { task_guidance: taskGuidance } : {}),
+    ...(facets ? { facets } : {}),
     sources,
     redactions: defaultRedactions(),
     delivery: {
@@ -1945,6 +1979,7 @@ export async function resolveMissionContextPack(
     projectState,
     trackRecord,
     missionTeamAssignment,
+    ...(input.facets ? { facets: input.facets } : {}),
     knowledgeHints,
     ...(input.contextBudgetChars ? { contextBudgetChars: input.contextBudgetChars } : {}),
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
@@ -2025,6 +2060,24 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
         ? [`  - Seed:`, ...pack.task_guidance.seed.map((entry) => `    - ${entry}`)]
         : [])
     );
+  }
+
+  if (pack.facets) {
+    if (pack.facets.persona) {
+      lines.push(
+        `- Persona facet: ${pack.facets.persona.name} (${pack.facets.persona.source})`,
+        `  - ${pack.facets.persona.content}`
+      );
+    }
+    for (const facet of [...pack.facets.policies, ...pack.facets.instructions]) {
+      lines.push(`- ${facet.name} facet: ${facet.source}`, `  - ${facet.content}`);
+    }
+    if (pack.facets.output_contract) {
+      lines.push(
+        `- Output contract facet: ${pack.facets.output_contract.name}`,
+        `  - ${pack.facets.output_contract.content}`
+      );
+    }
   }
 
   if (pack.pruning) {

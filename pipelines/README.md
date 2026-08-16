@@ -20,6 +20,13 @@ knowledge/product/pipeline-templates/
 - User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
 - Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
 
+**Workflow composition:**
+
+- A step may select `facets.persona`, `facets.policies`, `facets.instructions`, and `facets.output_contract`.
+- A step may declare `reasoning.provider`, `reasoning.profile`, `reasoning.model`, `reasoning.permission_mode`, `reasoning.tags`, and thresholded `reasoning.promotion`.
+- Resolution is fail-closed and traceable: environment override → promotion → step declaration → policy routing by step/tag/persona → pipeline default → governed policy. Tenant facets are available only inside a matching non-public tenant scope.
+- Validate facet purity with `pnpm run check:facet-purity`; validate the complete repository contract with `pnpm run validate`.
+
 **Running a system pipeline:**
 
 ```bash

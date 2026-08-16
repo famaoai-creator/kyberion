@@ -281,12 +281,13 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (168)
+## runtime (169)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
 | `KYBERION_A`                                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_A2A_SIGNATURE`                       | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGENT_ID`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_RING`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT`  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_TIER`                          | string | no       | _undocumented_                                                                                          |
@@ -352,6 +353,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INJECTION_SUSPECTED`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KI_CACHE_MAX_MB`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_KNOWLEDGE_TIER`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LIVE_BLACKHOLE_TEST`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALE`                              | string | no       | _undocumented_                                                                                          |
@@ -374,6 +376,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_MYSTERY`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_NHI_ACTOR`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_NHI_ID`                              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_NON_INTERACTIVE`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_OAUTH_SERVICE_ID`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ONBOARDING_NON_INTERACTIVE_OK`       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_ORGANIZATION_ID`                     | string | no       | _undocumented_                                                                                          |
