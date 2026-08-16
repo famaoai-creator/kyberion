@@ -23,6 +23,9 @@ describe('protocol service boundary registry', () => {
       expect(Array.isArray(entry.approval_classes)).toBe(true);
       expect(entry.data_residency).toBeTruthy();
       expect(Array.isArray(entry.data_paths)).toBe(true);
+      expect(Array.isArray(entry.lifecycle_actions)).toBe(true);
+      expect(entry.lifecycle_actions).toContain('start');
+      expect(entry.lifecycle_actions).toContain('stop');
     }
   });
 

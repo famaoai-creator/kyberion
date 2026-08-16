@@ -10,6 +10,7 @@ import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifa
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
+import { recordProtocolServiceLifecycle } from './protocol-service-lifecycle.js';
 import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeReaddir } from './secure-io.js';
 
 const RECOVERY_ROLE: GovernedArtifactRole = 'mission_controller';
@@ -263,6 +264,21 @@ export function resumePeerRuntimeFromQuarantine(
     restored_labels: moves.map((move) => move.label),
     verified_peers: peerIds,
     source_manifest_created_at: manifest.created_at,
+  });
+  recordProtocolServiceLifecycle({
+    serviceId: 'peer-messaging',
+    action: 'restore',
+    status: 'restored',
+    scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+    actorRole: RECOVERY_ROLE,
+    requestedBy: approval.decidedBy || 'peer-recovery',
+    principal: { kind: 'service', id: 'peer-runtime-recovery' },
+    correlationId: approval.id,
+    metadata: {
+      quarantine_path: quarantinePath,
+      restored_labels: moves.length,
+      verified_peers: peerIds.length,
+    },
   });
   return {
     tenant_id: tenantId,
