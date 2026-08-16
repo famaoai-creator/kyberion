@@ -2,6 +2,7 @@ import { createStandardYargs, logger } from '@agent/core';
 import {
   assertProtocolServiceRegistered,
   createPeerMessagingServer,
+  recordProtocolServiceLifecycle,
   type PeerMessageEnvelope,
 } from '@agent/core';
 
@@ -71,13 +72,33 @@ async function main(): Promise<void> {
   });
 
   await server.listen(Number(argv.port), String(argv.host));
+  recordProtocolServiceLifecycle({
+    serviceId: 'peer-messaging',
+    action: 'start',
+    status: 'started',
+    scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+    principal: { kind: 'service', id: peerId },
+    requestedBy: peerId,
+    metadata: { host: String(argv.host), port: Number(argv.port) },
+  });
   logger.success(
     `[peer-messaging-server] peer ${peerId} listening on http://${String(argv.host)}:${Number(argv.port)}`
   );
 
   const shutdown = async () => {
-    await server.close();
-    process.exit(0);
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'peer-messaging',
+        action: 'stop',
+        status: 'stopped',
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+        principal: { kind: 'service', id: peerId },
+        requestedBy: peerId,
+      });
+    } finally {
+      await server.close();
+      process.exit(0);
+    }
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);

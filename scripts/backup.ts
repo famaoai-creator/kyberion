@@ -18,6 +18,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
   assertProtocolServiceRegistered,
+  recordProtocolServiceLifecycle,
 } from '@agent/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
@@ -1232,6 +1233,36 @@ export function main(argv = process.argv.slice(2)): void {
   }
   if (options.command === 'restore') {
     const result = restoreBackup(options);
+    const scope =
+      options.scope === 'tenant' && options.tenant
+        ? {
+            scope_kind: 'tenant' as const,
+            tier: 'confidential' as const,
+            tenant_slug: options.tenant,
+          }
+        : { scope_kind: 'system' as const, tier: 'public' as const };
+    recordProtocolServiceLifecycle({
+      serviceId: 'backup-restore',
+      action: 'restore',
+      status: 'restored',
+      scope,
+      actorRole: 'infrastructure_sentinel',
+      principal: { kind: 'service', id: 'backup-restore' },
+      requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+      metadata: { archive: result.archive, target: result.target },
+    });
+    if (result.quarantinePaths.length > 0) {
+      recordProtocolServiceLifecycle({
+        serviceId: 'backup-restore',
+        action: 'restore_quarantine',
+        status: 'quarantined',
+        scope,
+        actorRole: 'infrastructure_sentinel',
+        principal: { kind: 'service', id: 'backup-restore' },
+        requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+        metadata: { quarantine_count: result.quarantinePaths.length },
+      });
+    }
     console.log(
       JSON.stringify(
         {
