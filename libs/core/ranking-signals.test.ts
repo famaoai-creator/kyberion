@@ -3,6 +3,7 @@ import {
   DEFAULT_SCOPE_AFFINITY,
   docAuthorityScore,
   knowledgeMetadataScore,
+  loadKnowledgeRankingWeights,
   recencyDecayScore,
   scopeAffinityScore,
   scopeContextFromKnowledgePath,
@@ -70,6 +71,31 @@ describe('ranking-signals (KM-02)', () => {
 
   it('keeps legacy hints neutral when metadata is absent', () => {
     expect(knowledgeMetadataScore({}, 'mission', {}, Date.UTC(2026, 6, 12))).toBe(0);
+  });
+
+  it('allows proximity and usage-yield signals to be rolled back independently', () => {
+    const current = {
+      tier: 'confidential' as const,
+      tenant_slug: 'acme-corp',
+      project_id: 'project-a',
+    };
+    const metadata = {
+      source: 'knowledge/confidential/acme-corp/organizations/org-a/projects/project-a/guide.md',
+      usage_yield: 1,
+    };
+    const baseline = knowledgeMetadataScore(metadata, 'global', {}, Date.now(), current);
+    const rolledBack = knowledgeMetadataScore(
+      metadata,
+      'global',
+      { proximity: 0, usage_yield: 0 },
+      Date.now(),
+      current
+    );
+    expect(baseline).toBeGreaterThan(rolledBack);
+    expect(loadKnowledgeRankingWeights(current)).toMatchObject({
+      proximity: expect.any(Number),
+      usage_yield: expect.any(Number),
+    });
   });
 });
 

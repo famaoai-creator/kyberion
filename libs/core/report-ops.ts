@@ -11,7 +11,9 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
-import { listMemoryPromotionCandidates } from './memory-promotion-queue.js';
+import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
+import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
+import { currentScope, type ScopeContext } from './scope-context.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
@@ -28,6 +30,13 @@ export interface AuditVerifyCliReport {
   }>;
   tenantMirrors: {
     ok: boolean;
+    findings: string[];
+  };
+  promotionQueue: {
+    ok: boolean;
+    total: number;
+    audited: number;
+    legacyUnlinked: number;
     findings: string[];
   };
 }
@@ -54,11 +63,51 @@ export function collectAuditVerifyReport(
     };
   });
   const tenantMirrors = auditChain.verifyTenantMirrors();
+  const auditEntries =
+    typeof (auditChain as any).loadAll === 'function' ? (auditChain as any).loadAll() : [];
+  const auditById = new Map(
+    (auditEntries as Array<{ id?: string; tenantSlug?: string }>).map((entry) => [entry.id, entry])
+  );
+  const promotionCandidates = listMemoryPromotionCandidates();
+  const promotionFindings: string[] = [];
+  let audited = 0;
+  let legacyUnlinked = 0;
+  for (const candidate of promotionCandidates) {
+    if (!candidate.audit_ref) {
+      legacyUnlinked += 1;
+      continue;
+    }
+    const auditId = candidate.audit_ref.replace(/^audit:/u, '');
+    const auditEntry = auditById.get(auditId);
+    if (!auditEntry) {
+      promotionFindings.push(`${candidate.candidate_id}: missing audit entry ${auditId}`);
+      continue;
+    }
+    if (candidate.scope?.tenant_slug && auditEntry.tenantSlug !== candidate.scope.tenant_slug) {
+      promotionFindings.push(
+        `${candidate.candidate_id}: audit tenant does not match candidate scope`
+      );
+      continue;
+    }
+    audited += 1;
+  }
+  const promotionQueue = {
+    ok: promotionFindings.length === 0,
+    total: promotionCandidates.length,
+    audited,
+    legacyUnlinked,
+    findings: promotionFindings,
+  };
   return {
-    ok: audit.corrupted.length === 0 && ledgers.every((ledger) => ledger.ok) && tenantMirrors.ok,
+    ok:
+      audit.corrupted.length === 0 &&
+      ledgers.every((ledger) => ledger.ok) &&
+      tenantMirrors.ok &&
+      promotionQueue.ok,
     audit,
     ledgers,
     tenantMirrors,
+    promotionQueue,
   };
 }
 
@@ -86,6 +135,12 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
   lines.push(`Tenant mirrors: ${report.tenantMirrors.ok ? 'ok' : 'failed'}`);
   if (report.tenantMirrors.findings.length > 0) {
     lines.push(`  - findings: ${report.tenantMirrors.findings.join(', ')}`);
+  }
+  lines.push(
+    `Promotion queue: ${report.promotionQueue.ok ? 'ok' : 'failed'}; total=${report.promotionQueue.total}; audited=${report.promotionQueue.audited}; legacy_unlinked=${report.promotionQueue.legacyUnlinked}`
+  );
+  if (report.promotionQueue.findings.length > 0) {
+    lines.push(`  - findings: ${report.promotionQueue.findings.join(', ')}`);
   }
   return lines;
 }
@@ -168,6 +223,106 @@ export function runMemoryPromotionQueueSummary(
     safeWriteFile(outputPath, `${markdown}\n`);
   }
   return { rows, markdown, ...(outputPath ? { output_path: outputPath } : {}) };
+}
+
+// ─── knowledge validation sweep (KO-17/19) ─────────────────
+
+export interface KnowledgeValidationFinding {
+  code: 'legacy_unscoped_candidate' | 'missing_tenant_scope' | 'tenant_reference_mismatch';
+  candidate_id: string;
+  detail: string;
+  severity: 'warning' | 'error';
+}
+
+export interface KnowledgeValidationSweepResult {
+  generated_at: string;
+  scope?: ScopeContext;
+  status: 'ok' | 'attention';
+  heuristics: HeuristicReport;
+  promotion_queue: {
+    visible_count: number;
+    queued_count: number;
+    legacy_unscoped_count: number;
+    scoped_count: number;
+    audited_count: number;
+    missing_audit_ref_count: number;
+  };
+  findings: KnowledgeValidationFinding[];
+}
+
+function candidateVisibleInScope(candidate: MemoryCandidate, scope?: ScopeContext): boolean {
+  if (!scope?.tenant_slug) return true;
+  return candidate.scope?.tenant_slug === scope.tenant_slug;
+}
+
+function tenantReferenceMismatch(candidate: MemoryCandidate): boolean {
+  const tenant = candidate.scope?.tenant_slug;
+  if (!tenant) return false;
+  return [...candidate.evidence_refs, candidate.source_ref, candidate.promoted_ref || ''].some(
+    (ref) => {
+      const match = ref.match(/knowledge\/confidential\/([^/]+)/u);
+      return Boolean(match && match[1] !== tenant);
+    }
+  );
+}
+
+/**
+ * Read-only weekly hygiene sweep for feedback-derived knowledge. It reports
+ * legacy records and scope violations but never changes queue status or
+ * demotes knowledge. Tenant-scoped callers only see their own queue rows.
+ */
+export function runKnowledgeValidationSweep(
+  input: { scope?: ScopeContext } = {}
+): KnowledgeValidationSweepResult {
+  const scope = input.scope ?? currentScope();
+  const visible = listMemoryPromotionCandidates().filter((candidate) =>
+    candidateVisibleInScope(candidate, scope)
+  );
+  const findings: KnowledgeValidationFinding[] = [];
+  for (const candidate of visible) {
+    if (!candidate.scope) {
+      findings.push({
+        code: 'legacy_unscoped_candidate',
+        candidate_id: candidate.candidate_id,
+        detail: 'promotion queue record has no scope envelope; review before promotion',
+        severity: 'warning',
+      });
+      continue;
+    }
+    if (candidate.scope.tier === 'confidential' && !candidate.scope.tenant_slug) {
+      findings.push({
+        code: 'missing_tenant_scope',
+        candidate_id: candidate.candidate_id,
+        detail: 'confidential promotion candidate is missing tenant_slug',
+        severity: 'error',
+      });
+    }
+    if (tenantReferenceMismatch(candidate)) {
+      findings.push({
+        code: 'tenant_reference_mismatch',
+        candidate_id: candidate.candidate_id,
+        detail: 'evidence or promoted reference names a different confidential tenant',
+        severity: 'error',
+      });
+    }
+  }
+  const queued = visible.filter((candidate) => candidate.status === 'queued');
+  const errors = findings.some((finding) => finding.severity === 'error');
+  return {
+    generated_at: new Date().toISOString(),
+    ...(scope ? { scope } : {}),
+    status: errors ? 'attention' : 'ok',
+    heuristics: summarizeHeuristics(10),
+    promotion_queue: {
+      visible_count: visible.length,
+      queued_count: queued.length,
+      legacy_unscoped_count: visible.filter((candidate) => !candidate.scope).length,
+      scoped_count: visible.filter((candidate) => Boolean(candidate.scope)).length,
+      audited_count: visible.filter((candidate) => Boolean(candidate.audit_ref)).length,
+      missing_audit_ref_count: visible.filter((candidate) => !candidate.audit_ref).length,
+    },
+    findings,
+  };
 }
 
 // ─── task model routing summary (MO-05) ─────────────────────

@@ -10,7 +10,18 @@
     },
     "ranking": {
       "index_path": "knowledge/orchestration/knowledge_index.json",
-      "weights": { "title": 10, "id": 5, "tag": 15, "category": 3, "role": 25, "phase": 18, "scope": 12, "kind": 10, "authority": 8 }
+      "weights": {
+        "title": 10,
+        "id": 5,
+        "tag": 15,
+        "category": 3,
+        "role": 25,
+        "phase": 18,
+        "scope": 12,
+        "kind": 10,
+        "authority": 8,
+        "usage_yield": 4
+      }
     },
     "graph": {
       "knowledge_dir": "knowledge",

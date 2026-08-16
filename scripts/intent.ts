@@ -4,6 +4,7 @@ import {
   auditChain,
   customerResolver,
   createStandardYargs,
+  currentScope,
   loadIntentContractMemorySnapshot,
   renderStatus,
   resolveLocale,
@@ -381,7 +382,9 @@ export function collectIntentTraceReport(
   const deltas = missions.flatMap((mission) =>
     loadDeltaEntries(mission.missionId, mission.evidencePath)
   );
-  const memoryEntries = (options.loadMemory || loadIntentContractMemorySnapshot)().entries.filter(
+  const memoryEntries = (
+    options.loadMemory || (() => loadIntentContractMemorySnapshot(currentScope()))
+  )().entries.filter(
     (entry) => entry.correlation_id === correlationId || entry.mission_id === correlationId
   );
   const traces = (options.traceDir ? [options.traceDir] : resolveTraceSearchDirs())

@@ -27,6 +27,12 @@ import {
   validateTaskSession,
 } from './task-session.js';
 
+const originalIntentContractMemoryRuntimePathEnv =
+  process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH = pathResolver.sharedTmp(
+  `test-intent-contract-memory/task-session-${process.pid}.json`
+);
+
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
 function cleanupTestTaskSessions() {
@@ -57,6 +63,11 @@ describe('task-session', () => {
       safeRmSync(intentContractMemoryRuntimePath);
     }
     refreshIntentContractMemorySnapshot();
+    if (originalIntentContractMemoryRuntimePathEnv === undefined)
+      delete process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH;
+    else
+      process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH =
+        originalIntentContractMemoryRuntimePathEnv;
   });
 
   beforeEach(() => {

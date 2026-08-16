@@ -248,7 +248,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.4.0",
-      "capability_count": 79
+      "capability_count": 80
     },
     {
       "n": "working-memory-actuator",
