@@ -7,6 +7,7 @@ import type {
   AgentProfileRecord,
   TeamRoleRecord,
 } from './team-role-assignment-selection.js';
+import { assertScopeContext, type ScopeContext } from './scope-context.js';
 
 interface MissionTeamTemplate {
   required_roles: string[];
@@ -183,25 +184,61 @@ export function loadAgentProfileIndex(rootDir?: string): Record<string, AgentPro
 }
 
 export function loadMissionTeamTemplates(
-  organizationProfile?: OrganizationProfile | null
+  organizationProfile?: OrganizationProfile | null,
+  scope?: ScopeContext
 ): Record<string, MissionTeamTemplate> {
   const index = loadJson<{ templates: Record<string, MissionTeamTemplate> }>(
     pathResolver.knowledge('product/orchestration/mission-team-templates.json')
   );
   const templates = { ...index.templates };
   const catalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
-  if (!catalogId) return templates;
+  if (catalogId) {
+    const catalogPath = pathResolver.knowledge(
+      `product/governance/organization-team-template-catalogs/${catalogId}.json`
+    );
+    if (safeExistsSync(catalogPath)) {
+      const catalog = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
+      for (const [templateId, overlay] of Object.entries(catalog.templates || {})) {
+        const base = templates[templateId] || templates.default;
+        if (!base) continue;
+        templates[templateId] = mergeMissionTeamTemplate(base, overlay);
+      }
+    }
+  }
 
-  const catalogPath = pathResolver.knowledge(
-    `product/governance/organization-team-template-catalogs/${catalogId}.json`
-  );
-  if (!safeExistsSync(catalogPath)) return templates;
-
-  const catalog = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
-  for (const [templateId, overlay] of Object.entries(catalog.templates || {})) {
-    const base = templates[templateId] || templates.default;
-    if (!base) continue;
-    templates[templateId] = mergeMissionTeamTemplate(base, overlay);
+  // Tenant/entity overlays are additive and resolve from tenant to organization
+  // to project; the later, more specific layer wins. They are read only from
+  // the authoritative tenant lane.
+  const normalizedScope = scope ? assertScopeContext(scope, { requireTenant: true }) : undefined;
+  const tenant = normalizedScope?.tenant_slug;
+  if (tenant && normalizedScope) {
+    const overlayPaths = [
+      pathResolver.knowledge(`confidential/${tenant}/orchestration/mission-team-templates.json`),
+      ...(normalizedScope.organization_id
+        ? [
+            pathResolver.knowledge(
+              `confidential/${tenant}/organizations/${normalizedScope.organization_id}/orchestration/mission-team-templates.json`
+            ),
+          ]
+        : []),
+      ...(normalizedScope.project_id
+        ? [
+            pathResolver.knowledge(
+              `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/orchestration/mission-team-templates.json`
+            ),
+          ]
+        : []),
+    ];
+    for (const overlayPath of overlayPaths) {
+      if (!safeExistsSync(overlayPath)) continue;
+      const overlayCatalog = loadJson<{ templates?: Record<string, Partial<MissionTeamTemplate>> }>(
+        overlayPath
+      );
+      for (const [templateId, overlay] of Object.entries(overlayCatalog.templates || {})) {
+        const base = templates[templateId] || templates.default;
+        if (base) templates[templateId] = mergeMissionTeamTemplate(base, overlay);
+      }
+    }
   }
   return templates;
 }

@@ -8,5 +8,8 @@
       "reason": "Governance: Security risk detected in automated scan.",
       "allow_override": false
     }
-  ]
+  ],
+  "tenant_overrides": {},
+  "organization_overrides": {},
+  "project_overrides": {}
 }

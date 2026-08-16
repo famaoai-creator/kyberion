@@ -6,7 +6,7 @@ last_updated: 2026-08-06
 
 # Chronos viewer scope 運用手順
 
-この機構はログイン基盤ではなく、Chronos の HTTP リクエストに viewer principal と tenant 許可集合を付与するための境界です。IdP、SSO、人間ユーザー管理は対象外です。
+この機構はログイン基盤ではなく、Chronos の HTTP リクエストに viewer principal と tenant / organization / project の許可集合を付与するための境界です。IdP、SSO、人間ユーザー管理は対象外です。
 
 ## 段階導入
 
@@ -37,6 +37,8 @@ token の平文は保存しません。SHA-256 を計算し、secret-guard の�
       "token_hash": "<sha256(token)>",
       "role": "readonly",
       "tenant_slugs": ["tenant-acme"],
+      "organization_ids": ["org-acme"],
+      "project_ids": ["project-acme"],
       "label": "acme-readonly"
     }
   ]
@@ -45,7 +47,7 @@ token の平文は保存しません。SHA-256 を計算し、secret-guard の�
 
 保存先は `knowledge/personal/connections/chronos-access.json` です。AC-05 の `KYBERION_SECRET_ENCRYPTION` が有効な環境では、通常の secret-guard 接続文書として暗号化して保存します。ログ、エラー、監査には token の値を出しません。
 
-既存の `KYBERION_API_TOKEN` と `KYBERION_LOCALADMIN_TOKEN` は all-tenant の互換 token です。`KYBERION_LOCALHOST_AUTOADMIN=false` にすると loopback の無資格自動 admin を無効化できるため、すべての利用者に token が必要になります。
+既存の `KYBERION_API_TOKEN` と `KYBERION_LOCALADMIN_TOKEN` は all-scope の互換 token です。`KYBERION_LOCALHOST_AUTOADMIN=false` にすると loopback の無資格自動 admin を無効化できるため、すべての利用者に token が必要になります。クエリの tenant / organization / project は登録済み許可集合を narrow するだけで、許可集合を拡張しません。
 
 ## 関連 transport
 

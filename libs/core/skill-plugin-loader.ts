@@ -27,6 +27,7 @@
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   derivePluginTrustLabel,
@@ -38,6 +39,7 @@ import {
   listManagedPlugins,
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
+import type { ScopeContext } from './scope-context.js';
 
 export const SKILL_PLUGINS_CONFIG_FILENAME = '.kyberion-plugins.json';
 
@@ -71,20 +73,87 @@ export interface SkillPluginLoadResult {
   diagnostics: SkillPluginAuthorization[];
 }
 
+interface RestrictedSkillRecord {
+  name?: string;
+  status?: string;
+  allow_override?: boolean;
+}
+
+/** Consume the governed restricted-skills catalog at the skill execution gate. */
+export function isSkillAllowed(
+  skillName: string,
+  scope?: ScopeContext
+): { allowed: boolean; reason?: string } {
+  const policyPath = pathResolver.knowledge('product/governance/restricted-skills.json');
+  if (!safeExistsSync(policyPath)) return { allowed: true };
+  try {
+    const parsed = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string) as {
+      restrictions?: RestrictedSkillRecord[];
+      tenant_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
+      organization_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
+      project_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
+    };
+    const records = [
+      ...(parsed.restrictions || []),
+      ...(scope?.tenant_slug
+        ? parsed.tenant_overrides?.[scope.tenant_slug]?.restrictions || []
+        : []),
+      ...(scope?.organization_id
+        ? parsed.organization_overrides?.[scope.organization_id]?.restrictions || []
+        : []),
+      ...(scope?.project_id
+        ? parsed.project_overrides?.[scope.project_id]?.restrictions || []
+        : []),
+    ];
+    const restricted = records.find(
+      (record) => record.name === skillName && record.status === 'restricted'
+    );
+    if (!restricted) return { allowed: true };
+    return {
+      allowed: restricted.allow_override === true,
+      reason: `skill '${skillName}' is restricted by governed policy`,
+    };
+  } catch {
+    return { allowed: false, reason: 'restricted-skills policy is unreadable' };
+  }
+}
+
 /**
  * Reads `.kyberion-plugins.json` from `cwd` (never throws — a missing or
  * malformed config degrades to "no plugins configured", matching the
  * existing fail-open contract for the rest of the plugin surface).
  */
-export function readSkillPluginsConfig(cwd: string): string[] {
+export function readSkillPluginsConfig(cwd: string, scope?: ScopeContext): string[] {
   const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
   if (!safeExistsSync(configPath)) return [];
   try {
     const raw = safeReadFile(configPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { plugins?: unknown };
-    if (!parsed || !Array.isArray(parsed.plugins)) return [];
-    return parsed.plugins.filter(
+    const parsed = JSON.parse(raw) as {
+      plugins?: unknown;
+      tenant_overrides?: Record<string, { plugins?: unknown }>;
+      organization_overrides?: Record<string, { plugins?: unknown }>;
+      project_overrides?: Record<string, { plugins?: unknown }>;
+    };
+    if (!parsed) return [];
+    const base = (Array.isArray(parsed.plugins) ? parsed.plugins : []).filter(
       (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
+    );
+    const overlays = [
+      scope?.tenant_slug ? parsed.tenant_overrides?.[scope.tenant_slug] : undefined,
+      scope?.organization_id ? parsed.organization_overrides?.[scope.organization_id] : undefined,
+      scope?.project_id ? parsed.project_overrides?.[scope.project_id] : undefined,
+    ];
+    return Array.from(
+      new Set([
+        ...base,
+        ...overlays.flatMap((overlay) =>
+          Array.isArray(overlay?.plugins)
+            ? overlay.plugins.filter(
+                (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
+              )
+            : []
+        ),
+      ])
     );
   } catch (err) {
     logger.warn(
@@ -184,9 +253,10 @@ export function authorizeSkillPlugin(
  */
 export function authorizeConfiguredSkillPlugins(
   cwd: string = process.cwd(),
-  managedRoot?: string
+  managedRoot?: string,
+  scope?: ScopeContext
 ): SkillPluginAuthorization[] {
-  return readSkillPluginsConfig(cwd).map((configuredPath) =>
+  return readSkillPluginsConfig(cwd, scope).map((configuredPath) =>
     authorizeSkillPlugin(configuredPath, cwd, managedRoot)
   );
 }
@@ -199,9 +269,10 @@ export function authorizeConfiguredSkillPlugins(
  */
 export async function loadAuthorizedSkillPlugins(
   cwd: string = process.cwd(),
-  managedRoot?: string
+  managedRoot?: string,
+  scope?: ScopeContext
 ): Promise<SkillPluginLoadResult> {
-  const authorizations = authorizeConfiguredSkillPlugins(cwd, managedRoot);
+  const authorizations = authorizeConfiguredSkillPlugins(cwd, managedRoot, scope);
   const loaded: LoadedSkillPlugin[] = [];
   const diagnostics: SkillPluginAuthorization[] = [];
 
