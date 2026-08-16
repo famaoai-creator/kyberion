@@ -1,18 +1,28 @@
 {
-  "generated_at": "2026-08-16T16:37:28.451Z",
+  "generated_at": "2026-08-16T16:51:46.451Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
       "actuator_id": "agent-actuator",
       "version": "1.1.0",
-      "ops": ["a2a", "ask", "delegate", "health", "list", "spawn", "team_plan"],
+      "ops": [
+        "a2a",
+        "ask",
+        "delegate",
+        "health",
+        "list",
+        "spawn",
+        "team_plan"
+      ],
       "contract_schema": "schemas/agent-action.schema.json",
       "contract_schema_sha256": "a348ef4ee8e0dccc8ae67e3cc67e3044c27ca60bc168ee8015b120debabc50f2"
     },
     {
       "actuator_id": "android-actuator",
       "version": "1.1.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
       "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
     },
@@ -33,21 +43,33 @@
     {
       "actuator_id": "artifact-actuator",
       "version": "1.0.0",
-      "ops": ["append_event", "read_json", "write_delivery_pack", "write_json"],
+      "ops": [
+        "append_event",
+        "read_json",
+        "write_delivery_pack",
+        "write_json"
+      ],
       "contract_schema": "schemas/artifact-action.schema.json",
       "contract_schema_sha256": "4ef1368f07742141344864c29cfff22a85164efb46157395e947a1922c2ab6aa"
     },
     {
       "actuator_id": "blockchain-actuator",
       "version": "1.1.0",
-      "ops": ["anchor_mission", "anchor_trust", "verify_anchor"],
+      "ops": [
+        "anchor_mission",
+        "anchor_trust",
+        "verify_anchor"
+      ],
       "contract_schema": "schemas/blockchain-action.schema.json",
       "contract_schema_sha256": "a5949f228e3ac534f7c43cb709c11844791002250ff251edc1c2983da316d57a"
     },
     {
       "actuator_id": "browser-actuator",
       "version": "1.1.0",
-      "ops": ["computer_interaction", "pipeline"],
+      "ops": [
+        "computer_interaction",
+        "pipeline"
+      ],
       "contract_schema": "schemas/browser-pipeline.schema.json",
       "contract_schema_sha256": "7462c43bb900466e5b1fb29791aa754229b4b1dd55207df62dc11061353543cb"
     },
@@ -70,35 +92,53 @@
     {
       "actuator_id": "calendar-actuator",
       "version": "1.1.0",
-      "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
+      "ops": [
+        "create_event",
+        "list_calendars",
+        "list_events",
+        "query_freebusy"
+      ],
       "contract_schema": "schemas/calendar-action.schema.json",
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "code-actuator",
       "version": "2.2.0",
-      "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
+      "ops": [
+        "impact_analysis",
+        "pipeline",
+        "reconcile",
+        "semgrep_scan"
+      ],
       "contract_schema": "schemas/code-pipeline.schema.json",
       "contract_schema_sha256": "05817263d4aa203f891281296137db571504564fd9c663abe2f89c88b671481d"
     },
     {
       "actuator_id": "deployment-actuator",
       "version": "1.0.0",
-      "ops": ["deploy_release"],
+      "ops": [
+        "deploy_release"
+      ],
       "contract_schema": "schemas/deployment-action.schema.json",
       "contract_schema_sha256": "f62f3467db3b6a978b2546ce604f631e91821246fef01994939a3757e6572a73"
     },
     {
       "actuator_id": "email-actuator",
       "version": "1.1.0",
-      "ops": ["create_draft", "send", "send_from_file"],
+      "ops": [
+        "create_draft",
+        "send",
+        "send_from_file"
+      ],
       "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
       "contract_schema_sha256": "0566c8073665c5ae983d46b709d15b510f09a67d2baa5b716ba38b364df10777"
     },
     {
       "actuator_id": "file-actuator",
       "version": "1.1.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "schemas/file-pipeline.schema.json",
       "contract_schema_sha256": "edd3f1059f6a3fd6c637a99ffba3c71c2eccb4044ef5fc5d0f7ffc6460f08f19"
     },
@@ -119,14 +159,18 @@
     {
       "actuator_id": "ios-actuator",
       "version": "1.1.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
       "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
     },
     {
       "actuator_id": "media-actuator",
       "version": "1.2.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "schemas/media-pipeline.schema.json",
       "contract_schema_sha256": "40f17639125da43e054b1e9fd11a5d6e72e142419e71b22d3d1c72534fe0b356"
     },
@@ -153,65 +197,105 @@
     {
       "actuator_id": "meeting-actuator",
       "version": "1.1.0",
-      "ops": ["chat", "join", "leave", "listen", "speak", "status"],
+      "ops": [
+        "chat",
+        "join",
+        "leave",
+        "listen",
+        "speak",
+        "status"
+      ],
       "contract_schema": "schemas/meeting-action.schema.json",
       "contract_schema_sha256": "17fde8b3f90c397cf7bddd90c922d67aef55df965fa02aaf81a5b969ab46b1cd"
     },
     {
       "actuator_id": "meeting-browser-driver",
       "version": "1.0.0",
-      "ops": ["join", "leave"],
+      "ops": [
+        "join",
+        "leave"
+      ],
       "contract_schema": null,
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "modeling-actuator",
       "version": "1.0.0",
-      "ops": ["pipeline", "reconcile"],
+      "ops": [
+        "pipeline",
+        "reconcile"
+      ],
       "contract_schema": "schemas/modeling-pipeline.schema.json",
       "contract_schema_sha256": "ae64b9779e379c1833be439f8b1437aaa7935963322274bebc1d246c85b13ee3"
     },
     {
       "actuator_id": "network-actuator",
       "version": "2.2.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "schemas/network-pipeline.schema.json",
       "contract_schema_sha256": "cfca2bd33415bcffacacd7a6dcbfc79caf1cc69cec12cb42b025c4e04413cb26"
     },
     {
       "actuator_id": "orchestrator-actuator",
       "version": "1.0.0",
-      "ops": ["pipeline", "reconcile"],
+      "ops": [
+        "pipeline",
+        "reconcile"
+      ],
       "contract_schema": "schemas/orchestrator-pipeline.schema.json",
       "contract_schema_sha256": "5a7d225192520052a0a73c3430940d9860a707a2c9d18a3e2bc60d9f1312ae2d"
     },
     {
       "actuator_id": "presence-actuator",
       "version": "1.0.0",
-      "ops": ["dispatch", "dispatch_timeline", "receive_event"],
+      "ops": [
+        "dispatch",
+        "dispatch_timeline",
+        "receive_event"
+      ],
       "contract_schema": "schemas/presence-action.schema.json",
       "contract_schema_sha256": "435a45e6d49e6c16ea926e5067d9f1c087d8ea462a291102b88f476946fe1940"
     },
     {
       "actuator_id": "process-actuator",
       "version": "1.0.0",
-      "ops": ["list", "spawn", "status", "stop"],
+      "ops": [
+        "list",
+        "spawn",
+        "status",
+        "stop"
+      ],
       "contract_schema": "schemas/process-action.schema.json",
       "contract_schema_sha256": "3cdfa30561aa37d76588d888af5ee44444020b2006426f296583d4f8dfd5fe8a"
     },
     {
       "actuator_id": "secret-actuator",
       "version": "1.1.0",
-      "ops": ["delete", "get", "list", "set"],
+      "ops": [
+        "delete",
+        "get",
+        "list",
+        "set"
+      ],
       "contract_schema": "schemas/secret-action.schema.json",
       "contract_schema_sha256": "5cb178a2d004b5b0499f5666c0313d4792f8c43c80391cbf12fb358d887471d7"
     },
     {
       "actuator_id": "service-actuator",
-      "version": "1.2.0",
-      "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
+      "version": "1.3.0",
+      "ops": [
+        "api",
+        "cli",
+        "mcp",
+        "oauth",
+        "pipeline",
+        "preset",
+        "reconcile"
+      ],
       "contract_schema": "schemas/service-action.schema.json",
-      "contract_schema_sha256": "5ef464a4dadb610c399540947542bbc4cb179f00bc4f80b25ec50533c4e5b478"
+      "contract_schema_sha256": "5d34d95d6495b02cf0644f8218a5247ae84e2c0588822b60b8c77e352279d976"
     },
     {
       "actuator_id": "system-actuator",
@@ -249,7 +333,13 @@
     {
       "actuator_id": "terminal-actuator",
       "version": "1.0.0",
-      "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
+      "ops": [
+        "computer_interaction",
+        "kill",
+        "poll",
+        "spawn",
+        "write"
+      ],
       "contract_schema": "schemas/terminal-action.schema.json",
       "contract_schema_sha256": "aff7129e9d112ec00a183d37c7ff8200e2c8059a5a400aaee6cb75a91d759553"
     },
@@ -273,7 +363,11 @@
     {
       "actuator_id": "vision-actuator",
       "version": "1.4.0",
-      "ops": ["describe_image", "inspect_image", "ocr_image"],
+      "ops": [
+        "describe_image",
+        "inspect_image",
+        "ocr_image"
+      ],
       "contract_schema": "schemas/vision-action.schema.json",
       "contract_schema_sha256": "475a245d9340c8e51d6f6311471f85b6717d1c8ae4bc1b7c721f35ba44341ca8"
     },
