@@ -281,7 +281,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (169)
+## runtime (171)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |

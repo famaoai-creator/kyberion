@@ -417,6 +417,10 @@
     "researcher": {
       "candidates": ["default-codex", "code-architect-claude"],
       "requires": ["text", "structured_output"]
+    },
+    "ecosystem_architect": {
+      "candidates": ["default-codex", "agy-default"],
+      "requires": ["text"]
     }
   },
   "tenant_overrides": {},
