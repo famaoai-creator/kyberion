@@ -12,6 +12,7 @@ export interface TraceFeedSummary {
   startedAt: string;
   completedAt?: string;
   missionId?: string;
+  tenantSlug?: string;
   pipelineId?: string;
   actuator?: string;
   status: 'ok' | 'error' | 'in_progress';
@@ -75,6 +76,8 @@ export interface TraceFeedOptions {
   pipelineId?: string;
   actuator?: string;
   query?: string;
+  /** Source-side viewer tenant allowlist; unscoped legacy traces fail closed. */
+  tenantSlugs?: string[] | 'all';
 }
 
 interface PersistedTraceShape {
@@ -86,6 +89,8 @@ interface PersistedTraceShape {
     pipelineId?: string;
     startedAt?: string;
     completedAt?: string;
+    tenantSlug?: string;
+    customerId?: string;
   };
   _persistedAt?: string;
 }
@@ -199,6 +204,9 @@ function matchesTraceQuery(summary: TraceFeedSummary, query?: string): boolean {
 }
 
 function matchesTraceFilters(summary: TraceFeedSummary, options: TraceFeedOptions): boolean {
+  if (options.tenantSlugs !== undefined && options.tenantSlugs !== 'all') {
+    if (!summary.tenantSlug || !options.tenantSlugs.includes(summary.tenantSlug)) return false;
+  }
   if (options.status && summary.status !== options.status) return false;
   if (options.missionId && summary.missionId !== options.missionId) return false;
   if (options.pipelineId && summary.pipelineId !== options.pipelineId) return false;
@@ -228,6 +236,7 @@ export function summarizePersistedTrace(
     startedAt,
     completedAt,
     missionId: record.metadata?.missionId,
+    tenantSlug: record.metadata?.tenantSlug || record.metadata?.customerId,
     pipelineId: record.metadata?.pipelineId,
     actuator: record.metadata?.actuator,
     status: rootSpan.status || 'in_progress',
@@ -335,7 +344,13 @@ export function collectTraceDetail(
           const parsed = JSON.parse(trimmed) as PersistedTraceShape;
           if (parsed.traceId !== traceId) continue;
           const detail = detailPersistedTrace(parsed, filePath);
-          if (detail) return detail;
+          if (
+            detail &&
+            (options.tenantSlugs === undefined ||
+              options.tenantSlugs === 'all' ||
+              (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug)))
+          )
+            return detail;
         } catch {
           // Skip malformed lines.
         }

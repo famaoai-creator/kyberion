@@ -321,7 +321,7 @@
     {
       "path": "product/architecture/entity-scope-hierarchy.md",
       "tier": "public",
-      "size": 4947,
+      "size": 6057,
       "type": "md"
     },
     {
@@ -1341,7 +1341,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 83048,
+      "size": 83403,
       "type": "json"
     },
     {
@@ -6459,7 +6459,7 @@
     {
       "path": "product/schemas/distill-candidate-record.schema.json",
       "tier": "public",
-      "size": 1768,
+      "size": 2528,
       "type": "json"
     },
     {
@@ -6915,7 +6915,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 15430,
+      "size": 16321,
       "type": "json"
     },
     {
@@ -7887,7 +7887,7 @@
     {
       "path": "product/schemas/tenant-profile.schema.json",
       "tier": "public",
-      "size": 2095,
+      "size": 2261,
       "type": "json"
     },
     {

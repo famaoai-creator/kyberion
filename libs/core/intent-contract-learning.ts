@@ -1,7 +1,11 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeMkdir } from './secure-io.js';
+import type { ScopeContext } from './scope-context.js';
+import { physicalScopedPath } from './physical-namespace.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -20,11 +24,7 @@ const POLICY_PATH = pathResolver.knowledge(
 const ONTOLOGY_PATH = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
 
 type ContractKind =
-  | 'pipeline'
-  | 'schema'
-  | 'task_session_policy'
-  | 'mission_command'
-  | 'direct_reply';
+  'pipeline' | 'schema' | 'task_session_policy' | 'mission_command' | 'direct_reply';
 
 export interface IntentContractMemoryEntry {
   intent_id: string;
@@ -97,7 +97,12 @@ export interface ContractCandidate {
 
 let memoryValidateFn: ValidateFunction | null = null;
 let policyValidateFn: ValidateFunction | null = null;
-let memorySnapshotCache: IntentContractMemoryFile | null = null;
+const memorySnapshotCache = new Map<string, IntentContractMemoryFile>();
+
+function runtimeMemoryPath(scope?: ScopeContext): string {
+  if (!scope?.tenant_slug) return MEMORY_RUNTIME_PATH;
+  return `${physicalScopedPath(path.dirname(MEMORY_RUNTIME_PATH), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(MEMORY_RUNTIME_PATH)}`;
+}
 
 function ensureMemoryValidator(): ValidateFunction {
   if (memoryValidateFn) return memoryValidateFn;
@@ -151,10 +156,10 @@ export function loadIntentContractMemory(): IntentContractMemoryFile {
   return loadIntentContractMemorySnapshot();
 }
 
-export function loadIntentContractMemoryStore(): IntentContractMemoryFile {
+export function loadIntentContractMemoryStore(scope?: ScopeContext): IntentContractMemoryFile {
   const fallback: IntentContractMemoryFile = { version: '1.0.0', entries: [] };
   const seed = loadMemoryFile(MEMORY_SEED_PATH) || fallback;
-  const runtime = loadMemoryFile(MEMORY_RUNTIME_PATH) || fallback;
+  const runtime = loadMemoryFile(runtimeMemoryPath(scope)) || fallback;
 
   const mergedByKey = new Map<string, IntentContractMemoryEntry>();
   for (const entry of seed.entries) {
@@ -170,21 +175,32 @@ export function loadIntentContractMemoryStore(): IntentContractMemoryFile {
   };
 }
 
-export function loadIntentContractMemorySnapshot(): IntentContractMemoryFile {
-  if (!memorySnapshotCache) {
-    memorySnapshotCache = loadIntentContractMemoryStore();
-  }
-  return memorySnapshotCache;
+export function loadIntentContractMemorySnapshot(scope?: ScopeContext): IntentContractMemoryFile {
+  const key = runtimeMemoryPath(scope);
+  const cached = memorySnapshotCache.get(key);
+  if (cached) return cached;
+  const snapshot = loadIntentContractMemoryStore(scope);
+  memorySnapshotCache.set(key, snapshot);
+  return snapshot;
 }
 
-export function refreshIntentContractMemorySnapshot(): IntentContractMemoryFile {
-  memorySnapshotCache = loadIntentContractMemoryStore();
-  return memorySnapshotCache;
+export function refreshIntentContractMemorySnapshot(
+  scope?: ScopeContext
+): IntentContractMemoryFile {
+  const snapshot = loadIntentContractMemoryStore(scope);
+  memorySnapshotCache.set(runtimeMemoryPath(scope), snapshot);
+  return snapshot;
 }
 
-export function saveIntentContractMemory(memory: IntentContractMemoryFile): void {
+export function saveIntentContractMemory(
+  memory: IntentContractMemoryFile,
+  scope?: ScopeContext
+): void {
   validateIntentContractMemory(memory);
-  safeWriteFile(MEMORY_RUNTIME_PATH, JSON.stringify(memory, null, 2));
+  const filePath = runtimeMemoryPath(scope);
+  const dir = path.dirname(filePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(memory, null, 2));
 }
 
 export function loadIntentContractSelectionPolicy(): IntentContractSelectionPolicy {
@@ -243,9 +259,13 @@ function defaultContractForIntent(intentId: string): ContractCandidate | null {
   };
 }
 
-export function selectContractCandidates(intentId: string, maxCandidates = 3): ContractCandidate[] {
+export function selectContractCandidates(
+  intentId: string,
+  maxCandidates = 3,
+  scope?: ScopeContext
+): ContractCandidate[] {
   const policy = loadIntentContractSelectionPolicy();
-  const memory = loadIntentContractMemorySnapshot();
+  const memory = loadIntentContractMemorySnapshot(scope);
   const remembered: ContractCandidate[] = memory.entries
     .filter((entry) => entry.intent_id === intentId)
     .map((entry) => ({
@@ -285,8 +305,9 @@ export function recordIntentContractOutcome(input: {
   mission_id?: string;
   context_fingerprint?: IntentContractMemoryEntry['context_fingerprint'];
   completion_summary?: IntentContractMemoryEntry['completion_summary'];
+  scope?: ScopeContext;
 }): IntentContractMemoryEntry {
-  const memory = loadIntentContractMemoryStore();
+  const memory = loadIntentContractMemoryStore(input.scope);
   const idx = memory.entries.findIndex(
     (entry) =>
       entry.intent_id === input.intent_id &&
@@ -309,7 +330,7 @@ export function recordIntentContractOutcome(input: {
       ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
     };
     memory.entries.push(created);
-    saveIntentContractMemory(memory);
+    saveIntentContractMemory(memory, input.scope);
     return created;
   }
 
@@ -329,6 +350,6 @@ export function recordIntentContractOutcome(input: {
     ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
   };
   memory.entries[idx] = updated;
-  saveIntentContractMemory(memory);
+  saveIntentContractMemory(memory, input.scope);
   return updated;
 }

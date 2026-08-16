@@ -1,5 +1,7 @@
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import type { ScopeContext } from './scope-context.js';
+import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from './knowledge-scope.js';
 
 /**
  * KnowledgeProvider abstracts the access to the `knowledge/` directory.
@@ -32,7 +34,12 @@ export class KnowledgeProvider {
    * @param relativePath Path relative to the `knowledge/` root.
    * @param defaultValue Optional default value if the file is not found.
    */
-  static getJson<T = any>(relativePath: string, defaultValue?: T): T {
+  static getJson<T = any>(
+    relativePath: string,
+    defaultValue?: T,
+    options: { scope?: ScopeContext; systemAuthority?: boolean } = {}
+  ): T {
+    this.assertReadable(relativePath, options);
     if (this.useMock) {
       if (this.mockData[relativePath] !== undefined) {
         return this.mockData[relativePath] as T;
@@ -59,7 +66,12 @@ export class KnowledgeProvider {
   /**
    * Read raw text content from a knowledge file.
    */
-  static getText(relativePath: string, defaultValue?: string): string {
+  static getText(
+    relativePath: string,
+    defaultValue?: string,
+    options: { scope?: ScopeContext; systemAuthority?: boolean } = {}
+  ): string {
+    this.assertReadable(relativePath, options);
     if (this.useMock) {
       if (this.mockData[relativePath] !== undefined) {
         return String(this.mockData[relativePath]);
@@ -74,5 +86,20 @@ export class KnowledgeProvider {
       throw new Error(`Knowledge file not found: ${fullPath}`);
     }
     return safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+  }
+
+  private static assertReadable(
+    relativePath: string,
+    options: { scope?: ScopeContext; systemAuthority?: boolean }
+  ): void {
+    const scope = options.scope || { tier: 'public' as const };
+    const scopeSet = resolveKnowledgeScopeSet(scope, {
+      systemAuthority: options.systemAuthority === true,
+    });
+    if (!assertKnowledgePathInScope(relativePath, scopeSet)) {
+      throw new Error(
+        `[KNOWLEDGE_SCOPE_DENIED] path '${relativePath}' is outside the authorized knowledge scope`
+      );
+    }
   }
 }

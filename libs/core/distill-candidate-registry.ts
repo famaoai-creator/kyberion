@@ -10,6 +10,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
 
 export interface DistillCandidateRecord {
   candidate_id: string;
@@ -33,6 +34,8 @@ export interface DistillCandidateRecord {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown>;
+  /** Canonical scope; absent only for legacy candidates. */
+  scope?: MemoryScopeEnvelope;
 }
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
