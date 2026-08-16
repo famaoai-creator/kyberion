@@ -43,6 +43,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AGENT_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_AGENT_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -1423,6 +1431,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_KNOWLEDGE_TIER",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_KNOWLEDGE_USAGE_PATH",
       "category": "path",
       "type": "path",
@@ -1900,6 +1916,14 @@
     },
     {
       "name": "KYBERION_NHI_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_NON_INTERACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,

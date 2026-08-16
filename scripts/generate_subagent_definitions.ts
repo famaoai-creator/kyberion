@@ -36,6 +36,8 @@ import {
   SUBAGENT_SECURE_IO_CONSTRAINT,
   SUBAGENT_SHARED_DIRECTORY_RULES_LINES,
   buildWorkingPrinciplesLines,
+  renderRuntimeInstructions,
+  runtimeInstructionsForProvider,
   pathResolver,
   resolveCapabilityProfileForTeamRole,
   safeExistsSync,
@@ -152,7 +154,7 @@ function renderFrontmatter(role: string, description: string, tools: readonly st
 }
 
 /** Pure, side-effect-free: builds the markdown body for one role's definition. */
-export function buildAgentDefinitionSource(role: string): string {
+export function buildAgentDefinitionSource(role: string, provider = 'claude'): string {
   const teamRole = loadTeamRole(role);
   const profileName = resolveProfile(role);
   const spec = PROFILE_SPECS[profileName];
@@ -186,6 +188,8 @@ export function buildAgentDefinitionSource(role: string): string {
   lines.push(spec.framing);
   lines.push('');
   lines.push(...principlesLines);
+  lines.push('');
+  lines.push(renderRuntimeInstructions(runtimeInstructionsForProvider(provider)));
   if (condensed.length > 0 && authorityRole) {
     lines.push(
       `## Role procedure (condensed from knowledge/product/roles/${authorityRole}/PROCEDURE.md)`
@@ -222,7 +226,7 @@ async function formatMarkdown(content: string, filePath: string): Promise<string
 export async function buildGeneratedFiles(): Promise<Map<string, string>> {
   const built = new Map<string, string>();
   for (const role of GENERATED_ROLES) {
-    const raw = buildAgentDefinitionSource(role);
+    const raw = buildAgentDefinitionSource(role, 'claude');
     const formatted = await formatMarkdown(raw, targetPath(role));
     built.set(role, formatted);
   }
@@ -233,7 +237,7 @@ export async function buildGeneratedFiles(): Promise<Map<string, string>> {
 export async function buildGeneratedAgyFiles(): Promise<Map<string, string>> {
   const built = new Map<string, string>();
   for (const role of GENERATED_ROLES) {
-    const source = buildAgentDefinitionSource(role);
+    const source = buildAgentDefinitionSource(role, 'agy');
     const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
     const profile = resolveProfile(role) as AgyAgentProfile;
     const raw = buildAgyAgentDefinitionSource({

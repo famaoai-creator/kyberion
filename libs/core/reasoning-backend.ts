@@ -439,6 +439,12 @@ export interface ReasoningCallOptions {
   role?: string;
   /** Optional resolved profile override; security constraints still apply. */
   profile?: string;
+  /** Selected reasoning-route profile (distinct from provider permission profile). */
+  route_profile?: string;
+  /** Provider-neutral permission tier projected by the provider adapter. */
+  capability_profile?: string;
+  /** Governed provider permission mode selected by the reasoning route. */
+  permission_mode?: 'readonly' | 'edit' | 'full';
   effort?: 'low' | 'medium' | 'high';
   budget?: ReasoningCallBudget;
   /**
@@ -497,6 +503,10 @@ export interface PeerAdviceResult {
 
 export interface ReasoningBackend {
   name: string;
+  /** Optional provider-specific notes; never overrides Kyberion governance. */
+  getRuntimeInstructions?(options?: ReasoningCallOptions): string[];
+  /** Provider identity selected by a routing wrapper for runtime notes. */
+  getRuntimeProviderName?(options?: ReasoningCallOptions): string;
   /** Divergence — produce independent hypotheses per persona. */
   divergePersonas(
     input: DivergeHypothesisInput,
@@ -816,6 +826,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       this.promptWithImages = (prompt, images, options) =>
         this.promptWithImagesAcrossCandidates(prompt, images, options);
     }
+  }
+
+  getRuntimeInstructions(options?: ReasoningCallOptions): string[] {
+    return this.candidates[0]?.backend.getRuntimeInstructions?.(options) || [];
+  }
+
+  getRuntimeProviderName(options?: ReasoningCallOptions): string {
+    return this.candidates[0]?.backend.getRuntimeProviderName?.(options) || this.name;
   }
 
   selectConsultationCandidate(
@@ -1280,24 +1298,37 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
   readonly name: string;
   private readonly defaultBackend: ReasoningBackend;
   private readonly roleBackends: Map<string, ReasoningBackend>;
+  private readonly profileBackends: Map<string, ReasoningBackend>;
 
   constructor(
     defaultBackend: ReasoningBackend,
-    roleBackends: Map<string, ReasoningBackend> = new Map()
+    roleBackends: Map<string, ReasoningBackend> = new Map(),
+    profileBackends: Map<string, ReasoningBackend> = new Map()
   ) {
     this.defaultBackend = defaultBackend;
     this.roleBackends = roleBackends;
+    this.profileBackends = profileBackends;
     // Preserve the legacy observable backend name for existing diagnostics and
     // consumers; role dispatch is an internal routing concern.
     this.name = defaultBackend.name;
   }
 
   private pick(options?: ReasoningCallOptions): ReasoningBackend {
+    const profile = options?.route_profile?.trim();
+    if (profile) return this.profileBackends.get(profile) || this.defaultBackend;
     const role = options?.role
       ?.trim()
       .toLowerCase()
       .replace(/[-\s]+/g, '_');
     return (role && this.roleBackends.get(role)) || this.defaultBackend;
+  }
+
+  getRuntimeInstructions(options?: ReasoningCallOptions): string[] {
+    return this.pick(options).getRuntimeInstructions?.(options) || [];
+  }
+
+  getRuntimeProviderName(options?: ReasoningCallOptions): string {
+    return this.pick(options).getRuntimeProviderName?.(options) || this.pick(options).name;
   }
 
   getNativeSubagentAdopter(): NativeSubagentAdopter | null {
@@ -1312,6 +1343,7 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
     const backends = new Set<ReasoningBackend>([
       this.defaultBackend,
       ...this.roleBackends.values(),
+      ...this.profileBackends.values(),
     ]);
     for (const backend of backends) {
       try {
@@ -1406,9 +1438,10 @@ export function buildFailoverReasoningBackend(
 
 export function buildRoleAwareReasoningBackend(
   defaultBackend: ReasoningBackend,
-  roleBackends: Map<string, ReasoningBackend>
+  roleBackends: Map<string, ReasoningBackend>,
+  profileBackends: Map<string, ReasoningBackend> = new Map()
 ): ReasoningBackend {
-  return new RoleAwareReasoningBackend(defaultBackend, roleBackends);
+  return new RoleAwareReasoningBackend(defaultBackend, roleBackends, profileBackends);
 }
 
 export function delegateStructured(

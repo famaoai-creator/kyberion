@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-07-13
+last_updated: 2026-08-16
 ---
 
 # Kyberion Extension Points
@@ -51,8 +51,12 @@ The JSON format of `pipelines/*.json`.
 
 **Stable elements**:
 
-- Top-level keys: `id`, `name`, `description`, `steps`, `inputs`, `outputs`.
-- Step shape: `op` (form: `domain.action`), `params`, `export_as`.
+- Top-level keys are governed by `knowledge/product/schemas/pipeline-adf.schema.json`; the current stable core is `action`, `name`, `description`, `context`, `knowledge_scope`, `env`, `options`, `steps`, and `schedule`.
+- Step shape: `op` (canonical form `domain:action`), optional typed `role`, `params`, `produces`/`consumes`, `depends_on`, `on_error`, `reasoning`, `facets`, and `report`.
+- `reasoning` declares step-level provider/profile/model/permission intent. Resolution remains governed by the reasoning route policy and provider capability gate; a pipeline cannot grant a permission below the policy floor.
+- `facets` composes `persona`, `policies`, `instructions`, and `output_contract` by name. Resolution is tenant → product → approved managed pack → legacy/builtin, and a public pipeline cannot read a confidential tenant facet.
+- `report` declares a post-perform report phase. It may be a single contract or an ordered list; each report is validated against a registered structured contract or a JSON Schema under `knowledge/product/schemas/` before being exported to the next step.
+- Provider runtime instructions are additive prompt material resolved by the selected reasoning backend. They cannot grant authority, bypass tenant scope, or change the declared permission floor.
 - The `ref` reference resolution (Phase 1 of engine refinement, completed).
 - The `on_error` semantics: `skip` / `abort` / `fallback`.
 - The canonical first-win smoke uses `pipelines/verify-session.json`; the optional voice smoke uses `pipelines/voice-hello.json`.
@@ -60,12 +64,14 @@ The JSON format of `pipelines/*.json`.
 **Beta elements** (may change in minor):
 
 - New step ops added by actuators.
-- New top-level fields like `metadata`, `tags`.
+- New control operations such as `core:judge_route` and `core:await_decision` are additive and remain subject to ADF guardrails.
 
 **Internal**:
 
 - Internal pipeline-engine state machine.
 - The exact format of intermediate context passed between steps.
+
+The schema, facet purity check, and op registry are the executable boundary checks. If this document and the schema disagree, update this document in the same change; do not rely on an undocumented field.
 
 ### 2.3 Plugin Format — **Beta**
 
@@ -126,7 +132,7 @@ See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
 **Beta** until Phase B-1 (cross-actuator integration) completes:
 
 - The exact shape of the `Trace` object.
-- The OTel-compatible exporter (planned).
+- The opt-in OTLP/HTTP exporter enabled by `OTEL_EXPORTER_OTLP_ENDPOINT`; local JSONL remains the authoritative trace store and exporter failure is non-fatal.
 
 ### 2.8 CLI — **Stable (v1)**
 

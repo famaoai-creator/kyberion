@@ -71,11 +71,26 @@ export interface RoleRouteConfig {
   requires?: ReasoningCapability[];
   sampling?: SamplingParams;
 }
+export interface ReasoningRouteBinding {
+  profile?: string;
+  mode?: string;
+  provider?: string;
+  model?: string;
+  permission_mode?: 'readonly' | 'edit' | 'full';
+  capability_profile?: string;
+}
+export interface ReasoningRouteRouting {
+  steps?: Record<string, ReasoningRouteBinding>;
+  tags?: Record<string, ReasoningRouteBinding>;
+  personas?: Record<string, ReasoningRouteBinding>;
+}
 export interface ReasoningRoutePolicy {
   version: string;
   runtime_adapters: Record<string, RuntimeAdapterConfig>;
   profiles: Record<string, RuntimeProfileConfig>;
   roles: Record<string, RoleRouteConfig>;
+  routing?: ReasoningRouteRouting;
+  permission_floor?: 'readonly' | 'edit' | 'full';
   fallback: {
     max_attempts: number;
     max_in_place_retries: number;
@@ -89,6 +104,23 @@ export interface ReasoningRoutePolicy {
 export interface ReasoningRouteOverlay {
   roles?: Record<string, Partial<RoleRouteConfig>>;
   profiles?: Record<string, Partial<RuntimeProfileConfig>>;
+}
+export interface ResolvedStepReasoningRoute {
+  profile?: string;
+  mode?: ReasoningBackendMode | string;
+  model?: string;
+  permission_mode: 'readonly' | 'edit' | 'full';
+  capability_profile?: string;
+  source:
+    | 'env'
+    | 'promotion'
+    | 'step'
+    | 'routing.step'
+    | 'routing.tag'
+    | 'routing.persona'
+    | 'pipeline'
+    | 'policy';
+  provenance: string[];
 }
 export interface ReasoningRouteUserConfig {
   version?: string;
@@ -546,6 +578,153 @@ export function resolveScopedReasoningRoutePolicy(
     }
     return { ...resolved, roles, profiles };
   }, policy);
+}
+
+const PERMISSION_RANK: Record<'readonly' | 'edit' | 'full', number> = {
+  readonly: 0,
+  edit: 1,
+  full: 2,
+};
+
+function modeForProvider(policy: ReasoningRoutePolicy, provider: string): string | undefined {
+  const normalized = provider.trim().toLowerCase();
+  return Object.values(policy.profiles).find((profile) => {
+    if (profile.mode === normalized) return true;
+    const modeProvider = profile.mode.split('-')[0];
+    return modeProvider === normalized;
+  })?.mode;
+}
+
+function profileForBinding(
+  policy: ReasoningRoutePolicy,
+  binding: ReasoningRouteBinding
+): string | undefined {
+  if (binding.profile) return binding.profile;
+  const mode =
+    binding.mode || (binding.provider ? modeForProvider(policy, binding.provider) : undefined);
+  if (!mode) return undefined;
+  return Object.entries(policy.profiles).find(([, profile]) => profile.mode === mode)?.[0];
+}
+
+/** Resolve Takt-style step routing onto Kyberion's governed profile resolver. */
+export function resolveStepReasoningRoute(input: {
+  stepId: string;
+  step?: ReasoningRouteBinding & {
+    tags?: string[];
+    promotion?: Array<
+      ReasoningRouteBinding & { after_failures?: number; after_iterations?: number }
+    >;
+  };
+  tags?: string[];
+  persona?: string;
+  pipelineProfile?: string;
+  failures?: number;
+  iterations?: number;
+  env?: NodeJS.ProcessEnv;
+  policy?: ReasoningRoutePolicy;
+}): ResolvedStepReasoningRoute {
+  const policy = input.policy ?? loadReasoningRoutePolicy();
+  const env = input.env ?? process.env;
+  const floor = policy.permission_floor ?? 'readonly';
+  const provenance: string[] = [];
+  let binding: ReasoningRouteBinding | undefined;
+  let source: ResolvedStepReasoningRoute['source'] = 'policy';
+
+  const envBinding = env.KYBERION_REASONING_PROFILE || env.KYBERION_REASONING_BACKEND;
+  if (envBinding) {
+    binding = envBinding.startsWith('profile:')
+      ? { profile: envBinding.slice('profile:'.length) }
+      : { mode: envBinding };
+    source = 'env';
+    provenance.push('env');
+  }
+  if (!binding && input.step?.promotion?.length) {
+    const eligible = input.step.promotion.filter(
+      (candidate) =>
+        (candidate.after_failures === undefined ||
+          (input.failures ?? 0) >= candidate.after_failures) &&
+        (candidate.after_iterations === undefined ||
+          (input.iterations ?? 0) >= candidate.after_iterations)
+    );
+    const promotion = eligible[eligible.length - 1];
+    if (promotion) {
+      binding = promotion;
+      source = 'promotion';
+      provenance.push(`promotion:${eligible.length}`);
+    }
+  }
+  if (
+    !binding &&
+    input.step &&
+    (input.step.profile ||
+      input.step.mode ||
+      input.step.provider ||
+      input.step.model ||
+      input.step.permission_mode)
+  ) {
+    binding = input.step;
+    source = 'step';
+    provenance.push('step');
+  }
+  if (!binding) {
+    const routed = policy.routing?.steps?.[input.stepId];
+    if (routed) {
+      binding = routed;
+      source = 'routing.step';
+      provenance.push(`routing.steps.${input.stepId}`);
+    }
+  }
+  if (!binding) {
+    for (const tag of input.tags || input.step?.tags || []) {
+      const routed = policy.routing?.tags?.[tag];
+      if (routed) {
+        binding = routed;
+        source = 'routing.tag';
+        provenance.push(`routing.tags.${tag}`);
+        break;
+      }
+    }
+  }
+  if (!binding && input.persona && policy.routing?.personas?.[input.persona]) {
+    binding = policy.routing.personas[input.persona];
+    source = 'routing.persona';
+    provenance.push(`routing.personas.${input.persona}`);
+  }
+  if (!binding && input.pipelineProfile) {
+    binding = { profile: input.pipelineProfile };
+    source = 'pipeline';
+    provenance.push('pipeline');
+  }
+
+  const requestedPermission = binding?.permission_mode ?? 'readonly';
+  if (PERMISSION_RANK[requestedPermission] < PERMISSION_RANK[floor]) {
+    throw new Error(
+      `[REASONING_PERMISSION_FLOOR] step=${input.stepId} requested=${requestedPermission} floor=${floor}`
+    );
+  }
+  const profile = profileForBinding(policy, binding || {});
+  const route = resolveReasoningRoute({
+    role: input.persona || 'default',
+    ...(profile ? { requestedProfile: profile } : {}),
+    ...(binding?.mode ? { requestedMode: binding.mode as ReasoningBackendMode } : {}),
+    ...(binding?.model ? { requestedModel: binding.model } : {}),
+    env,
+    policy,
+  });
+  return {
+    profile: route.profileRef,
+    mode: route.mode,
+    ...(route.model ? { model: route.model } : {}),
+    permission_mode: requestedPermission,
+    capability_profile:
+      binding?.capability_profile ||
+      (requestedPermission === 'readonly' ? 'explorer' : 'implementer'),
+    source,
+    provenance: [
+      ...provenance,
+      ...route.provenance.map((entry) => `${entry.source}:${entry.field}`),
+    ],
+  };
 }
 
 export function resetReasoningRoutePolicyCache(): void {
