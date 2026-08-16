@@ -39,6 +39,7 @@ export interface RecordedServiceCall extends ServiceCallObservation {
 
 const SECRET_KEY =
   /(token|secret|password|authorization|api[_-]?key|credential|cookie|private[_-]?key|otp|one[_-]?time|passphrase)/iu;
+const RECORDING_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
 const INPUT_RE = /^\{\{input\.([a-z][a-z0-9_]{0,63})\}\}$/u;
 const TEMPLATE_RE = /^\{\{(?:channel|secret)\.[^}]+\}\}$/u;
 
@@ -132,6 +133,11 @@ export class ServiceRecordingSession {
   constructor(options: ServiceRecordingSessionOptions) {
     if (!options.target_name.trim()) throw new Error('target_name is required');
     this.recording_id = options.recording_id?.trim() || `svc-rec-${randomUUID()}`;
+    if (!RECORDING_ID_RE.test(this.recording_id)) {
+      throw new Error(
+        'recording_id must contain only letters, numbers, dot, underscore, or hyphen'
+      );
+    }
     this.now = options.now || (() => new Date().toISOString());
     this.targetName = options.target_name.trim();
     for (const service of options.services || []) this.services.add(service);

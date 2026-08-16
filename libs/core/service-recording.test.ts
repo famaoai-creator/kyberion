@@ -103,6 +103,34 @@ describe('validateServiceRecording', () => {
     expect(r.valid).toBe(false);
     expect(r.errors.join(' ')).toContain('unbound sensitive parameter');
   });
+
+  it('rejects an approved review with incomplete or unknown decisions', () => {
+    const incomplete = validateServiceRecording(
+      rec({
+        review: {
+          status: 'approved',
+          decisions: [{ step_id: 's1', status: 'approved' }],
+        },
+      })
+    );
+    expect(incomplete.valid).toBe(false);
+    expect(incomplete.errors.join(' ')).toContain('missing decisions for: s2');
+
+    const unknown = validateServiceRecording(
+      rec({
+        review: {
+          status: 'approved',
+          decisions: [
+            { step_id: 's1', status: 'approved' },
+            { step_id: 's2', status: 'approved' },
+            { step_id: 'unknown', status: 'approved' },
+          ],
+        },
+      })
+    );
+    expect(unknown.valid).toBe(false);
+    expect(unknown.errors.join(' ')).toContain('unknown step unknown');
+  });
 });
 
 describe('isExternalEffectStep / collectServiceInputNames', () => {
