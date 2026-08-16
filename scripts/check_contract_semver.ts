@@ -26,6 +26,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
 
 interface Manifest {
   actuator_id: string;
@@ -80,12 +81,14 @@ function sha256(content: string): string {
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return '[' + value.map(canonicalize).join(',') + ']';
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   return '{' + entries.map(([k, v]) => JSON.stringify(k) + ':' + canonicalize(v)).join(',') + '}';
 }
 
 function fingerprint(manifest: Manifest): ActuatorFingerprint {
-  const ops = manifest.capabilities.map(c => c.op).sort();
+  const ops = manifest.capabilities.map((c) => c.op).sort();
   let contractSchema: string | null = null;
   let contractSchemaSha: string | null = null;
   if (manifest.contract_schema) {
@@ -93,7 +96,11 @@ function fingerprint(manifest: Manifest): ActuatorFingerprint {
     if (safeExistsSync(schemaPath)) {
       const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
       let parsed: unknown;
-      try { parsed = JSON.parse(raw); } catch { parsed = raw; }
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = raw;
+      }
       contractSchemaSha = sha256(canonicalize(parsed));
       contractSchema = manifest.contract_schema;
     } else {
@@ -132,8 +139,8 @@ function classifyBump(prev: ActuatorFingerprint, next: ActuatorFingerprint): Bum
 
   const prevOps = new Set(prev.ops);
   const nextOps = new Set(next.ops);
-  const removedOps = [...prevOps].filter(o => !nextOps.has(o));
-  const addedOps = [...nextOps].filter(o => !prevOps.has(o));
+  const removedOps = [...prevOps].filter((o) => !nextOps.has(o));
+  const addedOps = [...nextOps].filter((o) => !prevOps.has(o));
 
   if (removedOps.length > 0) {
     level = 'major';
@@ -173,8 +180,8 @@ interface Diagnostic {
 
 function check(prev: BaselineFile, current: ActuatorFingerprint[]): Diagnostic[] {
   const diags: Diagnostic[] = [];
-  const prevById = new Map(prev.actuators.map(a => [a.actuator_id, a]));
-  const currById = new Map(current.map(a => [a.actuator_id, a]));
+  const prevById = new Map(prev.actuators.map((a) => [a.actuator_id, a]));
+  const currById = new Map(current.map((a) => [a.actuator_id, a]));
 
   for (const [id, currA] of currById) {
     const prevA = prevById.get(id);
@@ -228,7 +235,9 @@ function loadBaseline(): BaselineFile | null {
 }
 
 function writeBaseline(file: BaselineFile): void {
-  safeWriteFile(BASELINE_PATH, JSON.stringify(file, null, 2) + '\n', { encoding: 'utf8' });
+  withExecutionContext('ecosystem_architect', () => {
+    safeWriteFile(BASELINE_PATH, JSON.stringify(file, null, 2) + '\n', { encoding: 'utf8' });
+  });
 }
 
 function buildBaseline(actuators: ActuatorFingerprint[]): BaselineFile {
@@ -253,7 +262,9 @@ function main(): void {
     return;
   }
 
-  const manifests = listActuatorManifests().map(readManifest).filter(m => m.actuator_id && m.version);
+  const manifests = listActuatorManifests()
+    .map(readManifest)
+    .filter((m) => m.actuator_id && m.version);
   const fingerprints = manifests.map(fingerprint);
 
   if (rebaseline) {
@@ -274,8 +285,8 @@ function main(): void {
   }
 
   const diags = check(baseline, fingerprints);
-  const errors = diags.filter(d => d.severity === 'error');
-  const warnings = diags.filter(d => d.severity === 'warning');
+  const errors = diags.filter((d) => d.severity === 'error');
+  const warnings = diags.filter((d) => d.severity === 'warning');
 
   for (const w of warnings) console.log(`⚠️  ${w.message}`);
   for (const e of errors) console.error(`❌ ${e.message}`);
@@ -285,7 +296,7 @@ function main(): void {
     process.exit(1);
   }
   console.log(
-    `✅ Contract-semver check passed. ${fingerprints.length} actuators, ${warnings.length} warnings.`,
+    `✅ Contract-semver check passed. ${fingerprints.length} actuators, ${warnings.length} warnings.`
   );
 }
 
