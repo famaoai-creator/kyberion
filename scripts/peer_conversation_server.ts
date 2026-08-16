@@ -1,15 +1,18 @@
 import { createStandardYargs, logger } from '@agent/core';
 import {
   advertiseMeshCapabilities,
+  assertProtocolServiceRegistered,
   createMeshHubPeerMessagingAdapter,
   createPeerConversationResponder,
   createPeerMessagingServer,
+  recordProtocolServiceLifecycle,
   recordMeshHeartbeat,
   registerMeshPeer,
   type MeshRequest,
 } from '@agent/core';
 
 async function main(): Promise<void> {
+  assertProtocolServiceRegistered('peer-messaging');
   const argv = await createStandardYargs()
     .option('peer-id', {
       type: 'string',
@@ -166,13 +169,33 @@ async function main(): Promise<void> {
   }
 
   await server.listen(port, host);
+  recordProtocolServiceLifecycle({
+    serviceId: 'peer-messaging',
+    action: 'start',
+    status: 'started',
+    scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+    principal: { kind: 'service', id: peerId },
+    requestedBy: peerId,
+    metadata: { host, port, mesh_namespace: meshNamespace || null },
+  });
   logger.success(`[peer-conversation-server] peer ${peerId} listening on http://${host}:${port}`);
 
   const shutdown = async () => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeat('maintenance');
-    await server.close();
-    process.exit(0);
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'peer-messaging',
+        action: 'stop',
+        status: 'stopped',
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+        principal: { kind: 'service', id: peerId },
+        requestedBy: peerId,
+      });
+    } finally {
+      await server.close();
+      process.exit(0);
+    }
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);

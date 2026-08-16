@@ -28,6 +28,8 @@ import {
   auditChain,
   buildNextAction,
   formatNextAction,
+  getProtocolServiceRegistryEntry,
+  recordProtocolServiceLifecycle,
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
@@ -161,6 +163,40 @@ function stopByPid(pid: number | undefined): void {
     process.kill(pid, 'SIGTERM');
   } catch (_) {
     /* best-effort cleanup */
+  }
+}
+
+function recordProtocolSurfaceLifecycle(
+  surfaceId: string,
+  action: 'start' | 'stop' | 'reconnect',
+  status: 'started' | 'stopped' | 'reconnected',
+  metadata: Record<string, string | number | boolean | null> = {}
+): void {
+  let registryEntry;
+  try {
+    registryEntry = getProtocolServiceRegistryEntry(surfaceId);
+  } catch {
+    return;
+  }
+  if (registryEntry.lifecycle_owner === 'service') return;
+  const tenant = String(process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || '').trim();
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: surfaceId,
+      action,
+      status,
+      scope: tenant
+        ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
+        : { scope_kind: 'system', tier: 'public' },
+      actorRole: 'surface_runtime',
+      principal: { kind: 'service', id: `surface-runtime:${surfaceId}` },
+      requestedBy: 'surface_runtime',
+      metadata: { origin: 'surface_runtime', ...metadata },
+    });
+  } catch (error) {
+    logger.warn(
+      `[SURFACE] Lifecycle receipt unavailable for ${surfaceId}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -337,6 +373,11 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   };
   saveSurfaceState(state);
 
+  recordProtocolSurfaceLifecycle(surfaceId, 'start', 'started', {
+    pid: managed.child.pid || -1,
+    manifest_path: manifestPath,
+  });
+
   return {
     status: 'started',
     id: surfaceId,
@@ -357,6 +398,7 @@ function stopSurfaceById(surfaceId: string) {
   runtimeSupervisor.unregister(record.resourceId);
   delete state.surfaces[surfaceId];
   saveSurfaceState(state);
+  recordProtocolSurfaceLifecycle(surfaceId, 'stop', 'stopped', { pid: record.pid });
   return { status: 'stopped', id: surfaceId, pid: record.pid };
 }
 
@@ -808,6 +850,9 @@ async function reconcileHealth(manifestPath: string) {
     if (health.status === 'unhealthy') {
       stopSurfaceById(definition.id);
       await startSurfaceById(definition.id, manifestPath);
+      recordProtocolSurfaceLifecycle(definition.id, 'reconnect', 'reconnected', {
+        reason: 'health_probe_unhealthy',
+      });
       restarted.push(definition.id);
     }
   }

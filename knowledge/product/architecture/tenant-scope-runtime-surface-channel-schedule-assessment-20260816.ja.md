@@ -548,13 +548,21 @@ tenant、organization、surface binding を一度に変更する onboarding で�
    `write_authority`、`nhi_binding`、`approval_classes`、`data_residency`、`data_paths` を持たせる。
 5. `surfaces:reconcile`、peer listener、MCP server、review server、scheduler は registry の
    lifecycle adapter とし、registry が許可しない状態では起動せず、停止・再接続・restore は
-   receipt を残す。
+   receipt を残す。protocol service registry に `lifecycle_actions` と `lifecycle_owner` を持たせ、
+   supervisor とサービス本体が同じ状態を二重記録しないよう、1つの lifecycle owner を正本とする。
+   共通の `protocol-service-lifecycle` は system / tenant の物理 namespace へ receipt を保存し、
+   記録失敗が停止・復旧済みの実処理を取り消さない。shared observability に保存する外部パスは
+   repo-relative または opaque reference に正規化し、reader は service と canonical scope を再検証する。
 
 `ConfigMissionBrief` と MCP / report-review の request context は共通化済みであり、MCP の
 高リスク tool は `approval_ref`、payload hash、effect binding、scope を同じ approval store
-へ束縛する。今後は `surfaces:reconcile`、peer listener、MCP server、review server、scheduler
-の停止・再接続・restore receipt を protocol registry の lifecycle adapter に統合することで、
-surface だけが安全で protocol gateway が抜け道になる状態を防ぐ。
+へ束縛する。peer listener、MCP server、report-review server、scheduler、backup-restore は
+共通 lifecycle receipt を記録する。receipt 自体も tenant scope を持ち、tenant がある場合は
+`active/shared/observability/protocol-services/{service}/tenants/{tenant}/` に保存するため、
+system の health と tenant の restore / reconnect を混在させない。service-owned の protocol
+surface はサービス本体が記録し、supervisor は同じ receipt を重複して書かない。残る作業は
+`surfaces:reconcile` の protocol-compatible surface 起動結果を同じ receipt stream に投影し、
+再接続・restore の operator UI 表示へ接続することである。
 
 ## 参照した正本・実装
 
