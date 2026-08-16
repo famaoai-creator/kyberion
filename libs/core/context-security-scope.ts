@@ -14,6 +14,8 @@ export interface ContextSecurityScope {
   tenant_id?: string;
   organization_id?: string;
   project_id?: string;
+  task_id?: string;
+  session_id?: string;
   mission_id: string;
   participant_id?: string;
   read_tiers: TierLevel[];
@@ -31,6 +33,8 @@ export interface GovernedContextFragment<T = unknown> {
   tenant_id?: string;
   organization_id?: string;
   project_id?: string;
+  task_id?: string;
+  session_id?: string;
   mission_id?: string;
   purpose_tags?: string[];
   content: T;
@@ -42,6 +46,8 @@ export type ContextFragmentRejectionCode =
   | 'TENANT_SCOPE_MISMATCH'
   | 'ORGANIZATION_SCOPE_MISMATCH'
   | 'PROJECT_SCOPE_MISMATCH'
+  | 'TASK_SCOPE_MISMATCH'
+  | 'SESSION_SCOPE_MISMATCH'
   | 'MISSION_SCOPE_MISMATCH'
   | 'PURPOSE_SCOPE_MISMATCH';
 
@@ -149,6 +155,22 @@ export function evaluateContextFragment<T>(
       fragment,
       'PROJECT_SCOPE_MISMATCH',
       'Fragment project_id does not match the participant scope'
+    );
+  }
+
+  if (nonEmpty(fragment.task_id) && fragment.task_id !== scope.task_id) {
+    return reject(
+      fragment,
+      'TASK_SCOPE_MISMATCH',
+      'Fragment task_id does not match the participant scope'
+    );
+  }
+
+  if (nonEmpty(fragment.session_id) && fragment.session_id !== scope.session_id) {
+    return reject(
+      fragment,
+      'SESSION_SCOPE_MISMATCH',
+      'Fragment session_id does not match the participant scope'
     );
   }
 

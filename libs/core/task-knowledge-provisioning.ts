@@ -211,6 +211,7 @@ export async function provisionTaskKnowledge(
     const egressCheck = checkProviderEgress({
       provider: resolvedProvider,
       dataTier: pack.mission.tier,
+      ...(pack.scope.tenant_slug ? { tenant_slug: pack.scope.tenant_slug } : {}),
     });
     if (!egressCheck.allowed) {
       logger.warn(
@@ -242,6 +243,15 @@ export async function provisionTaskKnowledge(
     taskId: resolveInput.workItem?.item_id || resolveInput.workItemId,
     teamRole: resolveInput.teamRole,
     recipientKind: resolveInput.recipientKind,
+    ...(pack.scope.tenant_slug
+      ? {
+          scope: {
+            tier: pack.scope.tier,
+            tenant_slug: pack.scope.tenant_slug,
+            mission_id: pack.scope.mission_id,
+          },
+        }
+      : {}),
     refs: (pack.knowledge_hints || []).map((hint) => ({
       path: hint.path,
       score: hint.score,

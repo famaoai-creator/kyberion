@@ -49,6 +49,8 @@ export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } fr
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
 export * from './context-boundary.js';
+export * from './scope-context.js';
+export * from './knowledge-scope.js';
 export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 export * as customerResolver from './customer-resolver.js';
 

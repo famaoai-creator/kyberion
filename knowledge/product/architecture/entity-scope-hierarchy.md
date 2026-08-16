@@ -1,7 +1,7 @@
 ---
 title: Canonical Entity Scope Hierarchy
 tags: [architecture, governance, tenant, organization, project, mission, task, session]
-last_updated: 2026-08-12
+last_updated: 2026-08-16
 ---
 
 # Canonical Entity Scope Hierarchy
@@ -51,6 +51,22 @@ tenant's seat, and a tenant's state falling into a partition's place).
 Every writer must validate the referenced parent records before committing a
 child. Readers must not create missing directories as a side effect; creation
 belongs to the governed writer and must use `secure-io`.
+
+## Knowledge and learning
+
+ナレッジもイベント・ledger と同じ containment chain を使う。`ScopeContext` から
+positive allowlist を解決し、未指定の reader は `knowledge/public` と
+`knowledge/product` だけを読める。confidential / personal は tenant と必要な
+entity prefix が一致した物理 namespace に限り、system-wide scan は明示的な
+system authority がある場合だけ許可する。`customer/{slug}/` は引き続き stance
+overlay であり、public knowledge の代替ではない。
+
+feedback delivery/usage、intent memory/learning、promotion ledger、HINTS、
+compaction summary、tenant distill は `tenants/{tenant}` 下の scope 区画へ保存する。
+legacy の unscoped 記録は tenant 記録として推測せず `unscoped-legacy` lane として
+分離する。context pack は `compileScopedContextPack` の rejection を経てから供給し、
+ranking は同一 task/mission/project/org/tenant を近接優先する。このため、knowledge
+の再利用・学習・蒸留も tenant をまたいだ暗黙の共有を行わない。
 
 ## Events and ledgers
 

@@ -78,6 +78,19 @@ describe('compileScopedContextPack', () => {
     ]);
   });
 
+  it('rejects task and session context from a different execution scope', () => {
+    const scoped = { ...scope, task_id: 'TASK-1', session_id: 'SESSION-1' };
+    const result = compileScopedContextPack(scoped, [
+      fragment({ fragment_id: 'TASK', task_id: 'TASK-2' }),
+      fragment({ fragment_id: 'SESSION', session_id: 'SESSION-2' }),
+    ]);
+
+    expect(result.rejected.map((entry) => entry.code)).toEqual([
+      'TASK_SCOPE_MISMATCH',
+      'SESSION_SCOPE_MISMATCH',
+    ]);
+  });
+
   it('fails closed when the security scope is incomplete', () => {
     expect(() => compileScopedContextPack({ ...scope, tenant_id: '' }, [fragment()])).toThrow(
       '[CONTEXT_SCOPE_INVALID]'

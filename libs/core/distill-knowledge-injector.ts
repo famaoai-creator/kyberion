@@ -28,6 +28,7 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { safeReadFile, safeReaddir, safeExistsSync } from './secure-io.js';
+import type { ScopeContext } from './scope-context.js';
 import {
   getEmbeddingBackend,
   cosineSimilarity,
@@ -106,6 +107,8 @@ export interface FindRelevantInput {
    * Defaults to 0 (return any non-zero match).
    */
   minScore?: number;
+  /** Optional tenant scope; only that tenant's confidential evolution lane is added. */
+  scope?: ScopeContext;
 }
 
 function parseFrontmatter(text: string): Record<string, unknown> {
@@ -153,10 +156,19 @@ function tokenize(s: string): string[] {
     .filter((t) => t.length >= 2);
 }
 
-function loadAllDistilled(): DistilledKnowledgeEntry[] {
+function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
   const out: DistilledKnowledgeEntry[] = [];
-  const seenNames = new Set<string>();
-  for (const dirName of [CURRENT_DISTILL_DIR, ...LEGACY_DISTILL_DIRS]) {
+  const seenKeys = new Set<string>();
+  const dirNames = [...new Set([CURRENT_DISTILL_DIR, ...LEGACY_DISTILL_DIRS])];
+  if (
+    scope?.tier === 'confidential' &&
+    scope.tenant_slug &&
+    !scope.tenant_slug.includes('/') &&
+    !scope.tenant_slug.includes('\\')
+  ) {
+    dirNames.push(`knowledge/confidential/${scope.tenant_slug}/evolution`);
+  }
+  for (const dirName of dirNames) {
     const dir = pathResolver.rootResolve(dirName);
     if (!safeExistsSync(dir)) continue;
     let entries: string[] = [];
@@ -166,7 +178,8 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
       continue;
     }
     for (const name of entries) {
-      if (seenNames.has(name) || !DISTILL_FILE_RE.test(name)) continue;
+      const key = `${dirName}/${name}`;
+      if (seenKeys.has(key) || !DISTILL_FILE_RE.test(name)) continue;
       const abs = path.join(dir, name);
       let text: string;
       try {
@@ -178,7 +191,7 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
       // — cheap (single substring pass, only when scanning) and keeps them
       // out of `out` entirely so they can never rank or be returned.
       if (isPlaceholderDistill(text)) {
-        seenNames.add(name);
+        seenKeys.add(key);
         continue;
       }
       const fm = parseFrontmatter(text);
@@ -199,7 +212,7 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
             : {}),
         excerpt: firstParagraph(body),
       });
-      seenNames.add(name);
+      seenKeys.add(key);
     }
   }
   return out;
@@ -294,7 +307,7 @@ export async function findRelevantDistilledKnowledge(
 
   if (queryTokens.size === 0 && queryTags.size === 0) return [];
 
-  const all = loadAllDistilled();
+  const all = loadAllDistilled(input.scope);
 
   // ── Lexical ranking ─────────────────────────────────────────────────────
   const lexicalScored = all

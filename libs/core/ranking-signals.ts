@@ -75,12 +75,73 @@ export interface KnowledgeRankingMetadata {
   last_updated?: string;
   doc_authority?: string;
   scope?: string;
+  /** Canonical containment scope derived from placement, never user text. */
+  scope_context?: ScopeContext;
+  /** Knowledge-relative source path used to derive a physical scope. */
+  source?: string;
 }
 
 export interface KnowledgeRankingWeights {
   scope?: number;
   authority?: number;
   recency?: number;
+}
+
+/**
+ * Rank a document by containment proximity.  The values intentionally form a
+ * strict ladder so a same-project document cannot lose to a shared document
+ * on a lexical tie.  `common` and public/product documents are the baseline.
+ */
+export function scopeProximityScore(
+  documentScope: ScopeContext | undefined,
+  currentScope: ScopeContext | undefined
+): number {
+  if (!currentScope) return 0;
+  if (!documentScope) return 1;
+  if (documentScope.tenant_slug && documentScope.tenant_slug !== currentScope.tenant_slug) {
+    return 0;
+  }
+  if (documentScope.task_id && documentScope.task_id === currentScope.task_id) return 6;
+  if (documentScope.mission_id && documentScope.mission_id === currentScope.mission_id) return 5;
+  if (documentScope.project_id && documentScope.project_id === currentScope.project_id) return 4;
+  if (
+    documentScope.organization_id &&
+    documentScope.organization_id === currentScope.organization_id
+  )
+    return 3;
+  if (documentScope.tenant_slug && documentScope.tenant_slug === currentScope.tenant_slug) return 2;
+  return 1;
+}
+
+/** Derive a physical scope from a knowledge-relative path. */
+export function scopeContextFromKnowledgePath(
+  source: string,
+  tier: ScopeContext['tier'] = 'confidential'
+): ScopeContext | undefined {
+  const normalized = source.replace(/\\/g, '/').replace(/^\.\.\//, '');
+  const match = normalized.match(
+    /^(?:knowledge\/)?confidential\/([^/]+)(?:\/organizations\/([^/]+))?(?:\/projects\/([^/]+))?(?:\/missions\/([^/]+))?(?:\/tasks\/([^/]+))?(?:\/sessions\/([^/]+))?(?:\/|$)/
+  );
+  if (!match || match[1] === 'common') return undefined;
+  return {
+    tier,
+    tenant_slug: match[1],
+    ...(match[2] ? { organization_id: match[2] } : {}),
+    ...(match[3] ? { project_id: match[3] } : {}),
+    ...(match[4] ? { mission_id: match[4] } : {}),
+    ...(match[5] ? { task_id: match[5] } : {}),
+    ...(match[6] ? { session_id: match[6] } : {}),
+  };
+}
+
+export function knowledgeScopeProximityScore(
+  metadata: KnowledgeRankingMetadata,
+  currentScope?: ScopeContext
+): number {
+  const documentScope =
+    metadata.scope_context ||
+    (metadata.source ? scopeContextFromKnowledgePath(metadata.source) : undefined);
+  return scopeProximityScore(documentScope, currentScope);
 }
 
 /**
@@ -92,7 +153,8 @@ export function knowledgeMetadataScore(
   metadata: KnowledgeRankingMetadata,
   currentScope = 'global',
   weights: KnowledgeRankingWeights = {},
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  currentScopeContext?: ScopeContext
 ): number {
   const scopeWeight = weights.scope ?? 12;
   const authorityWeight = weights.authority ?? 8;
@@ -106,5 +168,7 @@ export function knowledgeMetadataScore(
   const recencyScore = metadata.last_updated
     ? recencyDecayScore(Date.parse(metadata.last_updated), nowMs, { maxScore: recencyWeight })
     : 0;
-  return scopeScore + authorityScore + recencyScore;
+  const proximityScore = knowledgeScopeProximityScore(metadata, currentScopeContext);
+  return scopeScore + authorityScore + recencyScore + proximityScore;
 }
+import type { ScopeContext } from './scope-context.js';

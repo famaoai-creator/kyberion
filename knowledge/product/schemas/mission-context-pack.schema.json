@@ -55,6 +55,8 @@
         },
         "organization_id": { "type": "string", "minLength": 1 },
         "project_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
         "mission_id": { "type": "string", "minLength": 1 },
         "participant_id": { "type": "string", "minLength": 1 },
         "read_tiers": {
@@ -74,6 +76,28 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scope_audit": {
+      "type": "object",
+      "required": ["effective_scope", "rejected"],
+      "properties": {
+        "effective_scope": { "$ref": "#/properties/security_scope" },
+        "rejected": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fragment_id", "source_ref", "code", "reason"],
+            "properties": {
+              "fragment_id": { "type": "string", "minLength": 1 },
+              "source_ref": { "type": "string", "minLength": 1 },
+              "code": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
