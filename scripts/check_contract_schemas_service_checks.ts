@@ -106,5 +106,19 @@ export function createServiceChecks(): ContractCheck[] {
         },
       ],
     },
+    {
+      id: 'service-harness-registry',
+      schemaPath: 'knowledge/product/schemas/service-harness-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/orchestration/service-harness-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          kind: 'service-harness-registry',
+          services: [{ service_id: 'broken' }],
+        },
+      ],
+    },
   ];
 }

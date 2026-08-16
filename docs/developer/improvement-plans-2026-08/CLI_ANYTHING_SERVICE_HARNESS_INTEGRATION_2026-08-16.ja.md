@@ -2,7 +2,7 @@
 title: CLI-Anything Service Harness 統合改善計画
 tags: [service-actuator, service-harness, cli-anything, adapter, verification]
 last_updated: 2026-08-16
-status: in_progress
+status: implemented
 ---
 
 # CLI-Anything Service Harness 統合改善計画
@@ -80,23 +80,26 @@ CLI-Anythingのローカルプロジェクト向けundo/redoは、外部サー�
 
 ### Phase 4 — 生成surfaceと段階的開示
 
-- service presetからsummary/detailを生成
-- capability bundleとSKILL向けのoperation参照を接続
-- CLI/API surfaceはregistryを再実装せずresolver出力を利用
+- `service-harness-registry.json` をservice presetから生成
+- summary registryからdetail参照とoperation metadataを段階的に開示
+- CLI surfaceはregistryを再実装せず、service actuatorのresolver出力を利用
 
 ### Phase 5 — 検証と拡張
 
-- GitHub / Slack / smoke-testを対象にcontract testを追加
-- local service（ComfyUI等）はpreview/session/trajectoryへ拡張
-- 実サービスE2Eはcredential付きの任意smoke testとして分離
+- GitHub / Slackのpresetを対象にcontract testを追加
+- `service:harness` CLIでcredential不要のdescribe/plan/verify/receipt smoke testを提供
+- local service（ComfyUI等）へのpreview/session/trajectory拡張と、credential付き実サービスE2Eは次段階の拡張候補として整理
 
 ## 今回の受入範囲
 
-本変更ではPhase 1〜3を実装する。Phase 4〜5はregistryとcontractが安定した後の後続作業とする。
+本変更ではPhase 1〜5の基盤を実装した。実サービスへの外部副作用を伴うE2E、ComfyUI等のtrajectory拡張、capability bundleやSKILLへの詳細なoperation参照の展開は、既存の実行境界を維持したまま次段階で追加する。
 
 検証コマンド:
 
 - `pnpm vitest run libs/core/service-harness.test.ts libs/actuators/service-actuator/src/index.test.ts`
+- `pnpm run generate:service-harness-registry`
+- `pnpm run check:service-harness-registry`
+- `pnpm run service:harness -- --service github --action describe --detail false`
 - `pnpm run check:contract-schemas`
 - `pnpm run check:catalogs`
 - `pnpm run typecheck`
