@@ -32,6 +32,7 @@ import {
   verifyServiceOperationResult,
   createServiceExecutionReceipt,
   persistServiceExecutionReceipt,
+  recordServiceCall,
   type ServiceExecutionReceipt,
   type ContextSecurityScope,
   type EgressPayloadContext,
@@ -322,6 +323,34 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
   const result = egressContext
     ? await withEgressPayloadContext(egressContext, execute)
     : await execute();
+
+  // Capture only canonical PRESET calls when an explicit recording session is
+  // attached by the caller. The session stores operation metadata and bounded
+  // result shape; it redacts secret parameter values before persistence.
+  if (input.mode === 'PRESET') {
+    const sessionId = String(input.context?.service_recording_session_id || '').trim();
+    if (sessionId) {
+      try {
+        recordServiceCall(sessionId, {
+          service_id: input.service_id,
+          action: input.action,
+          params: input.params,
+          result,
+          summary: input.context?.service_recording_summary,
+          produces: input.context?.service_recording_produces,
+          consumes: Array.isArray(input.context?.service_recording_consumes)
+            ? input.context.service_recording_consumes.map(String)
+            : undefined,
+        });
+      } catch (error) {
+        // Recording is enrichment after the external call. Never throw here or
+        // a retry could duplicate a side effect that already completed.
+        logger.warn(
+          `[service-actuator] service recording failed after execution: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  }
 
   recordServiceObservation(preparedObservation, result);
   return result;

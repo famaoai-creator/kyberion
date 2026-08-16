@@ -140,6 +140,38 @@ describe('service-actuator handleAction', () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it('records a canonical PRESET call when a recording session is attached', async () => {
+    mocks.executeServicePreset.mockResolvedValue({
+      number: 42,
+      html_url: 'https://example.invalid/42',
+    });
+    const { startServiceRecordingSession } = await import('@agent/core');
+    const session = startServiceRecordingSession({
+      target_name: 'Issue intake',
+      recording_id: 'svc-actuator-test',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'create_issue',
+      params: {
+        owner: 'famaoai',
+        repo: 'kyberion',
+        title: '{{input.title}}',
+      },
+      auth: 'secret-guard',
+      context: { service_recording_session_id: session.recording_id },
+    });
+
+    expect(session.toRecording().steps[0]).toMatchObject({
+      service_id: 'github',
+      action: 'create_issue',
+      result_summary: { kind: 'object', keys: ['number', 'html_url'] },
+    });
+  });
+
   it('exposes side-effect-free Service Harness describe and plan actions', async () => {
     const { handleAction } = await import('./index.js');
 
