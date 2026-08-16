@@ -46,6 +46,8 @@ export interface TenantProfile {
   display_name: string;
   status: 'active' | 'suspended' | 'archived';
   assigned_role: string;
+  /** Tenant-level upper bound on providers allowed to receive its knowledge. */
+  allowed_reasoning_backends?: string[];
   isolation_policy?: {
     strict_isolation?: boolean;
     allow_cross_distillation?: boolean;

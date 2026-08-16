@@ -12,7 +12,10 @@ import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { _resetKnowledgeSlicesCacheForTests } from './knowledge-slices.js';
 import { _resetTenantKnowledgeWarningsForTests } from './tenant-knowledge-retrieval.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
-import { loadKnowledgeUsageAggregate } from './src/knowledge-feedback-loop.js';
+import {
+  knowledgeDeliveryLogDir,
+  loadKnowledgeUsageAggregate,
+} from './src/knowledge-feedback-loop.js';
 import {
   resetProviderEgressPolicyCache,
   type ProviderEgressPolicyFile,
@@ -457,6 +460,11 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
   });
 
   it('the pack carries the tenant card, and knowledge_feedback delivery telemetry records it', async () => {
+    const deliveryScope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-x',
+      mission_id: missionId,
+    };
     const result = await provisionTaskKnowledge({
       form: 'pack',
       missionId,
@@ -479,12 +487,17 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     expect(result.deliveredKnowledgeRefs.map((ref) => ref.path)).toContain(TENANT_DOC);
     const deliveryFiles = safeExistsSync(deliveryDirOverride);
     expect(deliveryFiles).toBe(true);
-    const aggregate = loadKnowledgeUsageAggregate();
+    const aggregate = loadKnowledgeUsageAggregate(deliveryScope);
     const entry = aggregate.find((e) => e.document_path === TENANT_DOC);
     expect(entry).toMatchObject({ delivered_count: 1 });
   });
 
   it('delivery log line records the tenant doc path verbatim (repo-relative, not dropped)', async () => {
+    const deliveryScope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-x',
+      mission_id: missionId,
+    };
     await provisionTaskKnowledge({
       form: 'pack',
       missionId,
@@ -496,7 +509,7 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     });
 
     const day = new Date().toISOString().slice(0, 10);
-    const logPath = path.join(deliveryDirOverride, `delivery-${day}.jsonl`);
+    const logPath = path.join(knowledgeDeliveryLogDir(deliveryScope), `delivery-${day}.jsonl`);
     expect(safeExistsSync(logPath)).toBe(true);
     const raw = safeReadFile(logPath, { encoding: 'utf8' }) as string;
     expect(raw).toContain(TENANT_DOC);

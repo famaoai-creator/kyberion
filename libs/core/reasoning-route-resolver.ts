@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
@@ -80,6 +81,14 @@ export interface ReasoningRoutePolicy {
     max_in_place_retries: number;
     on_unsupported_parameter: UnsupportedParameterPolicy;
   };
+  tenant_overrides?: Record<string, ReasoningRouteOverlay>;
+  organization_overrides?: Record<string, ReasoningRouteOverlay>;
+  project_overrides?: Record<string, ReasoningRouteOverlay>;
+}
+
+export interface ReasoningRouteOverlay {
+  roles?: Record<string, Partial<RoleRouteConfig>>;
+  profiles?: Record<string, Partial<RuntimeProfileConfig>>;
 }
 export interface ReasoningRouteUserConfig {
   version?: string;
@@ -329,9 +338,13 @@ export function resolveReasoningRoute(
     env?: NodeJS.ProcessEnv;
     policy?: ReasoningRoutePolicy;
     userConfig?: ReasoningRouteUserConfig;
+    scope?: ScopeContext;
   } = {}
 ): ResolvedReasoningRoute {
-  const policy = input.policy ?? loadReasoningRoutePolicy();
+  const policy = resolveScopedReasoningRoutePolicy(
+    input.policy ?? loadReasoningRoutePolicy(),
+    input.scope ?? currentScope()
+  );
   const env = input.env ?? process.env;
   const role = normalizeReasoningRole(input.role, policy);
   const user = input.userConfig ?? loadReasoningRouteUserConfig();
@@ -507,6 +520,32 @@ export function resolveReasoningRoute(
   throw new Error(
     `No usable reasoning route for role ${role}. Rejected: ${rejectedCandidates.map((x) => `${x.profile} (${x.reason})`).join('; ')}`
   );
+}
+
+/** Apply tenant -> organization -> project overlays; the later layer is more specific. */
+export function resolveScopedReasoningRoutePolicy(
+  policy: ReasoningRoutePolicy,
+  scope?: ScopeContext
+): ReasoningRoutePolicy {
+  const layers = [
+    scope?.tenant_slug ? policy.tenant_overrides?.[scope.tenant_slug] : undefined,
+    scope?.organization_id ? policy.organization_overrides?.[scope.organization_id] : undefined,
+    scope?.project_id ? policy.project_overrides?.[scope.project_id] : undefined,
+  ].filter(Boolean) as ReasoningRouteOverlay[];
+  return layers.reduce<ReasoningRoutePolicy>((resolved, layer) => {
+    const roles = { ...resolved.roles };
+    for (const [role, overlay] of Object.entries(layer.roles || {})) {
+      roles[role] = { ...(roles[role] || { candidates: [] }), ...overlay } as RoleRouteConfig;
+    }
+    const profiles = { ...resolved.profiles };
+    for (const [profile, overlay] of Object.entries(layer.profiles || {})) {
+      profiles[profile] = {
+        ...(profiles[profile] || { mode: '' }),
+        ...overlay,
+      } as RuntimeProfileConfig;
+    }
+    return { ...resolved, roles, profiles };
+  }, policy);
 }
 
 export function resetReasoningRoutePolicyCache(): void {

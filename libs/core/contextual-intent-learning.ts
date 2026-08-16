@@ -1,10 +1,13 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
+import type { ScopeContext } from './scope-context.js';
+import { physicalScopedPath } from './physical-namespace.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -14,11 +17,12 @@ const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-learning.schema.json'
 );
 
-function learningStorePath(): string {
-  return (
+function learningStorePath(scope?: ScopeContext): string {
+  const base =
     process.env.KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH?.trim() ||
-    pathResolver.knowledge('personal/contextual-intent-learning.json')
-  );
+    pathResolver.knowledge('personal/contextual-intent-learning.json');
+  if (!scope?.tenant_slug) return base;
+  return `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
 }
 
 export interface ContextualIntentLearningEntry {
@@ -57,11 +61,13 @@ function defaultStore(): ContextualIntentLearningStore {
   return { version: '1.0.0', entries: [] };
 }
 
-function readStore(): ContextualIntentLearningStore {
-  const filePath = learningStorePath();
+function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
+  const filePath = learningStorePath(scope);
   if (!safeExistsSync(filePath)) return defaultStore();
   try {
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ContextualIntentLearningStore;
+    const parsed = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as ContextualIntentLearningStore;
     const validate = ensureContextualIntentLearningValidator();
     if (!validate(parsed)) return defaultStore();
     return parsed;
@@ -70,18 +76,24 @@ function readStore(): ContextualIntentLearningStore {
   }
 }
 
-function writeStore(store: ContextualIntentLearningStore): void {
-  const filePath = learningStorePath();
+function writeStore(store: ContextualIntentLearningStore, scope?: ScopeContext): void {
+  const filePath = learningStorePath(scope);
   const validate = ensureContextualIntentLearningValidator();
   if (!validate(store)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid contextual-intent-learning store: ${errors}`);
   }
+  const dir = path.dirname(filePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(filePath, JSON.stringify(store, null, 2));
 }
 
-export function loadContextualIntentLearningStore(): ContextualIntentLearningStore {
-  return readStore();
+export function loadContextualIntentLearningStore(
+  scope?: ScopeContext
+): ContextualIntentLearningStore {
+  return readStore(scope);
 }
 
 export function recordContextualIntentLearning(input: {
@@ -94,8 +106,9 @@ export function recordContextualIntentLearning(input: {
   responseShape?: string;
   notes?: string;
   expiresAt?: string;
+  scope?: ScopeContext;
 }): ContextualIntentLearningEntry {
-  const store = readStore();
+  const store = readStore(input.scope);
   const entry: ContextualIntentLearningEntry = {
     id: randomUUID(),
     utterance: input.utterance,
@@ -118,6 +131,6 @@ export function recordContextualIntentLearning(input: {
     expires_at: input.expiresAt,
   };
   store.entries = [...store.entries, entry].slice(-500);
-  writeStore(store);
+  writeStore(store, input.scope);
   return entry;
 }

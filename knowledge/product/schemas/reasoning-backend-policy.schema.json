@@ -109,6 +109,28 @@
         }
       },
       "additionalProperties": false
+    },
+    "tenant_overrides": {
+      "$ref": "#/definitions/policy_overrides"
+    },
+    "organization_overrides": {
+      "$ref": "#/definitions/policy_overrides"
+    },
+    "project_overrides": {
+      "$ref": "#/definitions/policy_overrides"
+    }
+  },
+  "definitions": {
+    "policy_overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "allowed_modes": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "default_mode": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

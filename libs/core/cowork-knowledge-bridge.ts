@@ -38,6 +38,9 @@ import {
   type MemoryCandidateTier,
   type MemoryCandidateKind,
 } from './memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
+import { scopeContextKey, type ScopeContext } from './scope-context.js';
+import { physicalScopedPath } from './physical-namespace.js';
 import { deliverToCowork } from './cowork-surface.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,13 +79,19 @@ export interface BridgeSyncResult {
 
 const SYNC_STATE_LOGICAL = 'active/shared/runtime/cowork-sync-state.json';
 const POLICY_PATH = pathResolver.rootResolve(
-  'knowledge/product/governance/cowork-sync-policy.json',
+  'knowledge/product/governance/cowork-sync-policy.json'
 );
 
 // ─── Sync state helpers ───────────────────────────────────────────────────────
 
-function loadSyncState(): SyncState {
-  const resolved = pathResolver.resolve(SYNC_STATE_LOGICAL);
+function syncStateLogicalPath(scope?: ScopeContext): string {
+  return scope
+    ? physicalScopedPath('active/shared/runtime', scope, 'cowork-sync-state.json')
+    : SYNC_STATE_LOGICAL;
+}
+
+function loadSyncState(scope?: ScopeContext): SyncState {
+  const resolved = pathResolver.resolve(syncStateLogicalPath(scope));
   if (!safeExistsSync(resolved)) {
     return { ingested: {}, supplied: {}, last_sync_at: '' };
   }
@@ -93,11 +102,14 @@ function loadSyncState(): SyncState {
   }
 }
 
-function saveSyncState(state: SyncState): void {
-  const resolved = pathResolver.resolve(SYNC_STATE_LOGICAL);
+function saveSyncState(state: SyncState, scope?: ScopeContext): void {
+  const resolved = pathResolver.resolve(syncStateLogicalPath(scope));
   const dir = nodePath.dirname(resolved);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(resolved, JSON.stringify({ ...state, last_sync_at: new Date().toISOString() }, null, 2));
+  safeWriteFile(
+    resolved,
+    JSON.stringify({ ...state, last_sync_at: new Date().toISOString() }, null, 2)
+  );
 }
 
 function sha256(content: string): string {
@@ -112,7 +124,11 @@ interface SyncPolicy {
     default_ratification_required: boolean;
     kind_inference: { pattern: string; proposed_kind: MemoryCandidateKind }[];
     tier_assignment: {
-      rules: { source_path_pattern: string; assigned_tier: MemoryCandidateTier; ratification_required: boolean }[];
+      rules: {
+        source_path_pattern: string;
+        assigned_tier: MemoryCandidateTier;
+        ratification_required: boolean;
+      }[];
       default: MemoryCandidateTier;
     };
   };
@@ -139,7 +155,10 @@ function inferKind(name: string, policy: SyncPolicy): MemoryCandidateKind {
   return 'heuristic';
 }
 
-function inferTier(sourcePath: string, policy: SyncPolicy): { tier: MemoryCandidateTier; ratificationRequired: boolean } {
+function inferTier(
+  sourcePath: string,
+  policy: SyncPolicy
+): { tier: MemoryCandidateTier; ratificationRequired: boolean } {
   for (const rule of policy.cowork_to_kyberion.tier_assignment.rules) {
     if (new RegExp(rule.source_path_pattern).test(sourcePath)) {
       return { tier: rule.assigned_tier, ratificationRequired: rule.ratification_required };
@@ -164,12 +183,27 @@ function inferTier(sourcePath: string, policy: SyncPolicy): { tier: MemoryCandid
  *
  * @param artifactPaths  Absolute or repo-relative paths to Cowork output files.
  */
-export function ingestCoworkArtifacts(artifactPaths: string[]): IngestResult {
+export function ingestCoworkArtifacts(
+  artifactPaths: string[],
+  options: { scope?: ScopeContext } = {}
+): IngestResult {
   const policy = loadPolicy();
-  const state = loadSyncState();
-  const result: IngestResult = { enqueued: 0, skipped_duplicate: 0, skipped_tier_violation: 0, candidate_ids: [], errors: [] };
+  const state = loadSyncState(options.scope);
+  const result: IngestResult = {
+    enqueued: 0,
+    skipped_duplicate: 0,
+    skipped_tier_violation: 0,
+    candidate_ids: [],
+    errors: [],
+  };
 
-  const existingRefs = new Set(listMemoryPromotionCandidates().map((c) => c.source_ref));
+  const candidateScopeKey = (scope?: MemoryScopeEnvelope): string =>
+    scope ? scopeContextKey(scope) : 'legacy';
+  const existingRefs = new Set(
+    listMemoryPromotionCandidates().map(
+      (candidate) => `${candidate.source_ref}::${candidateScopeKey(candidate.scope)}`
+    )
+  );
 
   for (const rawPath of artifactPaths) {
     const absPath = nodePath.isAbsolute(rawPath) ? rawPath : pathResolver.rootResolve(rawPath);
@@ -191,17 +225,23 @@ export function ingestCoworkArtifacts(artifactPaths: string[]): IngestResult {
     const contentHash = sha256(content);
     const prevHash = state.ingested[sourceRef];
 
-    // Skip unchanged (idempotency)
-    if (prevHash === contentHash && existingRefs.has(sourceRef)) {
-      result.skipped_duplicate++;
-      continue;
-    }
-
-    // Tier inference
+    // Classify before checking the candidate lane: one Cowork source can be
+    // assigned to a different memory tier by policy, and the scope envelope
+    // must use the same tier as the candidate record.
     const tierInfo = policy
       ? inferTier(sourceRef, policy)
       : { tier: 'confidential' as MemoryCandidateTier, ratificationRequired: true };
     const kind = policy ? inferKind(nodePath.basename(sourceRef), policy) : 'heuristic';
+    const candidateScope = options.scope
+      ? ({ ...options.scope, tier: tierInfo.tier } as MemoryScopeEnvelope)
+      : undefined;
+    const ingestScopeKey = candidateScopeKey(candidateScope);
+
+    // Skip unchanged (idempotency)
+    if (prevHash === contentHash && existingRefs.has(`${sourceRef}::${ingestScopeKey}`)) {
+      result.skipped_duplicate++;
+      continue;
+    }
 
     // Tier-guard: block personal/confidential from having public evidence refs
     // (enforced further down in enqueueMemoryPromotionCandidate)
@@ -215,9 +255,11 @@ export function ingestCoworkArtifacts(artifactPaths: string[]): IngestResult {
         evidenceRefs: [sourceRef],
         sensitivityTier: tierInfo.tier,
         ratificationRequired: tierInfo.ratificationRequired,
+        ...(candidateScope ? { scope: candidateScope } : {}),
       });
       enqueueMemoryPromotionCandidate(candidate);
       state.ingested[sourceRef] = contentHash;
+      existingRefs.add(`${sourceRef}::${ingestScopeKey}`);
       result.enqueued++;
       result.candidate_ids.push(candidate.candidate_id);
     } catch (err) {
@@ -231,7 +273,7 @@ export function ingestCoworkArtifacts(artifactPaths: string[]): IngestResult {
     }
   }
 
-  saveSyncState(state);
+  saveSyncState(state, options.scope);
   return result;
 }
 
@@ -243,10 +285,12 @@ export function ingestCoworkArtifacts(artifactPaths: string[]): IngestResult {
  * Only `public` tier knowledge is exported (R5: no confidential/personal leakage).
  * Hash-diff ensures unchanged hints are not re-delivered.
  */
-export function supplyKnowledgeToCowork(options: { maxHints?: number } = {}): SupplyResult {
+export function supplyKnowledgeToCowork(
+  options: { maxHints?: number; scope?: ScopeContext } = {}
+): SupplyResult {
   const policy = loadPolicy();
   const maxHints = options.maxHints ?? policy?.kyberion_to_cowork.delivery.max_hints_per_sync ?? 50;
-  const state = loadSyncState();
+  const state = loadSyncState(options.scope);
   const result: SupplyResult = { delivered: 0, skipped_unchanged: 0, errors: [] };
 
   const publicRoot = pathResolver.rootResolve('knowledge/public');
@@ -255,13 +299,23 @@ export function supplyKnowledgeToCowork(options: { maxHints?: number } = {}): Su
     return result;
   }
 
-  const domains = policy?.kyberion_to_cowork.domains ?? ['procedures', 'architecture', 'governance'];
+  const domains = policy?.kyberion_to_cowork.domains ?? [
+    'procedures',
+    'architecture',
+    'governance',
+  ];
   const hintsToDeliver: { path: string; content: string }[] = [];
 
   for (const domain of domains) {
     const domainDir = nodePath.join(publicRoot, domain);
     if (!safeExistsSync(domainDir)) continue;
-    collectMarkdownFiles(domainDir, hintsToDeliver, state, maxHints - hintsToDeliver.length, result);
+    collectMarkdownFiles(
+      domainDir,
+      hintsToDeliver,
+      state,
+      maxHints - hintsToDeliver.length,
+      result
+    );
     if (hintsToDeliver.length >= maxHints) break;
   }
 
@@ -274,19 +328,25 @@ export function supplyKnowledgeToCowork(options: { maxHints?: number } = {}): Su
       .join('\n\n---\n\n');
 
     const deliveryId = deliverToCowork(
-      [{ content: combinedContent, content_type: 'text/markdown', description: 'Kyberion public knowledge supply' }],
+      [
+        {
+          content: combinedContent,
+          content_type: 'text/markdown',
+          description: 'Kyberion public knowledge supply',
+        },
+      ],
       {
         title: `Kyberion Knowledge Update (${hintsToDeliver.length} hints)`,
         summary: `Synced ${hintsToDeliver.length} public knowledge hints from Kyberion to Cowork.`,
         nextAction: 'Review the knowledge hints and use them in your Cowork session.',
-      },
+      }
     );
 
     // Update state for delivered hints
     for (const h of hintsToDeliver) {
       state.supplied[h.path] = sha256(h.content);
     }
-    saveSyncState(state);
+    saveSyncState(state, options.scope);
 
     result.delivered = hintsToDeliver.length;
     result.delivery_id = deliveryId;
@@ -302,7 +362,7 @@ function collectMarkdownFiles(
   collected: { path: string; content: string }[],
   state: SyncState,
   remaining: number,
-  result: SupplyResult,
+  result: SupplyResult
 ): void {
   if (remaining <= 0) return;
   const initialCount = collected.length;
@@ -347,17 +407,23 @@ export function runCoworkKnowledgeSync(params: {
   coworkArtifactPaths?: string[];
   direction?: 'cowork-to-kyberion' | 'kyberion-to-cowork' | 'both';
   maxHints?: number;
+  scope?: ScopeContext;
 }): BridgeSyncResult {
   const direction = params.direction ?? 'both';
-  const statePath = pathResolver.resolve(SYNC_STATE_LOGICAL);
+  const statePath = pathResolver.resolve(syncStateLogicalPath(params.scope));
 
   const syncResult: BridgeSyncResult = { direction, sync_state_path: statePath };
 
   if (direction === 'cowork-to-kyberion' || direction === 'both') {
-    syncResult.ingest = ingestCoworkArtifacts(params.coworkArtifactPaths ?? []);
+    syncResult.ingest = ingestCoworkArtifacts(params.coworkArtifactPaths ?? [], {
+      scope: params.scope,
+    });
   }
   if (direction === 'kyberion-to-cowork' || direction === 'both') {
-    syncResult.supply = supplyKnowledgeToCowork({ maxHints: params.maxHints });
+    syncResult.supply = supplyKnowledgeToCowork({
+      maxHints: params.maxHints,
+      scope: params.scope,
+    });
   }
 
   return syncResult;

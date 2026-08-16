@@ -4,6 +4,12 @@ const mocks = vi.hoisted(() => ({
   collectOperatorHomeSummary: vi.fn(),
   guardRequest: vi.fn(() => null),
   requireChronosAccess: vi.fn(() => null),
+  strictViewerScopeTenantSlugs: vi.fn(() => 'all'),
+  strictViewerScopeOrganizationIds: vi.fn(() => 'all'),
+  strictViewerScopeProjectIds: vi.fn(() => 'all'),
+  viewerErrorResponse: vi.fn(
+    (error: unknown) => new Response(JSON.stringify({ error: String(error) }), { status: 403 })
+  ),
 }));
 
 vi.mock('@agent/core', () => ({
@@ -23,6 +29,10 @@ vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: vi.fn(() => ({
     context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
   })),
+  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds: mocks.strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds: mocks.strictViewerScopeProjectIds,
+  viewerErrorResponse: mocks.viewerErrorResponse,
   withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
 }));
 

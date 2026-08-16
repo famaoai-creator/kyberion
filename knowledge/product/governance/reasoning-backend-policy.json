@@ -142,6 +142,9 @@
     }
   ],
   "default_mode": "claude-cli",
+  "tenant_overrides": {},
+  "organization_overrides": {},
+  "project_overrides": {},
   "openrouter": {
     "default_profile": "free-router",
     "default_cost_policy": "free-only",

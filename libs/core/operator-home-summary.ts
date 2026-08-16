@@ -16,6 +16,7 @@ export interface OperatorHomeMissionItem {
   missionType?: string;
   tenantSlug?: string;
   tenantId?: string;
+  organizationId?: string;
   persona?: string;
   projectId?: string;
   trackId?: string;
@@ -125,6 +126,28 @@ export interface OperatorHomeSummary {
   nextAction: NextAction;
 }
 
+export interface OperatorHomeScopeFilter {
+  tenantSlugs?: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
+}
+
+function scopeAllows(allowed: string[] | 'all' | undefined, value: string | undefined): boolean {
+  if (allowed === 'all' || allowed === undefined) return true;
+  return Boolean(value && allowed.includes(value));
+}
+
+function missionMatchesScope(
+  mission: Pick<OperatorHomeMissionItem, 'tenantSlug' | 'organizationId' | 'projectId'>,
+  scope?: OperatorHomeScopeFilter
+): boolean {
+  return (
+    scopeAllows(scope?.tenantSlugs, mission.tenantSlug) &&
+    scopeAllows(scope?.organizationIds, mission.organizationId) &&
+    scopeAllows(scope?.projectIds, mission.projectId)
+  );
+}
+
 /**
  * NI-05: NHI inventory for the operator packet. Never throws and never blocks
  * the home summary — an unreadable identity ledger degrades to `undefined`
@@ -210,7 +233,7 @@ function readMissionManagementDirs(): string[] {
   ];
 }
 
-function collectMissionStates(): OperatorHomeMissionItem[] {
+function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMissionItem[] {
   const missions: OperatorHomeMissionItem[] = [];
   const artifactRecords = listArtifactRecords();
   for (const root of readMissionManagementDirs()) {
@@ -227,8 +250,11 @@ function collectMissionStates(): OperatorHomeMissionItem[] {
             mission_type?: string;
             tenant_id?: string;
             tenant_slug?: string;
+            organization_id?: string;
+            project_id?: string;
             assigned_persona?: string;
             relationships?: {
+              organization?: { organization_id?: string };
               project?: { project_id?: string };
               track?: { track_id?: string; track_name?: string };
             };
@@ -239,6 +265,17 @@ function collectMissionStates(): OperatorHomeMissionItem[] {
             };
           };
           if (!state?.mission_id) continue;
+          const organizationId =
+            state.organization_id || state.relationships?.organization?.organization_id;
+          const projectId = state.project_id || state.relationships?.project?.project_id;
+          if (
+            !missionMatchesScope(
+              { tenantSlug: state.tenant_slug, organizationId, projectId },
+              scope
+            )
+          ) {
+            continue;
+          }
           const lastEvent = state.history?.[state.history.length - 1];
           const missionArtifacts = artifactRecords.filter(
             (artifact) => artifact.mission_id === state.mission_id
@@ -250,8 +287,9 @@ function collectMissionStates(): OperatorHomeMissionItem[] {
             missionType: state.mission_type,
             tenantSlug: state.tenant_slug,
             tenantId: state.tenant_id,
+            organizationId,
             persona: state.assigned_persona,
-            projectId: state.relationships?.project?.project_id,
+            projectId,
             trackId: state.relationships?.track?.track_id,
             trackName: state.relationships?.track?.track_name,
             updatedAt: lastEvent?.ts || state.history?.[0]?.ts,
@@ -295,6 +333,7 @@ function getMetricCost(entry: Record<string, any>): number {
 function collectCostSummary(
   input: {
     missionId?: string;
+    missionIds?: string[];
     since?: string;
     budgetUsd?: number;
   } = {}
@@ -302,9 +341,13 @@ function collectCostSummary(
   const history = new MetricsCollector({ persist: false }).loadHistory();
   const sinceIso = input.since || '';
   const missionFilter = (input.missionId || '').trim().toUpperCase();
+  const missionIds = input.missionIds
+    ? new Set(input.missionIds.map((missionId) => missionId.trim().toUpperCase()))
+    : undefined;
   const entries = history.filter((entry) => {
     const entryMissionId = String(entry.mission_id || entry.missionId || '').toUpperCase();
     if (missionFilter && entryMissionId !== missionFilter) return false;
+    if (missionIds && !missionIds.has(entryMissionId)) return false;
     if (sinceIso && String(entry.timestamp || entry.ts || '') < sinceIso) return false;
     return true;
   });
@@ -437,20 +480,58 @@ export function collectOperatorHomeSummary(
     budgetUsd?: number;
     since?: string;
     limit?: number;
+    scope?: OperatorHomeScopeFilter;
   } = {}
 ): OperatorHomeSummary {
-  const missionItems = collectMissionStates();
+  const missionItems = collectMissionStates(input.scope);
+  const scopedMissionIds = new Set(missionItems.map((mission) => mission.missionId.toUpperCase()));
+  const isScoped = Boolean(
+    input.scope &&
+    [input.scope.tenantSlugs, input.scope.organizationIds, input.scope.projectIds].some((allowed) =>
+      Array.isArray(allowed)
+    )
+  );
+  const approvalMatchesScope = (approval: OperatorHomeApprovalItem): boolean => {
+    if (!input.scope || !isScoped) return true;
+    const scope = approval.scope;
+    const missionId =
+      scope?.mission_id || approval.requestedByContext?.missionId || approval.steering?.missionId;
+    const tenantSlug = scope?.tenant_slug;
+    const organizationId = scope?.organization_id;
+    const projectId = scope?.project_id;
+    if (scope?.tenant_slug || scope?.organization_id || scope?.project_id) {
+      return (
+        scopeAllows(input.scope.tenantSlugs, tenantSlug) &&
+        scopeAllows(input.scope.organizationIds, organizationId) &&
+        scopeAllows(input.scope.projectIds, projectId)
+      );
+    }
+    return Boolean(missionId && scopedMissionIds.has(missionId.toUpperCase()));
+  };
+  const inboxMatchesScope = (entry: DeliverableInboxEntry): boolean => {
+    if (!input.scope || !isScoped) return true;
+    if (!scopeAllows(input.scope.tenantSlugs, entry.tenant_slug)) return false;
+    if (Array.isArray(input.scope.organizationIds) || Array.isArray(input.scope.projectIds)) {
+      return Boolean(entry.mission_id && scopedMissionIds.has(entry.mission_id.toUpperCase()));
+    }
+    return true;
+  };
   const activeMissions = missionItems.filter((item) => item.status === 'active');
   const blockedMissions = missionItems.filter(
     (item) => item.status === 'paused' || item.status === 'failed'
   );
-  const pendingApprovals = listApprovalRequests({ status: 'pending' }).slice(0, input.limit || 8);
-  const inboxEntries = listInboxEntries({ limit: input.limit || 8 });
+  const pendingApprovals = listApprovalRequests({ status: 'pending' })
+    .filter(approvalMatchesScope)
+    .slice(0, input.limit || 8);
+  const inboxEntries = listInboxEntries({ limit: isScoped ? 10000 : input.limit || 8 })
+    .filter(inboxMatchesScope)
+    .slice(0, input.limit || 8);
   const unreadInbox = inboxEntries.filter((entry) => entry.status === 'unread').length;
   const clarificationQuestions = 0;
   const costSummary = collectCostSummary({
     budgetUsd: input.budgetUsd,
     since: input.since,
+    ...(isScoped ? { missionIds: [...scopedMissionIds] } : {}),
   });
   const workforceSummary = collectWorkforceSummary(missionItems);
   const nhiLedger = collectNhiLedgerSummary();

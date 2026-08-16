@@ -56,6 +56,7 @@ import { executeApprovedClaudeTaskSession } from './claude-task-session-executor
 import { truncateTextWithCount } from './text-truncation.js';
 import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
+import { currentScope } from './scope-context.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
   deriveSurfaceIntentLabelFromProviderPolicy,
@@ -285,6 +286,7 @@ async function handleSurfaceQueryRoute(
   const providerConfig = getSurfaceQueryProviderConfig({
     role: deriveSurfaceQueryRole(context),
     phase: process.env.KYBERION_SURFACE_QUERY_PHASE?.trim() || undefined,
+    scope: currentScope(),
   });
 
   if (!queryText) {

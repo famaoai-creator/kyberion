@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertScopeContext,
+  currentScope,
   normalizeScopeContext,
+  resetCurrentScope,
   resolveScopeContext,
   scopeContextKey,
   validateScopeContext,
@@ -52,5 +54,56 @@ describe('scope-context', () => {
         mission_id: 'MSN-1',
       })
     ).toBe('acme-corp/org-a/_/MSN-1/_/_/confidential');
+  });
+
+  it('resolves project and task from the runtime environment', () => {
+    expect(
+      resolveScopeContext(
+        { tier: 'confidential', tenant_slug: 'acme-corp' },
+        {
+          KYBERION_ORGANIZATION_ID: 'org-a',
+          KYBERION_PROJECT_ID: 'project-a',
+          MISSION_ID: 'mission-a',
+          KYBERION_TASK_ID: 'task-a',
+        }
+      )
+    ).toMatchObject({
+      organization_id: 'org-a',
+      project_id: 'project-a',
+      mission_id: 'mission-a',
+      task_id: 'task-a',
+    });
+  });
+
+  it('memoizes and resets the process scope', () => {
+    resetCurrentScope();
+    const original = {
+      tenant: process.env.KYBERION_TENANT,
+      organization: process.env.KYBERION_ORGANIZATION_ID,
+      project: process.env.KYBERION_PROJECT_ID,
+      tier: process.env.KYBERION_TIER,
+    };
+    try {
+      process.env.KYBERION_TENANT = 'acme-corp';
+      process.env.KYBERION_ORGANIZATION_ID = 'org-a';
+      process.env.KYBERION_PROJECT_ID = 'project-a';
+      process.env.KYBERION_TIER = 'confidential';
+      const first = currentScope();
+      process.env.KYBERION_PROJECT_ID = 'project-b';
+      expect(currentScope()).toEqual(first);
+      resetCurrentScope();
+      expect(currentScope().project_id).toBe('project-b');
+    } finally {
+      resetCurrentScope();
+      for (const [key, value] of [
+        ['KYBERION_TENANT', original.tenant],
+        ['KYBERION_ORGANIZATION_ID', original.organization],
+        ['KYBERION_PROJECT_ID', original.project],
+        ['KYBERION_TIER', original.tier],
+      ] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });
