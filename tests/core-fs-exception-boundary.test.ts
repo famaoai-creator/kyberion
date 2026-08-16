@@ -80,7 +80,6 @@ const allowedCoreFsImports = [
   'libs/core/src/pipeline-engine.test.ts',
   'libs/core/src/pipeline-fragments-catalog.test.ts',
   'libs/core/src/pipeline-preview.test.ts',
-  'libs/core/src/trace.test.ts',
   'libs/core/storage-janitor.test.ts',
   // AL-01 catalog loader test: raw fs for temp catalog fixtures.
   'libs/core/storage-retention-catalog.test.ts',

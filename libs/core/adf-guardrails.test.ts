@@ -113,6 +113,21 @@ describe('validatePipelineGuardrails', () => {
     expect(report.ok).toBe(true);
     expect(report.findings).toHaveLength(0);
   });
+
+  it('caps team_lead worker concurrency at three', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        {
+          op: 'core:team_lead',
+          params: { max_concurrency: 4, do: [{ op: 'step:worker', params: {} }] },
+        },
+      ],
+    });
+    expect(report.ok).toBe(false);
+    expect(
+      report.findings.some((finding) => finding.code === 'team-lead-concurrency-exceeded')
+    ).toBe(true);
+  });
 });
 
 describe('semantic-op placement lint (LC-05)', () => {
@@ -123,7 +138,7 @@ describe('semantic-op placement lint (LC-05)', () => {
         { op: 'browser:navigate', params: { url: 'https://example.com' } },
         { op: 'browser:llm_decide', params: { goal: 'pick something' } },
       ],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     const codes = report.findings.map((finding) => finding.code);
     expect(report.ok).toBe(true); // warnings only
     expect(codes).toContain('llm-decide-without-distill');
@@ -140,7 +155,7 @@ describe('semantic-op placement lint (LC-05)', () => {
           params: { goal: 'pick the submit selector', options: ['#a', '#b'] },
         },
       ],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.findings).toHaveLength(0);
   });
 
@@ -153,7 +168,73 @@ describe('semantic-op placement lint (LC-05)', () => {
           params: { goal: 'summarize', observation: 'pre-distilled text', on_degraded: 'fail' },
         },
       ],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
+    expect(report.findings).toHaveLength(0);
+  });
+});
+
+describe('TAKT judge_route guardrails', () => {
+  it('rejects an unknown route target and fails closed on a back-edge', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        {
+          id: 'judge',
+          op: 'core:judge_route',
+          params: { routes: [{ when: { label: 'x' }, next: 'missing' }] },
+        },
+        { id: 'done', op: 'system:log', params: {} },
+      ],
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
+
+    expect(report.ok).toBe(false);
+    expect(report.findings.some((finding) => finding.code === 'judge-route-unknown-target')).toBe(
+      true
+    );
+    expect(report.findings.some((finding) => finding.code === 'loop-max-iterations-omitted')).toBe(
+      true
+    );
+  });
+
+  it('rejects a route target that is earlier than the judge step', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        { id: 'start', op: 'system:log', params: {} },
+        {
+          id: 'judge',
+          op: 'core:judge_route',
+          params: {
+            max_route_hops: 4,
+            routes: [{ when: { label: 'retry' }, next: 'start' }],
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
+
+    expect(report.ok).toBe(false);
+    expect(report.findings.some((finding) => finding.code === 'judge-route-back-edge')).toBe(true);
+    expect(
+      report.findings.find((finding) => finding.code === 'judge-route-back-edge')?.severity
+    ).toBe('error');
+  });
+
+  it('accepts terminal routes and explicit hop limits', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        {
+          id: 'judge',
+          op: 'core:judge_route',
+          params: {
+            max_route_hops: 6,
+            routes: [
+              { when: { label: 'approve' }, next: 'COMPLETE' },
+              { when: { label: 'reject' }, next: 'ABORT' },
+            ],
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
+
+    expect(report.ok).toBe(true);
     expect(report.findings).toHaveLength(0);
   });
 });
@@ -168,7 +249,7 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
           params: { script: 'x'.repeat(401), export_as: 'out' },
         },
       ],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.ok).toBe(true);
     const finding = report.findings.find((f) => f.code === 'transform-script-oversized');
     expect(finding?.severity).toBe('warn');
@@ -178,7 +259,7 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
     const report = validatePipelineGuardrails({
       id: 'lint-transform-small',
       steps: [{ op: 'core:transform', params: { script: 'return ctx.value;' } }],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.findings).toHaveLength(0);
   });
 
@@ -197,7 +278,7 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
           },
         },
       ],
-    } as any);
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.findings.some((f) => f.code === 'step-budget-exceeded')).toBe(true);
     expect(report.findings.some((f) => f.code === 'transform-script-oversized')).toBe(true);
   });

@@ -3,6 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { TraceContext } from '@agent/core';
 import { logger } from '@agent/core';
 import { pathResolver } from '@agent/core/path-resolver';
+import {
+  createPipelineRunJournal,
+  decideApprovalRequest,
+  loadApprovalRequest,
+  loadPipelineRunJournal,
+  approvalRequestLogicalPath,
+  safeRmSync,
+  withExecutionContext,
+} from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 
 const {
@@ -70,6 +79,15 @@ describe('findStepByIdRecursive', () => {
 });
 
 describe('run_pipeline compatibility', () => {
+  type TestSuspension = {
+    step_id: string;
+    approval_request_id: string;
+    storage_channel: string;
+    on_timeout: 'abort' | 'deny' | 'escalate';
+    timeout_at?: string;
+    reason?: string;
+  };
+
   it('persists a recovered fallback as one successful causal trace', () => {
     const trace = new TraceContext('pipeline:fallback-recovery', {
       pipelineId: 'fallback-recovery',
@@ -132,6 +150,122 @@ describe('run_pipeline compatibility', () => {
     expect(normalizePipelineOp('parallel_calls')).toBe('core:parallel_calls');
     expect(normalizePipelineOp('accumulate')).toBe('core:accumulate');
     expect(normalizePipelineOp('system:shell')).toBe('system:shell');
+    expect(normalizePipelineOp('judge_route')).toBe('core:judge_route');
+    expect(normalizePipelineOp('await_decision')).toBe('core:await_decision');
+  });
+
+  it('routes a deterministic judge fixture to the selected step', async () => {
+    const result = await runSteps([
+      {
+        id: 'judge',
+        op: 'core:judge_route',
+        params: {
+          fixture: true,
+          verdict: { label: 'approve', reason: 'fixture' },
+          export_as: 'selected_route',
+          routes: [
+            { when: { label: 'approve' }, next: 'approved' },
+            { when: { label: 'reject' }, next: 'rejected' },
+          ],
+        },
+      },
+      { id: 'rejected', op: 'log', params: { message: 'must not run' } },
+      { id: 'approved', op: 'log', params: { message: 'approved' } },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results.map((entry) => entry.status)).toEqual(['success', 'skipped', 'success']);
+    expect(result.context.selected_route).toMatchObject({ next: 'approved', matched: true });
+  });
+
+  it('fails closed when a judge fixture has no matching route', async () => {
+    const result = await runSteps([
+      {
+        id: 'judge',
+        op: 'core:judge_route',
+        params: {
+          fixture: true,
+          verdict: { label: 'unknown' },
+          routes: [{ when: { label: 'approve' }, next: 'approved' }],
+        },
+      },
+      { id: 'approved', op: 'log', params: { message: 'not reached' } },
+    ]);
+
+    expect(result.status).toBe('failed');
+    expect(result.results.some((entry) => entry.error?.includes('JUDGE_ROUTE_ABORT'))).toBe(true);
+  });
+
+  it('suspends at await_decision and resumes after the approval-store decision', async () => {
+    const runId = `await-decision-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'await-decision-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['before', 'approval', 'after'],
+    });
+    let suspension: TestSuspension | undefined;
+    try {
+      await runSteps(
+        [
+          { id: 'before', op: 'log', params: { message: 'before' } },
+          {
+            id: 'approval',
+            op: 'core:await_decision',
+            params: {
+              approval: { title: 'Test approval', summary: 'Resume the test pipeline.' },
+              timeout_ms: 60_000,
+            },
+          },
+          { id: 'after', op: 'log', params: { message: 'after' } },
+        ],
+        {},
+        { runJournal: journal, runId, quiet: true }
+      );
+      throw new Error('expected await_decision to suspend');
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('suspension' in error)) throw error;
+      suspension = (error as { suspension: TestSuspension }).suspension;
+    }
+
+    if (!suspension) throw new Error('await_decision did not expose suspension metadata');
+    expect(suspension).toMatchObject({ step_id: 'approval', on_timeout: 'abort' });
+    journal.append('run_suspended', { ...suspension });
+    const suspendedState = loadPipelineRunJournal(runId);
+    journal.append('run_resumed', { resumed_at: new Date().toISOString() });
+    const approval = loadApprovalRequest('pipeline-approval', suspension.approval_request_id);
+    expect(approval?.status).toBe('pending');
+    decideApprovalRequest('mission_controller', {
+      channel: 'pipeline-approval',
+      requestId: suspension.approval_request_id,
+      decision: 'approved',
+      decidedBy: 'test-operator',
+      decidedByType: 'human',
+      authenticated: true,
+      authMethod: 'manual',
+    });
+
+    const resumed = await runSteps(
+      [
+        { id: 'before', op: 'log', params: { message: 'before' } },
+        {
+          id: 'approval',
+          op: 'core:await_decision',
+          params: {
+            approval: { title: 'Test approval', summary: 'Resume the test pipeline.' },
+            timeout_ms: 60_000,
+          },
+        },
+        { id: 'after', op: 'log', params: { message: 'after' } },
+      ],
+      {},
+      { runJournal: journal, resumeState: suspendedState, runId, quiet: true }
+    );
+    expect(resumed.status).toBe('succeeded');
+
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(journal.path);
+      safeRmSync(approvalRequestLogicalPath('pipeline-approval', suspension.approval_request_id));
+    });
   });
 
   it('accepts short-form log ops with template params', async () => {
@@ -475,6 +609,69 @@ describe('run_pipeline compatibility', () => {
     expect(result.context.parallel_outputs).toHaveLength(2);
     expect(result.context.parallel_outputs[0].context.mapped.doubled).toBe(2);
     expect(result.context.parallel_outputs[1].context.mapped.doubled).toBe(4);
+  });
+
+  it('selects a bounded subset from a runtime pool for parallel_foreach', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:parallel_foreach',
+          params: {
+            items_from: { pool_ref: 'candidate_pool', selection: { fixture: [0, 2] } },
+            as: 'item',
+            export_as: 'selected',
+            do: [
+              {
+                op: 'core:transform',
+                params: {
+                  input: '{{item}}',
+                  script: 'return { value: input };',
+                  export_as: 'mapped',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      { candidate_pool: ['a', 'b', 'c'] }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(result.context.selected.map((entry: { item: string }) => entry.item)).toEqual([
+      'a',
+      'c',
+    ]);
+  });
+
+  it('decomposes fixture team_lead tasks and caps worker concurrency at three', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:team_lead',
+        params: {
+          fixture_tasks: [
+            { task_id: 'T1' },
+            { task_id: 'T2' },
+            { task_id: 'T3' },
+            { task_id: 'T4' },
+          ],
+          max_concurrency: 9,
+          as: 'task',
+          export_as: 'team_result',
+          do: [
+            {
+              op: 'core:transform',
+              params: {
+                input: '{{task.task_id}}',
+                script: 'return { task_id: input };',
+                export_as: 'worker',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    expect(result.status).toBe('succeeded');
+    expect(result.context.team_result.max_concurrency).toBe(3);
+    expect(result.context.team_result.outputs).toHaveLength(4);
   });
 
   it('runs core:parallel_calls across heterogeneous ops and merges per-call context in request order (KD-07)', async () => {

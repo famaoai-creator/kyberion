@@ -30,6 +30,21 @@ describe('graph scheduler', () => {
     expect(cyclic.errors.some((error) => error.code === 'cycle')).toBe(true);
   });
 
+  it('binds a when condition to a declared judge output channel', () => {
+    const derived = deriveExecutionGraph([
+      { id: 'judge', produces: 'decision' },
+      { id: 'approve', when: { from: 'decision', operator: 'eq', value: 'approve' } },
+    ]);
+
+    expect(derived.errors).toEqual([]);
+    expect(derived.graph.edges).toContainEqual({
+      from: 'judge',
+      to: 'approve',
+      kind: 'when',
+      channel: 'decision',
+    });
+  });
+
   it('keeps legacy un-declared steps as an implicit linear chain', () => {
     const derived = deriveExecutionGraph([{ op: 'a' }, { op: 'b' }, { op: 'c' }]);
     expect(derived.errors).toEqual([]);

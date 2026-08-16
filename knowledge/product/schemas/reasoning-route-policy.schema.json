@@ -21,6 +21,8 @@
     "tenant_overrides": { "$ref": "#/$defs/overrides" },
     "organization_overrides": { "$ref": "#/$defs/overrides" },
     "project_overrides": { "$ref": "#/$defs/overrides" },
+    "routing": { "$ref": "#/$defs/routing" },
+    "permission_floor": { "type": "string", "enum": ["readonly", "edit", "full"] },
     "fallback": { "$ref": "#/$defs/fallback" }
   },
   "$defs": {
@@ -159,6 +161,28 @@
         "max_completion_tokens": { "type": "integer", "minimum": 1 },
         "timeout_ms": { "type": "integer", "minimum": 1 },
         "sampling": { "$ref": "#/$defs/sampling" }
+      },
+      "additionalProperties": false
+    },
+    "binding": {
+      "type": "object",
+      "properties": {
+        "profile": { "type": "string", "minLength": 1 },
+        "mode": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "permission_mode": { "type": "string", "enum": ["readonly", "edit", "full"] },
+        "capability_profile": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "steps": { "type": "object", "additionalProperties": { "$ref": "#/$defs/binding" } },
+        "tags": { "type": "object", "additionalProperties": { "$ref": "#/$defs/binding" } },
+        "personas": { "type": "object", "additionalProperties": { "$ref": "#/$defs/binding" } }
       },
       "additionalProperties": false
     },

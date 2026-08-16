@@ -8,6 +8,7 @@ import {
 import { evaluateEgressPolicy } from './egress-policy.js';
 import type { PipelineAdf, PipelineAdfStep, StepHook } from './pipeline-contract.js';
 import { deriveExecutionGraph } from './graph-scheduler.js';
+import { resolveMaxRouteHops } from './judge-route.js';
 
 export interface AdfGuardrailFinding {
   code: string;
@@ -279,6 +280,102 @@ export function validatePipelineGuardrails(
         }
       }
 
+      // TAKT Wave 1: validate judge_route targets before any actuator runs.
+      // The model can propose a label, but it cannot invent a step id or an
+      // unbounded back-edge.
+      if (opName === 'core:judge_route' || opName === 'judge_route') {
+        const params = (step.params ?? {}) as Record<string, unknown>;
+        const routes = Array.isArray(params.routes) ? params.routes : [];
+        const knownIds = new Set(
+          steps
+            .map((candidate) => candidate.id)
+            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+        );
+        if (routes.length === 0) {
+          findings.push({
+            code: 'judge-route-without-routes',
+            severity: 'error',
+            message: 'judge_route requires a non-empty params.routes array.',
+            path: `${stepPath}.params.routes`,
+          });
+        }
+        const noMatch = params.on_no_match;
+        if (noMatch !== undefined && !['abort', 'complete', 'continue'].includes(String(noMatch))) {
+          findings.push({
+            code: 'judge-route-invalid-no-match',
+            severity: 'error',
+            message: 'judge_route on_no_match must be abort, complete, or continue.',
+            path: `${stepPath}.params.on_no_match`,
+          });
+        }
+        for (const [routeIndex, rawRoute] of routes.entries()) {
+          if (!rawRoute || typeof rawRoute !== 'object') {
+            findings.push({
+              code: 'judge-route-invalid-route',
+              severity: 'error',
+              message: `judge_route route ${routeIndex + 1} must be an object.`,
+              path: `${stepPath}.params.routes[${routeIndex}]`,
+            });
+            continue;
+          }
+          const next = String((rawRoute as Record<string, unknown>).next || '').trim();
+          if (!next) {
+            findings.push({
+              code: 'judge-route-missing-target',
+              severity: 'error',
+              message: `judge_route route ${routeIndex + 1} must declare next.`,
+              path: `${stepPath}.params.routes[${routeIndex}].next`,
+            });
+            continue;
+          }
+          if (!['COMPLETE', 'ABORT'].includes(next) && !knownIds.has(next)) {
+            findings.push({
+              code: 'judge-route-unknown-target',
+              severity: 'error',
+              message: `judge_route references unknown target step "${next}".`,
+              path: `${stepPath}.params.routes[${routeIndex}].next`,
+            });
+          }
+          const targetIndex = steps.findIndex((candidate) => candidate.id === next);
+          if (targetIndex >= 0 && targetIndex <= index) {
+            findings.push({
+              code: 'judge-route-back-edge',
+              severity: 'error',
+              message: `judge_route has a back-edge to "${next}"; linear execution cannot safely rewind, so the route must target a later step or a terminal.`,
+              path: `${stepPath}.params.routes[${routeIndex}].next`,
+            });
+          }
+        }
+        if (params.max_route_hops === undefined) {
+          findings.push({
+            code: 'loop-max-iterations-omitted',
+            severity: 'warn',
+            message: `judge_route max_route_hops omitted; defaulting to ${resolveMaxRouteHops(steps.length)}.`,
+            path: `${stepPath}.params.max_route_hops`,
+          });
+        } else if (
+          typeof params.max_route_hops !== 'number' ||
+          !Number.isInteger(params.max_route_hops) ||
+          params.max_route_hops < 1
+        ) {
+          findings.push({
+            code: 'judge-route-invalid-hop-limit',
+            severity: 'error',
+            message: 'judge_route max_route_hops must be a positive integer.',
+            path: `${stepPath}.params.max_route_hops`,
+          });
+        }
+        if (String(noMatch || '') === 'continue') {
+          findings.push({
+            code: 'judge-route-continue-without-match',
+            severity: 'warn',
+            message:
+              'judge_route on_no_match=continue leaves the next step unchanged; use abort unless intentional.',
+            path: `${stepPath}.params.on_no_match`,
+          });
+        }
+      }
+
       inspectStep(step, stepPath, depth);
     }
   }
@@ -325,7 +422,8 @@ export function validatePipelineGuardrails(
     if (
       step.op === 'core:foreach' ||
       step.op === 'core:parallel_foreach' ||
-      step.op === 'core:accumulate'
+      step.op === 'core:accumulate' ||
+      step.op === 'core:team_lead'
     ) {
       const params = step.params as Record<string, unknown> | undefined;
       const items = params?.items;
@@ -339,6 +437,17 @@ export function validatePipelineGuardrails(
       }
       const body = Array.isArray(params?.do) ? (params?.do as PipelineAdfStep[]) : undefined;
       if (body) visitSteps(body, `${stepPath}.params.do`, depth + 1);
+      if (step.op === 'core:team_lead') {
+        const concurrency = params?.max_concurrency ?? params?.concurrency;
+        if (typeof concurrency === 'number' && concurrency > 3) {
+          findings.push({
+            code: 'team-lead-concurrency-exceeded',
+            severity: 'error',
+            message: `team_lead max_concurrency (${concurrency}) exceeds governance limit (3)`,
+            path: `${stepPath}.params.max_concurrency`,
+          });
+        }
+      }
     }
 
     if (step.op === 'core:parallel_calls') {

@@ -1,0 +1,6 @@
+{
+  "kind": "instruction",
+  "name": "evidence-first",
+  "must_include": ["artifact path", "observed result", "bounded change"],
+  "must_not_include": []
+}

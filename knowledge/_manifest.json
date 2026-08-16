@@ -997,6 +997,30 @@
       "type": "json"
     },
     {
+      "path": "product/facets/instructions/evidence-first.md",
+      "tier": "public",
+      "size": 260,
+      "type": "md"
+    },
+    {
+      "path": "product/facets/output-contracts/operation-result.md",
+      "tier": "public",
+      "size": 216,
+      "type": "md"
+    },
+    {
+      "path": "product/facets/personas/orchestrator.md",
+      "tier": "public",
+      "size": 258,
+      "type": "md"
+    },
+    {
+      "path": "product/facets/policies/fail-closed.md",
+      "tier": "public",
+      "size": 244,
+      "type": "md"
+    },
+    {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
       "size": 8312,
@@ -1341,7 +1365,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 83403,
+      "size": 83947,
       "type": "json"
     },
     {
@@ -2181,7 +2205,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 13337,
+      "size": 13560,
       "type": "json"
     },
     {
@@ -4621,6 +4645,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/takt-clean-room-notes.md",
+      "tier": "public",
+      "size": 4481,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
       "size": 15403,
@@ -6915,7 +6945,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 16321,
+      "size": 17112,
       "type": "json"
     },
     {
@@ -7395,7 +7425,7 @@
     {
       "path": "product/schemas/pipeline-adf.schema.json",
       "tier": "public",
-      "size": 6094,
+      "size": 12912,
       "type": "json"
     },
     {
@@ -7587,7 +7617,7 @@
     {
       "path": "product/schemas/reasoning-route-policy.schema.json",
       "tier": "public",
-      "size": 6635,
+      "size": 7682,
       "type": "json"
     },
     {
