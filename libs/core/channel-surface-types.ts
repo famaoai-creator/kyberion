@@ -15,6 +15,7 @@ import type {
   ExecutionFeedbackRecord,
   ExecutionFeedbackRequest,
 } from './execution-feedback.js';
+import type { EventScope, EventScopeInput } from './event-scope.js';
 
 export type SurfaceRole = GovernedArtifactRole;
 
@@ -31,6 +32,7 @@ export interface SurfaceEvent {
   task_id?: string;
   agent_id?: string;
   resource_id?: string;
+  scope?: EventScope;
   [key: string]: unknown;
 }
 
@@ -262,6 +264,7 @@ export interface A2ATaskContext {
   // ContextSecurityScope object from the mission context pack; the a2a bridge
   // uses it to fingerprint conversation storage and validate egress.
   security_scope?: Record<string, unknown>;
+  scope?: EventScope;
   // NI-03: root-first DelegationChain (DelegationLink[] — delegation-chain.ts)
   // recording who delegated this task to whom. Typed loosely here like
   // security_scope; delegation-chain.ts's parseDelegationChain is the deep
@@ -299,6 +302,7 @@ export interface BaseSurfaceMetadata {
   actorId?: string;
   channel: string;
   threadTs: string;
+  scope?: EventScope;
   [key: string]: any;
 }
 
@@ -347,6 +351,7 @@ interface SurfaceConversationInputBase {
   missionId?: string;
   teamRole?: string;
   executionFeedback?: ExecutionFeedbackInput;
+  scope?: EventScopeInput;
 }
 
 export type SurfaceConversationInput = SurfaceConversationInputBase & {
@@ -371,6 +376,7 @@ interface SurfaceConversationMessageInputBase {
   /** Deterministic local E2E hook; production callers leave this unset. */
   awaitBackgroundReviewFork?: boolean;
   executionFeedback?: ExecutionFeedbackInput;
+  scope?: EventScopeInput;
 }
 
 export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBase & {
@@ -426,6 +432,7 @@ export interface SurfaceAsyncRequestRecord {
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  scope?: EventScope;
 }
 
 export interface SurfaceNotificationRecord {
@@ -439,6 +446,7 @@ export interface SurfaceNotificationRecord {
   text: string;
   status: 'info' | 'success' | 'error';
   created_at: string;
+  scope?: EventScope;
 }
 
 export type SurfaceDeliveryErrorKind =
@@ -466,6 +474,7 @@ export interface SurfaceOutboxMessage {
   next_attempt_at?: string;
   last_error_kind?: SurfaceDeliveryErrorKind;
   last_error?: string;
+  scope?: EventScope;
 }
 
 export interface SurfaceDeadLetterRecord extends SurfaceOutboxMessage {
@@ -485,6 +494,7 @@ export interface SurfaceDeadTargetRecord {
   failure: SurfaceDeliveryFailure;
   consecutive_failures: number;
   marked_at: string;
+  scope?: EventScope;
 }
 
 export interface SlackOutboxMessage extends SurfaceOutboxMessage {}

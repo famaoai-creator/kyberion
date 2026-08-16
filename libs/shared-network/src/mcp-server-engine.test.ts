@@ -2,7 +2,7 @@
  * Tests for mcp-server-engine.ts (Phase 0/1/2 — Kyberion MCP Server)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 
 // ── vi.hoisted — must come before vi.mock factory references ──────────────────
@@ -23,6 +23,10 @@ const {
   mockDeliverToCowork,
   mockListCoworkOutbox,
   mockRunCoworkKnowledgeSync,
+  mockCreateApprovalRequest,
+  mockListApprovalRequests,
+  mockLoadApprovalRequest,
+  mockComputeApprovalPayloadHash,
   registeredTools,
 } = vi.hoisted(() => {
   const registeredTools = new Map<
@@ -46,6 +50,10 @@ const {
     mockDeliverToCowork: vi.fn().mockReturnValue('COWORK-001'),
     mockListCoworkOutbox: vi.fn().mockReturnValue([]),
     mockRunCoworkKnowledgeSync: vi.fn(),
+    mockCreateApprovalRequest: vi.fn(),
+    mockListApprovalRequests: vi.fn().mockReturnValue([]),
+    mockLoadApprovalRequest: vi.fn(),
+    mockComputeApprovalPayloadHash: vi.fn().mockReturnValue('payload-hash'),
     registeredTools,
   };
 });
@@ -63,6 +71,10 @@ vi.mock('@agent/core', async () => {
     stopManagedProcess: mockStopManagedProcess,
     buildKnowledgeIndex: mockBuildKnowledgeIndex,
     queryKnowledge: mockQueryKnowledge,
+    createApprovalRequest: mockCreateApprovalRequest,
+    listApprovalRequests: mockListApprovalRequests,
+    loadApprovalRequest: mockLoadApprovalRequest,
+    computeApprovalPayloadHash: mockComputeApprovalPayloadHash,
   };
 });
 
@@ -107,8 +119,35 @@ vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => {
 import { createKyberionMcpServer } from './mcp-server-engine.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const governedToolNames = [
+  'kyberion.pipeline.list',
+  'kyberion.pipeline.run',
+  'kyberion.pipeline.job_status',
+  'kyberion.knowledge.search',
+  'kyberion.capability.list',
+  'kyberion.mission.create',
+  'kyberion.mission.status',
+  'kyberion.mission.journal',
+  'kyberion.surface.cowork.deliver',
+  'kyberion.surface.cowork.list',
+  'kyberion.knowledge.cowork_sync',
+  'kyberion.approval.list_pending',
+  'kyberion.approval.decide',
+  'kyberion.audit.export',
+  'kyberion.audit.verify',
+  'kyberion.service.actuate',
+];
+
 const FAKE_CATALOG = JSON.stringify({
   pipeline_run_allowlist: ['pipelines/vital-check.json'],
+  tools: governedToolNames.map((name) => ({
+    name,
+    allowed_tiers: name === 'kyberion.service.actuate' ? ['confidential', 'personal'] : ['public'],
+    allowed_caller_roles:
+      name === 'kyberion.approval.decide' || name === 'kyberion.service.actuate'
+        ? ['operator']
+        : ['operator', 'agent', 'cowork'],
+  })),
 });
 
 function setupCommonMocks() {
@@ -122,6 +161,13 @@ describe('createKyberionMcpServer()', () => {
     vi.clearAllMocks();
     registeredTools.clear();
     setupCommonMocks();
+    vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'cowork');
+    mockCreateApprovalRequest.mockReturnValue({ id: 'approval-001' });
+    mockComputeApprovalPayloadHash.mockReturnValue('payload-hash');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('サーバが作成されツールが登録される', () => {
@@ -133,6 +179,31 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.mission.create')).toBe(true);
     expect(registeredTools.has('kyberion.mission.status')).toBe(true);
     expect(registeredTools.has('kyberion.mission.journal')).toBe(true);
+  });
+
+  it('サーバー側 caller role が未確定ならツール実行を拒否する', async () => {
+    vi.stubEnv('KYBERION_MCP_CALLER_ROLE', '');
+
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
+    const result = await handler({});
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_REQUIRED');
+  });
+
+  it('カタログで operator 限定のツールは cowork role から拒否する', async () => {
+    createKyberionMcpServer();
+    const handler = registeredTools.get('kyberion.approval.decide')!.handler;
+    const result = await handler({
+      request_id: 'req-001',
+      decision: 'approved',
+      decided_by: 'cowork-client',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_DENIED');
+    expect(mockDecideApproval).not.toHaveBeenCalled();
   });
 
   describe('kyberion.pipeline.list', () => {
@@ -369,7 +440,8 @@ describe('createKyberionMcpServer()', () => {
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.mission.status')!.handler;
-      const result = await handler({ mission_id: 'mission-abc' });
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+      const result = await handler({ mission_id: 'mission-abc', tenant: 'tenant-a' });
 
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toBe('Mission status: running');
@@ -378,6 +450,95 @@ describe('createKyberionMcpServer()', () => {
         expect.arrayContaining(['status', '--mission-id', 'mission-abc']),
         expect.any(Object)
       );
+    });
+  });
+
+  describe('kyberion.mission.create approval gate', () => {
+    it('承認なしでは approval request を作成して mission を起動しない', async () => {
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.mission.create')!.handler;
+      const result = await handler({
+        title: 'Scoped mission',
+        brief: 'Do scoped work',
+        tenant: 'tenant-a',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.status).toBe('approval_required');
+      expect(parsed.request_id).toBe('approval-001');
+      expect(mockCreateApprovalRequest).toHaveBeenCalledWith(
+        'surface_runtime',
+        expect.objectContaining({
+          scope: expect.objectContaining({ tenant_slug: 'tenant-a' }),
+          accountability: expect.objectContaining({
+            payloadHash: 'payload-hash',
+            effectBinding: 'mission.create:tenant-a',
+          }),
+        })
+      );
+      expect(mockSafeExec).not.toHaveBeenCalled();
+    });
+
+    it('承認済みで payload と scope が一致した場合だけ mission を起動する', async () => {
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+      mockLoadApprovalRequest.mockReturnValue({
+        id: 'approval-001',
+        status: 'approved',
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: 'payload-hash',
+          effectBinding: 'mission.create:tenant-a',
+        },
+      });
+      mockSafeExec.mockReturnValue('Mission created: mission-001');
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.mission.create')!.handler;
+      const result = await handler({
+        title: 'Scoped mission',
+        brief: 'Do scoped work',
+        tenant: 'tenant-a',
+        approval_ref: 'approval-001',
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toBe('Mission created: mission-001');
+      expect(mockSafeExec).toHaveBeenCalledWith(
+        'node',
+        expect.arrayContaining(['--tenant-slug', 'tenant-a']),
+        expect.any(Object)
+      );
+    });
+
+    it('承認の scope が別 tenant なら mission を起動しない', async () => {
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+      mockLoadApprovalRequest.mockReturnValue({
+        id: 'approval-001',
+        status: 'approved',
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: 'payload-hash',
+          effectBinding: 'mission.create:tenant-a',
+        },
+      });
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.mission.create')!.handler;
+      const result = await handler({
+        title: 'Scoped mission',
+        brief: 'Do scoped work',
+        tenant: 'tenant-a',
+        approval_ref: 'approval-001',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('MCP_APPROVAL_SCOPE_MISMATCH');
+      expect(mockSafeExec).not.toHaveBeenCalled();
     });
   });
 
@@ -410,6 +571,7 @@ describe('createKyberionMcpServer()', () => {
 
   describe('kyberion.approval.decide', () => {
     it('valid な requestId で承認を適用する', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
       mockDecideApproval.mockReturnValue({
         request_id: 'req-001',
         decision: 'approved',
@@ -432,6 +594,7 @@ describe('createKyberionMcpServer()', () => {
     });
 
     it('decideApprovalFromCowork がエラーをスローした場合はエラーを返す', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
       mockDecideApproval.mockImplementation(() => {
         throw new Error('[APPROVAL_ERROR] Request not found');
       });

@@ -27,12 +27,7 @@ export interface ActuatorExecutionBrief {
     description: string;
     actuator: string;
     phase:
-      | 'resolve_system'
-      | 'authenticate'
-      | 'list_pending'
-      | 'review_item'
-      | 'decide'
-      | 'summarize';
+      'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
     requires_confirmation?: boolean;
     input_refs?: string[];
     output_refs?: string[];
@@ -48,10 +43,7 @@ export interface ActuatorExecutionBrief {
     [k: string]: unknown;
   }[];
   readiness?:
-    | 'fully_automatable'
-    | 'needs_clarification'
-    | 'needs_external_asset'
-    | 'blocked_by_runtime';
+    'fully_automatable' | 'needs_clarification' | 'needs_external_asset' | 'blocked_by_runtime';
   readiness_reason?: string;
   llm_touchpoints?: {
     stage: string;

@@ -1,5 +1,6 @@
 {
   "version": "1",
+  "tenant_id": "tenant-acme",
   "peers": [
     {
       "peer_id": "bootstrap-peer",

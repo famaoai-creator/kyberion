@@ -590,6 +590,7 @@ export async function executeDirectVideoGeneration(
       backend_kind: backend.kind,
       backend_provider: backend.provider,
       modality: 'video',
+      ...(submission.metadata ? { provider_metadata: submission.metadata } : {}),
     };
   }
   const completed = await waitForVideoGeneration(
@@ -611,6 +612,7 @@ export async function executeDirectVideoGeneration(
     backend_kind: backend.kind,
     backend_provider: backend.provider,
     modality: 'video',
+    ...(completed.metadata ? { provider_metadata: completed.metadata } : {}),
   };
 }
 
@@ -623,7 +625,12 @@ export async function refreshDirectVideoGeneration(
   const request = normalizeVideoGenerationRequest(params, backend);
   const status = await provider.status(providerJobId, request);
   if (status.status !== 'succeeded')
-    return { ...status, backend_id: backend.backend_id, backend_provider: backend.provider };
+    return {
+      ...status,
+      backend_id: backend.backend_id,
+      backend_provider: backend.provider,
+      ...(status.metadata ? { provider_metadata: status.metadata } : {}),
+    };
   const artifact = await collectDirectVideoArtifact(provider, status, request);
   return {
     ...status,
@@ -635,6 +642,7 @@ export async function refreshDirectVideoGeneration(
     backend_kind: backend.kind,
     backend_provider: backend.provider,
     modality: 'video',
+    ...(status.metadata ? { provider_metadata: status.metadata } : {}),
   };
 }
 

@@ -80,6 +80,16 @@
       "allowed_caller_roles": ["operator", "agent", "cowork"]
     },
     {
+      "name": "kyberion.service.actuate",
+      "description": "Execute an allowlisted service actuator operation for a bound tenant.",
+      "category": "service",
+      "risk_class": "high",
+      "requires_approval": true,
+      "allowed_tiers": ["confidential", "personal"],
+      "allowed_caller_roles": ["operator"],
+      "notes": "Disabled by default; requires a server-bound tenant and an explicit service-actuation gate."
+    },
+    {
       "name": "kyberion.approval.list_pending",
       "description": "List pending approval requests in Kyberion.",
       "category": "approval",

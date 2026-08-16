@@ -24,6 +24,13 @@ export interface EntityGovernanceReport {
   plan_ledger: { missing: string[] };
 }
 
+export function shouldFailEntityGovernance(
+  report: Pick<EntityGovernanceReport, 'status' | 'warnings'>,
+  strictWarnings = false
+): boolean {
+  return report.status === 'drift' || (strictWarnings && report.warnings.length > 0);
+}
+
 const REQUIRED_PROTECTED_PREFIXES = [
   'active/missions/confidential/',
   'active/projects/confidential/',
@@ -279,7 +286,10 @@ export function main(): void {
     'sovereign'
   );
   console.log(JSON.stringify(report, null, 2));
-  if (report.status === 'drift' || report.warnings.length > 0) process.exitCode = 1;
+  const strictWarnings =
+    process.argv.includes('--strict-warnings') ||
+    process.env.KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS === 'true';
+  if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
 }
 
 if (

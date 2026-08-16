@@ -8,14 +8,13 @@ import {
   listMeshDeliveries,
   type MeshDeadLetterRecord,
 } from './mesh-message-broker.js';
-import {
-  listMeshTopicSubscriptions,
-} from './mesh-topic-registry.js';
+import { listMeshTopicSubscriptions } from './mesh-topic-registry.js';
 import {
   type MeshDeliveryRecord,
   type MeshTopicSubscription,
   type MeshTargetSelector,
 } from './mesh-hub-contract.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 export interface MeshHubPeerInspection {
   peer_id: string;
@@ -65,6 +64,7 @@ export interface MeshHubInspectionReport {
 }
 
 export interface MeshHubInspectionOptions {
+  tenantId?: string;
   now?: string | Date;
   namespace?: string;
 }
@@ -90,7 +90,12 @@ function summarizeRoute(delivery: MeshDeliveryRecord): string {
   const route = delivery.route;
   const selector = route.selector;
   const selectedPeer = route.selected_peer_id ? ` selected=${route.selected_peer_id}` : '';
-  const fanOut = route.decision === 'direct' ? 'direct' : route.decision === 'requires_operator_selection' ? 'operator-selection' : route.decision;
+  const fanOut =
+    route.decision === 'direct'
+      ? 'direct'
+      : route.decision === 'requires_operator_selection'
+        ? 'operator-selection'
+        : route.decision;
   const selectorSummary =
     selector.kind === 'peer'
       ? `peer:${selector.peer_id}`
@@ -105,7 +110,7 @@ function summarizeRoute(delivery: MeshDeliveryRecord): string {
 function buildPeerInspection(
   now: string,
   peer: MeshPeerDirectoryEntry,
-  presenceRecord: { heartbeat_at: string; expires_at: string } | null,
+  presenceRecord: { heartbeat_at: string; expires_at: string } | null
 ): MeshHubPeerInspection {
   const heartbeatState = !presenceRecord
     ? 'missing'
@@ -124,19 +129,23 @@ function buildPeerInspection(
   };
 }
 
-export async function inspectMeshHub(options: MeshHubInspectionOptions = {}): Promise<MeshHubInspectionReport> {
+export async function inspectMeshHub(
+  options: MeshHubInspectionOptions = {}
+): Promise<MeshHubInspectionReport> {
+  const tenantId = String(options.tenantId || '').trim();
+  if (!isValidTenantSlug(tenantId)) {
+    throw new Error(`mesh_inspection_invalid_tenant_id:${tenantId}`);
+  }
   const now = normalizeIso(options.now);
   const namespace = options.namespace || undefined;
-  const directories = listMeshPeerDirectoryEntries(now);
-  const presences = listMeshPeerPresenceRecords();
-  const deliveryRecords = await listMeshDeliveries(namespace);
-  const deadLetters = await listMeshDeadLetters({}, { namespace });
-  const subscriptions = listMeshTopicSubscriptions({}, { namespace, now });
-  const presenceByPeer = new Map(
-    presences.map((record) => [record.peer_id, record] as const),
-  );
+  const directories = listMeshPeerDirectoryEntries(tenantId, now);
+  const presences = listMeshPeerPresenceRecords(tenantId);
+  const deliveryRecords = await listMeshDeliveries(namespace, tenantId);
+  const deadLetters = await listMeshDeadLetters({ tenant_id: tenantId }, { namespace });
+  const subscriptions = listMeshTopicSubscriptions({}, { namespace, now, tenantId });
+  const presenceByPeer = new Map(presences.map((record) => [record.peer_id, record] as const));
   const peerInspections = directories.map((peer) =>
-    buildPeerInspection(now, peer, presenceByPeer.get(peer.peer_id) || null),
+    buildPeerInspection(now, peer, presenceByPeer.get(peer.peer_id) || null)
   );
 
   const deliveries = deliveryRecords.map<MeshHubDeliveryInspection>((delivery) => ({
@@ -166,14 +175,19 @@ export async function inspectMeshHub(options: MeshHubInspectionOptions = {}): Pr
     };
     current.subscribers += 1;
     current.fan_out_count = current.subscribers;
-    current.request_kinds = Array.from(new Set([...current.request_kinds, ...subscription.filters.request_kinds]));
-    current.payload_classifications = Array.from(new Set([...current.payload_classifications, ...subscription.filters.payload_classifications]));
+    current.request_kinds = Array.from(
+      new Set([...current.request_kinds, ...subscription.filters.request_kinds])
+    );
+    current.payload_classifications = Array.from(
+      new Set([...current.payload_classifications, ...subscription.filters.payload_classifications])
+    );
     current.policy_version = subscription.policy_version;
     topicIndex.set(key, current);
   }
 
-  const topics = Array.from(topicIndex.values()).sort((left, right) =>
-    left.tenant_id.localeCompare(right.tenant_id) || left.topic.localeCompare(right.topic),
+  const topics = Array.from(topicIndex.values()).sort(
+    (left, right) =>
+      left.tenant_id.localeCompare(right.tenant_id) || left.topic.localeCompare(right.topic)
   );
 
   return {
@@ -193,26 +207,36 @@ export async function inspectMeshHub(options: MeshHubInspectionOptions = {}): Pr
 export function formatMeshHubInspectionReport(report: MeshHubInspectionReport): string[] {
   const lines: string[] = [];
   lines.push(`Mesh Hub inspection ${report.generated_at}`);
-  lines.push(`Peers: ${report.peer_count}  Deliveries: ${report.delivery_count}  Dead letters: ${report.dead_letter_count}  Topics: ${report.topic_count}`);
+  lines.push(
+    `Peers: ${report.peer_count}  Deliveries: ${report.delivery_count}  Dead letters: ${report.dead_letter_count}  Topics: ${report.topic_count}`
+  );
   lines.push('');
   lines.push('Peers');
   for (const peer of report.peers) {
-    lines.push(`- ${peer.peer_id} | ${peer.tenant_id || 'unknown'} | ${peer.heartbeat_state} | ${peer.status} | age=${peer.heartbeat_age_ms ?? 'n/a'}ms | caps=${peer.capabilities.join(', ') || 'none'}`);
+    lines.push(
+      `- ${peer.peer_id} | ${peer.tenant_id || 'unknown'} | ${peer.heartbeat_state} | ${peer.status} | age=${peer.heartbeat_age_ms ?? 'n/a'}ms | caps=${peer.capabilities.join(', ') || 'none'}`
+    );
   }
   lines.push('');
   lines.push('Routes');
   for (const route of report.routes) {
-    lines.push(`- ${route.delivery_id} | ${route.state} | retry=${route.retry_count} | expires=${route.expires_at} | ${route.route_explanation}`);
+    lines.push(
+      `- ${route.delivery_id} | ${route.state} | retry=${route.retry_count} | expires=${route.expires_at} | ${route.route_explanation}`
+    );
   }
   lines.push('');
   lines.push('Dead letters');
   for (const deadLetter of report.dead_letters) {
-    lines.push(`- ${deadLetter.dead_letter_id} | ${deadLetter.delivery_id} | ${deadLetter.failure_class} | ${deadLetter.redacted_reason}`);
+    lines.push(
+      `- ${deadLetter.dead_letter_id} | ${deadLetter.delivery_id} | ${deadLetter.failure_class} | ${deadLetter.redacted_reason}`
+    );
   }
   lines.push('');
   lines.push('Topics');
   for (const topic of report.topics) {
-    lines.push(`- ${topic.tenant_id}:${topic.topic} | subscribers=${topic.subscribers} | fan_out=${topic.fan_out_count} | request_kinds=${topic.request_kinds.join(', ')}`);
+    lines.push(
+      `- ${topic.tenant_id}:${topic.topic} | subscribers=${topic.subscribers} | fan_out=${topic.fan_out_count} | request_kinds=${topic.request_kinds.join(', ')}`
+    );
   }
   return lines;
 }

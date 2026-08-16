@@ -297,6 +297,7 @@
     "surface_runtime": {
       "allow_read": [
         "active/shared/runtime/",
+        "knowledge/personal/tenants/",
         "active/shared/logs/surfaces/",
         "knowledge/product/governance/surfaces/",
         "knowledge/product/governance/active-surfaces.json",
@@ -479,6 +480,24 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "active/audit/"
+      ]
+    },
+    "generation_scheduler": {
+      "allow_read": ["knowledge/personal/tenants/"],
+      "allow_write": []
+    },
+    "physical_namespace_migration": {
+      "allow_read": [
+        "active/shared/runtime/media-generation/schedules/",
+        "active/shared/coordination/channels/",
+        "active/shared/runtime/presence/",
+        "active/missions/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/media-generation/schedules/",
+        "active/shared/coordination/channels/",
+        "active/shared/runtime/presence/",
+        "active/shared/runtime/migrations/physical-namespace/"
       ]
     },
     "service_actuator": {

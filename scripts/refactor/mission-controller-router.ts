@@ -237,7 +237,7 @@ export interface MissionControllerRoutingContext {
  * are the CLI's read side (durable until acknowledged with --ack).
  */
 function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void {
-  const messages = listSurfaceOutboxMessages('terminal').filter(
+  const messages = listSurfaceOutboxMessages('terminal', { includeTenantNamespaces: true }).filter(
     (message) => !options.missionId || message.correlation_id === options.missionId.toUpperCase()
   );
   if (messages.length === 0) {
@@ -255,7 +255,7 @@ function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void
   }
   if (options.ack) {
     for (const message of messages) {
-      clearSurfaceOutboxMessage('terminal', message.message_id);
+      clearSurfaceOutboxMessage('terminal', message.message_id, message.scope);
     }
     logger.info(`Acknowledged ${messages.length} terminal outbox message(s).`);
   } else {
@@ -267,7 +267,7 @@ function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void
 
 function showTerminalOutboxHint(): void {
   try {
-    const pending = listSurfaceOutboxMessages('terminal').length;
+    const pending = listSurfaceOutboxMessages('terminal', { includeTenantNamespaces: true }).length;
     if (pending > 0) {
       logger.info(
         `📬 ${pending} unread mission result(s) in the terminal outbox — view with: mission_controller outbox`

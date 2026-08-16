@@ -23,6 +23,7 @@ const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}
 const PEER_A = `peer-a-e2e-${RUN}`;
 const PEER_B = `peer-b-e2e-${RUN}`;
 const NAMESPACE = `e2e-${RUN}`;
+const TENANT_ID = 'e2e-demo';
 
 function buildRequest(requestId: string): MeshRequest {
   return {
@@ -54,8 +55,8 @@ afterEach(async () => {
     await cleanups.pop()!();
   }
   clearMeshMessageBrokerNamespace(NAMESPACE);
-  clearPeerRuntime(PEER_A);
-  clearPeerRuntime(PEER_B);
+  clearPeerRuntime(TENANT_ID, PEER_A);
+  clearPeerRuntime(TENANT_ID, PEER_B);
 });
 
 describe('mesh two-peer E2E (AA-02)', () => {
@@ -63,6 +64,7 @@ describe('mesh two-peer E2E (AA-02)', () => {
     // Peer B: a live receiving server on an ephemeral port.
     const receiver = createPeerMessagingServer({
       peerId: PEER_B,
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
     });
     const server = await receiver.listen(0);
@@ -100,7 +102,7 @@ describe('mesh two-peer E2E (AA-02)', () => {
     expect(report.failures).toEqual([]);
 
     // Receiver side: the request landed in peer B's inbox.
-    const inbox = listPeerInboxRecords(PEER_B);
+    const inbox = listPeerInboxRecords(TENANT_ID, PEER_B);
     expect(inbox.length).toBeGreaterThanOrEqual(1);
     const payloads = JSON.stringify(inbox);
     expect(payloads).toContain(request.request_id);
@@ -127,7 +129,11 @@ describe('mesh two-peer E2E (AA-02)', () => {
     await broker.acceptMeshRequest(request);
 
     // Receiver down: grab an ephemeral port, then free it.
-    const probe = createPeerMessagingServer({ peerId: PEER_B, sharedSecret: SHARED_SECRET });
+    const probe = createPeerMessagingServer({
+      peerId: PEER_B,
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+    });
     const probeServer = await probe.listen(0);
     const port = (probeServer.address() as AddressInfo).port;
     await probe.close();
@@ -152,7 +158,11 @@ describe('mesh two-peer E2E (AA-02)', () => {
     expect(downPass.retried).toBe(1);
 
     // Receiver back up on the same port.
-    const receiver = createPeerMessagingServer({ peerId: PEER_B, sharedSecret: SHARED_SECRET });
+    const receiver = createPeerMessagingServer({
+      peerId: PEER_B,
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+    });
     await receiver.listen(port);
     cleanups.push(() => receiver.close());
 

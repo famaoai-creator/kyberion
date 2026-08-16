@@ -71,15 +71,15 @@ Kyberion peer
 
 ### 4.1 Core records
 
-| Record | Responsibility | Required fields |
-|---|---|---|
-| `PeerRegistration` | Stable peer identity and enrollment | `peer_id`, `tenant_id`, endpoint reference, key reference, status, registered_at |
-| `PeerPresence` | Short-lived liveness and availability | `peer_id`, `heartbeat_at`, `expires_at`, health, capacity, receive modes |
-| `CapabilityAdvertisement` | What a peer may receive | `capability_id`, version, roles, request kinds, approval policy, visibility |
-| `MeshRequest` | A typed request prior to delivery | sender, target selector, intent, payload reference, TTL, idempotency key |
-| `DeliveryRecord` | Queue and acknowledgement state | message ID, attempt count, route, status, retry time, failure class |
-| `TopicSubscription` | Explicit scoped fan-out membership | topic, peer ID, tenant, filters, expiry, policy version |
-| `RouteDecision` | Explainable recipient selection | candidates, exclusions, selected recipients, policy verdict, correlation ID |
+| Record                    | Responsibility                        | Required fields                                                                  |
+| ------------------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
+| `PeerRegistration`        | Stable peer identity and enrollment   | `peer_id`, `tenant_id`, endpoint reference, key reference, status, registered_at |
+| `PeerPresence`            | Short-lived liveness and availability | `peer_id`, `heartbeat_at`, `expires_at`, health, capacity, receive modes         |
+| `CapabilityAdvertisement` | What a peer may receive               | `capability_id`, version, roles, request kinds, approval policy, visibility      |
+| `MeshRequest`             | A typed request prior to delivery     | sender, target selector, intent, payload reference, TTL, idempotency key         |
+| `DeliveryRecord`          | Queue and acknowledgement state       | message ID, attempt count, route, status, retry time, failure class              |
+| `TopicSubscription`       | Explicit scoped fan-out membership    | topic, peer ID, tenant, filters, expiry, policy version                          |
+| `RouteDecision`           | Explainable recipient selection       | candidates, exclusions, selected recipients, policy verdict, correlation ID      |
 
 ### 4.2 Selector kinds
 
@@ -108,13 +108,13 @@ draft -> accepted -> routed -> queued -> dispatched -> acknowledged
 
 Use append-only runtime records and separate observability summaries.
 
-- `active/shared/runtime/mesh-hub/registrations.jsonl`
-- `active/shared/runtime/mesh-hub/presence.jsonl`
-- `active/shared/runtime/mesh-hub/capabilities.jsonl`
-- `active/shared/runtime/mesh-hub/deliveries.jsonl`
-- `active/shared/runtime/mesh-hub/subscriptions.jsonl`
-- `active/shared/runtime/mesh-hub/dead-letter.jsonl`
-- `active/shared/observability/mesh-hub/events.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/registrations.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/presence.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/capabilities.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/deliveries.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/subscriptions.jsonl`
+- `active/shared/runtime/mesh-hub/{namespace}/tenants/{tenant}/dead-letter.jsonl`
+- `active/shared/observability/mesh-hub/{namespace}/tenants/{tenant}/events.jsonl`
 
 Payload content must be stored only in the sender/recipient tier-authorized artifact store. Hub records contain payload metadata, hashes, and governed references. The observability stream contains identifiers, state transitions, and redacted reason codes only.
 
@@ -122,7 +122,8 @@ Payload content must be stored only in the sender/recipient tier-authorized arti
 
 `appendGovernedArtifactJsonl()` uses a synchronous append helper but does not provide a cross-process file lock. Therefore v1 has exactly one Mesh Hub writer process per runtime root.
 
-- Peer-facing processes submit typed commands to the Hub; they never append directly to `mesh-hub/*.jsonl`.
+- Peer-facing processes submit typed commands to the Hub; they never append directly to `mesh-hub/{namespace}/tenants/{tenant}/*.jsonl`.
+- Every request, delivery, proposal, and event is resolved under one validated tenant namespace; no cross-tenant scan is part of a request path.
 - The Hub serializes all mutation commands through one in-process command loop. It checks idempotency and writes the authoritative delivery record before returning `accepted`.
 - The Hub uses governed append helpers only from that writer. JSONL is the durable event journal; read models and indexes are derived and may be rebuilt.
 - A future multi-process or multi-host Hub requires a transactional store or a separately designed lock/lease protocol. Do not add an ad hoc lock file in this implementation.
@@ -132,14 +133,14 @@ Payload content must be stored only in the sender/recipient tier-authorized arti
 
 Use six `gpt-5.4-mini` subagents. They do not edit concurrently unless their file scopes are disjoint. `gpt-5.5-medium` is the sole coordinator and integration owner.
 
-| Agent | Role | Assigned task | Primary outputs | Dependencies |
-|---|---|---|---|---|
-| A1 | Contract engineer | Define schemas, types, and policy vocabulary | Mesh schemas, TypeScript types, schema tests | None |
-| A2 | Directory engineer | Implement enrollment, directory query, capability ads, heartbeat expiry | registry and presence store/APIs/tests | A1 |
-| A3 | Delivery engineer | Implement durable queue, idempotency, retry, expiry, and dead letter | delivery APIs/tests | A1 |
-| A4 | Routing and integration engineer | Implement selector routing and recipient adapters | router, peer transport adapter, WorkItem/A2A proposal adapters/tests | A1, A2, A3 |
-| A5 | Security reviewer | Perform independent threat-model and policy review | findings, required remediation tests | A1-A4 read-only until fixes are assigned |
-| A6 | Integration test engineer | Build deterministic same-host scenarios and regression suite | E2E tests, operator inspection tests, release evidence | A1-A4, A5 remediation |
+| Agent | Role                             | Assigned task                                                           | Primary outputs                                                      | Dependencies                             |
+| ----- | -------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| A1    | Contract engineer                | Define schemas, types, and policy vocabulary                            | Mesh schemas, TypeScript types, schema tests                         | None                                     |
+| A2    | Directory engineer               | Implement enrollment, directory query, capability ads, heartbeat expiry | registry and presence store/APIs/tests                               | A1                                       |
+| A3    | Delivery engineer                | Implement durable queue, idempotency, retry, expiry, and dead letter    | delivery APIs/tests                                                  | A1                                       |
+| A4    | Routing and integration engineer | Implement selector routing and recipient adapters                       | router, peer transport adapter, WorkItem/A2A proposal adapters/tests | A1, A2, A3                               |
+| A5    | Security reviewer                | Perform independent threat-model and policy review                      | findings, required remediation tests                                 | A1-A4 read-only until fixes are assigned |
+| A6    | Integration test engineer        | Build deterministic same-host scenarios and regression suite            | E2E tests, operator inspection tests, release evidence               | A1-A4, A5 remediation                    |
 
 ### Coordinator responsibilities: `gpt-5.5-medium`
 

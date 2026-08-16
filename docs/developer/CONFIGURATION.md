@@ -139,7 +139,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                                                                |
 
-## flag (15)
+## flag (16)
 
 | Variable                                           | Type                   | Required | Description                                                                                                                                                                                                                                 |
 | -------------------------------------------------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -155,6 +155,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON` | boolean                | no       | _undocumented_                                                                                                                                                                                                                              |
 | `KYBERION_DISABLE_EMBEDDINGS`                      | boolean                | no       | _undocumented_                                                                                                                                                                                                                              |
 | `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean                | no       | _undocumented_                                                                                                                                                                                                                              |
+| `KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS`       | boolean                | no       | Fail check:entity-governance when observed warnings exist.                                                                                                                                                                                  |
 | `KYBERION_SECRET_ENCRYPTION`                       | enum: none \| keychain | no       | At-rest encryption mode for connection documents (AC-05). none=plaintext (default, compatible); keychain=AES-256-GCM with a macOS-keychain-held key. Migrate with pnpm secrets:encrypt (--decrypt exports back to plaintext).               |
 | `KYBERION_SKIP_TYPE_RATCHET`                       | boolean                | no       | _undocumented_                                                                                                                                                                                                                              |
 | `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                                         |
@@ -280,7 +281,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (162)
+## runtime (166)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -356,6 +357,10 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_LOCALE`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                 | string | no       | Allow loopback Chronos requests to use the compatibility localadmin principal when true or unset.       |
 | `KYBERION_MANAGED_PYTHON_VERSION`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MCP_CALLER_ROLE`                     | string | no       | Server-bound MCP caller role checked against mcp-tool-catalog.json; client arguments cannot elevate it. |
+| `KYBERION_MCP_NHI`                             | string | no       | Server-bound NHI used to bind MCP event and approval scope.                                             |
+| `KYBERION_MCP_PRINCIPAL`                       | string | no       | Server-bound principal name recorded for MCP request attribution.                                       |
+| `KYBERION_MCP_TENANT`                          | string | no       | Server-bound tenant slug; a client-supplied tenant may only narrow this binding.                        |
 | `KYBERION_MEMORY_AUTOPROMOTE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_NAMESPACE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_PEER_ID`                        | string | no       | _undocumented_                                                                                          |

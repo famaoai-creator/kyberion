@@ -25,6 +25,7 @@ import {
   isSurfaceOutboxDue,
   recordSurfaceDeliverySuccess,
   settleSurfaceOutboxFailure,
+  assertSurfaceOutboxDeliveryAuthorized,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
   evaluateSurfaceActorAccess,
@@ -343,16 +344,17 @@ export async function handleDiscordInteraction(interaction: any): Promise<void> 
 }
 
 async function drainDiscordOutbox(client: Client): Promise<void> {
-  for (const message of listSurfaceOutboxMessages('discord')) {
+  for (const message of listSurfaceOutboxMessages('discord', { includeTenantNamespaces: true })) {
     if (!isSurfaceOutboxDue(message)) continue;
     try {
+      assertSurfaceOutboxDeliveryAuthorized(message);
       const channel = await (client as any).channels.fetch(message.channel);
       if (!channel || typeof channel.send !== 'function') {
         throw Object.assign(new Error('channel_not_found'), { status: 404 });
       }
       await channel.send(message.text);
-      recordSurfaceDeliverySuccess('discord', message.channel);
-      clearSurfaceOutboxMessage('discord', message.message_id);
+      recordSurfaceDeliverySuccess('discord', message.channel, message.scope);
+      clearSurfaceOutboxMessage('discord', message.message_id, message.scope);
     } catch (error) {
       const decision = settleSurfaceOutboxFailure('discord', message, error);
       logger.error(

@@ -4198,8 +4198,13 @@ function tryBuildAsyncStatusReply(userText: string): string | null {
         : `Request ${record.request_id} is still pending.`;
     }
 
-    const requests = listSurfaceAsyncRequests('presence').slice(0, 5);
-    const notifications = listSurfaceNotifications('presence').slice(0, 3);
+    const requests = listSurfaceAsyncRequests('presence', { includeTenantNamespaces: true }).slice(
+      0,
+      5
+    );
+    const notifications = listSurfaceNotifications('presence', {
+      includeTenantNamespaces: true,
+    }).slice(0, 3);
     if (isJapanese) {
       if (requests.length === 0) return '現在、進行中または最近のリクエストはありません。';
       const latest = requests.map((entry) => `${entry.request_id} ${entry.status}`).join('、');
