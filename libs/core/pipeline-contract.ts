@@ -32,6 +32,39 @@ export interface PipelineStepBudget {
   approval_required?: boolean;
 }
 
+export interface PipelineStepReasoning {
+  provider?: string;
+  mode?: string;
+  profile?: string;
+  model?: string;
+  model_tier?: 'fast' | 'standard' | 'deep';
+  permission_mode?: 'readonly' | 'edit' | 'full';
+  capability_profile?: string;
+  tags?: string[];
+  promotion?: Array<{
+    after_failures?: number;
+    after_iterations?: number;
+    provider?: string;
+    mode?: string;
+    profile?: string;
+    model?: string;
+  }>;
+}
+
+export interface PipelineStepFacets {
+  persona?: string;
+  policies?: string[];
+  instructions?: string[];
+  output_contract?: string;
+}
+
+export interface PipelineStepReport {
+  schema_ref: string;
+  use_judge?: boolean;
+  order?: number;
+  export_as?: string;
+}
+
 export type FlowRole = 'source' | 'transform' | 'sink' | 'gate';
 
 /** Maps legacy type values to Typed Flow roles. */
@@ -58,6 +91,10 @@ export interface PipelineAdfStep {
   comment?: string;
   effort?: 'low' | 'medium' | 'high';
   budget?: PipelineStepBudget;
+  reasoning?: PipelineStepReasoning;
+  facets?: PipelineStepFacets;
+  /** Optional perform -> report phase contract. */
+  report?: PipelineStepReport | PipelineStepReport[];
   /** Typed Flow node role. Preferred over `type`. */
   role?: FlowRole;
   /** Legacy role alias. Prefer `role`. capture→source, transform→transform, apply→sink, control→gate. */
@@ -76,6 +113,11 @@ export interface PipelineAdfStep {
     operator?: string;
     value?: unknown;
     conditions?: unknown[];
+    label?: string;
+    field?: string;
+    eq?: unknown;
+    in?: unknown[];
+    matches?: string;
   };
   /** Fan-in context merge policy. */
   merge?: 'collect' | 'namespace' | 'last';

@@ -422,5 +422,11 @@
   "tenant_overrides": {},
   "organization_overrides": {},
   "project_overrides": {},
+  "permission_floor": "readonly",
+  "routing": {
+    "steps": {},
+    "tags": {},
+    "personas": {}
+  },
   "fallback": { "max_attempts": 3, "max_in_place_retries": 3, "on_unsupported_parameter": "reject" }
 }

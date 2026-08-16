@@ -984,6 +984,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   let activeBackend = defaultBackend;
   if (!options.role && !options.profile) {
     const roleBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
+    const profileBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     for (const role of Object.keys(loadReasoningRoutePolicy().roles)) {
       try {
         const roleChain = buildReasoningRuntimeChain(mode, { ...effectiveOptions, role });
@@ -1001,9 +1002,26 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
         );
       }
     }
+    for (const profile of Object.keys(loadReasoningRoutePolicy().profiles)) {
+      try {
+        const profileChain = buildReasoningRuntimeChain(mode, { ...effectiveOptions, profile });
+        if (profileChain.length > 0)
+          profileBackends.set(
+            profile,
+            buildFailoverReasoningBackend(
+              profileChain.map((candidate) => candidate.backend),
+              governedFailoverPolicy
+            )
+          );
+      } catch (error) {
+        logger.warn(
+          `[reasoning-bootstrap] profile=${profile} route unavailable; skipping profile dispatch: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
     activeBackend =
-      roleBackends.size > 0
-        ? buildRoleAwareReasoningBackend(defaultBackend, roleBackends)
+      roleBackends.size > 0 || profileBackends.size > 0
+        ? buildRoleAwareReasoningBackend(defaultBackend, roleBackends, profileBackends)
         : defaultBackend;
   }
   registerReasoningBackend(activeBackend);
