@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { assertKnowledgePathInScope, resolveKnowledgeScopeSet } from './knowledge-scope.js';
+import {
+  assertKnowledgePathInScope,
+  knowledgeWritePathFor,
+  resolveKnowledgeScopeSet,
+} from './knowledge-scope.js';
 
 describe('knowledge-scope', () => {
   it('keeps a tenant-bearing public request on public/product roots', () => {
@@ -25,5 +29,24 @@ describe('knowledge-scope', () => {
     const scope = resolveKnowledgeScopeSet({ tier: 'confidential' }, { systemAuthority: true });
     expect(scope.roots).toContain('confidential');
     expect(assertKnowledgePathInScope('confidential/any-tenant/secret.md', scope)).toBe(true);
+  });
+
+  it('writes only to the requested point in the tenant containment chain', () => {
+    const path = knowledgeWritePathFor(
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+      'project',
+      'rollback guide'
+    );
+    expect(path).toBe(
+      'confidential/acme-corp/organizations/org-a/projects/project-a/rollback-guide.md'
+    );
+    expect(() =>
+      knowledgeWritePathFor({ tier: 'public', tenant_slug: 'acme-corp' }, 'tenant', 'secret')
+    ).toThrow('[KNOWLEDGE_WRITE_INVALID]');
   });
 });

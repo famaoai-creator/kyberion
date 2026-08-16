@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   guardRequest: vi.fn(() => null),
   requireChronosAccess: vi.fn(() => null),
   resolveViewerContextForRequest: vi.fn(),
+  strictViewerScopeTenantSlugs: vi.fn(),
+  strictViewerScopeOrganizationIds: vi.fn(),
+  strictViewerScopeProjectIds: vi.fn(),
   viewerScopeTenantSlugs: vi.fn(),
   viewerErrorResponse: vi.fn(),
   withViewerExecutionContext: vi.fn((_viewer: unknown, fn: () => unknown) => fn()),
@@ -29,6 +32,9 @@ vi.mock('../../../lib/api-guard', () => ({
 
 vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds: mocks.strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds: mocks.strictViewerScopeProjectIds,
   viewerScopeTenantSlugs: mocks.viewerScopeTenantSlugs,
   viewerErrorResponse: mocks.viewerErrorResponse,
   withViewerExecutionContext: mocks.withViewerExecutionContext,
@@ -43,6 +49,9 @@ describe('workitems route', () => {
     mocks.guardRequest.mockReset();
     mocks.requireChronosAccess.mockReset();
     mocks.resolveViewerContextForRequest.mockReset();
+    mocks.strictViewerScopeTenantSlugs.mockReset();
+    mocks.strictViewerScopeOrganizationIds.mockReset();
+    mocks.strictViewerScopeProjectIds.mockReset();
     mocks.viewerScopeTenantSlugs.mockReset();
     mocks.viewerErrorResponse.mockReset();
     mocks.withViewerExecutionContext.mockReset();
@@ -57,6 +66,11 @@ describe('workitems route', () => {
     mocks.viewerScopeTenantSlugs.mockImplementation(
       (_viewer: unknown, tenant: string | undefined) => (tenant ? [tenant] : 'all')
     );
+    mocks.strictViewerScopeTenantSlugs.mockImplementation(
+      (_viewer: unknown, tenant: string | undefined) => (tenant ? [tenant] : 'all')
+    );
+    mocks.strictViewerScopeOrganizationIds.mockImplementation(() => 'all');
+    mocks.strictViewerScopeProjectIds.mockImplementation(() => 'all');
     mocks.listWorkItems.mockReturnValue([{ item_id: 'WI-1' }]);
     mocks.buildWorkVisibilityProjection.mockReturnValue({
       scope: 'operations',
@@ -92,7 +106,7 @@ describe('workitems route', () => {
     expect(response.status).toBe(200);
     expect(mocks.buildWorkVisibilityProjection).toHaveBeenCalledWith({
       items: [{ item_id: 'WI-1' }],
-      viewer: { tenantSlugs: 'all' },
+      viewer: { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all' },
       scope: 'operations',
       view: 'active',
       organizationId: undefined,

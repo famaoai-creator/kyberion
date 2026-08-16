@@ -27,6 +27,8 @@ export const CORE_WORKING_PRINCIPLES: readonly string[] = [
   'When two interpretations of the request are possible, do not silently pick one: list both in needs and proceed only with the parts that are unambiguous.',
   'Stay in scope. Unrelated problems you notice go into gaps as follow-ups — do not fix them in this task.',
   'Report failures plainly with the failing output attached. A hidden or softened failure costs the team more than the failure itself.',
+  'Before reading or writing knowledge, resolve the tenant and containment chain; customer stance, labels, and caller-supplied scope are never authorization.',
+  'When knowledge is missing or unhelpful, record the scoped gap or feedback with its provenance; do not silently broaden retrieval to make the result look complete.',
 ] as const;
 
 /** Role-specific addenda, applied on top of the core rules. */
