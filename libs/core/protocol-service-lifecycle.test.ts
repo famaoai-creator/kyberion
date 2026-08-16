@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { pathResolver, safeExistsSync, safeRmSync } from './index.js';
+import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from './index.js';
 import {
   protocolServiceLifecycleLogicalPath,
+  portableProtocolServicePathRef,
   readProtocolServiceLifecycleReceipts,
   recordProtocolServiceLifecycle,
 } from './protocol-service-lifecycle.js';
@@ -84,5 +85,48 @@ describe('protocol service lifecycle receipts', () => {
     });
     expect(receipt.action).toBe('restore');
     expect(receipt.actor_role).toBe('mission_controller');
+  });
+
+  it('rejects malformed receipts and scope contamination while reading', () => {
+    const logicalPath = protocolServiceLifecycleLogicalPath('peer-messaging', scope);
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(
+        logicalPath,
+        `${JSON.stringify({
+          kind: 'protocol-service-lifecycle-receipt.v1',
+          receipt_id: 'foreign',
+          service_id: 'peer-messaging',
+          action: 'start',
+          status: 'started',
+          occurred_at: new Date().toISOString(),
+          actor_role: 'infrastructure_sentinel',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'other-tenant' },
+        })}\n`
+      );
+    });
+    expect(() => readProtocolServiceLifecycleReceipts('peer-messaging', scope)).toThrow(
+      'PROTOCOL_LIFECYCLE_RECEIPT_INVALID'
+    );
+  });
+
+  it('stores portable references for external absolute paths', () => {
+    expect(portableProtocolServicePathRef('/tmp/kyberion-archive.tar.gz')).toMatch(
+      /^external-path:[a-f0-9]{20}$/u
+    );
+    expect(portableProtocolServicePathRef('active/shared/tmp/archive.tar.gz')).toBe(
+      'active/shared/tmp/archive.tar.gz'
+    );
+
+    const receipt = recordProtocolServiceLifecycle({
+      serviceId: 'peer-messaging',
+      action: 'health_check',
+      status: 'healthy',
+      scope,
+      metadata: { manifest_path: '/tmp/manifest.json', port: 4100 },
+    });
+    expect(receipt.metadata).toMatchObject({
+      manifest_path: expect.stringMatching(/^external-path:[a-f0-9]{20}$/u),
+      port: 4100,
+    });
   });
 });

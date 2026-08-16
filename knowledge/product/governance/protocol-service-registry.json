@@ -48,6 +48,7 @@
         "active/shared/coordination/"
       ],
       "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"],
+      "lifecycle_owner": "service",
       "lifecycle_compatibility": "surface-provider-manifest:mcp-server-cowork"
     },
     {

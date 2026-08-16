@@ -11,6 +11,7 @@ describe('protocol service boundary registry', () => {
     const entries = new Map(registry.entries.map((entry) => [String(entry.id), entry]));
     expect(entries.get('peer-messaging')?.classification).toBe('protocol-gateway');
     expect(entries.get('mcp-server-cowork')?.classification).toBe('protocol-gateway');
+    expect(entries.get('mcp-server-cowork')?.lifecycle_owner).toBe('service');
     expect(entries.get('review-checks')?.classification).toBe('control-plane-worker');
     expect(entries.get('report-review')?.classification).toBe('artifact-review-port');
     for (const entry of entries.values()) {
