@@ -281,7 +281,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (166)
+## runtime (168)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -382,6 +382,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PHASE_GATE_MODE`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PIPELINE_FALLBACK_ACTIVE`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PREFIX`                              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROJECT_ID`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROJECT_NAME`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_CAPABILITY_PROBE`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_CAPABILITY_REFRESH`         | string | no       | Force a provider capability re-probe and reasoning backend re-selection                                 |
@@ -420,6 +421,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SURFACE_ALLOWLISTS`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SURFACE_QUERY_PHASE`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SURFACE_QUERY_ROLE`                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TASK_ID`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TASK_MODEL_ROUTING`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TELEMETRY`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TEN_VAD_PYTHON`                      | string | no       | _undocumented_                                                                                          |

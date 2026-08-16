@@ -16,6 +16,8 @@ import {
   reciprocalRankFusion,
 } from '../embedding-backend.js';
 import { knowledgeMetadataScore, type KnowledgeRankingMetadata } from '../ranking-signals.js';
+import type { ScopeContext } from '../scope-context.js';
+import { currentScope } from '../scope-context.js';
 
 /**
  * Reactive Knowledge Index v3.0
@@ -67,6 +69,8 @@ export interface KnowledgeQueryOptions {
   maxResults?: number;
   /** Scope used by the shared metadata ranker; defaults to global. */
   scope?: string;
+  /** Canonical containment scope used by the proximity signal. */
+  scopeContext?: ScopeContext;
   /**
    * DA-07: when true, `queryKnowledge` attaches the lexical relevance score
    * to each returned hint (`KnowledgeHint.score`) so callers can merge these
@@ -74,6 +78,16 @@ export interface KnowledgeQueryOptions {
    * the historical result shape untouched.
    */
   includeScores?: boolean;
+}
+
+function metadataScore(hint: KnowledgeHint, options: KnowledgeQueryOptions): number {
+  return knowledgeMetadataScore(
+    { ...hint, source: hint.source },
+    options.scope,
+    {},
+    Date.now(),
+    options.scopeContext
+  );
 }
 
 /**
@@ -117,6 +131,12 @@ export interface KnowledgeScope {
    * models automatically invalidates cached vectors.
    */
   embeddingModel?: string;
+  /** Canonical containment scope for confidential and personal reads. */
+  scopeContext?: ScopeContext;
+  /** Explicit authority for system-wide confidential/personal indexing. */
+  systemAuthority?: boolean;
+  /** Whether the shared confidential/common prefix is in scope. */
+  includeCommon?: boolean;
 }
 
 export const DEFAULT_SCOPE: KnowledgeScope = { tiers: ['public'] };
@@ -167,6 +187,9 @@ export function computeScopeHash(scope: KnowledgeScope, modelName?: string): str
     domains: scope.domains ? [...scope.domains].sort() : null,
     filterTags: scope.filterTags ? [...scope.filterTags].sort() : null,
     model: scope.embeddingModel ?? modelName ?? 'default',
+    scopeContext: scope.scopeContext ?? null,
+    systemAuthority: scope.systemAuthority === true,
+    includeCommon: scope.includeCommon !== false,
   });
   return createHash('sha256').update(key).digest('hex').slice(0, 16);
 }
@@ -339,10 +362,22 @@ export async function buildScopedIndex(
 ): Promise<KnowledgeHintIndex> {
   const knowledgeBase = rootDir || pathResolver.knowledge();
   const hints: KnowledgeHint[] = [];
+  const scopeContext =
+    scope.scopeContext ||
+    (scope.customerId && scope.customerId !== 'common'
+      ? currentScope({ tenant_slug: scope.customerId, tier: 'confidential' })
+      : undefined);
+  const effectiveScope = scopeContext
+    ? {
+        ...scope,
+        scopeContext,
+        ...(scope.includeCommon === false ? { includeCommon: false } : {}),
+      }
+    : scope;
 
-  const domains = scope.domains ?? TIER1_SUBDIRS;
+  const domains = effectiveScope.domains ?? TIER1_SUBDIRS;
 
-  for (const tier of scope.tiers) {
+  for (const tier of effectiveScope.tiers) {
     switch (tier) {
       case 'public':
         _scanPublicTier(knowledgeBase, domains, hints);
@@ -351,25 +386,45 @@ export async function buildScopedIndex(
         _scanProductTier(knowledgeBase, domains, hints);
         break;
       case 'confidential':
-        _scanConfidentialTier(knowledgeBase, domains, scope.customerId, hints);
+        _scanConfidentialTier(
+          knowledgeBase,
+          domains,
+          effectiveScope.customerId === 'common'
+            ? 'common'
+            : effectiveScope.scopeContext?.tenant_slug || effectiveScope.customerId,
+          hints,
+          effectiveScope.systemAuthority === true,
+          effectiveScope.customerId === 'common' ? undefined : effectiveScope.scopeContext,
+          effectiveScope.includeCommon !== false
+        );
         break;
       case 'personal':
-        _scanPersonalTier(knowledgeBase, domains, scope.customerId, hints);
+        _scanPersonalTier(
+          knowledgeBase,
+          domains,
+          effectiveScope.scopeContext?.tenant_slug || effectiveScope.customerId,
+          hints,
+          effectiveScope.systemAuthority === true
+        );
         break;
       case 'customer':
-        _scanCustomerOverlayTier(knowledgeBase, scope.customerId, hints);
+        _scanCustomerOverlayTier(
+          knowledgeBase,
+          effectiveScope.scopeContext?.tenant_slug || effectiveScope.customerId,
+          hints
+        );
         break;
     }
   }
 
   // Apply tag pre-filter after scanning (cheaper than per-file filter)
-  const filteredHints = scope.filterTags?.length
-    ? hints.filter((h) => h.tags?.some((t) => scope.filterTags!.includes(t)))
+  const filteredHints = effectiveScope.filterTags?.length
+    ? hints.filter((h) => h.tags?.some((t) => effectiveScope.filterTags!.includes(t)))
     : hints;
 
-  const index = new KnowledgeHintIndex(filteredHints, scope);
+  const index = new KnowledgeHintIndex(filteredHints, effectiveScope);
 
-  await _hydrateEmbedCache(index, scope);
+  await _hydrateEmbedCache(index, effectiveScope);
 
   return index;
 }
@@ -483,42 +538,75 @@ function _scanConfidentialTier(
   knowledgeBase: string,
   domains: string[],
   customerId: string | undefined,
-  hints: KnowledgeHint[]
+  hints: KnowledgeHint[],
+  systemAuthority = false,
+  scopeContext?: ScopeContext,
+  includeCommon = true
 ): void {
   const confidentialRoot = path.join(knowledgeBase, 'confidential');
   if (!safeExistsSync(confidentialRoot)) return;
 
+  const scanRoot = (root: string, tenant: string | undefined): void => {
+    if (!safeExistsSync(root)) return;
+    if (domains !== TIER1_SUBDIRS) {
+      for (const domain of domains) {
+        const dir = path.join(root, domain);
+        if (safeExistsSync(dir)) {
+          _scanMarkdownHints(dir, knowledgeBase, 'confidential', tenant, hints);
+        }
+      }
+    } else {
+      _scanMarkdownHints(root, knowledgeBase, 'confidential', tenant, hints);
+    }
+  };
+
+  const isSafeScopePath = (value: string): boolean =>
+    value.split(/[\\/]+/u).every((segment) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(segment));
+
+  // `confidential/common` is the only shared confidential prefix.  It is
+  // available to a tenant-scoped reader but never grants access to another
+  // tenant's subtree.
+  if (includeCommon) scanRoot(path.join(confidentialRoot, 'common'), undefined);
+
+  if (scopeContext?.tenant_slug && customerId === scopeContext.tenant_slug) {
+    const entitySegments = [
+      scopeContext.tenant_slug,
+      ...(scopeContext.organization_id ? ['organizations', scopeContext.organization_id] : []),
+      ...(scopeContext.project_id ? ['projects', scopeContext.project_id] : []),
+      ...(scopeContext.mission_id ? ['missions', scopeContext.mission_id] : []),
+      ...(scopeContext.task_id ? ['tasks', scopeContext.task_id] : []),
+      ...(scopeContext.session_id ? ['sessions', scopeContext.session_id] : []),
+    ];
+    if (entitySegments.every((segment) => !segment.includes('/') && !segment.includes('\\'))) {
+      scanRoot(path.join(confidentialRoot, ...entitySegments), scopeContext.tenant_slug);
+      return;
+    }
+  }
+
   let customerDirs: string[];
   if (customerId) {
+    if (!isSafeScopePath(customerId)) return;
     customerDirs = [customerId];
-  } else {
+  } else if (systemAuthority) {
     try {
-      customerDirs = safeReaddir(confidentialRoot).filter((e) => !e.startsWith('.'));
+      customerDirs = safeReaddir(confidentialRoot).filter(
+        (e) => !e.startsWith('.') && e !== 'common'
+      );
     } catch {
       return;
     }
+  } else {
+    // Never widen a confidential request to every tenant when no positive
+    // tenant authority was supplied.
+    return;
   }
 
   for (const cid of customerDirs) {
     const cidRoot = path.join(confidentialRoot, cid);
     if (!safeExistsSync(cidRoot)) continue;
-
     // Confidential dirs have customer-specific structures (design/, financials/,
     // browser-workflows/, etc.) that don't follow public's Tier-1 layout.
-    // Always scan the full customer root; `domains` acts as an allowlist only
-    // when the caller explicitly wants to narrow to Tier-1-named subdirs.
-    if (domains !== TIER1_SUBDIRS) {
-      // Explicit domain filter: only scan matching subdirs
-      for (const domain of domains) {
-        const dir = path.join(cidRoot, domain);
-        if (safeExistsSync(dir)) {
-          _scanMarkdownHints(dir, knowledgeBase, 'confidential', cid, hints);
-        }
-      }
-    } else {
-      // Default (no explicit filter): scan the full customer root recursively
-      _scanMarkdownHints(cidRoot, knowledgeBase, 'confidential', cid, hints);
-    }
+    scanRoot(cidRoot, cid);
   }
 }
 
@@ -526,10 +614,12 @@ function _scanPersonalTier(
   knowledgeBase: string,
   domains: string[],
   customerId: string | undefined,
-  hints: KnowledgeHint[]
+  hints: KnowledgeHint[],
+  systemAuthority = false
 ): void {
+  if (!customerId && !systemAuthority) return;
   // Customer overlay: customer/{slug}/ takes precedence over knowledge/personal/
-  const customerSlug = customerId ?? process.env.KYBERION_CUSTOMER?.trim() ?? '';
+  const customerSlug = customerId ?? '';
   const projectRoot = path.dirname(knowledgeBase);
 
   const roots: Array<{ dir: string; label: string }> = [];
@@ -540,7 +630,7 @@ function _scanPersonalTier(
     }
   }
   const personalDir = path.join(knowledgeBase, 'personal');
-  if (safeExistsSync(personalDir)) {
+  if (systemAuthority && safeExistsSync(personalDir)) {
     roots.push({ dir: personalDir, label: 'personal' });
   }
 
@@ -572,6 +662,7 @@ function _scanCustomerOverlayTier(
   hints: KnowledgeHint[]
 ): void {
   if (!customerId) return;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(customerId)) return;
   const projectRoot = path.dirname(knowledgeBase);
   const overlayDir = path.join(projectRoot, 'customer', customerId);
   if (!safeExistsSync(overlayDir)) return;
@@ -935,9 +1026,7 @@ export function queryKnowledge(
   }
 
   scored.sort(
-    (a, b) =>
-      b.score - a.score ||
-      knowledgeMetadataScore(b.hint, options.scope) - knowledgeMetadataScore(a.hint, options.scope)
+    (a, b) => b.score - a.score || metadataScore(b.hint, options) - metadataScore(a.hint, options)
   );
   // DA-07: opt-in score exposure. Copies (never mutations) so shared index
   // hint objects and non-opted callers keep the historical shape.
@@ -997,7 +1086,7 @@ export async function queryKnowledgeHybrid(
     .map((hint, index) => ({
       hint,
       index,
-      score: knowledgeMetadataScore(hint, options.scope),
+      score: metadataScore(hint, options),
     }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index)
@@ -1046,9 +1135,7 @@ export async function queryKnowledgeHybrid(
     rankedLists.push(metadataRanked.map((h) => ({ ...h, path: h.source })));
   }
   const rrfScores = reciprocalRankFusion(rankedLists);
-  const metadataScores = new Map(
-    pool.map((hint) => [hint.source, knowledgeMetadataScore(hint, options.scope)])
-  );
+  const metadataScores = new Map(pool.map((hint) => [hint.source, metadataScore(hint, options)]));
 
   const fused = pool
     .filter((h) => rrfScores.has(h.source))

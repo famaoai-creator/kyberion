@@ -28,7 +28,12 @@ import {
   scopeAffinityScore,
   docAuthorityScore,
   recencyDecayScore,
+  currentScope,
+  resolveKnowledgeScopeSet,
+  assertKnowledgePathInScope,
+  knowledgeScopeProximityScore,
 } from '@agent/core';
+import type { ScopeContext } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
 // ---------------------------------------------------------------------------
@@ -78,6 +83,7 @@ interface ScoredEntry extends KnowledgeEntry {
     docAuthority: number;
     importance: number;
     recency: number;
+    proximity: number;
   };
 }
 
@@ -189,7 +195,9 @@ export function parseFrontmatter(content: string): Record<string, any> {
 // ---------------------------------------------------------------------------
 // Knowledge Scanner
 // ---------------------------------------------------------------------------
-function scanKnowledgeFiles(): KnowledgeEntry[] {
+export function scanKnowledgeFiles(
+  scopeSet = resolveKnowledgeScopeSet(currentScope())
+): KnowledgeEntry[] {
   const knowledgeRoot = pathResolver.knowledge();
   const entries: KnowledgeEntry[] = [];
 
@@ -218,6 +226,7 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
           const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
           const fm = parseFrontmatter(content);
           const relativePath = path.relative(knowledgeRoot, fullPath);
+          if (!assertKnowledgePathInScope(relativePath, scopeSet)) continue;
           const tier = relativePath.startsWith('personal/')
             ? 'personal'
             : relativePath.startsWith('confidential/')
@@ -272,7 +281,8 @@ export function scoreEntry(
   phaseSlug: string,
   currentScope: string,
   weights: RankingWeights,
-  now: number
+  now: number,
+  currentScopeContext?: ScopeContext
 ): ScoredEntry {
   // 1. Intent Match — title + tags
   const titleTokens = tokenize(entry.title);
@@ -306,6 +316,7 @@ export function scoreEntry(
   }
 
   const scopeScore = scopeAffinityScore(currentScope, entry.scope, weights.scope);
+  const proximityScore = knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext);
 
   let kindScore = 0;
   if (phaseSlug) {
@@ -329,6 +340,7 @@ export function scoreEntry(
     roleScore +
     phaseScore +
     scopeScore +
+    proximityScore +
     kindScore +
     authorityScore +
     importanceScore +
@@ -342,6 +354,7 @@ export function scoreEntry(
       role: roleScore,
       phase: phaseScore,
       scope: scopeScore,
+      proximity: proximityScore,
       kind: kindScore,
       docAuthority: authorityScore,
       importance: importanceScore,
@@ -381,6 +394,11 @@ async function main() {
   const roleIdx = args.indexOf('--role');
   const phaseIdx = args.indexOf('--phase');
   const scopeIdx = args.indexOf('--scope');
+  const tenantIdx = args.indexOf('--tenant');
+  const organizationIdx = args.indexOf('--organization');
+  const projectIdx = args.indexOf('--project');
+  const missionIdx = args.indexOf('--mission');
+  const taskIdx = args.indexOf('--task');
   const limitIdx = args.indexOf('--limit');
   const jsonFlag = args.includes('--json');
 
@@ -388,11 +406,16 @@ async function main() {
   const role = roleIdx >= 0 ? args[roleIdx + 1] : '';
   const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : '';
   const scope = scopeIdx >= 0 ? args[scopeIdx + 1] : 'repository';
+  const tenant = tenantIdx >= 0 ? args[tenantIdx + 1] : undefined;
+  const organization = organizationIdx >= 0 ? args[organizationIdx + 1] : undefined;
+  const project = projectIdx >= 0 ? args[projectIdx + 1] : undefined;
+  const mission = missionIdx >= 0 ? args[missionIdx + 1] : undefined;
+  const task = taskIdx >= 0 ? args[taskIdx + 1] : undefined;
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
     console.log(
-      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]'
+      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--json]'
     );
     process.exit(1);
   }
@@ -402,25 +425,42 @@ async function main() {
   );
 
   const weights = loadWeights();
-  const entries = scanKnowledgeFiles();
+  const resolvedScope = currentScope({
+    tier: tenant ? 'confidential' : currentScope().tier,
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(organization ? { organization_id: organization } : {}),
+    ...(project ? { project_id: project } : {}),
+    ...(mission ? { mission_id: mission } : {}),
+    ...(task ? { task_id: task } : {}),
+  });
+  const knowledgeScope = resolveKnowledgeScopeSet(resolvedScope);
+  const entries = scanKnowledgeFiles(knowledgeScope);
   const intentTokens = tokenize(intent);
   const roleSlug = role.toLowerCase().replace(/\s+/g, '_');
   const phaseSlug = phase.toLowerCase().trim();
   const now = Date.now();
 
   const scored = entries
-    .map((e) => scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now))
+    .map((e) =>
+      scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now, resolvedScope)
+    )
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
   if (jsonFlag) {
-    console.log(JSON.stringify({ intent, role, phase, scope, limit, results: scored }, null, 2));
+    console.log(
+      JSON.stringify(
+        { intent, role, phase, scope, limit, knowledge_scope: knowledgeScope, results: scored },
+        null,
+        2
+      )
+    );
   } else {
     logger.info(`📊 TOP-${limit} Results (${scored.length} matches from ${entries.length} files):`);
     for (let i = 0; i < scored.length; i++) {
       const e = scored[i];
-      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} kind=${e.breakdown.kind} auth=${e.breakdown.docAuthority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
+      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} proximity=${e.breakdown.proximity} kind=${e.breakdown.kind} auth=${e.breakdown.docAuthority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
       logger.info(`  ${i + 1}. [${e.score.toFixed(1)}] ${e.path} (${breakdown})`);
     }
   }

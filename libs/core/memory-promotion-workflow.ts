@@ -29,6 +29,7 @@ import { logger } from './core.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
 import { listInboxEntries } from './deliverable-inbox.js';
 import { evaluateBackgroundReviewText } from './background-review-policy.js';
+import { checkProviderEgress, providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 
 type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
 
@@ -65,8 +66,17 @@ export interface PersonalAutopromoteSummary {
   skipped: Array<{ candidate_id: string; reason: string }>;
 }
 
-function promotionKnowledgeScope(): KnowledgeScope {
-  return { tiers: ['public', 'confidential', 'personal', 'product'] };
+function promotionKnowledgeScope(candidate: MemoryCandidate): KnowledgeScope {
+  if (candidate.scope?.tenant_slug) {
+    return {
+      tiers: ['public', 'product', 'confidential'],
+      customerId: candidate.scope.tenant_slug,
+      scopeContext: candidate.scope,
+    };
+  }
+  // Legacy/unscoped candidates may compare only against public/product. They
+  // must never trigger the former all-confidential scan.
+  return { tiers: ['public', 'product'] };
 }
 
 function mapKnowledgeMatch(hint: KnowledgeHint): PromotionKnowledgeMatch {
@@ -89,8 +99,11 @@ function formatKnowledgeMatch(match: PromotionKnowledgeMatch, index: number): st
 async function inspectPromotionReview(candidate: MemoryCandidate): Promise<PromotionReview> {
   const reviewedAt = new Date().toISOString();
   try {
-    const index = await buildScopedIndex(promotionKnowledgeScope());
-    const similar = await queryKnowledgeHybrid(index, candidate.summary, { maxResults: 3 });
+    const index = await buildScopedIndex(promotionKnowledgeScope(candidate));
+    const similar = await queryKnowledgeHybrid(index, candidate.summary, {
+      maxResults: 3,
+      ...(candidate.scope ? { scopeContext: candidate.scope } : {}),
+    });
     const similarKnowledge = similar.map(mapKnowledgeMatch);
     const backend = getReasoningBackend();
     let contradiction: PromotionContradictionAssessment | undefined;
@@ -102,6 +115,24 @@ async function inspectPromotionReview(candidate: MemoryCandidate): Promise<Promo
     }
 
     if (backend.name !== 'stub' && similarKnowledge.length > 0) {
+      const provider = providerIdForReasoningIdentifier(backend.name);
+      if (candidate.sensitivity_tier !== 'public' && provider) {
+        const egress = checkProviderEgress({
+          provider,
+          dataTier: candidate.sensitivity_tier,
+          ...(candidate.scope?.tenant_slug ? { tenant_slug: candidate.scope.tenant_slug } : {}),
+        });
+        if (!egress.allowed) {
+          logger.warn(
+            `[memory-promotion] contradiction prompt withheld for ${candidate.candidate_id}: ${egress.reason}`
+          );
+          return {
+            reviewed_at: reviewedAt,
+            backend: backend.name,
+            similar_knowledge: similarKnowledge,
+          };
+        }
+      }
       const topMatch = similarKnowledge[0];
       const prompt = [
         'Assess whether the proposed memory candidate conflicts with the existing knowledge item.',
@@ -287,6 +318,7 @@ function buildDistillCandidateFromMemoryCandidate(
     status: 'proposed',
     target_kind: mapMemoryKindToDistillTarget(candidate.proposed_memory_kind),
     evidence_refs: candidate.evidence_refs,
+    ...(candidate.scope ? { scope: candidate.scope } : {}),
     metadata: buildPromotionMetadata(candidate),
   });
 }
