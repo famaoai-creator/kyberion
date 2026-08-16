@@ -172,24 +172,32 @@ function recordProtocolSurfaceLifecycle(
   status: 'started' | 'stopped' | 'reconnected',
   metadata: Record<string, string | number | boolean | null> = {}
 ): void {
+  let registryEntry;
   try {
-    getProtocolServiceRegistryEntry(surfaceId);
+    registryEntry = getProtocolServiceRegistryEntry(surfaceId);
   } catch {
     return;
   }
+  if (registryEntry.lifecycle_owner === 'service') return;
   const tenant = String(process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || '').trim();
-  recordProtocolServiceLifecycle({
-    serviceId: surfaceId,
-    action,
-    status,
-    scope: tenant
-      ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
-      : { scope_kind: 'system', tier: 'public' },
-    actorRole: 'surface_runtime',
-    principal: { kind: 'service', id: `surface-runtime:${surfaceId}` },
-    requestedBy: 'surface_runtime',
-    metadata: { origin: 'surface_runtime', ...metadata },
-  });
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: surfaceId,
+      action,
+      status,
+      scope: tenant
+        ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
+        : { scope_kind: 'system', tier: 'public' },
+      actorRole: 'surface_runtime',
+      principal: { kind: 'service', id: `surface-runtime:${surfaceId}` },
+      requestedBy: 'surface_runtime',
+      metadata: { origin: 'surface_runtime', ...metadata },
+    });
+  } catch (error) {
+    logger.warn(
+      `[SURFACE] Lifecycle receipt unavailable for ${surfaceId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function buildSurfaceRepairHint(

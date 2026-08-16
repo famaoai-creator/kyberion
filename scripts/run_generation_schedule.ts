@@ -6,7 +6,7 @@ import {
   GENERATION_SCHEDULER_AUTHORITY,
   normalizeEventScope,
   assertProtocolServiceRegistered,
-  recordProtocolServiceLifecycle,
+  recordProtocolServiceLifecycleBestEffort,
   type EventScopeInput,
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
@@ -34,7 +34,7 @@ export async function runGenerationScheduleAction(argv: {
   assertProtocolServiceRegistered('generation-scheduler');
   const lifecycleScope = argv.scope || { scope_kind: 'system' as const, tier: 'public' as const };
   const recordHealthy = () =>
-    recordProtocolServiceLifecycle({
+    recordProtocolServiceLifecycleBestEffort({
       serviceId: 'generation-scheduler',
       action: 'health_check',
       status: 'healthy',

@@ -20,6 +20,7 @@ export interface ProtocolServiceRegistryEntry {
   data_residency: string;
   data_paths: string[];
   lifecycle_actions: string[];
+  lifecycle_owner?: 'surface_runtime' | 'service';
   lifecycle_compatibility?: string;
 }
 

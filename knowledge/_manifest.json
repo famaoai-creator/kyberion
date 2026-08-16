@@ -771,7 +771,7 @@
     {
       "path": "product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md",
       "tier": "public",
-      "size": 48083,
+      "size": 48612,
       "type": "md"
     },
     {
@@ -2127,7 +2127,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 5771,
+      "size": 5807,
       "type": "json"
     },
     {
