@@ -1,8 +1,11 @@
 import * as AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
+  isValidTenantSlug,
   logger,
   pathResolver,
+  physicalScopedPath,
+  resolveIntentContractMemoryPaths,
   safeExistsSync,
   safeWriteFile,
 } from '@agent/core';
@@ -14,12 +17,6 @@ const ajv = new AjvCtor({ allErrors: true });
 const MEMORY_SCHEMA_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH ||
   pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
-const SEED_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH ||
-  pathResolver.knowledge('product/governance/intent-contract-memory.json');
-const RUNTIME_PATH =
-  process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH ||
-  pathResolver.shared('runtime/intent-contract-memory.json');
 const DEFAULT_REPORT_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH ||
   pathResolver.shared('runtime/reports/intent-contract-memory-sync-latest.json');
@@ -66,23 +63,70 @@ function getOptionValue(name: string): string | undefined {
   return value;
 }
 
+function resolveTenantScope(): { tier: 'confidential'; tenant_slug: string } | undefined {
+  const tenant = getOptionValue('--tenant')?.trim();
+  if (!tenant) return undefined;
+  if (!isValidTenantSlug(tenant)) {
+    throw new Error(`[SCOPE_CONTEXT_INVALID] invalid tenant slug '${tenant}'`);
+  }
+  return { tier: 'confidential', tenant_slug: tenant };
+}
+
+function scopedReportPath(
+  scope: { tier: 'confidential'; tenant_slug: string } | undefined
+): string {
+  if (!scope) return DEFAULT_REPORT_PATH;
+  return pathResolver.resolve(
+    physicalScopedPath(
+      'active/shared/runtime',
+      { ...scope, scope_kind: 'tenant' },
+      'reports',
+      'intent-contract-memory-sync-latest.json'
+    )
+  );
+}
+
+function scopedExportDir(scope: { tier: 'confidential'; tenant_slug: string } | undefined): string {
+  if (!scope) return DEFAULT_EXPORT_DIR;
+  return pathResolver.resolve(
+    physicalScopedPath(
+      'active/shared/exports',
+      { ...scope, scope_kind: 'tenant' },
+      'intent-contract-memory-sync'
+    )
+  );
+}
+
 function main(): void {
-  const reportPath = getOptionValue('--report') || DEFAULT_REPORT_PATH;
-  const exportDir = getOptionValue('--export-dir') || DEFAULT_EXPORT_DIR;
+  const scope = resolveTenantScope();
+  const reportPath = getOptionValue('--report') || scopedReportPath(scope);
+  const exportDir = getOptionValue('--export-dir') || scopedExportDir(scope);
   const persistExport = process.argv.includes('--persist-export');
   const syncSeed = process.argv.includes('--sync-seed');
   const missionId = getOptionValue('--mission-id');
   const stage = getOptionValue('--stage');
-  if (!safeExistsSync(RUNTIME_PATH)) {
+  if (scope && syncSeed) {
+    throw new Error(
+      '[SCOPE_CONTEXT_INVALID] tenant intent memory cannot sync into the global governance seed without brokered promotion'
+    );
+  }
+  const paths = resolveIntentContractMemoryPaths(scope);
+  const runtimePathOverride = process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH?.trim();
+  const runtimePath =
+    runtimePathOverride && !scope ? pathResolver.rootResolve(runtimePathOverride) : paths.runtime;
+  const seedPath = process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH?.trim()
+    ? pathResolver.rootResolve(process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH.trim())
+    : paths.seed;
+  if (!safeExistsSync(runtimePath)) {
     logger.info('[sync:intent-contract-memory] runtime memory not found; nothing to sync');
     return;
   }
 
-  const runtime = readJson<unknown>(RUNTIME_PATH);
+  const runtime = readJson<unknown>(runtimePath);
   validateMemory(runtime);
 
-  const base = safeExistsSync(SEED_PATH)
-    ? readJson<unknown>(SEED_PATH)
+  const base = safeExistsSync(seedPath)
+    ? readJson<unknown>(seedPath)
     : { version: '1.0.0', entries: [] };
   validateMemory(base);
 
@@ -117,14 +161,15 @@ function main(): void {
   validateMemory(snapshot);
 
   if (syncSeed) {
-    safeWriteFile(SEED_PATH, JSON.stringify(snapshot, null, 2));
+    safeWriteFile(seedPath, JSON.stringify(snapshot, null, 2));
   }
   const report = {
     generated_at: new Date().toISOString(),
     ...(missionId ? { mission_id: missionId.toUpperCase() } : {}),
     ...(stage ? { stage } : {}),
-    runtime_path: RUNTIME_PATH,
-    governance_seed_path: SEED_PATH,
+    ...(scope ? { scope } : {}),
+    runtime_path: runtimePath,
+    governance_seed_path: seedPath,
     seed_sync_applied: syncSeed,
     result: {
       seed_entries_before: seedMemory.entries.length,

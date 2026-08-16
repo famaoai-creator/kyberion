@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import {
   loadIntentContractMemorySnapshot,
   listTaskSessions,
+  currentScope,
   pathResolver,
   renderStatus,
   safeExistsSync,
@@ -356,12 +357,13 @@ function collectIntentTraceEvidence(
     return matches;
   });
 
-  const memorySnapshot = loadIntentContractMemorySnapshot();
+  const scope = currentScope();
+  const memorySnapshot = loadIntentContractMemorySnapshot(scope);
   const memoryMatches = memorySnapshot.entries.filter((entry) =>
     derivedIntentIds.has(entry.intent_id)
   );
   const candidateContracts = [...derivedIntentIds].flatMap((intentId) =>
-    selectContractCandidates(intentId, 3)
+    selectContractCandidates(intentId, 3, scope)
   );
   const audits = collectAuditEntries(correlationId, missionEvidence);
 

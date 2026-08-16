@@ -39,6 +39,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'conduct_1on1',
   'curate_background_review',
   'curation_report',
+  'knowledge_validation_sweep',
   'cross_critique',
   'typed_cross_critique',
   'decompose_into_tasks',
@@ -177,6 +178,7 @@ const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
   // KP-06: recomputes + overwrites CURATION_REPORT.md deterministically from
   // the KP-05 usage aggregate + corpus frontmatter — safe to retry.
   curation_report: 'idempotent_write',
+  knowledge_validation_sweep: 'read',
   execute_task_plan: 'external_effect',
   execute_self_action_items: 'external_effect',
   track_pending_action_items: 'external_effect',

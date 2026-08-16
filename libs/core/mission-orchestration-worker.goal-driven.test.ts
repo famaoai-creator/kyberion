@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // KP-01: goal-driven dispatch's context-pack provisioning
 // (provisionGoalDrivenTaskKnowledge) goes through provisionTaskKnowledge ->
@@ -33,6 +33,31 @@ import { createGoal, type GoalRuntimeState } from './worker-goal.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { logger } from './core.js';
+
+const knowledgeFeedbackTestRoot = pathResolver.sharedTmp(
+  `goal-driven-tests/knowledge-feedback/${process.pid}`
+);
+const knowledgeDeliveryDir = `${knowledgeFeedbackTestRoot}/knowledge-delivery`;
+const knowledgeUsagePath = `${knowledgeFeedbackTestRoot}/knowledge-usage.json`;
+const originalKnowledgeDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+const originalKnowledgeUsagePath = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+
+beforeAll(() => {
+  // Goal-driven fixture packs intentionally omit a tenant. Keep their KP-05
+  // delivery/usage records in shared tmp instead of the repository's legacy
+  // unscoped feedback lane.
+  process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = knowledgeDeliveryDir;
+  process.env.KYBERION_KNOWLEDGE_USAGE_PATH = knowledgeUsagePath;
+});
+
+afterAll(() => {
+  safeRmSync(knowledgeFeedbackTestRoot, { recursive: true, force: true });
+  if (originalKnowledgeDeliveryDir === undefined)
+    delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+  else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;
+  if (originalKnowledgeUsagePath === undefined) delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+  else process.env.KYBERION_KNOWLEDGE_USAGE_PATH = originalKnowledgeUsagePath;
+});
 
 // KD-01 adoption: opt-in goal-driven execution in the mission orchestration
 // worker. These exercise the exported dispatch-path seam with a stub backend,

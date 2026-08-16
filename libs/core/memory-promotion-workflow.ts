@@ -387,6 +387,7 @@ export async function promotePersonalMemoryCandidates(
         candidateId: candidate.candidate_id,
         status: 'rejected',
         ratificationNote: `Background review policy: ${reason}`,
+        ...(candidate.scope ? { scope: candidate.scope } : {}),
       });
       skipped.push({ candidate_id: candidate.candidate_id, reason });
       continue;
@@ -460,6 +461,7 @@ export async function promoteMemoryCandidateToKnowledge(input: {
       candidateId: candidate.candidate_id,
       status: 'rejected',
       ratificationNote: `Background review policy: ${reason}`,
+      ...(candidate.scope ? { scope: candidate.scope } : {}),
     });
     throw new Error(
       `[POLICY_VIOLATION] Memory promotion suppressed for ${candidate.candidate_id}: ${reason}`
@@ -515,8 +517,9 @@ export async function promoteMemoryCandidateToKnowledge(input: {
         status: 'rejected',
         ratificationNote: `Promotion suppressed: ${err.reason}`,
         promotedRef: '',
+        ...(candidate.scope ? { scope: candidate.scope } : {}),
       });
-      const rejected = loadMemoryPromotionCandidate(candidateId);
+      const rejected = loadMemoryPromotionCandidate(candidateId, candidate.scope);
       if (!rejected) throw new Error(`Rejected candidate disappeared from queue: ${candidateId}`);
       return { candidate: rejected, promotedRef: '', review };
     }
@@ -531,8 +534,9 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     status: 'promoted',
     ratificationNote: input.ratificationNote || 'Promoted to governed knowledge.',
     promotedRef: promoted.logicalPath,
+    ...(candidate.scope ? { scope: candidate.scope } : {}),
   });
-  const updated = loadMemoryPromotionCandidate(candidateId);
+  const updated = loadMemoryPromotionCandidate(candidateId, candidate.scope);
   if (!updated) throw new Error(`Promoted candidate disappeared from queue: ${candidateId}`);
   return {
     candidate: updated,

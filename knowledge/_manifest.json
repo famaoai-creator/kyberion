@@ -585,7 +585,7 @@
     {
       "path": "product/architecture/multi-tenant-operations.md",
       "tier": "public",
-      "size": 18218,
+      "size": 21191,
       "type": "md"
     },
     {
@@ -1059,7 +1059,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16384,
+      "size": 16422,
       "type": "json"
     },
     {
@@ -1083,7 +1083,7 @@
     {
       "path": "product/governance/analysis-config.json",
       "tier": "public",
-      "size": 741,
+      "size": 845,
       "type": "json"
     },
     {
@@ -1365,7 +1365,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 83947,
+      "size": 85304,
       "type": "json"
     },
     {
@@ -1597,10 +1597,22 @@
       "type": "json"
     },
     {
+      "path": "product/governance/knowledge-feedback-policy.json",
+      "tier": "public",
+      "size": 326,
+      "type": "json"
+    },
+    {
       "path": "product/governance/knowledge-protocol.md",
       "tier": "public",
       "size": 3168,
       "type": "md"
+    },
+    {
+      "path": "product/governance/knowledge-scope-check.json",
+      "tier": "public",
+      "size": 802,
+      "type": "json"
     },
     {
       "path": "product/governance/knowledge-slices.json",
@@ -1618,6 +1630,12 @@
       "path": "product/governance/knowledge-taxonomy.json",
       "tier": "public",
       "size": 3274,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/knowledge-weights.json",
+      "tier": "public",
+      "size": 253,
       "type": "json"
     },
     {
@@ -1653,7 +1671,7 @@
     {
       "path": "product/governance/mcp-tool-catalog.json",
       "tier": "public",
-      "size": 6519,
+      "size": 7255,
       "type": "json"
     },
     {
@@ -1995,7 +2013,7 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 5123,
+      "size": 5354,
       "type": "md"
     },
     {
@@ -2373,7 +2391,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 18643,
+      "size": 21061,
       "type": "json"
     },
     {
@@ -3183,7 +3201,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 91228,
+      "size": 91321,
       "type": "json"
     },
     {
@@ -3531,7 +3549,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 18499,
+      "size": 18537,
       "type": "json"
     },
     {
@@ -4815,7 +4833,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 453155,
+      "size": 453777,
       "type": "json"
     },
     {
@@ -5793,7 +5811,7 @@
     {
       "path": "product/roles/knowledge_steward/PROCEDURE.md",
       "tier": "public",
-      "size": 3576,
+      "size": 5099,
       "type": "md"
     },
     {
@@ -6951,7 +6969,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 17112,
+      "size": 17177,
       "type": "json"
     },
     {

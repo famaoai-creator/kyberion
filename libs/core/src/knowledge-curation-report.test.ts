@@ -11,6 +11,7 @@ import { pathResolver } from '../path-resolver.js';
 import {
   computeCurationReport,
   generateKnowledgeCurationReport,
+  knowledgeCurationArchiveHistoryPath,
   loadCurationSloConfig,
   renderCurationReportMarkdown,
   writeCurationReport,
@@ -28,12 +29,16 @@ const usagePathOverride = `${suiteRoot}/knowledge-usage/usage.json`;
 const sloConfigPathOverride = `${suiteRoot}/knowledge-curation-slo.json`;
 const scanRootOverride = `${suiteRoot}/corpus`;
 const reportPathOverride = `${suiteRoot}/CURATION_REPORT.md`;
+const archiveHistoryPathOverride = `${suiteRoot}/curation-archive-history.json`;
+const queuePathOverride = `${suiteRoot}/promotion-queue.jsonl`;
 
 const envKeys = [
   'KYBERION_KNOWLEDGE_USAGE_PATH',
   'KYBERION_CURATION_SLO_CONFIG_PATH',
   'KYBERION_CURATION_SCAN_ROOTS',
   'KYBERION_CURATION_REPORT_PATH',
+  'KYBERION_CURATION_ARCHIVE_HISTORY_PATH',
+  'KYBERION_MEMORY_QUEUE_PATH',
 ] as const;
 const originalEnv: Record<string, string | undefined> = {};
 
@@ -61,6 +66,8 @@ beforeEach(() => {
   process.env.KYBERION_CURATION_SLO_CONFIG_PATH = sloConfigPathOverride;
   process.env.KYBERION_CURATION_SCAN_ROOTS = scanRootOverride;
   process.env.KYBERION_CURATION_REPORT_PATH = reportPathOverride;
+  process.env.KYBERION_CURATION_ARCHIVE_HISTORY_PATH = archiveHistoryPathOverride;
+  process.env.KYBERION_MEMORY_QUEUE_PATH = queuePathOverride;
   safeRmSync(suiteRoot, { recursive: true, force: true });
 });
 
@@ -75,6 +82,14 @@ afterEach(() => {
 const NOW = new Date('2026-07-25T00:00:00.000Z');
 
 describe('computeCurationReport — low-yield hints', () => {
+  it('keeps tenant archive history outside the global archive override', () => {
+    const tenantPath = knowledgeCurationArchiveHistoryPath('tenant-a');
+    expect(tenantPath).toContain(
+      '/active/shared/runtime/feedback-loop/tenants/tenant-a/curation-archive-history.json'
+    );
+    expect(tenantPath).not.toBe(pathResolver.rootResolve(archiveHistoryPathOverride));
+  });
+
   it('flags a document delivered >= threshold times with zero recorded uses', () => {
     writeUsageFixture([
       {
@@ -228,7 +243,6 @@ describe('computeCurationReport — determinism', () => {
       'stale.md',
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
     );
-
     const first = computeCurationReport({ now: NOW });
     const second = computeCurationReport({ now: NOW });
     expect(second).toEqual(first);
@@ -274,6 +288,55 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
     const { report, reportPath } = generateKnowledgeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toHaveLength(1);
     expect(safeExistsSync(reportPath)).toBe(true);
+  });
+
+  it('queues an archive advisory only after two weekly low-yield and freshness observations', () => {
+    writeUsageFixture([
+      {
+        document_path: 'knowledge/product/foo.md',
+        delivered_count: 5,
+        used_count: 0,
+        not_used_count: 5,
+        occurrences: 5,
+        last_seen: '2026-07-01T00:00:00.000Z',
+      },
+    ]);
+    writeCorpusDoc(
+      'stale.md',
+      ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
+    );
+    const staleDocumentPath = path
+      .relative(pathResolver.rootDir(), pathResolver.rootResolve(`${scanRootOverride}/stale.md`))
+      .replace(/\\/g, '/');
+
+    const first = generateKnowledgeCurationReport({ now: NOW });
+    expect(first.report.archive_advisories).toEqual([]);
+    const second = generateKnowledgeCurationReport({
+      now: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
+    });
+    expect(second.report.archive_advisories).toEqual([]);
+
+    // The usage path and stale document must refer to the same document for
+    // the intersection to become an archive advisory.
+    writeUsageFixture([
+      {
+        document_path: staleDocumentPath,
+        delivered_count: 5,
+        used_count: 0,
+        not_used_count: 5,
+        occurrences: 5,
+        last_seen: '2026-07-01T00:00:00.000Z',
+      },
+    ]);
+    generateKnowledgeCurationReport({ now: NOW });
+    const third = generateKnowledgeCurationReport({
+      now: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
+    });
+    expect(third.report.archive_advisories).toHaveLength(1);
+    expect(third.report.archive_advisories[0]).toMatchObject({
+      document_path: staleDocumentPath,
+      consecutive_weeks: 2,
+    });
   });
 
   it('never touches usage/promotion state — the report is read-only over KP-05 data', () => {

@@ -145,7 +145,7 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 
 - [x] **KS-10 feedback store の区画化** — `knowledge-feedback-loop.ts` の delivery/usage を `…/tenants/{slug}/…` 配下へ(`physicalScopedPath`)。reader は scope 一致のみ集計し、旧グローバル記録は `unscoped-legacy` disposition として分離する。
 - [x] **KS-11 intent memory / learning / HINTS / compaction の区画化** — intent memory/learning、intent contract、promotion ledger、HINTS、compaction summary の永続先を physical scope 区画へ分け、cap は区画ごとに適用する。compaction summary は egress gate 通過必須。
-- [~] **KS-12 tenant distill lane** — `distill-knowledge-injector.ts`、promotion candidate、tenant evolution lane を scope-aware にした。cowork bridge の ingest への tenant propagation は次段に残る。
+- [x] **KS-12 tenant distill lane** — `distill-knowledge-injector.ts`、promotion candidate、tenant evolution lane、cowork bridge の ingest tenant propagation を scope-aware にした。
 
 ### Wave 3 — 同コンセプトで UX を揃える(P2 / M)
 
@@ -205,3 +205,4 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 - 2026-08-16: Wave 1 を実装済み。`currentScope()` と project/task env、scope proximity ranking、context pack の `compileScopedContextPack`、chain-aware tenant retrieval、tenant-aware provider egress、delivery scope を追加した。task/session の fragment rejection も契約へ追加し、既存 pack のバイト互換は optional field が空のとき維持する。
 - 2026-08-16: Wave 2 を実装済み。feedback delivery/usage、intent memory/learning、intent contract、promotion ledger、HINTS、compaction summary を tenant physical namespace に区画化し、tenant distill lane と scope-aware promotion/egress を追加した。旧グローバル記録は `unscoped-legacy` lane として従来 lane に残し、自動的に tenant 記録へ混ぜない。
 - 2026-08-16: Wave 3 と KS-12 cowork bridge の残項目を実装した。Chronos viewer の organization/project scope、operator-home/workitems の source-side filtering、tenant/org/project overlay、rate limiter の API/policy 接続、Cowork tenant sync lane を追加した。KS-16 は direct-read/provider declaration 検査まで拡張し、focused tests・typecheck・checker を通過した。
+- 2026-08-16: 実装後 read-only 監査で残を確認 — pack retrieval scope に org/project 未伝播(proximity 3/4 段が pack 経路で発火しない)、`scope_audit` の消費者 0、`check:knowledge-scope` の PR CI 未配線、受入 3/7/8 のテスト欠落、`unscoped-legacy` の移行/期限なし、新区画の backup/offboarding/retention 未登録、design cascade(設計判断 6)は未着手。これらは後続の [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KO-01〜19)へ引き継ぐ。

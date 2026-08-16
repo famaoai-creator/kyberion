@@ -2088,6 +2088,7 @@ async function buildWorkItemDispatchContext(input: {
   contextPackPath: string;
   contextPackSummary: string;
   contextPackPruningSummary?: Record<string, unknown>;
+  contextPackScopeAudit?: { rejected: Array<{ code: string }> };
   securityScope: ContextSecurityScope;
   cognitiveRoute: CognitiveRouteDecision;
 }> {
@@ -2152,6 +2153,11 @@ async function buildWorkItemDispatchContext(input: {
     contextPackPruningSummary: contextPack.pruning
       ? (contextPack.pruning as unknown as Record<string, unknown>)
       : undefined,
+    contextPackScopeAudit: contextPack.scope_audit
+      ? {
+          rejected: contextPack.scope_audit.rejected.map((rejection) => ({ code: rejection.code })),
+        }
+      : undefined,
     securityScope: contextPack.security_scope,
     cognitiveRoute,
   };
@@ -2159,6 +2165,7 @@ async function buildWorkItemDispatchContext(input: {
 
 function summarizeDispatchObservability(input: {
   pruning?: Record<string, unknown>;
+  scopeAudit?: { rejected: Array<{ code: string }> };
   taskResult?: { needs?: string[] } | undefined;
   parseErrors: string[];
 }): {
@@ -2167,6 +2174,8 @@ function summarizeDispatchObservability(input: {
   rollup_used: boolean;
   result_schema_ok: boolean;
   needs_count: number;
+  scope_rejected_count: number;
+  scope_rejection_codes: string[];
 } {
   const estimatedCharsValue = input.pruning?.['estimated_chars'];
   const budgetCharsValue = input.pruning?.['budget_chars'];
@@ -2190,6 +2199,10 @@ function summarizeDispatchObservability(input: {
       input.taskResult && input.parseErrors.length === 0 && needsCount === 0
     ),
     needs_count: needsCount,
+    scope_rejected_count: input.scopeAudit?.rejected.length || 0,
+    scope_rejection_codes: [
+      ...new Set(input.scopeAudit?.rejected.map((item) => item.code) || []),
+    ].sort(),
   };
 }
 
@@ -3080,6 +3093,7 @@ async function dispatchMissionWorkItemsRound(
     const taskResultNeeds = response.taskResult?.needs || [];
     const taskResultObservability = summarizeDispatchObservability({
       pruning: dispatchContext.contextPackPruningSummary,
+      scopeAudit: dispatchContext.contextPackScopeAudit,
       taskResult: response.taskResult,
       parseErrors: response.parseErrors,
     });

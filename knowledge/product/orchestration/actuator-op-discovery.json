@@ -3691,6 +3691,10 @@
           "kind": "apply"
         },
         {
+          "op": "knowledge_validation_sweep",
+          "kind": "apply"
+        },
+        {
           "op": "cross_critique",
           "kind": "apply"
         },

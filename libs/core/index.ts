@@ -183,6 +183,7 @@ export * from './deck-theme-direction.js';
 export * from './semantic-decide.js';
 export * from './observation-distill.js';
 export * from './ranking-signals.js';
+export * from './knowledge-weight-recalculation.js';
 export * from './operation-policy-gate.js';
 export * from './ranking-signals.js';
 export * from './runtime-health-history.js';
@@ -2255,6 +2256,9 @@ export type { FailedScheduleFinding } from './src/feedback-loop.js';
 export {
   recordKnowledgeDelivery,
   recordKnowledgeUsageFeedback,
+  recordHumanKnowledgeFeedback,
+  recordSlackKnowledgeReaction,
+  recordKnowledgeGap,
   loadKnowledgeUsageAggregate,
   knowledgeDeliveryLogDir,
   knowledgeUsageAggregatePath,
@@ -2263,6 +2267,10 @@ export type {
   DeliveredKnowledgeRef,
   KnowledgeDeliveryRecord,
   KnowledgeUsageAggregateEntry,
+  HumanKnowledgeFeedback,
+  KnowledgeGapRecord,
+  SlackKnowledgeReactionInput,
+  KnowledgeFeedbackCap,
 } from './src/knowledge-feedback-loop.js';
 
 // KP-06: effectiveness-driven curation + freshness SLO report, built from
@@ -2280,6 +2288,7 @@ export type {
   CurationSloConfig,
   CurationLowYieldHint,
   CurationFreshnessBreach,
+  CurationArchiveAdvisory,
   KnowledgeCurationReport,
 } from './src/knowledge-curation-report.js';
 // DA-08: tenant-ingested cards join the weekly curation cycle (advisory only).

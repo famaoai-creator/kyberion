@@ -466,6 +466,8 @@ function ChronosMirrorV2Content() {
   const locale = useChronosLocale();
   const searchParams = useSearchParams();
   const tenant = useChronosTenant();
+  const organizationId = searchParams.get('organization_id') || '';
+  const projectId = searchParams.get('project_id') || '';
   const quickActionGroups = useMemo(() => buildQuickActionGroups(locale), [locale]);
   const statusCards = useMemo(() => buildStatusCards(locale), [locale]);
   const [surface, setSurface] = useState<any>(null);
@@ -592,7 +594,7 @@ function ChronosMirrorV2Content() {
   useEffect(() => {
     let cancelled = false;
     void fetch(
-      `/api/deliverables?limit=24${deliverablesQuery ? `&query=${encodeURIComponent(deliverablesQuery)}` : ''}${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`,
+      `/api/deliverables?limit=24${deliverablesQuery ? `&query=${encodeURIComponent(deliverablesQuery)}` : ''}${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}${organizationId ? `&organization_id=${encodeURIComponent(organizationId)}` : ''}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ''}`,
       {
         headers: { 'Cache-Control': 'no-cache' },
       }
@@ -616,7 +618,7 @@ function ChronosMirrorV2Content() {
     return () => {
       cancelled = true;
     };
-  }, [deliverablesQuery, deliverablesRefreshTick, tenant]);
+  }, [deliverablesQuery, deliverablesRefreshTick, tenant, organizationId, projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -703,7 +705,7 @@ function ChronosMirrorV2Content() {
   useEffect(() => {
     let cancelled = false;
     void fetch(
-      `/api/operator-home?limit=8${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`,
+      `/api/operator-home?limit=8${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}${organizationId ? `&organization_id=${encodeURIComponent(organizationId)}` : ''}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ''}`,
       {
         headers: { 'Cache-Control': 'no-cache' },
       }
@@ -725,7 +727,7 @@ function ChronosMirrorV2Content() {
     return () => {
       cancelled = true;
     };
-  }, [operatorHomeRefreshTick, tenant]);
+  }, [operatorHomeRefreshTick, tenant, organizationId, projectId]);
 
   useEffect(() => {
     if (!focusedOperatorView) return;
@@ -2573,6 +2575,8 @@ function ChronosMirrorV2Content() {
           {consoleSection === 'deliverables' ? (
             <DeliverablesWorkspace
               tenant={tenant || undefined}
+              organizationId={organizationId || undefined}
+              projectId={projectId || undefined}
               onOpenMission={(missionId) =>
                 handleOperatorViewOpen('mission-control-plane', missionId)
               }
@@ -3070,6 +3074,11 @@ function ChronosMirrorV2Content() {
                     <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
                       {activeSurfaceTitle}
                     </div>
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      scope:{' '}
+                      {[tenant, organizationId, projectId].filter(Boolean).join(' › ') ||
+                        'not configured'}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.22em] kb-text-secondary">
                     <PanelsTopLeft size={12} />
@@ -3090,6 +3099,8 @@ function ChronosMirrorV2Content() {
                     focusedOperatorView ? (
                       <FocusedOperatorView
                         tenant={tenant || undefined}
+                        organizationId={organizationId || undefined}
+                        projectId={projectId || undefined}
                         viewId={
                           focusedOperatorView as
                             | 'needs-attention'
@@ -3215,6 +3226,8 @@ function ChronosMirrorV2Content() {
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <WorkItemsWorkspace
                 tenant={tenant || undefined}
+                organizationId={organizationId || undefined}
+                projectId={projectId || undefined}
                 onOpenMission={(missionId) =>
                   handleOperatorViewOpen('mission-control-plane', missionId)
                 }
@@ -3294,6 +3307,8 @@ function ChronosMirrorV2Content() {
             <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
               <FocusedOperatorView
                 tenant={tenant || undefined}
+                organizationId={organizationId || undefined}
+                projectId={projectId || undefined}
                 viewId={focusedOperatorView as any}
                 onBack={() => {
                   setFocusedOperatorView(null);
@@ -3362,6 +3377,8 @@ function ChronosMirrorV2Content() {
                 ) : focusedOperatorView ? (
                   <FocusedOperatorView
                     tenant={tenant || undefined}
+                    organizationId={organizationId || undefined}
+                    projectId={projectId || undefined}
                     viewId={focusedOperatorView as any}
                     onBack={() => {
                       setFocusedOperatorView(null);

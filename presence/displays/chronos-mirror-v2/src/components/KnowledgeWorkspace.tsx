@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { BookOpen, CheckCircle2, FileSearch, UploadCloud, XCircle } from 'lucide-react';
+import {
+  BookOpen,
+  CheckCircle2,
+  FileSearch,
+  ThumbsDown,
+  ThumbsUp,
+  UploadCloud,
+  XCircle,
+} from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
 
@@ -37,6 +45,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
   const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
   const [error, setError] = React.useState<string | null>(null);
   const [decisionNote, setDecisionNote] = React.useState('');
+  const [feedback, setFeedback] = React.useState<string | null>(null);
   const selected = items.find((item) => item.candidate_id === selectedId) || items[0] || null;
 
   const refresh = React.useCallback(async () => {
@@ -108,6 +117,22 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const recordFeedback = async (verdict: 'useful' | 'not_useful') => {
+    if (!selected?.promoted_ref) return;
+    try {
+      const response = await fetch('/api/knowledge-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_path: selected.promoted_ref, verdict, tenant }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to record feedback');
+      setFeedback(verdict);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -276,6 +301,28 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                 <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap text-[11px] kb-text-secondary">
                   {promotedBody || `${uxText('chronos_loading', locale)}…`}
                 </pre>
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t kb-border-subtle pt-3">
+                  <span className="text-[10px] kb-text-muted">
+                    {uxText('chronos_knowledge_feedback_prompt', locale)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={uxText('chronos_knowledge_feedback_useful', locale)}
+                    onClick={() => void recordFeedback('useful')}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
+                  >
+                    <ThumbsUp size={12} /> {uxText('chronos_knowledge_feedback_useful', locale)}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={uxText('chronos_knowledge_feedback_not_useful', locale)}
+                    onClick={() => void recordFeedback('not_useful')}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'not_useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
+                  >
+                    <ThumbsDown size={12} />{' '}
+                    {uxText('chronos_knowledge_feedback_not_useful', locale)}
+                  </button>
+                </div>
               </div>
             ) : null}
             {selected.status === 'queued' || selected.status === 'approved' ? (

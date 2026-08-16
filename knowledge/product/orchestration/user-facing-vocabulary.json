@@ -2626,6 +2626,21 @@
         "ja": "根拠が紐づいていません。",
         "qps-ploc": "⟦Ñő ėṽïḓėñƈė ïş ŀïñķėḓ. ŀőřėɱ ï⟧"
       },
+      "chronos_knowledge_feedback_prompt": {
+        "en": "Was this knowledge helpful?",
+        "ja": "このナレッジは役立ちましたか？",
+        "qps-ploc": "⟦Ẇȧş ŧħïş ķñőẇŀėḓɠė ħėŀṗƒůŀ? ŀőřėɱ⟧"
+      },
+      "chronos_knowledge_feedback_useful": {
+        "en": "Helpful",
+        "ja": "役立った",
+        "qps-ploc": "⟦Ħėŀṗƒůŀ ŀőřėɱ⟧"
+      },
+      "chronos_knowledge_feedback_not_useful": {
+        "en": "Needs improvement",
+        "ja": "改善が必要",
+        "qps-ploc": "⟦Ñėėḓş ïɱṗřőṽėɱėñŧ ŀőřėɱ⟧"
+      },
       "chronos_register_knowledge": {
         "en": "Register knowledge",
         "ja": "ナレッジを登録",
