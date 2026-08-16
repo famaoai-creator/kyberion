@@ -4,6 +4,7 @@ import { safeAppendFileSync, safeMkdir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { TierLevel } from './types.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { physicalScopedPath } from './physical-namespace.js';
 
 const TIER_SENSITIVITY: Record<TierLevel, number> = {
   public: 1,
@@ -78,7 +79,29 @@ export function recordContextPromotion(
     content_digest: contentDigest,
   };
   const ledgerPath =
-    input.ledger_path || pathResolver.active('shared/audit/context-promotion-ledger.jsonl');
+    input.ledger_path ||
+    (() => {
+      const tenant = input.security_scope.tenant_slug || input.security_scope.tenant_id;
+      if (!tenant) return pathResolver.active('shared/audit/context-promotion-ledger.jsonl');
+      try {
+        return pathResolver.rootResolve(
+          physicalScopedPath('active/shared/audit', {
+            tier: input.security_scope.write_tier,
+            tenant_slug: tenant,
+            mission_id: input.security_scope.mission_id,
+            ...(input.security_scope.organization_id
+              ? { organization_id: input.security_scope.organization_id }
+              : {}),
+            ...(input.security_scope.project_id && input.security_scope.organization_id
+              ? { project_id: input.security_scope.project_id }
+              : {}),
+            scope_kind: 'mission',
+          }) + '/context-promotion-ledger.jsonl'
+        );
+      } catch {
+        return pathResolver.active('shared/audit/context-promotion-ledger.jsonl');
+      }
+    })();
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
   safeAppendFileSync(ledgerPath, `${JSON.stringify(authorization)}\n`);
   return authorization;

@@ -5,11 +5,9 @@ import {
   knowledgeMetadataScore,
   recencyDecayScore,
   scopeAffinityScore,
+  scopeContextFromKnowledgePath,
+  scopeProximityScore,
 } from './ranking-signals.js';
-
-// KM-02 Task 4: these formulas were extracted verbatim from
-// scripts/context_ranker.ts; the values below pin the pre-extraction
-// behaviour so both rankers keep scoring identically.
 
 describe('ranking-signals (KM-02)', () => {
   it('scopeAffinityScore matches the historical matrix values', () => {
@@ -72,5 +70,56 @@ describe('ranking-signals (KM-02)', () => {
 
   it('keeps legacy hints neutral when metadata is absent', () => {
     expect(knowledgeMetadataScore({}, 'mission', {}, Date.UTC(2026, 6, 12))).toBe(0);
+  });
+});
+
+describe('scope proximity ranking', () => {
+  const current = {
+    tier: 'confidential' as const,
+    tenant_slug: 'acme-corp',
+    organization_id: 'org-a',
+    project_id: 'project-a',
+    mission_id: 'mission-a',
+    task_id: 'task-a',
+  };
+
+  it('derives the physical containment chain from a knowledge path', () => {
+    expect(
+      scopeContextFromKnowledgePath(
+        'confidential/acme-corp/organizations/org-a/projects/project-a/missions/mission-a/tasks/task-a/guide.md'
+      )
+    ).toMatchObject({
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-a',
+      project_id: 'project-a',
+      mission_id: 'mission-a',
+      task_id: 'task-a',
+    });
+  });
+
+  it('uses a deterministic strict proximity ladder', () => {
+    expect(
+      scopeProximityScore(
+        { tier: 'confidential', tenant_slug: 'acme-corp', project_id: 'project-a' },
+        current
+      )
+    ).toBeGreaterThan(scopeProximityScore(undefined, current));
+    expect(
+      scopeProximityScore(
+        { tier: 'confidential', tenant_slug: 'acme-corp', mission_id: 'mission-a' },
+        current
+      )
+    ).toBeGreaterThan(
+      scopeProximityScore(
+        { tier: 'confidential', tenant_slug: 'acme-corp', project_id: 'project-a' },
+        current
+      )
+    );
+    expect(
+      scopeProximityScore(
+        { tier: 'confidential', tenant_slug: 'other-corp', project_id: 'project-a' },
+        current
+      )
+    ).toBe(0);
   });
 });

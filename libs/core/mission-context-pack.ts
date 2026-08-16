@@ -34,7 +34,11 @@ import {
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
 import { slugify } from './text-utils.js';
-import type { ContextSecurityScope } from './context-security-scope.js';
+import {
+  compileScopedContextPack,
+  type ContextFragmentRejection,
+  type ContextSecurityScope,
+} from './context-security-scope.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -292,6 +296,11 @@ export interface MissionContextPack {
   summary: string;
   scope: MissionContextPackScope;
   security_scope: ContextSecurityScope;
+  /** Present only when candidate fragments were rejected by the scope gate. */
+  scope_audit?: {
+    effective_scope: ContextSecurityScope;
+    rejected: ContextFragmentRejection[];
+  };
   recipient: MissionContextPackRecipient;
   mission: MissionContextPackMissionSummary;
   project?: MissionContextPackProjectSummary;
@@ -1207,6 +1216,32 @@ function tenantSlugForKnowledgeRetrieval(input: {
   return tenantSlugFromContext(input);
 }
 
+function knowledgeHintFragment(hint: MissionContextPackKnowledgeHint, index: number) {
+  const normalized = hint.path.replace(/\\/g, '/');
+  const confidential = normalized.match(/(?:^|\/)confidential\/([^/]+)/);
+  const customer = normalized.match(/(?:^|\/)customer\/([^/]+)/);
+  const tenant = confidential?.[1] || customer?.[1];
+  // customer/{slug}/ is a tenant stance overlay, not public knowledge.
+  const sourceTier: MissionTier = confidential || customer ? 'confidential' : 'public';
+  const organization = normalized.match(/\/organizations\/([^/]+)/)?.[1];
+  const project = normalized.match(/\/projects\/([^/]+)/)?.[1];
+  const mission = normalized.match(/\/missions\/([^/]+)/)?.[1];
+  const task = normalized.match(/\/tasks\/([^/]+)/)?.[1];
+  const session = normalized.match(/\/sessions\/([^/]+)/)?.[1];
+  return {
+    fragment_id: `knowledge-hint-${index}`,
+    source_ref: hint.path,
+    source_tier: sourceTier,
+    ...(tenant && tenant !== 'common' ? { tenant_slug: tenant } : {}),
+    ...(organization ? { organization_id: organization } : {}),
+    ...(project ? { project_id: project } : {}),
+    ...(mission ? { mission_id: mission } : {}),
+    ...(task ? { task_id: task } : {}),
+    ...(session ? { session_id: session } : {}),
+    content: hint,
+  };
+}
+
 /**
  * DA-07 merge policy (deterministic, documented here as the single source):
  * - Pinned slice documents always come first and are never displaced.
@@ -1334,6 +1369,15 @@ export async function loadKnowledgeHintsIfPossible(
     tags: Array.from(tags),
     limit: searchLimit,
     minScore: 0.08,
+    ...(sliceTenant && normalizeTier(input.missionState.tier) === 'confidential'
+      ? {
+          scope: {
+            tier: 'confidential' as const,
+            tenant_slug: sliceTenant,
+            mission_id: input.missionState.mission_id,
+          },
+        }
+      : {}),
   });
 
   const filtered =
@@ -1378,6 +1422,11 @@ export async function loadKnowledgeHintsIfPossible(
       tenantSlug,
       topic,
       limit: tenantFetchLimit,
+      scope: {
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        mission_id: input.missionState.mission_id,
+      },
       ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
     });
     tenantHints = tenantHits
@@ -1755,6 +1804,19 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     tenantSlug: input.missionState.tenant_slug,
   });
 
+  // Treat every supplied knowledge hint as an untrusted candidate at the
+  // pack boundary. Public/product hints remain compatible; tenant and
+  // overlay hints must prove the same security scope.
+  const candidateHints = input.knowledgeHints || [];
+  const compiledKnowledge = compileScopedContextPack(
+    securityScope,
+    candidateHints.map(knowledgeHintFragment)
+  );
+  const acceptedHintRefs = new Set(
+    compiledKnowledge.fragments.map((fragment) => fragment.source_ref)
+  );
+  const governedKnowledgeHints = candidateHints.filter((hint) => acceptedHintRefs.has(hint.path));
+
   const pack: MissionContextPack = {
     context_pack_id:
       input.contextPackId ||
@@ -1769,15 +1831,21 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     summary,
     scope,
     security_scope: securityScope,
+    ...(compiledKnowledge.rejected.length > 0
+      ? {
+          scope_audit: {
+            effective_scope: compiledKnowledge.security_scope,
+            rejected: compiledKnowledge.rejected,
+          },
+        }
+      : {}),
     recipient,
     mission,
     ...(project ? { project } : {}),
     ...(track ? { track } : {}),
     ...(taskSession ? { task_session: taskSession } : {}),
     ...(workItem ? { work_item: workItem } : {}),
-    ...(input.knowledgeHints && input.knowledgeHints.length > 0
-      ? { knowledge_hints: input.knowledgeHints }
-      : {}),
+    ...(governedKnowledgeHints.length > 0 ? { knowledge_hints: governedKnowledgeHints } : {}),
     ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
     ...(taskGuidance ? { task_guidance: taskGuidance } : {}),
     sources,

@@ -46,6 +46,7 @@ import {
 } from './src/knowledge-index.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { logger } from './core.js';
+import type { ScopeContext } from './scope-context.js';
 
 const TENANT_CONFIDENTIAL_PREFIX = 'knowledge/confidential/';
 const EXCERPT_MAX_CHARS = 400;
@@ -73,6 +74,8 @@ export interface TenantKnowledgeScopeSet {
 
 export interface QueryTenantKnowledgeInput {
   tenantSlug: string;
+  /** Optional full containment scope; tenantSlug remains the compatibility input. */
+  scope?: ScopeContext;
   /** Free-text topic — same string the distill corpus is queried with. */
   topic: string;
   /** Maximum hits returned across all scopes. */
@@ -107,7 +110,7 @@ export function _resetTenantKnowledgeWarningsForTests(): void {
  */
 export function buildTenantKnowledgeScopeSet(
   tenantSlug: string,
-  options: TenantRegistryPathOptions = {}
+  options: TenantRegistryPathOptions & { scope?: ScopeContext } = {}
 ): TenantKnowledgeScopeSet | null {
   let resolved;
   try {
@@ -135,10 +138,32 @@ export function buildTenantKnowledgeScopeSet(
   const tenantSubdir = knowledgeRoot.slice(TENANT_CONFIDENTIAL_PREFIX.length);
   const strictIsolation = resolved.profile.isolation_policy?.strict_isolation === true;
 
+  const scopeContext: ScopeContext = options.scope || {
+    tier: 'confidential',
+    tenant_slug: tenantSlug,
+  };
+  const scopedTenantContext =
+    scopeContext.tenant_slug === tenantSlug
+      ? scopeContext
+      : { ...scopeContext, tenant_slug: tenantSlug };
+  const ownScope: KnowledgeScope = {
+    tiers: ['confidential'],
+    customerId: tenantSubdir,
+    ...(options.scope ? { scopeContext: scopedTenantContext } : {}),
+  };
+  if (strictIsolation) {
+    // Keep the public shape of the legacy scope descriptor stable while the
+    // index receives an explicit, non-widening common-prefix decision.
+    Object.defineProperty(ownScope, 'includeCommon', {
+      value: false,
+      enumerable: false,
+      configurable: true,
+    });
+  }
   const scopes: KnowledgeScope[] = [
     // The tenant's own confidential subtree — customerId restricts the
     // confidential scanner to exactly this subdirectory.
-    { tiers: ['confidential'], customerId: tenantSubdir },
+    ownScope,
     // The customer/{slug}/ overlay — 'customer' tier scans ONLY the overlay.
     { tiers: ['customer'], customerId: tenantSlug },
   ];
@@ -186,6 +211,7 @@ export async function queryTenantKnowledge(
     const scopeSet = buildTenantKnowledgeScopeSet(input.tenantSlug, {
       ...(input.rootDir ? { rootDir: input.rootDir } : {}),
       ...(input.env ? { env: input.env } : {}),
+      ...(input.scope ? { scope: input.scope } : {}),
     });
     if (!scopeSet) return [];
 
@@ -199,6 +225,7 @@ export async function queryTenantKnowledge(
       const results = queryKnowledge(index, input.topic, {
         maxResults: limit,
         includeScores: true,
+        ...(scope.scopeContext ? { scopeContext: scope.scopeContext } : {}),
       });
       for (const hint of results) {
         const hit = toHit(hint, scopeSet.tenantSlug);

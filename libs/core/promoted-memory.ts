@@ -1,10 +1,13 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
+import { physicalScopedPath } from './physical-namespace.js';
 import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,
@@ -73,13 +76,27 @@ const validatorCache = new Map<string, ValidateFunction>();
 // Test isolation (env override): the distill E2E rewrites HINTS.md, and a
 // parallel catalog-integrity test can observe the mid-test dirty state.
 // Overriding the paths lets tests run against a scratch copy.
-function resolveHintsPath(): string {
+function tenantEvolutionRoot(scope?: MemoryScopeEnvelope): string | undefined {
+  const tenant = scope?.tier === 'confidential' ? scope.tenant_slug?.trim() : undefined;
+  if (!tenant || tenant.includes('/') || tenant.includes('\\')) return undefined;
+  const override = process.env.KYBERION_HINTS_PATH?.trim();
+  const base = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.knowledge('confidential');
+  return `${base}/${tenant}/evolution`;
+}
+
+function resolveHintsPath(scope?: MemoryScopeEnvelope): string {
+  const tenantRoot = tenantEvolutionRoot(scope);
+  if (tenantRoot) return `${tenantRoot}/HINTS.md`;
   const override = process.env.KYBERION_HINTS_PATH;
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.knowledge('product/governance/HINTS.md');
 }
-function resolveHintsArchiveDir(): string {
+function resolveHintsArchiveDir(scope?: MemoryScopeEnvelope): string {
+  const tenantRoot = tenantEvolutionRoot(scope);
+  if (tenantRoot) return `${tenantRoot}/hints-archive`;
   const override = process.env.KYBERION_HINTS_ARCHIVE_DIR;
   return override
     ? pathResolver.rootResolve(override)
@@ -119,7 +136,20 @@ function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
 function logicalDirFor(input: {
   kind: PromotedMemoryRecord['kind'];
   tier: PromotedMemoryRecord['tier'];
+  scope?: MemoryScopeEnvelope;
 }): string {
+  const tenantRoot = tenantEvolutionRoot(input.scope);
+  if (tenantRoot) {
+    const kindDir =
+      input.kind === 'pattern'
+        ? 'patterns'
+        : input.kind === 'sop_candidate'
+          ? 'operations'
+          : input.kind === 'knowledge_hint'
+            ? 'wisdom'
+            : 'templates';
+    return `${tenantRoot}/${kindDir}`;
+  }
   switch (input.kind) {
     case 'pattern':
       return `knowledge/${input.tier}/common/patterns/generated`;
@@ -294,21 +324,28 @@ function splitHintsBlocks(raw: string): string[] {
     .filter(Boolean);
 }
 
-function buildHintsArchivePath(record: PromotedKnowledgeHintRecord): string {
+function buildHintsArchivePath(
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): string {
   const stamp = record.created_at.replace(/[:.]/gu, '-');
-  return `${resolveHintsArchiveDir()}/${stamp}-${record.record_id}.md`;
+  return `${resolveHintsArchiveDir(scope)}/${stamp}-${record.record_id}.md`;
 }
 
-function archiveGovernanceHintBlocks(blocks: string[], record: PromotedKnowledgeHintRecord): void {
+function archiveGovernanceHintBlocks(
+  blocks: string[],
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): void {
   if (blocks.length === 0) return;
-  const archivePath = buildHintsArchivePath(record);
-  if (!safeExistsSync(resolveHintsArchiveDir()))
-    safeMkdir(resolveHintsArchiveDir(), { recursive: true });
+  const archivePath = buildHintsArchivePath(record, scope);
+  if (!safeExistsSync(resolveHintsArchiveDir(scope)))
+    safeMkdir(resolveHintsArchiveDir(scope), { recursive: true });
   const content = [
     '# Archived Operational Hints',
     '',
     `archived_at: ${record.created_at}`,
-    `source: ${resolveHintsPath()}`,
+    `source: ${resolveHintsPath(scope)}`,
     `archived_sections: ${blocks.length}`,
     '',
     ...blocks,
@@ -337,10 +374,14 @@ function buildLiveHintsDocument(existing: string, retainedBlocks: string[]): str
   return `${baseDocument.trimEnd()}\n\n${retainedBlocks.join('\n\n')}\n`;
 }
 
-function appendGovernanceHintRecord(record: PromotedKnowledgeHintRecord): void {
+function appendGovernanceHintRecord(
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): void {
   const block = buildHintsBlock(record);
-  const existing = safeExistsSync(resolveHintsPath())
-    ? (safeReadFile(resolveHintsPath(), { encoding: 'utf8' }) as string)
+  const hintsPath = resolveHintsPath(scope);
+  const existing = safeExistsSync(hintsPath)
+    ? (safeReadFile(hintsPath, { encoding: 'utf8' }) as string)
     : [
         '# Operational Hints',
         '',
@@ -360,8 +401,10 @@ function appendGovernanceHintRecord(record: PromotedKnowledgeHintRecord): void {
   const overflowBlocks = overflowCount > 0 ? blocks.slice(0, overflowCount) : [];
   const retainedBlocks = overflowCount > 0 ? blocks.slice(overflowCount) : blocks;
 
-  archiveGovernanceHintBlocks(overflowBlocks, record);
-  safeWriteFile(resolveHintsPath(), buildLiveHintsDocument(existing, retainedBlocks));
+  archiveGovernanceHintBlocks(overflowBlocks, record, scope);
+  const hintsDir = pathResolver.rootResolve(path.dirname(hintsPath));
+  if (!safeExistsSync(hintsDir)) safeMkdir(hintsDir, { recursive: true });
+  safeWriteFile(hintsPath, buildLiveHintsDocument(existing, retainedBlocks));
 }
 
 function resolvePromotedRecordPath(ref: string): string | null {
@@ -669,7 +712,11 @@ export function savePromotedMemoryRecord(
       );
       throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
     }
-    const logicalDir = logicalDirFor({ kind: record.kind, tier: record.tier });
+    const logicalDir = logicalDirFor({
+      kind: record.kind,
+      tier: record.tier,
+      scope: candidate.scope,
+    });
     const absDir = pathResolver.resolve(logicalDir);
     if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
     const baseName = record.record_id;
@@ -680,7 +727,7 @@ export function savePromotedMemoryRecord(
     safeWriteFile(mdPath, markdown);
     backlinkSupersededRecord(record);
     if (record.kind === 'knowledge_hint') {
-      appendGovernanceHintRecord(record);
+      appendGovernanceHintRecord(record, candidate.scope);
     }
     return {
       logicalPath: `${logicalDir}/${baseName}.md`,

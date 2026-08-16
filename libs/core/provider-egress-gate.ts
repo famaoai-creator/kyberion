@@ -46,6 +46,7 @@ import { detectTier, TIERS } from './tier-guard.js';
 import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
+import { resolveTenant } from './tenant-registry.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -136,6 +137,10 @@ export interface ProviderEgressCheckInput {
   provider: string;
   /** Highest data tier represented in the payload about to be handed to `provider`. */
   dataTier: TierLevel;
+  /** Optional tenant profile upper bound; it can only narrow global policy. */
+  tenant_slug?: string;
+  /** Alternate repository root used by hermetic tenant registries. */
+  tenant_registry_root_dir?: string;
 }
 
 /**
@@ -197,6 +202,26 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
 
   if (!provider) {
     return denyAndAlert(input, `no provider identified for a ${dataTier} payload; fail-closed.`);
+  }
+
+  if (input.tenant_slug?.trim()) {
+    try {
+      const profile = resolveTenant(input.tenant_slug.trim(), {
+        ...(input.tenant_registry_root_dir ? { rootDir: input.tenant_registry_root_dir } : {}),
+      }).profile;
+      const allowed = profile.allowed_reasoning_backends;
+      if (allowed?.length && !allowed.includes(provider)) {
+        return denyAndAlert(
+          input,
+          `tenant '${input.tenant_slug}' does not allow provider '${provider}'.`
+        );
+      }
+    } catch (error) {
+      return denyAndAlert(
+        input,
+        `tenant '${input.tenant_slug}' could not be resolved: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   const loaded = loadProviderEgressPolicy();
