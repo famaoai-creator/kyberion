@@ -1,5 +1,9 @@
 import { logger } from './core.js';
-import { isExternalEffectStep, type ServiceRecording, type ServiceRecordingStep } from './service-recording.js';
+import {
+  isExternalEffectStep,
+  type ServiceRecording,
+  type ServiceRecordingStep,
+} from './service-recording.js';
 
 export type ServicePresetRunner = (serviceId: string, action: string, params: any) => Promise<any>;
 
@@ -33,14 +37,18 @@ export interface ExecuteServiceProcedureResult {
 
 const INPUT_RE = /\{\{input\.([a-z][a-z0-9_]{0,63})\}\}/g;
 const CHANNEL_RE = /\{\{channel\.([a-zA-Z0-9_]+)\}\}/g;
+const SECRET_RE = /\{\{secret\.[a-zA-Z0-9_.-]+\}\}/u;
 
 /** Resolve `{{input.X}}` / `{{channel.X}}` placeholders inside a params structure. */
 export function resolveServiceParams(
   params: unknown,
   inputs: Record<string, unknown>,
-  channels: Record<string, unknown>,
+  channels: Record<string, unknown>
 ): unknown {
   if (typeof params === 'string') {
+    if (SECRET_RE.test(params)) {
+      throw new Error('service procedure requires a human-bound secret parameter');
+    }
     // A string that is exactly one placeholder resolves to the raw value (keeps type).
     const inputExact = params.match(/^\{\{input\.([a-z][a-z0-9_]{0,63})\}\}$/);
     if (inputExact) return inputs[inputExact[1]] ?? '';
@@ -72,7 +80,7 @@ async function defaultExecutePreset(serviceId: string, action: string, params: a
  * Agent-S3 (Dispatcher/exec). Design: docs/INTENT_DRIVEN_SERVICE_AUTOMATION_DESIGN.ja.md §7-C
  */
 export async function executeServiceProcedure(
-  input: ExecuteServiceProcedureInput,
+  input: ExecuteServiceProcedureInput
 ): Promise<ExecuteServiceProcedureResult> {
   const run = input.executePreset ?? defaultExecutePreset;
   const inputs = input.inputs ?? {};
@@ -82,22 +90,51 @@ export async function executeServiceProcedure(
   for (const step of input.recording.steps) {
     const external = isExternalEffectStep(step);
     if (external && input.dryRun) {
-      results.push({ step_id: step.step_id, service_id: step.service_id, action: step.action, status: 'skipped', detail: 'dry-run: external-effect not fired' });
+      results.push({
+        step_id: step.step_id,
+        service_id: step.service_id,
+        action: step.action,
+        status: 'skipped',
+        detail: 'dry-run: external-effect not fired',
+      });
       continue;
     }
     if (external && !input.externalEffectApproved) {
-      results.push({ step_id: step.step_id, service_id: step.service_id, action: step.action, status: 'blocked', detail: 'external-effect requires approval' });
+      results.push({
+        step_id: step.step_id,
+        service_id: step.service_id,
+        action: step.action,
+        status: 'blocked',
+        detail: 'external-effect requires approval',
+      });
       return { status: 'blocked', results, channels };
     }
-    const resolved = resolveServiceParams(step.params ?? {}, inputs, channels) as Record<string, unknown>;
+    const resolved = resolveServiceParams(step.params ?? {}, inputs, channels) as Record<
+      string,
+      unknown
+    >;
     try {
       const result = await run(step.service_id, step.action, resolved);
       if (step.produces) channels[step.produces] = result;
-      results.push({ step_id: step.step_id, service_id: step.service_id, action: step.action, status: 'done', produced: step.produces });
+      results.push({
+        step_id: step.step_id,
+        service_id: step.service_id,
+        action: step.action,
+        status: 'done',
+        produced: step.produces,
+      });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      logger.warn(`[service-procedure-executor] step ${step.step_id} (${step.service_id}.${step.action}) failed: ${detail}`);
-      results.push({ step_id: step.step_id, service_id: step.service_id, action: step.action, status: 'error', detail });
+      logger.warn(
+        `[service-procedure-executor] step ${step.step_id} (${step.service_id}.${step.action}) failed: ${detail}`
+      );
+      results.push({
+        step_id: step.step_id,
+        service_id: step.service_id,
+        action: step.action,
+        status: 'error',
+        detail,
+      });
       return { status: 'failed', results, channels };
     }
   }

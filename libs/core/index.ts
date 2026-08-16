@@ -2372,6 +2372,24 @@ export {
 export type { ServiceRecording, ServiceRecordingStep } from './service-recording.js';
 export { compileServiceRecording } from './service-recording-compiler.js';
 export type { CompileServiceOptions, CompileServiceResult } from './service-recording-compiler.js';
+export {
+  ServiceRecordingSession,
+  getServiceRecordingSession,
+  recordServiceCall,
+  startServiceRecordingSession,
+  stopServiceRecordingSession,
+} from './service-recording-session.js';
+export type {
+  RecordedServiceCall,
+  ServiceCallObservation,
+  ServiceRecordedParameterKind,
+  ServiceRecordingSessionOptions,
+} from './service-recording-session.js';
+export { promoteServiceProcedure } from './service-procedure-promotion.js';
+export type {
+  PromoteServiceProcedureOptions,
+  PromoteServiceProcedureResult,
+} from './service-procedure-promotion.js';
 export { executeServiceProcedure, resolveServiceParams } from './service-procedure-executor.js';
 export type {
   ServicePresetRunner,
