@@ -404,7 +404,7 @@
       "apply": ["delete"]
     },
     "service": {
-      "capture": ["preset"],
+      "capture": ["harness", "preset"],
       "transform": [],
       "apply": ["api", "cli", "mcp", "oauth", "reconcile"]
     },
