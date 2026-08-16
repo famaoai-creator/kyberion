@@ -2629,12 +2629,12 @@
       "chronos_knowledge_feedback_prompt": {
         "en": "Was this knowledge helpful?",
         "ja": "このナレッジは役立ちましたか？",
-        "qps-ploc": "⟦Ẇȧş ŧħïş ķñőẇŀėḓɠė ħėŀṗƒůŀ? ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ẇȧş ŧħïş ķñőẇŀėḓɠė ħėŀṗƒůŀ? ŀőřėɱ ïṗ⟧"
       },
       "chronos_knowledge_feedback_useful": {
         "en": "Helpful",
         "ja": "役立った",
-        "qps-ploc": "⟦Ħėŀṗƒůŀ ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ħėŀṗƒůŀ ŀőř⟧"
       },
       "chronos_knowledge_feedback_not_useful": {
         "en": "Needs improvement",

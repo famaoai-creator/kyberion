@@ -344,8 +344,13 @@ export function scoreEntry(
   }
 
   const scopeScore = scopeAffinityScore(currentScope, entry.scope, weights.scope);
+  // Keep direct callers compatible with pre-proximity ranking weight objects.
+  // CLI-loaded weights always contain these fields, but tests and integrations
+  // may provide the older shape; undefined * a number would poison the total
+  // with NaN instead of simply omitting the newer signal.
+  const proximityWeight = Number.isFinite(weights.proximity) ? weights.proximity : 0;
   const proximityScore =
-    knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext) * weights.proximity;
+    knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext) * proximityWeight;
 
   let kindScore = 0;
   if (phaseSlug) {
@@ -357,7 +362,8 @@ export function scoreEntry(
   }
 
   const authorityScore = docAuthorityScore(entry.docAuthority, weights.authority);
-  const usageYieldScore = usageYield * weights.usage_yield;
+  const usageYieldWeight = Number.isFinite(weights.usage_yield) ? weights.usage_yield : 0;
+  const usageYieldScore = usageYield * usageYieldWeight;
 
   // 3. Importance (normalize to 0-10 scale)
   const importanceScore = entry.importance;
