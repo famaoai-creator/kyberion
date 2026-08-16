@@ -845,8 +845,8 @@ function drawBackupStatus() {
 
 function drawSlackOutbox() {
   console.log(chalk.bold.green(' 📬 SURFACE OUTBOX'));
-  const slackMessages = listSurfaceOutboxMessages('slack');
-  const chronosMessages = listSurfaceOutboxMessages('chronos');
+  const slackMessages = listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true });
+  const chronosMessages = listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true });
   console.log(
     `  Slack pending:   ${slackMessages.length > 0 ? chalk.bold.yellow(slackMessages.length) : chalk.dim(0)}`
   );

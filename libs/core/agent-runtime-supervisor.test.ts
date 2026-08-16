@@ -36,6 +36,7 @@ describe('agent-runtime-supervisor', () => {
       missionId: 'MSN-PREWARM',
       teamRoles: ['planner'],
       requestedBy: 'test',
+      scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
       reason: 'unit test',
     });
 
@@ -43,6 +44,11 @@ describe('agent-runtime-supervisor', () => {
       getAgentRuntimeEnsureRequestPath(request.request_id)
     );
     expect(reloaded.mission_id).toBe('MSN-PREWARM');
+    expect(reloaded.scope).toEqual({
+      scope_kind: 'mission',
+      tier: 'public',
+      mission_id: 'MSN-PREWARM',
+    });
     expect(reloaded.team_roles).toEqual(['planner']);
     expect(reloaded.requested_by).toBe('test');
   });
@@ -72,6 +78,7 @@ describe('agent-runtime-supervisor', () => {
       missionId: 'MSN-PREWARM',
       teamRoles: ['planner'],
       requestedBy: 'test',
+      scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
     });
     const requestPath = (
       await import('./agent-runtime-supervisor.js')
@@ -81,6 +88,7 @@ describe('agent-runtime-supervisor', () => {
     expect(mocks.ensureMissionTeamRuntime).toHaveBeenCalledWith({
       missionId: 'MSN-PREWARM',
       teamRoles: ['planner'],
+      scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
     });
     expect(result.runtime_plan.assignments).toHaveLength(1);
 
@@ -97,6 +105,7 @@ describe('agent-runtime-supervisor', () => {
     const request = enqueueMissionTeamPrewarmRequest({
       missionId: 'MSN-PREWARM',
       requestedBy: 'test',
+      scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
     });
     startAgentRuntimeSupervisorForRequest(request);
 

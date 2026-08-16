@@ -1,0 +1,122 @@
+{
+  "version": "1.0.0",
+  "description": "Lifecycle and scope registry for protocol gateways and control-plane services that are not human-facing surfaces.",
+  "entries": [
+    {
+      "id": "peer-messaging",
+      "classification": "protocol-gateway",
+      "process_scope": "system",
+      "request_scope_mode": "server-bound-tenant",
+      "health": "peer-listener-health",
+      "owner": "infrastructure_sentinel",
+      "binding": "peer-envelope",
+      "approval": "cross-tenant-broker-only",
+      "principal_resolution": "peer-envelope-principal",
+      "write_authority": "same-tenant-or-brokered-peer",
+      "nhi_binding": "envelope-nhi-affiliation",
+      "approval_classes": ["cross-tenant-broker"],
+      "data_residency": "tenant-runtime-and-observability",
+      "data_paths": [
+        "active/shared/runtime/peer-messaging/tenants/{tenant}/",
+        "active/shared/observability/peer-messaging/tenants/{tenant}/"
+      ]
+    },
+    {
+      "id": "mcp-server-cowork",
+      "classification": "protocol-gateway",
+      "process_scope": "system",
+      "request_scope_mode": "viewer-derived-or-server-bound-tenant",
+      "health": "mcp-session-health",
+      "owner": "surface_runtime",
+      "binding": "mcp-request-context",
+      "approval": "tool-catalog-and-approval-store",
+      "principal_resolution": "server-bound-mcp-session",
+      "write_authority": "catalog-tool-and-approval-gate",
+      "nhi_binding": "server-bound-mcp-nhi",
+      "approval_classes": ["tool-catalog", "human-final"],
+      "data_residency": "tenant-scoped-coordination-and-observability",
+      "data_paths": [
+        "knowledge/product/governance/mcp-tool-catalog.json",
+        "active/shared/coordination/"
+      ],
+      "lifecycle_compatibility": "surface-provider-manifest:mcp-server-cowork"
+    },
+    {
+      "id": "review-checks",
+      "classification": "control-plane-worker",
+      "process_scope": "system",
+      "request_scope_mode": "authority-derived",
+      "health": "mission-review-gate",
+      "owner": "mission_controller",
+      "binding": "mission-or-task-authority",
+      "approval": "approval-store-human-final-decision",
+      "principal_resolution": "mission-authority",
+      "write_authority": "mission-review-worker",
+      "nhi_binding": "mission-authority-nhi",
+      "approval_classes": ["human-final"],
+      "data_residency": "mission-coordination-and-observability",
+      "data_paths": [
+        "active/missions/{tier}/{mission}/",
+        "active/shared/coordination/channels/{channel}/approvals/"
+      ]
+    },
+    {
+      "id": "report-review",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-review-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-review-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-review-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/review-service/tenants/{tenant}/receipts/",
+        "<target-artifact>"
+      ]
+    },
+    {
+      "id": "generation-scheduler",
+      "classification": "control-plane-worker",
+      "process_scope": "system",
+      "request_scope_mode": "system-or-tenant-schedule",
+      "health": "generation-schedule-daemon-heartbeat",
+      "owner": "generation_scheduler",
+      "binding": "schedule-scope-and-delivery-policy",
+      "approval": "schedule-registration-and-external-effect-policy",
+      "principal_resolution": "scheduler-authority",
+      "write_authority": "schedule-registry-and-job-lease",
+      "nhi_binding": "schedule-owner-nhi",
+      "approval_classes": ["external-effect", "quota-reservation"],
+      "data_residency": "system-schedule-and-tenant-artifact-runtime",
+      "data_paths": [
+        "active/shared/runtime/media-generation/schedules/",
+        "active/shared/runtime/media-generation/tenants/{tenant}/",
+        "active/shared/observability/media-generation/tenants/{tenant}/"
+      ]
+    },
+    {
+      "id": "backup-restore",
+      "classification": "control-plane-worker",
+      "process_scope": "system",
+      "request_scope_mode": "explicit-scope-and-archive-manifest",
+      "health": "backup-restore-baseline-check",
+      "owner": "infrastructure_sentinel",
+      "binding": "backup-manifest-and-restore-quarantine",
+      "approval": "tenant-restore-human-final",
+      "principal_resolution": "backup-operator",
+      "write_authority": "archive-target-and-quarantine-only",
+      "nhi_binding": "restore-operator-nhi",
+      "approval_classes": ["restore", "cross-tenant-export"],
+      "data_residency": "tenant-archive-and-quarantined-runtime",
+      "data_paths": [
+        "active/shared/backup/",
+        "active/shared/runtime/peer-recovery-quarantine/tenants/{tenant}/"
+      ]
+    }
+  ]
+}

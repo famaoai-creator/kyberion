@@ -98,7 +98,7 @@ describe('mesh-peer-directory', () => {
     expect(heartbeat.expires_at).toBe('2099-06-24T00:06:00.000Z');
     expect(capability.capability_id).toBe('document.review');
 
-    const resolved = resolveMeshPeer('peer-a1');
+    const resolved = resolveMeshPeer('tenant-acme', 'peer-a1');
     expect(resolved).toMatchObject({
       peer_id: 'peer-a1',
       tenant_id: 'tenant-acme',
@@ -147,7 +147,7 @@ describe('mesh-peer-directory', () => {
       expires_at: '2026-06-24T00:06:00.000Z',
     });
 
-    const staleExpired = expireMeshPresence('2026-06-24T00:03:00.000Z');
+    const staleExpired = expireMeshPresence('tenant-acme', '2026-06-24T00:03:00.000Z');
     expect(staleExpired.map((entry) => entry.peer_id)).toEqual(['peer-a1']);
 
     expect(
@@ -189,7 +189,7 @@ describe('mesh-peer-directory', () => {
       allowed_request_kinds: ['review.request'],
     });
 
-    const resolved = resolveMeshPeer('bootstrap-peer');
+    const resolved = resolveMeshPeer('tenant-acme', 'bootstrap-peer');
     expect(resolved).toMatchObject({
       peer_id: 'bootstrap-peer',
       tenant_id: 'tenant-acme',

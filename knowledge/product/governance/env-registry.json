@@ -1013,6 +1013,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Fail check:entity-governance when observed warnings exist.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
       "category": "runtime",
       "type": "string",
@@ -1595,6 +1603,42 @@
       "description": "HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign.",
       "documented": true,
       "subsystem": "governance"
+    },
+    {
+      "name": "KYBERION_MCP_CALLER_ROLE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "subsystem": "mcp",
+      "description": "Server-bound MCP caller role checked against mcp-tool-catalog.json; client arguments cannot elevate it.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_MCP_NHI",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "subsystem": "mcp",
+      "description": "Server-bound NHI used to bind MCP event and approval scope.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_MCP_PRINCIPAL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "subsystem": "mcp",
+      "description": "Server-bound principal name recorded for MCP request attribution.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_MCP_TENANT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "subsystem": "mcp",
+      "description": "Server-bound tenant slug; a client-supplied tenant may only narrow this binding.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEDIA_BACKEND_PROBE_TTL_MS",

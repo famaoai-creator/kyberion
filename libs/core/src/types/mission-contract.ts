@@ -33,7 +33,7 @@ export interface MissionContract {
      */
     tier: 'personal' | 'confidential' | 'public';
     /**
-     * Required scoping when tier is 'confidential': matches knowledge/confidential/{project}/.
+     * Required scoping when tier is 'confidential': the tenant slug segment of knowledge/confidential/{tenant-slug}/. The field name is historical — this segment is a tenant (a confidentiality boundary from the tenant registry), not a project.
      */
     project?: string;
     /**

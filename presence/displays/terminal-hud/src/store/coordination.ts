@@ -66,7 +66,7 @@ export async function loadCoordination(): Promise<CoordinationData> {
   const outboxLines: string[] = [];
   for (const surface of OUTBOX_SURFACES) {
     try {
-      const pending = listSurfaceOutboxMessages(surface).length;
+      const pending = listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true }).length;
       const dead = listSurfaceDeadLetters(surface).length;
       if (pending > 0 || dead > 0) {
         outboxLines.push(`${surface}: ${pending} pending, ${dead} dead`);

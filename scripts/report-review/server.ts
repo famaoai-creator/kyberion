@@ -19,18 +19,45 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { assertProtocolServiceRegistered } from '@agent/core';
+import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 
 const target = process.argv[2];
-const port = Number(process.argv[3] || 8137);
+const positionalPort =
+  process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : undefined;
+const option = (flag: string): string | undefined => {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+};
+const port = Number(positionalPort || 8137);
 if (!target) {
-  console.error('usage: server <report.html> [port]');
+  console.error(
+    'usage: server <report.html> [port] [--artifact-ref <ref>] [--tier <tier>] [--tenant <slug>]'
+  );
   process.exit(1);
 }
+assertProtocolServiceRegistered('report-review');
 if (!safeExistsSync(target)) {
   console.error(`report not found: ${target}`);
   process.exit(1);
 }
+
+const tier = (option('--tier') || 'public') as 'public' | 'confidential' | 'personal';
+if (!['public', 'confidential', 'personal'].includes(tier)) {
+  console.error(`invalid tier: ${tier}`);
+  process.exit(1);
+}
+const reviewContext = createReportReviewContext({
+  artifact_ref: option('--artifact-ref') || target,
+  viewer_principal:
+    process.env.KYBERION_VIEWER_PRINCIPAL || process.env.KYBERION_MCP_PRINCIPAL || 'local-reviewer',
+  tier,
+  tenant_slug: option('--tenant') || process.env.KYBERION_TENANT,
+  organization_id: option('--organization-id'),
+  project_id: option('--project-id'),
+  mission_id: option('--mission-id'),
+});
 
 const TOKEN = randomBytes(16).toString('hex');
 const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
@@ -108,8 +135,28 @@ const server = http.createServer((req, res) => {
             encoding: 'utf8',
           });
           safeWriteFile(target, html, { mkdir: false, encoding: 'utf8' });
+          safeWriteFile(
+            reviewReceiptLogicalPath(reviewContext),
+            JSON.stringify(
+              {
+                review_session_id: reviewContext.review_session_id,
+                artifact_ref: reviewContext.artifact_ref,
+                viewer_principal: reviewContext.viewer_principal,
+                scope: reviewContext.scope,
+                saved_at: new Date().toISOString(),
+                bytes: html.length,
+                backup: backup.split('/').pop(),
+                comment_count: (html.match(/class=["']rv-cmt["']/g) || []).length,
+              },
+              null,
+              2
+            ),
+            { mkdir: true, encoding: 'utf8' }
+          );
           res.writeHead(200);
-          res.end(`saved (backup: ${backup.split('/').pop()})`);
+          res.end(
+            `saved (backup: ${backup.split('/').pop()}, review_session: ${reviewContext.review_session_id})`
+          );
           console.log(
             `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
           );
@@ -131,6 +178,10 @@ const server = http.createServer((req, res) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`Report review server → http://127.0.0.1:${port}/`);
   console.log(`  target : ${target}`);
+  console.log(`  artifact: ${reviewContext.artifact_ref}`);
+  console.log(
+    `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
+  );
   console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
   console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
 });

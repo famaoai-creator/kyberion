@@ -20,6 +20,17 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true,
+        "principal_resolution": "channel-binding",
+        "write_authority": "surface-agent-to-governed-port",
+        "nhi_binding": "channel-bound-surface-agent",
+        "approval_classes": ["external-write", "cross-tenant-binding"],
+        "data_residency": "tenant-coordination-and-outbox"
+      },
       "intent_rules": {
         "rules": [
           {
@@ -571,6 +582,17 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "viewer-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": false,
+        "principal_resolution": "viewer-context",
+        "write_authority": "viewer-to-authority-facade",
+        "nhi_binding": "viewer-or-mission-nhi",
+        "approval_classes": ["human-approval"],
+        "data_residency": "tenant-projection-and-operator-observability"
+      },
       "routing": {
         "text_routing": {
           "greeting_patterns": [],
@@ -646,6 +668,17 @@
         "directReply": "notification",
         "supportsOutbox": false,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "viewer-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": false,
+        "principal_resolution": "viewer-context",
+        "write_authority": "viewer-to-authority-facade",
+        "nhi_binding": "viewer-or-mission-nhi",
+        "approval_classes": ["human-approval", "voice-external-effect"],
+        "data_residency": "tenant-presence-and-observability"
       },
       "routing": {
         "text_routing": {
@@ -731,6 +764,17 @@
         "directReply": "notification",
         "supportsOutbox": false,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true,
+        "principal_resolution": "channel-binding",
+        "write_authority": "surface-agent-to-governed-port",
+        "nhi_binding": "channel-bound-surface-agent",
+        "approval_classes": ["external-write", "cross-tenant-binding"],
+        "data_residency": "tenant-coordination-and-outbox"
       },
       "routing": {
         "text_routing": {
@@ -846,6 +890,17 @@
         "supportsOutbox": true,
         "supportsNotifications": true
       },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true,
+        "principal_resolution": "channel-binding",
+        "write_authority": "surface-agent-to-governed-port",
+        "nhi_binding": "channel-bound-surface-agent",
+        "approval_classes": ["external-write", "cross-tenant-binding"],
+        "data_residency": "tenant-coordination-and-outbox"
+      },
       "routing": {
         "text_routing": {
           "greeting_patterns": [
@@ -959,6 +1014,17 @@
         "directReply": "outbox",
         "supportsOutbox": true,
         "supportsNotifications": true
+      },
+      "scope_policy": {
+        "process_scope": "system",
+        "scope_mode": "request-derived",
+        "allowed_tiers": ["public", "confidential"],
+        "requires_channel_binding_for_customer_mode": true,
+        "principal_resolution": "channel-binding",
+        "write_authority": "surface-agent-to-governed-port",
+        "nhi_binding": "channel-bound-surface-agent",
+        "approval_classes": ["external-write", "cross-tenant-binding"],
+        "data_residency": "tenant-coordination-and-outbox"
       },
       "routing": {
         "text_routing": {

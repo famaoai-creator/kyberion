@@ -3,6 +3,7 @@ import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { createLogger } from './logger.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 const logger = createLogger('metrics');
 
 /**
@@ -147,6 +148,8 @@ export interface ResourceUsageRecord {
   cost_usd: number;
   status: ResourceUsageStatus;
   source: string;
+  /** Canonical containment scope; legacy records may omit it. */
+  scope?: EventScope;
   metadata?: Record<string, unknown>;
 }
 
@@ -169,10 +172,11 @@ export class MetricsCollector {
 
   /** Append a normalized, actor-neutral resource usage ledger entry. */
   recordResourceUsage(
-    input: Omit<ResourceUsageRecord, 'type' | 'usage_id' | 'timestamp' | 'cost_usd'> & {
+    input: Omit<ResourceUsageRecord, 'type' | 'usage_id' | 'timestamp' | 'cost_usd' | 'scope'> & {
       usage_id?: string;
       timestamp?: string;
       cost_usd?: number;
+      scope?: EventScopeInput;
     }
   ): ResourceUsageRecord {
     const quantity = Number(input.quantity);
@@ -189,6 +193,7 @@ export class MetricsCollector {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
     const missionId = input.mission_id || process.env.MISSION_ID || undefined;
+    const scope = input.scope ? normalizeEventScope(input.scope) : undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
       usage_id:
@@ -205,6 +210,7 @@ export class MetricsCollector {
       cost_usd: Math.round(cost * 100000) / 100000,
       status: input.status,
       source: input.source,
+      ...(scope ? { scope } : {}),
       metadata: input.metadata,
     };
     if (this._persist) this._appendResourceUsage(record);

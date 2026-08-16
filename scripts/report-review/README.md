@@ -24,11 +24,15 @@
 ### 方式B（推奨・往復編集 / 🎤も使える）
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port]
+KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port] \
+  --artifact-ref artifact://tenant-a/report-1 --tier confidential --tenant tenant-a
 # → http://127.0.0.1:<port>/ を開く（localhost=セキュアコンテキストなので 🎤 マイク可）
 ```
 
 - 保存先は起動時の1ファイルに固定・127.0.0.1限定・トークン＋Origin検査。
+- confidential/personal のレビューは `--tenant`（または `KYBERION_TENANT`）を必須とし、
+  `artifact_ref + EventScope + viewer_principal` を保存 receipt に固定する。client 側の
+  tenant 表示だけでは認可にならない。
 - 配信時に注入したレイヤ/configは保存時に自動除去（正本はコンテンツのみのクリーンな状態を維持）。
 - 既にレイヤが焼き込まれたレポートには再注入しない（二重表示防止）。
 
@@ -51,4 +55,7 @@ node_modules/.bin/tsx scripts/report-review/stamp.ts <report.html> --remove # �
 
 - 🎤（Web Speech API）は機種により**音声がブラウザ提供元のクラウドへ送信**される。機微な内容は **OSディクテーション（端末内）** を使うこと。
 - confidential 階層のレポートを保存する場合、secure-io のティアガードにより適切な `KYBERION_PERSONA` が必要。
+- 保存成功時は `active/shared/observability/review-service/tenants/{tenant}/receipts/` に
+  review session、scope、viewer、backup、comment 数を記録する。これは承認の代替ではなく、
+  review artifact の保存証跡である。
 - 生成されるバックアップ `<file>.bak-<ts>` は元ファイルと同じ階層に残る（不要なら削除）。

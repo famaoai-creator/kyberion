@@ -1,6 +1,9 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { collectEntityGovernanceReport } from '../../scripts/check_entity_governance.js';
+import {
+  collectEntityGovernanceReport,
+  shouldFailEntityGovernance,
+} from '../../scripts/check_entity_governance.js';
 import { ENTITY_SCOPE_HIERARCHY } from './entity-scope.js';
 import { createMission } from './mission-creation.js';
 import {
@@ -86,6 +89,13 @@ describe('entity governance acceptance boundaries', () => {
       'task_id',
       'session',
     ]);
+  });
+
+  it('keeps observed warnings non-fatal unless strict warning mode is requested', () => {
+    const warningReport = { status: 'ok' as const, warnings: ['unregistered workspace'] };
+    expect(shouldFailEntityGovernance(warningReport)).toBe(false);
+    expect(shouldFailEntityGovernance(warningReport, true)).toBe(true);
+    expect(shouldFailEntityGovernance({ status: 'drift', warnings: [] })).toBe(true);
   });
 
   it.each([

@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "kind",
+    "tenant_id",
     "session_id",
     "message_kind",
     "topic",
@@ -16,6 +17,11 @@
   ],
   "properties": {
     "kind": { "type": "string", "enum": ["peer_conversation_message"] },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
     "session_id": { "type": "string", "minLength": 1 },
     "message_kind": {
       "type": "string",

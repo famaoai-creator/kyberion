@@ -20,6 +20,7 @@ import {
   isSurfaceOutboxDue,
   recordSurfaceDeliverySuccess,
   settleSurfaceOutboxFailure,
+  assertSurfaceOutboxDeliveryAuthorized,
   deriveSlackDelegationReceiver,
   isEnvironmentInitialized,
   getSlackMissionProposalState,
@@ -229,10 +230,11 @@ function formatSlackMissionIssuedReply(
 }
 
 async function processSlackOutbox(client: any) {
-  const messages = listSlackOutboxMessages();
+  const messages = listSlackOutboxMessages({ includeTenantNamespaces: true });
   for (const message of messages) {
     if (!isSurfaceOutboxDue(message)) continue;
     try {
+      assertSurfaceOutboxDeliveryAuthorized(message);
       const response = await postSlackText(client, {
         channel: message.channel,
         thread_ts: message.thread_ts || undefined,
@@ -245,8 +247,8 @@ async function processSlackOutbox(client: any) {
         response.ts,
         message.source
       );
-      recordSurfaceDeliverySuccess('slack', message.channel);
-      clearSlackOutboxMessage(message.message_id);
+      recordSurfaceDeliverySuccess('slack', message.channel, message.scope);
+      clearSlackOutboxMessage(message.message_id, message.scope);
     } catch (err: any) {
       const decision = settleSurfaceOutboxFailure('slack', message, err);
       logger.error(

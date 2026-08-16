@@ -95,7 +95,8 @@
       "args": ["dist/scripts/mcp_server.js"],
       "env": {
         "KYBERION_PERSONA": "sovereign_concierge",
-        "MISSION_ROLE": "mcp_server"
+        "MISSION_ROLE": "mcp_server",
+        "KYBERION_MCP_CALLER_ROLE": "cowork"
       },
       "cwd": ".",
       "shutdownPolicy": "detached",

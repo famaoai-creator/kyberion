@@ -24,6 +24,7 @@ import {
   isSurfaceOutboxDue,
   recordSurfaceDeliverySuccess,
   settleSurfaceOutboxFailure,
+  assertSurfaceOutboxDeliveryAuthorized,
   getRecentIMessages,
   getIMessageHistory,
   formatIMessageAttachmentSummary,
@@ -144,14 +145,15 @@ async function hydrateBlueBubblesAttachments(
 }
 
 async function drainIMessageOutbox(): Promise<void> {
-  for (const message of listSurfaceOutboxMessages('imessage')) {
+  for (const message of listSurfaceOutboxMessages('imessage', { includeTenantNamespaces: true })) {
     if (!isSurfaceOutboxDue(message)) continue;
     try {
+      assertSurfaceOutboxDeliveryAuthorized(message);
       // Surface outbox channels are iMessage chat identifiers. Preserve the
       // chat target so a group completion never becomes a sender DM.
       await sendIMessageText({ recipient: '', chatId: message.channel, text: message.text });
-      recordSurfaceDeliverySuccess('imessage', message.channel);
-      clearSurfaceOutboxMessage('imessage', message.message_id);
+      recordSurfaceDeliverySuccess('imessage', message.channel, message.scope);
+      clearSurfaceOutboxMessage('imessage', message.message_id, message.scope);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const decision = settleSurfaceOutboxFailure('imessage', message, error);

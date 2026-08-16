@@ -1872,7 +1872,7 @@ function ChronosMirrorV2Content() {
                         {costSummaryError}
                       </div>
                     ) : null}
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
                         <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
                           {uxText('chronos_diagnostics_currency', locale)}
@@ -1915,6 +1915,26 @@ function ChronosMirrorV2Content() {
                             ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
                             : uxText('chronos_no_budget_guard', locale)}
                         </div>
+                      </div>
+                      <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                          {uxText('chronos_diagnostics_generation_actual', locale)}
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold kb-text-primary">
+                          {typeof costSummary?.generation?.actualUsd === 'number'
+                            ? `$${costSummary.generation.actualUsd.toFixed(3)}`
+                            : '-'}
+                        </div>
+                        <div className="mt-1 text-[10px] kb-text-muted">
+                          {costSummary?.generation?.settledJobs || 0}{' '}
+                          {uxText('chronos_diagnostics_entries', locale)}
+                        </div>
+                        {costSummary?.generation?.awaitingActualCost ? (
+                          <div className="mt-1 text-[10px] kb-status-warning">
+                            {costSummary.generation.awaitingActualCost}{' '}
+                            {uxText('chronos_diagnostics_generation_pending', locale)}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                     {Array.isArray(costSummary?.missionBreakdown) &&

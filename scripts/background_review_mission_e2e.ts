@@ -30,6 +30,7 @@ import {
   safeRmSync,
   safeWriteFile,
   withExecutionContext,
+  type EventScope,
   type ApprovalRequestRecord,
 } from '@agent/core';
 import * as path from 'node:path';
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
   const candidateIds: string[] = [];
   let approvalId: string | undefined;
   let notificationId: string | undefined;
+  let notificationScope: EventScope | undefined;
   let backupRef: string | undefined;
 
   try {
@@ -169,13 +171,13 @@ async function main(): Promise<void> {
 
     const notification =
       surface === 'presence'
-        ? listSurfaceNotifications('presence').find(
+        ? listSurfaceNotifications('presence', { includeTenantNamespaces: true }).find(
             (message) =>
               message.request_id === approval.id &&
               message.channel === channel &&
               message.thread_ts === threadTs
           )
-        : listSurfaceOutboxMessages(surface).find(
+        : listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true }).find(
             (message) =>
               message.correlation_id === approval.id &&
               message.channel === channel &&
@@ -185,6 +187,7 @@ async function main(): Promise<void> {
       throw new Error('Background-review approval outbox notification was not created.');
     notificationId =
       'message_id' in notification ? notification.message_id : notification.notification_id;
+    notificationScope = notification.scope;
     if (!notification.text.includes(`appr:${approval.id}:approve`)) {
       throw new Error('Approval outbox notification did not contain the surface approval token.');
     }
@@ -260,7 +263,7 @@ async function main(): Promise<void> {
         );
       } else {
         withExecutionContext('slack_bridge', () =>
-          clearSurfaceOutboxMessage(surface, notificationId!)
+          clearSurfaceOutboxMessage(surface, notificationId!, notificationScope)
         );
       }
     }

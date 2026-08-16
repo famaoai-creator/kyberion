@@ -1,0 +1,14 @@
+{
+  "$schema": "https://kyberion.local/schemas/media-generation-quota-policy.schema.json",
+  "version": "1.0.0",
+  "description": "Per-tenant daily abstract generation-unit quota. This is intentionally separate from reasoning token rate limits and provider dollar costs.",
+  "max_units_per_day": 100,
+  "warn_ratio": 0.8,
+  "operation_units": {
+    "generate_image": 1,
+    "generate_video": 10,
+    "generate_music": 10,
+    "run_workflow": 5
+  },
+  "tenant_overrides": {}
+}

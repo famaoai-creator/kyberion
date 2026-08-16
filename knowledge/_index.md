@@ -141,6 +141,7 @@
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./product/architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./product/architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [runtime-surface-lifecycle-model](./product/architecture/runtime-surface-lifecycle-model.md) (public | runtime_governance)
+- [テナント導入後の Runtime・Schedule・Surface・Channel スコープ調査報告](./product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md) (public | Ecosystem Architect)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 

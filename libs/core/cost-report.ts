@@ -1,4 +1,11 @@
 import { metrics, type ResourceUsageStatus } from './metrics.js';
+import {
+  eventScopeMatches,
+  parseEventScopeFromRecord,
+  type EventScope,
+  type EventScopeFilter,
+} from './event-scope.js';
+import { resolveScopeForRecord } from './scope-migration.js';
 
 /**
  * cost-report.ts — OP-01 Task 2: aggregate the usage ledger into
@@ -25,6 +32,7 @@ export interface CostLedgerEntry {
   customer_id?: string;
   cost_center?: string;
   status?: ResourceUsageStatus;
+  scope?: EventScope;
 }
 
 export interface CostBucket {
@@ -52,6 +60,9 @@ export interface CostReport {
   by_actor: CostBucket[];
   by_customer: CostBucket[];
   by_cost_center: CostBucket[];
+  by_tenant: CostBucket[];
+  by_organization: CostBucket[];
+  by_project: CostBucket[];
 }
 
 export function effectiveCostUsd(entry: CostLedgerEntry): number {
@@ -103,9 +114,17 @@ function bucketize(
     .sort((left, right) => right.cost_usd - left.cost_usd);
 }
 
+function scopeOf(entry: CostLedgerEntry): EventScope | undefined {
+  return resolveScopeForRecord(entry as unknown as Record<string, unknown>).scope;
+}
+
+function scopeKey(entry: CostLedgerEntry, key: keyof EventScope, emptyLabel: string): string {
+  return String(scopeOf(entry)?.[key] || emptyLabel);
+}
+
 export function buildCostReport(
   entries: CostLedgerEntry[],
-  options: { since?: string; until?: string } = {}
+  options: { since?: string; until?: string; scopeFilter?: EventScopeFilter } = {}
 ): CostReport {
   const sinceMs = options.since ? Date.parse(options.since) : Number.NEGATIVE_INFINITY;
   const untilMs = options.until ? Date.parse(options.until) : Number.POSITIVE_INFINITY;
@@ -115,6 +134,7 @@ export function buildCostReport(
   for (const entry of entries) {
     const at = Date.parse(String(entry.timestamp || ''));
     if (!Number.isFinite(at) || at < sinceMs || at > untilMs) continue;
+    if (options.scopeFilter && !eventScopeMatches(scopeOf(entry), options.scopeFilter)) continue;
     if (entry.type === 'resource_usage') resourceUsageEntries.push(entry);
     const cost = effectiveCostUsd(entry);
     if (cost <= 0) continue;
@@ -157,11 +177,16 @@ export function buildCostReport(
     by_actor: bucketize(costed, (entry) => entry.actor_id || '(no actor)'),
     by_customer: bucketize(costed, (entry) => entry.customer_id || '(no customer)'),
     by_cost_center: bucketize(costed, (entry) => entry.cost_center || '(no cost center)'),
+    by_tenant: bucketize(costed, (entry) => scopeKey(entry, 'tenant_slug', '(system)')),
+    by_organization: bucketize(costed, (entry) =>
+      scopeKey(entry, 'organization_id', '(no organization)')
+    ),
+    by_project: bucketize(costed, (entry) => scopeKey(entry, 'project_id', '(no project)')),
   };
 }
 
 export function buildCostReportFromHistory(
-  options: { since?: string; until?: string } = {}
+  options: { since?: string; until?: string; scopeFilter?: EventScopeFilter } = {}
 ): CostReport {
   return buildCostReport(
     [
@@ -190,6 +215,7 @@ export function formatCostReport(report: CostReport, topN = 5): string[] {
   };
   section('By mission', report.by_mission);
   section('By model', report.by_model);
+  section('By tenant', report.by_tenant);
   section('By day', report.by_day);
   return lines;
 }

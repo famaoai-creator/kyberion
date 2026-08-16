@@ -28,6 +28,7 @@ import {
   isSurfaceOutboxDue,
   recordSurfaceDeliverySuccess,
   settleSurfaceOutboxFailure,
+  assertSurfaceOutboxDeliveryAuthorized,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
   buildSurfaceApprovalActions,
@@ -664,8 +665,7 @@ export async function handleTelegramUpdate(
 async function handleInputFile(inputPath: string, options: TelegramBridgeOptions): Promise<void> {
   const resolved = pathResolver.rootResolve(inputPath);
   const parsed = JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as
-    | TelegramBridgeInput
-    | TelegramUpdate;
+    TelegramBridgeInput | TelegramUpdate;
 
   if ('action' in parsed && parsed.action === 'send') {
     const payload = await sendTelegramMessage(
@@ -775,12 +775,15 @@ async function main(): Promise<void> {
   // E2E-04 Task 2: drain the telegram surface outbox (operator notifications
   // enqueued by core, e.g. notifyOperator) — same shape as the Slack bridge.
   const drainOutbox = async () => {
-    for (const message of listSurfaceOutboxMessages('telegram')) {
+    for (const message of listSurfaceOutboxMessages('telegram', {
+      includeTenantNamespaces: true,
+    })) {
       if (!isSurfaceOutboxDue(message)) continue;
       try {
+        assertSurfaceOutboxDeliveryAuthorized(message);
         await sendTelegramMessage({ chatId: message.channel, text: message.text }, options);
-        recordSurfaceDeliverySuccess('telegram', message.channel);
-        clearSurfaceOutboxMessage('telegram', message.message_id);
+        recordSurfaceDeliverySuccess('telegram', message.channel, message.scope);
+        clearSurfaceOutboxMessage('telegram', message.message_id, message.scope);
       } catch (err: any) {
         const decision = settleSurfaceOutboxFailure('telegram', message, err);
         logger.error(

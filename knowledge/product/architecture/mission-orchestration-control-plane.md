@@ -163,6 +163,8 @@ while preserving flexibility:
   - `libs/core/a2a-bridge.ts`
 - generic surface outbox:
   - `active/shared/coordination/channels/<surface>/outbox/`
+  - tenant-scoped records: `active/shared/coordination/channels/<surface>/tenants/<tenant>/outbox/`
+- presence request/notification records: `active/shared/runtime/presence/{requests,notifications}/` with the same tenant namespace rule
 
 ## Surface Closing Contract
 
@@ -222,6 +224,7 @@ Chronos should also be read as part of the higher-order surface split:
   - leadership approval and outcome surface
 
 Reference:
+
 - `knowledge/product/architecture/surface-responsibility-model.md`
 
 ## Migration Direction

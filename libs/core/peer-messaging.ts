@@ -7,6 +7,7 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -21,6 +22,7 @@ export type PeerMessageType =
 
 export interface PeerMessageEnvelope<TPayload = unknown> {
   version: '1';
+  tenant_id: string;
   message_id: string;
   conversation_id: string;
   type: PeerMessageType;
@@ -35,6 +37,12 @@ export interface PeerMessageEnvelope<TPayload = unknown> {
   expires_at?: string;
   transport?: 'http';
   signature?: string;
+  /** Canonical request scope carried inside the signed peer envelope. */
+  scope: EventScope;
+  /** Optional NHI principal; peer identity alone is not an authority grant. */
+  principal?: { kind: 'nhi'; id: string };
+  /** Required for brokered cross-tenant extensions; same-tenant messages omit it. */
+  approval_ref?: string;
 }
 
 export interface PeerNetworkPeerRecord {
@@ -60,6 +68,7 @@ export interface PeerNetworkCatalog {
 }
 
 export interface BuildPeerMessageInput<TPayload = unknown> {
+  tenantId: string;
   senderPeerId: string;
   recipientPeerId: string;
   subject: string;
@@ -70,6 +79,9 @@ export interface BuildPeerMessageInput<TPayload = unknown> {
   replyToMessageId?: string;
   correlationId?: string;
   ttlMs?: number;
+  scope?: EventScopeInput;
+  principal?: { kind: 'nhi'; id: string };
+  approvalRef?: string;
 }
 
 export interface PeerMessageDispatchOptions {
@@ -107,6 +119,7 @@ export type PeerMessageResponder = (
 
 export interface PeerMessagingServerOptions {
   peerId: string;
+  tenantId: string;
   sharedSecret: string;
   responder?: PeerMessageResponder;
   inboxRole?: GovernedArtifactRole;
@@ -141,6 +154,7 @@ function normalizeEnvelope<TPayload>(
 ): PeerMessageEnvelope<TPayload> {
   return {
     version: envelope.version || '1',
+    tenant_id: envelope.tenant_id,
     message_id: envelope.message_id,
     conversation_id: envelope.conversation_id,
     type: envelope.type,
@@ -155,6 +169,9 @@ function normalizeEnvelope<TPayload>(
     ...(envelope.expires_at ? { expires_at: envelope.expires_at } : {}),
     ...(envelope.transport ? { transport: envelope.transport } : {}),
     ...(envelope.signature ? { signature: envelope.signature } : {}),
+    scope: envelope.scope,
+    ...(envelope.principal ? { principal: envelope.principal } : {}),
+    ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
 }
 
@@ -163,6 +180,7 @@ function signaturePayload<TPayload>(
 ): Record<string, unknown> {
   return {
     version: envelope.version || '1',
+    tenant_id: envelope.tenant_id,
     message_id: envelope.message_id,
     conversation_id: envelope.conversation_id,
     type: envelope.type,
@@ -176,6 +194,9 @@ function signaturePayload<TPayload>(
     ...(typeof envelope.ttl_ms === 'number' ? { ttl_ms: envelope.ttl_ms } : {}),
     ...(envelope.expires_at ? { expires_at: envelope.expires_at } : {}),
     ...(envelope.transport ? { transport: envelope.transport } : {}),
+    scope: envelope.scope,
+    ...(envelope.principal ? { principal: envelope.principal } : {}),
+    ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
 }
 
@@ -205,8 +226,16 @@ export function verifyPeerMessage<TPayload>(
 export function buildPeerMessageEnvelope<TPayload>(
   input: BuildPeerMessageInput<TPayload>
 ): PeerMessageEnvelope<TPayload> {
+  const tenantId = normalizeTenantId(input.tenantId);
+  const scope = normalizeEventScope(
+    input.scope || { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId }
+  );
+  if (scope.tenant_slug !== tenantId) {
+    throw new Error(`peer_message_scope_tenant_mismatch:${tenantId}`);
+  }
   const envelope: PeerMessageEnvelope<TPayload> = {
     version: '1',
+    tenant_id: tenantId,
     message_id: randomId('PM'),
     conversation_id: input.conversationId || randomId('PC'),
     type: input.type,
@@ -221,6 +250,9 @@ export function buildPeerMessageEnvelope<TPayload>(
       ? { ttl_ms: input.ttlMs, expires_at: new Date(Date.now() + input.ttlMs).toISOString() }
       : {}),
     transport: 'http',
+    scope,
+    ...(input.principal ? { principal: input.principal } : {}),
+    ...(input.approvalRef ? { approval_ref: input.approvalRef } : {}),
   };
   envelope.signature = signPeerMessage(envelope, input.sharedSecret);
   return envelope;
@@ -239,7 +271,7 @@ export function loadPeerNetworkCatalog(
       if (parsed.tenant_id && !isValidTenantSlug(parsed.tenant_id)) {
         throw new Error(`peer_catalog_invalid_tenant:${parsed.tenant_id}`);
       }
-      if (options.tenantId && parsed.tenant_id && parsed.tenant_id !== options.tenantId) {
+      if (options.tenantId && parsed.tenant_id !== options.tenantId) {
         throw new Error(`peer_catalog_tenant_mismatch:${options.tenantId}`);
       }
       if (
@@ -420,30 +452,36 @@ export function resolvePeerDispatchTarget(
   };
 }
 
-function runtimeLogicalPath(peerId: string, segment: string): string {
-  return `${DEFAULT_RUNTIME_ROOT}/${peerId}/${segment}`;
+function runtimeLogicalPath(tenantId: string, peerId: string, segment: string): string {
+  return `${DEFAULT_RUNTIME_ROOT}/tenants/${tenantId}/peers/${peerId}/${segment}`;
 }
 
-function observabilityLogicalPath(peerId: string, segment: string): string {
-  return `${DEFAULT_OBSERVABILITY_ROOT}/${peerId}/${segment}`;
+function observabilityLogicalPath(tenantId: string, peerId: string, segment: string): string {
+  return `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}/${segment}`;
 }
 
 function appendRuntimeJsonl(
   role: GovernedArtifactRole,
+  tenantId: string,
   peerId: string,
   segment: string,
   record: unknown
 ): string {
-  return appendGovernedArtifactJsonl(role, runtimeLogicalPath(peerId, segment), record);
+  return appendGovernedArtifactJsonl(role, runtimeLogicalPath(tenantId, peerId, segment), record);
 }
 
 function appendObservabilityJsonl(
   role: GovernedArtifactRole,
+  tenantId: string,
   peerId: string,
   segment: string,
   record: unknown
 ): string {
-  return appendGovernedArtifactJsonl(role, observabilityLogicalPath(peerId, segment), record);
+  return appendGovernedArtifactJsonl(
+    role,
+    observabilityLogicalPath(tenantId, peerId, segment),
+    record
+  );
 }
 
 function readJsonlRecords<T>(logicalPath: string): T[] {
@@ -457,23 +495,37 @@ function readJsonlRecords<T>(logicalPath: string): T[] {
     .map((line) => JSON.parse(line) as T);
 }
 
-export function listPeerInboxRecords(peerId: string): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(runtimeLogicalPath(peerId, 'inbox.jsonl'));
-}
-
-export function listPeerOutboxRecords(peerId: string): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(runtimeLogicalPath(peerId, 'outbox.jsonl'));
-}
-
-export function listPeerEvents(peerId: string): Array<Record<string, unknown>> {
+export function listPeerInboxRecords(
+  tenantId: string,
+  peerId: string
+): Array<Record<string, unknown>> {
   return readJsonlRecords<Record<string, unknown>>(
-    observabilityLogicalPath(peerId, 'events.jsonl')
+    runtimeLogicalPath(tenantId, peerId, 'inbox.jsonl')
   );
 }
 
-export function clearPeerRuntime(peerId: string): void {
-  const runtimeDir = pathResolver.resolve(`${DEFAULT_RUNTIME_ROOT}/${peerId}`);
-  const observabilityDir = pathResolver.resolve(`${DEFAULT_OBSERVABILITY_ROOT}/${peerId}`);
+export function listPeerOutboxRecords(
+  tenantId: string,
+  peerId: string
+): Array<Record<string, unknown>> {
+  return readJsonlRecords<Record<string, unknown>>(
+    runtimeLogicalPath(tenantId, peerId, 'outbox.jsonl')
+  );
+}
+
+export function listPeerEvents(tenantId: string, peerId: string): Array<Record<string, unknown>> {
+  return readJsonlRecords<Record<string, unknown>>(
+    observabilityLogicalPath(tenantId, peerId, 'events.jsonl')
+  );
+}
+
+export function clearPeerRuntime(tenantId: string, peerId: string): void {
+  const runtimeDir = pathResolver.resolve(
+    `${DEFAULT_RUNTIME_ROOT}/tenants/${tenantId}/peers/${peerId}`
+  );
+  const observabilityDir = pathResolver.resolve(
+    `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}`
+  );
   withExecutionContext('infrastructure_sentinel', () => {
     if (safeExistsSync(runtimeDir)) safeRmSync(runtimeDir, { recursive: true, force: true });
     if (safeExistsSync(observabilityDir))
@@ -482,11 +534,12 @@ export function clearPeerRuntime(peerId: string): void {
 }
 
 function recordPeerEvent(
+  tenantId: string,
   peerId: string,
   event: Record<string, unknown>,
   role: GovernedArtifactRole = DEFAULT_EVENT_ROLE
 ): string {
-  return appendObservabilityJsonl(role, peerId, 'events.jsonl', {
+  return appendObservabilityJsonl(role, tenantId, peerId, 'events.jsonl', {
     ts: nowIso(),
     peer_id: peerId,
     ...event,
@@ -494,17 +547,19 @@ function recordPeerEvent(
 }
 
 function recordInbox(
+  tenantId: string,
   peerId: string,
   envelope: PeerMessageEnvelope,
   role: GovernedArtifactRole = DEFAULT_INBOX_ROLE
 ): string {
-  return appendRuntimeJsonl(role, peerId, 'inbox.jsonl', {
+  return appendRuntimeJsonl(role, tenantId, peerId, 'inbox.jsonl', {
     received_at: nowIso(),
     envelope,
   });
 }
 
 function recordOutbox(
+  tenantId: string,
   peerId: string,
   envelope: PeerMessageEnvelope,
   destinationUrl: string,
@@ -513,7 +568,7 @@ function recordOutbox(
   error?: string,
   role: GovernedArtifactRole = DEFAULT_INBOX_ROLE
 ): string {
-  return appendRuntimeJsonl(role, peerId, 'outbox.jsonl', {
+  return appendRuntimeJsonl(role, tenantId, peerId, 'outbox.jsonl', {
     sent_at: nowIso(),
     destination_url: destinationUrl,
     status,
@@ -604,7 +659,9 @@ function sendJson(res: http.ServerResponse, statusCode: number, body: unknown): 
 export class PeerMessagingServer {
   private server: http.Server | null = null;
 
-  constructor(private readonly options: PeerMessagingServerOptions) {}
+  constructor(private readonly options: PeerMessagingServerOptions) {
+    normalizeTenantId(options.tenantId);
+  }
 
   public async processEnvelope(
     envelope: PeerMessageEnvelope
@@ -614,8 +671,31 @@ export class PeerMessagingServer {
     if (!normalized || typeof normalized !== 'object') {
       return { status: 400, body: { ok: false, error: 'invalid_envelope' } };
     }
+    if (!normalized.tenant_id || !isValidTenantSlug(normalized.tenant_id)) {
+      return { status: 400, body: { ok: false, error: 'invalid_tenant_id' } };
+    }
+    let scope: EventScope;
+    try {
+      scope = normalizeEventScope(normalized.scope);
+    } catch {
+      return { status: 400, body: { ok: false, error: 'invalid_scope' } };
+    }
+    if (scope.tenant_slug !== normalized.tenant_id) {
+      return { status: 403, body: { ok: false, error: 'scope_tenant_mismatch' } };
+    }
+    if (normalized.tenant_id !== this.options.tenantId) {
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
+        type: 'message_rejected',
+        message_id: normalized.message_id,
+        reason: 'tenant_mismatch',
+        envelope_tenant_id: normalized.tenant_id,
+        receiver_tenant_id: this.options.tenantId,
+        sender_peer_id: normalized.sender_peer_id,
+      });
+      return { status: 403, body: { ok: false, error: 'tenant_mismatch' } };
+    }
     if (normalized.recipient_peer_id !== this.options.peerId) {
-      recordPeerEvent(this.options.peerId, {
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
         type: 'message_rejected',
         message_id: normalized.message_id,
         reason: 'recipient_mismatch',
@@ -625,7 +705,7 @@ export class PeerMessagingServer {
       return { status: 400, body: { ok: false, error: 'recipient_mismatch' } };
     }
     if (!verifyPeerMessage(normalized, sharedSecret)) {
-      recordPeerEvent(this.options.peerId, {
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
         type: 'message_rejected',
         message_id: normalized.message_id,
         reason: 'invalid_signature',
@@ -635,8 +715,8 @@ export class PeerMessagingServer {
       return { status: 401, body: { ok: false, error: 'invalid_signature' } };
     }
 
-    recordInbox(this.options.peerId, normalized, this.options.inboxRole);
-    recordPeerEvent(this.options.peerId, {
+    recordInbox(this.options.tenantId, this.options.peerId, normalized, this.options.inboxRole);
+    recordPeerEvent(this.options.tenantId, this.options.peerId, {
       type: 'message_received',
       message_id: normalized.message_id,
       conversation_id: normalized.conversation_id,
@@ -655,7 +735,7 @@ export class PeerMessagingServer {
       });
     }
 
-    recordPeerEvent(this.options.peerId, {
+    recordPeerEvent(this.options.tenantId, this.options.peerId, {
       type: 'message_handled',
       message_id: normalized.message_id,
       conversation_id: normalized.conversation_id,
@@ -692,7 +772,7 @@ export class PeerMessagingServer {
           }
           return sendJson(res, 200, {
             ok: true,
-            items: listPeerInboxRecords(this.options.peerId),
+            items: listPeerInboxRecords(this.options.tenantId, this.options.peerId),
           });
         }
 
@@ -702,7 +782,7 @@ export class PeerMessagingServer {
           }
           return sendJson(res, 200, {
             ok: true,
-            items: listPeerOutboxRecords(this.options.peerId),
+            items: listPeerOutboxRecords(this.options.tenantId, this.options.peerId),
           });
         }
 
@@ -717,7 +797,7 @@ export class PeerMessagingServer {
         if (error instanceof RequestBodyTooLargeError) {
           return sendJson(res, 413, { ok: false, error: error.message });
         }
-        recordPeerEvent(this.options.peerId, {
+        recordPeerEvent(this.options.tenantId, this.options.peerId, {
           type: 'message_error',
           reason: error?.message || String(error),
         });
@@ -772,9 +852,10 @@ export async function sendPeerMessage<TPayload>(
     const text = await response.text();
     const payload = text ? JSON.parse(text) : {};
     if (response.ok) {
-      recordOutbox(outboxPeerId, envelope, destinationUrl, 'sent', payload);
+      recordOutbox(envelope.tenant_id, outboxPeerId, envelope, destinationUrl, 'sent', payload);
     } else {
       recordOutbox(
+        envelope.tenant_id,
         outboxPeerId,
         envelope,
         destinationUrl,
@@ -798,6 +879,7 @@ export async function sendPeerMessage<TPayload>(
     };
   } catch (error: any) {
     recordOutbox(
+      envelope.tenant_id,
       outboxPeerId,
       envelope,
       destinationUrl,
@@ -849,8 +931,8 @@ export function createPeerMessageNotification<TPayload = unknown>(
   });
 }
 
-export function ensurePeerRuntimeDir(peerId: string): string {
-  const resolved = pathResolver.resolve(runtimeLogicalPath(peerId, 'state.json'));
+export function ensurePeerRuntimeDir(tenantId: string, peerId: string): string {
+  const resolved = pathResolver.resolve(runtimeLogicalPath(tenantId, peerId, 'state.json'));
   const dir = path.dirname(resolved);
   if (!safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
@@ -858,8 +940,12 @@ export function ensurePeerRuntimeDir(peerId: string): string {
   return dir;
 }
 
-export function persistPeerRuntimeState(peerId: string, state: Record<string, unknown>): string {
-  const logicalPath = runtimeLogicalPath(peerId, 'state.json');
+export function persistPeerRuntimeState(
+  tenantId: string,
+  peerId: string,
+  state: Record<string, unknown>
+): string {
+  const logicalPath = runtimeLogicalPath(tenantId, peerId, 'state.json');
   safeWriteFile(logicalPath, JSON.stringify(state, null, 2));
   return pathResolver.resolve(logicalPath);
 }

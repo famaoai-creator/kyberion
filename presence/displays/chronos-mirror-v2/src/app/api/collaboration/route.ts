@@ -4,7 +4,7 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +49,7 @@ export function GET(req: NextRequest) {
       : {}),
   };
   try {
-    const tenantSlugs = viewerScopeTenantSlugs(resolvedViewer.context, tenant);
+    const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, tenant);
     const projection = buildAgentCollaborationProjection({
       missionId,
       tenant: tenantSlugs === 'all' || tenantSlugs.length !== 1 ? undefined : tenantSlugs[0],

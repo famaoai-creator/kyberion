@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { trustEngine } from './trust-engine.js';
+import type { EventScope } from './event-scope.js';
 
 /**
  * Agent Registry v1.1
@@ -29,6 +30,7 @@ export interface AgentRecord {
   lastActivity: number;
   parentAgentId?: string;
   missionId?: string;
+  scope?: EventScope;
   metadata?: Record<string, unknown>;
 }
 

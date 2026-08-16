@@ -47,6 +47,10 @@
 3. **`resolveCurrentTenantSlug()` と `assertTenantSlug()` が予約語を拒否**するようにした。前者は `KYBERION_TENANT=public` が全監査レコードを汚すのを止め、後者はティア名のテナントプロファイル（＝知識ルートとストレージ区画）が作られるのを止める。
 4. **テスト側**: `tenant_slug: 'public'` を `'shared'` に変更した。
 
+### 既存ミラーの後処理 (2026-08-16)
+
+既存の `customer/{slug}/logs/audit/` は、ミラー生成を止めただけでは消えないため、SA-01 の `audit:mirror-reconcile` で master と突合する。不一致ミラーは master の監査記録を変更せず recoverable archive へ退避し、master に記録が残る場合だけ再生成する。`customer/public` のような予約語由来のミラーも同じ手順で quarantine し、stance や tenant registry を新規作成しない。
+
 ### 4 について（判断の記録）
 
 当初 `'public'` `'shared'` の両方をテスト専用スラッグ（`test-analysis-intent` 等）に置換したが、**これは誤りだった**。`shared` は checker が「テナントではなくパーティション」として認識する正当な値であり、`active/projects/public/shared/` という既存のレイアウト規約とも一致する。テスト専用スラッグに置き換えた結果、checker が「project registry に居るがテナントプロファイルが無い」と新たな drift を報告した。

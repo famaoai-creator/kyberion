@@ -189,6 +189,68 @@
         }
       }
     },
+    "scopePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_scope",
+        "scope_mode",
+        "allowed_tiers",
+        "requires_channel_binding_for_customer_mode",
+        "principal_resolution",
+        "write_authority",
+        "nhi_binding",
+        "approval_classes",
+        "data_residency"
+      ],
+      "properties": {
+        "process_scope": {
+          "type": "string",
+          "enum": ["system", "tenant-service"]
+        },
+        "scope_mode": {
+          "type": "string",
+          "enum": ["system", "server-bound-tenant", "viewer-derived", "request-derived"]
+        },
+        "allowed_tiers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["public", "confidential", "personal"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requires_channel_binding_for_customer_mode": {
+          "type": "boolean"
+        },
+        "principal_resolution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "write_authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nhi_binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_classes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "data_residency": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "intentRules": {
       "type": "object",
       "additionalProperties": false,
@@ -275,6 +337,9 @@
         "delivery": {
           "$ref": "#/$defs/delivery"
         },
+        "scope_policy": {
+          "$ref": "#/$defs/scopePolicy"
+        },
         "mcp": {
           "$ref": "#/$defs/mcpBinding"
         },
@@ -319,6 +384,9 @@
         },
         "delivery": {
           "$ref": "#/$defs/delivery"
+        },
+        "scope_policy": {
+          "$ref": "#/$defs/scopePolicy"
         },
         "routing": {
           "$ref": "#/$defs/routingPolicy"

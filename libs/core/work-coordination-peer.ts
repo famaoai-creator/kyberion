@@ -46,6 +46,7 @@ export interface WorkCoordinationPeerCommandResult {
 }
 
 export function buildWorkCoordinationPeerCommandEnvelope(input: {
+  tenantId: string;
   senderPeerId: string;
   recipientPeerId: string;
   sharedSecret: string;
@@ -53,6 +54,7 @@ export function buildWorkCoordinationPeerCommandEnvelope(input: {
   correlationId?: string;
 }): WorkCoordinationPeerCommandEnvelope {
   return buildPeerMessageEnvelope({
+    tenantId: input.tenantId,
     senderPeerId: input.senderPeerId,
     recipientPeerId: input.recipientPeerId,
     subject: `coordination.${input.command.command_type}`,

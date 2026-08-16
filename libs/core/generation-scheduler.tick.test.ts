@@ -9,6 +9,7 @@ import {
   claimGenerationScheduleRun,
   completeGenerationScheduleRun,
   generationSchedulePath,
+  generationSchedulePaths,
   isGenerationScheduleDue,
   readGenerationSchedule,
   runGenerationScheduleAction,
@@ -51,8 +52,9 @@ describe('generation schedule tick (EV-01)', () => {
   afterEach(() => {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    const file = generationSchedulePath(scheduleId);
-    if (safeExistsSync(file)) safeRmSync(pathResolver.rootResolve(file), { force: true });
+    for (const file of generationSchedulePaths(scheduleId)) {
+      if (safeExistsSync(file)) safeRmSync(file, { force: true });
+    }
     safeRmSync(pathResolver.sharedTmp('generation-tick-test'), { recursive: true, force: true });
   });
 
@@ -70,6 +72,7 @@ describe('generation schedule tick (EV-01)', () => {
         now,
         leaderId,
         runner: createTriggerRunner({ storePath: triggerStore }),
+        resolveTenant: () => ({}),
       },
     });
 
@@ -83,7 +86,12 @@ describe('generation schedule tick (EV-01)', () => {
 
     expect(handleAction).toHaveBeenCalledWith({
       action: 'submit_generation',
-      params: { action: 'generate_music', params: { seed: 1 }, retry_policy: undefined },
+      params: {
+        action: 'generate_music',
+        params: { seed: 1 },
+        retry_policy: undefined,
+        scope: { scope_kind: 'system', tier: 'public' },
+      },
     });
     expect(result.results[0]).toMatchObject({
       schedule_id: scheduleId,
@@ -92,6 +100,109 @@ describe('generation schedule tick (EV-01)', () => {
       provider_prompt_id: 'prompt-1',
     });
     expect(result.results[0].trigger_delivery_id).toBeTruthy();
+  });
+
+  it('tenant schedule は quota を予約し、tenant artifact path を補完する', async () => {
+    writeGenerationSchedule({
+      ...(baseSchedule() as any),
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+      job_template: { action: 'generate_image', params: {} },
+    });
+    const handleAction = vi.fn().mockResolvedValue({ job_id: 'tenant-genjob-1' });
+    const reserve = vi.fn().mockReturnValue({
+      allowed: true,
+      level: 'ok',
+      tenant_slug: 'client-a',
+      action: 'generate_image',
+      units: 1,
+      usage: { units: 0 },
+      projected: { units: 1 },
+      limit: 100,
+      warned: false,
+    });
+    const release = vi.fn();
+
+    await runGenerationScheduleAction({
+      action: 'tick',
+      schedule: scheduleId,
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+      deps: {
+        handleAction,
+        now: new Date('2026-08-10T03:00:00.000Z'),
+        leaderId,
+        runner: createTriggerRunner({ storePath: triggerStore }),
+        quota: { reserve: reserve as any, release: release as any },
+        resolveTenant: () => ({}),
+      },
+    });
+
+    expect(reserve).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_slug: 'client-a' }),
+      'generate_image'
+    );
+    expect(handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          params: expect.objectContaining({
+            target_path: expect.stringContaining(
+              'active/shared/runtime/media-generation/artifacts/tenants/client-a'
+            ),
+          }),
+        }),
+      })
+    );
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it('quota 拒否時は provider submission を行わず run lock を解放する', async () => {
+    writeGenerationSchedule({
+      ...(baseSchedule() as any),
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+      job_template: { action: 'generate_video', params: {} },
+    });
+    const handleAction = vi.fn();
+    const reserve = vi.fn().mockReturnValue({
+      allowed: false,
+      level: 'block',
+      tenant_slug: 'client-a',
+      action: 'generate_video',
+      units: 10,
+      usage: { units: 100 },
+      projected: { units: 100 },
+      limit: 100,
+      warned: true,
+      reason: 'quota exceeded',
+    });
+    const release = vi.fn();
+
+    const result = (await runGenerationScheduleAction({
+      action: 'tick',
+      schedule: scheduleId,
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+      deps: {
+        handleAction,
+        now: new Date('2026-08-10T03:00:00.000Z'),
+        leaderId,
+        runner: createTriggerRunner({ storePath: triggerStore }),
+        quota: { reserve: reserve as any, release: release as any },
+        resolveTenant: () => ({}),
+      },
+    })) as { results: Record<string, unknown>[] };
+
+    expect(result.results[0]).toMatchObject({ status: 'blocked' });
+    expect(handleAction).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+    expect(
+      (
+        readGenerationSchedule(
+          generationSchedulePath(scheduleId, {
+            scope_kind: 'tenant',
+            tier: 'confidential',
+            tenant_slug: 'client-a',
+          })
+        ) as any
+      ).run_lock
+    ).toBeFalsy();
   });
 
   it('同一分の二度目の tick は submit を繰り返さない（冪等キー）', async () => {
@@ -222,6 +333,53 @@ describe('generation schedule tick (EV-01)', () => {
       expect(handleAction).not.toHaveBeenCalled();
     } finally {
       safeRmSync(pathResolver.rootResolve(generationSchedulePath(dependencyId)), { force: true });
+    }
+  });
+
+  it('tenant を跨ぐ dependency は成立条件にできない', async () => {
+    const dependencyId = 'ev01-cross-tenant-dependency';
+    writeGenerationSchedule({
+      ...(baseSchedule() as any),
+      schedule_id: dependencyId,
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-b' },
+      last_job_status: 'succeeded',
+    });
+    writeGenerationSchedule({
+      ...(baseSchedule() as any),
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+      execution_policy: { depends_on: [dependencyId] },
+    });
+    const handleAction = vi.fn();
+
+    try {
+      const result = (await runGenerationScheduleAction({
+        action: 'tick',
+        schedule: scheduleId,
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
+        deps: {
+          handleAction,
+          now: new Date('2026-08-10T03:00:00.000Z'),
+          leaderId,
+          runner: createTriggerRunner({ storePath: triggerStore }),
+          resolveTenant: () => ({}),
+        },
+      })) as { results: Record<string, unknown>[] };
+      expect(result.results[0]).toMatchObject({
+        status: 'skipped',
+        reason: 'dependencies are not yet satisfied',
+      });
+      expect(handleAction).not.toHaveBeenCalled();
+    } finally {
+      safeRmSync(
+        pathResolver.rootResolve(
+          generationSchedulePath(dependencyId, {
+            scope_kind: 'tenant',
+            tier: 'confidential',
+            tenant_slug: 'client-b',
+          })
+        ),
+        { force: true }
+      );
     }
   });
 

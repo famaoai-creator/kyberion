@@ -23,6 +23,7 @@ import {
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
+import type { EventScopeInput } from './event-scope.js';
 
 const COWORK_AGENT_ID = 'cowork-surface-agent';
 const GOVERNED_ROLE = 'sovereign_concierge' as const;
@@ -40,6 +41,7 @@ export interface CoworkPendingApproval {
   channel: string;
   storage_channel: string;
   expires_at?: string;
+  scope?: ApprovalRequestRecord['scope'];
 }
 
 export interface CoworkApprovalDecision {
@@ -58,8 +60,8 @@ export interface CoworkApprovalDecision {
  * formatted for Cowork's AskUserQuestion surface.
  * Records a read-audit entry for every invocation.
  */
-export function listPendingApprovalsForCowork(): CoworkPendingApproval[] {
-  const records = listApprovalRequests({ status: 'pending' });
+export function listPendingApprovalsForCowork(scope?: EventScopeInput): CoworkPendingApproval[] {
+  const records = listApprovalRequests({ status: 'pending', ...(scope ? { scope } : {}) });
 
   auditChain.record({
     agentId: COWORK_AGENT_ID,
@@ -80,6 +82,7 @@ export function listPendingApprovalsForCowork(): CoworkPendingApproval[] {
     channel: r.channel,
     storage_channel: r.storageChannel,
     expires_at: r.expiresAt,
+    scope: r.scope,
   }));
 }
 
@@ -99,9 +102,13 @@ export function decideApprovalFromCowork(params: {
   decision: 'approved' | 'rejected';
   decidedBy: string;
   note?: string;
+  scope?: EventScopeInput;
 }): CoworkApprovalDecision {
   // Step 1: locate and validate the request is still actionable
-  const allPending = listApprovalRequests({ status: 'pending' });
+  const allPending = listApprovalRequests({
+    status: 'pending',
+    ...(params.scope ? { scope: params.scope } : {}),
+  });
   const target = allPending.find((r) => r.id === params.requestId);
   if (!target) {
     auditChain.record({

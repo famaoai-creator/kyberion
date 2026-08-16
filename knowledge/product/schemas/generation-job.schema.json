@@ -21,6 +21,11 @@
       "type": "string",
       "enum": ["submitted", "running", "retrying", "succeeded", "failed", "timed_out", "canceled"]
     },
+    "scope": {
+      "type": "object",
+      "description": "Canonical event scope retained for cost settlement and delivery projection.",
+      "additionalProperties": true
+    },
     "provider": {
       "type": "object",
       "properties": {
@@ -87,6 +92,18 @@
         "modality": {
           "type": "string",
           "enum": ["image", "video", "music", "workflow"]
+        },
+        "actual_cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "provider_cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "provider_metadata": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       "additionalProperties": true

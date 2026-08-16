@@ -5,12 +5,12 @@ Mesh Hub の operator inspection surface は read-only です。
 
 ## Entry Point
 
-- `pnpm mesh-hub:inspect`
-- `pnpm mesh-hub:inspect peers`
-- `pnpm mesh-hub:inspect routes`
-- `pnpm mesh-hub:inspect deliveries`
-- `pnpm mesh-hub:inspect dead-letters`
-- `pnpm mesh-hub:inspect topics`
+- `pnpm mesh-hub:inspect --tenant-id <tenant>`
+- `pnpm mesh-hub:inspect peers --tenant-id <tenant>`
+- `pnpm mesh-hub:inspect routes --tenant-id <tenant>`
+- `pnpm mesh-hub:inspect deliveries --tenant-id <tenant>`
+- `pnpm mesh-hub:inspect dead-letters --tenant-id <tenant>`
+- `pnpm mesh-hub:inspect topics --tenant-id <tenant>`
 
 ## Output
 
@@ -43,5 +43,6 @@ Mesh Hub の operator inspection surface は read-only です。
 ## Notes
 
 - The command is intentionally read-only.
+- Tenant is required so inspection cannot enumerate another tenant by changing a client-side filter.
 - Route explanations only expose selector, state, peer selection, and policy version.
 - Payload content remains outside the inspection surface.

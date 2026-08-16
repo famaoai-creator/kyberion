@@ -14,6 +14,12 @@ export interface GenerationJob {
   job_id: string;
   action: 'generate_image' | 'generate_video' | 'generate_music' | 'run_workflow';
   status: 'submitted' | 'running' | 'retrying' | 'succeeded' | 'failed' | 'timed_out' | 'canceled';
+  /**
+   * Canonical event scope retained for cost settlement and delivery projection.
+   */
+  scope?: {
+    [k: string]: unknown;
+  };
   provider?: {
     engine?: string;
     provider_job_id?: string;
@@ -45,6 +51,11 @@ export interface GenerationJob {
     backend_kind?: string;
     backend_provider?: string;
     modality?: 'image' | 'video' | 'music' | 'workflow';
+    actual_cost_usd?: number;
+    provider_cost_usd?: number;
+    provider_metadata?: {
+      [k: string]: unknown;
+    };
     [k: string]: unknown;
   };
   retry_policy?: {

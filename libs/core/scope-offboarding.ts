@@ -48,6 +48,7 @@ import {
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
+import { assertPhysicalScopeSegment } from './physical-namespace.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -242,6 +243,10 @@ export interface OffboardApproval {
 export type OffboardTargetKind =
   | 'project_tree'
   | 'mission_tree'
+  /** Tenant-owned physical coordination namespace (surface queues/DLQ). */
+  | 'tenant_physical_namespace'
+  /** Project-owned physical namespace nested below a tenant namespace. */
+  | 'project_physical_namespace'
   /** DA-08: the tenant's governed knowledge root incl. its `_ledger/` asset ledger (DA-05). */
   | 'tenant_knowledge_tree'
   /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
@@ -327,29 +332,276 @@ function tenantKnowledgeRootDefault(tenantSlug: string): string {
 
 function missionStateScope(missionDir: string): {
   tenantSlug?: string;
+  organizationId?: string;
   projectId?: string;
 } {
   const record = readJsonRecord(path.join(missionDir, 'mission-state.json'));
   if (!record) return {};
   const relationships = record.relationships as Record<string, unknown> | undefined;
   const project = relationships?.project as Record<string, unknown> | undefined;
+  const organization = relationships?.organization as Record<string, unknown> | undefined;
+  const organizationProfile = record.organization_profile as Record<string, unknown> | undefined;
   return {
     tenantSlug: typeof record.tenant_slug === 'string' ? record.tenant_slug : undefined,
+    organizationId:
+      typeof record.organization_id === 'string'
+        ? record.organization_id
+        : typeof organization?.organization_id === 'string'
+          ? organization.organization_id
+          : typeof organizationProfile?.organization_id === 'string'
+            ? organizationProfile.organization_id
+            : undefined,
     projectId: typeof project?.project_id === 'string' ? project.project_id : undefined,
   };
 }
 
-/** Data-vault entry files (`active/shared/data-vault/*.json`) whose projectId equals the scope id. */
-function collectDataVaultEntryTargets(scopeId: string): OffboardTarget[] {
+function projectRecordScope(projectId: string): {
+  tenantSlug?: string;
+  organizationId?: string;
+} {
+  const record = readJsonRecord(
+    pathResolver.rootResolve(`active/shared/runtime/projects/${projectId}.json`)
+  );
+  return {
+    tenantSlug: typeof record?.tenant_slug === 'string' ? record.tenant_slug : undefined,
+    organizationId:
+      typeof record?.organization_id === 'string' ? record.organization_id : undefined,
+  };
+}
+
+function lineageMatches(
+  lineage: { tenantSlug?: string; organizationId?: string },
+  filter: PhysicalNamespaceFilter
+): boolean {
+  if (filter.tenantSlug && lineage.tenantSlug !== filter.tenantSlug) return false;
+  if (filter.organizationId && lineage.organizationId !== filter.organizationId) return false;
+  return true;
+}
+
+/**
+ * Resolve the lineage of a project workspace.
+ *
+ * New workspaces use `active/projects/{tier}/{tenant}/{project}`. The direct
+ * `active/projects/{tier}/{project}` form is legacy and can only be scoped by
+ * the project registry record; when that record is absent, a tenant/org
+ * filtered offboarding must leave the directory untouched.
+ */
+function projectWorkspaceLineage(
+  workspace: string,
+  projectId: string,
+  tierDir: string
+): { tenantSlug?: string; organizationId?: string } {
+  const segments = path.relative(tierDir, workspace).split(path.sep).filter(Boolean);
+  const recordScope = projectRecordScope(projectId);
+  const operationalState = readJsonRecord(path.join(workspace, 'state', 'project-state.json'));
+  const tenantSlug =
+    typeof operationalState?.tenant_slug === 'string'
+      ? operationalState.tenant_slug
+      : segments.length >= 2 && segments[0] !== 'shared'
+        ? segments[0]
+        : recordScope.tenantSlug;
+  const organizationId =
+    typeof operationalState?.organization_id === 'string'
+      ? operationalState.organization_id
+      : recordScope.organizationId;
+  if (segments.length < 2) return { tenantSlug, organizationId };
+  return {
+    tenantSlug,
+    organizationId,
+  };
+}
+
+function collectProjectWorkspaceTargets(
+  projectId: string,
+  filter: PhysicalNamespaceFilter
+): Array<{ target: OffboardTarget; lineage: { tenantSlug?: string; organizationId?: string } }> {
+  const candidates: Array<{
+    target: OffboardTarget;
+    lineage: { tenantSlug?: string; organizationId?: string };
+  }> = [];
+  for (const tier of SCOPE_TIERS) {
+    const tierDir = path.join(pathResolver.rootDir(), 'active', 'projects', tier);
+    for (const owner of listDirEntries(tierDir)) {
+      const ownerDir = path.join(tierDir, owner);
+      try {
+        if (!safeStat(ownerDir).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+
+      const candidate = owner === projectId ? ownerDir : path.join(ownerDir, projectId);
+      if (!safeExistsSync(candidate)) continue;
+      try {
+        if (!safeStat(candidate).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const lineage = projectWorkspaceLineage(candidate, projectId, tierDir);
+      if (lineageMatches(lineage, filter)) {
+        candidates.push({
+          target: { path: repoRelativePosix(candidate), kind: 'project_tree' },
+          lineage,
+        });
+      }
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Data-vault entry files (`active/shared/data-vault/*.json`) whose projectId
+ * equals the scope id. Vault records written before scoped ownership existed
+ * have no tenant/org lineage; project offboarding refuses to claim those
+ * records rather than deleting a potentially shared entry.
+ */
+function collectDataVaultEntryTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter
+): OffboardTarget[] {
   const targets: OffboardTarget[] = [];
   const vaultDir = pathResolver.shared('data-vault');
   for (const name of listDirEntries(vaultDir)) {
     if (!name.endsWith('.json')) continue;
     const filePath = path.join(vaultDir, name);
     const record = readJsonRecord(filePath);
-    if (record && typeof record.projectId === 'string' && record.projectId === scopeId) {
-      targets.push({ path: repoRelativePosix(filePath), kind: 'data_vault_entry' });
+    if (!record || record.projectId !== scopeId) continue;
+    if (scopeType === 'project' && (filter.tenantSlug || filter.organizationId)) {
+      const hasTenant = typeof record.tenant_slug === 'string';
+      const hasOrganization = typeof record.organization_id === 'string';
+      if (!hasTenant || !hasOrganization) {
+        throw new Error(
+          `[PROJECT_DATA_VAULT_AMBIGUOUS] data-vault entry '${name}' has no complete tenant/org lineage`
+        );
+      }
+      if (
+        record.tenant_slug !== filter.tenantSlug ||
+        record.organization_id !== filter.organizationId
+      ) {
+        continue;
+      }
     }
+    targets.push({ path: repoRelativePosix(filePath), kind: 'data_vault_entry' });
+  }
+  return targets;
+}
+
+const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
+const PHYSICAL_CHANNEL_ROOT = 'active/shared/coordination/channels';
+const PHYSICAL_PRESENCE_ROOT = 'active/shared/runtime/presence';
+
+export interface PhysicalNamespaceFilter {
+  tenantSlug?: string;
+  organizationId?: string;
+}
+
+interface PhysicalNamespaceRoot {
+  path: string;
+  kind: 'schedule' | 'channel' | 'presence';
+}
+
+function physicalLineageMatches(
+  root: string,
+  directory: string,
+  filter: PhysicalNamespaceFilter
+): boolean {
+  const segments = path.relative(root, directory).split(path.sep).filter(Boolean);
+  const tenantIndex = segments.lastIndexOf('tenants');
+  const organizationIndex = segments.lastIndexOf('organizations');
+  if (filter.tenantSlug && segments[tenantIndex + 1] !== filter.tenantSlug) return false;
+  if (filter.organizationId && segments[organizationIndex + 1] !== filter.organizationId)
+    return false;
+  return true;
+}
+
+function physicalProjectLineageKey(repoPath: string): string {
+  const segments = repoPath.split('/').filter(Boolean);
+  const tenantIndex = segments.lastIndexOf('tenants');
+  const organizationIndex = segments.lastIndexOf('organizations');
+  return [segments[tenantIndex + 1] || 'system', segments[organizationIndex + 1] || 'shared'].join(
+    '/'
+  );
+}
+
+function collectDirectoriesWithLineage(
+  root: string,
+  directoryName: 'projects',
+  scopeId: string,
+  filter: PhysicalNamespaceFilter
+): string[] {
+  const matches: string[] = [];
+  const visit = (dir: string): void => {
+    if (!safeExistsSync(dir)) return;
+    for (const name of listDirEntries(dir)) {
+      const child = path.join(dir, name);
+      try {
+        if (!safeStat(child).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      if (
+        path.basename(dir) === directoryName &&
+        name === scopeId &&
+        physicalLineageMatches(root, child, filter)
+      ) {
+        matches.push(child);
+        continue;
+      }
+      visit(child);
+    }
+  };
+  visit(root);
+  return matches;
+}
+
+function collectPhysicalNamespaceTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {}
+): OffboardTarget[] {
+  const roots: PhysicalNamespaceRoot[] = [
+    { path: pathResolver.rootResolve(PHYSICAL_SCHEDULE_ROOT), kind: 'schedule' },
+    { path: pathResolver.rootResolve(PHYSICAL_CHANNEL_ROOT), kind: 'channel' },
+    { path: pathResolver.rootResolve(PHYSICAL_PRESENCE_ROOT), kind: 'presence' },
+  ];
+  if (scopeType === 'tenant') {
+    const targets: OffboardTarget[] = [];
+    for (const root of roots) {
+      if (root.kind === 'channel') {
+        for (const surface of listDirEntries(root.path)) {
+          const tenantRoot = path.join(root.path, surface, 'tenants', scopeId);
+          if (safeExistsSync(tenantRoot)) {
+            targets.push({
+              path: repoRelativePosix(tenantRoot),
+              kind: 'tenant_physical_namespace',
+            });
+          }
+        }
+        continue;
+      }
+      const tenantRoot = path.join(root.path, 'tenants', scopeId);
+      if (safeExistsSync(tenantRoot)) {
+        targets.push({
+          path: repoRelativePosix(tenantRoot),
+          kind: 'tenant_physical_namespace',
+        });
+      }
+    }
+    return targets;
+  }
+
+  const targets = roots.flatMap((root) =>
+    collectDirectoriesWithLineage(root.path, 'projects', scopeId, filter).map((dir) => ({
+      path: repoRelativePosix(dir),
+      kind: 'project_physical_namespace' as const,
+    }))
+  );
+  const lineageCount = new Set(targets.map((target) => physicalProjectLineageKey(target.path)))
+    .size;
+  if (lineageCount > 1 && (!filter.tenantSlug || !filter.organizationId)) {
+    throw new Error(
+      `[PROJECT_PHYSICAL_NAMESPACE_AMBIGUOUS] project '${scopeId}' exists in multiple tenant namespaces; provide tenantSlug and organizationId`
+    );
   }
   return targets;
 }
@@ -365,19 +617,44 @@ function collectDataVaultEntryTargets(scopeId: string): OffboardTarget[] {
  */
 export function collectScopeTargets(
   scopeType: OffboardScopeType,
-  scopeId: string
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {}
 ): OffboardTarget[] {
   const targets: OffboardTarget[] = [];
   const id = scopeId.trim();
   if (!id) return targets;
+  assertPhysicalScopeSegment(id, `${scopeType} scopeId`);
+  if (filter.tenantSlug) assertPhysicalScopeSegment(filter.tenantSlug, 'tenantSlug');
+  if (filter.organizationId) assertPhysicalScopeSegment(filter.organizationId, 'organizationId');
+  if (scopeType === 'project' && Boolean(filter.tenantSlug) !== Boolean(filter.organizationId)) {
+    throw new Error(
+      '[PROJECT_SCOPE_LINEAGE_REQUIRED] project offboarding requires both tenantSlug and organizationId'
+    );
+  }
 
-  // Project workspace trees: `active/projects/<tier>/<id>` — the same
-  // location path-resolver's volatile('project'|'tenant', ref) resolves to.
-  for (const tier of SCOPE_TIERS) {
-    const dir = path.join(pathResolver.rootDir(), 'active', 'projects', tier, id);
-    if (safeExistsSync(dir)) {
-      targets.push({ path: repoRelativePosix(dir), kind: 'project_tree' });
+  // Project workspace trees use `active/projects/<tier>/<tenant>/<id>`;
+  // tenant offboarding claims the tenant root, while project offboarding
+  // selects only the exact project directory after lineage matching.
+  if (scopeType === 'tenant') {
+    for (const tier of SCOPE_TIERS) {
+      const dir = path.join(pathResolver.rootDir(), 'active', 'projects', tier, id);
+      if (safeExistsSync(dir)) {
+        targets.push({ path: repoRelativePosix(dir), kind: 'project_tree' });
+      }
     }
+  } else {
+    const workspaceCandidates = collectProjectWorkspaceTargets(id, filter);
+    const workspaceLineages = new Set(
+      workspaceCandidates.map(
+        ({ lineage }) => `${lineage.tenantSlug || 'shared'}/${lineage.organizationId || 'unknown'}`
+      )
+    );
+    if (workspaceLineages.size > 1 && (!filter.tenantSlug || !filter.organizationId)) {
+      throw new Error(
+        `[PROJECT_WORKSPACE_AMBIGUOUS] project '${id}' exists in multiple tenant namespaces; provide tenantSlug and organizationId`
+      );
+    }
+    targets.push(...workspaceCandidates.map(({ target }) => target));
   }
 
   // Mission trees declaring the scope in their state.
@@ -392,8 +669,28 @@ export function collectScopeTargets(
         continue;
       }
       const scope = missionStateScope(missionDir);
-      const matches = scopeType === 'tenant' ? scope.tenantSlug === id : scope.projectId === id;
+      const matches =
+        scopeType === 'tenant'
+          ? scope.tenantSlug === id
+          : scope.projectId === id && lineageMatches(scope, filter);
       if (matches) targets.push({ path: repoRelativePosix(missionDir), kind: 'mission_tree' });
+    }
+  }
+
+  if (scopeType === 'project') {
+    const matchingMissionDirs = targets.filter((target) => target.kind === 'mission_tree');
+    if (!filter.tenantSlug && !filter.organizationId && matchingMissionDirs.length > 1) {
+      const lineages = new Set(
+        matchingMissionDirs.map((target) => {
+          const scope = missionStateScope(pathResolver.rootResolve(target.path));
+          return `${scope.tenantSlug || 'unknown'}/${scope.organizationId || 'unknown'}`;
+        })
+      );
+      if (lineages.size > 1) {
+        throw new Error(
+          `[PROJECT_MISSION_AMBIGUOUS] project '${id}' is referenced by multiple tenant namespaces; provide tenantSlug and organizationId`
+        );
+      }
     }
   }
 
@@ -414,9 +711,16 @@ export function collectScopeTargets(
     }
   }
 
-  // DA-08 data-vault entries keyed by the scope id (both scope types — the
-  // vault's only scope dimension is projectId).
-  targets.push(...collectDataVaultEntryTargets(id));
+  // Physical runtime/channel records are outside the mission/project trees,
+  // so they must be explicitly included in the same export + soft-delete
+  // ceremony. Tenant targets include all nested organization/project paths;
+  // project targets select only the matching lineage directory.
+  targets.push(...collectPhysicalNamespaceTargets(scopeType, id, filter));
+
+  // DA-08 data-vault entries keyed by the scope id. Project entries require
+  // complete lineage when an explicit project scope is used; unscoped legacy
+  // entries are never silently assigned to a tenant/org.
+  targets.push(...collectDataVaultEntryTargets(scopeType, id, filter));
 
   return targets;
 }
@@ -518,10 +822,19 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
  */
 export function verifyScopeOffboarded(
   scopeType: OffboardScopeType,
-  scopeId: string
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {}
 ): OffboardVerification {
   const id = String(scopeId || '').trim();
-  const leftovers: string[] = collectScopeTargets(scopeType, id).map((target) => target.path);
+  let leftovers: string[];
+  try {
+    leftovers = collectScopeTargets(scopeType, id, filter).map((target) => target.path);
+  } catch (error) {
+    return {
+      clean: false,
+      leftovers: [error instanceof Error ? error.message : String(error)],
+    };
+  }
 
   if (scopeType === 'tenant' && id) {
     const knowledgeRoot = tenantKnowledgeRootDefault(id);
@@ -562,6 +875,10 @@ function copyTree(source: string, destination: string): void {
 export interface OffboardScopeInput {
   scopeType: OffboardScopeType;
   scopeId: string;
+  /** Optional tenant lineage for a project with a reused project ID. */
+  tenantSlug?: string;
+  /** Optional organization lineage for a project with a reused project ID. */
+  organizationId?: string;
   /** `dry_run` (default) only reports; `execute` exports then deletes. */
   mode?: 'dry_run' | 'execute';
   approval?: OffboardApproval;
@@ -586,6 +903,8 @@ export interface OffboardScopeInput {
 export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
   const scopeType = input.scopeType;
   const scopeId = String(input.scopeId || '').trim();
+  const tenantSlug = input.tenantSlug?.trim() || undefined;
+  const organizationId = input.organizationId?.trim() || undefined;
   const mode = input.mode ?? 'dry_run';
   const result: OffboardScopeResult = {
     status: mode === 'execute' ? 'offboarded' : 'dry_run',
@@ -602,7 +921,8 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
   }
 
   try {
-    result.targets = collectScopeTargets(scopeType, scopeId);
+    const physicalFilter = { tenantSlug, organizationId };
+    result.targets = collectScopeTargets(scopeType, scopeId, physicalFilter);
     const ownedArtifacts = listArtifactOwnershipRecordsByQuery(
       scopeType === 'tenant' ? { tenantSlug: scopeId } : { projectId: scopeId }
     );
@@ -631,6 +951,8 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         event: 'SCOPE_OFFBOARD_DRY_RUN',
         scope_type: scopeType,
         scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
         targets: result.targets.map((target) => target.path),
         ...(result.dedup_registry ? { dedup_registry_matched: result.dedup_registry.matched } : {}),
         ...(result.artifact_registry
@@ -653,6 +975,8 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         event: 'SCOPE_OFFBOARD_DENIED',
         scope_type: scopeType,
         scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
         targets: result.targets.map((target) => target.path),
         policy_ref: RETENTION_CATALOG_REPO_PATH,
         reason: result.reason,
@@ -699,6 +1023,8 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         {
           scope_type: scopeType,
           scope_id: scopeId,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+          ...(organizationId ? { organization_id: organizationId } : {}),
           exported_at: nowIso,
           approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
           targets: result.targets,
@@ -713,6 +1039,8 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       event: 'SCOPE_OFFBOARD_EXPORTED',
       scope_type: scopeType,
       scope_id: scopeId,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+      ...(organizationId ? { organization_id: organizationId } : {}),
       export_path: result.export_path,
       targets: result.targets.map((target) => target.path),
       approved_by: approvedBy,
@@ -796,11 +1124,13 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     // DA-08 acceptance: prove there is no trace left. Best-effort — a
     // verification failure is reported, never thrown.
     try {
-      result.verification = verifyScopeOffboarded(scopeType, scopeId);
+      result.verification = verifyScopeOffboarded(scopeType, scopeId, physicalFilter);
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_VERIFIED',
         scope_type: scopeType,
         scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
         clean: result.verification.clean,
         leftovers: result.verification.leftovers,
         policy_ref: RETENTION_CATALOG_REPO_PATH,

@@ -116,12 +116,17 @@ function meshHubObservabilityRoot(namespace?: string): string {
   return suffix ? `${baseRoot}/${suffix}` : baseRoot;
 }
 
-function subscriptionsPath(namespace?: string): string {
-  return `${meshHubRuntimeRoot(namespace)}/subscriptions.jsonl`;
+function tenantRoot(namespace: string | undefined, tenantId: string): string {
+  if (!isValidTenantSlug(tenantId)) throw new Error(`mesh_topic_invalid_tenant_id:${tenantId}`);
+  return `${meshHubRuntimeRoot(namespace)}/tenants/${tenantId}`;
 }
 
-function eventsPath(namespace?: string): string {
-  return `${meshHubObservabilityRoot(namespace)}/events.jsonl`;
+function subscriptionsPath(namespace: string | undefined, tenantId: string): string {
+  return `${tenantRoot(namespace, tenantId)}/subscriptions.jsonl`;
+}
+
+function eventsPath(namespace: string | undefined, tenantId: string): string {
+  return `${meshHubObservabilityRoot(namespace)}/tenants/${tenantId}/events.jsonl`;
 }
 
 function randomId(prefix: string): string {
@@ -142,15 +147,23 @@ function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: u
   return appendGovernedArtifactJsonl(role, logicalPath, record);
 }
 
-function recordEvent(namespace: string | undefined, event: Record<string, unknown>): string {
-  return appendRecord(DEFAULT_WRITER_ROLE, eventsPath(namespace), {
+function recordEvent(
+  namespace: string | undefined,
+  tenantId: string,
+  event: Record<string, unknown>
+): string {
+  return appendRecord(DEFAULT_WRITER_ROLE, eventsPath(namespace, tenantId), {
     ts: nowIso(),
+    tenant_id: tenantId,
     ...event,
   });
 }
 
-function loadSubscriptions(namespace?: string): MeshTopicSubscription[] {
-  return readJsonl<MeshTopicSubscription>(subscriptionsPath(namespace));
+function loadSubscriptions(
+  namespace: string | undefined,
+  tenantId: string
+): MeshTopicSubscription[] {
+  return readJsonl<MeshTopicSubscription>(subscriptionsPath(namespace, tenantId));
 }
 
 function normalizeSubscription(input: MeshTopicSubscriptionInput): MeshTopicSubscription {
@@ -207,8 +220,12 @@ export function subscribeMeshTopic(
 ): MeshTopicSubscription {
   const subscription = normalizeSubscription(input);
   const namespace = options.namespace || '';
-  appendRecord(DEFAULT_WRITER_ROLE, subscriptionsPath(namespace), subscription);
-  recordEvent(namespace, {
+  appendRecord(
+    DEFAULT_WRITER_ROLE,
+    subscriptionsPath(namespace, subscription.tenant_id),
+    subscription
+  );
+  recordEvent(namespace, subscription.tenant_id, {
     type: 'topic_subscription_created',
     subscription_id: subscription.subscription_id,
     tenant_id: subscription.tenant_id,
@@ -223,11 +240,13 @@ export function subscribeMeshTopic(
 
 export function listMeshTopicSubscriptions(
   filter: MeshTopicSubscriptionFilter = {},
-  options: { namespace?: string; now?: string | Date } = {}
+  options: { namespace?: string; now?: string | Date; tenantId?: string } = {}
 ): MeshTopicSubscription[] {
   const namespace = options.namespace || '';
   const now = normalizeIso(options.now);
-  return loadSubscriptions(namespace)
+  const tenantId = options.tenantId || filter.tenant_id;
+  if (!tenantId || !isValidTenantSlug(tenantId)) return [];
+  return loadSubscriptions(namespace, tenantId)
     .filter((subscription) => isActiveSubscription(subscription, now))
     .filter((subscription) => {
       if (filter.tenant_id && subscription.tenant_id !== filter.tenant_id) return false;
@@ -250,7 +269,7 @@ export function resolveMeshTopicRecipients(
   const fanOutLimit = Math.max(1, Math.floor(options.maxFanOut || 1));
   const now = normalizeIso(context.now);
 
-  const subscriptions = loadSubscriptions(namespace)
+  const subscriptions = loadSubscriptions(namespace, context.tenant_id)
     .filter((subscription) => isActiveSubscription(subscription, now))
     .filter((subscription) => matchesSubscription(subscription, context))
     .sort((left, right) => left.subscription_id.localeCompare(right.subscription_id));
@@ -327,7 +346,7 @@ export function resolveMeshTopicRecipients(
   }
 
   if (selected_peer_ids.length > fanOutLimit) {
-    recordEvent(namespace, {
+    recordEvent(namespace, context.tenant_id, {
       type: 'topic_publish_rejected',
       topic: context.topic,
       tenant_id: context.tenant_id,
@@ -360,7 +379,7 @@ export function resolveMeshTopicRecipients(
   }
 
   const decision = selected_peer_ids.length === 1 ? 'direct' : 'fan_out';
-  recordEvent(namespace, {
+  recordEvent(namespace, context.tenant_id, {
     type: 'topic_publish_resolved',
     topic: context.topic,
     tenant_id: context.tenant_id,
