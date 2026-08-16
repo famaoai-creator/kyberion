@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { ScopeContext } from './scope-context.js';
 import { assertScopeContext, scopeContextKey } from './scope-context.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * Positive knowledge roots derived from the canonical containment chain.
@@ -36,6 +37,72 @@ function entityRoot(scope: ScopeContext, root: 'confidential' | 'personal'): str
     segments.push(directory, value);
   }
   return segments.join('/');
+}
+
+/** Build a write target from the canonical containment chain. */
+export function knowledgeWritePathFor(
+  scopeInput: ScopeContext,
+  level:
+    | 'tenant'
+    | 'organization'
+    | 'project'
+    | 'mission'
+    | 'task'
+    | 'session'
+    | 'common'
+    | 'product'
+    | 'public',
+  slug: string,
+  extension = '.md'
+): string {
+  const scope = assertScopeContext(scopeInput, { requireTenant: false, allowShared: true });
+  const name = slug
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!name) throw new Error('[KNOWLEDGE_WRITE_INVALID] slug is required');
+  const suffix = extension.startsWith('.') ? extension : `.${extension}`;
+  if (level === 'product') return path.posix.join('product', `${name}${suffix}`);
+  if (level === 'public') return path.posix.join('public', `${name}${suffix}`);
+  if (level === 'common') {
+    if (scope.tier !== 'confidential') {
+      throw new Error('[KNOWLEDGE_WRITE_INVALID] common knowledge requires confidential tier');
+    }
+    return path.posix.join('confidential', 'common', `${name}${suffix}`);
+  }
+  if (!scope.tenant_slug || !isValidTenantSlug(scope.tenant_slug)) {
+    throw new Error('[SCOPE_CONTEXT_INVALID] tenant_slug is required for scoped knowledge');
+  }
+  if (scope.tier === 'public') {
+    throw new Error(
+      '[KNOWLEDGE_WRITE_INVALID] tenant-scoped knowledge requires personal or confidential tier'
+    );
+  }
+  const selected: Record<typeof level, string | undefined> = {
+    tenant: scope.tenant_slug,
+    organization: scope.organization_id,
+    project: scope.project_id,
+    mission: scope.mission_id,
+    task: scope.task_id,
+    session: scope.session_id,
+  };
+  const required = selected[level];
+  if (!required)
+    throw new Error(`[KNOWLEDGE_WRITE_INVALID] ${level} is absent from the scope chain`);
+  const chain: Array<[string, string | undefined]> = [
+    ['organizations', scope.organization_id],
+    ['projects', scope.project_id],
+    ['missions', scope.mission_id],
+    ['tasks', scope.task_id],
+    ['sessions', scope.session_id],
+  ];
+  const parts = [scope.tier === 'personal' ? 'personal' : 'confidential', scope.tenant_slug];
+  for (const [directory, value] of chain) {
+    if (!value) break;
+    parts.push(directory, value);
+    if (value === required) break;
+  }
+  return path.posix.join(...parts, `${name}${suffix}`);
 }
 
 /** Resolve the only knowledge subtrees a scope is allowed to read. */

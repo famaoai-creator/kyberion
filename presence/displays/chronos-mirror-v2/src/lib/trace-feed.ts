@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
-import { pathResolver } from '@agent/core/path-resolver';
+import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
 
@@ -13,6 +13,8 @@ export interface TraceFeedSummary {
   completedAt?: string;
   missionId?: string;
   tenantSlug?: string;
+  organizationId?: string;
+  projectId?: string;
   pipelineId?: string;
   actuator?: string;
   status: 'ok' | 'error' | 'in_progress';
@@ -78,6 +80,8 @@ export interface TraceFeedOptions {
   query?: string;
   /** Source-side viewer tenant allowlist; unscoped legacy traces fail closed. */
   tenantSlugs?: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
 }
 
 interface PersistedTraceShape {
@@ -90,6 +94,8 @@ interface PersistedTraceShape {
     startedAt?: string;
     completedAt?: string;
     tenantSlug?: string;
+    organizationId?: string;
+    projectId?: string;
     customerId?: string;
   };
   _persistedAt?: string;
@@ -207,6 +213,13 @@ function matchesTraceFilters(summary: TraceFeedSummary, options: TraceFeedOption
   if (options.tenantSlugs !== undefined && options.tenantSlugs !== 'all') {
     if (!summary.tenantSlug || !options.tenantSlugs.includes(summary.tenantSlug)) return false;
   }
+  if (options.organizationIds !== undefined && options.organizationIds !== 'all') {
+    if (!summary.organizationId || !options.organizationIds.includes(summary.organizationId))
+      return false;
+  }
+  if (options.projectIds !== undefined && options.projectIds !== 'all') {
+    if (!summary.projectId || !options.projectIds.includes(summary.projectId)) return false;
+  }
   if (options.status && summary.status !== options.status) return false;
   if (options.missionId && summary.missionId !== options.missionId) return false;
   if (options.pipelineId && summary.pipelineId !== options.pipelineId) return false;
@@ -229,6 +242,7 @@ export function summarizePersistedTrace(
     new Date().toISOString();
   const completedAt = record.metadata?.completedAt || rootSpan.endTime;
 
+  const missionScope = resolveMissionScope(record.metadata?.missionId);
   return {
     traceId: record.traceId,
     tracePath,
@@ -236,7 +250,10 @@ export function summarizePersistedTrace(
     startedAt,
     completedAt,
     missionId: record.metadata?.missionId,
-    tenantSlug: record.metadata?.tenantSlug || record.metadata?.customerId,
+    tenantSlug:
+      record.metadata?.tenantSlug || record.metadata?.customerId || missionScope.tenantSlug,
+    organizationId: record.metadata?.organizationId || missionScope.organizationId,
+    projectId: record.metadata?.projectId || missionScope.projectId,
     pipelineId: record.metadata?.pipelineId,
     actuator: record.metadata?.actuator,
     status: rootSpan.status || 'in_progress',
@@ -246,6 +263,35 @@ export function summarizePersistedTrace(
     artifactCount: counts.artifacts,
     errorCount: counts.errors,
   };
+}
+
+function resolveMissionScope(missionId?: string): {
+  tenantSlug?: string;
+  organizationId?: string;
+  projectId?: string;
+} {
+  if (!missionId) return {};
+  const missionPath = findMissionPath(missionId.toUpperCase());
+  if (!missionPath) return {};
+  const statePath = path.join(missionPath, 'mission-state.json');
+  if (!safeExistsSync(statePath)) return {};
+  try {
+    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+      tenant_slug?: string;
+      organization_id?: string;
+      relationships?: {
+        organization?: { organization_id?: string };
+        project?: { project_id?: string };
+      };
+    };
+    return {
+      tenantSlug: state.tenant_slug,
+      organizationId: state.organization_id || state.relationships?.organization?.organization_id,
+      projectId: state.relationships?.project?.project_id,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export function detailPersistedTrace(
@@ -348,7 +394,13 @@ export function collectTraceDetail(
             detail &&
             (options.tenantSlugs === undefined ||
               options.tenantSlugs === 'all' ||
-              (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug)))
+              (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug))) &&
+            (options.organizationIds === undefined ||
+              options.organizationIds === 'all' ||
+              (detail.organizationId && options.organizationIds.includes(detail.organizationId))) &&
+            (options.projectIds === undefined ||
+              options.projectIds === 'all' ||
+              (detail.projectId && options.projectIds.includes(detail.projectId)))
           )
             return detail;
         } catch {

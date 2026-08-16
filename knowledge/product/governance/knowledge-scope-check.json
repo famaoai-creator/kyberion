@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "description": "Semantic static baseline for tenant-aware knowledge scope choke points. Increase only through a reviewed migration that removes a direct env read.",
+  "max_direct_tenant_env_reads": 26,
+  "legacy_quarantine_ttl_days": 14,
+  "confidential_scope_allowlist": [],
+  "scoped_runtime_writer_files": [
+    "libs/core/context-promotion-ledger.ts",
+    "libs/core/contextual-intent-learning.ts",
+    "libs/core/contextual-intent-memory.ts",
+    "libs/core/intent-contract-learning.ts",
+    "libs/core/memory-promotion-queue.ts",
+    "libs/core/src/knowledge-curation-report.ts",
+    "libs/core/src/knowledge-feedback-loop.ts",
+    "libs/core/src/knowledge-index.ts",
+    "libs/core/worker-context-compaction.ts",
+    "libs/core/knowledge-weight-recalculation.ts"
+  ]
+}

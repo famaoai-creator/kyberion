@@ -79,12 +79,43 @@ export interface KnowledgeRankingMetadata {
   scope_context?: ScopeContext;
   /** Knowledge-relative source path used to derive a physical scope. */
   source?: string;
+  /** Fraction of explicit useful feedback among feedback events (0..1). */
+  usage_yield?: number;
 }
 
 export interface KnowledgeRankingWeights {
   scope?: number;
   authority?: number;
   recency?: number;
+  proximity?: number;
+  usage_yield?: number;
+}
+
+export interface KnowledgeRankingWeightConfig {
+  version?: string;
+  defaults?: KnowledgeRankingWeights;
+  tenant_overrides?: Record<string, KnowledgeRankingWeights>;
+}
+
+/** Load governed ranking knobs after the caller has resolved its scope. */
+export function loadKnowledgeRankingWeights(
+  scope?: ScopeContext,
+  rootPath = pathResolver.knowledge('product/governance/knowledge-weights.json')
+): KnowledgeRankingWeights {
+  const defaults: KnowledgeRankingWeights = { proximity: 1, usage_yield: 4 };
+  if (!safeExistsSync(rootPath)) return defaults;
+  try {
+    const config = JSON.parse(
+      safeReadFile(rootPath, { encoding: 'utf8' }) as string
+    ) as KnowledgeRankingWeightConfig;
+    return {
+      ...defaults,
+      ...(config.defaults || {}),
+      ...(scope?.tenant_slug ? config.tenant_overrides?.[scope.tenant_slug] || {} : {}),
+    };
+  } catch {
+    return defaults;
+  }
 }
 
 /**
@@ -159,6 +190,8 @@ export function knowledgeMetadataScore(
   const scopeWeight = weights.scope ?? 12;
   const authorityWeight = weights.authority ?? 8;
   const recencyWeight = weights.recency ?? 10;
+  const proximityWeight = weights.proximity ?? 1;
+  const usageYieldWeight = weights.usage_yield ?? 4;
   const scopeScore = metadata.scope
     ? scopeAffinityScore(currentScope, metadata.scope, scopeWeight)
     : 0;
@@ -168,7 +201,11 @@ export function knowledgeMetadataScore(
   const recencyScore = metadata.last_updated
     ? recencyDecayScore(Date.parse(metadata.last_updated), nowMs, { maxScore: recencyWeight })
     : 0;
-  const proximityScore = knowledgeScopeProximityScore(metadata, currentScopeContext);
-  return scopeScore + authorityScore + recencyScore + proximityScore;
+  const proximityScore =
+    knowledgeScopeProximityScore(metadata, currentScopeContext) * proximityWeight;
+  const usageYieldScore = Math.max(0, Math.min(1, metadata.usage_yield ?? 0)) * usageYieldWeight;
+  return scopeScore + authorityScore + recencyScore + proximityScore + usageYieldScore;
 }
 import type { ScopeContext } from './scope-context.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';

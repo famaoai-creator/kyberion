@@ -56,7 +56,18 @@ describe('audit_verify', () => {
       missingKey: false,
     });
     mocks.auditVerifyTenantMirrors.mockReturnValue({ ok: true, findings: [] });
-    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeExistsSync.mockImplementation((filePath?: string) => {
+      // The production queue discovers tenant shards below this root. Keep
+      // the fixture's global ledger/audit paths present while making absent
+      // tenant queue files and the optional global queue behave like the real
+      // filesystem. The runtime directories are intentionally gitignored, so
+      // this test must not depend on a developer's local queue state.
+      const resolved = String(filePath || '');
+      return (
+        !resolved.includes('/active/shared/runtime/tenants') &&
+        !resolved.endsWith('/active/shared/runtime/memory/promotion-queue.jsonl')
+      );
+    });
   });
 
   it('returns ok when audit chain and ledgers verify', async () => {

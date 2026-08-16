@@ -419,8 +419,8 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.4.0",
-      "capability_count": 79,
+      "version": "1.5.0",
+      "capability_count": 80,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -469,6 +469,7 @@
         "knowledge_import",
         "knowledge_inject",
         "knowledge_search",
+        "knowledge_validation_sweep",
         "log",
         "peer_advice",
         "perspective_fanout",

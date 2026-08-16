@@ -38,6 +38,13 @@ import {
   computeTenantIngestCuration,
   type TenantIngestCurationSection,
 } from './knowledge-curation-tenant-ingest.js';
+import { listTenantProfileSlugs } from '../tenant-registry.js';
+import type { ScopeContext } from '../scope-context.js';
+import { physicalScopedPath } from '../physical-namespace.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+} from '../memory-promotion-queue.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -59,6 +66,7 @@ const DEFAULT_SLO_CONFIG: CurationSloConfig = {
 
 export interface CurationLowYieldHint {
   document_path: string;
+  tenant_slug?: string;
   delivered_count: number;
   used_count: number;
   occurrences: number;
@@ -71,24 +79,49 @@ export interface CurationFreshnessBreach {
   last_updated: string | null;
   age_days: number | null;
   threshold_days: number;
-  reason: 'stale' | 'missing_last_updated';
+  review_by?: string;
+  reason: 'stale' | 'review_due' | 'missing_last_updated';
+}
+
+export interface CurationArchiveAdvisory {
+  document_path: string;
+  tenant_slug?: string;
+  reason: 'low_yield_and_freshness_breach';
+  consecutive_weeks: number;
+  first_observed_at: string;
+  last_observed_at: string;
 }
 
 export interface KnowledgeCurationReport {
   generated_at: string;
   config: CurationSloConfig;
   low_yield_hints: CurationLowYieldHint[];
+  /** Low-yield records written before tenant scoping was enforced. */
+  legacy_unscoped_hints: CurationLowYieldHint[];
   freshness_breaches: CurationFreshnessBreach[];
+  /** Advisory only: requires knowledge_steward ratification before archival. */
+  archive_advisories?: CurationArchiveAdvisory[];
   /** DA-08: per-tenant ingested-asset freshness sections (advisory only). */
   tenant_ingest: TenantIngestCurationSection[];
   scanned_document_count: number;
   summary: {
     low_yield_count: number;
     freshness_breach_count: number;
+    archive_advisory_count?: number;
     /** DA-08: total flagged ingested assets across tenants. */
     tenant_ingest_flagged_count: number;
   };
 }
+
+type ArchiveHistoryEntry = {
+  key: string;
+  document_path: string;
+  tenant_slug?: string;
+  consecutive_weeks: number;
+  first_observed_at: string;
+  last_observed_at: string;
+  last_week: string;
+};
 
 function sloConfigPath(): string {
   const override = process.env.KYBERION_CURATION_SLO_CONFIG_PATH?.trim();
@@ -108,6 +141,149 @@ function reportPath(): string {
   return pathResolver.knowledge('product/governance/CURATION_REPORT.md');
 }
 
+function archiveHistoryPath(tenantSlug?: string): string {
+  if (tenantSlug) {
+    return pathResolver.rootResolve(
+      physicalScopedPath(
+        'active/shared/runtime/feedback-loop',
+        { tier: 'confidential', tenant_slug: tenantSlug, scope_kind: 'tenant' },
+        'curation-archive-history.json'
+      )
+    );
+  }
+  const override = process.env.KYBERION_CURATION_ARCHIVE_HISTORY_PATH?.trim();
+  if (override) return pathResolver.rootResolve(override);
+  return pathResolver.shared('runtime/feedback-loop/curation-archive-history.json');
+}
+
+/** Physical archive-history location used by the weekly steward report. */
+export function knowledgeCurationArchiveHistoryPath(tenantSlug?: string): string {
+  return archiveHistoryPath(tenantSlug);
+}
+
+function weekKey(now: Date): string {
+  const day = now.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now.getTime() + mondayOffset * MS_PER_DAY);
+  return monday.toISOString().slice(0, 10);
+}
+
+function readArchiveHistory(tenantSlug?: string): ArchiveHistoryEntry[] {
+  const filePath = archiveHistoryPath(tenantSlug);
+  if (!safeExistsSync(filePath)) return [];
+  try {
+    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is ArchiveHistoryEntry =>
+        Boolean(entry) &&
+        typeof entry === 'object' &&
+        typeof (entry as ArchiveHistoryEntry).key === 'string' &&
+        typeof (entry as ArchiveHistoryEntry).last_week === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+function archiveCandidatesFromReport(
+  report: Pick<KnowledgeCurationReport, 'low_yield_hints' | 'freshness_breaches'>,
+  now: Date,
+  history: ArchiveHistoryEntry[]
+): CurationArchiveAdvisory[] {
+  const freshnessPaths = new Set(report.freshness_breaches.map((entry) => entry.document_path));
+  const currentWeek = weekKey(now);
+  const priorByKey = new Map(history.map((entry) => [entry.key, entry]));
+  return report.low_yield_hints
+    .filter((hint) => freshnessPaths.has(hint.document_path))
+    .map((hint) => {
+      const key = `${hint.tenant_slug || 'unscoped'}:${hint.document_path}`;
+      const prior = priorByKey.get(key);
+      if (!prior || prior.last_week === currentWeek) return undefined;
+      const elapsed = now.getTime() - Date.parse(prior.last_observed_at);
+      if (!Number.isFinite(elapsed) || elapsed < 6 * MS_PER_DAY || elapsed > 14 * MS_PER_DAY) {
+        return undefined;
+      }
+      return {
+        document_path: hint.document_path,
+        ...(hint.tenant_slug ? { tenant_slug: hint.tenant_slug } : {}),
+        reason: 'low_yield_and_freshness_breach' as const,
+        consecutive_weeks: prior.consecutive_weeks + 1,
+        first_observed_at: prior.first_observed_at,
+        last_observed_at: now.toISOString(),
+      };
+    })
+    .filter((entry): entry is CurationArchiveAdvisory => Boolean(entry))
+    .filter((entry) => entry.consecutive_weeks >= 2)
+    .sort((a, b) =>
+      `${a.tenant_slug || 'unscoped'}:${a.document_path}`.localeCompare(
+        `${b.tenant_slug || 'unscoped'}:${b.document_path}`
+      )
+    );
+}
+
+function observeArchiveHistory(
+  report: Pick<KnowledgeCurationReport, 'low_yield_hints' | 'freshness_breaches'>,
+  now: Date
+): CurationArchiveAdvisory[] {
+  const tenantKeys = new Set([
+    '',
+    ...registeredKnowledgeTenants(),
+    ...report.low_yield_hints.map((hint) => hint.tenant_slug || ''),
+  ]);
+  const advisories: CurationArchiveAdvisory[] = [];
+  for (const tenantKey of tenantKeys) {
+    const tenantSlug = tenantKey || undefined;
+    const lowYieldHints = report.low_yield_hints.filter(
+      (hint) => (hint.tenant_slug || '') === tenantKey
+    );
+    const documentPaths = new Set(lowYieldHints.map((hint) => hint.document_path));
+    const scopedReport = {
+      low_yield_hints: lowYieldHints,
+      freshness_breaches: report.freshness_breaches.filter((breach) =>
+        documentPaths.has(breach.document_path)
+      ),
+    };
+    const history = readArchiveHistory(tenantSlug);
+    const currentWeek = weekKey(now);
+    const priorByKey = new Map(history.map((entry) => [entry.key, entry]));
+    const candidates = scopedReport.low_yield_hints.filter((hint) =>
+      scopedReport.freshness_breaches.some((breach) => breach.document_path === hint.document_path)
+    );
+    const nextHistory = new Map<string, ArchiveHistoryEntry>();
+    for (const hint of candidates) {
+      const key = `${hint.tenant_slug || 'unscoped'}:${hint.document_path}`;
+      const prior = priorByKey.get(key);
+      const elapsed = prior ? now.getTime() - Date.parse(prior.last_observed_at) : NaN;
+      const consecutiveWeeks =
+        prior &&
+        prior.last_week !== currentWeek &&
+        Number.isFinite(elapsed) &&
+        elapsed >= 6 * MS_PER_DAY &&
+        elapsed <= 14 * MS_PER_DAY
+          ? prior.consecutive_weeks + 1
+          : prior?.last_week === currentWeek
+            ? prior.consecutive_weeks
+            : 1;
+      nextHistory.set(key, {
+        key,
+        document_path: hint.document_path,
+        ...(hint.tenant_slug ? { tenant_slug: hint.tenant_slug } : {}),
+        consecutive_weeks: consecutiveWeeks,
+        first_observed_at: prior?.first_observed_at || now.toISOString(),
+        last_observed_at: now.toISOString(),
+        last_week: currentWeek,
+      });
+    }
+    const historyPath = archiveHistoryPath(tenantSlug);
+    const parent = path.dirname(historyPath);
+    if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+    safeWriteFile(historyPath, JSON.stringify([...nextHistory.values()], null, 2) + '\n');
+    advisories.push(...archiveCandidatesFromReport(scopedReport, now, history));
+  }
+  return advisories;
+}
+
 export function knowledgeCurationSloConfigPath(): string {
   return sloConfigPath();
 }
@@ -118,6 +294,18 @@ export function knowledgeCurationReportPath(): string {
 
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function registeredKnowledgeTenants(): string[] {
+  try {
+    return listTenantProfileSlugs();
+  } catch {
+    return [];
+  }
+}
+
+function usageScopeForTenant(tenantSlug: string): ScopeContext {
+  return { tier: 'confidential', tenant_slug: tenantSlug };
 }
 
 /**
@@ -218,6 +406,7 @@ interface ScannedDoc {
   document_path: string;
   kind: string;
   last_updated?: string;
+  review_by?: string;
 }
 
 function scanMarkdownDocs(
@@ -256,10 +445,12 @@ function scanMarkdownDocs(
       extractFrontmatterValue(content, 'kind') || kindForPath(relSource, directoryDefaults);
     if (!kind) continue; // no declared/inferable kind — not subject to a freshness SLO
     const lastUpdated = extractFrontmatterValue(content, 'last_updated');
+    const reviewBy = extractFrontmatterValue(content, 'review_by');
     out.push({
       document_path: relSource,
       kind,
       ...(lastUpdated ? { last_updated: lastUpdated } : {}),
+      ...(reviewBy ? { review_by: reviewBy } : {}),
     });
   }
 }
@@ -274,20 +465,36 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   const now = options.now || new Date();
   const config = loadCurationSloConfig();
 
-  const usage = loadKnowledgeUsageAggregate();
-  const lowYieldHints: CurationLowYieldHint[] = usage
-    .filter(
-      (entry) =>
-        entry.delivered_count >= config.low_yield_delivery_threshold && entry.used_count === 0
-    )
-    .map((entry) => ({
+  const toLowYield = (
+    entry: ReturnType<typeof loadKnowledgeUsageAggregate>[number],
+    tenantSlug?: string
+  ): CurationLowYieldHint | undefined => {
+    if (entry.delivered_count < config.low_yield_delivery_threshold || entry.used_count !== 0) {
+      return undefined;
+    }
+    return {
       document_path: entry.document_path,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
       delivered_count: entry.delivered_count,
       used_count: entry.used_count,
       occurrences: entry.occurrences,
       last_seen: entry.last_seen,
-    }))
+    };
+  };
+  const legacyUnscopedHints = loadKnowledgeUsageAggregate()
+    .map((entry) => toLowYield(entry))
+    .filter((entry): entry is CurationLowYieldHint => Boolean(entry))
     .sort((a, b) => a.document_path.localeCompare(b.document_path));
+  const tenantHints = registeredKnowledgeTenants().flatMap((tenantSlug) =>
+    loadKnowledgeUsageAggregate(usageScopeForTenant(tenantSlug))
+      .map((entry) => toLowYield(entry, tenantSlug))
+      .filter((entry): entry is CurationLowYieldHint => Boolean(entry))
+  );
+  const lowYieldHints = [...legacyUnscopedHints, ...tenantHints].sort((a, b) =>
+    `${a.tenant_slug || 'unscoped'}:${a.document_path}`.localeCompare(
+      `${b.tenant_slug || 'unscoped'}:${b.document_path}`
+    )
+  );
 
   const directoryDefaults = loadTaxonomyDirectoryDefaults();
   const docs: ScannedDoc[] = [];
@@ -298,6 +505,19 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   const freshnessBreaches: CurationFreshnessBreach[] = [];
   for (const doc of docs) {
     const thresholdDays = config.freshness_days_by_kind[doc.kind] ?? config.default_freshness_days;
+    const reviewByMs = doc.review_by ? Date.parse(doc.review_by) : NaN;
+    if (Number.isFinite(reviewByMs) && reviewByMs < now.getTime()) {
+      freshnessBreaches.push({
+        document_path: doc.document_path,
+        kind: doc.kind,
+        last_updated: doc.last_updated ?? null,
+        review_by: doc.review_by,
+        age_days: Math.floor((now.getTime() - reviewByMs) / MS_PER_DAY),
+        threshold_days: 0,
+        reason: 'review_due',
+      });
+      continue;
+    }
     const parsed = doc.last_updated ? Date.parse(doc.last_updated) : NaN;
     if (!doc.last_updated || Number.isNaN(parsed)) {
       freshnessBreaches.push({
@@ -337,17 +557,25 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
     (sum, section) => sum + section.flagged.length,
     0
   );
+  const archiveAdvisories = archiveCandidatesFromReport(
+    { low_yield_hints: lowYieldHints, freshness_breaches: freshnessBreaches },
+    now,
+    readArchiveHistory()
+  );
 
   return {
     generated_at: now.toISOString(),
     config,
     low_yield_hints: lowYieldHints,
+    legacy_unscoped_hints: legacyUnscopedHints,
     freshness_breaches: freshnessBreaches,
+    archive_advisories: archiveAdvisories,
     tenant_ingest: tenantIngest,
     scanned_document_count: docs.length,
     summary: {
       low_yield_count: lowYieldHints.length,
       freshness_breach_count: freshnessBreaches.length,
+      archive_advisory_count: archiveAdvisories.length,
       tenant_ingest_flagged_count: tenantIngestFlaggedCount,
     },
   };
@@ -374,6 +602,8 @@ export function renderCurationReportMarkdown(report: KnowledgeCurationReport): s
     `generated_at: ${report.generated_at}`,
     `low_yield_delivery_threshold: ${report.config.low_yield_delivery_threshold}`,
     `scanned_document_count: ${report.scanned_document_count}`,
+    `legacy_unscoped_hint_count: ${(report.legacy_unscoped_hints || []).length}`,
+    `archive_advisory_count: ${(report.archive_advisories || []).length}`,
     '',
     '## Low-Yield Hints',
     '',
@@ -384,12 +614,32 @@ export function renderCurationReportMarkdown(report: KnowledgeCurationReport): s
     lines.push('_(none)_');
   } else {
     lines.push(
-      '| Document | Delivered | Used | Occurrences | Last Seen |',
-      '| --- | --- | --- | --- | --- |'
+      '| Tenant | Document | Delivered | Used | Occurrences | Last Seen |',
+      '| --- | --- | --- | --- | --- | --- |'
     );
     for (const hint of report.low_yield_hints) {
       lines.push(
-        `| ${hint.document_path} | ${hint.delivered_count} | ${hint.used_count} | ${hint.occurrences} | ${hint.last_seen} |`
+        `| ${hint.tenant_slug || 'unscoped-legacy'} | ${hint.document_path} | ${hint.delivered_count} | ${hint.used_count} | ${hint.occurrences} | ${hint.last_seen} |`
+      );
+    }
+  }
+  lines.push(
+    '',
+    '## Archive Advisories',
+    '',
+    'Two consecutive weekly observations of low-yield plus freshness-breach evidence are required. A knowledge_steward must ratify archival; this report never deletes or moves a document.',
+    ''
+  );
+  if ((report.archive_advisories || []).length === 0) {
+    lines.push('_(none)_');
+  } else {
+    lines.push(
+      '| Tenant | Document | Consecutive weeks | First observed | Last observed |',
+      '| --- | --- | --- | --- | --- |'
+    );
+    for (const advisory of report.archive_advisories) {
+      lines.push(
+        `| ${advisory.tenant_slug || 'unscoped-legacy'} | ${advisory.document_path} | ${advisory.consecutive_weeks} | ${advisory.first_observed_at} | ${advisory.last_observed_at} |`
       );
     }
   }
@@ -461,7 +711,32 @@ export function generateKnowledgeCurationReport(options: { now?: Date } = {}): {
   report: KnowledgeCurationReport;
   reportPath: string;
 } {
-  const report = computeCurationReport(options);
-  const { reportPath: writtenPath } = writeCurationReport(report);
-  return { report, reportPath: writtenPath };
+  const now = options.now || new Date();
+  const report = computeCurationReport({ now });
+  const observedAdvisories = observeArchiveHistory(report, now);
+  const reportWithAdvisories: KnowledgeCurationReport = {
+    ...report,
+    archive_advisories: observedAdvisories,
+    summary: {
+      ...report.summary,
+      archive_advisory_count: observedAdvisories.length,
+    },
+  };
+  for (const advisory of observedAdvisories) {
+    enqueueMemoryPromotionCandidate(
+      createMemoryPromotionCandidate({
+        sourceType: 'artifact',
+        sourceRef: `curation:${advisory.tenant_slug || 'unscoped'}:${advisory.document_path}`,
+        proposedMemoryKind: 'archive_advisory',
+        summary: `Review ${advisory.document_path} for archival after ${advisory.consecutive_weeks} consecutive weekly low-yield and freshness-breach observations.`,
+        evidenceRefs: [advisory.document_path, 'knowledge/product/governance/CURATION_REPORT.md'],
+        sensitivityTier: advisory.tenant_slug ? 'confidential' : 'personal',
+        ...(advisory.tenant_slug
+          ? { scope: { tier: 'confidential' as const, tenant_slug: advisory.tenant_slug } }
+          : {}),
+      })
+    );
+  }
+  const { reportPath: writtenPath } = writeCurationReport(reportWithAdvisories);
+  return { report: reportWithAdvisories, reportPath: writtenPath };
 }

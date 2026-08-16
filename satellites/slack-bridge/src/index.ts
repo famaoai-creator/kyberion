@@ -14,6 +14,7 @@ import {
   recordSlackSurfaceArtifact,
   runSurfaceMessageConversation,
   recordSlackDelivery,
+  recordSlackKnowledgeReaction,
   listSlackOutboxMessages,
   clearSlackOutboxMessage,
   createSurfaceOutboxDrainGuard,
@@ -722,6 +723,63 @@ async function start() {
         post: (text) =>
           postSlackText(client, { channel: message.channel, thread_ts: threadTs, text }),
       });
+    }
+  });
+
+  app.event('reaction_added', async ({ event, client }) => {
+    const reactionEvent = event as any;
+    const actorId = reactionEvent.user || '';
+    const channel = reactionEvent.item?.channel || '';
+    const messageTs = reactionEvent.item?.ts || '';
+    if (!channel || !messageTs || !actorId) return;
+    const access = evaluateSurfaceActorAccess('slack', actorId);
+    if (!access.allowed) {
+      logger.warn(`[SlackBridge] Ignored unauthorized knowledge reaction from ${actorId}`);
+      return;
+    }
+    try {
+      const history = await client.conversations.history({
+        channel,
+        latest: messageTs,
+        inclusive: true,
+        limit: 1,
+      });
+      const message = (history as any).messages?.[0];
+      const metadata = message?.metadata?.event_payload || message?.metadata || {};
+      const documentPath =
+        metadata.knowledge_document_path ||
+        metadata.document_path ||
+        String(message?.text || '').match(
+          /\b(knowledge\/(?:product|confidential|personal)\/[^\s>]+)/u
+        )?.[1];
+      if (!documentPath) return;
+      const binding = resolveCustomerBinding('slack', channel);
+      const target = recordSlackKnowledgeReaction({
+        reaction: reactionEvent.reaction || '',
+        document_path: documentPath,
+        actor: actorId,
+        channel,
+        message_ts: messageTs,
+        ...(binding ? { tenant_slug: binding.tenantSlug } : {}),
+      });
+      if (target) {
+        emitChannelSurfaceEvent('slack_bridge', 'slack', 'events', {
+          correlation_id: `slack-reaction-${messageTs}`,
+          decision: 'knowledge_feedback_recorded',
+          why: 'Slack reaction was translated into the governed human knowledge feedback loop.',
+          policy_used: 'slack_knowledge_feedback_v1',
+          agent_id: SLACK_SURFACE_AGENT_ID,
+          resource_id: messageTs,
+          slack_channel: channel,
+          feedback_path: target,
+          tenant_slug: binding?.tenantSlug,
+          reaction: reactionEvent.reaction,
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        `[SlackBridge] Knowledge reaction ignored: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   });
 

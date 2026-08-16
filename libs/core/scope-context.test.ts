@@ -4,9 +4,12 @@ import {
   currentScope,
   normalizeScopeContext,
   resetCurrentScope,
+  resolveScopeResolution,
   resolveScopeContext,
   scopeContextKey,
   validateScopeContext,
+  writeScopeEnv,
+  clearScopeEnv,
 } from './scope-context.js';
 
 describe('scope-context', () => {
@@ -73,6 +76,54 @@ describe('scope-context', () => {
       mission_id: 'mission-a',
       task_id: 'task-a',
     });
+  });
+
+  it('reports deterministic provenance and roots for a tenant scope', () => {
+    const resolution = resolveScopeResolution(
+      { tier: 'confidential', tenant_slug: 'acme-corp' },
+      { KYBERION_ORGANIZATION_ID: 'org-a', KYBERION_PROJECT_ID: 'project-a' }
+    );
+    expect(resolution.scope).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-a',
+      project_id: 'project-a',
+    });
+    expect(resolution.provenance).toMatchObject({
+      tier: 'explicit',
+      tenant_slug: 'explicit',
+      organization_id: 'env',
+      project_id: 'env',
+    });
+    expect(resolution.knowledge_roots).toContain(
+      'confidential/acme-corp/organizations/org-a/projects/project-a'
+    );
+    expect(resolution.knowledge_roots).not.toContain('confidential');
+  });
+
+  it('round-trips the governed scope.env file', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-context-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv(
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+      env
+    );
+    try {
+      expect(resolveScopeResolution({}, env).scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      });
+      expect(resolveScopeResolution({}, env).provenance.tenant_slug).toBe('scope.env');
+    } finally {
+      clearScopeEnv(env);
+    }
   });
 
   it('memoizes and resets the process scope', () => {

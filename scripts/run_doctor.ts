@@ -166,11 +166,18 @@ export function collectPipelineScheduleDoctorLines(): string[] {
 
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   try {
+    const tenantId = String(
+      process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || ''
+    ).trim();
+    const aliasNotice =
+      !process.env.KYBERION_TENANT && process.env.KYBERION_TENANT_ID
+        ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)'
+        : '';
     const report = await inspectMeshHub({
-      tenantId: String(process.env.KYBERION_TENANT_ID || '').trim(),
+      tenantId,
     });
     if (report.delivery_count === 0 && report.dead_letter_count === 0) {
-      return ['Mesh delivery: idle; no deliveries recorded'];
+      return [`Mesh delivery: idle; no deliveries recorded${aliasNotice}`];
     }
     const stuck = report.routes.filter(
       (route) => route.state === 'queued' || route.state === 'dispatched'

@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -294,6 +294,12 @@
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
       "note": "KP-06: deterministic weekly report of low-yield knowledge hints (KP-05 usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json); writes CURATION_REPORT.md. Candidates only — no automatic demotion, steward approval required."
+    },
+    {
+      "op": "knowledge_validation_sweep",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "note": "KO-17/19: read-only validation sweep for heuristic feedback and scope-bound promotion candidates; reports attention without changing queue status or knowledge tiers."
     }
   ]
 }

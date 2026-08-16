@@ -3,7 +3,7 @@
   "pipeline_id": "knowledge-curation-weekly",
   "version": "1.0.0",
   "name": "Weekly Knowledge Curation Report",
-  "description": "KP-06: computes low-yield knowledge hints (KP-05 delivery/usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json) via the deterministic wisdom:curation_report op, which persists CURATION_REPORT.md for knowledge_steward review. Candidates only — no automatic deletion or demotion (KM-03 guardrail).",
+  "description": "KP-06/KO-17: computes scoped low-yield hints and freshness SLO breaches, tracks two weekly observations for archive_advisory candidates, and persists CURATION_REPORT.md plus steward-gated promotion candidates. No automatic deletion or demotion (KM-03 guardrail).",
   "schedule": {
     "id": "knowledge-curation-weekly",
     "cron": "0 3 * * 0",
@@ -24,10 +24,20 @@
       "params": {}
     },
     {
+      "id": "knowledge-validation-sweep",
+      "role": "transform",
+      "op": "wisdom:knowledge_validation_sweep",
+      "produces": {
+        "channel": "knowledge_validation_sweep",
+        "type": "KnowledgeValidationSweepResult"
+      },
+      "params": {}
+    },
+    {
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "✅ [KNOWLEDGE-CURATION] Report written to {{curation_report.report_path}} (low_yield={{curation_report.summary.low_yield_count}}, freshness_breaches={{curation_report.summary.freshness_breach_count}})."
+        "message": "✅ [KNOWLEDGE-CURATION] Report written to {{curation_report.report_path}} (low_yield={{curation_report.summary.low_yield_count}}, freshness_breaches={{curation_report.summary.freshness_breach_count}}, archive_advisories={{curation_report.summary.archive_advisory_count}}, validation={{knowledge_validation_sweep.status}}, visible_candidates={{knowledge_validation_sweep.promotion_queue.visible_count}})."
       }
     }
   ]

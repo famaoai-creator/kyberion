@@ -41,11 +41,13 @@ import {
   normalizeEventScope,
   recordProtocolServiceLifecycle,
   computeApprovalPayloadHash,
+  resolveScopeResolution,
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
+import { recordHumanKnowledgeFeedback } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import {
   listPendingApprovalsForCowork,
@@ -523,6 +525,76 @@ export function createKyberionMcpServer(): McpServer {
         'Kyberion security model (3-tier knowledge isolation, audit chain).',
         'Use kyberion.pipeline.list to discover available pipelines before running one.',
       ].join(' '),
+    }
+  );
+
+  // ── kyberion.pipeline.list ────────────────────────────────────────────────
+  // ── kyberion.scope.current ────────────────────────────────────────────────
+  registerGovernedTool(
+    server,
+    catalog,
+    'kyberion.scope.current',
+    'Resolve the effective Kyberion scope, its provenance, and the positive knowledge roots available to this process.',
+    {},
+    async () => {
+      const context = resolveMcpRequestContext();
+      const scopeInput = {
+        tier: context.scope.tier,
+        ...(context.scope.tenant_slug ? { tenant_slug: context.scope.tenant_slug } : {}),
+        ...(context.scope.organization_id
+          ? { organization_id: context.scope.organization_id }
+          : {}),
+        ...(context.scope.project_id ? { project_id: context.scope.project_id } : {}),
+        ...(context.scope.mission_id ? { mission_id: context.scope.mission_id } : {}),
+        ...(context.scope.task_id ? { task_id: context.scope.task_id } : {}),
+      };
+      const resolution = resolveScopeResolution(
+        scopeInput,
+        {
+          KYBERION_TIER: context.scope.tier,
+          KYBERION_TENANT: context.scope.tenant_slug,
+          KYBERION_ORGANIZATION_ID: context.scope.organization_id,
+          KYBERION_PROJECT_ID: context.scope.project_id,
+          MISSION_ID: context.scope.mission_id,
+          KYBERION_TASK_ID: context.scope.task_id,
+        },
+        { includePersisted: false, inferFromMission: false, inferFromCwd: false }
+      );
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(resolution, null, 2) }],
+      };
+    }
+  );
+
+  // ── kyberion.knowledge.feedback ──────────────────────────────────────────
+  registerGovernedTool(
+    server,
+    catalog,
+    'kyberion.knowledge.feedback',
+    'Record human feedback for a knowledge document in the current tenant scope.',
+    {
+      document_path: z.string().describe('Repo-relative knowledge document path'),
+      verdict: z.enum(['useful', 'stale', 'wrong', 'not_useful']),
+      reason: z.string().optional(),
+    },
+    async ({ document_path, verdict, reason }) => {
+      const context = resolveMcpRequestContext();
+      const feedbackPath = recordHumanKnowledgeFeedback({
+        document_path,
+        verdict,
+        reason,
+        actor: context.principal,
+        source: 'mcp',
+        scope: context.scope,
+      });
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({ status: 'recorded', feedback_path: feedbackPath }, null, 2),
+          },
+        ],
+      };
     }
   );
 

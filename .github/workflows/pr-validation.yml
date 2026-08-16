@@ -55,6 +55,11 @@ jobs:
       - name: Check ESM integrity
         run: pnpm run check:esm
 
+      # KS-16 / KO-04: keep the knowledge scope checker on the PR gate as well
+      # as the broader CI validation job.
+      - name: Check knowledge scope boundaries
+        run: pnpm run check:knowledge-scope
+
       - name: Check packaging contract
         run: pnpm run check:packaging-contract
 

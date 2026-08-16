@@ -26,6 +26,7 @@ import {
 } from './outcome-contract.js';
 import { buildCompletionNextAction, type CompletionNextAction } from './next-action.js';
 import { recordIntentContractOutcome } from './intent-contract-learning.js';
+import { currentScope } from './scope-context.js';
 import { reconcileCompletionStructurally } from './intent-reconciliation.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
@@ -275,6 +276,7 @@ function recordTaskSessionCompletionLearning(session: TaskSession): void {
         confidence: session.completion_summary.confidence,
         evidence_refs: [...session.completion_summary.evidence_refs],
       },
+      scope: currentScope(),
     });
   } catch (error) {
     logger.warn(
