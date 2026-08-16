@@ -212,6 +212,9 @@ export async function provisionTaskKnowledge(
       provider: resolvedProvider,
       dataTier: pack.mission.tier,
       ...(pack.scope.tenant_slug ? { tenant_slug: pack.scope.tenant_slug } : {}),
+      ...(resolveInput.tenantKnowledgeRootDir
+        ? { tenant_registry_root_dir: resolveInput.tenantKnowledgeRootDir }
+        : {}),
     });
     if (!egressCheck.allowed) {
       logger.warn(

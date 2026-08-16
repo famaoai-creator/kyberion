@@ -546,17 +546,21 @@ function _scanConfidentialTier(
   const confidentialRoot = path.join(knowledgeBase, 'confidential');
   if (!safeExistsSync(confidentialRoot)) return;
 
-  const scanRoot = (root: string, tenant: string | undefined): void => {
+  const scanRoot = (
+    root: string,
+    tenant: string | undefined,
+    options: { excludeDirectories?: ReadonlySet<string> } = {}
+  ): void => {
     if (!safeExistsSync(root)) return;
     if (domains !== TIER1_SUBDIRS) {
       for (const domain of domains) {
         const dir = path.join(root, domain);
         if (safeExistsSync(dir)) {
-          _scanMarkdownHints(dir, knowledgeBase, 'confidential', tenant, hints);
+          _scanMarkdownHints(dir, knowledgeBase, 'confidential', tenant, hints, options);
         }
       }
     } else {
-      _scanMarkdownHints(root, knowledgeBase, 'confidential', tenant, hints);
+      _scanMarkdownHints(root, knowledgeBase, 'confidential', tenant, hints, options);
     }
   };
 
@@ -578,7 +582,31 @@ function _scanConfidentialTier(
       ...(scopeContext.session_id ? ['sessions', scopeContext.session_id] : []),
     ];
     if (entitySegments.every((segment) => !segment.includes('/') && !segment.includes('\\'))) {
-      scanRoot(path.join(confidentialRoot, ...entitySegments), scopeContext.tenant_slug);
+      if (entitySegments.length === 1) {
+        scanRoot(path.join(confidentialRoot, ...entitySegments), scopeContext.tenant_slug);
+      } else {
+        // A mission/task scope inherits tenant-level documents and the exact
+        // entity chain, but must not recurse into sibling organizations,
+        // projects, or missions. Scan each authorized prefix with the next
+        // containment branch excluded, then scan the exact leaf recursively.
+        const entityBranches = new Set([
+          'organizations',
+          'projects',
+          'missions',
+          'tasks',
+          'sessions',
+        ]);
+        scanRoot(path.join(confidentialRoot, scopeContext.tenant_slug), scopeContext.tenant_slug, {
+          excludeDirectories: entityBranches,
+        });
+        for (let end = 2; end < entitySegments.length; end += 2) {
+          const prefix = entitySegments.slice(0, end + 1);
+          const nextBranch = entitySegments[end + 1];
+          scanRoot(path.join(confidentialRoot, ...prefix), scopeContext.tenant_slug, {
+            ...(nextBranch ? { excludeDirectories: new Set([nextBranch]) } : {}),
+          });
+        }
+      }
       return;
     }
   }
@@ -728,7 +756,9 @@ function _scanMarkdownHints(
   knowledgeBase: string,
   tier: NonNullable<KnowledgeHint['tier']>,
   customerId: string | undefined,
-  hints: KnowledgeHint[]
+  hints: KnowledgeHint[],
+  options: { excludeDirectories?: ReadonlySet<string> } = {},
+  atRoot = true
 ): void {
   let entries: string[];
   try {
@@ -784,10 +814,11 @@ function _scanMarkdownHints(
       }
     } else if (!entry.startsWith('.') && !entry.includes('.')) {
       // Likely a subdirectory — recurse
+      if (atRoot && options.excludeDirectories?.has(entry)) continue;
       if (safeExistsSync(fullPath)) {
         try {
           safeReaddir(fullPath);
-          _scanMarkdownHints(fullPath, knowledgeBase, tier, customerId, hints);
+          _scanMarkdownHints(fullPath, knowledgeBase, tier, customerId, hints, options, false);
         } catch {
           // Not a directory, skip
         }

@@ -53,6 +53,7 @@ import {
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getSurfaceQueryProviderConfig,
+  currentScope,
   createVirtualDeviceInventoryBridge,
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
@@ -1798,7 +1799,7 @@ async function fetchPresenceLocationContext(): Promise<PresenceLocationContext |
 }
 
 async function tryBuildLocationReply(userText: string): Promise<string | null> {
-  const config = getSurfaceQueryProviderConfig().location;
+  const config = getSurfaceQueryProviderConfig({ scope: currentScope() }).location;
   if (config?.enabled === false) return null;
   const location = await fetchPresenceLocationContext();
   const isJapanese = detectReplyLanguage(userText) === 'ja';
@@ -1864,7 +1865,7 @@ function weatherCodeLabel(code: number, language: SupportedLocale): string {
 }
 
 async function tryBuildWeatherReply(userText: string): Promise<string | null> {
-  const config = getSurfaceQueryProviderConfig().weather;
+  const config = getSurfaceQueryProviderConfig({ scope: currentScope() }).weather;
   if (config?.enabled === false) return null;
   const isJapanese = detectReplyLanguage(userText) === 'ja';
   const location = await fetchPresenceLocationContext();
@@ -1924,7 +1925,7 @@ async function tryBuildWeatherReply(userText: string): Promise<string | null> {
 }
 
 async function searchWeb(query: string): Promise<WebSearchResult[]> {
-  const config = getSurfaceQueryProviderConfig().web_search;
+  const config = getSurfaceQueryProviderConfig({ scope: currentScope() }).web_search;
   if (config?.enabled === false) return [];
   const maxResults = config?.maxResults || 3;
   const timeoutMs = config?.timeoutMs || 5000;
@@ -2263,7 +2264,7 @@ async function executeBrowserOpenSite(params: {
 async function tryBuildKnowledgeReply(userText: string): Promise<string | null> {
   const extracted = extractSurfaceKnowledgeQuery(userText);
   if (!extracted) return null;
-  const config = getSurfaceQueryProviderConfig().knowledge;
+  const config = getSurfaceQueryProviderConfig({ scope: currentScope() }).knowledge;
   if (config?.enabled === false) return null;
   const query = extracted;
   try {

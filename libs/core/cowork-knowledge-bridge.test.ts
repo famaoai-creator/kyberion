@@ -76,7 +76,11 @@ const FAKE_POLICY = JSON.stringify({
     kind_inference: [{ pattern: '\\.md$', proposed_kind: 'heuristic' }],
     tier_assignment: {
       rules: [
-        { source_path_pattern: 'personal/', assigned_tier: 'personal', ratification_required: true },
+        {
+          source_path_pattern: 'personal/',
+          assigned_tier: 'personal',
+          ratification_required: true,
+        },
       ],
       default: 'confidential',
     },
@@ -187,7 +191,7 @@ describe('ingestCoworkArtifacts()', () => {
 
     expect(result.enqueued).toBe(1);
     expect(mockCreateCandidate).toHaveBeenCalledWith(
-      expect.objectContaining({ sensitivityTier: 'confidential', ratificationRequired: true }),
+      expect.objectContaining({ sensitivityTier: 'confidential', ratificationRequired: true })
     );
   });
 
@@ -205,7 +209,7 @@ describe('ingestCoworkArtifacts()', () => {
 
     expect(result.enqueued).toBe(1);
     expect(mockCreateCandidate).toHaveBeenCalledWith(
-      expect.objectContaining({ sensitivityTier: 'personal', ratificationRequired: true }),
+      expect.objectContaining({ sensitivityTier: 'personal', ratificationRequired: true })
     );
   });
 });
@@ -261,7 +265,8 @@ describe('supplyKnowledgeToCowork()', () => {
     mockSafeExistsSync.mockImplementation((p: string) => {
       if (p.includes('cowork-sync-policy')) return false;
       // Only procedures dir exists; architecture/governance/hints dirs do not
-      if (p.endsWith('/architecture') || p.endsWith('/governance') || p.endsWith('/hints')) return false;
+      if (p.endsWith('/architecture') || p.endsWith('/governance') || p.endsWith('/hints'))
+        return false;
       return true;
     });
     mockSafeReadFile.mockImplementation((p: string) => {
@@ -282,7 +287,10 @@ describe('runCoworkKnowledgeSync()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListCandidates.mockReturnValue([]);
-    mockCreateCandidate.mockImplementation((params: any) => ({ candidate_id: 'cand-1', ...params }));
+    mockCreateCandidate.mockImplementation((params: any) => ({
+      candidate_id: 'cand-1',
+      ...params,
+    }));
     mockDeliverToCowork.mockReturnValue('COWORK-SYNC-001');
     // Default: no public dir → supply returns error (so supply doesn't interfere with ingest tests)
     mockSafeExistsSync.mockImplementation(defaultExistsImpl);
@@ -341,5 +349,31 @@ describe('runCoworkKnowledgeSync()', () => {
   it('sync_state_path が結果に含まれる', () => {
     const result = runCoworkKnowledgeSync({ direction: 'kyberion-to-cowork' });
     expect(result.sync_state_path).toContain('cowork-sync-state.json');
+  });
+
+  it('tenant scope が sync state と promotion candidate に伝播する', () => {
+    mockSafeExistsSync.mockImplementation((p: string) => {
+      if (p.includes('cowork-sync-policy')) return false;
+      if (p.includes('cowork-sync-state')) return false;
+      return true;
+    });
+    mockSafeReadFile.mockReturnValue('tenant artifact');
+
+    const result = runCoworkKnowledgeSync({
+      direction: 'cowork-to-kyberion',
+      coworkArtifactPaths: ['work/tenant-artifact.md'],
+      scope: { tier: 'confidential', tenant_slug: 'tenant-a' },
+    });
+
+    expect(result.sync_state_path).toContain('/tenants/tenant-a/cowork-sync-state.json');
+    expect(mockCreateCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: { tier: 'confidential', tenant_slug: 'tenant-a' },
+      })
+    );
+    expect(mockSafeWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining('/tenants/tenant-a/cowork-sync-state.json'),
+      expect.any(String)
+    );
   });
 });

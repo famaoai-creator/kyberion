@@ -15,9 +15,10 @@
         "required": ["id", "kind", "path"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
-          "kind": { "type": "string", "enum": ["role", "phase", "personal"] },
+          "kind": { "type": "string", "enum": ["role", "phase", "tenant", "personal"] },
           "role": { "type": "string", "minLength": 1 },
           "phase": { "type": "string", "minLength": 1 },
+          "tenant": { "type": "string", "minLength": 1 },
           "path": { "type": "string", "minLength": 1 },
           "summary": { "type": "string" },
           "status": { "type": "string" }
