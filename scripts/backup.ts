@@ -3,15 +3,21 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
+  GENERATION_QUOTA_COUNTER_REPO_SUBPATH,
+  isValidTenantSlug,
+  resolveTenant,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeLstat,
+  safeMoveSync,
   safeRmSync,
   safeStat,
   safeSymlinkSync,
   safeWriteFile,
+  assertProtocolServiceRegistered,
 } from '@agent/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
@@ -65,6 +71,7 @@ interface PlanOptions {
   tenant?: string;
   rootDir?: string;
   pathExists?: (repoRelativePath: string) => boolean;
+  tenantResolver?: (tenant: string, rootDir: string) => void;
 }
 
 const DEFAULT_PASSPHRASE_ENV = 'KYBERION_BACKUP_PASSPHRASE';
@@ -73,10 +80,10 @@ function usage(): string {
   return [
     'Usage:',
     '  pnpm backup create [--scope all|mission|tenant] [--mission <id>] [--tenant <slug>] --out <archive.tar.gz.enc> --encrypt',
-    '  pnpm backup restore <archive.tar.gz.enc|archive.tar.gz> --target <clean-root> [--verify-baseline] [--force]',
+    '  pnpm backup restore <archive.tar.gz.enc|archive.tar.gz> --target <clean-root> [--scope all|mission|tenant] [--tenant <slug>] [--verify-baseline] [--force]',
     '  pnpm backup list [--dir <backup-dir>]',
     '  pnpm backup prune [--dir <backup-dir>] [--retain-daily 7] [--retain-weekly 4]',
-    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--target <clean-root>] [--prepare-checkout] [--verify-baseline] [--force]',
+    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <clean-root>] [--prepare-checkout] [--verify-baseline] [--force]',
     '',
     `Sensitive scopes require --encrypt and ${DEFAULT_PASSPHRASE_ENV}.`,
   ].join('\n');
@@ -224,6 +231,57 @@ function addTenantMatches(
   }
 }
 
+/**
+ * Tenant exports must include the physical namespaces introduced for runtime
+ * records. Walk only the explicitly registered roots and stop at the
+ * `tenants/{slug}` boundary; never infer ownership from arbitrary JSON.
+ */
+function addPhysicalTenantNamespaceMatches(
+  entries: Set<string>,
+  rootDir: string,
+  tenant: string,
+  baseRepoPath: string,
+  pathExists: (repoRelativePath: string) => boolean,
+  depth = 0
+): void {
+  if (depth > 6 || !pathExists(baseRepoPath)) return;
+  const basePath = path.join(rootDir, baseRepoPath);
+  let children: string[];
+  try {
+    children = safeReaddir(basePath);
+  } catch {
+    return;
+  }
+  for (const child of children) {
+    if (child === '.quarantine' || child === 'node_modules') continue;
+    const childRepoPath = `${baseRepoPath}/${child}`;
+    const childPath = path.join(rootDir, childRepoPath);
+    let stat;
+    try {
+      stat = safeLstat(childPath);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+    if (child === 'tenants') {
+      addIfExists(
+        entries,
+        normalizeRepoRelative(rootDir, path.join(childPath, tenant)),
+        pathExists
+      );
+      continue;
+    }
+    addPhysicalTenantNamespaceMatches(
+      entries,
+      rootDir,
+      tenant,
+      childRepoPath,
+      pathExists,
+      depth + 1
+    );
+  }
+}
+
 function collectMissionGitRepos(
   rootDir: string,
   repoRelativePath: string,
@@ -300,6 +358,13 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
   } else if (options.scope === 'tenant') {
     if (!options.tenant) throw new Error('--tenant/--customer is required for --scope tenant');
     const tenant = options.tenant;
+    if (!isValidTenantSlug(tenant)) {
+      throw new Error(`Invalid tenant slug: ${tenant}`);
+    }
+    const tenantResolver =
+      options.tenantResolver ||
+      ((slug: string, registryRoot: string) => resolveTenant(slug, { rootDir: registryRoot }));
+    tenantResolver(tenant, rootDir);
     addTenantMatches(entries, rootDir, tenant, 'active/projects', pathExists);
     addTenantMatches(entries, rootDir, tenant, 'active/missions', pathExists);
     for (const repoPath of [
@@ -313,8 +378,12 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
       // DA-08: incremental-sync cursor state (DA-03) rides along in the
       // tenant export so an offboarded tenant's sync position is restorable.
       `active/shared/runtime/ingest-cursors/${tenant}`,
+      `${GENERATION_QUOTA_COUNTER_REPO_SUBPATH}/${tenant}`,
     ]) {
       addIfExists(entries, repoPath, pathExists);
+    }
+    for (const physicalRoot of TENANT_PHYSICAL_BACKUP_ROOTS) {
+      addPhysicalTenantNamespaceMatches(entries, rootDir, tenant, physicalRoot, pathExists);
     }
   }
 
@@ -323,15 +392,17 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
   }
 
   const sortedEntries = [...entries].sort((a, b) => a.localeCompare(b));
-  const includesSensitive = sortedEntries.some(
-    (entry) =>
-      entry === 'vault' ||
-      entry.startsWith('vault/') ||
-      entry === 'knowledge/confidential' ||
-      entry.startsWith('knowledge/confidential/') ||
-      entry.startsWith('active/missions/confidential') ||
-      entry.startsWith('active/projects/confidential')
-  );
+  const includesSensitive =
+    options.scope === 'tenant' ||
+    sortedEntries.some(
+      (entry) =>
+        entry === 'vault' ||
+        entry.startsWith('vault/') ||
+        entry === 'knowledge/confidential' ||
+        entry.startsWith('knowledge/confidential/') ||
+        entry.startsWith('active/missions/confidential') ||
+        entry.startsWith('active/projects/confidential')
+    );
 
   return {
     scope: options.scope,
@@ -660,10 +731,212 @@ export function createBackup(options: BackupCliOptions): {
 
 interface RestoredBackupManifest {
   format?: string;
+  scope?: BackupScope;
+  tenant?: string | null;
+  entries?: string[];
   mission_git_repos?: Array<{
     repo_relative_path?: string;
     bundle_path?: string | null;
   }>;
+}
+
+const TENANT_PHYSICAL_BACKUP_ROOTS = [
+  'active/shared/coordination/channels',
+  'active/shared/runtime/presence',
+  'active/shared/runtime/media-generation/schedules',
+  'active/shared/runtime/media-generation/artifacts',
+  'active/shared/runtime/media-generation/cost-settlements',
+  'active/shared/runtime/peer-messaging',
+  'active/shared/observability/peer-messaging',
+  'active/shared/runtime/peer-conversations',
+  'active/shared/observability/peer-conversations',
+  'active/shared/runtime/mesh-hub',
+  'active/shared/observability/mesh-hub',
+] as const;
+
+function normalizeArchiveMember(member: string): string {
+  const normalized = member.replace(/^\.\//, '').replace(/\/+$/, '');
+  if (!normalized || normalized.startsWith('/') || normalized.split('/').includes('..')) {
+    throw new Error(`Backup archive contains an unsafe member path: ${member}`);
+  }
+  return normalized;
+}
+
+function archiveMembers(plainArchive: string): string[] {
+  const result = safeExecResult('tar', ['-tzf', plainArchive], {
+    timeoutMs: 120000,
+    maxOutputMB: 50,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `backup archive listing failed: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
+    );
+  }
+  return result.stdout
+    .split('\n')
+    .map((member) => member.trim())
+    .filter(Boolean)
+    .map(normalizeArchiveMember);
+}
+
+function readArchiveManifest(
+  plainArchive: string,
+  members: string[]
+): { manifest: RestoredBackupManifest; member: string } {
+  const manifestMembers = members.filter((member) =>
+    /^active\/shared\/tmp\/backup-[^/]+\/manifest\.json$/.test(member)
+  );
+  if (manifestMembers.length !== 1) {
+    throw new Error(
+      `Backup archive must contain exactly one backup manifest (found ${manifestMembers.length}).`
+    );
+  }
+  const member = manifestMembers[0];
+  const result = safeExecResult('tar', ['-xOzf', plainArchive, member], {
+    timeoutMs: 120000,
+    maxOutputMB: 10,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `backup manifest read failed: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
+    );
+  }
+  let manifest: RestoredBackupManifest;
+  try {
+    manifest = JSON.parse(result.stdout) as RestoredBackupManifest;
+  } catch (error) {
+    throw new Error(`Backup manifest is not valid JSON: ${(error as Error).message}`);
+  }
+  if (manifest.format !== 'kyberion-backup-v1') {
+    throw new Error('Unsupported or missing backup manifest format.');
+  }
+  if (!['all', 'mission', 'tenant'].includes(String(manifest.scope))) {
+    throw new Error('Backup manifest has an invalid scope.');
+  }
+  if (
+    !Array.isArray(manifest.entries) ||
+    manifest.entries.some((entry) => typeof entry !== 'string')
+  ) {
+    throw new Error('Backup manifest entries are missing or invalid.');
+  }
+  for (const entry of manifest.entries as string[]) normalizeArchiveMember(entry);
+  return { manifest, member };
+}
+
+function isWithinArchiveRoot(member: string, root: string): boolean {
+  return member === root || member.startsWith(`${root}/`) || root.startsWith(`${member}/`);
+}
+
+function isArchiveEntryWithinRoot(entry: string, root: string): boolean {
+  return entry === root || entry.startsWith(`${root}/`);
+}
+
+function isTenantBackupEntry(entry: string, tenant: string): boolean {
+  const exactRoots = [
+    `knowledge/confidential/${tenant}`,
+    `knowledge/personal/${tenant}`,
+    `knowledge/personal/customers/${tenant}`,
+    `customer/${tenant}`,
+    `customers/${tenant}`,
+    `active/shared/runtime/ingest-cursors/${tenant}`,
+    `${GENERATION_QUOTA_COUNTER_REPO_SUBPATH}/${tenant}`,
+  ];
+  if (exactRoots.some((root) => isArchiveEntryWithinRoot(entry, root))) return true;
+  if (/^active\/(projects|missions)\/[^/]+\//.test(entry)) {
+    const parts = entry.split('/');
+    return parts[3] === tenant;
+  }
+  for (const root of ['active/shared/runtime/mesh-hub', 'active/shared/observability/mesh-hub']) {
+    const relative = entry.startsWith(`${root}/`) ? entry.slice(root.length + 1).split('/') : [];
+    if (
+      (relative[0] === 'tenants' && relative[1] === tenant) ||
+      (relative[1] === 'tenants' && relative[2] === tenant)
+    ) {
+      return true;
+    }
+  }
+  return TENANT_PHYSICAL_BACKUP_ROOTS.some((root) =>
+    isArchiveEntryWithinRoot(entry, `${root}/tenants/${tenant}`)
+  );
+}
+
+function validateArchiveManifestScope(
+  manifest: RestoredBackupManifest,
+  manifestMember: string,
+  members: string[],
+  options: BackupCliOptions
+): void {
+  const scope = manifest.scope as BackupScope;
+  const entries = manifest.entries as string[];
+  if (manifest.mission_git_repos !== undefined && !Array.isArray(manifest.mission_git_repos)) {
+    throw new Error('Backup manifest mission git metadata is invalid.');
+  }
+  const bundlePaths: string[] = [];
+  const manifestDir = manifestMember.slice(0, manifestMember.lastIndexOf('/'));
+  for (const entry of manifest.mission_git_repos || []) {
+    if (!entry || typeof entry !== 'object') {
+      throw new Error('Backup manifest mission git metadata is invalid.');
+    }
+    if (typeof entry.repo_relative_path !== 'string') {
+      throw new Error('Backup manifest mission repository path is invalid.');
+    }
+    const repoRelativePath = normalizeArchiveMember(entry.repo_relative_path);
+    if (
+      scope === 'tenant' &&
+      (typeof manifest.tenant !== 'string' ||
+        !isTenantBackupEntry(repoRelativePath, manifest.tenant))
+    ) {
+      throw new Error(
+        'Tenant backup manifest contains a mission repository outside the tenant scope.'
+      );
+    }
+    if (entry.bundle_path !== null && entry.bundle_path !== undefined) {
+      if (typeof entry.bundle_path !== 'string') {
+        throw new Error('Backup manifest mission bundle path is invalid.');
+      }
+      const bundlePath = normalizeArchiveMember(entry.bundle_path);
+      if (!bundlePath.startsWith(`${manifestDir}/mission-git-bundles/`)) {
+        throw new Error('Backup manifest mission bundle is outside the backup temp namespace.');
+      }
+      bundlePaths.push(bundlePath);
+    }
+  }
+  const allowedRoots = [...entries, manifestMember, ...bundlePaths];
+
+  if (scope === 'tenant') {
+    if (typeof manifest.tenant !== 'string' || !isValidTenantSlug(manifest.tenant)) {
+      throw new Error('Tenant backup manifest has an invalid tenant slug.');
+    }
+    if (options.scope !== 'tenant' || !options.tenant) {
+      throw new Error(
+        'Tenant backup restore requires --scope tenant --tenant <slug> so the restore boundary is explicit.'
+      );
+    }
+    if (options.tenant !== manifest.tenant) {
+      throw new Error(
+        `Tenant backup restore scope mismatch: archive=${manifest.tenant}, requested=${options.tenant}`
+      );
+    }
+    if (!entries.every((entry) => isTenantBackupEntry(entry, manifest.tenant))) {
+      throw new Error(
+        'Tenant backup manifest contains an entry outside the tenant export allowlist.'
+      );
+    }
+  } else if (options.scope !== 'all' && options.scope !== scope) {
+    throw new Error(`Backup restore scope mismatch: archive=${scope}, requested=${options.scope}`);
+  }
+
+  for (const member of members) {
+    if (!allowedRoots.some((root) => isWithinArchiveRoot(member, root))) {
+      throw new Error(`Backup archive member is outside the manifest scope: ${member}`);
+    }
+  }
+}
+
+function validateBackupArchive(plainArchive: string, options: BackupCliOptions): void {
+  const members = archiveMembers(plainArchive);
+  const { manifest, member } = readArchiveManifest(plainArchive, members);
+  validateArchiveManifestScope(manifest, member, members, options);
 }
 
 function findRestoredManifests(target: string): string[] {
@@ -711,16 +984,105 @@ function restoreMissionGitBundles(target: string): void {
   }
 }
 
-export function restoreBackup(options: BackupCliOptions): { target: string; archive: string } {
-  const archive = path.resolve(options.archive || '');
-  if (!archive) throw new Error('restore requires an archive path');
+/**
+ * A tenant restore must never make a stale peer lease, presence record, or
+ * proposal executable immediately. Move all restored peer/Mesh runtime state
+ * out of the live roots; re-enrollment and a fresh heartbeat are the resume
+ * gate. The quarantine is deliberately inside the restored tree so the
+ * operation remains self-contained and auditable.
+ */
+function quarantineRestoredPeerRuntime(
+  target: string,
+  tenant: string
+): { quarantinePath: string; moved: string[] } {
+  const stampId = stamp();
+  const moved: string[] = [];
+  const quarantineRoot = path.join(
+    target,
+    'active/shared/runtime/peer-recovery-quarantine/tenants',
+    tenant,
+    stampId
+  );
+  const candidates: Array<{ source: string; label: string }> = [
+    {
+      source: path.join(target, 'active/shared/runtime/peer-messaging/tenants', tenant),
+      label: 'runtime-peer-messaging',
+    },
+    {
+      source: path.join(target, 'active/shared/observability/peer-messaging/tenants', tenant),
+      label: 'observability-peer-messaging',
+    },
+    {
+      source: path.join(target, 'active/shared/runtime/peer-conversations/tenants', tenant),
+      label: 'runtime-peer-conversations',
+    },
+    {
+      source: path.join(target, 'active/shared/observability/peer-conversations/tenants', tenant),
+      label: 'observability-peer-conversations',
+    },
+  ];
+
+  for (const base of [
+    ['active/shared/runtime/mesh-hub', 'runtime-mesh-hub'],
+    ['active/shared/observability/mesh-hub', 'observability-mesh-hub'],
+  ] as const) {
+    const root = path.join(target, base[0]);
+    if (!safeExistsSync(root)) continue;
+    for (const entry of safeReaddir(root)) {
+      const namespaceRoot = path.join(root, entry);
+      const tenantRoot = path.join(namespaceRoot, 'tenants', tenant);
+      if (entry === 'tenants' && safeExistsSync(path.join(root, 'tenants', tenant))) {
+        candidates.push({ source: path.join(root, 'tenants', tenant), label: base[1] });
+      } else if (safeExistsSync(tenantRoot)) {
+        candidates.push({
+          source: tenantRoot,
+          label: `${base[1]}-${entry.replace(/[^a-zA-Z0-9._-]+/g, '-')}`,
+        });
+      }
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (!safeExistsSync(candidate.source)) continue;
+    const destination = path.join(quarantineRoot, candidate.label);
+    safeMkdir(path.dirname(destination));
+    safeMoveSync(candidate.source, destination);
+    moved.push(path.relative(target, destination));
+  }
+
+  if (moved.length > 0) {
+    safeMkdir(quarantineRoot);
+    safeWriteFile(
+      path.join(quarantineRoot, 'quarantine-manifest.json'),
+      `${JSON.stringify(
+        {
+          format: 'kyberion-peer-runtime-quarantine-v1',
+          tenant,
+          created_at: new Date().toISOString(),
+          reason: 'tenant_restore_requires_reenrollment_and_fresh_heartbeat',
+          moved,
+        },
+        null,
+        2
+      )}\n`
+    );
+  }
+  return { quarantinePath: quarantineRoot, moved };
+}
+
+export function restoreBackup(options: BackupCliOptions): {
+  target: string;
+  archive: string;
+  quarantinePaths: string[];
+} {
+  if (!options.archive) throw new Error('restore requires an archive path');
+  const archive = path.resolve(options.archive);
   if (!safeExistsSync(archive)) throw new Error(`Archive not found: ${archive}`);
-  const target = path.resolve(options.target || '');
-  if (!target) throw new Error('restore requires --target <clean-root>');
+  if (!options.target) throw new Error('restore requires --target <clean-root>');
+  const target = path.resolve(options.target);
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
-  safeMkdir(target);
 
   const tempDir = pathResolver.sharedTmp(`restore-${stamp()}`);
   safeMkdir(tempDir);
@@ -746,7 +1108,14 @@ export function restoreBackup(options: BackupCliOptions): { target: string; arch
     );
   }
 
+  validateBackupArchive(plainArchive, options);
+  safeMkdir(target);
   runRequired('tar', ['-xzf', plainArchive, '-C', target], 'backup restore extraction failed');
+  const quarantinePaths: string[] = [];
+  if (options.scope === 'tenant' && options.tenant) {
+    const quarantine = quarantineRestoredPeerRuntime(target, options.tenant);
+    if (quarantine.moved.length > 0) quarantinePaths.push(quarantine.quarantinePath);
+  }
   restoreMissionGitBundles(target);
 
   if (options.verifyBaseline) {
@@ -760,7 +1129,7 @@ export function restoreBackup(options: BackupCliOptions): { target: string; arch
     }
   }
 
-  return { target, archive };
+  return { target, archive, quarantinePaths };
 }
 
 export function runRestoreDrill(options: BackupCliOptions): {
@@ -769,6 +1138,7 @@ export function runRestoreDrill(options: BackupCliOptions): {
   checkoutPrepared: boolean;
   baselineVerified: boolean;
   restoredManifestCount: number;
+  quarantinePaths: string[];
 } {
   const archive =
     options.archive ||
@@ -810,6 +1180,7 @@ export function runRestoreDrill(options: BackupCliOptions): {
     checkoutPrepared: Boolean(options.prepareCheckout),
     baselineVerified: Boolean(options.verifyBaseline),
     restoredManifestCount: findRestoredManifests(result.target).length,
+    quarantinePaths: result.quarantinePaths,
   };
 }
 
@@ -849,6 +1220,7 @@ export function summarizeBackupStatus(
 }
 
 export function main(argv = process.argv.slice(2)): void {
+  assertProtocolServiceRegistered('backup-restore');
   const options = parseBackupArgs(argv);
   if (options.command === 'create') {
     const result = createBackup(options);
@@ -861,7 +1233,16 @@ export function main(argv = process.argv.slice(2)): void {
   if (options.command === 'restore') {
     const result = restoreBackup(options);
     console.log(
-      JSON.stringify({ ok: true, archive: result.archive, target: result.target }, null, 2)
+      JSON.stringify(
+        {
+          ok: true,
+          archive: result.archive,
+          target: result.target,
+          quarantine_paths: result.quarantinePaths,
+        },
+        null,
+        2
+      )
     );
     return;
   }

@@ -12,6 +12,7 @@ import type { AgentHandle, SpawnOptions } from './agent-lifecycle.js';
 import type { AgentRecord } from './agent-registry.js';
 import { resolveAgentTrustScore } from './agent-registry.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
+import type { EventScope, EventScopeInput } from './event-scope.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-runtime-supervisor-client');
 
@@ -73,6 +74,7 @@ export interface AgentRuntimeSupervisorEnsurePayload {
   cwd?: string;
   parentAgentId?: string;
   missionId?: string;
+  scope?: EventScopeInput;
   trustRequired?: number;
   requestedBy: string;
   runtimeMetadata?: Record<string, unknown>;
@@ -90,6 +92,7 @@ export interface AgentRuntimeSupervisorSnapshot {
   owner_id?: string;
   owner_type?: string;
   metadata?: Record<string, unknown>;
+  scope?: EventScope;
   /** Runtime daemon may include a bounded log tail in status responses. */
   log?: Array<Record<string, unknown>>;
 }
@@ -99,6 +102,7 @@ export interface AgentRuntimeSupervisorAskPayload {
   prompt: string;
   requestedBy: string;
   missionId?: string;
+  scope?: EventScopeInput;
   correlationId?: string;
   /** Transport timeout for this ask; ordinary conversation asks use the default. */
   timeoutMs?: number;
@@ -396,6 +400,7 @@ export function createSupervisorBackedAgentHandle(
         prompt,
         requestedBy,
         ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+        ...(snapshot?.scope ? { scope: snapshot.scope } : {}),
         model_tier: options.model_tier,
       });
       return result.text;
@@ -416,6 +421,7 @@ export function createSupervisorBackedAgentHandle(
         status: (snapshot?.status as AgentRecord['status']) || 'ready',
         spawnedAt: now,
         lastActivity: now,
+        scope: snapshot?.scope,
       };
     },
   };
@@ -438,6 +444,7 @@ export function toSupervisorEnsurePayload(
     cwd: options.cwd,
     parentAgentId: options.parentAgentId,
     missionId: options.missionId,
+    scope: options.scope,
     trustRequired: options.trustRequired,
     requestedBy: options.requestedBy,
     runtimeMetadata: options.runtimeMetadata,

@@ -26,8 +26,9 @@ Use this catalog to exchange messages between Kyberion instances.
 - `peer:send` resolves a peer from the tenant catalog and sends a signed envelope.
 - `peer:conversation` opens, sends, lists, and closes peer conversation sessions.
 - `peer:collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
-- Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/` and `active/shared/observability/peer-messaging/`.
-- Conversation sessions are stored under `active/shared/runtime/peer-conversations/` and `active/shared/observability/peer-conversations/`.
+- Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-messaging/tenants/{tenant}/peers/{peer}/`.
+- Conversation sessions are stored under `active/shared/runtime/peer-conversations/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-conversations/tenants/{tenant}/peers/{peer}/`.
+- Mesh Hub registrations, presence, capabilities, delivery ledger, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
 - Message handling is synchronous on receipt: the recipient processes the envelope inside the HTTP request handler, then returns the ACK response only after the responder finishes.
 - The response body includes `processing_mode: "synchronous_on_receive"` and `processed_at` so operators can tell when handling completed.
 - There is no deferred queue in this transport yet; if the recipient needs to fan out into mission/A2A work, that happens from the responder logic after the message is accepted.
@@ -62,8 +63,9 @@ before persisting a pending proposal.
 Inspect and decide proposals locally:
 
 ```bash
-pnpm peer:collaboration list --peer-id kyberion-local-b --status pending
+pnpm peer:collaboration list --tenant-id default --peer-id kyberion-local-b --status pending
 pnpm peer:collaboration accept \
+  --tenant-id default \
   --peer-id kyberion-local-b \
   --proposal-id <proposal-id> \
   --actor-id <operator-id> \
@@ -85,6 +87,30 @@ embedded WorkItem/A2A proposal.
 ## Envelope rules
 
 - Every message is HMAC-signed with the sender/recipient shared secret.
-- The recipient rejects mismatched peer IDs and invalid signatures.
+- `tenant_id` is part of the signed envelope. The recipient rejects missing or mismatched tenant IDs, peer IDs, and invalid signatures.
+- The peer catalog must declare the same tenant selected by the sender; a caller-supplied tenant never broadens access.
 - The transport is intentionally store-and-forward so messages remain auditable.
 - Store-and-forward here means the sender records the outbound attempt, the recipient records the inbound envelope, and the final ACK is issued only after the recipient finishes synchronous handling.
+
+## Tenant backup and restore
+
+Tenant backup includes the tenant namespaces for peer messaging, conversations, and Mesh Hub runtime/observability. The archive itself is never sent as a peer payload. To notify another same-tenant peer, send only a signed `backup.artifact_reference` notification containing an encrypted artifact reference, SHA-256 hash, expiry, and `requires_explicit_acceptance: true`. The receiver accepts the reference locally and runs `pnpm backup restore --scope tenant --tenant <slug> ...`; restored peer/Mesh state is placed in `active/shared/runtime/peer-recovery-quarantine/` until re-enrollment and a fresh heartbeat are verified.
+
+For an existing checkout that still has flat legacy records, first create a dry-run migration plan and then apply that exact plan after review:
+
+```bash
+pnpm migrate:peer-tenant-runtime
+pnpm migrate:peer-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
+```
+
+Records without an explicit, valid tenant remain quarantined. After a tenant restore, request and resolve the human resume gate only after the peer has been re-enrolled and its heartbeat is healthy:
+
+```bash
+pnpm peer:runtime-recovery request --tenant-id <tenant> \
+  --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/<tenant>/<restore-id> \
+  --requested-by <operator>
+pnpm cli approve <approval-id> peer-recovery
+pnpm peer:runtime-recovery resume --tenant-id <tenant> \
+  --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/<tenant>/<restore-id> \
+  --approval-id <approval-id>
+```

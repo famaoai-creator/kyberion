@@ -84,7 +84,7 @@ KYBERION_PEER_SHARED_SECRET="$PEER_B_SECRET" pnpm peer:conversation-server \
 別の端末で次を実行します。
 
 ```bash
-pnpm mesh-hub:inspect peers
+pnpm mesh-hub:inspect peers --tenant-id demo
 ```
 
 次のように、対象 peer が `demo` tenant で `healthy` なら会話を開始できます。

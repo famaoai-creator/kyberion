@@ -38,5 +38,8 @@
     "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
   ],
   "authority_role": "system_configurator",
+  "target_kind": "tenant",
+  "scope_kind": "tenant",
+  "tier": "confidential",
   "notes": "After applying, run `pnpm vital` to verify the service appears in the active-services registry."
 }

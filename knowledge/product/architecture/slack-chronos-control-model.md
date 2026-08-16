@@ -93,6 +93,9 @@ Preferred response sources:
 - `active/shared/runtime/terminal/<session_id>/out/latest_response.json`
 - mission-local handoff artifacts under `coordination/handoffs/`
 - channel outbox artifacts under `active/shared/coordination/channels/<channel>/outbox/`
+  - tenant-scoped outbox artifacts are under `active/shared/coordination/channels/<channel>/tenants/<tenant>/outbox/`
+- presence request/notification artifacts are under `active/shared/runtime/presence/{requests,notifications}/` and their tenant subtrees.
+- aggregate reads are explicit system/broker operations; a bridge verifies the record scope against the active customer-channel binding before egress.
 
 Legacy compatibility path:
 

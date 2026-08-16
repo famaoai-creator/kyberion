@@ -261,6 +261,152 @@ describe('AL-04 tenant/project offboarding', () => {
     expect(collectScopeTargets('tenant', 'tenant-unknown')).toEqual([]);
   });
 
+  it('discovers tenant and project physical namespaces outside the mission tree', () => {
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha/organizations/org-a/projects/proj-x/monthly.json'
+      ),
+      { schedule_id: 'monthly' }
+    );
+    writeJson(
+      abs(
+        'active/shared/coordination/channels/discord/tenants/tenant-alpha/organizations/org-a/projects/proj-x/outbox/msg.json'
+      ),
+      { message_id: 'msg' }
+    );
+    writeJson(
+      abs('active/shared/runtime/presence/tenants/tenant-alpha/notifications/presence.json'),
+      { notification_id: 'presence' }
+    );
+
+    expect(collectScopeTargets('tenant', 'tenant-alpha')).toEqual([
+      {
+        path: 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+      {
+        path: 'active/shared/coordination/channels/discord/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+      {
+        path: 'active/shared/runtime/presence/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+    ]);
+    expect(
+      collectScopeTargets('project', 'proj-x', {
+        tenantSlug: 'tenant-alpha',
+        organizationId: 'org-a',
+      })
+    ).toEqual([
+      {
+        path: 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha/organizations/org-a/projects/proj-x',
+        kind: 'project_physical_namespace',
+      },
+      {
+        path: 'active/shared/coordination/channels/discord/tenants/tenant-alpha/organizations/org-a/projects/proj-x',
+        kind: 'project_physical_namespace',
+      },
+    ]);
+  });
+
+  it('fails closed for overlapping project namespaces and unsafe scope IDs', () => {
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-a/organizations/org-a/projects/proj-overlap/job.json'
+      ),
+      { schedule_id: 'job' }
+    );
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-b/organizations/org-b/projects/proj-overlap/job.json'
+      ),
+      { schedule_id: 'job' }
+    );
+
+    expect(() => collectScopeTargets('project', 'proj-overlap')).toThrow(
+      'PROJECT_PHYSICAL_NAMESPACE_AMBIGUOUS'
+    );
+    expect(offboardScope({ scopeType: 'tenant', scopeId: '../outside' })).toMatchObject({
+      status: 'error',
+    });
+  });
+
+  it('applies tenant and organization lineage to project workspaces and missions', () => {
+    writeJson(abs('active/projects/confidential/tenant-a/proj-shared/state/project-state.json'), {
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+    });
+    writeJson(abs('active/projects/confidential/tenant-b/proj-shared/state/project-state.json'), {
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+    });
+    writeJson(abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'), {
+      mission_id: 'MIS-PROJ-A',
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+    });
+    writeJson(abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'), {
+      mission_id: 'MIS-PROJ-B',
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+    });
+
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_WORKSPACE_AMBIGUOUS'
+    );
+    expect(
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toEqual([
+      { path: 'active/projects/confidential/tenant-a/proj-shared', kind: 'project_tree' },
+      { path: 'active/missions/confidential/MIS-PROJ-A', kind: 'mission_tree' },
+    ]);
+  });
+
+  it('refuses to claim an unscoped data-vault entry during project offboarding', () => {
+    writeJson(abs('active/shared/data-vault/shared-project.json'), {
+      sourceType: 'confluence',
+      key: 'shared',
+      projectId: 'proj-shared',
+      tier: 'confidential',
+    });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('exports and soft-deletes physical namespaces during tenant offboarding', () => {
+    const scheduleRoot = 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha';
+    const channelRoot = 'active/shared/coordination/channels/discord/tenants/tenant-alpha';
+    writeJson(abs(`${scheduleRoot}/monthly.json`), { schedule_id: 'monthly' });
+    writeJson(abs(`${channelRoot}/outbox/msg.json`), { message_id: 'msg' });
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+      approval: { approved_by: 'human:test', purpose: 'physical namespace test' },
+      nowIso: '2026-08-16T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('offboarded');
+    expect(result.soft_deleted).toEqual(expect.arrayContaining([scheduleRoot, channelRoot]));
+    expect(fs.existsSync(abs(`${scheduleRoot}/monthly.json`))).toBe(false);
+    expect(fs.existsSync(abs(`${channelRoot}/outbox/msg.json`))).toBe(false);
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(trashPathOf(scheduleRoot))).toBe(true);
+    expect(fs.existsSync(trashPathOf(channelRoot))).toBe(true);
+  });
+
   it('dry run reports the targets, writes nothing, and needs no approval', () => {
     seedTenant();
     const result = offboardScope({ scopeType: 'tenant', scopeId: 'tenant-alpha' });

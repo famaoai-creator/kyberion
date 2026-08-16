@@ -6,6 +6,7 @@ import {
   type MissionTeamAssignment,
   type MissionTeamOrganizationProfileSummary,
 } from './mission-team-plan-composer.js';
+import type { EventScopeInput } from './event-scope.js';
 
 export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
   runtime_status: 'spawned' | 'already_ready' | 'unfilled' | 'failed';
@@ -21,6 +22,7 @@ export interface MissionTeamRuntimePlan {
 export interface EnsureMissionTeamRuntimeOptions {
   missionId: string;
   teamRoles?: string[];
+  scope?: EventScopeInput;
 }
 
 function isReady(
@@ -39,6 +41,7 @@ export async function ensureMissionTeamRuntime(
 ): Promise<MissionTeamRuntimePlan> {
   const missionId = typeof input === 'string' ? input : input.missionId;
   const teamRoles = typeof input === 'string' ? undefined : input.teamRoles;
+  const requestedScope = typeof input === 'string' ? undefined : input.scope;
   const requestedRoles = teamRoles ? new Set(teamRoles) : null;
 
   const plan = loadMissionTeamPlan(missionId);
@@ -96,6 +99,15 @@ export async function ensureMissionTeamRuntime(
           task_model_hint: assignment.model_hint,
         },
         missionId: missionId.toUpperCase(),
+        scope: requestedScope || {
+          scope_kind: 'mission',
+          tier: plan.tier as 'personal' | 'confidential' | 'public',
+          mission_id: plan.mission_id,
+          ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
+          ...(plan.organization_profile?.organization_id
+            ? { organization_id: plan.organization_profile.organization_id }
+            : {}),
+        },
         requestedBy: 'mission_team_orchestrator',
       };
       try {

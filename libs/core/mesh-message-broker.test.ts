@@ -7,12 +7,12 @@ import {
 } from './mesh-message-broker.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
 
-function namespacePath(namespace: string, segment: string): string {
-  return `active/shared/runtime/mesh-hub/${namespace}/${segment}`;
+function namespacePath(namespace: string, segment: string, tenantId = 'tenant-acme'): string {
+  return `active/shared/runtime/mesh-hub/${namespace}/tenants/${tenantId}/${segment}`;
 }
 
-function observabilityPath(namespace: string): string {
-  return `active/shared/observability/mesh-hub/${namespace}/events.jsonl`;
+function observabilityPath(namespace: string, tenantId = 'tenant-acme'): string {
+  return `active/shared/observability/mesh-hub/${namespace}/tenants/${tenantId}/events.jsonl`;
 }
 
 function readJsonl(path: string): any[] {

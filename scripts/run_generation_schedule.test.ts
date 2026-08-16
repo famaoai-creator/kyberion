@@ -113,6 +113,23 @@ describe('run_generation_schedule', () => {
     expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({ action: 'list' });
   });
 
+  it('forwards an explicit tenant scope for duplicate schedule IDs', async () => {
+    mocks.runGovernedGenerationScheduleAction.mockResolvedValue([]);
+
+    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
+    const scope = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+    };
+    await runGenerationScheduleAction({ action: 'list', scope });
+
+    expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({
+      action: 'list',
+      scope,
+    });
+  });
+
   it('rejects an unsupported action', async () => {
     const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
     await expect(runGenerationScheduleAction({ action: 'nope' })).rejects.toThrow(

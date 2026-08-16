@@ -7,6 +7,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeStat,
   safeWriteFile,
 } from './secure-io.js';
 import type { GenerationSchedule } from './src/types/generation-schedule.js';
@@ -19,8 +20,26 @@ import {
   type TriggerRunner,
 } from './trigger-runner.js';
 import { logger } from './core.js';
+import {
+  eventScopeMatches,
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from './event-scope.js';
+import { releaseGenerationQuota, reserveGenerationQuota } from './generation-quota.js';
+import { resolveTenant } from './tenant-registry.js';
+import { physicalScopedPath } from './physical-namespace.js';
+import { settleGenerationProviderCost } from './generation-cost-settlement.js';
 
 export const GENERATION_SCHEDULE_DIR = 'active/shared/runtime/media-generation/schedules';
+export const GENERATION_ARTIFACT_ROOT = 'active/shared/runtime/media-generation/artifacts';
+
+export type ScopedGenerationSchedule = GenerationSchedule & { scope: EventScope };
+
+export interface GenerationScheduleTenantRegistryOptions {
+  /** Test seam; production resolves the durable tenant registry. */
+  resolveTenant?: (tenantSlug: string) => unknown;
+}
 
 function nowIso(date = new Date()): string {
   return date.toISOString();
@@ -32,8 +51,47 @@ function ensureScheduleDir(): void {
   }
 }
 
-export function generationSchedulePath(scheduleId: string): string {
-  return path.join(GENERATION_SCHEDULE_DIR, `${scheduleId}.json`);
+export function generationSchedulePath(scheduleId: string, scope?: EventScopeInput): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(scheduleId)) {
+    throw new Error(`[GENERATION_SCHEDULE_ID_INVALID] invalid schedule_id '${scheduleId}'`);
+  }
+  return physicalScopedPath(
+    GENERATION_SCHEDULE_DIR,
+    scope || { scope_kind: 'system', tier: 'public' },
+    `${scheduleId}.json`
+  );
+}
+
+function scheduleFiles(root = pathResolver.resolve(GENERATION_SCHEDULE_DIR)): string[] {
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root).flatMap((entry) => {
+    const entryPath = path.join(root, entry);
+    if (entry === '.quarantine') return [];
+    const stat = safeStat(entryPath);
+    if (stat.isFile() && entry.endsWith('.json')) return [entryPath];
+    if (stat.isDirectory()) return scheduleFiles(entryPath);
+    return [];
+  });
+}
+
+export function generationSchedulePaths(scheduleId: string): string[] {
+  const suffix = `${scheduleId}.json`;
+  return scheduleFiles().filter((file) => path.basename(file) === suffix);
+}
+
+export function findGenerationSchedulePath(scheduleId: string, scope?: EventScopeInput): string {
+  if (scope) {
+    return pathResolver.resolve(
+      physicalScopedPath(GENERATION_SCHEDULE_DIR, normalizeEventScope(scope), `${scheduleId}.json`)
+    );
+  }
+  const matches = generationSchedulePaths(scheduleId);
+  if (matches.length > 1) {
+    throw new Error(
+      `[GENERATION_SCHEDULE_ID_AMBIGUOUS] schedule_id '${scheduleId}' exists in multiple namespaces; provide scope`
+    );
+  }
+  return matches[0] || pathResolver.resolve(generationSchedulePath(scheduleId));
 }
 
 function resolveRootRelativePath(logicalPath?: string | null): string | null {
@@ -41,57 +99,179 @@ function resolveRootRelativePath(logicalPath?: string | null): string | null {
   return pathResolver.rootResolve(logicalPath);
 }
 
+function scheduleScope(schedule: GenerationSchedule): EventScope {
+  return normalizeEventScope(
+    (schedule as GenerationSchedule & { scope?: EventScopeInput }).scope || {
+      scope_kind: 'system',
+      tier: 'public',
+    }
+  );
+}
+
+function tenantArtifactRoot(scope: EventScope, scheduleId: string): string | null {
+  if (!scope.tenant_slug) return null;
+  return pathResolver.rootResolve(
+    `${GENERATION_ARTIFACT_ROOT}/tenants/${scope.tenant_slug}/${scheduleId}`
+  );
+}
+
+function pathWithin(root: string, target: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function assertTenantDeliveryPath(
+  scope: EventScope,
+  scheduleId: string,
+  target: string,
+  label: string
+): void {
+  const root = tenantArtifactRoot(scope, scheduleId);
+  if (!root || pathWithin(root, target)) return;
+  throw new Error(
+    `[GENERATION_SCOPE_PATH_DENIED] ${label} for tenant '${scope.tenant_slug}' must stay under '${path.relative(pathResolver.rootDir(), root)}'`
+  );
+}
+
+function targetPathValues(value: unknown, seen = new Set<object>()): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const object = value as Record<string, unknown>;
+  if (seen.has(object)) return [];
+  seen.add(object);
+  const targets: string[] = [];
+  for (const [key, child] of Object.entries(object)) {
+    if (
+      ['target_path', 'targetPath', 'output_path', 'outputPath'].includes(key) &&
+      typeof child === 'string' &&
+      child.trim()
+    ) {
+      targets.push(child);
+      continue;
+    }
+    targets.push(...targetPathValues(child, seen));
+  }
+  return targets;
+}
+
 export function resolveGenerationScheduleDeliveryPaths(schedule: GenerationSchedule): {
   artifactDir: string | null;
   latestAliasPath: string | null;
   schedulePath: string;
 } {
+  const scope = scheduleScope(schedule);
+  const tenantRoot = tenantArtifactRoot(scope, schedule.schedule_id);
+  const explicitArtifactDir = resolveRootRelativePath(
+    schedule.delivery_policy?.artifact_dir ?? undefined
+  );
+  const artifactDir = explicitArtifactDir || tenantRoot;
+  const latestAliasPath = resolveRootRelativePath(
+    schedule.delivery_policy?.latest_alias_path ?? undefined
+  );
+  if (scope.tenant_slug) {
+    if (artifactDir)
+      assertTenantDeliveryPath(scope, schedule.schedule_id, artifactDir, 'artifact_dir');
+    if (latestAliasPath) {
+      assertTenantDeliveryPath(scope, schedule.schedule_id, latestAliasPath, 'latest_alias_path');
+    }
+    for (const target of targetPathValues(schedule.job_template?.params)) {
+      assertTenantDeliveryPath(
+        scope,
+        schedule.schedule_id,
+        resolveRootRelativePath(target) || target,
+        'job_template target path'
+      );
+    }
+  }
   return {
-    artifactDir: resolveRootRelativePath(schedule.delivery_policy?.artifact_dir ?? undefined),
-    latestAliasPath: resolveRootRelativePath(
-      schedule.delivery_policy?.latest_alias_path ?? undefined
+    artifactDir,
+    latestAliasPath,
+    schedulePath: physicalScopedPath(
+      GENERATION_SCHEDULE_DIR,
+      scope,
+      `${schedule.schedule_id}.json`
     ),
-    schedulePath: generationSchedulePath(schedule.schedule_id),
   };
 }
 
 export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): string {
-  const artifactDir = resolveRootRelativePath(schedule.delivery_policy?.artifact_dir ?? undefined);
+  const { artifactDir, latestAliasPath } = resolveGenerationScheduleDeliveryPaths(schedule);
   if (artifactDir) return artifactDir;
-
-  const latestAliasPath = resolveRootRelativePath(
-    schedule.delivery_policy?.latest_alias_path ?? undefined
-  );
   if (latestAliasPath) return path.dirname(latestAliasPath);
 
-  return pathResolver.rootResolve(path.dirname(generationSchedulePath(schedule.schedule_id)));
+  return pathResolver.rootResolve(
+    path.dirname(generationSchedulePath(schedule.schedule_id, scheduleScope(schedule)))
+  );
 }
 
 export function readGenerationSchedule(logicalPath: string): GenerationSchedule {
-  return JSON.parse(
+  const schedule = JSON.parse(
     safeReadFile(logicalPath, { encoding: 'utf8' }) as string
   ) as GenerationSchedule;
+  return normalizeGenerationSchedule(schedule);
 }
 
 export function writeGenerationSchedule(schedule: GenerationSchedule): GenerationSchedule {
   ensureScheduleDir();
-  safeWriteFile(generationSchedulePath(schedule.schedule_id), JSON.stringify(schedule, null, 2));
-  return schedule;
+  const normalized = normalizeGenerationSchedule(schedule);
+  const target = pathResolver.resolve(
+    physicalScopedPath(GENERATION_SCHEDULE_DIR, normalized.scope, `${normalized.schedule_id}.json`)
+  );
+  safeMkdir(path.dirname(target), { recursive: true });
+  safeWriteFile(target, JSON.stringify(normalized, null, 2));
+  return normalized;
 }
 
-export function registerGenerationSchedule(sourcePath: string): GenerationSchedule {
+function normalizeGenerationSchedule(schedule: GenerationSchedule): ScopedGenerationSchedule {
+  const normalized = {
+    ...schedule,
+    scope: scheduleScope(schedule),
+  } as ScopedGenerationSchedule;
+  // Registration/read normalization is also the schedule delivery preflight.
+  resolveGenerationScheduleDeliveryPaths(normalized);
+  return normalized;
+}
+
+export function assertGenerationScheduleTenantRegistered(
+  schedule: GenerationSchedule,
+  options: GenerationScheduleTenantRegistryOptions = {}
+): void {
+  const scope = scheduleScope(schedule);
+  if (!scope.tenant_slug) return;
+  (options.resolveTenant ?? resolveTenant)(scope.tenant_slug);
+}
+
+export function registerGenerationSchedule(
+  sourcePath: string,
+  options: GenerationScheduleTenantRegistryOptions = {}
+): GenerationSchedule {
   const schedule = readGenerationSchedule(sourcePath);
+  assertGenerationScheduleTenantRegistered(schedule, options);
   return writeGenerationSchedule({
     ...schedule,
     updated_at: nowIso(),
   });
 }
 
-export function listGenerationSchedules(): GenerationSchedule[] {
+export function listGenerationSchedules(
+  options: { scope?: EventScopeInput } = {}
+): GenerationSchedule[] {
+  const filter = options.scope ? normalizeEventScope(options.scope) : undefined;
   if (!safeExistsSync(GENERATION_SCHEDULE_DIR)) return [];
-  return safeReaddir(GENERATION_SCHEDULE_DIR)
-    .filter((name) => name.endsWith('.json'))
-    .map((name) => readGenerationSchedule(path.join(GENERATION_SCHEDULE_DIR, name)))
+  return scheduleFiles()
+    .map((file) => readGenerationSchedule(file))
+    .filter((schedule) => {
+      if (!filter) return true;
+      const scope = (schedule as ScopedGenerationSchedule).scope;
+      return eventScopeMatches(scope, {
+        scope_kind: filter.scope_kind,
+        tenant_slug: filter.tenant_slug,
+        organization_id: filter.organization_id,
+        project_id: filter.project_id,
+        mission_id: filter.mission_id,
+        task_id: filter.task_id,
+        session_id: filter.session_id,
+      });
+    })
     .sort((a, b) => a.schedule_id.localeCompare(b.schedule_id));
 }
 
@@ -163,11 +343,27 @@ export function isGenerationScheduleDue(schedule: GenerationSchedule, now = new 
  */
 export function claimGenerationScheduleRun(
   scheduleId: string,
-  now = new Date()
+  now = new Date(),
+  scope?: EventScopeInput
 ): GenerationScheduleRuntime | null {
-  const logicalPath = generationSchedulePath(scheduleId);
+  const logicalPath = findGenerationSchedulePath(scheduleId, scope);
   if (!safeExistsSync(logicalPath)) return null;
   const schedule = readGenerationSchedule(logicalPath) as GenerationScheduleRuntime;
+  if (scope) {
+    const filter = normalizeEventScope(scope);
+    if (
+      !eventScopeMatches((schedule as ScopedGenerationSchedule).scope, {
+        scope_kind: filter.scope_kind,
+        tenant_slug: filter.tenant_slug,
+        organization_id: filter.organization_id,
+        project_id: filter.project_id,
+        mission_id: filter.mission_id,
+        task_id: filter.task_id,
+        session_id: filter.session_id,
+      })
+    )
+      return null;
+  }
   if (!isGenerationScheduleDue(schedule, now)) return null;
 
   const claimed: GenerationScheduleRuntime = {
@@ -189,9 +385,10 @@ export function completeGenerationScheduleRun(
   scheduleId: string,
   token: string,
   status: 'submitted' | 'failed',
-  now = new Date()
+  now = new Date(),
+  scope?: EventScopeInput
 ): GenerationScheduleRuntime | null {
-  const logicalPath = generationSchedulePath(scheduleId);
+  const logicalPath = findGenerationSchedulePath(scheduleId, scope);
   if (!safeExistsSync(logicalPath)) return null;
   const schedule = readGenerationSchedule(logicalPath) as GenerationScheduleRuntime;
   // A stale holder must not clear a lock that a later run already re-took.
@@ -239,6 +436,53 @@ function normalizeGenerationScheduleId(value: string): string {
   return value.endsWith('.json') ? value.slice(0, -5) : value;
 }
 
+function generationTargetFormat(schedule: GenerationSchedule): string {
+  const params = schedule.job_template?.params || {};
+  const actionKey =
+    schedule.job_template.action === 'generate_image'
+      ? 'image_adf'
+      : schedule.job_template.action === 'generate_video'
+        ? 'video_adf'
+        : schedule.job_template.action === 'generate_music'
+          ? 'music_adf'
+          : undefined;
+  const adf = actionKey && params[actionKey];
+  const output =
+    adf && typeof adf === 'object' && !Array.isArray(adf)
+      ? (adf as Record<string, any>).output
+      : undefined;
+  const explicit =
+    typeof params.format === 'string'
+      ? params.format
+      : output && typeof output.format === 'string'
+        ? output.format
+        : undefined;
+  if (explicit && /^[a-z0-9]{1,8}$/i.test(explicit)) return explicit.toLowerCase();
+  return schedule.job_template.action === 'generate_image'
+    ? 'png'
+    : schedule.job_template.action === 'generate_video'
+      ? 'mp4'
+      : schedule.job_template.action === 'generate_music'
+        ? 'mp3'
+        : 'json';
+}
+
+function generationParamsForSchedule(schedule: GenerationSchedule): Record<string, unknown> {
+  const params = { ...(schedule.job_template?.params || {}) };
+  const scope = scheduleScope(schedule);
+  if (!scope.tenant_slug || targetPathValues(params).length > 0) return params;
+  const { artifactDir } = resolveGenerationScheduleDeliveryPaths(schedule);
+  if (!artifactDir) return params;
+  const target = pathResolver.toRepoRelative(
+    path.join(artifactDir, `${schedule.schedule_id}.${generationTargetFormat(schedule)}`)
+  );
+  return { ...params, target_path: target };
+}
+
+function isTerminalGenerationJobStatus(status: unknown): boolean {
+  return ['succeeded', 'failed', 'timed_out', 'canceled'].includes(String(status || ''));
+}
+
 export type MediaGenerationHandleAction = (request: {
   action: string;
   params: Record<string, unknown>;
@@ -264,6 +508,12 @@ export interface GenerationScheduleTickDeps {
    * intentionally non-blocking lease.
    */
   leaderId?: string;
+  quota?: {
+    reserve?: typeof reserveGenerationQuota;
+    release?: typeof releaseGenerationQuota;
+  };
+  /** Test seam; production resolves the durable tenant registry. */
+  resolveTenant?: (tenantSlug: string) => unknown;
 }
 
 export const GENERATION_SCHEDULE_LEADER_ID = 'generation-schedule-daemon';
@@ -333,6 +583,27 @@ async function reconcileGenerationSchedule(
     last_completed_at: job?.completed_at || schedule.last_completed_at,
   });
 
+  let costSettlement: Record<string, unknown> | null = null;
+  if (isTerminalGenerationJobStatus(job?.status) && job?.job_id) {
+    try {
+      costSettlement = {
+        ...settleGenerationProviderCost({
+          job_id: String(job.job_id),
+          action: String(job.action || schedule.job_template.action),
+          status: String(job.status),
+          scope: scheduleScope(schedule),
+          provider: job.provider,
+          result: job.result,
+        }),
+      };
+    } catch (error) {
+      costSettlement = {
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   return {
     schedule: updatedSchedule,
     outcome: {
@@ -343,6 +614,7 @@ async function reconcileGenerationSchedule(
       latest_alias_path: aliasUpdated ? latestAliasPath : null,
       artifact_dir: artifactDir,
       workdir,
+      cost_settlement: costSettlement,
     },
   };
 }
@@ -367,6 +639,18 @@ async function tickGenerationSchedule(
   now: Date,
   deps: GenerationScheduleTickDeps = {}
 ): Promise<Record<string, unknown>> {
+  try {
+    assertGenerationScheduleTenantRegistered(schedule, {
+      resolveTenant: deps.resolveTenant,
+    });
+  } catch (error) {
+    return {
+      schedule_id: schedule.schedule_id,
+      status: 'blocked',
+      reason: 'tenant registry validation failed',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
   const reconciliation = await reconcileGenerationSchedule(schedule, deps);
   schedule = reconciliation.schedule;
 
@@ -374,11 +658,23 @@ async function tickGenerationSchedule(
     ? schedule.execution_policy.depends_on
     : [];
   if (dependencies.length > 0) {
+    const currentScope = scheduleScope(schedule);
     const dependencyStates = dependencies.map((scheduleId) => {
       try {
-        return readGenerationSchedule(
-          `active/shared/runtime/media-generation/schedules/${normalizeGenerationScheduleId(scheduleId)}.json`
+        const dependency = readGenerationSchedule(
+          findGenerationSchedulePath(normalizeGenerationScheduleId(scheduleId), currentScope)
         );
+        const dependencyScope = scheduleScope(dependency);
+        const sameScope = eventScopeMatches(dependencyScope, {
+          scope_kind: currentScope.scope_kind,
+          tenant_slug: currentScope.tenant_slug,
+          organization_id: currentScope.organization_id,
+          project_id: currentScope.project_id,
+          mission_id: currentScope.mission_id,
+          task_id: currentScope.task_id,
+          session_id: currentScope.session_id,
+        });
+        return sameScope ? dependency : null;
       } catch {
         return null;
       }
@@ -440,7 +736,11 @@ async function tickGenerationSchedule(
       },
     },
     async ({ deliveryId }) => {
-      const claimed = claimGenerationScheduleRun(schedule.schedule_id, now);
+      const claimed = claimGenerationScheduleRun(
+        schedule.schedule_id,
+        now,
+        (schedule as ScopedGenerationSchedule).scope
+      );
       if (!claimed || !claimed.run_lock) {
         outcome = {
           schedule_id: schedule.schedule_id,
@@ -451,6 +751,29 @@ async function tickGenerationSchedule(
         return `skipped:${schedule.schedule_id}:${minuteKey}`;
       }
       const runToken = claimed.run_lock.token;
+      const claimedScope = (claimed as ScopedGenerationSchedule).scope;
+      const quotaReserve = deps.quota?.reserve ?? reserveGenerationQuota;
+      const quotaRelease = deps.quota?.release ?? releaseGenerationQuota;
+      let quota: ReturnType<typeof reserveGenerationQuota>;
+      try {
+        quota = quotaReserve(claimedScope, claimed.job_template.action);
+      } catch (err) {
+        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
+        throw err;
+      }
+      if (!quota.allowed) {
+        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
+        outcome = {
+          schedule_id: schedule.schedule_id,
+          status: 'blocked',
+          reason: 'generation quota exceeded',
+          quota,
+          reconciliation: reconciliation.outcome || null,
+        };
+        return `quota-blocked:${schedule.schedule_id}:${minuteKey}`;
+      }
+      let quotaCommitted = false;
+      let quotaReleased = false;
 
       try {
         const handleAction = await resolveHandleAction(deps);
@@ -458,13 +781,26 @@ async function tickGenerationSchedule(
           action: 'submit_generation',
           params: {
             action: claimed.job_template.action,
-            params: claimed.job_template.params,
+            params: generationParamsForSchedule(claimed),
             retry_policy: claimed.execution_policy?.retry_policy,
+            scope: claimedScope,
           },
         });
 
         if (!submittedJob?.job_id) {
-          completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now);
+          if (quota.tenant_slug) {
+            quotaRelease(claimedScope, claimed.job_template.action, {
+              reservation_units: quota.units,
+            });
+            quotaReleased = true;
+          }
+          completeGenerationScheduleRun(
+            schedule.schedule_id,
+            runToken,
+            'failed',
+            now,
+            claimedScope
+          );
           outcome = {
             schedule_id: schedule.schedule_id,
             status: 'failed',
@@ -474,8 +810,15 @@ async function tickGenerationSchedule(
           throw new Error('job submission did not return a job_id');
         }
 
+        quotaCommitted = true;
         markGenerationScheduleSubmitted(claimed, submittedJob.job_id);
-        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'submitted', now);
+        completeGenerationScheduleRun(
+          schedule.schedule_id,
+          runToken,
+          'submitted',
+          now,
+          claimedScope
+        );
         outcome = {
           schedule_id: schedule.schedule_id,
           status: 'submitted',
@@ -486,7 +829,12 @@ async function tickGenerationSchedule(
         };
         return `generation-run:${runToken}`;
       } catch (err) {
-        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now);
+        if (quota.tenant_slug && !quotaCommitted && !quotaReleased) {
+          quotaRelease(claimedScope, claimed.job_template.action, {
+            reservation_units: quota.units,
+          });
+        }
+        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
         throw err;
       }
     }
@@ -507,12 +855,13 @@ async function tickGenerationSchedule(
 export async function runGenerationScheduleAction(argv: {
   action: GenerationScheduleAction;
   schedule?: string;
+  scope?: EventScopeInput;
   /** Test seam; production callers omit this. See GenerationScheduleTickDeps. */
   deps?: GenerationScheduleTickDeps;
 }): Promise<GenerationSchedule[] | { status: 'completed'; results: Record<string, unknown>[] }> {
   switch (argv.action) {
     case 'list':
-      return listGenerationSchedules();
+      return listGenerationSchedules({ scope: argv.scope });
     case 'tick': {
       const deps = argv.deps ?? {};
       const now = deps.now ?? new Date();
@@ -527,10 +876,13 @@ export async function runGenerationScheduleAction(argv: {
             const schedules = argv.schedule
               ? [
                   readGenerationSchedule(
-                    `active/shared/runtime/media-generation/schedules/${normalizeGenerationScheduleId(String(argv.schedule))}.json`
+                    findGenerationSchedulePath(
+                      normalizeGenerationScheduleId(String(argv.schedule)),
+                      argv.scope
+                    )
                   ),
                 ]
-              : listGenerationSchedules();
+              : listGenerationSchedules({ scope: argv.scope });
             const results: Record<string, unknown>[] = [];
             for (const schedule of schedules) {
               results.push(await tickGenerationSchedule(schedule, runner, now, deps));

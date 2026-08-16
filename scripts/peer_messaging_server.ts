@@ -1,10 +1,12 @@
 import { createStandardYargs, logger } from '@agent/core';
 import {
+  assertProtocolServiceRegistered,
   createPeerMessagingServer,
   type PeerMessageEnvelope,
 } from '@agent/core';
 
 async function main(): Promise<void> {
+  assertProtocolServiceRegistered('peer-messaging');
   const argv = await createStandardYargs()
     .option('peer-id', {
       type: 'string',
@@ -26,6 +28,11 @@ async function main(): Promise<void> {
       default: process.env.KYBERION_PEER_SHARED_SECRET || '',
       description: 'HMAC shared secret used to verify inbound messages',
     })
+    .option('tenant-id', {
+      type: 'string',
+      default: process.env.KYBERION_TENANT_ID || '',
+      description: 'Tenant scope for this peer listener',
+    })
     .option('echo', {
       type: 'boolean',
       default: true,
@@ -35,12 +42,17 @@ async function main(): Promise<void> {
 
   const peerId = String(argv['peer-id']);
   const sharedSecret = String(argv['shared-secret'] || '');
+  const tenantId = String(argv['tenant-id'] || '').trim();
   if (!sharedSecret) {
-    throw new Error('Missing peer shared secret. Set KYBERION_PEER_SHARED_SECRET or pass --shared-secret.');
+    throw new Error(
+      'Missing peer shared secret. Set KYBERION_PEER_SHARED_SECRET or pass --shared-secret.'
+    );
   }
+  if (!tenantId) throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
 
   const server = createPeerMessagingServer({
     peerId,
+    tenantId,
     sharedSecret,
     responder: async ({ envelope }: { envelope: PeerMessageEnvelope }) => {
       if (!argv.echo) {
@@ -59,7 +71,9 @@ async function main(): Promise<void> {
   });
 
   await server.listen(Number(argv.port), String(argv.host));
-  logger.success(`[peer-messaging-server] peer ${peerId} listening on http://${String(argv.host)}:${Number(argv.port)}`);
+  logger.success(
+    `[peer-messaging-server] peer ${peerId} listening on http://${String(argv.host)}:${Number(argv.port)}`
+  );
 
   const shutdown = async () => {
     await server.close();

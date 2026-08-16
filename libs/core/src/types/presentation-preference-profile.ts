@@ -34,7 +34,7 @@ export interface PresentationPreferenceProfile {
         | 'executive_tone_unclear'
         | 'new_deck_category'
         | 'user_requested_precheck'
-      )[]
+      )[],
     ];
     default_theme_hint?: string;
   };
@@ -42,7 +42,8 @@ export interface PresentationPreferenceProfile {
     pack_id?: string;
     default_pattern_id?: string;
     rules?: {
-      deck_purpose?: 'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison';
+      deck_purpose?:
+        'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison';
       semantic_type?: string;
       slide_type?: string;
       pattern_id: string;
@@ -54,7 +55,9 @@ export interface PresentationPreferenceProfile {
   brief_question_sets: [
     {
       label: string;
-      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      deck_purposes: (
+        'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison'
+      )[];
       /**
        * @minItems 1
        * @maxItems 2
@@ -64,14 +67,16 @@ export interface PresentationPreferenceProfile {
     },
     ...{
       label: string;
-      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      deck_purposes: (
+        'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison'
+      )[];
       /**
        * @minItems 1
        * @maxItems 2
        */
       questions: [string] | [string, string];
       notes?: string;
-    }[]
+    }[],
   ];
   /**
    * @minItems 1
@@ -79,7 +84,9 @@ export interface PresentationPreferenceProfile {
   theme_sets: [
     {
       label: string;
-      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      deck_purposes: (
+        'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison'
+      )[];
       theme_hint: string;
       design_traits?: (
         | 'executive'
@@ -95,7 +102,9 @@ export interface PresentationPreferenceProfile {
     },
     ...{
       label: string;
-      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      deck_purposes: (
+        'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison'
+      )[];
       theme_hint: string;
       design_traits?: (
         | 'executive'
@@ -108,6 +117,6 @@ export interface PresentationPreferenceProfile {
         | 'dense'
       )[];
       notes?: string;
-    }[]
+    }[],
   ];
 }

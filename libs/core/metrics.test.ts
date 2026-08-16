@@ -118,11 +118,16 @@ describe('metrics core', () => {
       unit_cost_usd: 100,
       status: 'committed',
       source: 'manual-plan',
+      scope: { tier: 'confidential', tenant_slug: 'client-a' },
     });
 
     expect(record.cost_usd).toBe(150);
     expect(mc.loadResourceUsageHistory()).toHaveLength(1);
     expect(mc.loadResourceUsageHistory()[0]?.status).toBe('committed');
+    expect(mc.loadResourceUsageHistory()[0]?.scope).toMatchObject({
+      scope_kind: 'tenant',
+      tenant_slug: 'client-a',
+    });
   });
 
   it('rejects invalid resource usage quantities and costs', () => {

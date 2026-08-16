@@ -166,7 +166,9 @@ export function collectPipelineScheduleDoctorLines(): string[] {
 
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   try {
-    const report = await inspectMeshHub();
+    const report = await inspectMeshHub({
+      tenantId: String(process.env.KYBERION_TENANT_ID || '').trim(),
+    });
     if (report.delivery_count === 0 && report.dead_letter_count === 0) {
       return ['Mesh delivery: idle; no deliveries recorded'];
     }
@@ -198,11 +200,11 @@ const DOCTOR_SURFACES = ['slack', 'telegram', 'imessage', 'discord', 'chronos'];
 
 export function collectSurfaceDeliveryDoctorLines(): string[] {
   const summaries = DOCTOR_SURFACES.map((surface) => {
-    const messages = listSurfaceOutboxMessages(surface);
+    const messages = listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true });
     const due = messages.filter((message) => isSurfaceOutboxDue(message)).length;
     const deferred = messages.length - due;
-    const deadLetters = listSurfaceDeadLetters(surface).length;
-    const deadTargets = listSurfaceDeadTargets(surface).length;
+    const deadLetters = listSurfaceDeadLetters(surface, { includeTenantNamespaces: true }).length;
+    const deadTargets = listSurfaceDeadTargets(surface, { includeTenantNamespaces: true }).length;
     return { surface, pending: messages.length, due, deferred, deadLetters, deadTargets };
   });
   const pending = summaries.reduce((sum, item) => sum + item.pending, 0);

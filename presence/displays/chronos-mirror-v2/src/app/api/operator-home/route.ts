@@ -81,6 +81,7 @@ export function GET(req: NextRequest) {
             ),
             since: url.searchParams.get('since') || undefined,
             budgetUsd: Number.isFinite(budgetUsd) && budgetUsd > 0 ? budgetUsd : undefined,
+            scopeFilter: { tenant_slugs: tenantSlugs },
           })
         ),
         workforceSummary: undefined,

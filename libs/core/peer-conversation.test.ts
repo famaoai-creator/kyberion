@@ -15,11 +15,12 @@ import {
 } from './peer-conversation.js';
 
 const SHARED_SECRET = 'peer-conversation-test-secret';
+const TENANT_ID = 'tenant-acme';
 const CATALOG_PATH = pathResolver.sharedTmp('peer-conversation-catalog.test.json');
 
 afterEach(() => {
-  clearPeerConversationRuntime('peer-a-test');
-  clearPeerConversationRuntime('peer-b-test');
+  clearPeerConversationRuntime(TENANT_ID, 'peer-a-test');
+  clearPeerConversationRuntime(TENANT_ID, 'peer-b-test');
   try {
     safeRmSync(CATALOG_PATH, { force: true });
   } catch (_) {
@@ -32,12 +33,14 @@ describe('peer conversation', () => {
     const session = createPeerConversationSession({
       localPeerId: 'peer-a-test',
       remotePeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       topic: 'kanban-sync',
       relatedWorkItemIds: ['WIT-1'],
     });
 
     const saved = appendPeerConversationTranscript({
       sessionId: session.session_id,
+      tenantId: TENANT_ID,
       localPeerId: 'peer-a-test',
       remotePeerId: 'peer-b-test',
       kind: 'open',
@@ -47,7 +50,7 @@ describe('peer conversation', () => {
     });
 
     expect(saved.related_work_item_ids).toContain('WIT-1');
-    const loaded = loadPeerConversationSession('peer-a-test', session.session_id);
+    const loaded = loadPeerConversationSession(TENANT_ID, 'peer-a-test', session.session_id);
     expect(loaded?.transcript).toHaveLength(1);
   });
 
@@ -55,6 +58,7 @@ describe('peer conversation', () => {
     const envelope = buildPeerConversationEnvelope({
       senderPeerId: 'peer-a-test',
       recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
       sessionId: 'PCS-test',
       topic: 'kanban-sync',
@@ -73,6 +77,7 @@ describe('peer conversation', () => {
       JSON.stringify(
         {
           version: '1',
+          tenant_id: TENANT_ID,
           peers: [
             {
               peer_id: 'peer-b-test',
@@ -90,8 +95,9 @@ describe('peer conversation', () => {
 
     const server = createPeerMessagingServer({
       peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       sharedSecret: SHARED_SECRET,
-      responder: createPeerConversationResponder({ peerId: 'peer-b-test' }),
+      responder: createPeerConversationResponder({ peerId: 'peer-b-test', tenantId: TENANT_ID }),
     });
 
     const fetchSpy = vi
@@ -110,6 +116,7 @@ describe('peer conversation', () => {
     const outcome = await sendPeerConversationMessageToPeer({
       senderPeerId: 'peer-a-test',
       recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
       topic: 'kanban-sync',
       text: 'Can you review WIT-1?',
       relatedWorkItemIds: ['WIT-1'],
@@ -125,8 +132,8 @@ describe('peer conversation', () => {
       reply: expect.any(Object),
     });
 
-    const senderSession = listPeerConversationSessions('peer-a-test')[0];
-    const receiverSession = listPeerConversationSessions('peer-b-test')[0];
+    const senderSession = listPeerConversationSessions(TENANT_ID, 'peer-a-test')[0];
+    const receiverSession = listPeerConversationSessions(TENANT_ID, 'peer-b-test')[0];
     expect(senderSession.transcript).toHaveLength(2);
     expect(receiverSession.transcript).toHaveLength(2);
     expect(senderSession.related_work_item_ids).toContain('WIT-1');

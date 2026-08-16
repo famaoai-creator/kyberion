@@ -1,4 +1,11 @@
 import { MetricsCollector } from '@agent/core/metrics';
+import {
+  eventScopeMatches,
+  listGenerationCostSettlements,
+  resolveScopeForRecord,
+  type EventScopeFilter,
+  type GenerationCostSettlement,
+} from '@agent/core';
 import { listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
 import type { ApprovalRequestRecord } from '@agent/core/approval-store';
@@ -50,6 +57,11 @@ export interface CostSummary {
   budgetUsd?: number;
   remainingUsd?: number | null;
   overBudget: boolean;
+  generation: {
+    actualUsd: number;
+    settledJobs: number;
+    awaitingActualCost: number;
+  };
   missionBreakdown: Array<{
     missionId: string;
     tokens: number;
@@ -328,10 +340,12 @@ function getMetricCost(entry: Record<string, any>): number {
 
 export function buildCostSummary(input: {
   history: Record<string, any>[];
+  generationSettlements?: GenerationCostSettlement[];
   missionId?: string;
   missionIds?: string[];
   since?: string;
   budgetUsd?: number;
+  scopeFilter?: EventScopeFilter;
 }): CostSummary {
   const sinceIso = input.since || '';
   const missionFilter = (input.missionId || '').trim().toUpperCase();
@@ -343,6 +357,15 @@ export function buildCostSummary(input: {
     if (missionFilter && entryMissionId !== missionFilter) return false;
     if (input.missionIds !== undefined && !missionFilters.has(entryMissionId)) return false;
     if (sinceIso && String(entry.timestamp || entry.ts || '') < sinceIso) return false;
+    if (
+      input.scopeFilter &&
+      !eventScopeMatches(
+        resolveScopeForRecord(entry as Record<string, unknown>).scope,
+        input.scopeFilter
+      )
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -373,6 +396,42 @@ export function buildCostSummary(input: {
     totalUsd += usd;
   }
 
+  let generationActualUsd = 0;
+  let settledGenerationJobs = 0;
+  let awaitingGenerationCost = 0;
+  const seenGenerationSettlements = new Set<string>();
+  for (const settlement of input.generationSettlements || []) {
+    if (seenGenerationSettlements.has(settlement.settlement_id)) continue;
+    seenGenerationSettlements.add(settlement.settlement_id);
+    const settlementMissionId = String(settlement.scope.mission_id || 'unassigned').toUpperCase();
+    if (missionFilter && settlementMissionId !== missionFilter) continue;
+    if (input.missionIds !== undefined && !missionFilters.has(settlementMissionId)) continue;
+    if (sinceIso && settlement.observed_at < sinceIso) continue;
+    if (input.scopeFilter && !eventScopeMatches(settlement.scope, input.scopeFilter)) continue;
+    if (settlement.status === 'unavailable') {
+      awaitingGenerationCost += 1;
+      continue;
+    }
+    const usd = Number(settlement.actual_cost_usd);
+    if (!Number.isFinite(usd) || usd < 0) continue;
+    const record = byMission.get(settlementMissionId) || {
+      missionId: settlementMissionId,
+      tokens: 0,
+      usd: 0,
+      entryCount: 0,
+      lastSeen: undefined,
+    };
+    record.usd += usd;
+    record.entryCount += 1;
+    record.lastSeen = settlement.observed_at;
+    byMission.set(settlementMissionId, record);
+    generationActualUsd += usd;
+    settledGenerationJobs += 1;
+    totalUsd += usd;
+  }
+
+  const generationEntryCount = settledGenerationJobs;
+
   const budgetUsd =
     typeof input.budgetUsd === 'number' && Number.isFinite(input.budgetUsd) && input.budgetUsd > 0
       ? input.budgetUsd
@@ -385,12 +444,17 @@ export function buildCostSummary(input: {
   return {
     totalTokens,
     totalUsd: Math.round(totalUsd * 1000) / 1000,
-    entryCount: entries.length,
+    entryCount: entries.length + generationEntryCount,
     missionCount: byMission.size,
     since: sinceIso || undefined,
     budgetUsd,
     remainingUsd,
     overBudget: typeof budgetUsd === 'number' ? totalUsd > budgetUsd : false,
+    generation: {
+      actualUsd: Math.round(generationActualUsd * 1000) / 1000,
+      settledJobs: settledGenerationJobs,
+      awaitingActualCost: awaitingGenerationCost,
+    },
     missionBreakdown: Array.from(byMission.values()).sort((left, right) => right.usd - left.usd),
   };
 }
@@ -401,15 +465,22 @@ export function collectCostSummary(
     missionIds?: string[];
     since?: string;
     budgetUsd?: number;
+    scopeFilter?: EventScopeFilter;
   } = {}
 ): CostSummary {
   const history = new MetricsCollector({ persist: false }).loadHistory();
+  const generationSettlements = listGenerationCostSettlements({
+    scopeFilter: input.scopeFilter,
+    since: input.since,
+  });
   return buildCostSummary({
     history,
+    generationSettlements,
     missionId: input.missionId,
     missionIds: input.missionIds,
     since: input.since,
     budgetUsd: input.budgetUsd,
+    scopeFilter: input.scopeFilter,
   });
 }
 

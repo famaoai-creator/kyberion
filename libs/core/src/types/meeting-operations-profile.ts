@@ -73,19 +73,9 @@ export interface MeetingOperationsProfile {
         | 'default'
       )[];
       primary_role:
-        | 'planner'
-        | 'facilitator'
-        | 'scribe'
-        | 'executor'
-        | 'decision_maker'
-        | 'tracker';
+        'planner' | 'facilitator' | 'scribe' | 'executor' | 'decision_maker' | 'tracker';
       support_roles?: (
-        | 'planner'
-        | 'facilitator'
-        | 'scribe'
-        | 'executor'
-        | 'decision_maker'
-        | 'tracker'
+        'planner' | 'facilitator' | 'scribe' | 'executor' | 'decision_maker' | 'tracker'
       )[];
       notes?: string;
     },
@@ -103,19 +93,9 @@ export interface MeetingOperationsProfile {
         | 'default'
       )[];
       primary_role:
-        | 'planner'
-        | 'facilitator'
-        | 'scribe'
-        | 'executor'
-        | 'decision_maker'
-        | 'tracker';
+        'planner' | 'facilitator' | 'scribe' | 'executor' | 'decision_maker' | 'tracker';
       support_roles?: (
-        | 'planner'
-        | 'facilitator'
-        | 'scribe'
-        | 'executor'
-        | 'decision_maker'
-        | 'tracker'
+        'planner' | 'facilitator' | 'scribe' | 'executor' | 'decision_maker' | 'tracker'
       )[];
       notes?: string;
     }[],
