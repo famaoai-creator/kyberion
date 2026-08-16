@@ -1966,6 +1966,7 @@ export type {
   SuggestFieldUpdateParams,
 } from './relationship-graph-store.js';
 export * from './distill-candidate-registry.js';
+export * from './op-preflight.js';
 export * from './promoted-memory.js';
 export * from './memory-promotion-queue.js';
 export * from './memory-promotion-workflow.js';
