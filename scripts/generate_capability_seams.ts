@@ -1,7 +1,7 @@
 /** DH-07: generate the declaration/provider/consumer seam graph. */
 import { loadCoreSeamBindings } from './bindings.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 
 interface SeamRoleEntry {
   declaration: string;

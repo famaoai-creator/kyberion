@@ -1,6 +1,6 @@
 /** PI-12: reject dependency declarations that bypass the lockfile policy. */
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeReadFile } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 type PackageManifest = {
   packageManager?: string;

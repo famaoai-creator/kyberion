@@ -1,7 +1,7 @@
-import { safeReadFile, safeWriteFile } from '../libs/core/secure-io.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { TRACE_SPAN_DEFINITIONS } from '../libs/core/trace-schema.js';
-import { withExecutionContext } from '../libs/core/authority.js';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { TRACE_SPAN_DEFINITIONS } from '@agent/core/trace-schema';
+import { withExecutionContext } from '@agent/core/authority';
 
 const outputPath = pathResolver.rootResolve('docs/developer/TRACE_SCHEMA.md');
 

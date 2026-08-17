@@ -1,7 +1,7 @@
-import { listReasoningProviderDescriptors } from '../libs/core/reasoning-provider-registry.js';
-import { loadReasoningBackendPolicy } from '../libs/core/reasoning-backend-policy.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeExistsSync } from '../libs/core/secure-io.js';
+import { listReasoningProviderDescriptors } from '@agent/core/reasoning-provider-registry';
+import { loadReasoningBackendPolicy } from '@agent/core/reasoning-backend-policy';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 
 const descriptors = listReasoningProviderDescriptors();
 const policy = loadReasoningBackendPolicy();
