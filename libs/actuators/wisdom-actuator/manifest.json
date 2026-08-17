@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
