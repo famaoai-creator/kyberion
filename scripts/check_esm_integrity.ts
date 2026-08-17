@@ -21,6 +21,9 @@ const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([
   'scripts/check_install_script_allowlist.ts',
   'scripts/check_lockfile_commit_gate.ts',
   'scripts/check_pinned_deps.ts',
+  // bindings.ts is imported by the standalone scripts test suite, which runs
+  // without the package build and therefore needs source seam registrations.
+  'scripts/bindings.ts',
 ]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
