@@ -1,5 +1,5 @@
 /** PI-12: require an explicit opt-in for pnpm-lock.yaml changes. */
-import { safeExec } from '@agent/core/secure-io';
+import { safeExec } from '../libs/core/secure-io.js';
 
 const baseRef = process.env.GITHUB_BASE_REF?.trim();
 const safeBase = baseRef && /^[A-Za-z0-9._/-]+$/u.test(baseRef) ? baseRef : undefined;
