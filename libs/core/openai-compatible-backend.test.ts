@@ -179,6 +179,83 @@ describe('openai-compatible-backend', () => {
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
 
+  it('returns caller-provided governed tool calls without executing them', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: 'I will inspect the capability.',
+                tool_calls: [
+                  {
+                    id: 'call-capability',
+                    type: 'function',
+                    function: {
+                      name: 'capability_read',
+                      arguments: JSON.stringify({ name: 'browser' }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'deepseek-coder',
+    });
+
+    const result = await backend.generateWithTools(
+      'Find the browser capability.',
+      [
+        {
+          name: 'capability_read',
+          description: 'Read one governed capability description.',
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+      ],
+      {
+        deferred_tool_definitions: [
+          {
+            name: 'not_active',
+            description: 'Deferred',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      }
+    );
+
+    expect(result).toEqual({
+      text: 'I will inspect the capability.',
+      toolCalls: [{ name: 'capability_read', input: { name: 'browser' } }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.tools).toEqual([
+      expect.objectContaining({
+        function: expect.objectContaining({ name: 'capability_read' }),
+      }),
+    ]);
+    expect(body.tools).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          function: expect.objectContaining({ name: 'not_active' }),
+        }),
+      ])
+    );
+  });
+
   it('streams OpenAI-compatible text deltas without waiting for the full response', async () => {
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
@@ -300,6 +377,17 @@ describe('openai-compatible-backend', () => {
 
     expect(result).toContain('stopped after 3 repeated calls to read_file');
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(firstBody.tools).toEqual([
+      {
+        type: 'function',
+        function: {
+          name: 'read_file',
+          description: expect.any(String),
+          parameters: expect.any(Object),
+        },
+      },
+    ]);
   });
 
   it('budgets max_tokens against a configured context window', async () => {

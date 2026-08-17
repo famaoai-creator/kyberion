@@ -12,6 +12,7 @@ export const WISDOM_ACTUATOR_CAPTURE_OPS = [
   'glob_files',
   'history_search',
   'knowledge_search',
+  'knowledge_read',
   'query',
   'read_file',
   'read_json',
@@ -167,6 +168,7 @@ const SINGLE_REASONING_OPS = new Set([
 
 const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
   knowledge_search: 'read',
+  knowledge_read: 'read',
   history_search: 'read',
   query: 'read',
   glob_files: 'read',

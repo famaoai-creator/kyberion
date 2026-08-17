@@ -151,15 +151,12 @@ export async function POST(req: NextRequest) {
     const updated = withViewerExecutionContext(viewer, () => updateWorkItem({ itemId, status }));
     return NextResponse.json({ ok: true, item: updated });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      {
-        status:
-          error instanceof ViewerContextError ||
-          (error instanceof Error && error.message.includes('not authorized'))
-            ? 403
-            : 500,
-      }
+    return viewerErrorResponse(
+      error,
+      error instanceof ViewerContextError ||
+        (error instanceof Error && error.message.includes('not authorized'))
+        ? 403
+        : 500
     );
   }
 }

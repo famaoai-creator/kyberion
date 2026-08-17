@@ -1,0 +1,21 @@
+[
+  {
+    "name": "baseline",
+    "model": "stub",
+    "noTools": true,
+    "facet_request": {
+      "persona": "orchestrator",
+      "instructions": ["evidence-first"]
+    }
+  },
+  {
+    "name": "policy-aware",
+    "model": "stub",
+    "noTools": false,
+    "facet_request": {
+      "persona": "orchestrator",
+      "policies": ["fail-closed"],
+      "output_contract": "operation-result"
+    }
+  }
+]

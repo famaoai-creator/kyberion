@@ -11,6 +11,8 @@ import {
   buildGovernedRetryOptions,
   classifyError,
   retry,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core';
 import * as path from 'node:path';
@@ -55,7 +57,7 @@ function buildRetryOptions(override?: Record<string, any>) {
 }
 
 export async function handleAction(input: ProcessAction) {
-  const { action, params, steps, context } = input;
+  const { action, steps, context } = input;
 
   if (action === 'pipeline') {
     if (!steps || steps.length === 0) return { status: 'error', message: 'Empty pipeline steps' };
@@ -67,6 +69,20 @@ export async function handleAction(input: ProcessAction) {
     const result = await handleAction({ action: step.op as any, params: step.params, context });
     return { ...result, context: (result as any).context || context };
   }
+
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `process:${action}`,
+    params: input.params || {},
+    context: context && typeof context === 'object' ? context : undefined,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation process:${action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input as ProcessAction['params'];
 
   switch (action) {
     case 'spawn': {

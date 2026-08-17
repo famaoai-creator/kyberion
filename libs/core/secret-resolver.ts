@@ -21,29 +21,108 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface ResolveSecretInput {
   key: string;
   scope?: string;
+  /** Operation requesting the reference; resolvers may apply per-operation policy. */
+  operation?: string;
+}
+
+/** A model/tool-safe reference. It carries a name, never a secret value. */
+export interface SecretReference {
+  env: string;
+  scope?: string;
+  operation?: string;
+}
+
+/** Non-sensitive resolver capability summary. Never add secret values here. */
+export interface SecretResolverDescription {
+  configured: boolean;
+  writable: boolean;
 }
 
 export interface SecretResolver {
   name: string;
   resolve(input: ResolveSecretInput): Promise<string | null> | string | null;
+  describe?: () => SecretResolverDescription;
 }
 
-let registered: SecretResolver | null = null;
+const secretResolverSeam = defineSeam<SecretResolver>({
+  key: 'secret-resolver',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerSecretResolver(resolver: SecretResolver): void {
-  registered = resolver;
+export function registerSecretResolver(resolver: SecretResolver): () => void {
+  if (!resolver || typeof resolver.name !== 'string' || !resolver.name.trim()) {
+    throw new TypeError('Secret resolver must have a non-empty name');
+  }
+  registeredDisposer = secretResolverSeam.register(resolver.name, resolver, {
+    provenance: 'builtin',
+    source: 'secret-resolver',
+  });
+  return registeredDisposer;
 }
 
 export function getSecretResolver(): SecretResolver | null {
-  return registered;
+  return secretResolverSeam.getOptional() ?? null;
 }
 
 export function resetSecretResolver(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
+}
+
+function assertSecretReference(reference: SecretReference): void {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(reference.env.trim())) {
+    throw new Error(`[SECRET_REFERENCE_INVALID] env name is invalid: ${reference.env}`);
+  }
+  if (reference.scope !== undefined && !reference.scope.trim()) {
+    throw new Error('[SECRET_REFERENCE_INVALID] scope must not be empty');
+  }
+  if (reference.operation !== undefined && !reference.operation.trim()) {
+    throw new Error('[SECRET_REFERENCE_INVALID] operation must not be empty');
+  }
+}
+
+/** Describe the active resolver without revealing configuration values. */
+export function describeSecretResolver(): SecretResolverDescription {
+  const resolver = getSecretResolver();
+  if (!resolver) return { configured: false, writable: false };
+  try {
+    const description = resolver.describe?.() ?? { configured: true, writable: false };
+    return {
+      configured: description.configured === true,
+      writable: description.writable === true,
+    };
+  } catch {
+    return { configured: false, writable: false };
+  }
+}
+
+/** Resolve an env-name reference synchronously; the reference is not cached. */
+export function resolveSecretReferenceSync(reference: SecretReference): string | null {
+  assertSecretReference(reference);
+  return resolveSecretSync({
+    key: reference.env,
+    ...(reference.scope ? { scope: reference.scope } : {}),
+    ...(reference.operation ? { operation: reference.operation } : {}),
+  });
+}
+
+/** Resolve an env-name reference asynchronously; each call reaches the resolver. */
+export async function resolveSecretReferenceAsync(
+  reference: SecretReference
+): Promise<string | null> {
+  assertSecretReference(reference);
+  return resolveSecretAsync({
+    key: reference.env,
+    ...(reference.scope ? { scope: reference.scope } : {}),
+    ...(reference.operation ? { operation: reference.operation } : {}),
+  });
 }
 
 /**
@@ -55,7 +134,7 @@ export function resetSecretResolver(): void {
  * honored; async resolvers should be used through resolveSecretAsync.
  */
 export function resolveSecretSync(input: ResolveSecretInput): string | null {
-  const resolver = registered;
+  const resolver = getSecretResolver();
   if (!resolver) return null;
   try {
     const result = resolver.resolve(input);
@@ -76,7 +155,7 @@ export function resolveSecretSync(input: ResolveSecretInput): string | null {
 }
 
 export async function resolveSecretAsync(input: ResolveSecretInput): Promise<string | null> {
-  const resolver = registered;
+  const resolver = getSecretResolver();
   if (!resolver) return null;
   try {
     const result = await resolver.resolve(input);
@@ -132,6 +211,10 @@ export class ShellSecretResolver implements SecretResolver {
   readonly name = 'shell';
   constructor(private readonly options: ShellSecretResolverOptions) {}
 
+  describe(): SecretResolverDescription {
+    return { configured: this.options.command.trim().length > 0, writable: false };
+  }
+
   resolve(input: ResolveSecretInput): string | null {
     const cmd = this.options.command
       .replace(/\{\{key\}\}/gu, input.key)
@@ -160,6 +243,7 @@ export class ShellSecretResolver implements SecretResolver {
 export function installSecretResolverIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
   const command = env.KYBERION_SECRET_RESOLVER_COMMAND?.trim();
   if (!command) return false;
+  resetSecretResolver();
   registerSecretResolver(
     new ShellSecretResolver({
       command,

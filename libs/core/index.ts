@@ -13,6 +13,20 @@ export * from './capability-wrapper.js';
 export * from './metrics.js';
 export * from './generation-cost-settlement.js';
 export * from './error-codes.js';
+export * from './wire-error.js';
+export * from './trust-requiring-resources.js';
+export * from './resource-provenance.js';
+export * from './skill-resource-loader.js';
+export * from './agent-instruction-loader.js';
+export * from './prompt-visibility-ledger.js';
+export * from './scoped-registry.js';
+export * from './usage-accounting.js';
+export * from './reasoning-provider-registry.js';
+export * from './reasoning-cli-provider.js';
+export * from './reasoning-api-provider.js';
+export * from './trace-schema.js';
+export * from './testing/reasoning-backend-conformance.js';
+export * from './reasoning-auth-preflight.js';
 
 // Secure IO & Filesystem (Shield Layer)
 export * as secureIo from './secure-io.js';
@@ -164,6 +178,7 @@ export * from './schema-loader.js';
 export * from './operator-learning.js';
 export * from './question-resolver.js';
 export * from './op-input-contracts.js';
+export * from './seam.js';
 export * from './op-suggestions.js';
 export * from './adf-engine.js';
 export * from './tool-call-scheduler.js';
@@ -702,6 +717,12 @@ export * from './worker-event-stream.js';
 export * from './ce-adoption.js';
 export * from './office-snapshot.js';
 export * from './lifecycle-hook-engine.js';
+export * from './external-hook-bridge.js';
+export * from './external-hook-discovery.js';
+export * from './agent-input-queue.js';
+export * from './writer-lease.js';
+export * from './invariants.js';
+export * from './plugin-contributions.js';
 export * from './dynamic-injection.js';
 export * from './prompt-cache-discipline.js';
 export * from './context-rewind.js';
@@ -806,6 +827,10 @@ export * from './provider-capability-scanner.js';
 export * from './provider-capability-overview.js';
 export * from './provider-bridge.js';
 export * from './provider-permission-profiles.js';
+export * from './sandbox-policy.js';
+export * from './permission-presets.js';
+export * from './tool-repeat-advisor.js';
+export * from './spill-result.js';
 export * from './claude-task-runner.js';
 export * from './claude-task-session-executor.js';
 export * from './actuator-op-registry.js';
@@ -894,14 +919,31 @@ export {
   startDelegatedTaskTrace,
   completeDelegatedTaskTrace,
   cancelDelegatedTaskTrace,
+  claimDelegatedTaskActivation,
+  enqueueDelegatedTaskInbox,
+  consumeDelegatedTaskInbox,
+  hasPendingDelegatedTaskInbox,
+  recordDelegatedTaskActivationFailure,
+  recordDelegatedTaskActivationCompletion,
   createDelegationHandle,
+  buildDelegatedTaskWorkerProcessSpec,
   loadDelegatedTaskRecord,
   listActiveDelegatedTaskRecords,
   resumeDelegatedTask,
+  registerDelegatedTaskWorker,
+  spawnDelegatedTaskWorkerProcess,
+  wakeDelegatedTaskWorker,
 } from './delegated-task-observability.js';
 export type {
   DelegatedTaskTrace,
   DelegatedTaskRecord,
+  DelegatedTaskReport,
+  DelegatedTaskSettlement,
+  DelegatedTaskActivationFailure,
+  DelegatedTaskInboxInput,
+  DelegatedTaskWorkerWake,
+  DelegatedTaskWorkerHandler,
+  DelegatedTaskWorkerProcessSpec,
   DelegationHandle,
 } from './delegated-task-observability.js';
 export type {
@@ -988,7 +1030,7 @@ export * from './plugin-managed-install.js';
 export * from './skill-plugin-loader.js';
 export * from './provider-capability-scanner.js';
 export * from './approval-gate-summary.js';
-export { enforceApprovalGate } from './approval-gate.js';
+export { enforceApprovalGate, hasHuman } from './approval-gate.js';
 export type { ApprovalGateParams, ApprovalGateResult } from './approval-gate.js';
 export * from './lead-score.js';
 export * from './inbound-inquiry-adapter.js';
@@ -1075,6 +1117,7 @@ export type {
 export {
   getAgentExecutionPort,
   registerAgentExecutionPort,
+  resetAgentExecutionPort,
   SupervisorAgentExecutionPort,
 } from './agent-execution-port.js';
 export type {
@@ -1148,16 +1191,21 @@ export type {
 } from './audit-forwarder.js';
 export {
   ChainSecretResolver,
+  describeSecretResolver,
   getSecretResolver,
   installSecretResolverIfAvailable,
   registerSecretResolver,
   resetSecretResolver,
   resolveSecretAsync,
+  resolveSecretReferenceAsync,
+  resolveSecretReferenceSync,
   resolveSecretSync,
   ShellSecretResolver,
 } from './secret-resolver.js';
 export type {
   ResolveSecretInput,
+  SecretReference,
+  SecretResolverDescription,
   SecretResolver,
   ShellSecretResolverOptions,
 } from './secret-resolver.js';
@@ -1197,6 +1245,7 @@ export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
 export {
   bootstrapManifest,
   computeManifestSignature,
+  hasEnvironmentCapabilityProbe,
   loadEnvironmentManifest,
   listEnvironmentManifestIds,
   probeManifest,
@@ -1394,12 +1443,14 @@ export {
   StubStreamingSpeechToTextBridge,
   getStreamingSttBridge,
   registerStreamingSttBridge,
+  resetStreamingSttBridges,
 } from './streaming-stt-bridge.js';
 export type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
 export {
   StubStreamingTextToSpeechBridge,
   getStreamingTtsBridge,
   registerStreamingTtsBridge,
+  resetStreamingTtsBridges,
 } from './streaming-tts-bridge.js';
 export type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
 export {
@@ -1508,6 +1559,7 @@ export {
   stubExplicitlyRequested,
   getLastServedReasoningMode,
   resetReasoningFailoverTracking,
+  type ReasoningPromptVisibilityContext,
   type StubServedRecord,
   type LastServedReasoningMode,
 } from './reasoning-backend.js';
@@ -1708,6 +1760,7 @@ export {
 export type {
   ModelRegistryEntry,
   ModelRegistryFile,
+  ModelCompatibilityOverrides,
   ReasoningModelRoute,
   TaskModelEffort,
   TaskModelHint,
@@ -1967,6 +2020,7 @@ export type {
 } from './relationship-graph-store.js';
 export * from './distill-candidate-registry.js';
 export * from './op-preflight.js';
+export * from './op-preflight-defaults.js';
 export * from './promoted-memory.js';
 export * from './memory-promotion-queue.js';
 export * from './memory-promotion-workflow.js';
@@ -2500,11 +2554,19 @@ export type {
   BackendCapabilityProfile,
   BackendTransport,
   BackendUtilityFit,
+  ConstrainedSampling,
+  ConstrainedSamplingRequest,
+  GrammarSamplingRequest,
+  ThinkingLevel,
+  ThinkingLevelMap,
 } from './backend-capability-profile.js';
 export {
   BACKEND_CAPABILITY_PROFILES,
+  availableThinkingLevels,
   backendCapabilityProfile,
   modesWithUtilityFit,
+  resolveConstrainedSampling,
+  resolveThinkingLevel,
 } from './backend-capability-profile.js';
 export {
   runBackendConformance,

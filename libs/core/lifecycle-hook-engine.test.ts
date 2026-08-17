@@ -31,6 +31,7 @@ import {
   loadLifecycleHookEngine,
   resetDefaultLifecycleHookEngine,
 } from './lifecycle-hook-engine.js';
+import { registerExternalLifecycleHooks } from './external-hook-bridge.js';
 import {
   getDefaultWorkerEventStream,
   resetDefaultWorkerEventStream,
@@ -167,6 +168,207 @@ describe('LifecycleHookEngine', () => {
       engine.register({ id: 'bad-event', event: 'not_an_event' as never, handler: () => undefined })
     ).toThrow('[HOOK_CONFIG]');
     expect(() => engine.register({ id: 'empty', event: 'stop' })).toThrow('[HOOK_CONFIG]');
+  });
+
+  it('accepts task_settled as the terminal lifecycle receipt event', async () => {
+    const engine = new LifecycleHookEngine();
+    const seen: string[] = [];
+    engine.register({
+      id: 'settlement-receipt',
+      event: 'task_settled',
+      handler: (_event, payload) => {
+        seen.push(String(payload.status));
+      },
+    });
+    const outcome = await engine.fire('task_settled', {
+      matcher_value: 'pipeline:demo',
+      status: 'succeeded',
+    });
+    expect(outcome.blocked).toBe(false);
+    expect(seen).toEqual(['succeeded']);
+  });
+
+  it('accepts before_agent_start and exposes system prompt options to hooks', async () => {
+    const engine = new LifecycleHookEngine();
+    const seen: unknown[] = [];
+    engine.register({
+      id: 'prompt-policy',
+      event: 'before_agent_start',
+      handler: (_event, payload) => {
+        seen.push(payload.systemPromptOptions);
+        return { block: false, additional_context: 'use the governed context pack' };
+      },
+    });
+    const outcome = await engine.fire('before_agent_start', {
+      matcher_value: 'TASK-1',
+      systemPromptOptions: { taskId: 'TASK-1', promptVisibility: 'ledgered' },
+    });
+    expect(outcome).toMatchObject({
+      blocked: false,
+      additionalContext: ['use the governed context pack'],
+    });
+    expect(seen).toEqual([{ taskId: 'TASK-1', promptVisibility: 'ledgered' }]);
+  });
+
+  it('projects ask as a fail-closed disposition and keeps block precedence', async () => {
+    const engine = new LifecycleHookEngine();
+    engine.register({
+      id: 'ask',
+      event: 'pre_tool_use',
+      handler: () => ({ block: false, decision: 'ask', reason: 'operator required' }),
+    });
+    const asked = await engine.fire('pre_tool_use', { matcher_value: 'tool:x' });
+    expect(asked).toMatchObject({ blocked: true, asked: true, decision: 'ask' });
+    expect(asked.reasons).toEqual(['operator required']);
+
+    engine.register({
+      id: 'block',
+      event: 'pre_tool_use',
+      handler: () => ({ block: true, reason: 'deny wins' }),
+    });
+    const blocked = await engine.fire('pre_tool_use', { matcher_value: 'tool:x' });
+    expect(blocked).toMatchObject({ blocked: true, asked: false, decision: 'block' });
+    expect(blocked.reasons).toContain('deny wins');
+  });
+
+  it('latches a sticky block until an explicit clearHalt', async () => {
+    const engine = new LifecycleHookEngine({ stickyHalt: true });
+    const denyDispose = engine.register({
+      id: 'deny-once',
+      event: 'pre_tool_use',
+      handler: () => ({ block: true, reason: 'operator denied this tool' }),
+    });
+    const denied = await engine.fire('pre_tool_use', { matcher_value: 'tool:x' });
+    expect(denied).toMatchObject({ blocked: true, decision: 'block' });
+    expect(engine.isHalted).toBe(true);
+
+    const dispose = engine.register({
+      id: 'later-allow',
+      event: 'pre_tool_use',
+      handler: () => ({ block: false }),
+    });
+    dispose();
+    const stillDenied = await engine.fire('pre_tool_use', { matcher_value: 'tool:y' });
+    expect(stillDenied.reasons).toEqual(['sticky lifecycle halt: operator denied this tool']);
+
+    engine.clearHalt();
+    expect(engine.isHalted).toBe(false);
+    denyDispose();
+    const afterClear = await engine.fire('pre_tool_use', { matcher_value: 'tool:z' });
+    expect(afterClear.blocked).toBe(false);
+  });
+
+  it('exposes an idle barrier for in-flight async hooks', async () => {
+    const engine = new LifecycleHookEngine();
+    let release!: () => void;
+    const hookFinished = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    engine.register({
+      id: 'slow',
+      event: 'pre_tool_use',
+      handler: async () => {
+        await hookFinished;
+        return { block: false };
+      },
+    });
+    const fire = engine.fire('pre_tool_use', { matcher_value: 'tool:x' });
+    let idle = false;
+    const idlePromise = engine.whenIdle().then(() => {
+      idle = true;
+    });
+    await Promise.resolve();
+    expect(idle).toBe(false);
+    release();
+    await fire;
+    await idlePromise;
+    expect(idle).toBe(true);
+  });
+
+  it('registers Claude grouped hooks and disposes the external batch', async () => {
+    const engine = new LifecycleHookEngine();
+    const bridge = registerExternalLifecycleHooks(
+      engine,
+      {
+        PreToolUse: [
+          {
+            matcher: '^Bash$',
+            hooks: [{ type: 'command', command: 'kyberion-hook' }],
+          },
+        ],
+      },
+      'claude-code'
+    );
+    expect(bridge.registered).toBe(1);
+    expect(engine.hookCountFor('pre_tool_use')).toBe(1);
+    await bridge.dispose();
+    expect(engine.hookCountFor('pre_tool_use')).toBe(0);
+  });
+
+  it('registers normalized Codex hooks with the same lifecycle vocabulary', async () => {
+    const engine = new LifecycleHookEngine();
+    const bridge = registerExternalLifecycleHooks(
+      engine,
+      {
+        hooks: [
+          { event: 'tool_call', matcher: '^fs:', command: ['codex-hook'] },
+          { event: 'agent_end', command: ['codex-settled-hook'] },
+        ],
+      },
+      'codex'
+    );
+    expect(bridge.registered).toBe(2);
+    expect(engine.hookCountFor('pre_tool_use')).toBe(1);
+    expect(engine.hookCountFor('task_settled')).toBe(1);
+    await bridge.dispose();
+  });
+
+  it('maps external Claude permission deny and ask responses', async () => {
+    const engine = new LifecycleHookEngine();
+    registerExternalLifecycleHooks(
+      engine,
+      { PreToolUse: [{ hooks: [{ type: 'command', command: ['external-hook'] }] }] },
+      'claude-code'
+    );
+    execResult.value = {
+      stdout: JSON.stringify({
+        hookSpecificOutput: {
+          permissionDecision: 'ask',
+          permissionDecisionReason: 'needs approval',
+        },
+      }),
+      stderr: '',
+      status: 0,
+    };
+    const asked = await engine.fire('pre_tool_use', { matcher_value: 'Bash' });
+    expect(asked).toMatchObject({ blocked: true, asked: true, decision: 'ask' });
+    execResult.value = {
+      stdout: JSON.stringify({
+        hookSpecificOutput: {
+          permissionDecision: 'deny',
+          permissionDecisionReason: 'policy denied',
+        },
+      }),
+      stderr: '',
+      status: 0,
+    };
+    const denied = await engine.fire('pre_tool_use', { matcher_value: 'Bash' });
+    expect(denied).toMatchObject({ blocked: true, decision: 'block' });
+    expect(denied.reasons).toEqual(['policy denied']);
+  });
+
+  it('aggregates partial result patches for post-tool middleware', async () => {
+    const engine = new LifecycleHookEngine();
+    engine.register({
+      id: 'patch-result',
+      event: 'post_tool_use',
+      handler: () => ({ block: false, result_patch: { redacted: true, source: 'hook' } }),
+    });
+    const outcome = await engine.fire('post_tool_use', { matcher_value: 'tool:read' });
+    expect(outcome).toMatchObject({
+      blocked: false,
+      resultPatch: { redacted: true, source: 'hook' },
+    });
   });
 
   it('loadLifecycleHookEngine skips malformed config entries (fail-open)', () => {

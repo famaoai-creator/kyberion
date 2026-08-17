@@ -56,6 +56,16 @@ export interface ApprovalGateParams {
   actionDescriptor?: ApprovalActionDescriptor;
   /** KC-03: originating mission/task/agent, persisted for source-scoped cancellation. */
   source?: ApprovalRequestSource;
+  /**
+   * Trusted caller-side presence signal. `false` means that this boundary is
+   * non-interactive and must not create a human approval prompt. Omission is
+   * intentionally treated as unknown for backwards compatibility.
+   */
+  hasHuman?: boolean;
+  /** Optional UI capability signal used by callers that model a surface separately. */
+  hasUI?: boolean;
+  /** Explicit non-interactive mode signal; stronger than an inferred TTY. */
+  nonInteractive?: boolean;
 }
 
 export interface ApprovalGateResult {
@@ -74,6 +84,24 @@ function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
+  return undefined;
+}
+
+/**
+ * Resolve human presence from trusted execution metadata.
+ *
+ * The result is tri-state: `undefined` means the caller did not provide a
+ * presence decision and preserves legacy approval behaviour. User payload
+ * fields are deliberately not consulted here; presence belongs to the
+ * execution/surface boundary, not to an operation's untrusted parameters.
+ */
+export function hasHuman(
+  input: Pick<ApprovalGateParams, 'hasHuman' | 'hasUI' | 'nonInteractive'>
+): boolean | undefined {
+  if (input.nonInteractive === true) return false;
+  if (typeof input.hasHuman === 'boolean') return input.hasHuman;
+  if (typeof input.hasUI === 'boolean') return input.hasUI;
+  if (typeof input.nonInteractive === 'boolean') return !input.nonInteractive;
   return undefined;
 }
 
@@ -421,6 +449,26 @@ export function enforceApprovalGate(
   // --- Step 3: Create a new approval request ---
   const draft =
     params.draft ?? buildApprovalDraft({ operationId, agentId, correlationId, payload, intentId });
+
+  if (hasHuman(params) === false) {
+    const reason =
+      'Human approval is required, but this execution boundary has no interactive human present.';
+    auditChain.record({
+      agentId,
+      action: 'approval_gate',
+      operation: operationId,
+      result: 'denied',
+      reason,
+      metadata: { correlationId, intentId, humanPresence: false },
+    });
+    trace?.addEvent('approval.blocked', {
+      operation_id: operationId,
+      agent_id: agentId,
+      reason: 'human_required_non_interactive',
+    });
+    recordGovernanceAction(agentId, 'approval_gate', `${operationId}:denied`, true);
+    return { allowed: false, status: 'pending', message: `[HUMAN_REQUIRED] ${reason}` };
+  }
 
   const record = createApprovalRequest(role, {
     channel,

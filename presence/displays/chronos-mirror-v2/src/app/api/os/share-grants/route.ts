@@ -141,20 +141,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result }, { status: 200 });
   } catch (error) {
     if (error instanceof ShareGrantAuthorizationError) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 403 });
+      return viewerErrorResponse(error, 403);
     }
     if (error instanceof ShareGrantValidationError) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return viewerErrorResponse(error, 400);
     }
     if (error instanceof ProvenanceTaintPolicyError) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 403 });
+      return viewerErrorResponse(error, 403);
     }
     if (error instanceof Error && error.message.includes('viewer')) {
       return viewerErrorResponse(error);
     }
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'Share grant failed.' },
-      { status: 500 }
-    );
+    return viewerErrorResponse(error, 500);
   }
 }

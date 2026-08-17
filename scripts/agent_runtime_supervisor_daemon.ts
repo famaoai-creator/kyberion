@@ -5,16 +5,21 @@ import { fileURLToPath } from 'node:url';
 import {
   appendSupervisorEvent,
   askAgentRuntime,
+  enqueueDelegatedTaskInbox,
   ensureAgentRuntime,
+  hasPendingDelegatedTaskInbox,
   getAgentRuntimeLog,
   getAgentRuntimeSnapshot,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
+  loadDelegatedTaskRecord,
   logger,
   pathResolver,
   recordDaemonHeartbeat,
+  recordDelegatedTaskActivationFailure,
   refreshAgentRuntime,
   restartAgentRuntime,
+  spawnDelegatedTaskWorkerProcess,
   rootDir,
   runtimeSupervisor,
   safeExistsSync,
@@ -57,6 +62,7 @@ type SupervisorMethod =
   | 'shutdown'
   | 'refresh'
   | 'restart'
+  | 'delegated_enqueue'
   | 'terminate';
 
 interface SupervisorRequest {
@@ -83,6 +89,10 @@ const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
 
 let daemonGlobalInflight = 0;
 const daemonAgentInflightMap = new Map<string, number>();
+const delegatedWorkerStarts = new Map<string, Promise<{ resourceId: string; pid?: number }>>();
+const delegatedWorkerRestartCounts = new Map<string, number>();
+const MAX_DELEGATED_WORKER_RESTARTS = 3;
+let delegatedWorkerShutdown = false;
 
 setInterval(
   () => {
@@ -231,6 +241,141 @@ function socketIsLoopback(socket: net.Socket): boolean {
   return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(socket.remoteAddress || '');
 }
 
+async function ensureDelegatedTaskWorkerProcess(
+  delegationId: string,
+  owner: string
+): Promise<{ resourceId: string; pid?: number }> {
+  const resourceId = `delegated-task-worker:${delegationId}`;
+  const existing = runtimeSupervisor.get(resourceId);
+  if (existing?.state === 'running') {
+    return { resourceId, ...(existing.pid !== undefined ? { pid: existing.pid } : {}) };
+  }
+  const inFlight = delegatedWorkerStarts.get(delegationId);
+  if (inFlight) return inFlight;
+
+  const start = Promise.resolve().then(() => {
+    const handle = spawnDelegatedTaskWorkerProcess(delegationId, owner);
+    watchDelegatedTaskWorkerProcess(delegationId, owner, handle.child);
+    return {
+      resourceId: handle.resourceId,
+      ...(handle.child.pid !== undefined ? { pid: handle.child.pid } : {}),
+    };
+  });
+  delegatedWorkerStarts.set(delegationId, start);
+  try {
+    return await start;
+  } finally {
+    if (delegatedWorkerStarts.get(delegationId) === start)
+      delegatedWorkerStarts.delete(delegationId);
+  }
+}
+
+function scheduleDelegatedTaskWorkerRestart(delegationId: string, owner: string): void {
+  if (delegatedWorkerShutdown) return;
+  const attempt = (delegatedWorkerRestartCounts.get(delegationId) || 0) + 1;
+  delegatedWorkerRestartCounts.set(delegationId, attempt);
+  if (attempt > MAX_DELEGATED_WORKER_RESTARTS) {
+    appendSupervisorEvent({
+      decision: 'delegated_task_worker_restart_exhausted',
+      delegation_id: delegationId,
+      owner,
+      attempts: MAX_DELEGATED_WORKER_RESTARTS,
+    });
+    return;
+  }
+  const delayMs = Math.min(1000, 100 * 2 ** (attempt - 1));
+  const timer = setTimeout(() => {
+    if (delegatedWorkerShutdown) return;
+    void ensureDelegatedTaskWorkerProcess(delegationId, owner).catch((error) => {
+      logger.warn(
+        `[agent_runtime_supervisor_daemon] delegated worker restart failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      appendSupervisorEvent({
+        decision: 'delegated_task_worker_restart_failed',
+        delegation_id: delegationId,
+        owner,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, delayMs);
+  timer.unref?.();
+  appendSupervisorEvent({
+    decision: 'delegated_task_worker_restart_scheduled',
+    delegation_id: delegationId,
+    owner,
+    attempt,
+    delay_ms: delayMs,
+  });
+}
+
+function watchDelegatedTaskWorkerProcess(
+  delegationId: string,
+  owner: string,
+  child: import('node:child_process').ChildProcess
+): void {
+  child.once('exit', (code, signal) => {
+    void (async () => {
+      if (delegatedWorkerShutdown) return;
+      const record = loadDelegatedTaskRecord(delegationId);
+      if (!record) return;
+
+      // A successful activation settles its parent snapshot before the worker
+      // exits. Never replay a completed child after a normal process exit.
+      if ((record.activation_count ?? 0) >= 1) {
+        delegatedWorkerRestartCounts.delete(delegationId);
+        if (record.activation_status === 'claimed' && record.activation_id) {
+          try {
+            recordDelegatedTaskActivationFailure(
+              delegationId,
+              record.activation_id,
+              `worker exited before activation settlement (code=${String(code)}, signal=${String(signal)})`
+            );
+          } catch (error) {
+            logger.warn(
+              `[agent_runtime_supervisor_daemon] failed to settle crashed delegated worker: ${
+                error instanceof Error ? error.message : String(error)
+              }`
+            );
+          }
+        }
+        return;
+      }
+
+      let pending = false;
+      try {
+        pending = await hasPendingDelegatedTaskInbox(delegationId, owner);
+      } catch (error) {
+        logger.warn(
+          `[agent_runtime_supervisor_daemon] delegated worker inbox inspection failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+      if (!pending) {
+        delegatedWorkerRestartCounts.delete(delegationId);
+        return;
+      }
+      appendSupervisorEvent({
+        decision: 'delegated_task_worker_exited_with_pending_inbox',
+        delegation_id: delegationId,
+        owner,
+        code,
+        signal,
+      });
+      scheduleDelegatedTaskWorkerRestart(delegationId, owner);
+    })().catch((error) => {
+      logger.warn(
+        `[agent_runtime_supervisor_daemon] delegated worker exit recovery failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    });
+  });
+}
+
 async function handleRequest(
   request: SupervisorRequest,
   socketLabel: string
@@ -255,6 +400,7 @@ async function handleRequest(
         logger.info(
           '[agent-runtime-supervisor-daemon] terminate requested (stale code stamp); shutting down.'
         );
+        delegatedWorkerShutdown = true;
         appendSupervisorEvent({
           decision: 'agent_runtime_supervisor_daemon_stopping',
           pid: process.pid,
@@ -465,6 +611,40 @@ async function handleRequest(
           result: toSnapshotResult(handle.agentId, snapshot, lease) || { agent_id: handle.agentId },
         };
       }
+      case 'delegated_enqueue': {
+        const payload = request.payload || {};
+        const delegationId = String(payload.delegationId || '').trim();
+        const owner = String(payload.owner || '').trim();
+        const text = String(payload.text || '');
+        if (!delegationId || !owner || !text.trim()) {
+          throw new Error('delegated_enqueue requires delegationId, owner, and text');
+        }
+        const metadata =
+          payload.metadata && typeof payload.metadata === 'object'
+            ? Object.fromEntries(
+                Object.entries(payload.metadata as Record<string, unknown>)
+                  .filter(([, value]) => ['string', 'number', 'boolean'].includes(typeof value))
+                  .map(([key, value]) => [key, value as string | number | boolean])
+              )
+            : undefined;
+        const entry = await enqueueDelegatedTaskInbox(delegationId, {
+          text,
+          requestedBy: owner,
+          ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
+          wake: false,
+        });
+        const worker = await ensureDelegatedTaskWorkerProcess(delegationId, owner);
+        return {
+          id: request.id,
+          ok: true,
+          result: {
+            delegation_id: delegationId,
+            entry_id: entry.id,
+            resource_id: worker.resourceId,
+            ...(worker.pid !== undefined ? { pid: worker.pid } : {}),
+          },
+        };
+      }
       default:
         throw new Error(`unsupported_method:${request.method}`);
     }
@@ -520,6 +700,8 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
 export async function startAgentRuntimeSupervisorDaemon(
   options: AgentRuntimeSupervisorDaemonOptions = {}
 ): Promise<AgentRuntimeSupervisorDaemonInstance> {
+  delegatedWorkerShutdown = false;
+  delegatedWorkerRestartCounts.clear();
   process.env.MISSION_ROLE ||= 'surface_runtime';
   recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
     status: 'starting',
@@ -748,6 +930,7 @@ export async function startAgentRuntimeSupervisorDaemon(
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
+    delegatedWorkerShutdown = true;
     appendSupervisorEvent({
       decision: 'agent_runtime_supervisor_daemon_stopping',
       pid: process.pid,

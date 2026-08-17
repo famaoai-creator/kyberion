@@ -21,6 +21,8 @@ import {
   resolveVars,
   sendEmail,
   createDraft,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 
 const PLATFORMS_DARWIN = process.platform === 'darwin';
@@ -68,8 +70,20 @@ async function executePipeline(
 ): Promise<Record<string, unknown>> {
   for (const step of steps) {
     const rawParams: EmailParams = step.params ?? {};
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: `email:${step.op}`,
+      params: rawParams as Record<string, unknown>,
+      context: ctx,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation email:${step.op} was not admitted.`}`
+      );
+    }
     // Resolve {{vars}} from pipeline context before using params
-    const params: EmailParams = resolveEmailParams(rawParams, ctx);
+    const params: EmailParams = resolveEmailParams(preflight.input as EmailParams, ctx);
 
     // Read body from file for send_from_file, and also for create_draft/send when body_file provided
     if (params.body_file && !params.body) {

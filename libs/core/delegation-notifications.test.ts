@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   claimPendingDelegationNotifications,
   delegationNotificationsPath,
@@ -116,5 +116,25 @@ describe('KC-06 delegation-notifications', () => {
     expect(lines.join('\n')).toContain('Summary written to');
     expect(lines.join('\n')).toContain('untrusted data');
     expect(renderDelegationNotificationLines([])).toEqual([]);
+  });
+
+  it('derives child provenance when reading a legacy notification record', () => {
+    safeWriteFile(
+      delegationNotificationsPath(),
+      `${JSON.stringify({
+        notification_id: 'N-LEGACY',
+        delegation_id: 'DLG-LEGACY',
+        owner: 'worker',
+        status: 'completed',
+        instruction_excerpt: 'legacy',
+        completed_at: new Date().toISOString(),
+        enqueued_at: new Date().toISOString(),
+        claimed: false,
+      })}\n`
+    );
+    expect(listDelegationNotifications()[0]?.report_provenance).toEqual({
+      source: 'child',
+      delegation_id: 'DLG-LEGACY',
+    });
   });
 });

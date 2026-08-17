@@ -15,6 +15,7 @@ import {
   fireSkillPluginHook,
   loadAuthorizedSkillPlugins,
   isSkillAllowed,
+  disposeSkillPluginContributions,
   type LoadedSkillPlugin,
 } from './skill-plugin-loader.js';
 import { currentScope } from './scope-context.js';
@@ -157,9 +158,13 @@ async function runSkillWithPlugins<T>(
   }
 
   await fireSkillPluginHook('beforeSkill', plugins, skillName, process.argv.slice(2));
-  const output = await wrapSkillAsync(skillName, fn);
-  await fireSkillPluginHook('afterSkill', plugins, skillName, output);
-  return output;
+  try {
+    const output = await wrapSkillAsync(skillName, fn);
+    await fireSkillPluginHook('afterSkill', plugins, skillName, output);
+    return output;
+  } finally {
+    disposeSkillPluginContributions(plugins);
+  }
 }
 
 export async function runSkillAsync<T>(

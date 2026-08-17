@@ -1059,7 +1059,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16422,
+      "size": 16536,
       "type": "json"
     },
     {
@@ -1519,6 +1519,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/install-script-allowlist.json",
+      "tier": "public",
+      "size": 1679,
+      "type": "json"
+    },
+    {
       "path": "product/governance/integrity-policy.json",
       "tier": "public",
       "size": 435,
@@ -1671,7 +1677,7 @@
     {
       "path": "product/governance/mcp-tool-catalog.json",
       "tier": "public",
-      "size": 7255,
+      "size": 7731,
       "type": "json"
     },
     {
@@ -1857,7 +1863,7 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1671,
+      "size": 1950,
       "type": "json"
     },
     {
@@ -2008,6 +2014,12 @@
       "path": "product/governance/path-scope-policy.json",
       "tier": "public",
       "size": 2720,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/permission-presets.json",
+      "tier": "public",
+      "size": 454,
       "type": "json"
     },
     {
@@ -2218,6 +2230,12 @@
       "path": "product/governance/reasoning-level-policy.json",
       "tier": "public",
       "size": 3958,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-provider-registry.json",
+      "tier": "public",
+      "size": 6850,
       "type": "json"
     },
     {
@@ -3201,7 +3219,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 91321,
+      "size": 91404,
       "type": "json"
     },
     {
@@ -3549,7 +3567,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 18537,
+      "size": 18563,
       "type": "json"
     },
     {
@@ -5653,6 +5671,12 @@
       "type": "md"
     },
     {
+      "path": "product/prompts/worker-context-update-summary.md",
+      "tier": "public",
+      "size": 717,
+      "type": "md"
+    },
+    {
       "path": "product/roles/README.md",
       "tier": "public",
       "size": 2315,
@@ -6969,7 +6993,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 17177,
+      "size": 17796,
       "type": "json"
     },
     {
@@ -7119,7 +7143,7 @@
     {
       "path": "product/schemas/model-registry.schema.json",
       "tier": "public",
-      "size": 2822,
+      "size": 3441,
       "type": "json"
     },
     {

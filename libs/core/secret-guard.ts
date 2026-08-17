@@ -229,7 +229,7 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
 /**
  * Retrieve a secret value, enforcing temporal and intent-based gates.
  */
-export const getSecret = (key: string, scope?: string): string | null => {
+export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
   const currentMission = process.env.MISSION_ID;
   const authorizedScope = process.env.AUTHORIZED_SCOPE;
 
@@ -260,7 +260,7 @@ export const getSecret = (key: string, scope?: string): string | null => {
   // 0. Upstream resolver (external KMS — AWS Secrets Manager, Vault, etc.)
   //    consulted first if one is registered. Returns null on miss; missing
   //    resolver falls through to the local vault chain below.
-  const upstream = resolveSecretSync({ key, scope });
+  const upstream = resolveSecretSync({ key, scope, operation });
   if (upstream && upstream.length > 0) {
     if (upstream.length > 8) _activeSecrets.add(upstream);
     return upstream;

@@ -39,70 +39,27 @@
  *   KYBERION_REASONING_BACKEND=stub            (offline / testing)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './core.js';
+import type Anthropic from '@anthropic-ai/sdk';
 import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
-import { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
-import { AnthropicIntentExtractor } from './anthropic-intent-extractor.js';
-import { AnthropicVoiceBridge } from './anthropic-voice-bridge.js';
-import { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
-import { ClaudeAgentIntentExtractor } from './claude-agent-intent-extractor.js';
-import { ClaudeAgentVoiceBridge } from './claude-agent-voice-bridge.js';
-import { CodexCliReasoningBackend } from './codex-cli-reasoning-backend.js';
-import { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
-import { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
-import { buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
-import { buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
-import { buildGeminiApiBackendFromEnv } from './gemini-api-backend.js';
-import { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
-import { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
-import { buildClaudeCliOptionsFromEnv } from './claude-cli-backend.js';
-import { buildShellClaudeCliBackendFromEnv } from './claude-cli-backend.js';
-import { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
-import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
-import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
-import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
-import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
-import {
-  buildGrokCliOptionsFromEnv,
-  buildShellGrokCliBackendFromEnv,
-  GrokCliBackend,
-} from './grok-cli-backend.js';
-import { GrokCliIntentExtractor } from './grok-cli-intent-extractor.js';
-import { GrokCliVoiceBridge } from './grok-cli-voice-bridge.js';
-import { buildGrokApiBackendFromEnv } from './grok-api-backend.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from './adapter-default-selection.js';
-import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
-import {
-  buildOpenAiCompatibleBackendFromEnv,
-  buildOllamaBackendFromEnv,
-  buildVllmBackendFromEnv,
-  buildLmStudioBackendFromEnv,
-  buildLlamaCppBackendFromEnv,
-  buildMlxBackendFromEnv,
-  buildLocalAiBackendFromEnv,
-  buildNemotronBackendFromEnv,
-  type OpenAiCompatibleBackendOverrides,
-} from './openai-compatible-backend.js';
-import { buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
-import { maybeWrapWithDispatcher } from './agent-dispatch.js';
+import type { OpenAiCompatibleBackendOverrides } from './openai-compatible-backend.js';
+import { buildOpenAiCompatibleProviderBundle } from './reasoning-openai-compatible-provider.js';
+import { buildCliProviderBundle } from './reasoning-cli-provider.js';
+import { buildApiProviderBundle } from './reasoning-api-provider.js';
 import {
   buildFailoverReasoningBackend,
   buildRoleAwareReasoningBackend,
-  type ReasoningBackendCandidate,
   registerReasoningBackend,
+  resetReasoningBackend,
 } from './reasoning-backend.js';
 import {
   buildFailoverIntentExtractor,
-  type IntentExtractorCandidate,
   registerIntentExtractor,
+  resetIntentExtractor,
 } from './intent-extractor.js';
-import {
-  buildFailoverVoiceBridge,
-  type VoiceBridgeCandidate,
-  registerVoiceBridge,
-} from './voice-bridge.js';
+import { buildFailoverVoiceBridge, registerVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
 import {
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
@@ -136,6 +93,12 @@ import {
   resolveSamplingParams,
   type SamplingParams,
 } from './reasoning-route-resolver.js';
+import {
+  buildRegisteredReasoningProvider,
+  getReasoningProviderDescriptor,
+  listReasoningProviderModes,
+  type ReasoningProviderRuntimeBundle,
+} from './reasoning-provider-registry.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -207,56 +170,10 @@ function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallRea
 }
 
 function providerForReasoningMode(mode: ReasoningBackendMode): string | undefined {
-  switch (mode) {
-    case 'claude-cli':
-    case 'claude-agent':
-      return 'claude';
-    case 'codex-cli':
-      return 'codex';
-    case 'gemini-cli':
-      return 'gemini';
-    case 'gemini-api':
-      return 'gemini-api';
-    case 'agy-cli':
-      return 'agy';
-    case 'grok-cli':
-      return 'grok';
-    case 'grok-api':
-      return 'grok-api';
-    case 'copilot':
-      return 'copilot';
-    case 'anthropic':
-      return 'anthropic';
-    case 'openrouter':
-      return 'openrouter';
-    case 'local':
-      return 'local';
-    case 'ollama':
-      return 'ollama';
-    case 'vllm':
-      return 'vllm';
-    case 'lmstudio':
-      return 'lmstudio';
-    case 'llamacpp':
-      return 'llamacpp';
-    case 'mlx':
-      return 'mlx';
-    case 'localai':
-      return 'localai';
-    case 'nemotron':
-    case 'nemotron-api':
-      return 'nemotron';
-    case 'stub':
-      return undefined;
-  }
+  return getReasoningProviderDescriptor(mode)?.provider;
 }
 
-interface ReasoningRuntimeBundle {
-  mode: ReasoningBackendMode;
-  backend: ReasoningBackendCandidate;
-  intentExtractor?: IntentExtractorCandidate;
-  voiceBridge?: VoiceBridgeCandidate;
-}
+type ReasoningRuntimeBundle = ReasoningProviderRuntimeBundle;
 
 function openAiOverrides(
   options: InstallReasoningOptions,
@@ -278,361 +195,38 @@ function buildReasoningRuntimeBundle(
   mode: ReasoningBackendMode,
   options: InstallReasoningOptions
 ): ReasoningRuntimeBundle | null {
+  // Managed provider modules get the same governed bundle contract as built-ins.
+  // A factory returning null deliberately falls through to the built-in adapter
+  // so registration can add a mode-specific override without changing policy.
+  const registeredBundle = buildRegisteredReasoningProvider(mode, options);
+  if (registeredBundle) return registeredBundle;
+
   const provider = providerForReasoningMode(mode);
-  switch (mode) {
-    case 'anthropic': {
-      if (!options.anthropicClient && !process.env.ANTHROPIC_API_KEY && !options.force) {
-        return null;
-      }
-      const client = options.anthropicClient ?? new Anthropic();
-      return {
-        mode,
-        backend: {
-          backend: new AnthropicReasoningBackend({ client, model: options.model }),
-          provider,
-          label: mode,
-        },
-        intentExtractor: {
-          extractor: new AnthropicIntentExtractor({ client, model: options.model }),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new AnthropicVoiceBridge({ client, model: options.model }),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'gemini-api': {
-      const geminiBackend = buildGeminiApiBackendFromEnv(
-        process.env,
-        options.model,
-        options.samplingParams
-      );
-      if (!geminiBackend && !options.force) return null;
-      if (!geminiBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: maybeWrapWithDispatcher(geminiBackend),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'claude-cli': {
-      const cliBackend = buildShellClaudeCliBackendFromEnv(process.env, undefined, options.model);
-      if (!cliBackend) return null;
-      // The availability probe may have selected a real CLI outside
-      // node_modules/.bin when the PATH entry is a pnpm placeholder. Reuse
-      // that exact validated path for intent and voice so all Claude adapters
-      // execute the same binary.
-      const claudeOptions = {
-        ...buildClaudeCliOptionsFromEnv(),
-        ...(options.model ? { model: options.model } : {}),
-        bin: cliBackend.getBinaryPath(),
-      };
-      return {
-        mode,
-        backend: { backend: cliBackend, provider, label: mode },
-        intentExtractor: {
-          extractor: new ClaudeCliIntentExtractor(claudeOptions),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new ClaudeCliVoiceBridge(claudeOptions),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'codex-cli': {
-      const codexOptions = buildCodexCliQueryOptionsFromEnv();
-      const mergedCodexOptions = {
-        ...codexOptions,
-        ...(options.model ? { model: options.model } : {}),
-      };
-      const codexBackend = new CodexCliReasoningBackend(mergedCodexOptions);
-      return {
-        mode,
-        backend: {
-          backend: maybeWrapWithDispatcher(codexBackend),
-          provider,
-          label: mode,
-        },
-        intentExtractor: {
-          extractor: new CodexCliIntentExtractor(mergedCodexOptions),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new CodexCliVoiceBridge(mergedCodexOptions),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'claude-agent': {
-      if (!process.env.CLAUDECODE && !process.env.ANTHROPIC_API_KEY && !options.force) return null;
-      return {
-        mode,
-        backend: {
-          backend: maybeWrapWithDispatcher(
-            new ClaudeAgentReasoningBackend({ model: options.model })
-          ),
-          provider,
-          label: mode,
-        },
-        intentExtractor: {
-          extractor: new ClaudeAgentIntentExtractor({ model: options.model }),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new ClaudeAgentVoiceBridge({ model: options.model }),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'gemini-cli': {
-      const geminiBackend = buildGeminiCliBackendFromEnv(process.env, options.model);
-      if (!geminiBackend && !options.force) return null;
-      if (!geminiBackend) return null;
-      const geminiOptions = {
-        bin: process.env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
-        model: options.model ?? (process.env.KYBERION_GEMINI_CLI_MODEL?.trim() || undefined),
-      };
-      return {
-        mode,
-        backend: {
-          backend: maybeWrapWithDispatcher(geminiBackend),
-          provider,
-          label: mode,
-        },
-        intentExtractor: {
-          extractor: new GeminiCliIntentExtractor(geminiOptions),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new GeminiCliVoiceBridge(geminiOptions),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'agy-cli': {
-      const agyBackend = buildAgyCliBackendFromEnv(process.env);
-      if (!agyBackend && !options.force) return null;
-      if (!agyBackend) return null;
-      const agyOptions = {
-        bin:
-          (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() ||
-          undefined,
-      };
-      return {
-        mode,
-        backend: { backend: maybeWrapWithDispatcher(agyBackend), provider, label: mode },
-        intentExtractor: {
-          extractor: new AgyCliIntentExtractor(agyOptions),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new AgyCliVoiceBridge(agyOptions),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'grok-cli': {
-      // Probe via env helper, then re-construct with optional model override so
-      // installReasoningBackends({ model }) pins intent/voice/reasoning alike.
-      if (!buildShellGrokCliBackendFromEnv() && !options.force) return null;
-      const grokOptions = {
-        ...buildGrokCliOptionsFromEnv(),
-        ...(options.model ? { model: options.model } : {}),
-      };
-      const grokBackend = new GrokCliBackend(grokOptions);
-      return {
-        mode,
-        backend: { backend: maybeWrapWithDispatcher(grokBackend), provider, label: mode },
-        intentExtractor: {
-          extractor: new GrokCliIntentExtractor(grokOptions),
-          provider,
-          label: mode,
-        },
-        voiceBridge: {
-          bridge: new GrokCliVoiceBridge(grokOptions),
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'grok-api': {
-      const grokApiBackend = buildGrokApiBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!grokApiBackend && !options.force) return null;
-      if (!grokApiBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: grokApiBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'local': {
-      const localBackend = buildOpenAiCompatibleBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!localBackend && !options.force) return null;
-      if (!localBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: localBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'ollama': {
-      const ollamaBackend = buildOllamaBackendFromEnv(process.env, openAiOverrides(options, mode));
-      if (!ollamaBackend && !options.force) return null;
-      if (!ollamaBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: ollamaBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'vllm': {
-      const vllmBackend = buildVllmBackendFromEnv(process.env, openAiOverrides(options, mode));
-      if (!vllmBackend && !options.force) return null;
-      if (!vllmBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: vllmBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'lmstudio': {
-      const lmstudioBackend = buildLmStudioBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!lmstudioBackend && !options.force) return null;
-      if (!lmstudioBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: lmstudioBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'llamacpp': {
-      const llamacppBackend = buildLlamaCppBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!llamacppBackend && !options.force) return null;
-      if (!llamacppBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: llamacppBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'mlx': {
-      const mlxBackend = buildMlxBackendFromEnv(process.env, openAiOverrides(options, mode));
-      if (!mlxBackend && !options.force) return null;
-      if (!mlxBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: mlxBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'localai': {
-      const localaiBackend = buildLocalAiBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!localaiBackend && !options.force) return null;
-      if (!localaiBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: localaiBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'nemotron-api': {
-      const nemotronBackend = buildNemotronBackendFromEnv(
-        process.env,
-        openAiOverrides(options, mode)
-      );
-      if (!nemotronBackend && !options.force) return null;
-      if (!nemotronBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: nemotronBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'copilot': {
-      const copilotBackend = buildCopilotAcpBackendFromEnv(process.env, options.model);
-      return {
-        mode,
-        backend: { backend: copilotBackend, provider, label: mode },
-      };
-    }
-    case 'openrouter': {
-      const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model, {
-        toolsEnabled: options.toolsEnabled,
-        allowedTools: options.allowedTools,
-      });
-      if (!openrouterBackend && !options.force) return null;
-      if (!openrouterBackend) return null;
-      return {
-        mode,
-        backend: {
-          backend: openrouterBackend,
-          provider,
-          label: mode,
-        },
-      };
-    }
-    case 'stub':
-      return null;
-  }
+  const openAiCompatibleBundle = buildOpenAiCompatibleProviderBundle({
+    mode,
+    provider,
+    overrides: openAiOverrides(options, mode),
+  });
+  if (openAiCompatibleBundle !== undefined) return openAiCompatibleBundle;
+
+  const cliBundle = buildCliProviderBundle({
+    mode,
+    provider,
+    model: options.model,
+    force: options.force,
+  });
+  if (cliBundle !== undefined) return cliBundle;
+
+  return buildApiProviderBundle({
+    mode,
+    provider,
+    model: options.model,
+    force: options.force,
+    anthropicClient: options.anthropicClient,
+    samplingParams: options.samplingParams,
+    toolsEnabled: options.toolsEnabled,
+    allowedTools: options.allowedTools,
+  });
 }
 
 /**
@@ -780,29 +374,9 @@ function buildReasoningRuntimeChain(
   return filterChainByProviderCapability(candidates);
 }
 
-const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
-  'claude-cli',
-  'codex-cli',
-  'claude-agent',
-  'anthropic',
-  'gemini-cli',
-  'gemini-api',
-  'agy-cli',
-  'grok-cli',
-  'grok-api',
-  'copilot',
-  'local',
-  'nemotron',
-  'nemotron-api',
-  'openrouter',
-  'ollama',
-  'vllm',
-  'lmstudio',
-  'llamacpp',
-  'mlx',
-  'localai',
-  'stub',
-]);
+const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set(
+  listReasoningProviderModes()
+);
 
 /**
  * GAP2: route the reasoning-backend selection through the Capability Broker so
@@ -861,6 +435,11 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   if (shouldReselect) {
     installed = false;
     installedMode = null;
+    // The bootstrap owns runtime reselection. Dispose the previous sole
+    // providers before constructing the replacement chain.
+    resetReasoningBackend();
+    resetIntentExtractor();
+    resetVoiceBridge();
   }
   const result = _installReasoningBackendsCore(options);
   // Python voice bridge must wrap the mode-specific bridge registered above.

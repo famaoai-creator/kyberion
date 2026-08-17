@@ -388,6 +388,21 @@
         "additionalProperties": true
       }
     },
+    "skill_resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "path", "frontmatter", "provenance"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "frontmatter": { "type": "object", "additionalProperties": true },
+          "provenance": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      }
+    },
     "task_guidance": {
       "type": "object",
       "required": ["model_tier", "acceptance_criteria", "output_contract", "verification"],
@@ -436,6 +451,7 @@
               "task_session",
               "work_item",
               "knowledge_hint",
+              "skill_resource",
               "other"
             ]
           },

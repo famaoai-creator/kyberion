@@ -23,6 +23,7 @@ import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from './s
 import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -79,24 +80,42 @@ export function getSpeechToTextCapabilities(
   return bridge.capabilities ?? NO_TIMESTAMP_STT_CAPABILITIES;
 }
 
-const registered = new Map<string, SpeechToTextBridge>();
+const speechToTextSeam = defineSeam<SpeechToTextBridge>({
+  key: 'speech-to-text-bridge',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+  select: (providers) =>
+    [...providers].sort(
+      (left, right) =>
+        (right.implementation.priority ?? 0) - (left.implementation.priority ?? 0) ||
+        left.id.localeCompare(right.id)
+    )[0]?.implementation,
+});
+const registeredDisposers = new Map<string, () => void>();
 
-export function registerSpeechToTextBridge(bridge: SpeechToTextBridge): void {
+export function registerSpeechToTextBridge(bridge: SpeechToTextBridge): () => void {
   const name = String(bridge.name || '').trim();
   if (!name) throw new Error('SpeechToTextBridge.name is required');
-  registered.set(name, bridge);
+  const disposer = speechToTextSeam.register(name, bridge, {
+    provenance: 'builtin',
+    source: 'speech-to-text-bridge',
+  });
+  registeredDisposers.set(name, disposer);
+  return disposer;
 }
 
 export function getSpeechToTextBridge(): SpeechToTextBridge {
-  return getSpeechToTextBridges()[0] || stubSpeechToTextBridge;
+  return speechToTextSeam.getOptional() || stubSpeechToTextBridge;
 }
 
 export function getSpeechToTextBridges(): SpeechToTextBridge[] {
-  return registered.size > 0 ? [...registered.values()] : [stubSpeechToTextBridge];
+  const bridges = speechToTextSeam.list().map((provider) => provider.implementation);
+  return bridges.length > 0 ? bridges : [stubSpeechToTextBridge];
 }
 
 export function resetSpeechToTextBridge(): void {
-  registered.clear();
+  for (const dispose of registeredDisposers.values()) dispose();
+  registeredDisposers.clear();
 }
 
 export function normalizeSpeechToTextResult(

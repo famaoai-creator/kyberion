@@ -28,9 +28,10 @@ describe('buildCostReport', () => {
     entry({
       mission_id: 'MSN-A',
       cost_usd: 0.2,
+      cause: 'assistant',
       usage: { prompt_tokens: 100, completion_tokens: 50 },
     }),
-    entry({ mission_id: 'MSN-A', sdk_cost_usd: 0.6, cost_usd: 0.1 }),
+    entry({ mission_id: 'MSN-A', sdk_cost_usd: 0.6, cost_usd: 0.1, cause: 'judge' }),
     entry({ mission_id: 'MSN-B', model: 'gemini-3.5-flash', cost_usd: 0.05, estimated: true }),
     entry({ timestamp: D1, cost_usd: 0.4 }),
     entry({ cost_usd: 0 }), // zero cost — excluded
@@ -49,6 +50,7 @@ describe('buildCostReport', () => {
 
     const noMission = report.by_mission.find((b) => b.key === '(no mission)');
     expect(noMission?.cost_usd).toBeCloseTo(0.4, 5);
+    expect(report.by_cause.find((b) => b.key === 'judge')?.cost_usd).toBeCloseTo(0.6, 5);
 
     expect(report.by_day.map((b) => b.key)).toEqual(['2026-07-10', '2026-07-11']);
   });

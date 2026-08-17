@@ -11,6 +11,7 @@ import {
   type ContextSecurityScope,
 } from './context-security-scope.js';
 import type { EventScopeInput } from './event-scope.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface AgentTaskEnvelope {
   task_id: string;
@@ -135,12 +136,26 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
   }
 }
 
-let registeredAgentExecutionPort: AgentExecutionPort | undefined;
+const agentExecutionPortSeam = defineSeam<AgentExecutionPort>({
+  key: 'agent-execution-port',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerAgentExecutionPort(port: AgentExecutionPort): void {
-  registeredAgentExecutionPort = port;
+export function registerAgentExecutionPort(port: AgentExecutionPort): () => void {
+  registeredDisposer = agentExecutionPortSeam.register('default', port, {
+    provenance: 'builtin',
+    source: 'agent-execution-port',
+  });
+  return registeredDisposer;
+}
+
+export function resetAgentExecutionPort(): void {
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 export function getAgentExecutionPort(): AgentExecutionPort {
-  return (registeredAgentExecutionPort ||= new SupervisorAgentExecutionPort());
+  return agentExecutionPortSeam.getOptional() ?? new SupervisorAgentExecutionPort();
 }

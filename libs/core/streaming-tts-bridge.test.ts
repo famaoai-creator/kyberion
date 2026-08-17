@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   GeminiStreamingTextToSpeechBridge,
+  StubStreamingTextToSpeechBridge,
   getStreamingTtsBridge,
+  registerStreamingTtsBridge,
+  resetStreamingTtsBridges,
 } from './streaming-tts-bridge.js';
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +25,7 @@ describe('GeminiStreamingTextToSpeechBridge', () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    resetStreamingTtsBridges();
   });
 
   it('decodes Gemini TTS audio bytes into a PCM chunk', async () => {
@@ -58,5 +62,15 @@ describe('GeminiStreamingTextToSpeechBridge', () => {
 
   it('resolves gemini bridge from the built-in registry shortcut', () => {
     expect(getStreamingTtsBridge('gemini').bridge_id).toBe('gemini');
+  });
+
+  it('rejects duplicate named providers and supports disposal', () => {
+    const first = registerStreamingTtsBridge('test', () => new StubStreamingTextToSpeechBridge());
+    expect(() =>
+      registerStreamingTtsBridge('test', () => new StubStreamingTextToSpeechBridge())
+    ).toThrow(/already registered/);
+    expect(getStreamingTtsBridge('test').bridge_id).toBe('stub');
+    first();
+    expect(() => getStreamingTtsBridge('test')).toThrow(/unknown bridge id/);
   });
 });

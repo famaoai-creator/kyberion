@@ -23,6 +23,13 @@ describe('intent-extractor', () => {
     expect(getIntentExtractor().name).toBe('fake');
   });
 
+  it('rejects a second sole provider instead of silently replacing the first', () => {
+    registerIntentExtractor({ name: 'first', extract: stubIntentExtractor.extract });
+    expect(() =>
+      registerIntentExtractor({ name: 'second', extract: stubIntentExtractor.extract })
+    ).toThrow(/already has provider first/);
+  });
+
   it('fails over to the next extractor when the first one throws', async () => {
     const calls: string[] = [];
     const extractor = buildFailoverIntentExtractor([

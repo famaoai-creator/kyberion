@@ -11,6 +11,7 @@
  */
 
 import { logger } from './core.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 import {
   listDemotedProviders,
   reportProviderHealthy,
@@ -75,7 +76,9 @@ export interface VoiceBridgeCandidate {
 }
 
 function normalizeProviderName(value?: string): string | null {
-  const provider = String(value || '').trim().toLowerCase();
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase();
   return provider || null;
 }
 
@@ -136,18 +139,31 @@ export function buildFailoverVoiceBridge(candidates: VoiceBridgeCandidate[]): Vo
   return new FailoverVoiceBridge(candidates);
 }
 
-let registered: VoiceBridge | null = null;
+const voiceBridgeSeam = defineSeam<VoiceBridge>({
+  key: 'voice-bridge',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerVoiceBridge(bridge: VoiceBridge): void {
-  registered = bridge;
+export function registerVoiceBridge(bridge: VoiceBridge): () => void {
+  if (!bridge || typeof bridge.name !== 'string' || !bridge.name.trim()) {
+    throw new TypeError('Voice bridge must have a non-empty name');
+  }
+  registeredDisposer = voiceBridgeSeam.register(bridge.name, bridge, {
+    provenance: 'builtin',
+    source: 'voice-bridge',
+  });
+  return registeredDisposer;
 }
 
 export function getVoiceBridge(): VoiceBridge {
-  return registered ?? stubVoiceBridge;
+  return voiceBridgeSeam.getOptional() ?? stubVoiceBridge;
 }
 
 export function resetVoiceBridge(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 function basename(p: string): string {
@@ -165,21 +181,24 @@ export const stubVoiceBridge: VoiceBridge = {
 
   async runRoleplaySession(input) {
     logger.warn(
-      '[voice-bridge:stub] runRoleplaySession — no governed voice bridge registered; producing synthetic transcript',
+      '[voice-bridge:stub] runRoleplaySession — no governed voice bridge registered; producing synthetic transcript'
     );
     return {
       written_to: input.outputPath,
       _synthetic: true,
       turns: [
         { speaker: 'sovereign', text: `[SYNTH] Opening line for objective: ${input.objective}` },
-        { speaker: 'counterparty', text: '[SYNTH] Placeholder reply shaped by persona style_hints' },
+        {
+          speaker: 'counterparty',
+          text: '[SYNTH] Placeholder reply shaped by persona style_hints',
+        },
       ],
     };
   },
 
   async runOneOnOneSession(input) {
     logger.warn(
-      '[voice-bridge:stub] runOneOnOneSession — no governed voice bridge registered; producing synthetic session',
+      '[voice-bridge:stub] runOneOnOneSession — no governed voice bridge registered; producing synthetic session'
     );
     return {
       written_to: input.outputPath,

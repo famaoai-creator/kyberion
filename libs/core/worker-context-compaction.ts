@@ -21,7 +21,7 @@ import { logger } from './core.js';
 import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
@@ -38,6 +38,8 @@ export interface WorkerContextMessage {
   pairId?: string;
   /** Pinned messages (goal, system framing) are never elided or summarized away. */
   pinned?: boolean;
+  /** PI-04: a summary entry can carry its verbatim tail for standalone recovery. */
+  retained_tail?: WorkerContextMessage[];
 }
 
 /** KC-06: a still-running delegated background task surfaced across the compaction boundary. */
@@ -58,6 +60,23 @@ export interface CompactionCarryover {
   next_step: string;
   /** KC-06: still-running delegated tasks re-injected post-compaction (≤8). */
   active_background_tasks?: ActiveBackgroundTaskRef[];
+  /** PI-04: cumulative file context supplied to update-style summaries. */
+  read_files?: string[];
+  modified_files?: string[];
+}
+
+export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+
+export interface CompactionDetails {
+  readFiles: string[];
+  modifiedFiles: string[];
+}
+
+export interface CompactionSummaryContext {
+  previousSummary?: string;
+  details: CompactionDetails;
+  retainedTail: WorkerContextMessage[];
+  reason: CompactionReason;
 }
 
 export interface ContextWindowProfile {
@@ -79,7 +98,7 @@ export interface CompactWorkerContextOptions {
   /** Recent tool_result messages kept verbatim by microcompact. Default 5. */
   keepRecentToolResults?: number;
   /** LLM summary stage; omit to run microcompact only. */
-  summarize?: (transcript: string) => Promise<string>;
+  summarize?: (transcript: string, context?: CompactionSummaryContext) => Promise<string>;
   carryover?: CompactionCarryover;
   missionId?: string;
   taskId?: string;
@@ -97,6 +116,24 @@ export interface CompactWorkerContextOptions {
   scope?: ScopeContext;
   /** Provider used by the summary callback, when known. */
   summaryProvider?: string;
+  /** Token usage measured by the last provider call, used as a hybrid anchor. */
+  lastProviderUsageTokens?: number;
+  /** Number of leading messages represented by the provider usage anchor. */
+  providerUsageMessageCount?: number;
+  /** Previous update-summary text, when the caller has it outside the transcript. */
+  previousSummary?: string;
+  /** Cumulative file context for the update-summary prompt. */
+  details?: Partial<CompactionDetails>;
+  /** Explicit reason; reactive overflow compaction sets this automatically. */
+  reason?: CompactionReason;
+}
+
+export interface ContextTokenEstimate {
+  tokens: number;
+  strategy: 'char' | 'hybrid';
+  usageTokens?: number;
+  estimatedTrailingTokens: number;
+  trailingMessageCount: number;
 }
 
 export interface CompactWorkerContextResult {
@@ -110,6 +147,11 @@ export interface CompactWorkerContextResult {
   summaryArtifactPath?: string;
   /** Set when the summarize stage was attempted and failed (microcompact still applied). */
   summaryError?: string;
+  tokenEstimate: ContextTokenEstimate;
+  reason?: CompactionReason;
+  /** Tail copied into the summary entry and available for standalone recovery. */
+  retainedTail: WorkerContextMessage[];
+  details: CompactionDetails;
 }
 
 const DEFAULT_CONTEXT_WINDOW_TOKENS = 200_000;
@@ -120,6 +162,14 @@ const ELIDE_MIN_CHARS = 200;
 /** Fraction of the threshold kept as verbatim recent history by the summary stage. */
 const SUMMARY_TAIL_FRACTION = 0.25;
 const MAX_CONSECUTIVE_SUMMARY_FAILURES = 3;
+const UPDATE_SUMMARY_PROMPT_PATH = pathResolver.knowledge(
+  'product/prompts/worker-context-update-summary.md'
+);
+const FALLBACK_UPDATE_SUMMARY_PROMPT = [
+  'Update the existing worker context summary from the new transcript.',
+  'Preserve completed decisions and keep In Progress items explicit.',
+  'Return a concise summary that can stand alone after compaction.',
+].join('\n');
 
 /** Provider "prompt too long" detection for the reactive compaction path. */
 export const PROMPT_TOO_LONG_PATTERN =
@@ -161,18 +211,110 @@ export function compactionThresholdTokens(profile: ContextWindowProfile): number
 }
 
 /**
- * ~4 chars/token (cli-usage-metering heuristic) padded by 4/3 so the estimate
- * errs high — OpenHarness-validated as sufficient for compaction triggering.
+ * The legacy estimate remains intentionally conservative for callers outside
+ * compaction. PI-04's hybrid path uses a separate /4 estimate for its
+ * unmeasured tail below.
  */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
 
-export function estimateContextTokens(messages: readonly WorkerContextMessage[]): number {
-  return messages.reduce((sum, message) => sum + estimateTokens(message.content), 0);
+function estimateHybridTailTokens(text: string): number {
+  return Math.ceil(text.length / 4);
 }
 
-export function renderCarryoverBlock(carryover: CompactionCarryover): string {
+export function estimateContextTokenDetails(
+  messages: readonly WorkerContextMessage[],
+  options: { providerUsageTokens?: number; providerUsageMessageCount?: number } = {}
+): ContextTokenEstimate {
+  const usageTokens = options.providerUsageTokens;
+  if (typeof usageTokens === 'number' && Number.isFinite(usageTokens) && usageTokens >= 0) {
+    const prefixCount = Math.max(
+      0,
+      Math.min(messages.length, Math.floor(options.providerUsageMessageCount ?? messages.length))
+    );
+    const estimatedTrailingTokens = messages
+      .slice(prefixCount)
+      .reduce((sum, message) => sum + estimateHybridTailTokens(message.content), 0);
+    return {
+      tokens: Math.ceil(usageTokens) + estimatedTrailingTokens,
+      strategy: 'hybrid',
+      usageTokens: Math.ceil(usageTokens),
+      estimatedTrailingTokens,
+      trailingMessageCount: messages.length - prefixCount,
+    };
+  }
+  const estimatedTrailingTokens = messages.reduce(
+    (sum, message) => sum + estimateTokens(message.content),
+    0
+  );
+  return {
+    tokens: estimatedTrailingTokens,
+    strategy: 'char',
+    estimatedTrailingTokens,
+    trailingMessageCount: messages.length,
+  };
+}
+
+export function estimateContextTokens(
+  messages: readonly WorkerContextMessage[],
+  options: { providerUsageTokens?: number; providerUsageMessageCount?: number } = {}
+): number {
+  return estimateContextTokenDetails(messages, options).tokens;
+}
+
+function uniqueStrings(values: readonly string[] | undefined): string[] {
+  return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))].sort();
+}
+
+function resolveCompactionDetails(options: CompactWorkerContextOptions): CompactionDetails {
+  return {
+    readFiles: uniqueStrings([
+      ...(options.carryover?.read_files ?? []),
+      ...(options.details?.readFiles ?? []),
+    ]),
+    modifiedFiles: uniqueStrings([
+      ...(options.carryover?.modified_files ?? []),
+      ...(options.details?.modifiedFiles ?? []),
+    ]),
+  };
+}
+
+function extractPreviousSummary(messages: readonly WorkerContextMessage[]): string | undefined {
+  const summaryMessage = [...messages]
+    .reverse()
+    .find((message) => message.content.includes('<summary>'));
+  if (!summaryMessage) return undefined;
+  const match = summaryMessage.content.match(/<summary>\s*([\s\S]*?)\s*<\/summary>/u);
+  return match?.[1]?.trim() || undefined;
+}
+
+function loadUpdateSummaryPrompt(): string {
+  if (!safeExistsSync(UPDATE_SUMMARY_PROMPT_PATH)) return FALLBACK_UPDATE_SUMMARY_PROMPT;
+  return String(safeReadFile(UPDATE_SUMMARY_PROMPT_PATH, { encoding: 'utf8' }) || '').trim();
+}
+
+function renderUpdateSummaryInput(transcript: string, context: CompactionSummaryContext): string {
+  return [
+    loadUpdateSummaryPrompt(),
+    '',
+    '## Previous summary',
+    context.previousSummary || '(none — establish the first summary)',
+    '',
+    '## Cumulative file context',
+    JSON.stringify(context.details),
+    '',
+    `## Compaction reason\n${context.reason}`,
+    '',
+    '## New transcript',
+    transcript,
+  ].join('\n');
+}
+
+export function renderCarryoverBlock(
+  carryover: CompactionCarryover,
+  details?: CompactionDetails
+): string {
   const list = (values: string[]): string =>
     values.length > 0 ? values.map((value) => `  - ${value}`).join('\n') : '  - none';
   const backgroundTasks = (carryover.active_background_tasks ?? []).slice(
@@ -187,6 +329,12 @@ export function renderCarryoverBlock(carryover: CompactionCarryover): string {
     'verified_state:',
     list(carryover.verified_state),
     `next_step: ${carryover.next_step}`,
+    ...(details && (details.readFiles.length > 0 || details.modifiedFiles.length > 0)
+      ? [
+          `read_files: ${details.readFiles.join(', ') || 'none'}`,
+          `modified_files: ${details.modifiedFiles.join(', ') || 'none'}`,
+        ]
+      : []),
     ...(backgroundTasks.length > 0
       ? [
           'active_background_tasks:',
@@ -308,6 +456,9 @@ function pairSafeTailStart(
 function persistSummaryArtifact(input: {
   summary: string;
   carryover?: CompactionCarryover;
+  details: CompactionDetails;
+  reason: CompactionReason;
+  retainedTail: WorkerContextMessage[];
   missionId?: string;
   summaryDir?: string;
   recordArtifact?: (artifactPath: string, description: string) => void;
@@ -335,6 +486,13 @@ function persistSummaryArtifact(input: {
       '# Auto-compaction summary',
       '',
       input.summary,
+      '',
+      `compaction_reason: ${input.reason}`,
+      `details: ${JSON.stringify(input.details)}`,
+      '',
+      '<retained_tail>',
+      renderTranscriptForSummary(input.retainedTail),
+      '</retained_tail>',
       ...(input.carryover ? ['', renderCarryoverBlock(input.carryover)] : []),
       '',
     ].join('\n');
@@ -368,7 +526,20 @@ export async function compactWorkerContext(
 ): Promise<CompactWorkerContextResult> {
   const profile = resolveContextWindowProfile(options.profile);
   const thresholdTokens = compactionThresholdTokens(profile);
-  const tokensBefore = estimateContextTokens(messages);
+  const reason = options.reason || (options.force ? 'manual' : 'threshold');
+  const details = resolveCompactionDetails(options);
+  const carryover = options.carryover
+    ? {
+        ...options.carryover,
+        ...(details.readFiles.length > 0 ? { read_files: details.readFiles } : {}),
+        ...(details.modifiedFiles.length > 0 ? { modified_files: details.modifiedFiles } : {}),
+      }
+    : undefined;
+  const tokenEstimate = estimateContextTokenDetails(messages, {
+    providerUsageTokens: options.lastProviderUsageTokens,
+    providerUsageMessageCount: options.providerUsageMessageCount,
+  });
+  const tokensBefore = tokenEstimate.tokens;
 
   if (!options.force && tokensBefore <= thresholdTokens) {
     return {
@@ -378,6 +549,9 @@ export async function compactWorkerContext(
       tokensBefore,
       tokensAfter: tokensBefore,
       thresholdTokens,
+      tokenEstimate,
+      retainedTail: [],
+      details,
     };
   }
 
@@ -386,7 +560,13 @@ export async function compactWorkerContext(
     attributes: {
       tokens_before: tokensBefore,
       threshold_tokens: thresholdTokens,
+      estimate_strategy: tokenEstimate.strategy,
+      ...(tokenEstimate.usageTokens === undefined
+        ? {}
+        : { usage_tokens_anchor: tokenEstimate.usageTokens }),
+      estimated_trailing_tokens: tokenEstimate.estimatedTrailingTokens,
       forced: Boolean(options.force),
+      reason,
       ...(options.missionId ? { mission_id: options.missionId } : {}),
     },
   });
@@ -416,6 +596,7 @@ export async function compactWorkerContext(
   let stage: CompactWorkerContextResult['stage'] = 'microcompact';
   let summaryArtifactPath: string | undefined;
   let summaryError: string | undefined;
+  let retainedTail: WorkerContextMessage[] = [];
 
   // Stage 2 — LLM summary over the older history.
   const stillOver = estimateContextTokens(compactedMessages) > thresholdTokens;
@@ -426,6 +607,7 @@ export async function compactWorkerContext(
     const tailStart = pairSafeTailStart(flow, tailBudget);
     const head = flow.slice(0, tailStart);
     const tail = flow.slice(tailStart);
+    retainedTail = tail;
     if (head.length > 0) {
       try {
         if (options.summaryProvider && options.scope) {
@@ -436,10 +618,24 @@ export async function compactWorkerContext(
           });
           if (!egress.allowed) throw new Error(egress.reason || 'summary egress denied');
         }
-        const summary = await options.summarize(renderTranscriptForSummary(head));
+        const summaryContext: CompactionSummaryContext = {
+          ...(options.previousSummary || extractPreviousSummary(messages)
+            ? { previousSummary: options.previousSummary || extractPreviousSummary(messages) }
+            : {}),
+          details,
+          retainedTail: tail,
+          reason,
+        };
+        const summary = await options.summarize(
+          renderUpdateSummaryInput(renderTranscriptForSummary(head), summaryContext),
+          summaryContext
+        );
         summaryArtifactPath = persistSummaryArtifact({
           summary,
-          carryover: options.carryover,
+          carryover,
+          details,
+          reason,
+          retainedTail: tail,
           missionId: options.missionId,
           summaryDir: options.summaryDir,
           recordArtifact: options.recordArtifact,
@@ -450,11 +646,12 @@ export async function compactWorkerContext(
           content: [
             '<summary>',
             summary,
-            summaryArtifactPath ? `(full summary artifact: ${summaryArtifactPath})` : '',
             '</summary>',
+            summaryArtifactPath ? `(full summary artifact: ${summaryArtifactPath})` : '',
           ]
             .filter(Boolean)
             .join('\n'),
+          retained_tail: tail,
         };
         compactedMessages = [...pinned, summaryMessage, ...tail];
         stage = 'summary';
@@ -473,19 +670,29 @@ export async function compactWorkerContext(
 
   // Carryover survives the boundary as structured data, independent of the
   // summary stage's outcome.
-  if (options.carryover) {
+  if (carryover) {
     compactedMessages = [
       ...compactedMessages,
-      { role: 'user', content: renderCarryoverBlock(options.carryover), pinned: true },
+      { role: 'user', content: renderCarryoverBlock(carryover, details), pinned: true },
     ];
     if (options.workingMemory && options.missionId) {
       persistCarryover({
         workingMemory: options.workingMemory,
         missionId: options.missionId,
-        carryover: options.carryover,
+        carryover,
         writerAgent: options.writerAgent,
         taskId: options.taskId,
-        metadata: { stage, tokens_before: tokensBefore, threshold_tokens: thresholdTokens },
+        metadata: {
+          stage,
+          tokens_before: tokensBefore,
+          threshold_tokens: thresholdTokens,
+          estimate_strategy: tokenEstimate.strategy,
+          reason,
+          details,
+          ...(tokenEstimate.usageTokens === undefined
+            ? {}
+            : { usage_tokens_anchor: tokenEstimate.usageTokens }),
+        },
       });
     }
   }
@@ -498,6 +705,9 @@ export async function compactWorkerContext(
       tokens_after: tokensAfter,
       threshold_tokens: thresholdTokens,
       stage,
+      reason,
+      estimate_strategy: tokenEstimate.strategy,
+      estimated_trailing_tokens: tokenEstimate.estimatedTrailingTokens,
       ...(summaryArtifactPath ? { summary_artifact: summaryArtifactPath } : {}),
       ...(summaryError ? { summary_error: summaryError } : {}),
       ...(options.missionId ? { mission_id: options.missionId } : {}),
@@ -529,6 +739,7 @@ export async function compactWorkerContext(
   }
   try {
     metrics.record('worker:context-compaction', tokensBefore - tokensAfter, 'success', {
+      cause: 'compaction',
       stage,
       tokens_before: tokensBefore,
       tokens_after: tokensAfter,
@@ -547,6 +758,10 @@ export async function compactWorkerContext(
     thresholdTokens,
     summaryArtifactPath,
     summaryError,
+    tokenEstimate,
+    reason,
+    retainedTail,
+    details,
   };
 }
 
@@ -572,7 +787,11 @@ export class WorkerContextCompactor {
     const options = { ...this.baseOptions, ...overrides };
     if (this.disabled) {
       const profile = resolveContextWindowProfile(options.profile);
-      const tokens = estimateContextTokens(messages);
+      const tokenEstimate = estimateContextTokenDetails(messages, {
+        providerUsageTokens: options.lastProviderUsageTokens,
+        providerUsageMessageCount: options.providerUsageMessageCount,
+      });
+      const tokens = tokenEstimate.tokens;
       return {
         messages: [...messages],
         compacted: false,
@@ -580,6 +799,9 @@ export class WorkerContextCompactor {
         tokensBefore: tokens,
         tokensAfter: tokens,
         thresholdTokens: compactionThresholdTokens(profile),
+        tokenEstimate,
+        retainedTail: [],
+        details: resolveCompactionDetails(options),
       };
     }
     const result = await compactWorkerContext(messages, options);
@@ -616,6 +838,6 @@ export class WorkerContextCompactor {
     overrides: Partial<CompactWorkerContextOptions> = {}
   ): Promise<CompactWorkerContextResult | null> {
     if (this.disabled || !isPromptTooLongError(error)) return null;
-    return this.maybeCompact(messages, { ...overrides, force: true });
+    return this.maybeCompact(messages, { ...overrides, force: true, reason: 'overflow' });
   }
 }
