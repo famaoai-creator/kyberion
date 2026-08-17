@@ -603,6 +603,13 @@ class RequestBodyTooLargeError extends Error {
   }
 }
 
+function isRequestBodyTooLargeError(error: unknown): boolean {
+  return (
+    error instanceof RequestBodyTooLargeError ||
+    (error instanceof Error && error.message === 'request_body_too_large')
+  );
+}
+
 function parseRequestBody(
   req: http.IncomingMessage,
   maxBytes = MAX_REQUEST_BODY_BYTES
@@ -813,12 +820,15 @@ export class PeerMessagingServer {
         const result = await this.processEnvelope(body as PeerMessageEnvelope);
         return sendJson(res, result.status, result.body);
       } catch (error: any) {
+        if (isRequestBodyTooLargeError(error)) {
+          return sendJson(res, 413, { ok: false, error: 'request_body_too_large' });
+        }
         const safe = toWireError(error);
         recordPeerEvent(this.options.tenantId, this.options.peerId, {
           type: 'message_error',
           reason: safe.code,
         });
-        return sendJson(res, error instanceof RequestBodyTooLargeError ? 413 : 500, {
+        return sendJson(res, 500, {
           ok: false,
           error: safe.message,
           error_code: safe.code,
