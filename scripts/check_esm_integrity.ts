@@ -16,6 +16,11 @@ const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([
   // Bootstrap exception: clean.ts runs BEFORE build on a fresh checkout, so
   // @agent/core's dist entry points do not exist yet. It must import source.
   'scripts/clean.ts',
+  // Dependency policy checks also run BEFORE build in CI and need secure-io
+  // without relying on @agent/core's not-yet-built dist entry points.
+  'scripts/check_install_script_allowlist.ts',
+  'scripts/check_lockfile_commit_gate.ts',
+  'scripts/check_pinned_deps.ts',
 ]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
