@@ -15,6 +15,7 @@ import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
   ViewerContextError,
+  viewerErrorResponse,
 } from '../../../lib/viewer-context';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
@@ -159,9 +160,6 @@ export async function POST(req: NextRequest) {
       reentryRequestId,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to review deliverable' },
-      { status: err instanceof ViewerContextError ? err.status : 500 }
-    );
+    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
   }
 }

@@ -33,6 +33,8 @@ import {
   createServiceExecutionReceipt,
   persistServiceExecutionReceipt,
   recordServiceCall,
+  runOpPreflight,
+  ensureDefaultOpPreflight,
   type ServiceExecutionReceipt,
   type ContextSecurityScope,
   type EgressPayloadContext,
@@ -227,6 +229,8 @@ async function startService(id: string, service: any, pids: any) {
 }
 
 export async function handleAction(input: ServiceAction, onEvent?: (data: any) => void) {
+  const admitted = await admitServiceAction(input);
+  input = admitted;
   if (input.action === 'pipeline') {
     const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
     let ctx = { ...input.context };
@@ -259,10 +263,15 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     }
     return { status: derivePipelineStatus(results), results, ...ctx };
   }
-  return await handleSingleAction(input, onEvent);
+  return await handleSingleAction(input, onEvent, true);
 }
 
-async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) => void) {
+async function handleSingleAction(
+  input: ServiceAction,
+  onEvent?: (data: any) => void,
+  alreadyAdmitted = false
+) {
+  if (!alreadyAdmitted) input = await admitServiceAction(input);
   logger.info(
     `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
   );
@@ -354,6 +363,32 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
   recordServiceObservation(preparedObservation, result);
   return result;
+}
+
+/**
+ * DH-01: service-actuator is also a public execution boundary. Pipeline
+ * dispatch normally arrives through run_pipeline, but direct CLI, harness,
+ * and embedded callers must receive the same serial preflight waterfall.
+ */
+async function admitServiceAction(input: ServiceAction): Promise<ServiceAction> {
+  ensureDefaultOpPreflight();
+  const approvalGranted =
+    input.params?._approval_granted === true || input.context?._approval_granted === true;
+  const preflight = await runOpPreflight({
+    op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
+    params: input as unknown as Record<string, unknown>,
+    context: input.context,
+    source: 'actuator',
+    requiresApproval:
+      input.params?._approval_required === true || input.context?._approval_required === true,
+    approvalGranted,
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Service operation was not admitted.'}`
+    );
+  }
+  return preflight.input as unknown as ServiceAction;
 }
 
 async function executeHarnessRequest(input: ServiceAction): Promise<unknown> {

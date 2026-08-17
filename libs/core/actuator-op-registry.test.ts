@@ -5,6 +5,9 @@ import {
   determineActuatorStepType,
   listKnownActuatorOps,
   listRegisteredDomainOps,
+  resolveActuatorOperation,
+  resolveActuatorOperationTimeout,
+  resolveActuatorModulePath,
 } from './actuator-op-registry.js';
 import { pathResolver, safeReadFile, safeReaddir, safeStat } from './index.js';
 
@@ -69,6 +72,45 @@ describe('actuator-op-registry', () => {
     expect(message).toContain('[UNKNOWN_OP]');
     expect(message).toContain('Did you mean: fetch');
     expect(listKnownActuatorOps('network')).toContain('fetch');
+  });
+
+  it('resolves a registered operation with actuator provenance', () => {
+    const resolved = resolveActuatorOperation('service', 'api');
+    expect(resolved).toMatchObject({
+      domain: 'service',
+      action: 'api',
+      actuatorId: 'service-actuator',
+      stepType: 'apply',
+      source: 'actuator-op-registry',
+      manifestPath: 'libs/actuators/service-actuator/manifest.json',
+    });
+    expect(resolved?.modulePath).toBe('dist/libs/actuators/service-actuator/src/index.js');
+  });
+
+  it('derives the dispatch module from the manifest entrypoint', () => {
+    const resolved = resolveActuatorOperation('video-composition', 'prepare_video_composition');
+    expect(resolved).toMatchObject({
+      actuatorId: 'video-composition-actuator',
+      manifestPath: 'libs/actuators/video-composition-actuator/manifest.json',
+      modulePath: 'dist/libs/actuators/video-composition-actuator/src/index.js',
+    });
+  });
+
+  it('resolves governed operation budgets without importing the actuator', () => {
+    expect(resolveActuatorOperationTimeout('system', 'exec')).toBe(120000);
+    expect(resolveActuatorOperation('system', 'exec')).toMatchObject({ timeoutMs: 120000 });
+  });
+
+  it('rejects manifest entrypoints that could escape the actuator directory', () => {
+    expect(resolveActuatorModulePath('service-actuator', 'src/index.ts')).toBe(
+      'dist/libs/actuators/service-actuator/src/index.js'
+    );
+    expect(() => resolveActuatorModulePath('service-actuator', '../shared.js')).toThrow(
+      '[OP_RESOLUTION_MANIFEST]'
+    );
+    expect(() => resolveActuatorModulePath('service-actuator', '/tmp/escape.js')).toThrow(
+      '[OP_RESOLUTION_MANIFEST]'
+    );
   });
 
   it('fails loudly for unknown ops instead of defaulting to apply', () => {

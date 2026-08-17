@@ -18,6 +18,7 @@
     "src/types/system-status-brief.ts",
     "src/types/system-status-report.ts",
     "types/**/*.ts",
+    "testing/**/*.ts",
     "adapters/**/*.ts",
     "deployment-adapters/**/*.ts",
     "work-integrations/**/*.ts"

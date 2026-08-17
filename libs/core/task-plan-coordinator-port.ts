@@ -1,11 +1,8 @@
 import type { AgentExecutionPort } from './agent-execution-port.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export type TaskExecutionStatus =
-  | 'pending'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'skipped_upstream_failed';
+  'pending' | 'running' | 'succeeded' | 'failed' | 'skipped_upstream_failed';
 
 export interface TaskExecutionRecord {
   task_id: string;
@@ -47,21 +44,32 @@ export interface TaskPlanCoordinatorPort {
   execute(params: ExecuteTaskPlanParams): Promise<ExecuteTaskPlanResult>;
 }
 
-let registeredTaskPlanCoordinator: TaskPlanCoordinatorPort | undefined;
+const taskPlanCoordinatorSeam = defineSeam<TaskPlanCoordinatorPort>({
+  key: 'task-plan-coordinator',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerTaskPlanCoordinator(port: TaskPlanCoordinatorPort): void {
-  registeredTaskPlanCoordinator = port;
+export function registerTaskPlanCoordinator(port: TaskPlanCoordinatorPort): () => void {
+  registeredDisposer = taskPlanCoordinatorSeam.register('default', port, {
+    provenance: 'builtin',
+    source: 'task-plan-coordinator',
+  });
+  return registeredDisposer;
 }
 
 export function resetTaskPlanCoordinator(): void {
-  registeredTaskPlanCoordinator = undefined;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 export function getTaskPlanCoordinator(): TaskPlanCoordinatorPort {
-  if (!registeredTaskPlanCoordinator) {
+  const coordinator = taskPlanCoordinatorSeam.getOptional();
+  if (!coordinator) {
     throw new Error(
       '[TASK_PLAN_COORDINATOR_UNAVAILABLE] execute_task_plan must be routed through orchestrator-actuator'
     );
   }
-  return registeredTaskPlanCoordinator;
+  return coordinator;
 }

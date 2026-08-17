@@ -10,7 +10,7 @@ export interface ActuatorManifestFile {
   entrypoint?: string;
   resilience_tier?: string;
   recovery_policy?: Record<string, unknown>;
-  capabilities?: Array<{ op?: string }>;
+  capabilities?: Array<{ op?: string; timeout_ms?: number }>;
 }
 
 export interface ActuatorCatalogEntry {

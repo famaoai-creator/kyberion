@@ -37,6 +37,7 @@ import {
   resolveProviderUrl,
 } from './external-service-registry.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 
 export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
 
@@ -684,17 +685,25 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
 export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
 
-const _taskIntentRegistry = new Map<string, TaskSessionIntentBuilder>();
+const taskIntentBuilderSeam = defineSeam<TaskSessionIntentBuilder>({
+  key: 'task-intent-builder',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
 export function registerTaskIntentBuilder(
   intentId: string,
-  builder: TaskSessionIntentBuilder
-): void {
-  _taskIntentRegistry.set(intentId, builder);
+  builder: TaskSessionIntentBuilder,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/task-session.ts',
+  }
+): () => void {
+  return taskIntentBuilderSeam.register(intentId, builder, metadata);
 }
 
 export function getTaskIntentBuilder(intentId: string): TaskSessionIntentBuilder | undefined {
-  return _taskIntentRegistry.get(intentId);
+  return taskIntentBuilderSeam.getOptional(intentId);
 }
 
 // ─── Default Builders (Auto-registered) ──────────────────────────────────────

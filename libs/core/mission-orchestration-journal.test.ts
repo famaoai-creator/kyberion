@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeRmSync } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('mission-orchestration-journal', () => {
   beforeEach(() => {
@@ -115,5 +115,191 @@ describe('mission-orchestration-journal', () => {
     expect(replayPlan.replay_count).toBe(2);
     expect(replayPlan.last_completed_event_id).toBe(first.event_id);
     expect(replayPlan.next_event?.event_id).toBe(second.event_id);
+  });
+
+  it('records operation kind/attempt/outcome and reduces records without I/O', async () => {
+    const { appendMissionOrchestrationJournalEntry, reduceMissionState } =
+      await import('./mission-orchestration-journal.js');
+
+    const missionId = `MSN-JOURNAL-OP-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+    });
+
+    const enqueued = appendMissionOrchestrationJournalEntry({
+      missionId,
+      eventId: 'EV-OP-1',
+      eventType: 'mission_followup_requested',
+      status: 'enqueued',
+      payload: { task: 'checkpoint' },
+      operation: { kind: 'checkpoint', attempt: 2 },
+    });
+    const suspended = appendMissionOrchestrationJournalEntry({
+      missionId,
+      eventId: 'EV-OP-1',
+      eventType: 'mission_followup_requested',
+      status: 'failed',
+      payload: { task: 'checkpoint' },
+      operation: { kind: 'checkpoint', attempt: 2 },
+      outcome: { status: 'suspended', reason: 'worker_stopped' },
+    });
+
+    expect(enqueued.operation).toEqual({ id: 'EV-OP-1', kind: 'checkpoint', attempt: 2 });
+    expect(suspended.outcome).toEqual({ status: 'suspended', reason: 'worker_stopped' });
+    const reduced = reduceMissionState([enqueued, suspended]);
+    expect(reduced.pending_operation_ids).toEqual(['EV-OP-1']);
+    expect(reduced.terminal_failure).toBeNull();
+    expect(reduced.operations['EV-OP-1'].outcome.status).toBe('suspended');
+
+    const retried = appendMissionOrchestrationJournalEntry({
+      missionId,
+      eventId: 'EV-OP-1',
+      eventType: 'mission_followup_requested',
+      status: 'enqueued',
+      payload: { task: 'checkpoint' },
+    });
+    expect(retried.operation.attempt).toBe(3);
+  });
+
+  it('provisions, writes, and verifies an artifact; mismatch is fail-closed', async () => {
+    const { provisionMissionEntry, verifyProvisionedEntry, writeProvisionedEntry } =
+      await import('./mission-orchestration-journal.js');
+    const dir = pathResolver.shared(`tmp/pi-provisioned-entry-${process.pid}`);
+    const filePath = `${dir}/artifact.json`;
+    safeMkdir(dir, { recursive: true });
+    safeRmSync(filePath, { force: true });
+
+    const provisioned = provisionMissionEntry({ artifact: 'worker-output', version: 1 });
+    const persisted = writeProvisionedEntry(filePath, provisioned);
+    expect(persisted.id).toBe(provisioned.id);
+    expect(persisted.content_hash).toBe(provisioned.content_hash);
+    expect(() =>
+      verifyProvisionedEntry(provisioned, {
+        ...persisted,
+        content: { artifact: 'tampered', version: 1 },
+      })
+    ).toThrow('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
+
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects unreadable journal lines and regressing operation attempts', async () => {
+    const {
+      appendMissionOrchestrationJournalEntry,
+      loadMissionOrchestrationJournal,
+      reduceMissionState,
+    } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-CORRUPT-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(`${missionPath}/coordination/orchestration-journal.jsonl`, '{not-json}\n');
+    });
+    expect(() => loadMissionOrchestrationJournal(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:journal_entry_unreadable:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
+
+    const first = appendMissionOrchestrationJournalEntry({
+      missionId,
+      eventId: 'EV-CORRUPT-1',
+      eventType: 'mission_followup_requested',
+      status: 'enqueued',
+      payload: { attempt: 2 },
+      operation: { id: 'OP-CORRUPT', kind: 'run', attempt: 2 },
+    });
+    const older = {
+      ...first,
+      event_id: 'EV-CORRUPT-OLDER',
+      operation: { id: 'OP-CORRUPT', kind: 'run' as const, attempt: 1 },
+    };
+    expect(() => reduceMissionState([first, older])).toThrow(
+      'MISSION_LOG_CORRUPT:operation_attempt_regression:OP-CORRUPT'
+    );
+  });
+
+  it('records provision intent before a native JSON write and verifies it after the write', async () => {
+    const { loadProvisionedEntryRecords, provisionMissionEntry, writeProvisionedJson } =
+      await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-PROVISION-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const dir = pathResolver.shared(`tmp/pi-provisioned-json-${process.pid}`);
+    const filePath = `${dir}/NEXT_TASKS.json`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(dir, { recursive: true, force: true });
+      safeMkdir(dir, { recursive: true });
+    });
+    const provisioned = provisionMissionEntry([{ task_id: 'TASK-1', status: 'planned' }]);
+    const content = writeProvisionedJson({
+      missionId,
+      filePath,
+      targetPath: 'NEXT_TASKS.json',
+      provisioned,
+    });
+    expect(content).toEqual([{ task_id: 'TASK-1', status: 'planned' }]);
+    const records = loadProvisionedEntryRecords(missionId);
+    expect(records.map((record) => record.phase)).toEqual(['provisioned', 'verified']);
+    expect(records[0]).toMatchObject({
+      entry_id: provisioned.id,
+      content_hash: provisioned.content_hash,
+      target_path: 'NEXT_TASKS.json',
+    });
+    expect(String(safeReadFile(filePath, { encoding: 'utf8' }))).not.toContain('provisioned');
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(dir, { recursive: true, force: true });
+    });
+  });
+
+  it('records provision intent for native text writes without wrapping the file', async () => {
+    const { loadProvisionedEntryRecords, provisionMissionEntry, writeProvisionedText } =
+      await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-TEXT-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const dir = pathResolver.shared(`tmp/pi-provisioned-text-${process.pid}`);
+    const filePath = `${dir}/PLAN.md`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(dir, { recursive: true, force: true });
+      safeMkdir(dir, { recursive: true });
+    });
+
+    const provisioned = provisionMissionEntry('# PLAN\n\n## Objective\nKeep native text.\n');
+    const content = writeProvisionedText({
+      missionId,
+      filePath,
+      targetPath: 'PLAN.md',
+      provisioned,
+    });
+
+    expect(content).toBe(provisioned.content);
+    expect(String(safeReadFile(filePath, { encoding: 'utf8' }))).toBe(provisioned.content);
+    expect(loadProvisionedEntryRecords(missionId).map((record) => record.phase)).toEqual([
+      'provisioned',
+      'verified',
+    ]);
+    expect(loadProvisionedEntryRecords(missionId)[0]).toMatchObject({
+      entry_id: provisioned.id,
+      content_hash: provisioned.content_hash,
+      target_path: 'PLAN.md',
+    });
+
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeRmSync(dir, { recursive: true, force: true });
+    });
   });
 });

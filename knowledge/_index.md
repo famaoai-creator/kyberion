@@ -446,6 +446,7 @@
 - [Pipeline Templates](./product/pipeline-templates/README.md) (public | Unknown)
 
 ## 📁 product/prompts
+- [Worker context update summary prompt](./product/prompts/worker-context-update-summary.md) (public | Unknown)
 - [prompts/](./product/prompts/README.md) (public | Unknown)
 
 ## 📁 product/roles

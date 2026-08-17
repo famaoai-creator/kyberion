@@ -96,11 +96,31 @@ const CACHED_SYSTEM_PROMPT_BLOCKS = applyCacheBreakpointToSystemBlocks([
   { type: 'text' as const, text: SYSTEM_PROMPT },
 ]);
 
+export interface AnthropicCacheUsage {
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+/** Convert provider cache-token evidence into one request-level hit/miss event. */
+export function deriveAnthropicCacheStats(
+  usage: AnthropicCacheUsage | undefined
+): { hits: number; misses: number } | undefined {
+  if (!usage) return undefined;
+  const read = Number(usage.cache_read_input_tokens ?? 0);
+  const write = Number(usage.cache_creation_input_tokens ?? 0);
+  if (!Number.isFinite(read) || !Number.isFinite(write) || (read <= 0 && write <= 0)) {
+    return undefined;
+  }
+  return { hits: read > 0 ? 1 : 0, misses: read > 0 ? 0 : 1 };
+}
+
 export interface AnthropicReasoningBackendOptions {
   client?: Anthropic;
   model?: string;
   maxTokens?: number;
   effort?: 'low' | 'medium' | 'high';
+  /** PI-17: opt in to Anthropic's native deferred tool/search wire. */
+  enableNativeDeferredTools?: boolean;
 }
 
 const HypothesisSketchSchema = z.object({
@@ -365,12 +385,16 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly maxTokens: number;
   private readonly effort?: AnthropicReasoningBackendOptions['effort'];
+  private readonly enableNativeDeferredTools: boolean;
 
   constructor(options: AnthropicReasoningBackendOptions = {}) {
     this.client = options.client ?? new Anthropic();
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.effort = options.effort;
+    this.enableNativeDeferredTools =
+      options.enableNativeDeferredTools === true ||
+      process.env.KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS === '1';
   }
 
   /**
@@ -385,24 +409,32 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     status: 'success' | 'error',
     model: unknown,
     message?: {
-      usage?: {
+      usage?: AnthropicCacheUsage & {
         input_tokens?: number;
         output_tokens?: number;
-        cache_creation_input_tokens?: number;
       };
     }
   ): void {
     try {
       const usage = message?.usage;
+      const cacheStats = deriveAnthropicCacheStats(usage);
       metrics.record('anthropic-sdk', Date.now() - started, status, {
         model: String(model || this.model),
         agent: 'anthropic-sdk',
+        cause: 'assistant',
         mission_id: process.env.MISSION_ID || undefined,
+        ...(cacheStats ? { cacheStats } : {}),
         ...(usage
           ? {
               usage: {
-                prompt_tokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+                prompt_tokens: usage.input_tokens ?? 0,
                 completion_tokens: usage.output_tokens ?? 0,
+                ...(usage.cache_read_input_tokens === undefined
+                  ? {}
+                  : { cache_read_tokens: usage.cache_read_input_tokens }),
+                ...(usage.cache_creation_input_tokens === undefined
+                  ? {}
+                  : { cache_write_tokens: usage.cache_creation_input_tokens }),
               },
             }
           : {}),
@@ -931,13 +963,32 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
 
   async generateWithTools(
     prompt: string,
-    tools: ToolDefinition[]
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
   ): Promise<GenerateWithToolsResult> {
-    const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
+    const deferred =
+      this.enableNativeDeferredTools && options?.deferred_tool_definitions
+        ? options.deferred_tool_definitions
+        : [];
+    const anthropicTools: Anthropic.ToolUnion[] = tools.map((t) => ({
       name: t.name,
       description: t.description,
       input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
     }));
+    for (const tool of deferred) {
+      anthropicTools.push({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
+        defer_loading: true,
+      });
+    }
+    if (deferred.length > 0) {
+      anthropicTools.push({
+        type: 'tool_search_tool_bm25_20251119',
+        name: 'tool_search_tool_bm25',
+      });
+    }
 
     // KD-08: cache breakpoints at the stable-prefix boundaries — the last
     // tool declaration and the last message content block. This is the only
@@ -960,9 +1011,21 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
         input: b.input as Record<string, unknown>,
       }));
 
+    const deferredToolReferences = response.content
+      .filter(
+        (block): block is Anthropic.ToolSearchToolResultBlock =>
+          block.type === 'tool_search_tool_result'
+      )
+      .flatMap((block) =>
+        block.content.type === 'tool_search_tool_search_result'
+          ? block.content.tool_references.map((reference) => reference.tool_name)
+          : []
+      );
+
     return {
       ...(text ? { text } : {}),
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
+      ...(deferredToolReferences.length > 0 ? { deferredToolReferences } : {}),
     };
   }
 }

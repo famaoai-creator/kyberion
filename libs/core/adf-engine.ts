@@ -17,6 +17,8 @@ import {
 } from './tool-call-repeat-governor.js';
 import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.js';
 import type { ResourceClaim } from './tool-call-scheduler.js';
+import { runOpPreflight } from './op-preflight.js';
+import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -24,6 +26,8 @@ export interface AdfStep {
   type: AdfStepType;
   op: string;
   params: any;
+  /** Optional budget projected from the governed actuator operation definition. */
+  timeout_ms?: number;
   /** Explicit shared-resource claims used by the graph frontier scheduler. */
   resource_claims?: Array<string | ResourceClaim>;
 }
@@ -312,6 +316,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
     }
 
+    let executionParams = step.params;
     if (step.type !== 'control') {
       // Signature over *resolved* params: template steps inside foreach resolve
       // to different values per item and must not count as repeats.
@@ -354,6 +359,25 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           );
         }
       }
+      // DH-01: all actuator pipelines using this shared engine enter the same
+      // serial governance waterfall. A repaired input is the only input that
+      // reaches the handler; block/ask decisions are terminal and cannot be
+      // recovered through a step's on_error fallback.
+      ensureDefaultOpPreflight();
+      const preflight = await runOpPreflight({
+        op: step.op,
+        params: (resolve(step.params) || {}) as Record<string, unknown>,
+        context: ctx,
+        source: 'actuator',
+      });
+      if (preflight.decision !== 'allow') {
+        const error = new Error(
+          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${step.op} was not admitted.`}`
+        );
+        (error as Error & { adfControlFlow?: string }).adfControlFlow = 'preflight';
+        throw error;
+      }
+      executionParams = preflight.input;
     }
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
@@ -370,7 +394,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         try {
           controlResult = await handlers.control(
             step.op,
-            step.params,
+            executionParams,
             ctx,
             runNestedSteps,
             resolve
@@ -389,11 +413,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         ctx = controlResult;
         terminalRequested = ctx.__adf_terminal === true;
       } else if (step.type === 'capture') {
-        ctx = await handlers.capture(step.op, step.params, ctx, resolve);
+        ctx = await handlers.capture(step.op, executionParams, ctx, resolve);
       } else if (step.type === 'transform') {
-        ctx = await handlers.transform(step.op, step.params, ctx, resolve);
+        ctx = await handlers.transform(step.op, executionParams, ctx, resolve);
       } else if (step.type === 'apply') {
-        const nextCtx = await handlers.apply(step.op, step.params, ctx, resolve);
+        const nextCtx = await handlers.apply(step.op, executionParams, ctx, resolve);
         if (isSkippedStep(nextCtx)) {
           ctx = nextCtx.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });
@@ -419,7 +443,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       // copies. Fallback sub-pipelines run through the same engine, so their
       // failures propagate (AR-06) and their steps count against the budget.
       const onError = (step as any).on_error;
-      if (onError) {
+      if (onError && err?.adfControlFlow !== 'preflight') {
         try {
           const recovery = await handleStepError(
             err,

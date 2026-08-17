@@ -205,8 +205,7 @@ export async function executePipeline(
   );
   runtime.navigationPolicy = options.navigation_policy;
   const activeLease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
-    | BrowserRuntimeLeaseLike
-    | undefined;
+    BrowserRuntimeLeaseLike | undefined;
   if (runtime.tabs.size === 0) {
     const page = await browserContext.newPage();
     browserRuntimeHelpers.registerBrowserPage(runtime, page, 'tab-1');
@@ -1379,7 +1378,9 @@ async function opApply(
         })
       );
       const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
-      const text = secretKey ? getSecret(secretKey) : resolve(params.text);
+      const text = secretKey
+        ? getSecret(secretKey, undefined, 'browser.fill_ref')
+        : resolve(params.text);
       if (secretKey && text == null)
         throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
       await retry(async () => {
@@ -1401,7 +1402,7 @@ async function opApply(
     case 'fill_secret_ref': {
       const ref = resolve(params.ref);
       const secretKey = String(resolve(params.secret_ref));
-      const secret = getSecret(secretKey);
+      const secret = getSecret(secretKey, undefined, 'browser.fill_secret_ref');
       if (secret == null)
         throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
       const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
@@ -1537,8 +1538,7 @@ async function opApply(
       let managedProfiles: string[] = [];
       let nativeProfiles: string[] = [];
       const lease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
-        | BrowserRuntimeLeaseLike
-        | undefined;
+        BrowserRuntimeLeaseLike | undefined;
       try {
         const managedDir = pathResolver.rootResolve('active/shared/runtime/browser/profiles');
         if (safeExistsSync(managedDir)) {

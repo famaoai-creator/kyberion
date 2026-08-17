@@ -6,6 +6,8 @@
  * tighten the decision; no later registration can re-allow a denied call.
  */
 
+import { assertModuleInvariant } from './invariants.js';
+
 export type OpPreflightDecision = 'allow' | 'block' | 'ask';
 
 export interface OpPreflightCall {
@@ -15,6 +17,8 @@ export interface OpPreflightCall {
   source: 'pipeline' | 'actuator' | 'delegate' | 'mcp';
   requiresApproval?: boolean;
   approvalGranted?: boolean;
+  /** Trusted caller-side signal; false converts approval ask into a block. */
+  hasHuman?: boolean;
 }
 
 export interface OpPreflightResult {
@@ -98,8 +102,16 @@ export function resetOpPreflight(): void {
   guards.clear();
 }
 
-function approvalGuard(call: OpPreflightCall): { decision: 'ask'; reason: string } | undefined {
+function approvalGuard(
+  call: OpPreflightCall
+): { decision: 'block' | 'ask'; reason: string } | undefined {
   if (call.requiresApproval && !call.approvalGranted) {
+    if (call.hasHuman === false) {
+      return {
+        decision: 'block',
+        reason: `[HUMAN_REQUIRED] Operation ${call.op} requires human approval, but the execution boundary is non-interactive.`,
+      };
+    }
     return {
       decision: 'ask',
       reason: `Operation ${call.op} requires a prior human approval decision.`,
@@ -113,35 +125,40 @@ export async function runOpPreflight(
   call: OpPreflightCall
 ): Promise<OpPreflightResult & { input: Record<string, unknown> }> {
   let input = { ...call.params };
+  const originalInput = input;
   const listenerIds: string[] = [];
   const guardIds: string[] = [];
+  let terminate: boolean | undefined;
 
   for (const listener of ordered(listeners.values())) {
     listenerIds.push(listener.id);
     const result = await listener.run(call, input);
     if (!result) continue;
     if (result.repaired_input) input = { ...input, ...result.repaired_input };
+    if (result.terminate !== undefined) terminate = result.terminate;
     if (result.decision === 'block' || result.decision === 'ask') {
-      return {
+      return assertPreflightResult({
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
-        ...(result.repaired_input ? { repaired_input: input } : {}),
-        ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
+        ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+        ...(terminate !== undefined ? { terminate } : {}),
         listener_ids: listenerIds,
         guard_ids: guardIds,
         input,
-      };
+      });
     }
   }
 
   const builtInApproval = approvalGuard(call);
   if (builtInApproval) {
-    return {
+    return assertPreflightResult({
       ...builtInApproval,
+      ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+      ...(terminate !== undefined ? { terminate } : {}),
       listener_ids: listenerIds,
       guard_ids: ['builtin:approval'],
       input,
-    };
+    });
   }
 
   for (const guard of ordered(guards.values())) {
@@ -149,16 +166,128 @@ export async function runOpPreflight(
     const result = await guard.check(call, input);
     if (!result) continue;
     if (result?.decision === 'block' || result?.decision === 'ask') {
-      return {
+      return assertPreflightResult({
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
         ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
+        ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
         listener_ids: listenerIds,
         guard_ids: guardIds,
         input,
-      };
+      });
     }
   }
 
-  return { decision: 'allow', listener_ids: listenerIds, guard_ids: guardIds, input };
+  return assertPreflightResult({
+    decision: 'allow',
+    ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+    ...(terminate !== undefined ? { terminate } : {}),
+    listener_ids: listenerIds,
+    guard_ids: guardIds,
+    input,
+  });
+}
+
+/**
+ * Synchronous admission for command paths whose caller must begin an
+ * operation before yielding to the event loop (for example, cancellation of
+ * a running render). It executes the same ordered waterfall and fails closed
+ * if an extension contributes an async listener/guard; such a path must use
+ * runOpPreflight instead.
+ */
+export function runOpPreflightSync(
+  call: OpPreflightCall
+): OpPreflightResult & { input: Record<string, unknown> } {
+  let input = { ...call.params };
+  const originalInput = input;
+  const listenerIds: string[] = [];
+  const guardIds: string[] = [];
+  let terminate: boolean | undefined;
+
+  for (const listener of ordered(listeners.values())) {
+    listenerIds.push(listener.id);
+    const result = listener.run(call, input);
+    if (isPromiseLike(result)) {
+      throw new Error(
+        `[OP_PREFLIGHT_SYNC_UNAVAILABLE] Async listener ${listener.id} requires await.`
+      );
+    }
+    if (!result) continue;
+    if (result.repaired_input) input = { ...input, ...result.repaired_input };
+    if (result.terminate !== undefined) terminate = result.terminate;
+    if (result.decision === 'block' || result.decision === 'ask') {
+      return assertPreflightResult({
+        decision: result.decision,
+        ...(result.reason ? { reason: result.reason } : {}),
+        ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+        ...(terminate !== undefined ? { terminate } : {}),
+        listener_ids: listenerIds,
+        guard_ids: guardIds,
+        input,
+      });
+    }
+  }
+
+  const builtInApproval = approvalGuard(call);
+  if (builtInApproval) {
+    return assertPreflightResult({
+      ...builtInApproval,
+      ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+      ...(terminate !== undefined ? { terminate } : {}),
+      listener_ids: listenerIds,
+      guard_ids: ['builtin:approval'],
+      input,
+    });
+  }
+
+  for (const guard of ordered(guards.values())) {
+    guardIds.push(guard.id);
+    const result = guard.check(call, input);
+    if (isPromiseLike(result)) {
+      throw new Error(`[OP_PREFLIGHT_SYNC_UNAVAILABLE] Async guard ${guard.id} requires await.`);
+    }
+    if (!result) continue;
+    if (result.decision === 'block' || result.decision === 'ask') {
+      return assertPreflightResult({
+        decision: result.decision,
+        ...(result.reason ? { reason: result.reason } : {}),
+        ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
+        ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+        listener_ids: listenerIds,
+        guard_ids: guardIds,
+        input,
+      });
+    }
+  }
+
+  return assertPreflightResult({
+    decision: 'allow',
+    ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
+    ...(terminate !== undefined ? { terminate } : {}),
+    listener_ids: listenerIds,
+    guard_ids: guardIds,
+    input,
+  });
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return Boolean(value && typeof (value as any).then === 'function');
+}
+
+function assertPreflightResult(
+  result: OpPreflightResult & { input: Record<string, unknown> }
+): OpPreflightResult & { input: Record<string, unknown> } {
+  assertModuleInvariant('op-preflight', 'decision-domain', result);
+  assertModuleInvariant('op-preflight', 'input-record', result);
+  return result;
+}
+
+function inputChanged(
+  original: Record<string, unknown>,
+  repaired: Record<string, unknown>
+): boolean {
+  const originalKeys = Object.keys(original);
+  const repairedKeys = Object.keys(repaired);
+  if (originalKeys.length !== repairedKeys.length) return true;
+  return repairedKeys.some((key) => !Object.is(original[key], repaired[key]));
 }

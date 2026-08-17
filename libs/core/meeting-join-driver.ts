@@ -19,6 +19,7 @@ import type {
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 import type { AudioBus } from './audio-bus.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface MeetingJoinDriver {
   readonly driver_id: string;
@@ -116,14 +117,30 @@ export function validateMeetingTarget(
  * Registry
  * ------------------------------------------------------------------ */
 
-const _drivers = new Map<string, MeetingJoinDriver>();
+const meetingJoinDriverSeam = defineSeam<MeetingJoinDriver>({
+  key: 'meeting-join-driver',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const meetingJoinDriverDisposers = new Map<string, () => void>();
 
-export function registerMeetingJoinDriver(driver: MeetingJoinDriver): void {
-  _drivers.set(driver.driver_id, driver);
+export function registerMeetingJoinDriver(driver: MeetingJoinDriver): () => void {
+  const seamDispose = meetingJoinDriverSeam.register(driver.driver_id, driver, {
+    provenance: 'builtin',
+    source: 'meeting-join-driver',
+  });
+  const dispose = () => {
+    seamDispose();
+    if (meetingJoinDriverDisposers.get(driver.driver_id) === dispose) {
+      meetingJoinDriverDisposers.delete(driver.driver_id);
+    }
+  };
+  meetingJoinDriverDisposers.set(driver.driver_id, dispose);
+  return dispose;
 }
 
 export function getMeetingJoinDriver(driver_id: string): MeetingJoinDriver | undefined {
-  return _drivers.get(driver_id);
+  return meetingJoinDriverSeam.getOptional(driver_id);
 }
 
 /**
@@ -132,13 +149,16 @@ export function getMeetingJoinDriver(driver_id: string): MeetingJoinDriver | und
  * `browser-playwright`, fall to `stub`.
  */
 export function listMeetingJoinDriversFor(platform: MeetingPlatform): MeetingJoinDriver[] {
-  return Array.from(_drivers.values()).filter(
-    (d) => d.supported_platforms.includes(platform) || d.supported_platforms.includes('auto')
-  );
+  return meetingJoinDriverSeam
+    .list()
+    .map(({ implementation }) => implementation)
+    .filter(
+      (d) => d.supported_platforms.includes(platform) || d.supported_platforms.includes('auto')
+    );
 }
 
 export function resetMeetingJoinDriverRegistry(): void {
-  _drivers.clear();
+  for (const dispose of [...meetingJoinDriverDisposers.values()]) dispose();
 }
 
 /* ------------------------------------------------------------------ *

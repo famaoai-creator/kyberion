@@ -1,0 +1,10 @@
+{
+  "plugin_id": "skill-plugin-loader-contribution-fixture",
+  "version": "1.0.0",
+  "provides": {
+    "ops": ["fixture:run"],
+    "hooks": ["settlement-audit"],
+    "prompt_sections": ["fixture-note"],
+    "facets": ["fixture-policy"]
+  }
+}

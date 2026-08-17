@@ -5,6 +5,12 @@ import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
 import { tryRepairJson } from '@agent/core/json-repair';
+import { requiresProjectTrust } from '@agent/core/trust-requiring-resources';
+
+export interface AdfInputOptions {
+  /** Set false for pre-trust callers; project-local pipeline resources are not read. */
+  trustResolved?: boolean;
+}
 
 export function resolveAdfInputPath(inputPath: string): string {
   return rootResolve(inputPath);
@@ -42,6 +48,19 @@ function resolvePipelineFragmentPath(ref: string): string {
   return resolved;
 }
 
+function assertPipelineResourceTrust(inputPath: string, options: AdfInputOptions): void {
+  if (options.trustResolved !== false) return;
+  const absolute = resolveAdfInputPath(inputPath);
+  const relative = path.relative(rootResolve('.'), absolute).replaceAll('\\', '/');
+  const isProjectLocal =
+    relative !== '' && !relative.startsWith('../') && !path.isAbsolute(relative);
+  if (requiresProjectTrust(relative) || (isWorkflowModulePath(inputPath) && isProjectLocal)) {
+    throw new Error(
+      '[TRUST_REQUIRED] project-local pipeline/template cannot be loaded before trust resolution'
+    );
+  }
+}
+
 function parsePipelineFragment(raw: string, ref: string): any {
   try {
     return JSON.parse(raw);
@@ -60,7 +79,8 @@ function parsePipelineFragment(raw: string, ref: string): any {
  * schema/guardrail/graph lint before any actuator runs.
  */
 export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[] }>(
-  pipeline: T
+  pipeline: T,
+  options: AdfInputOptions = {}
 ): T {
   const expandSteps = (steps: unknown[], includeStack: ReadonlySet<string>): unknown[] =>
     steps.flatMap((rawStep) => {
@@ -71,6 +91,7 @@ export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[
       const ref = typeof params.fragment === 'string' ? params.fragment : params.path;
       if (isInclude && typeof ref === 'string' && ref.trim() && !ref.includes('{{')) {
         const fragmentPath = resolvePipelineFragmentPath(ref.trim());
+        assertPipelineResourceTrust(fragmentPath, options);
         if (!safeExistsSync(fragmentPath)) {
           throw new Error(`core:include: fragment not found: ${ref} (resolved: ${fragmentPath})`);
         }
@@ -120,9 +141,13 @@ async function readWorkflowModuleInput<T = any>(inputPath: string): Promise<T> {
   return (candidate ?? loaded) as T;
 }
 
-export function readValidatedPipelineAdf<T = any>(inputPath: string): T {
+export function readValidatedPipelineAdf<T = any>(
+  inputPath: string,
+  options: AdfInputOptions = {}
+): T {
+  assertPipelineResourceTrust(inputPath, options);
   const pipeline = validatePipelineAdf(readJsonInput(inputPath));
-  const expanded = expandPipelineIncludesForGuardrails(pipeline);
+  const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
   const guardrails = validatePipelineGuardrails(expanded as any, inputPath);
   if (!guardrails.ok) {
     const details = guardrails.findings
@@ -134,12 +159,16 @@ export function readValidatedPipelineAdf<T = any>(inputPath: string): T {
   return pipeline as T;
 }
 
-export async function readValidatedWorkflowAdf<T = any>(inputPath: string): Promise<T> {
+export async function readValidatedWorkflowAdf<T = any>(
+  inputPath: string,
+  options: AdfInputOptions = {}
+): Promise<T> {
+  assertPipelineResourceTrust(inputPath, options);
   const raw = isWorkflowModulePath(inputPath)
     ? await readWorkflowModuleInput<T>(inputPath)
     : readJsonInput<T>(inputPath);
   const pipeline = validatePipelineAdf(raw);
-  const expanded = expandPipelineIncludesForGuardrails(pipeline);
+  const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
   const guardrails = validatePipelineGuardrails(expanded as any, inputPath);
   if (!guardrails.ok) {
     const details = guardrails.findings

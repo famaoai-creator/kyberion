@@ -1,8 +1,13 @@
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import {
+  compileSchemaFromPath,
+  pathResolver,
+  registerOpPreflightListener,
+  resetOpPreflight,
+} from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
@@ -70,6 +75,29 @@ describe('service-actuator handleAction', () => {
     });
     delete process.env.KYBERION_ALLOW_UNSAFE_CLI;
     delete process.env.MISSION_ID;
+  });
+
+  afterEach(() => resetOpPreflight());
+
+  it('routes direct service execution through the shared preflight waterfall', async () => {
+    const seen: string[] = [];
+    registerOpPreflightListener({
+      id: 'service-actuator-test-observer',
+      run: (call) => {
+        seen.push(`${call.source}:${call.op}`);
+      },
+    });
+    mocks.executeServicePreset.mockResolvedValue({ ok: true });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'create_issue',
+      params: { owner: 'famaoai', repo: 'kyberion' },
+    });
+
+    expect(seen).toEqual(['actuator:service:preset:create_issue']);
   });
 
   it('uses the manifest retry policy for service pipeline steps', async () => {

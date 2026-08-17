@@ -13,9 +13,14 @@ import {
   classifyError,
   derivePipelineStatus,
   executeAdfSteps,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
   rebuildPublicHistorySearchIndexFromLocalSources,
   searchHistory,
+  loadSkillResourceDescriptor,
+  readSkillResourceForModel,
 } from '@agent/core';
+import type { ScopeContext, TierLevel } from '@agent/core';
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as yaml from 'js-yaml';
@@ -52,6 +57,7 @@ const operationRetryState = new AsyncLocalStorage<Map<string, number>>();
 const RECONCILE_ALLOWED_OPS = new Set([
   'history_search',
   'knowledge_search',
+  'knowledge_read',
   'query',
   'distill',
   'inject_prior_knowledge',
@@ -172,6 +178,7 @@ export interface PipelineStep {
 export interface WisdomDirectAction {
   action:
     | 'knowledge_search'
+    | 'knowledge_read'
     | 'history_search'
     | 'knowledge_inject'
     | 'knowledge_export'
@@ -195,7 +202,30 @@ export interface WisdomAction {
 export async function handleAction(input: WisdomAction) {
   validateWisdomRequest(input);
   if (input.action === 'reconcile') {
-    return await performReconcile(input);
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'wisdom:reconcile',
+      params: {
+        ...(input.strategy_path ? { strategy_path: input.strategy_path } : {}),
+        ...(input.options ? { options: input.options } : {}),
+      },
+      context: input.context,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation wisdom:reconcile was not admitted.'}`
+      );
+    }
+    const strategyPath =
+      typeof preflight.input.strategy_path === 'string'
+        ? preflight.input.strategy_path
+        : input.strategy_path;
+    const options =
+      preflight.input.options && typeof preflight.input.options === 'object'
+        ? (preflight.input.options as WisdomAction['options'])
+        : input.options;
+    return await performReconcile({ ...input, strategy_path: strategyPath, options });
   }
   if (input.action === 'pipeline') {
     return await executePipeline(input.steps || [], input.context || {}, input.options);
@@ -204,7 +234,7 @@ export async function handleAction(input: WisdomAction) {
   if (!spec) throw new Error(`[UNKNOWN_OP] Unknown direct wisdom action: ${input.action}`);
   return await executePipeline(
     [{ type: spec.kind, op: input.action, params: input.params || {} }],
-    {},
+    input.context || {},
     input.options
   );
 }
@@ -458,6 +488,86 @@ async function opCapture(
         _knowledgeIndex: index,
         _knowledgeIndexScopeKey: scopeKey,
         [params.export_as || 'found_knowledge']: normalized,
+      };
+    }
+    case 'knowledge_read': {
+      const rawPath = params.path ?? params.skill_path;
+      if (typeof rawPath !== 'string' || !rawPath.trim()) {
+        throw new Error('[INVALID_PARAMS] knowledge_read requires params.path');
+      }
+      const securityScope =
+        ctx.security_scope && typeof ctx.security_scope === 'object'
+          ? (ctx.security_scope as Record<string, unknown>)
+          : undefined;
+      const missionId =
+        typeof securityScope?.mission_id === 'string' ? securityScope.mission_id.trim() : '';
+      if (!missionId) {
+        throw new Error('[KNOWLEDGE_READ_SCOPE_REQUIRED] security_scope.mission_id is required');
+      }
+      const readTiers = Array.isArray(securityScope?.read_tiers)
+        ? securityScope.read_tiers.filter((tier): tier is TierLevel =>
+            KNOWLEDGE_TIER_PATTERN.test(String(tier))
+          )
+        : [];
+      const tier: TierLevel = readTiers.includes('personal')
+        ? 'personal'
+        : readTiers.includes('confidential')
+          ? 'confidential'
+          : 'public';
+      const scope: ScopeContext = {
+        tier,
+        mission_id: missionId,
+        ...(typeof securityScope?.tenant_slug === 'string'
+          ? { tenant_slug: securityScope.tenant_slug }
+          : typeof securityScope?.tenant_id === 'string'
+            ? { tenant_slug: securityScope.tenant_id }
+            : {}),
+        ...(typeof securityScope?.organization_id === 'string'
+          ? { organization_id: securityScope.organization_id }
+          : {}),
+        ...(typeof securityScope?.project_id === 'string'
+          ? { project_id: securityScope.project_id }
+          : {}),
+        ...(typeof securityScope?.task_id === 'string' ? { task_id: securityScope.task_id } : {}),
+      };
+      const missionPath =
+        pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, tier);
+      const descriptor = loadSkillResourceDescriptor(String(resolveVars(rawPath, ctx)));
+      const repoRelative = path.relative(pathResolver.rootResolve(''), descriptor.path);
+      const isInsideRepo = repoRelative !== '..' && !repoRelative.startsWith(`..${path.sep}`);
+      const normalizedResourcePath = repoRelative.replaceAll(path.sep, '/');
+      const isGovernedSkillRoot =
+        normalizedResourcePath.startsWith('plugins/') ||
+        normalizedResourcePath.startsWith('skills/');
+      if (!isInsideRepo || !isGovernedSkillRoot) {
+        throw new Error(`[KNOWLEDGE_READ_RESOURCE_SCOPE] ${descriptor.path}`);
+      }
+      if (descriptor.provenance.trust === 'untrusted') {
+        throw new Error(`[KNOWLEDGE_READ_UNTRUSTED_RESOURCE] ${descriptor.path}`);
+      }
+      const result = readSkillResourceForModel(descriptor, {
+        missionPath,
+        missionId,
+        ...(typeof securityScope?.task_id === 'string' ? { taskId: securityScope.task_id } : {}),
+        ...(typeof ctx.context_pack_id === 'string' ? { contextPackId: ctx.context_pack_id } : {}),
+        scope,
+      });
+      const exportAs = String(params.export_as || 'knowledge_read');
+      const visibleReceipt = {
+        ...result.promptVisibilityRecord,
+        knowledge_refs: result.promptVisibilityRecord.knowledge_refs.map((ref) =>
+          pathResolver.toRepoRelative(ref)
+        ),
+      };
+      const visibleProvenance = {
+        ...descriptor.provenance,
+        base_dir: pathResolver.toRepoRelative(descriptor.provenance.base_dir),
+      };
+      return {
+        ...ctx,
+        [exportAs]: result.body,
+        [`${exportAs}_receipt`]: visibleReceipt,
+        [`${exportAs}_provenance`]: visibleProvenance,
       };
     }
     case 'query': {

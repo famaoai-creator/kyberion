@@ -69,6 +69,7 @@ import {
 } from './mission-lifecycle.js';
 import { reconcileCompletion, reconcileCompletionStructurally } from './intent-reconciliation.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
+import { enqueueSurfaceAgentInput } from './agent-input-queue.js';
 import type { MissionStatusView } from './mission-read-model.js';
 import type {
   SurfaceConversationInput,
@@ -81,12 +82,7 @@ import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 // ---------------------------------------------------------------------------
 
 export type SteeringVerb =
-  | 'status'
-  | 'checkpoint'
-  | 'pause'
-  | 'resume'
-  | 'gate_approval'
-  | 'finish';
+  'status' | 'checkpoint' | 'steer' | 'follow_up' | 'pause' | 'resume' | 'gate_approval' | 'finish';
 
 export interface SteeringMatch {
   verb: SteeringVerb;
@@ -153,6 +149,22 @@ const STEERING_RULES: SteeringRule[] = [
       if (!match) return { matched: false };
       const note = match[1]?.trim();
       return { matched: true, note: note || undefined };
+    },
+  },
+  {
+    verb: 'steer',
+    test: (text: string) => {
+      const match = text.match(/^(?:steer|操縦|指示)(?:$|[\s:：]+(.+))$/iu);
+      const note = match?.[1]?.trim();
+      return { matched: Boolean(note), note: note || undefined };
+    },
+  },
+  {
+    verb: 'follow_up',
+    test: (text: string) => {
+      const match = text.match(/^(?:follow[- ]?up|次のターン|次ターン)(?:$|[\s:：]+(.+))$/iu);
+      const note = match?.[1]?.trim();
+      return { matched: Boolean(note), note: note || undefined };
     },
   },
 ];
@@ -709,6 +721,31 @@ function missionSteeringRejectionResult(text: string): SurfaceConversationResult
   return buildSteeringResult(text);
 }
 
+async function enqueueMissionSteeringInput(input: {
+  missionId: string;
+  delivery: 'steer' | 'follow_up';
+  text: string;
+  surface: string;
+  channel?: string;
+  threadTs?: string;
+}): Promise<SurfaceConversationResult> {
+  await enqueueSurfaceAgentInput({
+    missionId: input.missionId,
+    delivery: input.delivery,
+    text: input.text,
+    surface: input.surface,
+    ...(input.channel ? { channel: input.channel } : {}),
+    ...(input.threadTs ? { threadTs: input.threadTs } : {}),
+  });
+  const label = input.delivery === 'steer' ? '操縦指示' : '次回 turn 指示';
+  return buildSteeringResult(
+    [
+      `状態: ${label}を queue に追加しました。`,
+      '次のアクション: 実行中の turn は中断せず、次の turn boundary で worker が処理します。',
+    ].join('\n')
+  );
+}
+
 async function handleMissionSteeringTurn(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
@@ -767,6 +804,24 @@ async function handleMissionSteeringTurn(
       return handleStatusVerb(missionId);
     case 'checkpoint':
       return handleCheckpointVerb(missionId, match.note, surfaceTag);
+    case 'steer':
+      return enqueueMissionSteeringInput({
+        missionId,
+        delivery: 'steer',
+        text: match.note!,
+        surface: key.surface,
+        channel: key.channel,
+        threadTs: key.threadTs,
+      });
+    case 'follow_up':
+      return enqueueMissionSteeringInput({
+        missionId,
+        delivery: 'follow_up',
+        text: match.note!,
+        surface: key.surface,
+        channel: key.channel,
+        threadTs: key.threadTs,
+      });
     case 'pause':
       return handlePauseVerb(missionId, surfaceTag);
     case 'resume':

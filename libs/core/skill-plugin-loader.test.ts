@@ -7,16 +7,23 @@ import { decideApprovalRequest, loadApprovalRequest } from './approval-store.js'
 import { installPluginManaged, refreshManagedPluginActivation } from './plugin-managed-install.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
+  evaluateSkillRestrictionRecords,
   authorizeConfiguredSkillPlugins,
+  disposeSkillPluginContributions,
   fireSkillPluginHook,
   loadAuthorizedSkillPlugins,
+  readSkillPluginsConfig,
 } from './skill-plugin-loader.js';
+import { resolveActuatorOperation } from './actuator-op-registry.js';
 
 // Checked-in fixture (see the file itself for why it can't be written at
 // test time): resolves inside this repo's own plugins/ tree, so it is the
 // `official` case. Inert unless KYBERION_SKILL_PLUGIN_TEST_MARKER is set.
 const OFFICIAL_FIXTURE_PATH = pathResolver.rootResolve(
   'plugins/fixtures/skill-plugin-loader-official-fixture.mjs'
+);
+const CONTRIBUTION_FIXTURE_PATH = pathResolver.rootResolve(
+  'plugins/fixtures/skill-plugin-loader-contribution-fixture/index.mjs'
 );
 
 const cleanupPaths: string[] = [];
@@ -89,6 +96,23 @@ function readMarker(markerPath: string): string {
 }
 
 describe('loadAuthorizedSkillPlugins', () => {
+  it('activates manifest-declared contributions through the authorized loader and disposes them', async () => {
+    const cwd = cwdDir('contributions');
+    writeConfig(cwd, [CONTRIBUTION_FIXTURE_PATH]);
+
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    expect(diagnostics).toHaveLength(0);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.contributions?.registered.ops).toEqual(['fixture:run']);
+    expect(resolveActuatorOperation('fixture', 'run')).toMatchObject({
+      source: 'plugin',
+      pluginId: 'skill-plugin-loader-contribution-fixture',
+    });
+
+    disposeSkillPluginContributions(loaded);
+    expect(() => resolveActuatorOperation('fixture', 'run')).toThrow('[UNKNOWN_OP]');
+  });
+
   it("loads an official plugin (inside this repo's plugins/ tree) and its hooks actually fire", async () => {
     const markerPath = path.join(sourceDir('official-marker'), 'marker.log');
     safeMkdir(path.dirname(markerPath), { recursive: true });
@@ -223,5 +247,71 @@ describe('loadAuthorizedSkillPlugins', () => {
     const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
     expect(loaded).toHaveLength(0);
     expect(diagnostics).toHaveLength(0);
+  });
+
+  it('does not consume plugin configuration before project trust is resolved', async () => {
+    const cwd = cwdDir('pre-trust');
+    const markerPath = path.join(cwd, 'should-not-run.log');
+    writeConfig(cwd, [CONTRIBUTION_FIXTURE_PATH]);
+
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, undefined, undefined, {
+      trustResolved: false,
+    });
+    expect(loaded).toHaveLength(0);
+    expect(diagnostics).toMatchObject([
+      {
+        configuredPath: path.join(cwd, '.kyberion-plugins.json'),
+        allowed: false,
+        trust: 'third-party',
+      },
+    ]);
+    expect(diagnostics[0]?.reason).toMatch(/trust is unresolved/);
+    expect(safeExistsSync(markerPath)).toBe(false);
+  });
+});
+describe('restricted skill policy', () => {
+  it('allows overlays to narrow but never to reopen a restricted skill', () => {
+    expect(
+      evaluateSkillRestrictionRecords('deploy', [
+        { name: 'deploy', status: 'restricted', allow_override: true },
+      ])
+    ).toMatchObject({ allowed: false });
+    expect(evaluateSkillRestrictionRecords('deploy', [])).toEqual({ allowed: true });
+  });
+
+  it('applies plugin overlays as narrow-only selectors', () => {
+    const cwd = cwdDir('narrow-only-overlay');
+    safeMkdir(cwd, { recursive: true });
+    safeWriteFile(
+      path.join(cwd, '.kyberion-plugins.json'),
+      JSON.stringify({
+        plugins: ['plugin-a', 'plugin-b'],
+        tenant_overrides: {
+          tenant_a: { plugins: ['-plugin-a'] },
+        },
+      })
+    );
+
+    expect(readSkillPluginsConfig(cwd, { tenant_slug: 'tenant_a' })).toEqual(['plugin-b']);
+    expect(readSkillPluginsConfig(cwd, { tenant_slug: 'tenant_missing' })).toEqual([
+      'plugin-a',
+      'plugin-b',
+    ]);
+  });
+
+  it('rejects a plugin overlay that would introduce an undeclared resource', () => {
+    const cwd = cwdDir('widened-overlay');
+    safeMkdir(cwd, { recursive: true });
+    safeWriteFile(
+      path.join(cwd, '.kyberion-plugins.json'),
+      JSON.stringify({
+        plugins: ['plugin-a'],
+        tenant_overrides: {
+          tenant_a: { plugins: ['plugin-new'] },
+        },
+      })
+    );
+
+    expect(readSkillPluginsConfig(cwd, { tenant_slug: 'tenant_a' })).toEqual([]);
   });
 });

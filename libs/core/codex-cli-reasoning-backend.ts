@@ -42,6 +42,7 @@ import {
   type SubagentCapabilityProfile,
 } from './subagent-capability-profiles.js';
 import { resolveProviderPermissionArgs } from './provider-permission-profiles.js';
+import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 
 export interface CodexHarnessSession {
@@ -326,14 +327,9 @@ function sandboxModeFromArgs(
 
 function sandboxPolicyForArgs(args: readonly string[]): Record<string, unknown> {
   const mode = sandboxModeFromArgs(args);
-  if (mode === 'read-only') return { type: 'readOnly', networkAccess: false };
-  if (mode === 'danger-full-access') return { type: 'dangerFullAccess' };
-  return {
-    type: 'workspaceWrite',
-    networkAccess: false,
-    excludeTmpdirEnvVar: false,
-    excludeSlashTmp: false,
-  };
+  return toCodexSandboxPolicy(
+    resolveSandboxPolicy({ provider: 'codex', mode, networkAccess: false })
+  );
 }
 
 export function buildCodexCliBackendFromEnv(

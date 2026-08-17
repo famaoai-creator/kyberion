@@ -103,6 +103,26 @@ function getShellPolicy(): ShellCommandPolicyFile {
   return loadShellCommandPolicy();
 }
 
+/**
+ * PI-19 / DH-14: commands that can mutate another co-executing session's
+ * working tree are never safe as an unqualified ADF shell step. Read-only
+ * git commands and explicit-path add/commit/push commands remain available;
+ * broad reset/checkout/clean/stash/force operations must use a separately
+ * governed recovery surface.
+ */
+export function forbiddenGitCoexecutionMutation(command: string): string | undefined {
+  const checks: Array<[RegExp, string]> = [
+    [/\bgit\s+reset\s+[^;&|]*--hard\b/iu, 'git reset --hard'],
+    [/\bgit\s+checkout\s+(?:--\s*)?\.\s*(?:$|[;&|])/iu, 'git checkout .'],
+    [/\bgit\s+clean\s+-[^\s;&|]*f[^\s;&|]*/iu, 'git clean -f*'],
+    [/\bgit\s+stash(?:\s|$)/iu, 'git stash'],
+    [/\bgit\s+add\s+(?:--all|-A|\.)\s*(?:$|[;&|])/iu, 'git add -A/.'],
+    [/\bgit\s+commit\b[^;&|]*--no-verify\b/iu, 'git commit --no-verify'],
+    [/\bgit\s+push\b[^;&|]*(?:--force\b|-f\b)/iu, 'git push --force'],
+  ];
+  return checks.find(([pattern]) => pattern.test(command))?.[1];
+}
+
 export function validatePipelineGuardrails(
   pipeline: PipelineAdf,
   sourcePath = 'pipeline'
@@ -207,6 +227,23 @@ export function validatePipelineGuardrails(
       // authors may have a reason, but the default shape is distill → decide,
       // selection over generation.
       const opName = String(step.op || '');
+      if (opName === 'system:shell' || opName === 'system:exec') {
+        const params = (step.params ?? {}) as Record<string, unknown>;
+        const command = [params.cmd, params.command, params.shell_command].find(
+          (value): value is string => typeof value === 'string' && value.trim().length > 0
+        );
+        if (command) {
+          const forbidden = forbiddenGitCoexecutionMutation(command);
+          if (forbidden) {
+            findings.push({
+              code: 'git-coexecution-mutation-forbidden',
+              severity: 'error',
+              message: `${forbidden} is forbidden in an ADF shell step because it can mutate another session's worktree; use a governed explicit-path/recovery surface.`,
+              path: `${stepPath}.params.cmd`,
+            });
+          }
+        }
+      }
       if (opName === 'core:include' || opName === 'include') {
         const includeParams = (step.params ?? {}) as Record<string, unknown>;
         const includeRef = includeParams.fragment ?? includeParams.path;

@@ -33,6 +33,7 @@ import {
   setMissionSteeringReconciliationBuilderForTests,
   type MissionSteeringLifecycleAdapter,
 } from './surface-mission-steering.js';
+import { getMissionAgentInputQueue } from './agent-input-queue.js';
 import type { SurfaceConversationInput } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type { MissionStatusView } from './mission-read-model.js';
@@ -256,6 +257,14 @@ describe('classifySteeringMessage', () => {
       verb: 'checkpoint',
       note: 'fixed the bug',
     });
+    expect(classifySteeringMessage('steer: inspect the failing test')).toEqual({
+      verb: 'steer',
+      note: 'inspect the failing test',
+    });
+    expect(classifySteeringMessage('follow-up: continue after review')).toEqual({
+      verb: 'follow_up',
+      note: 'continue after review',
+    });
   });
 
   it('never false-positives on ordinary conversation', () => {
@@ -268,6 +277,7 @@ describe('classifySteeringMessage', () => {
     expect(classifySteeringMessage('この承認プロセスは長すぎると思う')).toBeNull();
     expect(classifySteeringMessage('let me know the finish line for the marathon')).toBeNull();
     expect(classifySteeringMessage('')).toBeNull();
+    expect(classifySteeringMessage('steer')).toBeNull();
   });
 });
 
@@ -281,6 +291,8 @@ describe('surface-mission-steering route handler (SO-04)', () => {
       '再開',
       '承認',
       '完了にして',
+      'steer: inspect logs',
+      'follow-up: continue',
     ]) {
       const context = buildContext(text, {
         channel: 'no-session-channel',
@@ -288,6 +300,27 @@ describe('surface-mission-steering route handler (SO-04)', () => {
       });
       expect(handler.matches(context)).toBe(false);
     }
+  });
+
+  it('enqueues explicit steer and follow-up messages for the session-owned mission', async () => {
+    const missionId = 'MSN-SO04-QUEUE';
+    createSession({ missionId, channel: 'C-queue', threadTs: 'T-queue' });
+    const handler = buildMissionSteeringRouteHandler();
+    const at = (text: string) => buildContext(text, { channel: 'C-queue', threadTs: 'T-queue' });
+
+    expect(handler.matches(at('steer: inspect the failing test'))).toBe(true);
+    const steerResult = await handler.handle(at('steer: inspect the failing test'));
+    expect(steerResult.text).toContain('queue');
+    expect(validateSurfaceUxContract({ text: steerResult.text }).valid).toBe(true);
+
+    const followResult = await handler.handle(at('follow-up: continue after review'));
+    expect(validateSurfaceUxContract({ text: followResult.text }).valid).toBe(true);
+    const queue = getMissionAgentInputQueue({ missionId });
+    const entries = await queue.consumeForTurn();
+    expect(entries.map((entry) => [entry.delivery, entry.text])).toEqual([
+      ['steer', 'inspect the failing test'],
+      ['follow_up', 'continue after review'],
+    ]);
   });
 
   it('(a) full flow: status -> checkpoint -> pause -> resume -> gate approval -> decision -> gate executes', async () => {

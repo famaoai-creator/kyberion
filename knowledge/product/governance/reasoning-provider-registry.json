@@ -1,0 +1,265 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "claude-cli",
+      "provider": "claude",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["CLAUDECODE"]
+    },
+    {
+      "mode": "codex-cli",
+      "provider": "codex",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["CODEX_CLI", "CODEX_VERSION"]
+    },
+    {
+      "mode": "claude-agent",
+      "provider": "claude",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["CLAUDECODE", "ANTHROPIC_API_KEY"]
+    },
+    {
+      "mode": "anthropic",
+      "provider": "anthropic",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["ANTHROPIC_API_KEY"]
+    },
+    {
+      "mode": "gemini-cli",
+      "provider": "gemini",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": false
+      },
+      "env_keys": ["GEMINI_CLI_BIN"]
+    },
+    {
+      "mode": "gemini-api",
+      "provider": "gemini-api",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+    },
+    {
+      "mode": "agy-cli",
+      "provider": "agy",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["AGY_CLI", "ANTIGRAVITY_CLI"]
+    },
+    {
+      "mode": "grok-cli",
+      "provider": "grok",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["GROK_CLI", "GROK_VERSION"]
+    },
+    {
+      "mode": "grok-api",
+      "provider": "grok-api",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["XAI_API_KEY", "KYBERION_GROK_API_KEY"]
+    },
+    {
+      "mode": "copilot",
+      "provider": "copilot",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "images": false
+      },
+      "env_keys": ["GH_TOKEN"]
+    },
+    {
+      "mode": "local",
+      "provider": "local",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_LOCAL_LLM_URL"]
+    },
+    {
+      "mode": "ollama",
+      "provider": "ollama",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_OLLAMA_URL"]
+    },
+    {
+      "mode": "vllm",
+      "provider": "vllm",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_VLLM_URL"]
+    },
+    {
+      "mode": "lmstudio",
+      "provider": "lmstudio",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_LMSTUDIO_URL", "KYBERION_LM_STUDIO_URL"]
+    },
+    {
+      "mode": "llamacpp",
+      "provider": "llamacpp",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_LLAMACPP_URL"]
+    },
+    {
+      "mode": "mlx",
+      "provider": "mlx",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_MLX_URL"]
+    },
+    {
+      "mode": "localai",
+      "provider": "localai",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_LOCALAI_URL"]
+    },
+    {
+      "mode": "nemotron-api",
+      "provider": "nemotron",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["KYBERION_NEMOTRON_URL"]
+    },
+    {
+      "mode": "openrouter",
+      "provider": "openrouter",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "images": true
+      },
+      "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
+    },
+    {
+      "mode": "stub",
+      "provider": "stub",
+      "module": "./reasoning-backend",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": false,
+        "session_continuity": false,
+        "images": false
+      },
+      "env_keys": []
+    }
+  ]
+}

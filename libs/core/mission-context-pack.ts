@@ -40,6 +40,13 @@ import {
   type ContextSecurityScope,
 } from './context-security-scope.js';
 import { resolveFacets, type FacetRequest, type ResolvedFacets } from './facet-registry.js';
+import {
+  loadSkillResourceDescriptor,
+  renderSkillResourceIndex,
+  type SkillResourceDescriptor,
+} from './skill-resource-loader.js';
+import { isSkillAllowed } from './skill-plugin-loader.js';
+import type { ScopeContext } from './scope-context.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -135,6 +142,7 @@ export interface MissionContextPackSource {
     | 'task_session'
     | 'work_item'
     | 'knowledge_hint'
+    | 'skill_resource'
     | 'other';
   ref: string;
   path?: string;
@@ -318,6 +326,8 @@ export interface MissionContextPack {
   task_session?: MissionContextPackTaskSessionSummary;
   work_item?: MissionContextPackWorkItemSummary;
   knowledge_hints?: MissionContextPackKnowledgeHint[];
+  /** PI-09: metadata-only skill descriptors; bodies are never part of a pack. */
+  skill_resources?: SkillResourceDescriptor[];
   artifact_hints?: MissionContextPackArtifactHint[];
   task_guidance?: MissionContextPackTaskGuidance;
   facets?: MissionContextPackFacets;
@@ -343,6 +353,12 @@ export interface BuildMissionContextPackInput {
   trackRecord?: ProjectTrackRecord | null;
   missionTeamAssignment?: MissionTeamAssignment | null;
   knowledgeHints?: MissionContextPackKnowledgeHint[];
+  /** Preloaded descriptors for a governed caller; bodies are not accepted. */
+  skillResources?: SkillResourceDescriptor[];
+  /** Explicit skill resources to expose as a metadata-only progressive index. */
+  skillPaths?: string[];
+  /** Set false for pre-trust callers; project-local skills are not inspected. */
+  trustResolved?: boolean;
   contextPackId?: string;
   contextBudgetChars?: number;
   /**
@@ -366,6 +382,10 @@ export interface ResolveMissionContextPackInput {
   projectId?: string;
   trackId?: string;
   includeKnowledgeHints?: boolean;
+  /** Explicit skill resources to expose as a metadata-only progressive index. */
+  skillPaths?: string[];
+  /** Set false for pre-trust callers; project-local skills are not inspected. */
+  trustResolved?: boolean;
   missionState?: MissionStateSummary | null;
   workItem?: WorkItem | null;
   taskSession?: TaskSession | null;
@@ -842,6 +862,26 @@ function serializeFacets(facets: ResolvedFacets): MissionContextPackFacets {
   };
 }
 
+function filterAllowedSkillResources(
+  resources: readonly SkillResourceDescriptor[],
+  scope: ScopeContext
+): SkillResourceDescriptor[] {
+  return resources.filter((resource) => isSkillAllowed(resource.name, scope).allowed);
+}
+
+function loadSkillResources(
+  skillPaths: string[] | undefined,
+  scope: ScopeContext,
+  options: { trustResolved?: boolean } = {}
+): SkillResourceDescriptor[] {
+  const resources = [
+    ...new Set((skillPaths || []).map((value) => String(value).trim()).filter(Boolean)),
+  ]
+    .sort()
+    .map((skillPath) => loadSkillResourceDescriptor(skillPath, undefined, options));
+  return filterAllowedSkillResources(resources, scope);
+}
+
 function missionSources(input: {
   missionId: string;
   missionPath?: string;
@@ -859,6 +899,7 @@ function missionSources(input: {
   workItem?: WorkItem | null;
   missionTeamAssignment?: MissionTeamAssignment | null;
   knowledgeHints?: MissionContextPackKnowledgeHint[];
+  skillResources?: SkillResourceDescriptor[];
 }): MissionContextPackSource[] {
   const sources: MissionContextPackSource[] = [
     {
@@ -964,6 +1005,16 @@ function missionSources(input: {
       ref: hint.path,
       path: hint.path,
       summary: hint.title,
+      captured_at: new Date().toISOString(),
+    });
+  }
+
+  for (const skill of input.skillResources || []) {
+    sources.push({
+      kind: 'skill_resource',
+      ref: skill.name,
+      path: skill.path,
+      summary: skill.description,
       captured_at: new Date().toISOString(),
     });
   }
@@ -1690,6 +1741,30 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         })
       )
     : undefined;
+  const skillResources =
+    input.skillResources && input.skillResources.length > 0
+      ? filterAllowedSkillResources(input.skillResources, {
+          tier: missionTier,
+          mission_id: input.missionState.mission_id,
+          ...(input.missionState.tenant_slug || input.missionState.tenant_id
+            ? { tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id }
+            : {}),
+          ...(organizationId ? { organization_id: organizationId } : {}),
+          ...(projectId ? { project_id: projectId } : {}),
+        })
+      : loadSkillResources(
+          input.skillPaths,
+          {
+            tier: missionTier,
+            mission_id: input.missionState.mission_id,
+            ...(input.missionState.tenant_slug || input.missionState.tenant_id
+              ? { tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id }
+              : {}),
+            ...(organizationId ? { organization_id: organizationId } : {}),
+            ...(projectId ? { project_id: projectId } : {}),
+          },
+          { ...(input.trustResolved !== undefined ? { trustResolved: input.trustResolved } : {}) }
+        );
 
   const mission: MissionContextPackMissionSummary = {
     mission_id: input.missionState.mission_id,
@@ -1846,6 +1921,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     workItem: input.workItem,
     missionTeamAssignment: assignment,
     knowledgeHints: input.knowledgeHints,
+    skillResources,
   });
   const summary = missionContextSummary({
     missionId: input.missionState.mission_id,
@@ -1900,6 +1976,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(taskSession ? { task_session: taskSession } : {}),
     ...(workItem ? { work_item: workItem } : {}),
     ...(governedKnowledgeHints.length > 0 ? { knowledge_hints: governedKnowledgeHints } : {}),
+    ...(skillResources.length > 0 ? { skill_resources: skillResources } : {}),
     ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
     ...(taskGuidance ? { task_guidance: taskGuidance } : {}),
     ...(facets ? { facets } : {}),
@@ -2001,6 +2078,8 @@ export async function resolveMissionContextPack(
     trackRecord,
     missionTeamAssignment,
     ...(input.facets ? { facets: input.facets } : {}),
+    ...(input.skillPaths ? { skillPaths: input.skillPaths } : {}),
+    ...(input.trustResolved !== undefined ? { trustResolved: input.trustResolved } : {}),
     knowledgeHints,
     ...(input.contextBudgetChars ? { contextBudgetChars: input.contextBudgetChars } : {}),
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
@@ -2099,6 +2178,13 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
         `  - ${pack.facets.output_contract.content}`
       );
     }
+  }
+
+  if (pack.skill_resources && pack.skill_resources.length > 0) {
+    lines.push(
+      '- Available skills (metadata only):',
+      renderSkillResourceIndex(pack.skill_resources)
+    );
   }
 
   if (pack.pruning) {

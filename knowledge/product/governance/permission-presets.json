@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "presets": {
+    "readonly": {
+      "sandbox_mode": "read-only",
+      "approval_policy": "strict",
+      "capability_profile": "explorer"
+    },
+    "edit": {
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "strict",
+      "capability_profile": "implementer"
+    },
+    "full": {
+      "sandbox_mode": "danger-full-access",
+      "approval_policy": "relaxed",
+      "capability_profile": "implementer"
+    }
+  }
+}

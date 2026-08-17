@@ -3607,6 +3607,10 @@
           "kind": "capture"
         },
         {
+          "op": "knowledge_read",
+          "kind": "capture"
+        },
+        {
           "op": "query",
           "kind": "capture"
         },

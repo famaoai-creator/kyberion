@@ -105,6 +105,8 @@ export interface DispatchInput {
   desktopScreenRedactor?: (inputPath: string, outputPath: string) => Promise<void>;
   /** Injectable validated pipeline for hermetic tests; CLI loads it from pipeline_ref. */
   desktopPipeline?: DesktopPipeline;
+  /** Set false for pre-trust callers; project-local desktop pipelines are then rejected. */
+  trustResolved?: boolean;
   /**
    * Required for `execution_substrate: 'playwright'` browser procedures. Runs
    * the compiled pipeline steps through the Playwright browser-actuator.
@@ -120,6 +122,10 @@ export interface DispatchInput {
   /** Surface channel forwarded to the approval gate (e.g. "browser-extension"). */
   channel?: string;
   correlationId?: string;
+  /** Trusted caller-side human presence signal for approval-gated effects. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
 }
 
 export interface DispatchResult {
@@ -284,6 +290,9 @@ function desktopApproval(
     agentId: input.agentId,
     correlationId: `${correlationBase}:step:${step.step_id}`,
     channel: input.channel || 'desktop',
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
     payload: {
       operation: op,
       procedure_id: input.procedure.procedure_id,
@@ -318,7 +327,7 @@ function validateDesktopExecutionContract(
   if (!recordingValidation.value) return recordingValidation.errors.join('; ');
   const pipelineResult = input.desktopPipeline
     ? validateDesktopPipeline(input.desktopPipeline)
-    : loadDesktopPipeline(input.procedure.pipeline_ref);
+    : loadDesktopPipeline(input.procedure.pipeline_ref, { trustResolved: input.trustResolved });
   if (!pipelineResult.value) return pipelineResult.errors.join('; ');
   const pipeline = pipelineResult.value;
   if (pipeline.procedure_id !== input.procedure.procedure_id)
@@ -588,6 +597,9 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
     agentId,
     channel: channel ?? 'browser-extension',
     correlationId: correlationId ?? `procedure:${procedure.procedure_id}:${recording.recording_id}`,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
   });
 
   if (!approval.allowed) {
@@ -735,6 +747,9 @@ async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<Dispatc
     agentId,
     channel: channel ?? 'browser-playwright',
     correlationId: correlationId ?? `procedure:${procedure.procedure_id}:${recording.recording_id}`,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
   });
 
   if (!approval.allowed) {
@@ -824,7 +839,16 @@ async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<Dispatc
 // ---------------------------------------------------------------------------
 
 async function dispatchServiceSession(input: DispatchInput): Promise<DispatchResult> {
-  const { procedure, serviceRecording, agentId, channel, correlationId } = input;
+  const {
+    procedure,
+    serviceRecording,
+    agentId,
+    channel,
+    correlationId,
+    hasHuman,
+    hasUI,
+    nonInteractive,
+  } = input;
 
   if (!serviceRecording) {
     recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_missing_recording', true);
@@ -887,6 +911,9 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
         summary: `${externalEffectSteps.length} 件の external-effect（${externalEffectSteps.map((s) => `${s.service_id}.${s.action}`).join(', ')}）`,
         severity: 'high',
       },
+      ...(hasHuman !== undefined ? { hasHuman } : {}),
+      ...(hasUI !== undefined ? { hasUI } : {}),
+      ...(nonInteractive !== undefined ? { nonInteractive } : {}),
     });
     if (!approval.allowed) {
       logger.info(

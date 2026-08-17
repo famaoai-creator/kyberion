@@ -117,6 +117,17 @@ describe('readValidatedPipelineAdf', () => {
     );
   });
 
+  it('rejects project-local workflow modules before importing them when trust is unresolved', async () => {
+    const examplePath = path.resolve(
+      pathResolver.rootDir(),
+      'scripts/demos/workflow-as-code-example.ts'
+    );
+
+    await expect(readValidatedWorkflowAdf(examplePath, { trustResolved: false })).rejects.toThrow(
+      '[TRUST_REQUIRED] project-local pipeline/template'
+    );
+  });
+
   it('loads the checked-in workflow-as-code example module', async () => {
     const examplePath = path.resolve(
       pathResolver.rootDir(),
@@ -145,6 +156,22 @@ describe('readValidatedPipelineAdf', () => {
 
     await expect(readValidatedWorkflowAdf(cyclePath)).rejects.toThrow(
       'circular reference detected'
+    );
+  });
+
+  it('applies the pre-trust boundary to static pipeline fragments', async () => {
+    safeMkdir(tmpRoot, { recursive: true });
+    const cyclePath = fixturePath('include-from-untrusted-root.json');
+    safeWriteFile(
+      cyclePath,
+      JSON.stringify({
+        steps: [{ op: 'core:include', params: { fragment: 'fragments/unknown.json' } }],
+      }),
+      { encoding: 'utf8' }
+    );
+
+    await expect(readValidatedWorkflowAdf(cyclePath, { trustResolved: false })).rejects.toThrow(
+      '[TRUST_REQUIRED] project-local pipeline/template'
     );
   });
 });

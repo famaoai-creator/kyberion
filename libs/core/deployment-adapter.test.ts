@@ -53,6 +53,20 @@ describe('deployment-adapter', () => {
     expect(getDeploymentAdapter().name).toBe('fake');
   });
 
+  it('rejects a second sole adapter instead of silently replacing the first', () => {
+    const makeAdapter = (name: string): DeploymentAdapter => ({
+      name,
+      deploy: async () => ({
+        adapter: name,
+        status: 'dry_run',
+        message: 'ok',
+        started_at: new Date().toISOString(),
+      }),
+    });
+    registerDeploymentAdapter(makeAdapter('first'));
+    expect(() => registerDeploymentAdapter(makeAdapter('second'))).toThrow(/already has provider/);
+  });
+
   it('installs a shell adapter from the personal deployment config', async () => {
     withExecutionContext('ecosystem_architect', () => {
       safeWriteFile(

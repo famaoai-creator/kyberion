@@ -12,6 +12,7 @@
 
 import { EnergyVad, type VoiceActivityDetector } from './voice-activity-detector.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface VadFactoryOptions {
   /** Calibrated or explicit RMS threshold; null when calibration is skipped. */
@@ -29,8 +30,6 @@ export interface VadBackend {
   create(opts: VadFactoryOptions): VoiceActivityDetector;
 }
 
-const registry = new Map<string, VadBackend>();
-
 export const ENERGY_VAD_BACKEND: VadBackend = {
   backend_id: 'energy',
   needsCalibration: true,
@@ -39,14 +38,35 @@ export const ENERGY_VAD_BACKEND: VadBackend = {
     new EnergyVad({ rms_threshold: opts.rmsThreshold ?? 800, endpoint_ms: opts.endpointMs }),
 };
 
-registry.set('energy', ENERGY_VAD_BACKEND);
+const vadBackendSeam = defineSeam<VadBackend>({
+  key: 'voice.vad-backend',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const registrations = new Map<string, () => void>();
 
-export function registerVadBackend(backend: VadBackend): void {
-  registry.set(backend.backend_id, backend);
+export function registerVadBackend(backend: VadBackend): () => void {
+  const dispose = vadBackendSeam.register(backend.backend_id, backend, {
+    provenance: backend.backend_id === 'energy' ? 'builtin' : 'plugin',
+    source: `vad:${backend.backend_id}`,
+  });
+  const wrappedDispose = () => {
+    dispose();
+    if (registrations.get(backend.backend_id) === wrappedDispose) {
+      registrations.delete(backend.backend_id);
+    }
+  };
+  registrations.set(backend.backend_id, wrappedDispose);
+  return wrappedDispose;
 }
 
+registerVadBackend(ENERGY_VAD_BACKEND);
+
 export function listVadBackends(): string[] {
-  return [...registry.keys()].sort();
+  return vadBackendSeam
+    .list()
+    .map((provider) => provider.id)
+    .sort();
 }
 
 export interface ResolvedVadBackend {
@@ -64,7 +84,9 @@ export interface ResolvedVadBackend {
 export function resolveVadBackend(id?: string): ResolvedVadBackend {
   const explicit = id?.trim() || process.env.KYBERION_VAD?.trim();
   const requested = explicit || getAdapterDefault('voice.vad') || 'energy';
-  const backend = registry.get(requested);
+  const backend = vadBackendSeam
+    .list()
+    .find((provider) => provider.id === requested)?.implementation;
   if (!backend) {
     return {
       backend: ENERGY_VAD_BACKEND,
@@ -85,6 +107,6 @@ export function resolveVadBackend(id?: string): ResolvedVadBackend {
 
 /** Test hook: drop everything except the built-in energy backend. */
 export function resetVadBackendRegistry(): void {
-  registry.clear();
-  registry.set('energy', ENERGY_VAD_BACKEND);
+  for (const dispose of [...registrations.values()]) dispose();
+  registerVadBackend(ENERGY_VAD_BACKEND);
 }

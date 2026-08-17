@@ -1,3 +1,5 @@
+import { coreSeamCatalog, defineSeam } from './seam.js';
+
 export interface EmbeddingBackend {
   name: string;
   dimensions?: number;
@@ -6,7 +8,12 @@ export interface EmbeddingBackend {
 }
 
 const VECTOR_SIZE = 64;
-let registeredBackend: EmbeddingBackend | null = null;
+const embeddingBackendSeam = defineSeam<EmbeddingBackend>({
+  key: 'embedding-backend',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredBackendDisposer: (() => void) | null = null;
 
 function hashToken(token: string): number {
   let hash = 2166136261;
@@ -51,6 +58,7 @@ function embedText(text: string): Float32Array {
 }
 
 export function getEmbeddingBackend(): EmbeddingBackend | null {
+  const registeredBackend = embeddingBackendSeam.getOptional();
   if (registeredBackend) return registeredBackend;
   if (process.env.KYBERION_DISABLE_EMBEDDINGS === '1') return null;
   return {
@@ -64,12 +72,27 @@ export function getEmbeddingBackend(): EmbeddingBackend | null {
   };
 }
 
-export function registerEmbeddingBackend(backend: EmbeddingBackend): void {
-  registeredBackend = backend;
+export function registerEmbeddingBackend(backend: EmbeddingBackend): () => void;
+/** @deprecated Pass null only for compatibility with legacy reset callers. */
+export function registerEmbeddingBackend(backend: null): () => void;
+export function registerEmbeddingBackend(backend: EmbeddingBackend | null): () => void {
+  if (backend === null) {
+    resetEmbeddingBackend();
+    return () => undefined;
+  }
+  if (!backend || typeof backend.name !== 'string' || !backend.name.trim()) {
+    throw new TypeError('Embedding backend must have a non-empty name');
+  }
+  registeredBackendDisposer = embeddingBackendSeam.register(backend.name, backend, {
+    provenance: 'builtin',
+    source: 'embedding-backend',
+  });
+  return registeredBackendDisposer;
 }
 
 export function resetEmbeddingBackend(): void {
-  registeredBackend = null;
+  registeredBackendDisposer?.();
+  registeredBackendDisposer = null;
 }
 
 export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
@@ -88,7 +111,7 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 
 export function reciprocalRankFusion(
   rankedLists: Array<Array<{ path: string }>>,
-  k = 60,
+  k = 60
 ): Map<string, number> {
   const scores = new Map<string, number>();
   for (const list of rankedLists) {

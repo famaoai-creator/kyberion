@@ -12,6 +12,7 @@ import { runCodexCliQuery } from './codex-cli-query.js';
 import { runGeminiCliQuery } from './gemini-cli-backend.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { readJsonFile } from './cli-input.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 
 export interface LlmProfile {
   description?: string;
@@ -63,7 +64,6 @@ export const BUILTIN_FALLBACK: LlmProfile = {
 export const PROFILE_FALLBACK_ORDER = ['heavy', 'standard', 'light'];
 
 const commandAvailabilityCache = new Map<string, { available: boolean; reason?: string }>();
-const structuredRunners = new Map<string, StructuredRunner>();
 
 export interface StructuredRunner<T = unknown> {
   (params: {
@@ -74,14 +74,25 @@ export interface StructuredRunner<T = unknown> {
   }): Promise<T>;
 }
 
-export function registerStructuredRunner(name: string, runner: StructuredRunner): void {
-  structuredRunners.set(name, runner);
+const structuredRunnerSeam = defineSeam<StructuredRunner>({
+  key: 'structured-runner',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerStructuredRunner(
+  name: string,
+  runner: StructuredRunner,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/mission-llm.ts',
+  }
+): () => void {
+  return structuredRunnerSeam.register(name, runner, metadata);
 }
 
 function ensureStructuredRunner(name: string, runner: StructuredRunner): void {
-  if (!structuredRunners.has(name)) {
-    structuredRunners.set(name, runner);
-  }
+  if (!structuredRunnerSeam.getOptional(name)) registerStructuredRunner(name, runner);
 }
 
 function inferAdapter(profile: LlmProfile): string {
@@ -118,7 +129,7 @@ function registerDefaultStructuredRunners(): void {
     return safe.data;
   });
 
-  const shellRunner = structuredRunners.get('shell-json');
+  const shellRunner = structuredRunnerSeam.getOptional('shell-json');
   if (shellRunner) {
     ensureStructuredRunner('claude-cli', shellRunner);
     ensureStructuredRunner('shell-claude-cli', shellRunner);
@@ -340,8 +351,8 @@ export async function runStructuredLlmProfile<T>(
 
   // Custom adapter takes absolute precedence if registered
   const adapter = inferAdapter(profile);
-  if (structuredRunners.has(adapter)) {
-    const runner = structuredRunners.get(adapter)!;
+  const runner = structuredRunnerSeam.getOptional(adapter);
+  if (runner) {
     return (await runner({
       profile,
       prompt,
@@ -352,7 +363,7 @@ export async function runStructuredLlmProfile<T>(
 
   // Fallback to shell invocation only if using standard adapter
   if (adapter === 'shell-json') {
-    const shellRunner = structuredRunners.get('shell-json');
+    const shellRunner = structuredRunnerSeam.getOptional('shell-json');
     if (shellRunner) {
       return (await shellRunner({
         profile,

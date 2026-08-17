@@ -11,6 +11,8 @@ import {
   approvalRequestLogicalPath,
   safeRmSync,
   withExecutionContext,
+  getDefaultLifecycleHookEngine,
+  resetDefaultLifecycleHookEngine,
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 
@@ -285,6 +287,26 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'system:log', status: 'success' }]);
   });
 
+  it('applies post-tool result patches before the next step consumes context', async () => {
+    const dispose = getDefaultLifecycleHookEngine().register({
+      id: 'run-pipeline-result-patch-test',
+      event: 'post_tool_use',
+      matcher: '^system:log$',
+      handler: () => ({ block: false, result_patch: { patched_by_hook: 'yes' } }),
+    });
+    try {
+      const result = await runSteps([
+        { op: 'log', params: { message: 'patch me' } },
+        { op: 'log', params: { template: 'patched={{patched_by_hook}}' } },
+      ]);
+      expect(result.status).toBe('succeeded');
+      expect(result.context.patched_by_hook).toBe('yes');
+    } finally {
+      dispose();
+      resetDefaultLifecycleHookEngine();
+    }
+  });
+
   it('accepts short-form shell ops and exports context', async () => {
     const result = await runSteps([
       {
@@ -299,6 +321,23 @@ describe('run_pipeline compatibility', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.shell_result).toBe('test-output');
     expect(result.results).toEqual([{ op: 'system:shell', status: 'success' }]);
+  });
+
+  it('blocks an approval-gated step when the pipeline has no human present', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'system:log',
+          params: { message: 'must not run' },
+          budget: { approval_required: true },
+        },
+      ],
+      {},
+      { hasHuman: false, quiet: true }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('[HUMAN_REQUIRED]');
   });
 
   it('dispatches core:ptc through typed ops and records the call trace', async () => {

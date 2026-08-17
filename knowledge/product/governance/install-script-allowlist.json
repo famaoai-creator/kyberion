@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "description": "Every pnpm allowBuilds entry must have an explicit, reviewable reason.",
+  "packages": {
+    "@anthropic-ai/claude-code": {
+      "allow": true,
+      "reason": "Installs the managed Claude CLI used by the claude-cli reasoning backend."
+    },
+    "@scarf/scarf": {
+      "allow": false,
+      "reason": "Package telemetry is intentionally disabled for deterministic, governed installs."
+    },
+    "esbuild": {
+      "allow": true,
+      "reason": "Build tooling requires the platform esbuild binary."
+    },
+    "node-pty": {
+      "allow": true,
+      "reason": "Terminal and CLI actuator tests require the native pseudo-terminal binding."
+    },
+    "onnxruntime-node": {
+      "allow": true,
+      "reason": "Local inference actuators require the native ONNX runtime binding."
+    },
+    "protobufjs": {
+      "allow": true,
+      "reason": "The installed runtime is used by protocol and generated-message integrations."
+    },
+    "puppeteer": {
+      "allow": true,
+      "reason": "Browser actuator provisioning uses the package-managed browser runtime."
+    },
+    "sharp": {
+      "allow": true,
+      "reason": "Media and document actuators require the native image processing binary."
+    },
+    "sqlite3": {
+      "allow": true,
+      "reason": "Durable mission and history integrations require the native SQLite binding."
+    },
+    "tesseract.js": {
+      "allow": true,
+      "reason": "OCR capability provisioning requires its worker/runtime assets."
+    },
+    "unrs-resolver": {
+      "allow": true,
+      "reason": "The resolver supplies the platform-specific native module used by the build toolchain."
+    }
+  }
+}

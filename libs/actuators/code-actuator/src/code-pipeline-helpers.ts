@@ -19,6 +19,8 @@ import {
   classifyError,
   createActuatorTrace,
   finalizeActuatorTrace,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -100,7 +102,30 @@ interface GlobalSkillIndex {
 
 export async function handleAction(input: CodeAction) {
   if (input.action === 'reconcile') {
-    return await performReconcile(input);
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'code:reconcile',
+      params: {
+        ...(input.strategy_path ? { strategy_path: input.strategy_path } : {}),
+        ...(input.options ? { options: input.options } : {}),
+      },
+      context: input.context,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation code:reconcile was not admitted.'}`
+      );
+    }
+    const strategyPath =
+      typeof preflight.input.strategy_path === 'string'
+        ? preflight.input.strategy_path
+        : input.strategy_path;
+    const options =
+      preflight.input.options && typeof preflight.input.options === 'object'
+        ? (preflight.input.options as CodeAction['options'])
+        : input.options;
+    return await performReconcile({ ...input, strategy_path: strategyPath, options });
   }
   const traceCtx = createActuatorTrace('code-actuator', 'pipeline');
   traceCtx.startSpan('code:pipeline', {

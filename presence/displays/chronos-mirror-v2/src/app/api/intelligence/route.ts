@@ -11,6 +11,7 @@ import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
   ViewerContextError,
+  viewerErrorResponse,
   type ViewerContext,
 } from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
@@ -2069,10 +2070,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to load mission intelligence' },
-      { status: err instanceof ViewerContextError ? err.status : 500 }
-    );
+    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
   }
 }
 
@@ -2914,9 +2912,6 @@ export async function POST(req: NextRequest) {
       ts: new Date().toISOString(),
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to apply runtime remediation' },
-      { status: err instanceof ViewerContextError ? err.status : 500 }
-    );
+    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
   }
 }

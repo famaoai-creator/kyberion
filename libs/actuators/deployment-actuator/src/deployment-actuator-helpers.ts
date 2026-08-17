@@ -4,6 +4,8 @@ import {
   RISKY_OPS,
   executeAdfSteps,
   resolveVars,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { describeOps } from './op-catalog.js';
 
@@ -65,7 +67,20 @@ async function deployRelease(params: DeploymentParams) {
 }
 
 export async function handleDeploymentAction(input: DeploymentAction) {
-  if (input.action === 'deploy_release') return deployRelease(input.params as DeploymentParams);
+  if (input.action === 'deploy_release') {
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'deployment:deploy_release',
+      params: input.params || {},
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation deployment:deploy_release was not admitted.'}`
+      );
+    }
+    return deployRelease(preflight.input as DeploymentParams);
+  }
   const result = await executeAdfSteps(
     input.steps || [],
     { ...(input.context || {}), timestamp: new Date().toISOString() },

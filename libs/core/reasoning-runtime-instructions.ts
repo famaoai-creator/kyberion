@@ -5,6 +5,7 @@
  */
 
 import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend.js';
+import { renderPluginPromptSections } from './plugin-contributions.js';
 
 const PROVIDER_INSTRUCTIONS: Record<string, readonly string[]> = {
   claude: [
@@ -63,7 +64,13 @@ export function getReasoningRuntimeInstructions(
 ): string[] {
   const hooked = backend.getRuntimeInstructions?.(options) || [];
   const provider = backend.getRuntimeProviderName?.(options) || backend.name;
-  return [...new Set([...hooked, ...runtimeInstructionsForProvider(provider)])];
+  return [
+    ...new Set([
+      ...hooked,
+      ...runtimeInstructionsForProvider(provider),
+      ...renderPluginPromptSections(),
+    ]),
+  ];
 }
 
 export function renderRuntimeInstructions(instructions: readonly string[]): string {

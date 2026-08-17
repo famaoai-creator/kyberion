@@ -8,6 +8,8 @@ import {
   waitForJob,
   classifyError,
   normalizeEventScope,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import type { GenerationJob } from '@agent/core';
 import { handleCaptureAction } from './capture-actions.js';
@@ -633,7 +635,18 @@ async function collectGenerationArtifact(params: any) {
 
 async function handleSingleAction(input: MediaActionInput) {
   const action = String(input.action || '');
-  const params = input.params || {};
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `media-generation:${action || 'unknown'}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation media-generation:${action || 'unknown'} was not admitted.`}`
+    );
+  }
+  const params = preflight.input;
   if (!SUPPORTED_ACTIONS.has(String(action))) {
     throw new Error(`Unsupported media generation action: ${String(action)}`);
   }

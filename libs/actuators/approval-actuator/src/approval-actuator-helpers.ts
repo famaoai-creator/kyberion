@@ -6,6 +6,8 @@ import {
   retry,
   executeAdfSteps,
   resolveVars,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import {
   createApprovalRequest,
@@ -135,7 +137,18 @@ export async function handleApprovalAction(input: ApprovalAction) {
   if (input.action === 'pipeline') {
     return executeApprovalPipeline(input.steps || [], input.context || {}, input.options);
   }
-  const params = input.params || ({} as any);
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `approval:${input.action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation approval:${input.action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input as ApprovalAction['params'];
   const role = params.role || 'mission_controller';
   switch (input.action) {
     case 'create':

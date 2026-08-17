@@ -37,6 +37,8 @@ import type {
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
+import { runOpPreflight } from './op-preflight.js';
+import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -692,24 +694,42 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     return this.base.requiresNativeSubagent?.() ?? false;
   }
 
-  delegateTask(
+  async delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'delegateTask',
+      params: { instruction, ...(context !== undefined ? { context } : {}) },
+      context: { backend: this.name, dispatcher: this.dispatcher.name },
+      source: 'delegate',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${
+          preflight.reason || 'Delegation was not admitted.'
+        }`
+      );
+    }
+    const repairedInstruction =
+      typeof preflight.input.instruction === 'string' ? preflight.input.instruction : instruction;
+    const repairedContext =
+      typeof preflight.input.context === 'string' ? preflight.input.context : context;
     // NI-03: continue (or originate) the delegation chain BEFORE dispatch —
     // an attenuation violation rejects here and the dispatcher never runs.
     let chainedContext: string;
     try {
       chainedContext = propagateDelegationChainThroughContext(
-        context,
+        repairedContext,
         options,
         this.dispatcher.name
       );
     } catch (error) {
       return Promise.reject(error);
     }
-    return this.dispatcher.dispatch(instruction, chainedContext, this.base, options);
+    return this.dispatcher.dispatch(repairedInstruction, chainedContext, this.base, options);
   }
 
   delegateTaskHandle(
@@ -721,6 +741,7 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
       instruction,
       ...(context ? { context } : {}),
       backendName: this.name,
+      ...(options?.continuable ? { continuable: true } : {}),
       execute: (signal) =>
         this.delegateTask(instruction, context, { ...options, ...(signal ? { signal } : {}) }),
     });

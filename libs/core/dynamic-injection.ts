@@ -13,6 +13,11 @@
 
 import { logger } from './core.js';
 import { frameUntrustedInput } from './untrusted-input-framing.js';
+import {
+  canonicalizeScopedRegistryScope,
+  ScopedRegistry,
+  type ScopedRegistryScope,
+} from './scoped-registry.js';
 
 export interface DynamicInjectionState {
   /** Monotonic step counter of the consuming loop (for step-based pacing). */
@@ -118,6 +123,94 @@ export class DynamicInjectionRegistry {
 }
 
 /**
+ * DH-09: scope-aware dynamic injections. Ancestor providers are inherited by
+ * descendants; a same-id provider at a more specific scope shadows it. The
+ * generic ScopedRegistry owns deterministic selection while this wrapper owns
+ * provider throttling/compaction state.
+ */
+export class ScopedDynamicInjectionRegistry {
+  private readonly providers = new ScopedRegistry<DynamicInjectionProvider>();
+  private readonly bookkeeping = new Map<string, ProviderBookkeeping>();
+
+  register(scope: ScopedRegistryScope, provider: DynamicInjectionProvider): () => void {
+    const dispose = this.providers.register(scope, provider.id, provider);
+    const key = this.providerKey(scope, provider.id);
+    this.bookkeeping.set(key, { firedSinceReset: false });
+    return () => {
+      dispose();
+      this.bookkeeping.delete(key);
+    };
+  }
+
+  collect(
+    scope: ScopedRegistryScope,
+    state: DynamicInjectionState = {},
+    nowMs: number = Date.now()
+  ): CollectedInjection[] {
+    const collected: CollectedInjection[] = [];
+    for (const entry of this.providers.list(scope)) {
+      const bookkeeping = this.bookkeeping.get(this.providerKey(entry.scope, entry.id));
+      if (!bookkeeping) continue;
+      const provider = entry.value;
+      if (provider.oneShot && bookkeeping.firedSinceReset) continue;
+      if (
+        provider.throttleMs &&
+        bookkeeping.lastInjectedAtMs !== undefined &&
+        nowMs - bookkeeping.lastInjectedAtMs < provider.throttleMs
+      ) {
+        continue;
+      }
+      let text: string | null = null;
+      try {
+        text = provider.collect(state);
+      } catch (err) {
+        logger.warn(
+          `[dynamic-injection] scoped provider ${provider.id} failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+        continue;
+      }
+      if (!text || !text.trim()) continue;
+      bookkeeping.lastInjectedAtMs = nowMs;
+      bookkeeping.firedSinceReset = true;
+      collected.push({ providerId: provider.id, text: text.trim() });
+    }
+    return collected;
+  }
+
+  notifyContextCompacted(): void {
+    for (const entry of this.providers.listAll()) {
+      const bookkeeping = this.bookkeeping.get(this.providerKey(entry.scope, entry.id));
+      if (!bookkeeping) continue;
+      bookkeeping.firedSinceReset = false;
+      bookkeeping.lastInjectedAtMs = undefined;
+      try {
+        entry.value.onContextCompacted?.();
+      } catch (err) {
+        logger.warn(
+          `[dynamic-injection] scoped provider ${entry.id} compaction reset failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  }
+
+  list(scope: ScopedRegistryScope): ScopedRegistryScope[] {
+    return this.providers.list(scope).map((entry) => entry.scope);
+  }
+
+  get providerCount(): number {
+    return this.providers.size;
+  }
+
+  hasProvider(scope: ScopedRegistryScope, providerId: string): boolean {
+    return this.providers.get(scope, providerId) !== undefined;
+  }
+
+  private providerKey(scope: ScopedRegistryScope, providerId: string): string {
+    return `${canonicalizeScopedRegistryScope(scope)}::${providerId.trim()}`;
+  }
+}
+
+/**
  * Injections are carried as standalone user-role messages; merge adjacent
  * same-role text messages so providers never fragment the visible history
  * (kimi-cli normalize_history).
@@ -199,6 +292,9 @@ export function buildUntrustedDataInjectionProvider(
 
 const GLOBAL_KEY = Symbol.for('kyberion.dynamicInjectionRegistry');
 const MISSION_REGISTRIES_KEY = Symbol.for('kyberion.dynamicInjectionMissionRegistries');
+const SCOPED_MISSION_REGISTRIES_KEY = Symbol.for(
+  'kyberion.dynamicInjectionScopedMissionRegistries'
+);
 
 function missionRegistries(): Map<string, DynamicInjectionRegistry> {
   const holder = globalThis as Record<symbol, unknown>;
@@ -206,6 +302,14 @@ function missionRegistries(): Map<string, DynamicInjectionRegistry> {
     holder[MISSION_REGISTRIES_KEY] = new Map<string, DynamicInjectionRegistry>();
   }
   return holder[MISSION_REGISTRIES_KEY] as Map<string, DynamicInjectionRegistry>;
+}
+
+function scopedMissionRegistries(): Map<string, ScopedDynamicInjectionRegistry> {
+  const holder = globalThis as Record<symbol, unknown>;
+  if (!holder[SCOPED_MISSION_REGISTRIES_KEY]) {
+    holder[SCOPED_MISSION_REGISTRIES_KEY] = new Map<string, ScopedDynamicInjectionRegistry>();
+  }
+  return holder[SCOPED_MISSION_REGISTRIES_KEY] as Map<string, ScopedDynamicInjectionRegistry>;
 }
 
 /**
@@ -231,14 +335,31 @@ export function getMissionDynamicInjectionRegistry(missionId: string): DynamicIn
   return registry;
 }
 
+/** DH-09: persistent scope-aware registry per mission. */
+export function getMissionScopedDynamicInjectionRegistry(
+  missionId: string
+): ScopedDynamicInjectionRegistry {
+  const key = String(missionId || '').trim();
+  if (!key) throw new Error('[INJECTION_SCOPE] missionId is required');
+  const registries = scopedMissionRegistries();
+  let registry = registries.get(key);
+  if (!registry) {
+    registry = new ScopedDynamicInjectionRegistry();
+    registries.set(key, registry);
+  }
+  return registry;
+}
+
 /** Reset all live registries after compaction, including mission-scoped ones. */
 export function notifyAllDynamicInjectionRegistries(): void {
   getDefaultDynamicInjectionRegistry().notifyContextCompacted();
   for (const registry of missionRegistries().values()) registry.notifyContextCompacted();
+  for (const registry of scopedMissionRegistries().values()) registry.notifyContextCompacted();
 }
 
 /** Test seam. */
 export function resetDefaultDynamicInjectionRegistry(): void {
   delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
   missionRegistries().clear();
+  scopedMissionRegistries().clear();
 }

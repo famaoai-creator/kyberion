@@ -23,24 +23,35 @@ import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { redactSensitiveObject } from './network.js';
 import type { AuditEntry } from './audit-chain.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface AuditForwarder {
   name: string;
   publish(entry: AuditEntry): Promise<void> | void;
 }
 
-let registered: AuditForwarder | null = null;
+const auditForwarderSeam = defineSeam<AuditForwarder>({
+  key: 'audit-forwarder',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerAuditForwarder(forwarder: AuditForwarder): void {
-  registered = forwarder;
+export function registerAuditForwarder(forwarder: AuditForwarder): () => void {
+  registeredDisposer = auditForwarderSeam.register(forwarder.name, forwarder, {
+    provenance: 'builtin',
+    source: 'audit-forwarder',
+  });
+  return registeredDisposer;
 }
 
 export function getAuditForwarder(): AuditForwarder {
-  return registered ?? stubAuditForwarder;
+  return auditForwarderSeam.getOptional() ?? stubAuditForwarder;
 }
 
 export function resetAuditForwarder(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 export const stubAuditForwarder: AuditForwarder = {

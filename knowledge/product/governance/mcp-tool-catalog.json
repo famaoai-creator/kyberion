@@ -98,6 +98,16 @@
       "allowed_caller_roles": ["operator", "agent", "cowork"]
     },
     {
+      "name": "kyberion.capability.search",
+      "description": "Search the governed actuator capability catalog before loading an additional tool surface.",
+      "category": "capability",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "notes": "Deferred-tool discovery surface; results are descriptions only and do not execute an operation."
+    },
+    {
       "name": "kyberion.service.actuate",
       "description": "Execute an allowlisted service actuator operation for a bound tenant.",
       "category": "service",

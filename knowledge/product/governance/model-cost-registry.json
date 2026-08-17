@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "currency": "USD",
   "unit": "per_1k_tokens",
-  "note": "Per-1k-token prompt/completion rates used by MetricsCollector to attribute usage cost. EDIT THIS FILE to add models or update prices — no code change/redeploy needed. 'aliases' map SDK short names (e.g. the Agent SDK's 'opus') to a model id. 'default' is the fallback. resolveCostRates() also substring-matches versioned ids (e.g. claude-opus-5-YYYYMMDD → claude-opus-5).",
+  "note": "Per-1k-token prompt/completion rates used by MetricsCollector to attribute usage cost. EDIT THIS FILE to add models or update prices — no code change/redeploy needed. 'aliases' map SDK short names (e.g. the Agent SDK's 'opus') to a model id. 'default' is the fallback. resolveCostRates() also substring-matches versioned ids (e.g. claude-opus-5-YYYYMMDD → claude-opus-5). A model may optionally add 'tiers': [{ 'input_tokens_above': 0, 'prompt': 0, 'completion': 0, 'cache_read': 0, 'cache_write': 0, 'cache_write_1h': 0 }] and optional cache rates; thresholds are inclusive and all rates remain per 1k tokens. Existing two-rate entries remain valid.",
   "models": {
     "claude-fable-5": { "prompt": 0.01, "completion": 0.05 },
     "claude-opus-5": { "prompt": 0.005, "completion": 0.025 },

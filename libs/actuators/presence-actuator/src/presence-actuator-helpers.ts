@@ -9,6 +9,8 @@ import {
   classifyError,
   retry,
   secureFetch,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { WebClient } from '@slack/web-api';
 
@@ -71,7 +73,19 @@ function buildRetryOptions(override?: Record<string, any>) {
 }
 
 export async function handleAction(input: PresenceAction) {
-  const { action, params } = input;
+  const { action } = input;
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `presence:${action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation presence:${action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input as PresenceAction['params'];
 
   let slack: WebClient | null = null;
   try {

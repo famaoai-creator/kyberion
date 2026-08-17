@@ -125,6 +125,7 @@ const governedToolNames = [
   'kyberion.pipeline.job_status',
   'kyberion.knowledge.search',
   'kyberion.capability.list',
+  'kyberion.capability.search',
   'kyberion.mission.create',
   'kyberion.mission.status',
   'kyberion.mission.journal',
@@ -176,6 +177,7 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.pipeline.run')).toBe(true);
     expect(registeredTools.has('kyberion.knowledge.search')).toBe(true);
     expect(registeredTools.has('kyberion.capability.list')).toBe(true);
+    expect(registeredTools.has('kyberion.capability.search')).toBe(true);
     expect(registeredTools.has('kyberion.mission.create')).toBe(true);
     expect(registeredTools.has('kyberion.mission.status')).toBe(true);
     expect(registeredTools.has('kyberion.mission.journal')).toBe(true);
@@ -189,7 +191,9 @@ describe('createKyberionMcpServer()', () => {
     const result = await handler({});
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_REQUIRED');
+    expect(result.content[0].text).toContain('correlation_id=');
+    expect(result.content[0].text).toContain('invalid or not permitted');
+    expect(result.content[0].text).not.toContain('MCP_CALLER_ROLE_REQUIRED');
   });
 
   it('カタログで operator 限定のツールは cowork role から拒否する', async () => {
@@ -202,7 +206,9 @@ describe('createKyberionMcpServer()', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('MCP_CALLER_ROLE_DENIED');
+    expect(result.content[0].text).toContain('correlation_id=');
+    expect(result.content[0].text).toContain('invalid or not permitted');
+    expect(result.content[0].text).not.toContain('MCP_CALLER_ROLE_DENIED');
     expect(mockDecideApproval).not.toHaveBeenCalled();
   });
 
@@ -434,6 +440,30 @@ describe('createKyberionMcpServer()', () => {
     });
   });
 
+  describe('kyberion.capability.search', () => {
+    it('returns descriptions for matching capabilities without executing an operation', async () => {
+      mockSafeReaddir.mockReturnValue(['meeting-actuator', 'file-actuator']);
+      mockSafeReadFile
+        .mockReturnValueOnce(FAKE_CATALOG)
+        .mockReturnValueOnce(
+          JSON.stringify({ actuator_id: 'meeting-actuator', capabilities: [{ op: 'join' }] })
+        )
+        .mockReturnValueOnce(
+          JSON.stringify({ actuator_id: 'file-actuator', capabilities: [{ op: 'write' }] })
+        );
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.capability.search')!.handler;
+      const result = await handler({ query: 'join', max_results: 5 });
+
+      expect(result.isError).toBeFalsy();
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { actuator: 'meeting-actuator', ops: ['join'] },
+      ]);
+      expect(mockSafeExec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('kyberion.mission.status', () => {
     it('mission_controller.js status を呼び出して結果を返す', async () => {
       mockSafeExec.mockReturnValue('Mission status: running');
@@ -537,7 +567,9 @@ describe('createKyberionMcpServer()', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('MCP_APPROVAL_SCOPE_MISMATCH');
+      expect(result.content[0].text).toContain('correlation_id=');
+      expect(result.content[0].text).toContain('invalid or not permitted');
+      expect(result.content[0].text).not.toContain('MCP_APPROVAL_SCOPE_MISMATCH');
       expect(mockSafeExec).not.toHaveBeenCalled();
     });
   });

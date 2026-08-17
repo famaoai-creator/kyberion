@@ -33,6 +33,14 @@ const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = {
   copilot: 'copilot',
 };
 
+const BOOLEAN_CAPABILITIES = [
+  'structured_output',
+  'session_continuity',
+  'abort',
+  'images',
+] as const satisfies readonly (keyof BackendCapabilityProfile['capabilities'])[];
+type BooleanCapability = (typeof BOOLEAN_CAPABILITIES)[number];
+
 export type ConformanceEvidenceStatus = 'verified' | 'declared' | 'unavailable';
 
 export interface BackendConformanceResult {
@@ -50,7 +58,7 @@ export interface BackendConformanceResult {
     error?: string;
   };
   capabilities: Record<
-    keyof BackendCapabilityProfile['capabilities'],
+    BooleanCapability,
     { declared: boolean; status: ConformanceEvidenceStatus; evidence: string }
   >;
 }
@@ -86,7 +94,7 @@ function runProbe(
 
 function capabilityEvidence(
   profile: BackendCapabilityProfile,
-  capability: keyof BackendCapabilityProfile['capabilities'],
+  capability: BooleanCapability,
   help: BackendConformanceResult['help']
 ): { declared: boolean; status: ConformanceEvidenceStatus; evidence: string } {
   const declared = profile.capabilities[capability];
@@ -122,9 +130,10 @@ export function runBackendConformance(
     const version = runProbe(exec, binary, ['--version']);
     const help = runProbe(exec, binary, ['--help']);
     const capabilities = Object.fromEntries(
-      (
-        Object.keys(profile.capabilities) as Array<keyof BackendCapabilityProfile['capabilities']>
-      ).map((capability) => [capability, capabilityEvidence(profile, capability, help)])
+      BOOLEAN_CAPABILITIES.map((capability) => [
+        capability,
+        capabilityEvidence(profile, capability, help),
+      ])
     ) as BackendConformanceResult['capabilities'];
     return { mode, binary, profile, version, help, capabilities };
   });

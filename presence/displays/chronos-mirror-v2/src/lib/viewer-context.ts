@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { auditChain } from '@agent/core/audit-chain';
-import { isValidTenantSlug, pathResolver, safeExistsSync } from '@agent/core';
+import { isValidTenantSlug, pathResolver, safeExistsSync, toWireError } from '@agent/core';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { secretGuard } from '@agent/core/secret-guard';
 import {
@@ -312,10 +312,16 @@ export async function withViewerExecutionContextAsync<T>(
   return withExecutionContextAsync(role, fn, undefined, tenant);
 }
 
-export function viewerErrorResponse(error: unknown): NextResponse {
-  const status = error instanceof ViewerContextError ? error.status : 403;
+export function viewerErrorResponse(error: unknown, statusOverride?: number): NextResponse {
+  const status = statusOverride ?? (error instanceof ViewerContextError ? error.status : 403);
+  const safe = toWireError(error);
   return NextResponse.json(
-    { ok: false, error: error instanceof Error ? error.message : 'Forbidden' },
+    {
+      ok: false,
+      error: safe.message,
+      error_code: safe.code,
+      correlation_id: safe.correlation_id,
+    },
     { status }
   );
 }

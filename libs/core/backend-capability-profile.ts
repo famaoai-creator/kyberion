@@ -17,15 +17,34 @@ import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 export type BackendTransport = 'cli' | 'sdk' | 'api' | 'local-server' | 'in-process';
 
 export type BackendUtilityFit = 'judge' | 'classify' | 'summarize' | 'divergent';
+export type ThinkingLevel = 'low' | 'medium' | 'high';
+export type ThinkingLevelMap = Partial<Record<ThinkingLevel, string | null>>;
+
+export interface ConstrainedSamplingRequest {
+  jsonSchema: Record<string, unknown>;
+  strict: 'prefer' | 'require';
+}
+
+export interface GrammarSamplingRequest {
+  grammar: string;
+}
+
+export type ConstrainedSampling = false | ConstrainedSamplingRequest | GrammarSamplingRequest;
 
 export interface BackendCapabilityProfile {
   mode: ReasoningBackendMode;
   transport: BackendTransport;
+  /** Provider SDK retry contract; orchestration retries remain explicit in reasoning-backend. */
+  provider_retry: { max_retries: number; quota_errors_propagate: boolean };
   capabilities: {
     structured_output: boolean;
     session_continuity: boolean;
     abort: boolean;
     images: boolean;
+    /** Provider wire value by requested cognitive level; null means hidden/unsupported. */
+    thinkingLevelMap: ThinkingLevelMap;
+    supportsStrictTools: boolean;
+    supportsGrammarTools: boolean;
   };
   utility_fit: BackendUtilityFit[];
 }
@@ -37,11 +56,15 @@ const cli = (
 ): BackendCapabilityProfile => ({
   mode,
   transport: 'cli',
+  provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
     structured_output: true,
     session_continuity: true,
     abort: true,
     images: false,
+    thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
+    supportsStrictTools: false,
+    supportsGrammarTools: false,
     ...overrides,
   },
   utility_fit: utilityFit,
@@ -54,11 +77,15 @@ const api = (
 ): BackendCapabilityProfile => ({
   mode,
   transport: 'api',
+  provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
     structured_output: true,
     session_continuity: false,
     abort: true,
     images: false,
+    thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
+    supportsStrictTools: false,
+    supportsGrammarTools: false,
     ...overrides,
   },
   utility_fit: utilityFit,
@@ -67,6 +94,7 @@ const api = (
 const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
   mode,
   transport: 'local-server',
+  provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
     // The local OpenAI-compatible adapters can enforce the repository's
     // structured response envelope even though the model server itself does
@@ -75,6 +103,9 @@ const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
     session_continuity: false,
     abort: true,
     images: false,
+    thinkingLevelMap: {},
+    supportsStrictTools: false,
+    supportsGrammarTools: false,
   },
   utility_fit: ['classify', 'summarize'],
 });
@@ -86,11 +117,15 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   'claude-agent': {
     mode: 'claude-agent',
     transport: 'sdk',
+    provider_retry: { max_retries: 0, quota_errors_propagate: true },
     capabilities: {
       structured_output: true,
       session_continuity: true,
       abort: true,
       images: true,
+      thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
+      supportsStrictTools: true,
+      supportsGrammarTools: false,
     },
     utility_fit: ['judge', 'classify', 'summarize', 'divergent'],
   },
@@ -115,11 +150,15 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   stub: {
     mode: 'stub',
     transport: 'in-process',
+    provider_retry: { max_retries: 0, quota_errors_propagate: true },
     capabilities: {
       structured_output: true,
       session_continuity: false,
       abort: true,
       images: false,
+      thinkingLevelMap: {},
+      supportsStrictTools: false,
+      supportsGrammarTools: false,
     },
     // The stub is deterministic — it can exercise plumbing but must never
     // be treated as capable of real judgment or divergent thinking
@@ -130,6 +169,55 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
 
 export function backendCapabilityProfile(mode: ReasoningBackendMode): BackendCapabilityProfile {
   return BACKEND_CAPABILITY_PROFILES[mode];
+}
+
+export function availableThinkingLevels(profile: BackendCapabilityProfile): ThinkingLevel[] {
+  return (['low', 'medium', 'high'] as const).filter(
+    (level) =>
+      Object.prototype.hasOwnProperty.call(profile.capabilities.thinkingLevelMap, level) &&
+      profile.capabilities.thinkingLevelMap[level] !== null
+  );
+}
+
+export function resolveThinkingLevel(
+  profile: BackendCapabilityProfile,
+  requested?: ThinkingLevel
+): { requested?: ThinkingLevel; supported: boolean; wireValue?: string; reason: string } {
+  if (!requested) {
+    return { supported: true, reason: 'provider-default' };
+  }
+  if (!Object.prototype.hasOwnProperty.call(profile.capabilities.thinkingLevelMap, requested)) {
+    return { requested, supported: false, reason: 'provider-default-only' };
+  }
+  const wireValue = profile.capabilities.thinkingLevelMap[requested];
+  if (wireValue === null) return { requested, supported: false, reason: 'unsupported' };
+  return { requested, supported: true, wireValue, reason: 'mapped' };
+}
+
+export function resolveConstrainedSampling(
+  request: ConstrainedSampling | undefined,
+  capabilities: Pick<
+    BackendCapabilityProfile['capabilities'],
+    'supportsStrictTools' | 'supportsGrammarTools'
+  >
+): { mode: 'disabled' | 'native' | 'fallback'; request?: ConstrainedSampling; reason: string } {
+  if (request === false) return { mode: 'disabled', reason: 'explicitly-disabled' };
+  if (!request) return { mode: 'disabled', reason: 'not-requested' };
+  if ('grammar' in request) {
+    if (!capabilities.supportsGrammarTools) {
+      throw new Error('Grammar constrained sampling is not supported by the selected backend');
+    }
+    return { mode: 'native', request, reason: 'grammar-supported' };
+  }
+  if (capabilities.supportsStrictTools) {
+    return { mode: 'native', request, reason: 'strict-tools-supported' };
+  }
+  if (request.strict === 'prefer') {
+    return { mode: 'fallback', request, reason: 'strict-tools-unsupported' };
+  }
+  throw new Error(
+    'Strict constrained sampling is required but not supported by the selected backend'
+  );
 }
 
 export function modesWithUtilityFit(fit: BackendUtilityFit): ReasoningBackendMode[] {

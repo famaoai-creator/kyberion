@@ -128,6 +128,16 @@ describe('super-nerve engine', () => {
     expect(actuatorModuleLoader.load).toHaveBeenCalledTimes(1);
   });
 
+  it('runs the standard preflight waterfall before in-process actuator dispatch', async () => {
+    const result = await executeSuperPipeline([
+      { op: 'network:fetch', params: { _approval_required: true } },
+    ]);
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('[OP_PREFLIGHT_ASK]');
+    expect(actuatorModuleLoader.load).not.toHaveBeenCalled();
+  });
+
   it('resolves core call/include through the canonical resolver', async () => {
     const result = await executeSuperPipeline([
       { op: 'core:call', params: { path: 'macros/sample.json' } },

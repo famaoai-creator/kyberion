@@ -25,6 +25,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', () => ({
+  runOpPreflight: vi.fn(async ({ params }: { params: unknown }) => ({
+    decision: 'allow',
+    input: params,
+    reason: undefined,
+    repaired_input: false,
+    terminate: false,
+    listener_ids: [],
+    guard_ids: [],
+  })),
   resolveServiceBinding: mocks.resolveServiceBinding,
   safeReadFile: mocks.safeReadFile,
   safeExistsSync: mocks.safeExistsSync,

@@ -1,8 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
+import {
+  AnthropicReasoningBackend,
+  deriveAnthropicCacheStats,
+} from './anthropic-reasoning-backend.js';
 import { applyCacheBreakpointToSystemBlocks } from './prompt-cache-discipline.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { metrics } from './metrics.js';
 
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
@@ -92,6 +96,88 @@ describe('AnthropicReasoningBackend', () => {
     expect(params.messages[0].content).toEqual([
       { type: 'text', text: 'do the thing', cache_control: { type: 'ephemeral' } },
     ]);
+  });
+
+  it('derives request-level cache hit/miss evidence from provider usage', () => {
+    expect(deriveAnthropicCacheStats({ cache_creation_input_tokens: 100 })).toEqual({
+      hits: 0,
+      misses: 1,
+    });
+    expect(deriveAnthropicCacheStats({ cache_read_input_tokens: 100 })).toEqual({
+      hits: 1,
+      misses: 0,
+    });
+    expect(
+      deriveAnthropicCacheStats({ cache_creation_input_tokens: 0, cache_read_input_tokens: 0 })
+    ).toBeUndefined();
+  });
+
+  it('records provider cache-hit evidence for tool-capable calls', async () => {
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 8 },
+    });
+    const record = vi.spyOn(metrics, 'record').mockImplementation(() => undefined);
+    const backend = new AnthropicReasoningBackend({
+      client: { messages: { create, parse: vi.fn() } } as any,
+    });
+
+    await backend.generateWithTools('use the cached tools', [
+      { name: 'read_file', description: 'Read a file.', inputSchema: { type: 'object' } },
+    ]);
+
+    expect(record).toHaveBeenCalledWith(
+      'anthropic-sdk',
+      expect.any(Number),
+      'success',
+      expect.objectContaining({ cacheStats: { hits: 1, misses: 0 } })
+    );
+  });
+});
+
+it('emits Anthropic native deferred-tool definitions and returns tool references', async () => {
+  const create = vi.fn().mockResolvedValue({
+    content: [
+      {
+        type: 'tool_search_tool_result',
+        tool_use_id: 'search-1',
+        content: {
+          type: 'tool_search_tool_search_result',
+          tool_references: [{ type: 'tool_reference', tool_name: 'deploy_service' }],
+        },
+      },
+      { type: 'text', text: 'tool discovered' },
+    ],
+  });
+  const backend = new AnthropicReasoningBackend({
+    enableNativeDeferredTools: true,
+    client: { messages: { create, parse: vi.fn() } } as any,
+  });
+
+  const result = await backend.generateWithTools(
+    'find the deployment tool',
+    [{ name: 'read_file', description: 'Read a file.', inputSchema: { type: 'object' } }],
+    {
+      deferred_tool_definitions: [
+        {
+          name: 'deploy_service',
+          description: 'Deploy a governed service.',
+          inputSchema: { type: 'object', properties: { service: { type: 'string' } } },
+        },
+      ],
+    }
+  );
+
+  const params = create.mock.calls[0][0];
+  expect(params.tools).toHaveLength(3);
+  expect(params.tools[1]).toMatchObject({ name: 'deploy_service', defer_loading: true });
+  expect(params.tools[2]).toMatchObject({
+    type: 'tool_search_tool_bm25_20251119',
+    name: 'tool_search_tool_bm25',
+  });
+  expect(result).toMatchObject({
+    text: 'tool discovered',
+    deferredToolReferences: ['deploy_service'],
   });
 });
 

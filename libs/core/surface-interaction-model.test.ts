@@ -20,7 +20,10 @@ import {
   createSlackSurfaceMessage,
   createSurfaceMessageFromConversationInput,
   createSurfaceSpace,
+  getSurfaceProviderDefinition,
+  registerSurfaceProvider,
   resolveSurfaceIngressScope,
+  slackSurfaceProviderDefinition,
   SurfaceUnsupportedActionError,
 } from './surface-interaction-model.js';
 import { pathResolver } from './path-resolver.js';
@@ -325,6 +328,27 @@ describe('surface-interaction-model', () => {
     });
 
     expect(() => presence.reply({ text: 'hello' })).toThrow(SurfaceUnsupportedActionError);
+  });
+
+  it('treats surface providers as reversible named seam registrations', () => {
+    const definition = { ...slackSurfaceProviderDefinition, id: 'test-surface-seam' };
+    const dispose = registerSurfaceProvider(definition, {
+      provenance: 'plugin',
+      source: 'surface-interaction-model.test',
+    });
+
+    expect(getSurfaceProviderDefinition('test-surface-seam')).toBe(definition);
+    expect(() =>
+      registerSurfaceProvider(definition, {
+        provenance: 'plugin',
+        source: 'duplicate-test',
+      })
+    ).toThrow(/already registered/u);
+
+    dispose();
+    expect(() => getSurfaceProviderDefinition('test-surface-seam')).toThrow(
+      /No provider .* is registered/u
+    );
   });
 
   it('surfaces responding lifecycle notifications through the space object', async () => {

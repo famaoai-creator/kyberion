@@ -26,6 +26,8 @@ import {
   spawnManagedProcess,
   retry,
   writeVideoCompositionBundle,
+  ensureDefaultOpPreflight,
+  runOpPreflightSync,
 } from '@agent/core';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -1012,6 +1014,31 @@ async function prepareVideoComposition(params: {
 }
 
 export async function handleSingleAction(input: VideoCompositionAction) {
+  const actionName = String((input as any).action || (input as any).kind || 'unknown');
+  ensureDefaultOpPreflight();
+  const hasNestedParams = Boolean(
+    (input as any).params && typeof (input as any).params === 'object'
+  );
+  const preflight = runOpPreflightSync({
+    op: `video-composition:${actionName}`,
+    params: (hasNestedParams ? (input as any).params : input) as Record<string, unknown>,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation video-composition:${actionName} was not admitted.`}`
+    );
+  }
+  input = (
+    hasNestedParams
+      ? { ...(input as any), params: preflight.input }
+      : {
+          ...(input as any),
+          ...preflight.input,
+          action: (input as any).action,
+          kind: (input as any).kind,
+        }
+  ) as VideoCompositionAction;
   if ((input as any).kind === 'video-composition-adf') {
     return prepareVideoComposition({
       video_composition_adf: input as VideoCompositionADF,

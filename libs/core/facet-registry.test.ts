@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { resolveFacets, validateFacetPurity } from './facet-registry.js';
+import { registerPluginFacet, resolveFacets, validateFacetPurity } from './facet-registry.js';
 
 describe('facet-registry', () => {
   it('keeps legacy role procedures resolvable as product persona facets', () => {
@@ -74,6 +74,32 @@ describe('facet-registry', () => {
     ).toContain('persona facet contains procedural instructions');
     expect(validateFacetPurity({ kind: 'policy', content: 'Response format: JSON' })).toContain(
       'policy facet contains output-format instructions'
+    );
+  });
+
+  it('resolves an authorized virtual plugin facet with provenance and disposes it', () => {
+    const dispose = registerPluginFacet({
+      name: 'virtual-policy',
+      metadata: { kind: 'policy', content: 'Virtual plugin policy.' },
+      provenance: {
+        pluginId: 'facet-test-plugin',
+        sourcePath: '/managed/facet-test/index.mjs',
+        trust: 'official',
+      },
+    });
+    try {
+      expect(
+        resolveFacets({ policies: ['virtual-policy'] }, { tier: 'public' }).policies[0]
+      ).toMatchObject({
+        source: 'plugin',
+        content: 'Virtual plugin policy.',
+        provenance: { plugin_id: 'facet-test-plugin', trust: 'official' },
+      });
+    } finally {
+      dispose();
+    }
+    expect(() => resolveFacets({ policies: ['virtual-policy'] }, { tier: 'public' })).toThrow(
+      '[FACET_NOT_FOUND]'
     );
   });
 });

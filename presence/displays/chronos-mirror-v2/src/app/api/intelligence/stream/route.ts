@@ -16,6 +16,7 @@ import {
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  viewerErrorResponse,
 } from '../../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../../lib/su-surface-data';
 import {
@@ -186,10 +187,7 @@ export async function GET(req: NextRequest) {
       req.nextUrl.searchParams.get('tenant') || undefined
     );
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'Tenant scope denied' },
-      { status: 403 }
-    );
+    return viewerErrorResponse(error, 403);
   }
 
   const accessRole = getChronosAccessRoleOrThrow(req);

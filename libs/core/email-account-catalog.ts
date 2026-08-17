@@ -1,4 +1,5 @@
 import { safeExec } from './secure-io.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 
 /** Provider IDs are open-ended so a new account connector does not require a core type change. */
 export type EmailAccountId = string;
@@ -49,52 +50,32 @@ export interface EmailAccountDescriptor {
   capabilities: EmailAccountOperation[];
 }
 
-const accountDescriptors = new Map<EmailAccountId, EmailAccountDescriptor>([
-  [
-    'gmail',
-    {
-      id: 'gmail',
-      display_name: 'Gmail',
-      status: 'needs_setup',
-      selectable: true,
-      reason: 'Authenticate Gmail before runtime use.',
-      capabilities: [...EMAIL_CAPABILITIES],
-    },
-  ],
-  [
-    'outlook',
-    {
-      id: 'outlook',
-      display_name: 'Outlook / Microsoft 365',
-      status: 'needs_setup',
-      selectable: true,
-      reason: 'Authenticate Microsoft 365 CLI before runtime use.',
-      capabilities: [...EMAIL_CAPABILITIES],
-    },
-  ],
-  [
-    'yahoo',
-    {
-      id: 'yahoo',
-      display_name: 'Yahoo Mail',
-      status: 'needs_setup',
-      selectable: false,
-      reason: 'Yahoo Mail needs an OAuth/IMAP connector before runtime use.',
-      capabilities: [...EMAIL_CAPABILITIES],
-    },
-  ],
-]);
+const emailAccountProviderSeam = defineSeam<EmailAccountDescriptor>({
+  key: 'email-account-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
-export function registerEmailAccountProvider(descriptor: EmailAccountDescriptor): void {
-  accountDescriptors.set(descriptor.id, {
-    ...descriptor,
-    capabilities: [...descriptor.capabilities],
-  });
+export function registerEmailAccountProvider(
+  descriptor: EmailAccountDescriptor,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/email-account-catalog.ts',
+  }
+): () => void {
+  return emailAccountProviderSeam.register(
+    descriptor.id,
+    {
+      ...descriptor,
+      capabilities: [...descriptor.capabilities],
+    },
+    metadata
+  );
 }
 
 export function listEmailAccountProviders(): EmailAccountProviderCandidate[] {
   const gmailIsReady = gmailReady();
-  return [...accountDescriptors.values()].map((descriptor) => {
+  return emailAccountProviderSeam.list().map(({ implementation: descriptor }) => {
     const ready = descriptor.id === 'gmail' && gmailIsReady;
     return {
       ...descriptor,
@@ -105,3 +86,28 @@ export function listEmailAccountProviders(): EmailAccountProviderCandidate[] {
     };
   });
 }
+
+registerEmailAccountProvider({
+  id: 'gmail',
+  display_name: 'Gmail',
+  status: 'needs_setup',
+  selectable: true,
+  reason: 'Authenticate Gmail before runtime use.',
+  capabilities: [...EMAIL_CAPABILITIES],
+});
+registerEmailAccountProvider({
+  id: 'outlook',
+  display_name: 'Outlook / Microsoft 365',
+  status: 'needs_setup',
+  selectable: true,
+  reason: 'Authenticate Microsoft 365 CLI before runtime use.',
+  capabilities: [...EMAIL_CAPABILITIES],
+});
+registerEmailAccountProvider({
+  id: 'yahoo',
+  display_name: 'Yahoo Mail',
+  status: 'needs_setup',
+  selectable: false,
+  reason: 'Yahoo Mail needs an OAuth/IMAP connector before runtime use.',
+  capabilities: [...EMAIL_CAPABILITIES],
+});

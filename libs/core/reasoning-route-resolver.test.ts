@@ -76,6 +76,36 @@ describe('reasoning-route-resolver', () => {
     expect(overridden.model).toBe('anthropic:claude-opus-4-8');
   });
 
+  it('resolves graded thinking levels and constrained sampling at route selection', () => {
+    const route = resolveReasoningRoute({
+      requestedProfile: 'claude-cli-default',
+      thinkingLevel: 'high',
+      constrainedSampling: {
+        jsonSchema: { type: 'object' },
+        strict: 'prefer',
+      },
+      env: {},
+    });
+    expect(route.thinkingLevel).toEqual({ requested: 'high', wireValue: 'high' });
+    expect(route.constrainedSampling.mode).toBe('fallback');
+  });
+
+  it('rejects a required constrained feature or hidden thinking level before execution', () => {
+    expect(() =>
+      resolveReasoningRoute({
+        requestedProfile: 'claude-cli-default',
+        constrainedSampling: {
+          jsonSchema: { type: 'object' },
+          strict: 'require',
+        },
+        env: {},
+      })
+    ).toThrow(/No usable reasoning route/);
+    expect(() =>
+      resolveReasoningRoute({ requestedProfile: 'ollama-default', thinkingLevel: 'high', env: {} })
+    ).toThrow(/No usable reasoning route/);
+  });
+
   it('does not let a Grok CLI model override the Grok API route', () => {
     const route = resolveReasoningRoute({
       role: 'default',

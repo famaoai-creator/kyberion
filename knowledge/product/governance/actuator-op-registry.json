@@ -71,6 +71,10 @@
     "write_file",
     "xlsx_render"
   ],
+  "operation_timeouts_ms": {
+    "system:exec": 120000,
+    "system:shell": 120000
+  },
   "domains": {
     "agent": {
       "capture": ["health", "list", "list_manifests", "list_runtimes", "snapshot"],
@@ -556,6 +560,7 @@
       "capture": [
         "glob_files",
         "history_search",
+        "knowledge_read",
         "knowledge_search",
         "query",
         "read_file",

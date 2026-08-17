@@ -83,6 +83,31 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it('does not create a human approval request at an explicitly non-interactive boundary', () => {
+    mockResolvePolicy.mockReturnValue({
+      requiresApproval: true,
+      missingRequirements: [],
+    });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([]);
+
+    const result = enforceApprovalGate({ ...baseParams, hasHuman: false });
+
+    expect(result).toMatchObject({
+      allowed: false,
+      status: 'pending',
+      message: expect.stringContaining('[HUMAN_REQUIRED]'),
+    });
+    expect(mockCreateRequest).not.toHaveBeenCalled();
+    expect(mockAuditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        result: 'denied',
+        reason: expect.stringContaining('no interactive'),
+      })
+    );
+  });
+
   it('allows when an existing approved request matches correlationId', () => {
     mockResolvePolicy.mockReturnValue({
       requiresApproval: true,

@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => ({
     const exportAs = params.export_as || 'llm_decision';
     return { [exportAs]: { decision: 'retry' }, [`${exportAs}_degraded`]: null };
   }),
+  ensureDefaultOpPreflight: vi.fn(),
+  runOpPreflight: vi.fn(async ({ params }: any) => ({
+    decision: 'allow',
+    input: params,
+    listener_ids: [],
+    guard_ids: [],
+  })),
 }));
 
 vi.mock('@agent/core', () => ({
@@ -32,6 +39,8 @@ vi.mock('@agent/core', () => ({
   })),
   retry: mocks.retry,
   executeLlmDecideOp: mocks.executeLlmDecideOp,
+  ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,
+  runOpPreflight: mocks.runOpPreflight,
   ptyEngine: {
     spawn: vi.fn((shell: string, args: string[], cwd?: string) => {
       const id = `pty-${ptyState.sessions.size + 1}`;

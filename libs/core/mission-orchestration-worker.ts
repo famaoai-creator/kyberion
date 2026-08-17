@@ -68,12 +68,15 @@ import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from './working-pri
 import {
   buildWorkingPrinciplesInjectionProvider,
   getMissionDynamicInjectionRegistry,
+  getMissionScopedDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
   type DynamicInjectionProvider,
   type DynamicInjectionRegistry,
+  type ScopedDynamicInjectionRegistry,
 } from './dynamic-injection.js';
 import {
   runGoalDrivenLoop,
+  type GoalPreStepHook,
   type GoalWallClockScheduler,
   type RunGoalDrivenLoopOptions,
 } from './worker-goal-driver.js';
@@ -90,6 +93,7 @@ import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
+import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
 import {
   recordKnowledgeDelivery,
   recordKnowledgeUsageFeedback,
@@ -119,7 +123,11 @@ import {
 import {
   appendMissionOrchestrationJournalEntry,
   appendMissionOrchestrationJournalStatus,
+  loadMissionOrchestrationJournal,
   loadMissionOrchestrationReplayPlan,
+  provisionMissionEntry,
+  writeProvisionedJson,
+  writeProvisionedText,
 } from './mission-orchestration-journal.js';
 import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
 import {
@@ -132,6 +140,13 @@ import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
 import { getReasoningBackend, getLastServedReasoningMode } from './reasoning-backend.js';
+import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
+import {
+  getMissionAgentInputQueue,
+  renderAgentInputQueueEntries,
+  type AgentInputQueueScope,
+  type AgentInputQueue,
+} from './agent-input-queue.js';
 import { deriveExecutionGraph, executeGraph, type GraphNode } from './graph-scheduler.js';
 import {
   buildMissionGraphInputs,
@@ -150,6 +165,7 @@ import {
   isPromptTooLongError,
   type ActiveBackgroundTaskRef,
   type CompactionCarryover,
+  type CompactionReason,
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
 import { listActiveDelegatedTaskRecords } from './delegated-task-observability.js';
@@ -1104,7 +1120,9 @@ export async function maybeCompactDispatchSections(input: {
   missionGoalLines: string[];
   upstreamResultLines: string[];
   teamSnapshotLines: string[];
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   force?: boolean;
+  reason?: CompactionReason;
 }): Promise<{ upstreamResultLines: string[]; teamSnapshotLines: string[] }> {
   let compactor = dispatchCompactors.get(input.missionId);
   if (!compactor) {
@@ -1112,15 +1130,22 @@ export async function maybeCompactDispatchSections(input: {
       missionId: input.missionId,
       writerAgent: 'mission-orchestration-worker',
       workingMemory: compactionWorkingMemory,
-      summarize: async (transcript) =>
-        getReasoningBackend().prompt(
-          [
-            'Summarize this mission worker history for a successor agent.',
-            'Keep: completed work, artifact paths, verified outcomes, unresolved blockers, and immediate next steps. Be concise and factual.',
-            '',
-            transcript,
-          ].join('\n')
-        ),
+      summarize: async (transcript) => {
+        const summaryPrompt = [
+          'Summarize this mission worker history for a successor agent.',
+          'Keep: completed work, artifact paths, verified outcomes, unresolved blockers, and immediate next steps. Be concise and factual.',
+          '',
+          transcript,
+        ].join('\n');
+        recordMissionVisiblePrompt({
+          missionId: input.missionId,
+          taskId: `${input.task.task_id}-compaction`,
+          content: summaryPrompt,
+          form: 'compaction_summary',
+          securityScope: input.securityScope,
+        });
+        return getReasoningBackend().prompt(summaryPrompt);
+      },
     });
     dispatchCompactors.set(input.missionId, compactor);
   }
@@ -1149,6 +1174,7 @@ export async function maybeCompactDispatchSections(input: {
     taskId: input.task.task_id,
     ...(evidenceDir ? { summaryDir: path.join(evidenceDir, 'compaction') } : {}),
     ...(input.force ? { force: true } : {}),
+    ...(input.reason ? { reason: input.reason } : {}),
   });
   if (!result.compacted) {
     return {
@@ -1873,7 +1899,9 @@ async function buildTaskDispatchContext(input: {
       ...buildReviewDiffLines(input.missionId, input.task),
     ],
     teamSnapshotLines: buildTeamSnapshotLines(input.allTasks),
+    securityScope: missionContextPack?.security_scope,
     force: input.forceContextCompaction,
+    ...(input.forceContextCompaction ? { reason: 'overflow' as const } : {}),
   });
   const upstreamResultLines = compactedSections.upstreamResultLines;
   const teamSnapshotLines = compactedSections.teamSnapshotLines;
@@ -2057,6 +2085,9 @@ export interface GoalDrivenWorkItemSeams {
   backend?: RunGoalDrivenLoopOptions['backend'];
   stream?: WorkerEventStream;
   injectionRegistry?: DynamicInjectionRegistry;
+  /** DH-09: optional task/session-scoped injection registry. */
+  scopedInjectionRegistry?: ScopedDynamicInjectionRegistry;
+  injectionScope?: import('./scoped-registry.js').ScopedRegistryScope;
   journal?: WorkerStateJournal;
   /** Escalate a blocked goal to the mission owner (defaults to `recordMissionContextTask`). */
   reportBlockerToMission?: (state: GoalRuntimeState) => void;
@@ -2065,6 +2096,8 @@ export interface GoalDrivenWorkItemSeams {
   maxTurns?: number;
   wallClockScheduler?: GoalWallClockScheduler;
   now?: () => string;
+  /** PI-15/DH-10: ordered model-entry admission hooks. */
+  preStep?: readonly GoalPreStepHook[];
 }
 
 export interface GoalDrivenWorkItemResult {
@@ -2142,6 +2175,16 @@ export async function runGoalDrivenWorkItem(input: {
   systemPrompt?: string;
   /** Per-turn instruction appended after the injected goal reminders. */
   turnPrompt?: string;
+  /** DH-06: optional receipt sink for each model-visible goal turn. */
+  onPromptVisible?: (content: string, form: string) => void;
+  /** PI-15/DH-10: cooperative turn-boundary yield; never interrupts a turn. */
+  shouldStopAfterTurn?: RunGoalDrivenLoopOptions['shouldStopAfterTurn'];
+  /** PI-15/DH-10: ordered model-entry admission hooks. */
+  preStep?: readonly GoalPreStepHook[];
+  /** PI-15: shared mission inbox consumed at goal turn boundaries. */
+  inputQueue?: AgentInputQueue;
+  /** PI-15: optional task/agent/session filter for the shared inbox. */
+  inputQueueScope?: AgentInputQueueScope;
   seams?: GoalDrivenWorkItemSeams;
 }): Promise<GoalDrivenWorkItemResult> {
   const { missionId, task } = input;
@@ -2177,10 +2220,25 @@ export async function runGoalDrivenWorkItem(input: {
     missionId,
     stream,
     injectionRegistry,
+    ...(seams.scopedInjectionRegistry
+      ? { scopedInjectionRegistry: seams.scopedInjectionRegistry }
+      : {}),
+    ...(seams.injectionScope ? { injectionScope: seams.injectionScope } : {}),
     reportBlockerToMission,
     ...(budget ? { budget } : {}),
     ...(input.systemPrompt ? { systemPrompt: input.systemPrompt } : {}),
     ...(input.turnPrompt ? { turnPrompt: input.turnPrompt } : {}),
+    ...(input.onPromptVisible ? { onPromptVisible: input.onPromptVisible } : {}),
+    ...(input.shouldStopAfterTurn ? { shouldStopAfterTurn: input.shouldStopAfterTurn } : {}),
+    ...(input.preStep ? { preStep: input.preStep } : {}),
+    ...(input.inputQueue
+      ? {
+          getTurnPrompt: async () =>
+            renderAgentInputQueueEntries(
+              await input.inputQueue!.consumeForTurn(32, input.inputQueueScope)
+            ),
+        }
+      : {}),
     ...(seams.backend ? { backend: seams.backend } : {}),
     ...(seams.maxTurns !== undefined ? { maxTurns: seams.maxTurns } : {}),
     ...(seams.wallClockScheduler ? { wallClockScheduler: seams.wallClockScheduler } : {}),
@@ -2272,6 +2330,8 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
 }): Promise<{
   systemPrompt?: string;
   missionContextPackPath?: string;
+  contextPackId?: string;
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   /** KP-05: knowledge actually delivered to this goal-driven dispatch, if any. */
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
 }> {
@@ -2298,6 +2358,12 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       systemPrompt: provisioned.text,
       ...(provisioned.missionContextPackPath
         ? { missionContextPackPath: provisioned.missionContextPackPath }
+        : {}),
+      ...(provisioned.pack?.context_pack_id
+        ? { contextPackId: provisioned.pack.context_pack_id }
+        : {}),
+      ...(provisioned.pack?.security_scope
+        ? { securityScope: provisioned.pack.security_scope }
         : {}),
       deliveredKnowledgeRefs: provisioned.deliveredKnowledgeRefs,
     };
@@ -2357,13 +2423,14 @@ async function dispatchGoalDrivenMissionTask(
 
   // KP-01: provision the mission context pack as a stable system-prompt
   // prefix for the goal loop. Fail-open — see provisionGoalDrivenTaskKnowledge.
-  const { systemPrompt, deliveredKnowledgeRefs } = await provisionGoalDrivenTaskKnowledge({
-    missionId: input.missionId,
-    task: input.task,
-    teamRole: input.teamRole,
-    agentId: input.assignment.agent_id,
-    workItem,
-  });
+  const { systemPrompt, contextPackId, securityScope, deliveredKnowledgeRefs } =
+    await provisionGoalDrivenTaskKnowledge({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+      agentId: input.assignment.agent_id,
+      workItem,
+    });
   // KP-05: report what the goal loop's stable prefix actually delivered so
   // the dispatch trace's knowledgeRefs are non-empty for this path too — see
   // attachDeliveredKnowledgeRefs.
@@ -2375,6 +2442,30 @@ async function dispatchGoalDrivenMissionTask(
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
     ...(systemPrompt ? { systemPrompt } : {}),
+    inputQueue: getMissionAgentInputQueue({ missionId: input.missionId }),
+    inputQueueScope: {
+      taskId: input.task.task_id,
+      agentId: input.assignment.agent_id,
+      sessionId: goalIdForWorkItem(input.missionId, input.task.task_id),
+    },
+    seams: {
+      scopedInjectionRegistry: getMissionScopedDynamicInjectionRegistry(input.missionId),
+      injectionScope: {
+        mission: input.missionId,
+        task: input.task.task_id,
+        session: goalIdForWorkItem(input.missionId, input.task.task_id),
+      },
+    },
+    onPromptVisible: (content, form) =>
+      recordMissionVisiblePrompt({
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        content,
+        form,
+        ...(contextPackId ? { contextPackId } : {}),
+        knowledgeRefs: deliveredKnowledgeRefs,
+        securityScope,
+      }),
   });
 
   const baseOutcome: DispatchMissionTaskOutcome = {
@@ -2586,6 +2677,8 @@ interface DispatchPlannedMissionTaskInput {
   };
   allTasks: PlannedNextTask[];
   upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>;
+  /** PI-15: queue data captured once before a single-shot dispatch/retry pair. */
+  queuedInputPrompt?: string;
   iterationPolicy: {
     max_rework_attempts: number;
     max_review_rounds: number;
@@ -2703,7 +2796,47 @@ async function dispatchPlannedMissionTask(
     ...(onBehalfOf ? { onBehalfOf } : {}),
   });
   let outcome: DispatchMissionTaskOutcome | null = null;
+  let agentStartAdmitted = false;
   try {
+    // PI-08: expose the governed system-prompt boundary before either the
+    // single-shot or goal-driven agent starts. The hook receives metadata and
+    // options, never the prompt body; prompt content remains behind the
+    // existing visibility ledger at the actual dispatch boundary.
+    const beforeAgentStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'before_agent_start',
+      {
+        matcher_value: input.task.task_id,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        agent_id: input.assignment.agent_id,
+        systemPromptOptions: {
+          missionId: input.missionId,
+          taskId: input.task.task_id,
+          teamRole: input.teamRole,
+          agentId: input.assignment.agent_id,
+          goalDriven: input.task.goal_driven === true,
+          modelHint: input.assignment.model_hint,
+          promptVisibility: 'ledgered',
+        },
+      }
+    );
+    if (beforeAgentStart.blocked) {
+      throw new Error(
+        `[HOOK_BLOCKED] before_agent_start blocked task ${input.task.task_id}: ${beforeAgentStart.reasons.join('; ')}`
+      );
+    }
+    agentStartAdmitted = true;
+    const missionInputQueue = getMissionAgentInputQueue({ missionId: input.missionId });
+    const queuedInputPrompt = input.task.goal_driven
+      ? undefined
+      : renderAgentInputQueueEntries(
+          await missionInputQueue.consumeForTurn(32, {
+            taskId: input.task.task_id,
+            agentId: input.assignment.agent_id,
+          })
+        );
     // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
     // loop instead of the single-shot dispatch below. Default OFF — the rest
     // of dispatchPlannedMissionTaskCore is unchanged when `goal_driven` is unset.
@@ -2717,9 +2850,39 @@ async function dispatchPlannedMissionTask(
           },
           traceCtx
         )
-      : await dispatchPlannedMissionTaskCore(input, traceCtx, delegationChain, gapRecorder);
+      : await dispatchPlannedMissionTaskCore(
+          { ...input, ...(queuedInputPrompt ? { queuedInputPrompt } : {}) },
+          traceCtx,
+          delegationChain,
+          gapRecorder
+        );
     return outcome;
   } finally {
+    // PI-08: this is the mission-worker receipt point. All retry, prompt
+    // compaction, goal turns, acceptance review, and rework decisions inside
+    // the dispatch have completed before this observer runs. A settled hook
+    // cannot change the already-finalized task outcome.
+    if (agentStartAdmitted) {
+      try {
+        const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+          matcher_value: input.task.task_id,
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          team_role: input.teamRole,
+          agent_id: input.assignment.agent_id,
+          status: outcome ? (outcome.dispatched ? 'succeeded' : 'blocked') : 'failed',
+        });
+        if (settled.blocked) {
+          logger.warn(
+            `[PI-08] task_settled observer blocked after mission task finalization: ${settled.reasons.join('; ')}`
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          `[PI-08] task_settled observer failed after mission task finalization: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
     finalizeMissionTaskTrace(traceCtx, input, outcome, gapRecorder);
   }
 }
@@ -2792,7 +2955,8 @@ async function dispatchPlannedMissionTaskCore(
       taskModelHint: input.assignment.model_hint,
       provider: input.assignment.provider || undefined,
       providerModelId: input.assignment.modelId || undefined,
-      prompt: context.prompt,
+      prompt: [context.prompt, input.queuedInputPrompt].filter(Boolean).join('\n\n'),
+      contextPackId: context.missionContextPackId,
       securityScope: context.securityScope,
       // KP-04: lets a needs-driven retry's second-round retrieval exclude
       // what the first-round context pack already delivered.
@@ -2928,23 +3092,21 @@ async function dispatchPlannedMissionTaskCore(
         team_role: input.teamRole,
       },
     });
-    safeWriteFile(
-      clarificationPacketPath,
-      JSON.stringify(
-        {
-          mission_id: input.missionId,
-          task_id: input.task.task_id,
-          task_result: response.taskResult,
-          clarification_packet: clarificationPacket,
-          clarification_packet_path: clarificationPacketPath,
-          needs: taskResultNeeds,
-          status: 'needs_input',
-          written_at: new Date().toISOString(),
-        },
-        null,
-        2
-      )
-    );
+    writeProvisionedJson({
+      missionId: input.missionId,
+      filePath: clarificationPacketPath,
+      targetPath: `evidence/task-clarification-${input.task.task_id}.json`,
+      provisioned: provisionMissionEntry({
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        task_result: response.taskResult,
+        clarification_packet: clarificationPacket,
+        clarification_packet_path: clarificationPacketPath,
+        needs: taskResultNeeds,
+        status: 'needs_input',
+        written_at: new Date().toISOString(),
+      }),
+    });
     input.task.status = 'blocked';
     emitMissionTaskEvent({
       event_type: 'task_reviewed',
@@ -3611,6 +3773,34 @@ function stampTaskResultProvenance(taskResult: TaskResultBlock | undefined): voi
   };
 }
 
+/**
+ * DH-06: record a model-visible dispatch prompt before it crosses the A2A
+ * boundary. The ledger stores only a digest/length and references, never the
+ * prompt body. This is deliberately fail-closed: sending a prompt without a
+ * durable visibility receipt would violate the model-visible/logged contract.
+ */
+function recordMissionVisiblePrompt(input: {
+  missionId: string;
+  taskId: string;
+  content: string;
+  form: string;
+  contextPackId?: string;
+  knowledgeRefs?: DeliveredKnowledgeRef[];
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+}): void {
+  const tier = input.securityScope?.write_tier || 'public';
+  appendPromptVisibilityRecord({
+    missionPath: missionDir(input.missionId, tier),
+    missionId: input.missionId,
+    source: 'mission-orchestration-worker',
+    form: input.form,
+    content: input.content,
+    ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
+    taskId: input.taskId,
+    knowledgeRefs: (input.knowledgeRefs || []).map((ref) => ref.path),
+  });
+}
+
 async function obtainTaskResultResponse(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -3620,6 +3810,7 @@ async function obtainTaskResultResponse(input: {
   provider?: string;
   providerModelId?: string;
   prompt: string;
+  contextPackId?: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   /**
    * KP-04: what the first-round context pack already delivered (from
@@ -3645,6 +3836,15 @@ async function obtainTaskResultResponse(input: {
   notes: string[];
 }> {
   const notes: string[] = [];
+  recordMissionVisiblePrompt({
+    missionId: input.missionId,
+    taskId: input.task.task_id,
+    content: input.prompt,
+    form: 'task_dispatch',
+    ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
+    knowledgeRefs: input.deliveredKnowledgeRefs,
+    securityScope: input.securityScope,
+  });
   let response = await a2aBridge.route({
     a2a_version: '1.0',
     header: {
@@ -3715,6 +3915,25 @@ async function obtainTaskResultResponse(input: {
       deliveredKnowledgeRefs: input.deliveredKnowledgeRefs || [],
       securityScope: input.securityScope,
     });
+    const retryPrompt = buildTaskResultRetryPrompt({
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      previousResponse: String(response.payload?.text || ''),
+      parseErrors: [
+        ...(taskResult?.needs?.length ? [`needs unresolved: ${taskResult.needs.join('; ')}`] : []),
+        ...parseErrors,
+      ],
+      knowledgeDeltaLines,
+    });
+    recordMissionVisiblePrompt({
+      missionId: input.missionId,
+      taskId: `${input.task.task_id}-retry`,
+      content: retryPrompt,
+      form: 'task_result_retry',
+      ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
+      knowledgeRefs: input.deliveredKnowledgeRefs,
+      securityScope: input.securityScope,
+    });
     response = await a2aBridge.route({
       a2a_version: '1.0',
       header: {
@@ -3729,18 +3948,7 @@ async function obtainTaskResultResponse(input: {
       },
       payload: {
         intent: 'mission_task_execution',
-        text: buildTaskResultRetryPrompt({
-          missionId: input.missionId,
-          taskId: input.task.task_id,
-          previousResponse: String(response.payload?.text || ''),
-          parseErrors: [
-            ...(taskResult?.needs?.length
-              ? [`needs unresolved: ${taskResult.needs.join('; ')}`]
-              : []),
-            ...parseErrors,
-          ],
-          knowledgeDeltaLines,
-        }),
+        text: retryPrompt,
         objective: input.task.description || input.task.task_id,
         acceptance_criteria: Array.isArray((input.task as any).acceptance_criteria)
           ? (input.task as any).acceptance_criteria.filter(
@@ -3938,6 +4146,7 @@ async function obtainBestOfTaskResultResponse(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
+  contextPackId?: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
   deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
   /** NI-03: forwarded verbatim to each candidate's obtainTaskResultResponse. */
@@ -3978,6 +4187,16 @@ async function obtainBestOfTaskResultResponse(input: {
   ]
     .filter(Boolean)
     .join('\n');
+
+  recordMissionVisiblePrompt({
+    missionId: input.missionId,
+    taskId: `${input.task.task_id}-judge`,
+    content: judgePrompt,
+    form: 'best_of_judge',
+    ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
+    knowledgeRefs: input.deliveredKnowledgeRefs,
+    securityScope: input.securityScope,
+  });
 
   let verdict: { winner: 'A' | 'B'; rationale?: string; merge_hints?: string[] } | null = null;
   try {
@@ -4020,21 +4239,19 @@ async function obtainBestOfTaskResultResponse(input: {
     if (evidenceDir) {
       const alternativesDir = path.join(evidenceDir, 'alternatives');
       safeMkdir(alternativesDir, { recursive: true });
-      safeWriteFile(
-        path.join(alternativesDir, `${input.task.task_id}-candidate-${loser.key}.json`),
-        JSON.stringify(
-          {
-            task_id: input.task.task_id,
-            candidate: loser.key,
-            winner: winnerKey,
-            judge_rationale: verdict?.rationale,
-            merge_hints: verdict?.merge_hints,
-            task_result: loser.response.taskResult,
-          },
-          null,
-          2
-        )
-      );
+      writeProvisionedJson({
+        missionId: input.missionId,
+        filePath: path.join(alternativesDir, `${input.task.task_id}-candidate-${loser.key}.json`),
+        targetPath: `evidence/alternatives/${input.task.task_id}-candidate-${loser.key}.json`,
+        provisioned: provisionMissionEntry({
+          task_id: input.task.task_id,
+          candidate: loser.key,
+          winner: winnerKey,
+          judge_rationale: verdict?.rationale,
+          merge_hints: verdict?.merge_hints,
+          task_result: loser.response.taskResult,
+        }),
+      });
     }
   } catch (err: any) {
     logger.warn(
@@ -4131,30 +4348,38 @@ function publishTaskPrArtifacts(input: {
   }
   const prDir = path.join(missionPath, 'evidence', 'prs', input.task.task_id);
   safeMkdir(prDir, { recursive: true });
-  safeWriteFile(
-    path.join(prDir, 'diff.patch'),
-    diff || `(no committed changes for task ${input.task.task_id})\n`
-  );
-  safeWriteFile(
-    path.join(prDir, 'PR.md'),
-    [
-      `# ${summary}`,
-      '',
-      `- Mission: ${input.missionId}`,
-      `- Task: ${input.task.task_id}`,
-      `- Branch: ${branch}`,
-      `- Deliverable: ${input.task.deliverable || input.task.target_path || 'n/a'}`,
-      '',
-      '## Description',
-      input.taskResult?.summary || input.task.description || '(no summary)',
-      '',
-      '## Changed files',
-      ...(changedFiles.length > 0
-        ? changedFiles.map((file) => `- ${file}`)
-        : ['- (none committed)']),
-      '',
-    ].join('\n')
-  );
+  writeProvisionedText({
+    missionId: input.missionId,
+    filePath: path.join(prDir, 'diff.patch'),
+    targetPath: `evidence/prs/${input.task.task_id}/diff.patch`,
+    provisioned: provisionMissionEntry(
+      diff || `(no committed changes for task ${input.task.task_id})\n`
+    ),
+  });
+  writeProvisionedText({
+    missionId: input.missionId,
+    filePath: path.join(prDir, 'PR.md'),
+    targetPath: `evidence/prs/${input.task.task_id}/PR.md`,
+    provisioned: provisionMissionEntry(
+      [
+        `# ${summary}`,
+        '',
+        `- Mission: ${input.missionId}`,
+        `- Task: ${input.task.task_id}`,
+        `- Branch: ${branch}`,
+        `- Deliverable: ${input.task.deliverable || input.task.target_path || 'n/a'}`,
+        '',
+        '## Description',
+        input.taskResult?.summary || input.task.description || '(no summary)',
+        '',
+        '## Changed files',
+        ...(changedFiles.length > 0
+          ? changedFiles.map((file) => `- ${file}`)
+          : ['- (none committed)']),
+        '',
+      ].join('\n')
+    ),
+  });
   return `evidence/prs/${input.task.task_id}/PR.md`;
 }
 
@@ -4472,7 +4697,12 @@ function syncPlanningArtifacts(missionId: string): void {
     .replace(/(?:\n### Gate Status[\s\S]*?)?$/u, gateSection);
 
   if (updatedTaskBoard !== currentTaskBoard) {
-    safeWriteFile(taskBoardPath, updatedTaskBoard);
+    writeProvisionedText({
+      missionId,
+      filePath: taskBoardPath,
+      targetPath: 'TASK_BOARD.md',
+      provisioned: provisionMissionEntry(updatedTaskBoard),
+    });
   }
 
   const nextTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
@@ -4520,7 +4750,12 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
     throw new Error(`Invalid planning packet for ${missionId}: ${validation.errors.join('; ')}`);
   }
   const missionPath = missionDir(missionId, 'public');
-  safeWriteFile(`${missionPath}/PLAN.md`, validation.value.plan_markdown.trimEnd() + '\n');
+  writeProvisionedText({
+    missionId,
+    filePath: `${missionPath}/PLAN.md`,
+    targetPath: 'PLAN.md',
+    provisioned: provisionMissionEntry(validation.value.plan_markdown.trimEnd() + '\n'),
+  });
   const derivedTasks = validation.value.next_tasks.map((task, index) => {
     const taskId =
       typeof task.task_id === 'string' && task.task_id.trim()
@@ -4588,7 +4823,12 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
   if (seededTasks.length > 0) {
     const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
     const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
-    safeWriteFile(nextTasksPath, JSON.stringify([...seededTasks, ...additions], null, 2));
+    writeProvisionedJson({
+      missionId,
+      filePath: nextTasksPath,
+      targetPath: 'NEXT_TASKS.json',
+      provisioned: provisionMissionEntry([...seededTasks, ...additions]),
+    });
     ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
       mission_id: missionId,
       seeded_task_count: seededTasks.length,
@@ -4597,7 +4837,12 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
     });
     return;
   }
-  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
+  writeProvisionedJson({
+    missionId,
+    filePath: nextTasksPath,
+    targetPath: 'NEXT_TASKS.json',
+    provisioned: provisionMissionEntry(nextTasks),
+  });
 }
 
 function readProcessTemplateSeededTasks(nextTasksPath: string): Array<Record<string, unknown>> {
@@ -4657,7 +4902,12 @@ function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
       ...(rework_count > 0 ? { rework_count } : {}),
     };
   });
-  safeWriteFile(nextTasksPath, JSON.stringify(mergedTasks, null, 2));
+  writeProvisionedJson({
+    missionId,
+    filePath: nextTasksPath,
+    targetPath: 'NEXT_TASKS.json',
+    provisioned: provisionMissionEntry(mergedTasks),
+  });
 }
 
 function restoreMissionGraphRunTaskSnapshots(
@@ -4795,7 +5045,12 @@ export function reconcileMissionProgress(missionId: string): void {
   }
 
   if (updatedTaskBoard !== currentTaskBoard) {
-    safeWriteFile(taskBoardPath, updatedTaskBoard);
+    writeProvisionedText({
+      missionId,
+      filePath: taskBoardPath,
+      targetPath: 'TASK_BOARD.md',
+      provisioned: provisionMissionEntry(updatedTaskBoard),
+    });
   }
 
   if (acceptedCount > 0 || reviewedCount > 0 || completedCount > 0) {
@@ -4818,7 +5073,12 @@ function markTaskBoardInProgress(missionId: string): void {
     .replace('## Status: Planning Ready', '## Status: Execution Ready')
     .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
   if (updatedTaskBoard !== currentTaskBoard) {
-    safeWriteFile(taskBoardPath, updatedTaskBoard);
+    writeProvisionedText({
+      missionId,
+      filePath: taskBoardPath,
+      targetPath: 'TASK_BOARD.md',
+      provisioned: provisionMissionEntry(updatedTaskBoard),
+    });
   }
 }
 
@@ -5677,31 +5937,31 @@ async function recordPlanningPacketGate(input: {
     const current = JSON.parse(
       safeReadFile(evaluation.evidence_path, { encoding: 'utf8' }) as string
     ) as Record<string, unknown>;
-    safeWriteFile(
-      evaluation.evidence_path,
-      JSON.stringify(
-        {
-          ...current,
-          planner_agent_id: input.plannerAgentId,
-          ...(input.reviewerAgentId ? { reviewer_agent_id: input.reviewerAgentId } : {}),
-          review_round: input.reviewRound,
-          requires_independent_review: requiresIndependentReview,
-          ...(input.reviewVerdict
-            ? {
-                review_verdict: {
-                  approve: input.reviewVerdict.approve,
-                  gaps: input.reviewVerdict.gaps,
-                  ...(input.reviewVerdict.rationale
-                    ? { rationale: input.reviewVerdict.rationale }
-                    : {}),
-                },
-              }
-            : {}),
-        },
-        null,
-        2
-      )
-    );
+    writeProvisionedJson({
+      missionId: input.missionId,
+      filePath: evaluation.evidence_path,
+      targetPath: nodePath
+        .relative(missionDir(input.missionId, 'public'), evaluation.evidence_path)
+        .replaceAll(nodePath.sep, '/'),
+      provisioned: provisionMissionEntry({
+        ...current,
+        planner_agent_id: input.plannerAgentId,
+        ...(input.reviewerAgentId ? { reviewer_agent_id: input.reviewerAgentId } : {}),
+        review_round: input.reviewRound,
+        requires_independent_review: requiresIndependentReview,
+        ...(input.reviewVerdict
+          ? {
+              review_verdict: {
+                approve: input.reviewVerdict.approve,
+                gaps: input.reviewVerdict.gaps,
+                ...(input.reviewVerdict.rationale
+                  ? { rationale: input.reviewVerdict.rationale }
+                  : {}),
+              },
+            }
+          : {}),
+      }),
+    });
   }
 }
 
@@ -6399,11 +6659,12 @@ async function handleMissionDistillationRequested(event: MissionOrchestrationEve
     const report = summarizeHeuristics(10);
     const evidenceDir = missionEvidenceDir(missionId);
     if (evidenceDir) {
-      safeWriteFile(
-        nodePath.join(evidenceDir, 'heuristic-feedback-report.json'),
-        `${JSON.stringify(report, null, 2)}\n`,
-        { mkdir: true }
-      );
+      writeProvisionedJson({
+        missionId,
+        filePath: nodePath.join(evidenceDir, 'heuristic-feedback-report.json'),
+        targetPath: 'evidence/heuristic-feedback-report.json',
+        provisioned: provisionMissionEntry(report),
+      });
     }
   } catch (err: any) {
     logger.warn(`[worker] heuristic summary skipped for ${missionId}: ${err?.message ?? err}`);
@@ -6646,6 +6907,19 @@ async function handleSurfaceControlRequested(
 export async function processMissionOrchestrationEventPath(eventPath: string): Promise<void> {
   ensureWorkerBackendsInstalled();
   const event = loadMissionOrchestrationEvent<SlackPayload>(eventPath);
+  const priorCompletion = loadMissionOrchestrationJournal(event.mission_id, event.scope)
+    .filter((entry) => entry.event_id === event.event_id)
+    .at(-1);
+  if (priorCompletion?.outcome.status === 'completed') {
+    emitMissionOrchestrationObservation({
+      decision: 'mission_orchestration_event_already_completed',
+      event_id: event.event_id,
+      event_type: event.event_type,
+      mission_id: event.mission_id,
+      scope: event.scope,
+    });
+    return;
+  }
   emitMissionOrchestrationObservation({
     decision: 'mission_orchestration_event_started',
     event_id: event.event_id,

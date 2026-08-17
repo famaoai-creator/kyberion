@@ -20,6 +20,7 @@ vi.mock('../core.js', () => ({
 }));
 
 import {
+  type ActuatorCapabilityProbe,
   checkActuatorCapabilities,
   checkAllActuatorCapabilities,
   registerCapabilityProbe,
@@ -142,7 +143,10 @@ describe('actuator-capability', () => {
         .fn()
         .mockResolvedValue([{ op: 'custom-op', available: true, cost: 'free' as const }]);
 
-      registerCapabilityProbe('custom-test-actuator', customProbe);
+      const dispose = registerCapabilityProbe('custom-test-actuator', customProbe, {
+        provenance: 'generated',
+        source: 'actuator-capability.test.ts',
+      });
 
       const manifest = {
         actuator_id: 'custom-test-actuator',
@@ -157,6 +161,19 @@ describe('actuator-capability', () => {
       expect(status.capabilities).toHaveLength(1);
       expect(status.capabilities[0].op).toBe('custom-op');
       expect(status.capabilities[0].available).toBe(true);
+      dispose();
+      expect(
+        (await checkActuatorCapabilities('custom-test-actuator', TMP_MANIFEST)).capabilities
+      ).toHaveLength(0);
+    });
+
+    it('rejects duplicate ids and supports reversible registration', () => {
+      const probe: ActuatorCapabilityProbe = async () => [];
+      const dispose = registerCapabilityProbe('duplicate-test-actuator', probe);
+      expect(() => registerCapabilityProbe('duplicate-test-actuator', probe)).toThrow(
+        /already registered/
+      );
+      dispose();
     });
   });
 

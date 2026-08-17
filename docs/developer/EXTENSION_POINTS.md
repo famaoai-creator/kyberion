@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-08-16
+last_updated: 2026-08-17
 ---
 
 # Kyberion Extension Points
@@ -194,6 +194,57 @@ runtime, platform, readiness, and fallback metadata.
 See [Adapter-First Extension Policy](../../knowledge/product/governance/adapter-first-extension-policy.md)
 for the required registration ceremony, security, UX, operations, and
 maintainability rules.
+
+## 2.11 Lifecycle order — **Beta**
+
+The lifecycle graph is the ordering contract for extension hooks. A hook may
+observe or repair a tool input during `pre_tool_use`; it must not assume that
+`post_tool_use` means the whole task is complete. The `task_settled` event is
+the terminal receipt point: retry, repair, fallback, and compaction work must
+already be finished before it is emitted, and it is emitted at most once per
+top-level pipeline run.
+
+```mermaid
+flowchart TD
+  trust[project_trust] --> start[session_start]
+  start --> discover[resources_discover]
+  discover --> input[input]
+  input --> before[before_agent_start]
+  before --> pre[pre_tool_use<br/>serial preflight + repair]
+  pre --> execute[tool execution<br/>parallel siblings]
+  execute --> post[post_tool_use / post_tool_use_failure]
+  post --> retry[retry / repair / fallback / compaction]
+  retry --> settled[task_settled<br/>one terminal receipt]
+  settled --> end[session_end]
+```
+
+The currently executable hook vocabulary is `pre_tool_use`, `post_tool_use`,
+`post_tool_use_failure`, `user_prompt_submit`, `stop`, `stop_failure`,
+`session_start`, `before_agent_start`, `session_end`, `subagent_start`, `subagent_stop`,
+`pre_compact`, `post_compact`, `notification`, and `task_settled`. The
+remaining graph labels are extension roadmap anchors; their presence in this
+diagram does not imply a runtime hook has already been added.
+`scripts/check_extension_order.ts` keeps the runtime vocabulary and this
+contract from drifting.
+
+`runOpPreflight` returns `{ decision, reason, repaired_input, terminate }`.
+Listeners run serially in canonical order; only after all listeners finish may
+the execution engine run sibling tools in parallel. A repaired input is
+returned even when the final decision is `allow`, and the repair is included
+in the admission result for audit and downstream dispatch.
+
+Goal-driven workers expose the same model-entry discipline through an ordered
+`preStep` chain. Each hook returns `enter(messages)` or `reject(reason)`;
+rejection pauses before any model/tool call, while admitted messages are
+appended in registration order. Input queue delivery is turn-boundary only:
+`steer → follow_up → next_run → inject`, with mission-wide broadcast or an
+explicit task/agent/session scope. Queue content is rendered as untrusted data
+and never interrupts an in-flight turn.
+
+Lifecycle hooks expose a separate `decision: allow | ask | block` disposition.
+Multiple hooks aggregate monotonically (`block > ask > allow`); non-interactive
+pipeline and worker boundaries project `ask` to a fail-closed block until an
+interactive approval surface is connected.
 
 ## 3. Semver Rules
 

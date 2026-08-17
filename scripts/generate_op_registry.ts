@@ -103,6 +103,7 @@ interface ActuatorOpRegistryFile {
   shared_capture_ops: string[];
   shared_transform_ops: string[];
   shared_apply_ops: string[];
+  operation_timeouts_ms?: Record<string, number>;
   domains: Record<string, DomainOpRegistry>;
 }
 
@@ -181,6 +182,9 @@ function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
     shared_capture_ops: uniqueSorted(registry.shared_capture_ops || []),
     shared_transform_ops: uniqueSorted(registry.shared_transform_ops || []),
     shared_apply_ops: uniqueSorted(registry.shared_apply_ops || []),
+    ...(registry.operation_timeouts_ms
+      ? { operation_timeouts_ms: { ...registry.operation_timeouts_ms } }
+      : {}),
     domains: registry.domains || {},
   };
 }

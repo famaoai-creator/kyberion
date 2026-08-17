@@ -651,6 +651,9 @@ export function enforceBrowserExtensionApproval(input: {
   agentId: string;
   channel?: string;
   correlationId?: string;
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
 }): ApprovalGateResult {
   const highRiskActions = selectedRecordingActions(input.recording).filter((action) =>
     HIGH_RISK_OPERATIONS.has(action.op)
@@ -679,6 +682,9 @@ export function enforceBrowserExtensionApproval(input: {
       summary: `${highRiskActions.length} 件の高リスク操作（${highRiskActions.map((action) => action.op).join(', ')}）`,
       severity: 'high',
     },
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
   });
 }
 

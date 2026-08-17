@@ -6,6 +6,7 @@ import {
   type EventScopeFilter,
 } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
+import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 
 /**
  * cost-report.ts — OP-01 Task 2: aggregate the usage ledger into
@@ -26,11 +27,18 @@ export interface CostLedgerEntry {
   cost_usd?: number;
   sdk_cost_usd?: number;
   estimated?: boolean;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    cache_read_tokens?: number;
+    cache_write_tokens?: number;
+    cache_write_1h_tokens?: number;
+  };
   type?: string;
   actor_id?: string;
   customer_id?: string;
   cost_center?: string;
+  cause?: UsageCause;
   status?: ResourceUsageStatus;
   scope?: EventScope;
 }
@@ -42,6 +50,9 @@ export interface CostBucket {
   calls: number;
   prompt_tokens: number;
   completion_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cache_write_1h_tokens: number;
 }
 
 export interface CostReport {
@@ -63,6 +74,7 @@ export interface CostReport {
   by_tenant: CostBucket[];
   by_organization: CostBucket[];
   by_project: CostBucket[];
+  by_cause: CostBucket[];
 }
 
 export function effectiveCostUsd(entry: CostLedgerEntry): number {
@@ -96,6 +108,9 @@ function bucketize(
         calls: 0,
         prompt_tokens: 0,
         completion_tokens: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        cache_write_1h_tokens: 0,
       };
       buckets.set(key, bucket);
     }
@@ -104,6 +119,9 @@ function bucketize(
     bucket.calls += 1;
     bucket.prompt_tokens += entry.usage?.prompt_tokens ?? 0;
     bucket.completion_tokens += entry.usage?.completion_tokens ?? 0;
+    bucket.cache_read_tokens += entry.usage?.cache_read_tokens ?? 0;
+    bucket.cache_write_tokens += entry.usage?.cache_write_tokens ?? 0;
+    bucket.cache_write_1h_tokens += entry.usage?.cache_write_1h_tokens ?? 0;
   }
   return [...buckets.values()]
     .map((bucket) => ({
@@ -182,6 +200,7 @@ export function buildCostReport(
       scopeKey(entry, 'organization_id', '(no organization)')
     ),
     by_project: bucketize(costed, (entry) => scopeKey(entry, 'project_id', '(no project)')),
+    by_cause: bucketize(costed, (entry) => normalizeUsageCause(entry.cause)),
   };
 }
 

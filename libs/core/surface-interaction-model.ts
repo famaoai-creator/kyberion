@@ -13,6 +13,7 @@ import {
 } from './surface-coordination-store.js';
 import { resolveCustomerBinding } from './customer-channel-binding.js';
 import { renderStatus } from './ux-vocabulary.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 
 import type {
   SlackSurfaceMetadata,
@@ -177,20 +178,29 @@ export class SurfaceUnsupportedActionError extends Error {
 }
 
 // ─── Dynamic Registry ────────────────────────────────────────────────────────
-const _surfaceProviderRegistry = new Map<SurfaceProviderId, SurfaceProviderDefinition>();
+// Surface providers are a named seam: adding a provider is reversible, while
+// silently replacing a provider would make boot/load order part of product
+// semantics and could route replies through an unintended implementation.
+const surfaceProviderSeam = defineSeam<SurfaceProviderDefinition>({
+  key: 'surface-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
-export function registerSurfaceProvider(definition: SurfaceProviderDefinition): void {
-  _surfaceProviderRegistry.set(definition.id, definition);
+export function registerSurfaceProvider(
+  definition: SurfaceProviderDefinition,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: `surface-interaction-model:${definition.id}`,
+  }
+): () => void {
+  return surfaceProviderSeam.register(definition.id, definition, metadata);
 }
 
 export function getSurfaceProviderDefinition(
   surface: SurfaceProviderId
 ): SurfaceProviderDefinition {
-  const definition = _surfaceProviderRegistry.get(surface);
-  if (!definition) {
-    throw new Error(`Surface provider '${surface}' not found in registry.`);
-  }
-  return definition;
+  return surfaceProviderSeam.get(surface);
 }
 
 export function getSurfaceCapabilities(surface: SurfaceProviderId): SurfaceCapabilityContract {
@@ -492,7 +502,8 @@ export const cliSurfaceProviderDefinition: SurfaceProviderDefinition = {
   createMessage: createSurfaceMessage,
 };
 
-// Auto-register defaults (can be overridden by later registrations)
+// Auto-register defaults. A later registration must use a new provider id;
+// replacing a built-in provider is intentionally rejected by the seam.
 registerSurfaceProvider(slackSurfaceProviderDefinition);
 registerSurfaceProvider(chronosSurfaceProviderDefinition);
 registerSurfaceProvider(presenceSurfaceProviderDefinition);
