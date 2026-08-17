@@ -194,6 +194,21 @@ function hash(value: string): number {
   return result;
 }
 
+function normalizeGeneratedDocument(document: string): string {
+  return document
+    .split('\n')
+    .map((line) => {
+      if (!line.trimStart().startsWith('|')) return line;
+      const cells = line
+        .trim()
+        .split('|')
+        .map((cell) => cell.trim());
+      if (cells.length < 3) return line.trimEnd();
+      return `| ${cells.slice(1, -1).join(' | ')} |`;
+    })
+    .join('\n');
+}
+
 const bindings = loadCoreSeamBindings();
 const findings = validateRoles(bindings);
 if (findings.length > 0) {
@@ -205,7 +220,8 @@ if (findings.length > 0) {
   if (process.argv.includes('--check')) {
     if (
       !safeExistsSync(OUTPUT_PATH) ||
-      String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' })) !== generated
+      normalizeGeneratedDocument(String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' }))) !==
+        normalizeGeneratedDocument(generated)
     ) {
       console.error('[generate:capability-seams] FAILED: generated document is stale');
       process.exitCode = 1;
