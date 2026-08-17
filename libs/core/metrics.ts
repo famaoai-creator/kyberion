@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 import { createLogger } from './logger.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 const logger = createLogger('metrics');
 
 /**
@@ -16,14 +17,24 @@ const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_RESOURCE_USAGE_FILE = 'resource-usage.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
-interface CostRate {
+export interface CostRate {
   prompt: number;
   completion: number;
+  cache_read?: number;
+  cache_write?: number;
+  cache_write_1h?: number;
 }
-interface ModelCostRegistry {
-  models: Record<string, CostRate>;
+export interface CostTier extends CostRate {
+  /** Inclusive input-token threshold for this rate, stored per 1k tokens. */
+  input_tokens_above: number;
+}
+export interface ModelCostEntry extends CostRate {
+  tiers?: CostTier[];
+}
+export interface ModelCostRegistry {
+  models: Record<string, ModelCostEntry>;
   aliases?: Record<string, string>;
-  default: CostRate;
+  default: ModelCostEntry;
 }
 
 // Model pricing is data, not code: it lives in a knowledge-tier registry so models
@@ -44,20 +55,53 @@ const EMPTY_COST_REGISTRY: ModelCostRegistry = {
 
 let _cachedCostRegistry: ModelCostRegistry | null = null;
 
+function isOptionalRate(value: unknown): value is number | undefined {
+  return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+}
+
 function isCostRate(value: any): value is CostRate {
-  return value && typeof value.prompt === 'number' && typeof value.completion === 'number';
+  return (
+    value &&
+    typeof value.prompt === 'number' &&
+    Number.isFinite(value.prompt) &&
+    value.prompt >= 0 &&
+    typeof value.completion === 'number' &&
+    Number.isFinite(value.completion) &&
+    value.completion >= 0 &&
+    isOptionalRate(value.cache_read) &&
+    isOptionalRate(value.cache_write) &&
+    isOptionalRate(value.cache_write_1h)
+  );
+}
+
+function isCostEntry(value: any): value is ModelCostEntry {
+  const tiers = value?.tiers as unknown;
+  return (
+    isCostRate(value) &&
+    (tiers === undefined || (Array.isArray(tiers) && tiers.every((tier: any) => isCostTier(tier))))
+  );
+}
+
+function isCostTier(value: any): value is CostTier {
+  const threshold = value?.input_tokens_above;
+  return (
+    isCostRate(value) &&
+    typeof threshold === 'number' &&
+    Number.isFinite(threshold) &&
+    threshold >= 0
+  );
 }
 
 function readCostRegistry(filePath: string): ModelCostRegistry | null {
   try {
     if (!safeExistsSync(filePath)) return null;
     const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
-    if (parsed && typeof parsed.models === 'object' && isCostRate(parsed.default)) {
-      const models: Record<string, CostRate> = {};
+    if (parsed && typeof parsed.models === 'object' && isCostEntry(parsed.default)) {
+      const models: Record<string, ModelCostEntry> = {};
       for (const [id, rate] of Object.entries(parsed.models)) {
-        if (isCostRate(rate)) models[id] = rate as CostRate;
+        if (isCostEntry(rate)) models[id] = rate as ModelCostEntry;
       }
-      return { models, aliases: parsed.aliases ?? {}, default: parsed.default };
+      return { models, aliases: parsed.aliases ?? {}, default: parsed.default as ModelCostEntry };
     }
   } catch {
     /* ignore */
@@ -93,11 +137,22 @@ export function resetModelCostRegistryCache(): void {
   _cachedCostRegistry = null;
 }
 
-function resolvePer1kRate(reg: ModelCostRegistry, model: string): CostRate {
+function selectTier(entry: ModelCostEntry, inputTokens: number): CostRate {
+  if (!entry.tiers?.length) return entry;
+  const threshold = Number.isFinite(inputTokens) && inputTokens >= 0 ? inputTokens : 0;
+  return (
+    [...entry.tiers]
+      .filter((tier) => tier.input_tokens_above <= threshold)
+      .sort((left, right) => right.input_tokens_above - left.input_tokens_above)[0] ?? entry
+  );
+}
+
+function resolvePer1kRate(reg: ModelCostRegistry, model: string, inputTokens: number): CostRate {
   const id = (model || '').trim();
-  if (!id) return reg.default;
-  if (reg.models[id]) return reg.models[id];
-  if (reg.aliases?.[id] && reg.models[reg.aliases[id]]) return reg.models[reg.aliases[id]];
+  if (!id) return selectTier(reg.default, inputTokens);
+  if (reg.models[id]) return selectTier(reg.models[id], inputTokens);
+  if (reg.aliases?.[id] && reg.models[reg.aliases[id]])
+    return selectTier(reg.models[reg.aliases[id]], inputTokens);
   // Versioned ids never exact-match; take the longest model-id or alias contained in the given id.
   const lower = id.toLowerCase();
   const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
@@ -106,10 +161,10 @@ function resolvePer1kRate(reg: ModelCostRegistry, model: string): CostRate {
   for (const key of candidates) {
     if (lower.includes(key.toLowerCase())) {
       const target = reg.models[key] ? key : reg.aliases?.[key];
-      if (target && reg.models[target]) return reg.models[target];
+      if (target && reg.models[target]) return selectTier(reg.models[target], inputTokens);
     }
   }
-  return reg.default;
+  return selectTier(reg.default, inputTokens);
 }
 
 /**
@@ -117,9 +172,23 @@ function resolvePer1kRate(reg: ModelCostRegistry, model: string): CostRate {
  * Registry stores per-1k rates; returned rates are per-token (÷1000) for direct
  * multiplication by token counts in `record()`.
  */
-export function resolveCostRates(model: string): CostRate {
-  const perK = resolvePer1kRate(loadModelCostRegistry(), model);
-  return { prompt: perK.prompt / 1000, completion: perK.completion / 1000 };
+export function resolveCostRatesFromRegistry(
+  registry: ModelCostRegistry,
+  model: string,
+  inputTokens = 0
+): CostRate {
+  const perK = resolvePer1kRate(registry, model, inputTokens);
+  return {
+    prompt: perK.prompt / 1000,
+    completion: perK.completion / 1000,
+    ...(perK.cache_read === undefined ? {} : { cache_read: perK.cache_read / 1000 }),
+    ...(perK.cache_write === undefined ? {} : { cache_write: perK.cache_write / 1000 }),
+    ...(perK.cache_write_1h === undefined ? {} : { cache_write_1h: perK.cache_write_1h / 1000 }),
+  };
+}
+
+export function resolveCostRates(model: string, inputTokens = 0): CostRate {
+  return resolveCostRatesFromRegistry(loadModelCostRegistry(), model, inputTokens);
 }
 
 export interface MetricsOptions {
@@ -128,6 +197,8 @@ export interface MetricsOptions {
   persist?: boolean;
   memoryBudgetMB?: number;
   resourceUsageFile?: string;
+  /** Optional injected registry for deterministic tests or an isolated runtime. */
+  costRegistry?: ModelCostRegistry;
 }
 
 export type ResourceUsageKind = 'llm' | 'api' | 'compute' | 'saas' | 'human_time' | 'other';
@@ -151,6 +222,7 @@ export interface ResourceUsageRecord {
   /** Canonical containment scope; legacy records may omit it. */
   scope?: EventScope;
   metadata?: Record<string, unknown>;
+  cause?: UsageCause;
 }
 
 export class MetricsCollector {
@@ -159,6 +231,7 @@ export class MetricsCollector {
   private _persist: boolean;
   private _memoryBudgetMB: number;
   private _resourceUsageFile: string;
+  private _costRegistry?: ModelCostRegistry;
   private _aggregates: Map<string, any>;
 
   constructor(options: MetricsOptions = {}) {
@@ -167,6 +240,7 @@ export class MetricsCollector {
     this._persist = options.persist !== false;
     this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
     this._resourceUsageFile = options.resourceUsageFile || DEFAULT_RESOURCE_USAGE_FILE;
+    this._costRegistry = options.costRegistry;
     this._aggregates = new Map();
   }
 
@@ -210,6 +284,7 @@ export class MetricsCollector {
       cost_usd: Math.round(cost * 100000) / 100000,
       status: input.status,
       source: input.source,
+      cause: normalizeUsageCause(input.cause),
       ...(scope ? { scope } : {}),
       metadata: input.metadata,
     };
@@ -254,6 +329,9 @@ export class MetricsCollector {
         outputSizeKB: 0,
         promptTokens: 0,
         completionTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        cacheWrite1hTokens: 0,
         totalTokens: 0,
       };
       this._aggregates.set(componentName, agg);
@@ -273,13 +351,31 @@ export class MetricsCollector {
     if (extra.usage) {
       const pTokens = extra.usage.prompt_tokens || 0;
       const cTokens = extra.usage.completion_tokens || 0;
+      const cacheReadTokens =
+        extra.usage.cache_read_tokens ?? extra.usage.cache_read_input_tokens ?? 0;
+      const cacheWriteTokens =
+        extra.usage.cache_write_tokens ?? extra.usage.cache_creation_input_tokens ?? 0;
+      const cacheWrite1hTokens = extra.usage.cache_write_1h_tokens ?? 0;
+      const inputTokens = pTokens + cacheReadTokens + cacheWriteTokens + cacheWrite1hTokens;
       agg.promptTokens += pTokens;
       agg.completionTokens += cTokens;
-      agg.totalTokens += pTokens + cTokens;
+      agg.cacheReadTokens += cacheReadTokens;
+      agg.cacheWriteTokens += cacheWriteTokens;
+      agg.cacheWrite1hTokens += cacheWrite1hTokens;
+      agg.totalTokens += inputTokens + cTokens;
 
       const model = extra.model || 'default';
-      const rates = resolveCostRates(model);
-      const cost = pTokens * rates.prompt + cTokens * rates.completion;
+      const rates = resolveCostRatesFromRegistry(
+        this._costRegistry ?? loadModelCostRegistry(),
+        model,
+        inputTokens
+      );
+      const cost =
+        pTokens * rates.prompt +
+        cTokens * rates.completion +
+        cacheReadTokens * (rates.cache_read ?? 0) +
+        cacheWriteTokens * (rates.cache_write ?? 0) +
+        cacheWrite1hTokens * (rates.cache_write_1h ?? 0);
       agg.totalCostUSD += cost;
       extra.cost_usd = Math.round(cost * 100000) / 100000;
     }
@@ -298,6 +394,7 @@ export class MetricsCollector {
     const missionId = extra.mission_id || process.env.MISSION_ID || undefined;
     const persistedExtra = {
       ...extra,
+      cause: normalizeUsageCause(extra.cause),
       ...(missionId ? { mission_id: missionId } : {}),
     };
 
@@ -362,6 +459,9 @@ export class MetricsCollector {
         outputSizeKB: agg.outputSizeKB || 0,
         avgTokens: agg.count > 0 ? Math.round(agg.totalTokens / agg.count) : 0,
         totalTokens: agg.totalTokens,
+        cacheReadTokens: agg.cacheReadTokens,
+        cacheWriteTokens: agg.cacheWriteTokens,
+        cacheWrite1hTokens: agg.cacheWrite1hTokens,
         totalCostUSD: Math.round(agg.totalCostUSD * 1000) / 1000,
         interventions: agg.interventions || 0,
         interventionRate: agg.count > 0 ? Math.round((agg.interventions / agg.count) * 100) : 0,

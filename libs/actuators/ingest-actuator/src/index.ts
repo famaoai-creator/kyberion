@@ -17,7 +17,14 @@
  * is the dedup registry append under active/shared/runtime/ingest/.
  */
 
-import { logger, resolveVars, stalenessReport, type IngestSourceObservation } from '@agent/core';
+import {
+  logger,
+  resolveVars,
+  stalenessReport,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
+  type IngestSourceObservation,
+} from '@agent/core';
 import { commitIngest, type IngestCommitInput } from './commit.js';
 import { dedupContent, type DedupInput } from './dedup.js';
 import { normalizeCard, type NormalizeCardInput } from './normalize-card.js';
@@ -67,12 +74,7 @@ export {
 } from './sync-source.js';
 
 type IngestOp =
-  | 'sync_source'
-  | 'parse_document'
-  | 'normalize_card'
-  | 'dedup'
-  | 'staleness_report'
-  | 'commit';
+  'sync_source' | 'parse_document' | 'normalize_card' | 'dedup' | 'staleness_report' | 'commit';
 
 interface IngestParams extends Record<string, unknown> {
   export_as?: string;
@@ -175,7 +177,20 @@ async function executePipeline(
 ): Promise<Record<string, unknown>> {
   let currentCtx = ctx;
   for (const step of steps) {
-    const params = resolveDeep(step.params ?? {}, currentCtx) as IngestParams;
+    const resolvedParams = resolveDeep(step.params ?? {}, currentCtx) as IngestParams;
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: `ingest:${step.op}`,
+      params: resolvedParams,
+      context: currentCtx,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ingest:${step.op} was not admitted.`}`
+      );
+    }
+    const params = preflight.input as IngestParams;
     currentCtx = await executeOp(step.op, params, currentCtx);
   }
   return currentCtx;

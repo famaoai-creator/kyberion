@@ -54,6 +54,14 @@ describe('graph scheduler', () => {
     ]);
   });
 
+  it('carries a declared operation budget into graph nodes', () => {
+    const derived = deriveExecutionGraph([
+      { id: 'bounded', op: 'system:exec', params: { timeout_ms: 120000 } },
+      { id: 'next' },
+    ]);
+    expect(derived.graph.nodes[0].timeoutMs).toBe(120000);
+  });
+
   it('starts an independent downstream node as soon as its own dependency completes', async () => {
     const events: string[] = [];
     const derived = deriveExecutionGraph([

@@ -1211,6 +1211,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeReadFile } = await import('./secure-io.js');
     const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
+    const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
 
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     persistPlanningPacket('MSN-FOLLOWUP', {
@@ -1247,6 +1248,11 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         estimated_scope: 'M',
       }),
     ]);
+    expect(
+      loadProvisionedEntryRecords('MSN-FOLLOWUP')
+        .slice(-2)
+        .map((record) => record.phase)
+    ).toEqual(['provisioned', 'verified']);
   });
 
   it('preserves process-template-seeded tasks when persisting a planner packet', async () => {

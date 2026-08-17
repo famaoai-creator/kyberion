@@ -89,6 +89,8 @@ describe('agent-runtime-supervisor', () => {
       missionId: 'MSN-PREWARM',
       teamRoles: ['planner'],
       scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+      runtimeOwnerId: expect.stringMatching(/^agent-runtime-supervisor:/),
+      runtimeOwnerType: 'agent-runtime-supervisor',
     });
     expect(result.runtime_plan.assignments).toHaveLength(1);
 

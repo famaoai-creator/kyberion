@@ -49,6 +49,10 @@ export interface RequireApprovalParams {
   /** Optional session-cache descriptor; the concrete payload remains hash-bound. */
   actionDescriptor?: ApprovalActionDescriptor;
   source?: ApprovalRequestSource;
+  /** Trusted caller-side human presence signal for non-interactive runs. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
 }
 
 /**
@@ -81,6 +85,9 @@ export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGat
     trace: params.trace,
     actionDescriptor: params.actionDescriptor,
     source: params.source,
+    ...(params.hasHuman !== undefined ? { hasHuman: params.hasHuman } : {}),
+    ...(params.hasUI !== undefined ? { hasUI: params.hasUI } : {}),
+    ...(params.nonInteractive !== undefined ? { nonInteractive: params.nonInteractive } : {}),
   });
 }
 

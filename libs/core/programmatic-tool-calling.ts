@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
+import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool-repeat-advisor.js';
 
 export const PROGRAMMATIC_TOOL_SANDBOX_ALLOWLIST = [
   'system:read_file',
@@ -58,7 +59,11 @@ export interface ProgrammaticToolCallOptions {
     call_index: number;
     status: 'allowed' | 'denied' | 'succeeded' | 'failed';
     error?: string;
+    repeat_count?: number;
+    repeat_advice?: string;
   }) => void;
+  /** Optional attention/prompt injection seam; raw params are never provided. */
+  on_repeat?: (observation: ToolRepeatObservation) => void;
   /** Test-only runner override; production uses the built runner. */
   runner?: { command: string; args: string[]; cwd?: string };
 }
@@ -207,6 +212,7 @@ export async function executeProgrammaticToolCall(
   const server = net.createServer();
   let connection: net.Socket | undefined;
   let callCount = 0;
+  const repeatAdvisor = new ToolRepeatAdvisor();
   let connectionReady: (() => void) | undefined;
   let connectionFailed: ((error: Error) => void) | undefined;
   const connected = new Promise<void>((resolve, reject) => {
@@ -253,13 +259,23 @@ export async function executeProgrammaticToolCall(
             return;
           }
           callCount += 1;
-          if (callCount > normalized.maxCalls) {
+          const repeat = repeatAdvisor.observe(request.op, request.params || {});
+          if (repeat.advice) options.on_repeat?.(repeat);
+          const notify = (
+            status: 'allowed' | 'denied' | 'succeeded' | 'failed',
+            error?: string
+          ): void => {
             options.on_call?.({
               op: request.op,
               call_index: callCount,
-              status: 'denied',
-              error: '[PTC_LIMIT] call limit exceeded.',
+              status,
+              ...(error ? { error } : {}),
+              repeat_count: repeat.repeat_count,
+              ...(repeat.advice ? { repeat_advice: repeat.advice } : {}),
             });
+          };
+          if (callCount > normalized.maxCalls) {
+            notify('denied', '[PTC_LIMIT] call limit exceeded.');
             writeLine(socket, {
               id: request.id,
               ok: false,
@@ -269,12 +285,7 @@ export async function executeProgrammaticToolCall(
             return;
           }
           if (!normalized.effectiveOps.includes(request.op)) {
-            options.on_call?.({
-              op: request.op,
-              call_index: callCount,
-              status: 'denied',
-              error: '[PTC_POLICY] op is outside allowed_ops ∩ granted_ops.',
-            });
+            notify('denied', '[PTC_POLICY] op is outside allowed_ops ∩ granted_ops.');
             writeLine(socket, {
               id: request.id,
               ok: false,
@@ -282,7 +293,7 @@ export async function executeProgrammaticToolCall(
             });
             return;
           }
-          options.on_call?.({ op: request.op, call_index: callCount, status: 'allowed' });
+          notify('allowed');
           try {
             const result = await withTimeout(
               options.invoke({
@@ -293,16 +304,11 @@ export async function executeProgrammaticToolCall(
               normalized.timeoutMs,
               'op timeout'
             );
-            options.on_call?.({ op: request.op, call_index: callCount, status: 'succeeded' });
+            notify('succeeded');
             writeLine(socket, { id: request.id, ok: true, result });
           } catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
-            options.on_call?.({
-              op: request.op,
-              call_index: callCount,
-              status: 'failed',
-              error: detail,
-            });
+            notify('failed', detail);
             writeLine(socket, { id: request.id, ok: false, error: detail.slice(0, 2_000) });
           }
         });

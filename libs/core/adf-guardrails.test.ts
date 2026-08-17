@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { validatePipelineGuardrails } from './adf-guardrails.js';
+import { forbiddenGitCoexecutionMutation, validatePipelineGuardrails } from './adf-guardrails.js';
 
 describe('validatePipelineGuardrails', () => {
+  it('blocks broad git mutations in ADF shell steps while allowing explicit-path push', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        { op: 'system:shell', params: { cmd: 'git reset --hard HEAD' } },
+        { op: 'system:shell', params: { cmd: 'git add . && git commit -m x' } },
+      ],
+    });
+    expect(report.ok).toBe(false);
+    expect(
+      report.findings.filter((finding) => finding.code === 'git-coexecution-mutation-forbidden')
+    ).toHaveLength(2);
+    expect(forbiddenGitCoexecutionMutation('git push origin feature')).toBeUndefined();
+    expect(forbiddenGitCoexecutionMutation('git add src/file.ts')).toBeUndefined();
+    expect(forbiddenGitCoexecutionMutation('git push --force origin feature')).toBe(
+      'git push --force'
+    );
+  });
+
   it('warns when a dynamic include cannot be expanded during preflight', () => {
     const report = validatePipelineGuardrails({
       steps: [{ op: 'core:include', params: { fragment: '{{fragment_ref}}' } }],

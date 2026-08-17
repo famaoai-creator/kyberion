@@ -50,6 +50,10 @@ import {
 import { checkProviderEgress, providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { getInstalledReasoningMode } from './reasoning-bootstrap.js';
 import { logger } from './core.js';
+import {
+  appendPromptVisibilityRecord,
+  type PromptVisibilityRecord,
+} from './prompt-visibility-ledger.js';
 
 export type TaskKnowledgeForm = 'pack' | 'system_prompt' | 'context_string';
 
@@ -58,6 +62,8 @@ export interface ProvisionTaskKnowledgeInput extends ResolveMissionContextPackIn
   form?: TaskKnowledgeForm;
   /** Mission directory to persist the resolved pack under. Omit to skip persistence. */
   missionPath?: string;
+  /** Optional alternate path for the mission-local prompt visibility ledger. */
+  visibilityLedgerPath?: string;
   /**
    * XP-03: the provider that will ultimately consume the rendered pack
    * (e.g. `'claude'`, `'codex'`), when the caller knows it. Enables the
@@ -108,6 +114,8 @@ export interface ProvisionTaskKnowledgeResult {
     dataTier: MissionContextPack['mission']['tier'];
     reason: string;
   };
+  /** DH-06: metadata receipt for the rendered model-visible prompt. */
+  promptVisibilityRecord?: PromptVisibilityRecord;
 }
 
 function truncate(value: string, max: number): string {
@@ -196,7 +204,7 @@ function renderTaskKnowledgeForm(pack: MissionContextPack, form: TaskKnowledgeFo
 export async function provisionTaskKnowledge(
   input: ProvisionTaskKnowledgeInput
 ): Promise<ProvisionTaskKnowledgeResult> {
-  const { form = 'pack', missionPath, provider, ...resolveInput } = input;
+  const { form = 'pack', missionPath, visibilityLedgerPath, provider, ...resolveInput } = input;
   const pack = await resolveMissionContextPack(resolveInput);
   if (!pack) {
     return { pack: null, text: '', deliveredKnowledgeRefs: [] };
@@ -237,6 +245,21 @@ export async function provisionTaskKnowledge(
     ? saveMissionContextPack(missionPath, pack)
     : undefined;
   const text = renderTaskKnowledgeForm(pack, form);
+  const promptVisibilityRecord = missionPath
+    ? appendPromptVisibilityRecord({
+        missionPath,
+        ...(visibilityLedgerPath ? { ledgerPath: visibilityLedgerPath } : {}),
+        missionId: pack.mission.mission_id,
+        source: 'task-knowledge-provisioning',
+        form,
+        content: text,
+        contextPackId: pack.context_pack_id,
+        ...(resolveInput.workItem?.item_id || resolveInput.workItemId
+          ? { taskId: resolveInput.workItem?.item_id || resolveInput.workItemId }
+          : {}),
+        knowledgeRefs: (pack.knowledge_hints || []).map((hint) => hint.path),
+      })
+    : undefined;
   // KP-05: report what this call actually delivered. Fire-and-forget from
   // the caller's perspective (recordKnowledgeDelivery fails open — see its
   // doc comment) but always returned so callers can attach it to a trace or
@@ -266,5 +289,6 @@ export async function provisionTaskKnowledge(
     text,
     ...(missionContextPackPath ? { missionContextPackPath } : {}),
     deliveredKnowledgeRefs: delivery?.refs ?? [],
+    ...(promptVisibilityRecord ? { promptVisibilityRecord } : {}),
   };
 }

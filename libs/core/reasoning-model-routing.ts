@@ -26,6 +26,13 @@ const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
 type ModelRoleFit = 'primary' | 'secondary' | 'not_recommended';
 type ModelStatus = 'approved' | 'candidate' | 'deprecated' | 'blocked';
 
+export interface ModelCompatibilityOverrides {
+  /** Provider wire values; null explicitly hides a level from callers. */
+  thinkingLevelMap?: Partial<Record<'low' | 'medium' | 'high', string | null>>;
+  supportsStrictTools?: boolean;
+  supportsGrammarTools?: boolean;
+}
+
 export interface ModelRegistryEntry {
   model_id: string;
   provider: string;
@@ -37,6 +44,7 @@ export interface ModelRegistryEntry {
   latency_band?: 'low' | 'medium' | 'high';
   reasoning_confidence?: 'low' | 'medium' | 'high';
   capability_tags?: string[];
+  compat?: ModelCompatibilityOverrides;
   role_fit: {
     intent_compiler: ModelRoleFit;
     surface_agent: ModelRoleFit;

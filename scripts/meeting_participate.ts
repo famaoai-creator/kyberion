@@ -207,7 +207,7 @@ async function loadDriver(
       `[participate-cli] driver '${driverId}' unavailable: ${probe.reason}; falling back to stub`
     );
   }
-  registerMeetingJoinDriver(new StubMeetingJoinDriver());
+  if (!getMeetingJoinDriver('stub')) registerMeetingJoinDriver(new StubMeetingJoinDriver());
   return new StubMeetingJoinDriver();
 }
 
@@ -418,10 +418,7 @@ async function main(): Promise<void> {
 
     const runtimePlan = resolveMeetingParticipationRuntimePlan({
       transport_mode: argv['transport-mode'] as
-        | 'transcribe_first'
-        | 'captions_first'
-        | 'realtime_voice'
-        | undefined,
+        'transcribe_first' | 'captions_first' | 'realtime_voice' | undefined,
       dry_run: Boolean(argv['dry-run']),
     });
     logger.info(

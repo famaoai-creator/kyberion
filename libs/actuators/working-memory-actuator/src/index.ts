@@ -14,6 +14,8 @@ import {
   safeReadFile,
   safeWriteFile,
   safeReaddir,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import {
   createMemoryPromotionCandidate,
@@ -784,11 +786,35 @@ export interface HandleActionInput {
 export async function handleAction(input: HandleActionInput): Promise<Record<string, unknown>> {
   if (input.action === 'pipeline' && Array.isArray(input.steps) && input.steps.length > 0) {
     const step = input.steps[0];
-    const result = dispatchOp(step.op, step.params ?? {});
-    const exportAs = ((step.params ?? {}).export_as as string) ?? 'working_memory_result';
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: `working-memory:${step.op}`,
+      params: step.params ?? {},
+      context: input.context,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation working-memory:${step.op} was not admitted.`}`
+      );
+    }
+    const result = dispatchOp(step.op, preflight.input);
+    const exportAs = (preflight.input.export_as as string) ?? 'working_memory_result';
     return { ...(input.context ?? {}), [exportAs]: result };
   }
-  const params = input.params ?? {};
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `working-memory:${input.action}`,
+    params: input.params ?? {},
+    context: input.context,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation working-memory:${input.action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input;
   const result = dispatchOp(input.action, params);
   const exportAs = (params.export_as as string) ?? 'working_memory_result';
   return { ...(input.context ?? {}), [exportAs]: result };

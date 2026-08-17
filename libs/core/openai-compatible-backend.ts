@@ -36,7 +36,9 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  GenerateWithToolsResult,
   ReasoningCallOptions,
+  ToolDefinition,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
@@ -352,6 +354,33 @@ function createToolDefinitions(
   return definitions.filter((tool) => allowedTools.has(tool.function.name as ReasoningToolName));
 }
 
+/** Convert the shared governed tool contract to the OpenAI function-tool wire. */
+function createProvidedToolDefinitions(
+  tools: readonly ToolDefinition[]
+): NonNullable<ChatCompletionRequest['tools']> {
+  const seen = new Set<string>();
+  return tools.map((tool) => {
+    const name = String(tool.name || '').trim();
+    if (!name || seen.has(name)) {
+      throw new Error(`[OPENAI_TOOL_INVALID] duplicate or empty tool name: ${name || '<empty>'}`);
+    }
+    if (!tool.description?.trim() || !tool.inputSchema || tool.inputSchema.type !== 'object') {
+      throw new Error(
+        `[OPENAI_TOOL_INVALID] tool '${name}' must have a description and object schema`
+      );
+    }
+    seen.add(name);
+    return {
+      type: 'function' as const,
+      function: {
+        name,
+        description: tool.description,
+        parameters: tool.inputSchema as Record<string, unknown>,
+      },
+    };
+  });
+}
+
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -519,7 +548,11 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean; signal?: AbortSignal } = {}
+    opts: {
+      useTools?: boolean;
+      signal?: AbortSignal;
+      toolDefinitions?: readonly ToolDefinition[];
+    } = {}
   ): Promise<ChatCompletionResponse> {
     if (opts.signal?.aborted) {
       throw opts.signal.reason instanceof Error
@@ -534,11 +567,20 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       headers.authorization = `Bearer ${this.apiKey}`;
     }
 
+    const useTools = opts.useTools ?? this.toolsEnabled;
+    const providedTools =
+      useTools && opts.toolDefinitions
+        ? createProvidedToolDefinitions(opts.toolDefinitions)
+        : undefined;
+    const routeTools =
+      useTools && !providedTools && this.toolsEnabled && this.allowedTools.size > 0
+        ? createToolDefinitions(this.allowedTools)
+        : undefined;
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...((opts.useTools ?? this.toolsEnabled) && this.allowedTools.size > 0
-        ? { tools: createToolDefinitions(this.allowedTools), tool_choice: 'auto' }
+      ...(providedTools?.length || routeTools?.length
+        ? { tools: providedTools ?? routeTools, tool_choice: 'auto' }
         : {}),
       ...this.samplingParams,
     };
@@ -769,6 +811,50 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       },
     ];
     return this.completePromptMessages(messages, options?.signal);
+  }
+
+  /**
+   * Run one governed tool-capable turn and return tool calls to the caller.
+   * The backend deliberately does not execute caller-provided tools here;
+   * execution remains in the worker/ADF governance boundary. This is the
+   * OpenAI-compatible counterpart to the shared ReasoningBackend contract.
+   */
+  async generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult> {
+    if (tools.length === 0) return { text: await this.prompt(prompt, options) };
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are Kyberion. Use only the governed tools supplied for this turn. ' +
+          'Tool calls are returned to the runtime for policy-checked execution.',
+      },
+      { role: 'user', content: prompt },
+    ];
+    const response = await this.fetchChatCompletion(messages, {
+      useTools: true,
+      signal: options?.signal,
+      toolDefinitions: tools,
+    });
+    const message = response.choices[0].message;
+    const toolCalls = (message.tool_calls ?? []).map((call) => {
+      const parsed = safeJsonParse(call.function.arguments);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(`[OPENAI_TOOL_ARGUMENTS_INVALID] tool '${call.function.name}' arguments`);
+      }
+      return {
+        name: call.function.name,
+        input: parsed as Record<string, unknown>,
+      };
+    });
+    const text = extractTextContent(message.content);
+    return {
+      ...(text ? { text } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 
   async *streamPrompt(prompt: string, options?: ReasoningCallOptions): AsyncGenerator<string> {

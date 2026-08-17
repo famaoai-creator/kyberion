@@ -13,6 +13,7 @@ export interface GraphRunArtifactNode {
   id: string;
   status: GraphNodeStatus;
   duration_ms: number;
+  timeout_ms?: number;
   output_hash?: string;
 }
 
@@ -36,7 +37,12 @@ export function createGraphRunArtifact<T>(
     ...(runId ? { run_id: runId } : {}),
     ...(traceId ? { trace_id: traceId } : {}),
     generated_at: new Date().toISOString(),
-    nodes: graph.nodes.map((node) => ({ id: node.id, status: 'pending', duration_ms: 0 })),
+    nodes: graph.nodes.map((node) => ({
+      id: node.id,
+      status: 'pending' as const,
+      duration_ms: 0,
+      ...(node.timeoutMs !== undefined ? { timeout_ms: node.timeoutMs } : {}),
+    })),
     edges: graph.edges.map((edge) => ({ ...edge })),
   };
 }

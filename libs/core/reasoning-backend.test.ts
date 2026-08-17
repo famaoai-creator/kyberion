@@ -13,6 +13,11 @@ import {
 } from './reasoning-backend.js';
 import { clearProviderHealth } from './provider-health-registry.js';
 import { z } from 'zod';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
+import { withExecutionContextAsync } from './authority.js';
+
+const visibilityRoot = pathResolver.sharedTmp(`reasoning-backend-visibility-${process.pid}`);
 
 describe('reasoning-backend', () => {
   afterEach(() => {
@@ -20,10 +25,41 @@ describe('reasoning-backend', () => {
     delete process.env.KYBERION_REASONING_RETRY_BASE_MS;
     resetReasoningBackend();
     clearProviderHealth();
+    safeRmSync(visibilityRoot, { recursive: true, force: true });
   });
 
   it('defaults to the stub backend when none is registered', () => {
     expect(getReasoningBackend().name).toBe('stub');
+  });
+
+  it('gates structured constrained sampling before provider execution', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (prompt: string) => {
+        calls.push(prompt);
+        return '{}';
+      },
+    };
+    const schema = z.object({});
+    await expect(
+      delegateStructured(backend, 'produce JSON', schema, {
+        constrainedSampling: {
+          jsonSchema: { type: 'object' },
+          strict: 'require',
+        },
+      })
+    ).rejects.toThrow(/required but not supported/);
+    expect(calls).toEqual([]);
+
+    await expect(
+      delegateStructured(backend, 'produce JSON', schema, {
+        constrainedSampling: {
+          jsonSchema: { type: 'object' },
+          strict: 'prefer',
+        },
+      })
+    ).resolves.toEqual({});
+    expect(calls.at(-1)).toMatch(/schema validator as the fallback/);
   });
 
   it('resolves a registered backend', () => {
@@ -41,8 +77,19 @@ describe('reasoning-backend', () => {
       delegateTask: stubReasoningBackend.delegateTask,
       prompt: stubReasoningBackend.prompt,
     };
-    registerReasoningBackend(fake);
+    const dispose = registerReasoningBackend(fake);
     expect(getReasoningBackend().name).toBe('fake');
+    dispose();
+    expect(getReasoningBackend().name).toBe('stub');
+  });
+
+  it('rejects a second active backend until the first registration is disposed', () => {
+    const first = { ...stubReasoningBackend, name: 'first' } as ReasoningBackend;
+    const second = { ...stubReasoningBackend, name: 'second' } as ReasoningBackend;
+    const dispose = registerReasoningBackend(first);
+    expect(() => registerReasoningBackend(second)).toThrow(/already registered/);
+    dispose();
+    expect(() => registerReasoningBackend(second)).not.toThrow();
   });
 
   it('fails over to the next backend when the first backend throws', async () => {
@@ -102,6 +149,145 @@ describe('reasoning-backend', () => {
 
     await expect(backend.prompt('hello')).resolves.toBe('recovered');
     expect(calls).toEqual(['primary', 'primary', 'primary']);
+  });
+
+  it('records generic model-visible prompt calls without persisting prompt bodies', async () => {
+    const missionPath = `${visibilityRoot}/mission`;
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'visibility-test',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async (prompt) => {
+            calls.push(prompt);
+            return 'ok';
+          },
+          generateWithTools: async (prompt) => {
+            calls.push(prompt);
+            return { text: 'tool-ok' };
+          },
+          async *streamPrompt(prompt) {
+            calls.push(prompt);
+            yield 'stream-ok';
+          },
+          promptWithImages: async (prompt) => {
+            calls.push(prompt);
+            return 'image-ok';
+          },
+        },
+      },
+    ]);
+    const visibility = {
+      missionPath,
+      missionId: 'MSN-REASONING-VISIBILITY',
+      taskId: 'TASK-REASONING-VISIBILITY',
+      contextPackId: 'CP-REASONING-VISIBILITY',
+      knowledgeRefs: ['knowledge/product/example.md'],
+    };
+
+    await expect(backend.prompt('prompt secret', { prompt_visibility: visibility })).resolves.toBe(
+      'ok'
+    );
+    await expect(
+      backend.generateWithTools?.(
+        'tool secret',
+        [
+          {
+            name: 'lookup',
+            description: 'Lookup',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+        { prompt_visibility: visibility }
+      )
+    ).resolves.toMatchObject({ text: 'tool-ok' });
+
+    await expect(
+      backend.delegateTask('delegate secret', 'delegate context', {
+        prompt_visibility: visibility,
+      })
+    ).resolves.toContain('[STUB]');
+    const streamChunks: string[] = [];
+    for await (const chunk of backend.streamPrompt!('stream secret', {
+      prompt_visibility: visibility,
+    })) {
+      streamChunks.push(chunk);
+    }
+    await expect(
+      backend.promptWithImages?.(
+        'image secret',
+        [{ path: 'active/shared/example.png', media_type: 'image/png' }],
+        { prompt_visibility: visibility }
+      )
+    ).resolves.toBe('image-ok');
+
+    const ledger = String(
+      safeReadFile(`${missionPath}/coordination/prompt-visibility.jsonl`, { encoding: 'utf8' })
+    );
+    expect(ledger).not.toContain('prompt secret');
+    expect(ledger).not.toContain('tool secret');
+    expect(ledger).toContain('reasoning_prompt');
+    expect(ledger).toContain('reasoning_generate_with_tools');
+    expect(ledger).toContain('reasoning_delegate_task');
+    expect(ledger).toContain('reasoning_stream_prompt');
+    expect(ledger).toContain('reasoning_prompt_with_images');
+    expect(ledger).toContain('CP-REASONING-VISIBILITY');
+    expect(streamChunks).toEqual(['stream-ok']);
+    expect(calls).toEqual(['prompt secret', 'tool secret', 'stream secret', 'image secret']);
+  });
+
+  it('derives a prompt visibility ledger from an active mission for direct callers', async () => {
+    const missionId = `MSN-REASONING-AMBIENT-${Date.now()}`;
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousMissionId = process.env.MISSION_ID;
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(missionPath, { recursive: true });
+      process.env.MISSION_ID = missionId;
+      try {
+        const backend = buildFailoverReasoningBackend([
+          {
+            backend: { ...stubReasoningBackend, prompt: async () => 'ambient-ok' },
+          },
+        ]);
+        await expect(backend.prompt('ambient secret')).resolves.toBe('ambient-ok');
+        const ledger = String(
+          safeReadFile(`${missionPath}/coordination/prompt-visibility.jsonl`, { encoding: 'utf8' })
+        );
+        expect(ledger).not.toContain('ambient secret');
+        expect(ledger).toContain('reasoning_ambient');
+        expect(ledger).toContain(missionId);
+      } finally {
+        if (previousMissionId === undefined) delete process.env.MISSION_ID;
+        else process.env.MISSION_ID = previousMissionId;
+        safeRmSync(missionPath, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('does not invoke a provider when the visibility receipt cannot be written', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('called');
+            return 'must-not-run';
+          },
+        },
+      },
+    ]);
+
+    expect(() =>
+      backend.prompt('blocked before provider', {
+        prompt_visibility: {
+          missionPath: visibilityRoot,
+          missionId: '',
+        },
+      })
+    ).toThrow('[PROMPT_VISIBILITY_INVALID] missionId is required');
+    expect(calls).toEqual([]);
   });
 
   it('dispatches a role-scoped prompt to the governed role chain', async () => {
@@ -217,6 +403,55 @@ describe('reasoning-backend', () => {
     const result = await backend.generateWithTools!('hello', []);
     expect(result.text).toBe('recovered');
     expect(calls).toEqual(['primary', 'primary', 'primary']);
+  });
+
+  it('applies PI-17 deferred tool loading at the shared backend boundary', async () => {
+    let dispatchedPrompt = '';
+    let dispatchedTools: Array<{ name: string }> = [];
+    let deferredDefinitions: Array<{ name: string }> = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'deferred-tools',
+        backend: {
+          ...stubReasoningBackend,
+          generateWithTools: async (prompt, tools, options) => {
+            dispatchedPrompt = prompt;
+            dispatchedTools = tools;
+            deferredDefinitions = options?.deferred_tool_definitions || [];
+            return { text: 'ok', toolCalls: [] };
+          },
+        },
+      },
+    ]);
+
+    await backend.generateWithTools(
+      'Choose the right capability.',
+      [
+        {
+          name: 'read_file',
+          description: 'Read a file.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'search',
+          description: 'Search knowledge.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'deploy',
+          description: 'Deploy a release.',
+          inputSchema: { type: 'object', properties: {} },
+          allowed_roles: ['operator'],
+        },
+      ],
+      { role: 'agent', deferred_tool_names: ['search'] }
+    );
+
+    expect(dispatchedTools.map((tool) => tool.name)).toEqual(['read_file']);
+    expect(dispatchedPrompt).toContain('Choose the right capability.');
+    expect(dispatchedPrompt).toContain('search');
+    expect(dispatchedPrompt).not.toContain('deploy');
+    expect(deferredDefinitions.map((tool) => tool.name)).toEqual(['search']);
   });
 
   it('delegates structured output with retry-on-mismatch', async () => {

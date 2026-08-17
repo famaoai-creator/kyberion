@@ -14,6 +14,7 @@
  */
 
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface StreamingSpeechToTextBridge {
   readonly bridge_id: string;
@@ -58,20 +59,38 @@ export class StubStreamingSpeechToTextBridge implements StreamingSpeechToTextBri
  * Registry — lets the coordinator pick a backend by id at runtime.
  * ------------------------------------------------------------------ */
 
-const _streamingSttRegistry = new Map<string, () => StreamingSpeechToTextBridge>();
+const streamingSttSeam = defineSeam<() => StreamingSpeechToTextBridge>({
+  key: 'streaming-stt-bridge',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const streamingSttDisposers = new Map<string, () => void>();
 
 export function registerStreamingSttBridge(
   id: string,
-  factory: () => StreamingSpeechToTextBridge,
-): void {
-  _streamingSttRegistry.set(id, factory);
+  factory: () => StreamingSpeechToTextBridge
+): () => void {
+  const seamDispose = streamingSttSeam.register(id, factory, {
+    provenance: 'builtin',
+    source: 'streaming-stt-bridge',
+  });
+  const dispose = () => {
+    seamDispose();
+    if (streamingSttDisposers.get(id) === dispose) streamingSttDisposers.delete(id);
+  };
+  streamingSttDisposers.set(id, dispose);
+  return dispose;
+}
+
+export function resetStreamingSttBridges(): void {
+  for (const dispose of [...streamingSttDisposers.values()]) dispose();
 }
 
 export function getStreamingSttBridge(
-  id: string = process.env.KYBERION_STREAMING_STT_BRIDGE ?? 'stub',
+  id: string = process.env.KYBERION_STREAMING_STT_BRIDGE ?? 'stub'
 ): StreamingSpeechToTextBridge {
   if (id === 'stub') return new StubStreamingSpeechToTextBridge();
-  const factory = _streamingSttRegistry.get(id);
+  const factory = streamingSttSeam.getOptional(id);
   if (!factory) throw new Error(`[streaming-stt] unknown bridge id '${id}'`);
   return factory();
 }

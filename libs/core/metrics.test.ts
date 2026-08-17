@@ -1,9 +1,78 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { MetricsCollector } from './metrics.js';
+import {
+  MetricsCollector,
+  resolveCostRatesFromRegistry,
+  type ModelCostRegistry,
+} from './metrics.js';
 
 describe('metrics core', () => {
+  it('selects the highest applicable input tier and exposes cache rates per token', () => {
+    const registry: ModelCostRegistry = {
+      models: {
+        tiered: {
+          prompt: 0.01,
+          completion: 0.02,
+          cache_read: 0.003,
+          cache_write: 0.004,
+          tiers: [
+            {
+              input_tokens_above: 1000,
+              prompt: 0.02,
+              completion: 0.03,
+              cache_read: 0.005,
+              cache_write: 0.006,
+            },
+          ],
+        },
+      },
+      default: { prompt: 0.1, completion: 0.2 },
+    };
+
+    expect(resolveCostRatesFromRegistry(registry, 'tiered', 999)).toMatchObject({
+      prompt: 0.00001,
+      cache_read: 0.000003,
+    });
+    const tiered = resolveCostRatesFromRegistry(registry, 'tiered', 1000);
+    expect(tiered.prompt).toBeCloseTo(0.00002, 10);
+    expect(tiered.completion).toBeCloseTo(0.00003, 10);
+    expect(tiered.cache_write).toBeCloseTo(0.000006, 10);
+  });
+
+  it('accounts for explicit cache read/write tokens without double counting them as prompt tokens', () => {
+    const mc = new MetricsCollector({
+      persist: false,
+      costRegistry: {
+        models: {
+          tiered: {
+            prompt: 0.01,
+            completion: 0.02,
+            cache_read: 0.003,
+            cache_write: 0.004,
+          },
+        },
+        default: { prompt: 0, completion: 0 },
+      },
+    });
+    mc.record('cache-metering', 1, 'success', {
+      model: 'tiered',
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 10,
+        cache_read_tokens: 20,
+        cache_write_tokens: 5,
+      },
+    });
+
+    const metrics = mc.getCapabilityMetrics('cache-metering');
+    expect(metrics.totalCostUSD).toBeCloseTo(0.001 + 0.0002 + 0.00006 + 0.00002, 8);
+    expect(metrics.promptTokens).toBe(100);
+    expect(metrics.cacheReadTokens).toBe(20);
+    expect(metrics.cacheWriteTokens).toBe(5);
+    expect(metrics.totalTokens).toBe(135);
+  });
+
   it('should record and summarize aggregates correctly', () => {
     const mc = new MetricsCollector({ persist: false });
     mc.record('test-capability-a', 100, 'success');
@@ -96,6 +165,14 @@ describe('metrics core', () => {
     expect(history[0].component).toBe('persist-capability');
     expect(history[0].cost_usd).toBeGreaterThan(0);
     expect(history[1].type).toBe('intervention');
+  });
+
+  it('persists a normalized usage cause for backward-compatible ledgers', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-cause');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    const mc = new MetricsCollector({ metricsDir, persist: true });
+    mc.record('cause-test', 1, 'success', { cause: 'compaction' });
+    expect(mc.loadHistory()[0]?.cause).toBe('compaction');
   });
 
   it('records extensible resource usage with separate commitment status', () => {

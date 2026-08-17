@@ -11,6 +11,7 @@
       "type": "string",
       "enum": [
         "knowledge_search",
+        "knowledge_read",
         "history_search",
         "knowledge_inject",
         "knowledge_export",
@@ -30,6 +31,13 @@
       "properties": {
         "action": { "const": "knowledge_search" },
         "params": { "$ref": "#/$defs/knowledgeSearchParams" }
+      },
+      "required": ["action", "params"]
+    },
+    {
+      "properties": {
+        "action": { "const": "knowledge_read" },
+        "params": { "$ref": "#/$defs/knowledgeReadParams" }
       },
       "required": ["action", "params"]
     },
@@ -75,6 +83,16 @@
         "query": { "type": "string", "minLength": 1 },
         "tier": { "$ref": "#/$defs/knowledgeTier" },
         "limit": { "type": "integer", "minimum": 1 },
+        "export_as": { "$ref": "#/$defs/exportAs" }
+      }
+    },
+    "knowledgeReadParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "skill_path": { "type": "string", "minLength": 1 },
         "export_as": { "$ref": "#/$defs/exportAs" }
       }
     },
@@ -150,6 +168,7 @@
                 "glob_files",
                 "history_search",
                 "knowledge_search",
+                "knowledge_read",
                 "query",
                 "read_file",
                 "read_json",

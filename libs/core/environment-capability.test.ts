@@ -74,6 +74,16 @@ describe('probeManifest', () => {
     delete process.env.PROBE_TEST_ENV;
   });
 
+  it('rejects duplicate probe ids and supports disposer-based cleanup', () => {
+    const probe = async () => ({ available: true });
+    const dispose = registerEnvironmentCapabilityProbe('disposable-probe', probe);
+    expect(() => registerEnvironmentCapabilityProbe('disposable-probe', probe)).toThrow(
+      /already registered/
+    );
+    dispose();
+    expect(() => registerEnvironmentCapabilityProbe('disposable-probe', probe)).not.toThrow();
+  });
+
   it('marks capabilities not_applicable when platform mismatched', async () => {
     const otherPlatform: NodeJS.Platform = process.platform === 'darwin' ? 'linux' : 'darwin';
     const manifest: EnvironmentManifest = {
