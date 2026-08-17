@@ -297,6 +297,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_ANTIGRAVITY_CLI_BIN",
       "category": "path",
       "type": "path",
@@ -710,6 +718,14 @@
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
       "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CONTEXT_PACK_ID",
+      "category": "runtime",
       "type": "string",
       "required": false,
       "description": "",
@@ -1442,6 +1458,14 @@
       "name": "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_KNOWLEDGE_REFS",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
