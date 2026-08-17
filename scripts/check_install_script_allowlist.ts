@@ -1,6 +1,6 @@
 /** PI-12: ensure pnpm build-script policy and its reasons cannot drift. */
-import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '../libs/core/path-resolver.js';
+import { safeReadFile } from '../libs/core/secure-io.js';
 
 type AllowlistEntry = { allow: boolean; reason: string };
 type AllowlistFile = { schema_version: number; packages: Record<string, AllowlistEntry> };
