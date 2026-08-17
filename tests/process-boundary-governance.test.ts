@@ -24,6 +24,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/agent-runtime-supervisor-client.ts',
   'libs/core/agent-runtime-supervisor.test.ts',
   'libs/core/agent-runtime-supervisor.ts',
+  'libs/core/delegated-task-observability.ts',
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
   'libs/core/mission-orchestration-worker.resume.test.ts',

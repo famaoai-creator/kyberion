@@ -1,30 +1,30 @@
 /** DH-03: inspect the runtime seam catalog without mutating provider state. */
-import { coreSeamCatalog, type SeamBindingSnapshot } from '@agent/core/seam';
+import { coreSeamCatalog, type SeamBindingSnapshot } from '../libs/core/seam.js';
 
 // Import only modules that declare production seams. Keeping this list explicit
 // makes the dump deterministic and prevents a CLI inspection from booting the
 // entire core barrel (which may discover credentials or external providers).
-import '@agent/core/agent-execution-port';
-import '@agent/core/actuator-forwarding-port';
-import '@agent/core/audit-forwarder';
-import '@agent/core/deployment-adapter';
-import '@agent/core/embedding-backend';
-import '@agent/core/email-account-catalog';
-import '@agent/core/intent-extractor';
-import '@agent/core/meeting-join-driver';
-import '@agent/core/mission-llm';
-import '@agent/core/reasoning-backend';
-import '@agent/core/secret-resolver';
-import '@agent/core/speech-to-text-bridge';
-import '@agent/core/streaming-stt-bridge';
-import '@agent/core/streaming-tts-bridge';
-import '@agent/core/actuator-capability';
-import '@agent/core/surface-interaction-model';
-import '@agent/core/task-plan-coordinator-port';
-import '@agent/core/task-session';
-import '@agent/core/voice-bridge';
-import '@agent/core/vad-registry';
-import '@agent/core/environment-capability';
+import '../libs/core/agent-execution-port.js';
+import '../libs/core/actuator-forwarding-port.js';
+import '../libs/core/audit-forwarder.js';
+import '../libs/core/deployment-adapter.js';
+import '../libs/core/embedding-backend.js';
+import '../libs/core/email-account-catalog.js';
+import '../libs/core/intent-extractor.js';
+import '../libs/core/meeting-join-driver.js';
+import '../libs/core/mission-llm.js';
+import '../libs/core/reasoning-backend.js';
+import '../libs/core/secret-resolver.js';
+import '../libs/core/speech-to-text-bridge.js';
+import '../libs/core/streaming-stt-bridge.js';
+import '../libs/core/streaming-tts-bridge.js';
+import '../libs/core/src/actuator-capability.js';
+import '../libs/core/surface-interaction-model.js';
+import '../libs/core/task-plan-coordinator-port.js';
+import '../libs/core/task-session.js';
+import '../libs/core/voice-bridge.js';
+import '../libs/core/vad-registry.js';
+import '../libs/core/environment-capability.js';
 
 export function loadCoreSeamBindings(): SeamBindingSnapshot[] {
   return coreSeamCatalog.list();

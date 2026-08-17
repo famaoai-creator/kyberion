@@ -34,6 +34,7 @@ vi.mock('@agent/core', () => ({
     listener_ids: [],
     guard_ids: [],
   })),
+  ensureDefaultOpPreflight: vi.fn(),
   resolveServiceBinding: mocks.resolveServiceBinding,
   safeReadFile: mocks.safeReadFile,
   safeExistsSync: mocks.safeExistsSync,
