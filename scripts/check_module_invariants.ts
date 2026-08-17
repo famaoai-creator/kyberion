@@ -1,7 +1,7 @@
 /** DH-06: major runtime modules must declare an attributed invariant. */
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { listModuleInvariants } from '../libs/core/invariants.js';
-import { safeReadFile } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { listModuleInvariants } from '@agent/core/invariants';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const required = [
   { module: 'op-preflight', source: 'libs/core/op-preflight.ts' },

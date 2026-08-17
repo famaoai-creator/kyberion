@@ -1,7 +1,7 @@
 import {
   checkAllReasoningBackendAuth,
   checkReasoningBackendAuth,
-} from '../libs/core/reasoning-auth-preflight.js';
+} from '@agent/core/reasoning-auth-preflight';
 
 function hasFlag(name: string): boolean {
   return process.argv.includes(name);

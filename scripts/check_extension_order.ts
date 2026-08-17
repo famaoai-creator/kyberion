@@ -1,7 +1,7 @@
 /** PI-08: keep the public lifecycle graph and runtime hook vocabulary aligned. */
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { LIFECYCLE_HOOK_EVENTS } from '../libs/core/lifecycle-hook-engine.js';
-import { safeReadFile } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { LIFECYCLE_HOOK_EVENTS } from '@agent/core/lifecycle-hook-engine';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const extensionPointsPath = pathResolver.rootResolve('docs/developer/EXTENSION_POINTS.md');
 const document = String(safeReadFile(extensionPointsPath, { encoding: 'utf8' }));

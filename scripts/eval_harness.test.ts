@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeExistsSync, safeRmSync } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import { loadEvalHarnessTable, runEvalHarnessTable } from './eval_harness.js';
 
 const RUN_PATH = `active/shared/tmp/pi18-eval-${process.pid}.jsonl`;
