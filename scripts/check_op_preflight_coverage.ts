@@ -1,6 +1,6 @@
 /** DH-01: fail if a public operation boundary drops the standard waterfall. */
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeReadFile } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const boundaries = [
   'scripts/run_pipeline.ts',

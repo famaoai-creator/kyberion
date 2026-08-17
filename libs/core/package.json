@@ -459,6 +459,86 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
+    "./agent-execution-port": {
+      "types": "./dist/agent-execution-port.d.ts",
+      "default": "./dist/agent-execution-port.js"
+    },
+    "./actuator-forwarding-port": {
+      "types": "./dist/actuator-forwarding-port.d.ts",
+      "default": "./dist/actuator-forwarding-port.js"
+    },
+    "./actuator-capability": {
+      "types": "./dist/src/actuator-capability.d.ts",
+      "default": "./dist/src/actuator-capability.js"
+    },
+    "./audit-forwarder": {
+      "types": "./dist/audit-forwarder.d.ts",
+      "default": "./dist/audit-forwarder.js"
+    },
+    "./deployment-adapter": {
+      "types": "./dist/deployment-adapter.d.ts",
+      "default": "./dist/deployment-adapter.js"
+    },
+    "./email-account-catalog": {
+      "types": "./dist/email-account-catalog.d.ts",
+      "default": "./dist/email-account-catalog.js"
+    },
+    "./environment-capability": {
+      "types": "./dist/environment-capability.d.ts",
+      "default": "./dist/environment-capability.js"
+    },
+    "./intent-extractor": {
+      "types": "./dist/intent-extractor.d.ts",
+      "default": "./dist/intent-extractor.js"
+    },
+    "./lifecycle-hook-engine": {
+      "types": "./dist/lifecycle-hook-engine.d.ts",
+      "default": "./dist/lifecycle-hook-engine.js"
+    },
+    "./meeting-join-driver": {
+      "types": "./dist/meeting-join-driver.d.ts",
+      "default": "./dist/meeting-join-driver.js"
+    },
+    "./reasoning-backend": {
+      "types": "./dist/reasoning-backend.d.ts",
+      "default": "./dist/reasoning-backend.js"
+    },
+    "./secret-resolver": {
+      "types": "./dist/secret-resolver.d.ts",
+      "default": "./dist/secret-resolver.js"
+    },
+    "./speech-to-text-bridge": {
+      "types": "./dist/speech-to-text-bridge.d.ts",
+      "default": "./dist/speech-to-text-bridge.js"
+    },
+    "./streaming-stt-bridge": {
+      "types": "./dist/streaming-stt-bridge.d.ts",
+      "default": "./dist/streaming-stt-bridge.js"
+    },
+    "./streaming-tts-bridge": {
+      "types": "./dist/streaming-tts-bridge.d.ts",
+      "default": "./dist/streaming-tts-bridge.js"
+    },
+    "./surface-interaction-model": {
+      "types": "./dist/surface-interaction-model.d.ts",
+      "default": "./dist/surface-interaction-model.js"
+    },
+    "./task-plan-coordinator-port": {
+      "types": "./dist/task-plan-coordinator-port.d.ts",
+      "default": "./dist/task-plan-coordinator-port.js"
+    },
+    "./task-session": {
+      "types": "./dist/task-session.d.ts",
+      "default": "./dist/task-session.js"
+    },
+    "./voice-bridge": {
+      "types": "./dist/voice-bridge.d.ts",
+      "default": "./dist/voice-bridge.js"
+    },
+    "./vad-registry": {
+      "types": "./dist/vad-registry.d.ts",
+      "default": "./dist/vad-registry.js"
+    },
     "./operator-home-summary": {
       "types": "./dist/operator-home-summary.d.ts",
       "default": "./dist/operator-home-summary.js"

@@ -8,8 +8,8 @@
  */
 import * as path from 'node:path';
 import * as ts from 'typescript';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeReadFile, safeReaddir, safeStat } from '../libs/core/secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
 
 const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
 const GRAPH_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
