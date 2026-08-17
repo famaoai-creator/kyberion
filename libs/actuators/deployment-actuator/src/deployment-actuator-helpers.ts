@@ -71,7 +71,7 @@ export async function handleDeploymentAction(input: DeploymentAction) {
     ensureDefaultOpPreflight();
     const preflight = await runOpPreflight({
       op: 'deployment:deploy_release',
-      params: input.params || {},
+      params: (input.params || {}) as Record<string, unknown>,
       source: 'actuator',
     });
     if (preflight.decision !== 'allow') {
@@ -79,7 +79,7 @@ export async function handleDeploymentAction(input: DeploymentAction) {
         `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation deployment:deploy_release was not admitted.'}`
       );
     }
-    return deployRelease(preflight.input as DeploymentParams);
+    return deployRelease(preflight.input as unknown as DeploymentParams);
   }
   const result = await executeAdfSteps(
     input.steps || [],

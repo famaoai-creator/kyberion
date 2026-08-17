@@ -46,6 +46,17 @@ jobs:
           pnpm run check:install-script-allowlist
           pnpm run check:lockfile-commit-gate
 
+      - name: Build @agent/core
+        run: pnpm --filter '@agent/core' build
+
+      - name: Check PR title
+        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
+
+      - name: Build project
+        run: pnpm run build
+
+      # These checkers import @agent/core through its package entrypoint.
+      # Run them after the build so fresh runners have dist/index.js.
       - name: Check operation preflight and seam bindings
         run: |
           pnpm run check:op-preflight-coverage
@@ -56,15 +67,6 @@ jobs:
           pnpm run check:capability-seams
           pnpm run check:capability-seams-ast
           pnpm run check:reasoning-provider-registry
-
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
-
-      - name: Check PR title
-        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
-
-      - name: Build project
-        run: pnpm run build
 
       - name: Type check
         run: pnpm run typecheck
