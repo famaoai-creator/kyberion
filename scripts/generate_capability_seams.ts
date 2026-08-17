@@ -204,6 +204,12 @@ function normalizeGeneratedDocument(document: string): string {
         .split('|')
         .map((cell) => cell.trim());
       if (cells.length < 3) return line.trimEnd();
+      if (cells.slice(1, -1).every((cell) => /^-+$/u.test(cell))) {
+        return `| ${cells
+          .slice(1, -1)
+          .map(() => '---')
+          .join(' | ')} |`;
+      }
       return `| ${cells.slice(1, -1).join(' | ')} |`;
     })
     .join('\n');
@@ -218,11 +224,10 @@ if (findings.length > 0) {
 } else {
   const generated = render(bindings);
   if (process.argv.includes('--check')) {
-    if (
-      !safeExistsSync(OUTPUT_PATH) ||
-      normalizeGeneratedDocument(String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' }))) !==
-        normalizeGeneratedDocument(generated)
-    ) {
+    const existing = safeExistsSync(OUTPUT_PATH)
+      ? normalizeGeneratedDocument(String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' })))
+      : '';
+    if (!safeExistsSync(OUTPUT_PATH) || existing !== normalizeGeneratedDocument(generated)) {
       console.error('[generate:capability-seams] FAILED: generated document is stale');
       process.exitCode = 1;
     } else {
