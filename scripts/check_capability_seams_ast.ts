@@ -93,6 +93,17 @@ function check(): string[] {
   const declarations = scanDeclarations();
   const byKey = new Map<string, SeamDeclaration>();
   const graph = String(safeReadFile(GRAPH_PATH, { encoding: 'utf8' }) || '');
+  // Prettier pads Markdown table cells to a common width, so compare the
+  // trimmed first cell instead of relying on the exact substring
+  // `| key |`.
+  const documentedKeys = new Set<string>();
+  for (const line of graph.split('\n')) {
+    if (!line.trimStart().startsWith('|')) continue;
+    const cells = line.split('|').map((cell) => cell.trim());
+    if (cells.length >= 2 && cells[1] && cells[1] !== 'Seam' && !/^[-:]+$/u.test(cells[1])) {
+      documentedKeys.add(cells[1]);
+    }
+  }
 
   if (declarations.length === 0) findings.push('no production defineSeam declaration was found');
   for (const declaration of declarations) {
@@ -108,18 +119,13 @@ function check(): string[] {
         `${declaration.key}: defineSeam declaration is not registered in a catalog (${declaration.file}:${declaration.line})`
       );
     }
-    if (!graph.includes(`| ${declaration.key} |`)) {
+    if (!documentedKeys.has(declaration.key)) {
       findings.push(
         `${declaration.key}: generated capability seam graph is missing the AST declaration`
       );
     }
   }
 
-  const documentedKeys = new Set<string>();
-  for (const line of graph.split('\n')) {
-    const match = line.match(/^\| ([^|]+) \| (?:sole|named) \|/u);
-    if (match?.[1]) documentedKeys.add(match[1].trim());
-  }
   for (const key of documentedKeys) {
     if (!byKey.has(key)) findings.push(`${key}: generated graph documents no AST declaration`);
   }
