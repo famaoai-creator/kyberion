@@ -676,9 +676,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
 
     const dispatchedPromise = dispatchMissionNextTasks('MSN-FOLLOWUP');
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(2), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(
       mocks.route.mock.calls.map((call) =>
         String((call[0] as any)?.payload?.context?.task_id || '')
@@ -1733,9 +1734,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
 
     const dispatchedPromise = dispatchMissionNextTasks('MSN-FOLLOWUP');
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(1), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
       'task-bootstrap'
     );
@@ -1752,9 +1754,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       },
     });
 
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(2), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(String((mocks.route.mock.calls[1]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
       'task-followup'
     );
