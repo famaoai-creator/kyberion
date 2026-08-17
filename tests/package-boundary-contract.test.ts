@@ -228,10 +228,17 @@ describe('Package boundary contract', () => {
 
   it('forbids runtime imports from libs/core via relative paths', () => {
     const matches = findMatches(/\.\.\/(?:\.\.\/)?(?:\.\.\/)?libs\/core\//);
-    // Bootstrap exception: clean.ts runs before the first build, when the
-    // @agent/core dist entry points do not exist yet (see check_esm_integrity
-    // ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES for the same rationale).
-    expect(matches.filter((match) => match !== 'scripts/clean.ts')).toEqual([]);
+    // Bootstrap/test exceptions run without a package build, when the
+    // @agent/core dist entry points do not exist yet (see
+    // check_esm_integrity ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES).
+    const sourceImportExceptions = new Set([
+      'scripts/clean.ts',
+      'scripts/bindings.ts',
+      'scripts/check_install_script_allowlist.ts',
+      'scripts/check_lockfile_commit_gate.ts',
+      'scripts/check_pinned_deps.ts',
+    ]);
+    expect(matches.filter((match) => !sourceImportExceptions.has(match))).toEqual([]);
   });
 
   it('forbids test imports from @agent/core/src and @agent/core/dist', () => {
