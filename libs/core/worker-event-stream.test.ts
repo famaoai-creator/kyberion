@@ -17,6 +17,8 @@ const secureIo = vi.hoisted(() => {
       options.encoding === null
         ? fs.readFileSync(abs(filePath))
         : fs.readFileSync(abs(filePath), 'utf8'),
+    safeExistsSync: (filePath: string) => fs.existsSync(abs(filePath)),
+    safeReaddir: (dirPath: string) => fs.readdirSync(abs(dirPath)).map(String),
   };
 });
 

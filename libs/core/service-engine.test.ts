@@ -61,7 +61,10 @@ vi.mock('./secure-io.js', async () => {
   const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
-    safeReadFile: mocks.safeReadFile,
+    safeReadFile: (filePath: string, options?: Record<string, unknown>) => {
+      const mocked = mocks.safeReadFile(filePath, options);
+      return mocked === undefined ? actual.safeReadFile(filePath, options) : mocked;
+    },
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     safeStat: mocks.safeStat,
