@@ -158,7 +158,7 @@ export async function handleAction(
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
     op: `calendar:${action.op}`,
-    params: action.params || {},
+    params: (action.params || {}) as Record<string, unknown>,
     source: 'actuator',
   });
   if (preflight.decision !== 'allow') {
