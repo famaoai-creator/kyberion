@@ -101,7 +101,8 @@
             "max_prompt_chars": { "type": "number", "minimum": 1 },
             "max_response_chars": { "type": "number", "minimum": 1 },
             "max_combined_chars": { "type": "number", "minimum": 1 },
-            "approval_required": { "type": "boolean" }
+            "approval_required": { "type": "boolean" },
+            "approval_ref": { "type": "string", "minLength": 1 }
           },
           "additionalProperties": false
         },

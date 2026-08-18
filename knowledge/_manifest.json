@@ -7473,7 +7473,7 @@
     {
       "path": "product/schemas/pipeline-adf.schema.json",
       "tier": "public",
-      "size": 12912,
+      "size": 12978,
       "type": "json"
     },
     {
@@ -7755,7 +7755,7 @@
     {
       "path": "product/schemas/service-recording.schema.json",
       "tier": "public",
-      "size": 4226,
+      "size": 4301,
       "type": "json"
     },
     {

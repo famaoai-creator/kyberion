@@ -185,6 +185,18 @@ export function resolveViewerTierAccess(
   return normalized;
 }
 
+/** Enforce the resolved viewer tier set for data-bearing routes. */
+export function strictViewerTier(
+  viewer: ViewerContext,
+  requested: OsKnowledgeTier
+): OsKnowledgeTier {
+  const allowed = viewer.tierAccess ?? defaultTierAccess(viewer.role);
+  if (!allowed.includes(requested)) {
+    throw new ViewerContextError(403, `viewer tier scope denied: ${requested}`);
+  }
+  return requested;
+}
+
 export function resolveViewerContextForRequest(
   req: NextRequest
 ): { context: ViewerContext; response?: never } | { context?: never; response: NextResponse } {

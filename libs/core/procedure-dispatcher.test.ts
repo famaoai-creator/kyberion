@@ -12,7 +12,7 @@ import type {
   BrowserExtensionRecording,
   BrowserExtensionSessionRequest,
 } from './browser-extension-bridge.js';
-import type { ServiceRecording } from './service-recording.js';
+import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import { computeDesktopRecordingHash, type DesktopRecording } from './desktop-recording.js';
 import {
   intentDraftHash,
@@ -35,7 +35,7 @@ const SERVICE_PROCEDURE: ProcedureEntry = {
 };
 
 function serviceRecording(overrides: Partial<ServiceRecording> = {}): ServiceRecording {
-  return {
+  const recording: ServiceRecording = {
     schema_version: 'service-recording.v1',
     recording_id: 'svc-1',
     source: 'service-capture',
@@ -55,6 +55,10 @@ function serviceRecording(overrides: Partial<ServiceRecording> = {}): ServiceRec
     review: { status: 'approved', decisions: [{ step_id: 's1', status: 'approved' }] },
     ...overrides,
   };
+  if (recording.review?.status === 'approved' && !recording.review.content_hash) {
+    recording.review.content_hash = serviceRecordingContentHash(recording);
+  }
+  return recording;
 }
 
 // ---------------------------------------------------------------------------

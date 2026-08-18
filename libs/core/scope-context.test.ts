@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   assertScopeContext,
   currentScope,
@@ -99,6 +101,31 @@ describe('scope-context', () => {
       'confidential/acme-corp/organizations/org-a/projects/project-a'
     );
     expect(resolution.knowledge_roots).not.toContain('confidential');
+  });
+
+  it('uses the mission tier before the public default', () => {
+    const missionDir = pathResolver.shared('tmp/scope-context-mission-tier-test');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
+      JSON.stringify({ tier: 'confidential', tenant_slug: 'acme-corp' })
+    );
+    const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
+    try {
+      const resolution = resolveScopeResolution(
+        { mission_id: 'mission-tier-test' },
+        {},
+        { includePersisted: false, inferFromCwd: false }
+      );
+      expect(resolution.scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+      });
+      expect(resolution.provenance.tier).toBe('mission-state');
+    } finally {
+      findMissionPath.mockRestore();
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
   });
 
   it('round-trips the governed scope.env file', () => {

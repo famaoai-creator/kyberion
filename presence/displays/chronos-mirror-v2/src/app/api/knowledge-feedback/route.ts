@@ -5,6 +5,7 @@ import {
   resolveViewerContextForRequest,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
+  strictViewerTier,
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
   withViewerExecutionContext,
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
     const requestedTenant = typeof body.tenant === 'string' ? body.tenant : undefined;
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
     const pathParts = documentPath.split('/');
+    const tier = strictViewerTier(
+      resolvedViewer.context,
+      pathParts[1] as 'public' | 'confidential' | 'personal'
+    );
     const pathTenant =
       pathParts[1] === 'confidential' && pathParts[2] !== 'common' ? pathParts[2] : undefined;
     if (pathTenant && tenantSlugs !== 'all' && !tenantSlugs.includes(pathTenant)) {
@@ -52,12 +57,7 @@ export async function POST(req: NextRequest) {
       typeof body.project_id === 'string' ? body.project_id : undefined
     );
     const scope = {
-      tier:
-        pathParts[1] === 'personal'
-          ? 'personal'
-          : pathParts[1] === 'confidential'
-            ? 'confidential'
-            : 'public',
+      tier,
       ...(pathTenant ? { tenant_slug: pathTenant } : {}),
       ...(organizationIds !== 'all' && organizationIds[0]
         ? { organization_id: organizationIds[0] }
