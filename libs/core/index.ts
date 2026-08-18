@@ -2434,6 +2434,7 @@ export {
   collectServiceInputNames,
 } from './service-recording.js';
 export type { ServiceRecording, ServiceRecordingStep } from './service-recording.js';
+export { serviceRecordingContentHash } from './service-recording.js';
 export { compileServiceRecording } from './service-recording-compiler.js';
 export type { CompileServiceOptions, CompileServiceResult } from './service-recording-compiler.js';
 export {

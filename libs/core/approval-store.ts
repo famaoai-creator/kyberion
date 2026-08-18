@@ -66,6 +66,10 @@ export interface ApprovalRequesterContext {
   actorRole: string;
   missionId?: string;
   runtimeId?: string;
+  /** Pipeline control step that created the request. */
+  stepId?: string;
+  /** Effect step this approval is explicitly bound to. */
+  targetStepId?: string;
 }
 
 export interface ApprovalTargetDescriptor {

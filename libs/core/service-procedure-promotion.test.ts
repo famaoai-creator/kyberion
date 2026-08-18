@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteServiceProcedure } from './service-procedure-promotion.js';
+import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import * as secureIo from './secure-io.js';
 
-const recording = {
+const recording: ServiceRecording = {
   schema_version: 'service-recording.v1',
   recording_id: 'svc-promotion-test',
   source: 'service-capture',
@@ -25,6 +26,7 @@ const recording = {
     decisions: [{ step_id: 'step-001', status: 'approved' }],
   },
 };
+recording.review!.content_hash = serviceRecordingContentHash(recording);
 
 describe('promoteServiceProcedure', () => {
   afterEach(() => vi.restoreAllMocks());

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
@@ -51,6 +52,8 @@ export interface ServiceRecording {
     reviewer?: string;
     reviewed_at?: string;
     note?: string;
+    /** SHA-256 of the recording content excluding the review envelope. */
+    content_hash?: string;
     decisions: Array<{
       step_id: string;
       status: 'pending' | 'approved' | 'rejected';
@@ -70,6 +73,12 @@ function getValidator(): ValidateFunction {
 /** A step has an external effect (must pass the approval gate) iff risk_class is high. */
 export function isExternalEffectStep(step: ServiceRecordingStep): boolean {
   return step.risk_class === 'high';
+}
+
+/** Bind an approval to the exact effect plan that was reviewed. */
+export function serviceRecordingContentHash(recording: ServiceRecording): string {
+  const { review: _review, ...content } = recording;
+  return createHash('sha256').update(JSON.stringify(content)).digest('hex');
 }
 
 const INPUT_PLACEHOLDER = /\{\{input\.([a-z][a-z0-9_]{0,63})\}\}/g;
@@ -166,6 +175,9 @@ export function validateServiceRecording(input: unknown): {
       reviewedIds.add(decision.step_id);
     }
     if (recording.review.status === 'approved') {
+      if (recording.review.content_hash !== serviceRecordingContentHash(recording)) {
+        errors.push('approved review content_hash does not match the recording content');
+      }
       const missing = recording.steps
         .filter((step) => !reviewedIds.has(step.step_id))
         .map((step) => step.step_id);

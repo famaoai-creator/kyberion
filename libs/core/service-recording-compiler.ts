@@ -146,6 +146,7 @@ export function compileServiceRecording(
             severity: 'high',
           },
           storage_channel: approvalChannel,
+          approval_for: step.step_id,
           export_as: `${step.step_id}_approval`,
         },
       });
@@ -156,7 +157,14 @@ export function compileServiceRecording(
       op: 'service:preset',
       ...(step.produces ? { produces: { channel: step.produces, type: 'ServiceResult' } } : {}),
       ...(step.consumes?.length ? { consumes: step.consumes } : {}),
-      ...(step.risk_class === 'high' ? { budget: { approval_required: true } } : {}),
+      ...(step.risk_class === 'high'
+        ? {
+            budget: {
+              approval_required: true,
+              approval_ref: `${step.step_id}_approval`,
+            },
+          }
+        : {}),
       params: {
         service_id: step.service_id,
         action: step.action,

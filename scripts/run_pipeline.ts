@@ -251,6 +251,7 @@ export interface NormalizedStepBudget {
   max_response_chars?: number;
   max_combined_chars?: number;
   approval_required?: boolean;
+  approval_ref?: string;
 }
 
 export interface ReasoningStepPolicy {
@@ -278,6 +279,9 @@ export function normalizeStepBudget(raw: unknown): NormalizedStepBudget | undefi
   if (maxCombinedChars !== undefined) normalized.max_combined_chars = maxCombinedChars;
   if (budget.approval_required === true || budget.approvalRequired === true) {
     normalized.approval_required = true;
+  }
+  if (typeof budget.approval_ref === 'string' && budget.approval_ref.trim()) {
+    normalized.approval_ref = budget.approval_ref.trim();
   }
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
@@ -1463,6 +1467,40 @@ async function dispatchProgrammaticToolCall(
   return { ...ctx, [exportKey]: result.stdout };
 }
 
+/**
+ * Approval grants are durable capabilities, not context-shaped hints. A leaf
+ * step may proceed only when its declared approval_ref points at a decision
+ * emitted by this pipeline and the persisted request binds that decision to
+ * the exact effect step.
+ */
+function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unknown>): boolean {
+  const approvalRef =
+    typeof step.budget?.approval_ref === 'string' ? step.budget.approval_ref.trim() : '';
+  if (!approvalRef || !step.id) return false;
+  const candidate = ctx[approvalRef];
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false;
+  const decision = candidate as Record<string, unknown>;
+  if (
+    decision.status !== 'approved' ||
+    typeof decision.approval_request_id !== 'string' ||
+    typeof decision.storage_channel !== 'string' ||
+    typeof decision.step_id !== 'string' ||
+    decision.target_step_id !== step.id
+  ) {
+    return false;
+  }
+  try {
+    const request = loadApprovalRequest(decision.storage_channel, decision.approval_request_id);
+    return (
+      request?.status === 'approved' &&
+      request.requestedByContext?.stepId === decision.step_id &&
+      request.requestedByContext?.targetStepId === step.id
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** All non-control ops (system:*, core:wait/run_janitor/transform/ptc, reasoning:*, actuator dispatch). */
 async function dispatchLeafOp(
   step: PipelineAdfStep,
@@ -1486,14 +1524,7 @@ async function dispatchLeafOp(
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
 
-  const approvalGranted =
-    params._approval_granted === true ||
-    Object.values(ctx).some(
-      (value) =>
-        value &&
-        typeof value === 'object' &&
-        (value as Record<string, unknown>).status === 'approved'
-    );
+  const approvalGranted = hasBoundApproval(step, ctx);
   const preflight = await runOpPreflight({
     op: normalizedOp,
     params,
@@ -1924,6 +1955,10 @@ async function runStepsInternal(
       const approval = (params.approval || {}) as Record<string, unknown>;
       const stepId = currentStep?.id;
       if (!stepId) throw new Error('core:await_decision requires a step id for durable resume');
+      const targetStepId =
+        typeof params.approval_for === 'string' && params.approval_for.trim()
+          ? params.approval_for.trim()
+          : undefined;
       const storageChannel = String(params.storage_channel || 'pipeline-approval');
       const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
         params.on_timeout as 'abort' | 'deny' | 'escalate'
@@ -1942,6 +1977,11 @@ async function runStepsInternal(
             [String(params.export_as || 'decision')]: {
               status: 'approved',
               approval_request_id: existing.id,
+              storage_channel: suspended.storage_channel,
+              step_id: existing.requestedByContext?.stepId || stepId,
+              ...(existing.requestedByContext?.targetStepId
+                ? { target_step_id: existing.requestedByContext.targetStepId }
+                : {}),
               decided_by: existing.decidedBy,
             },
           };
@@ -1976,6 +2016,10 @@ async function runStepsInternal(
                 surface: 'system',
                 actorId: `pipeline:${opts.runId || 'pending'}`,
                 actorRole: 'pipeline',
+                stepId,
+                ...(existing?.requestedByContext?.targetStepId
+                  ? { targetStepId: existing.requestedByContext.targetStepId }
+                  : {}),
                 ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
               },
               source: {
@@ -2021,6 +2065,8 @@ async function runStepsInternal(
           surface: 'system',
           actorId: `pipeline:${opts.runId || 'pending'}`,
           actorRole: 'pipeline',
+          stepId,
+          ...(targetStepId ? { targetStepId } : {}),
           ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
         },
         source: {
