@@ -8,6 +8,7 @@ import {
 } from './event-scope.js';
 import { findMissionPath } from './path-resolver.js';
 import { loadJson, safeExistsSync } from './secure-io.js';
+import { loadProjectRecord } from './project-registry.js';
 import type { TierLevel } from './types.js';
 
 export type RuntimeProcessScope = 'system' | 'tenant-service';
@@ -24,7 +25,9 @@ interface MissionScopeState {
   tenant_slug?: unknown;
   tenant_id?: unknown;
   organization_id?: unknown;
-  relationships?: { project?: { project_id?: unknown } };
+  relationships?: {
+    project?: { project_id?: unknown; organization_id?: unknown };
+  };
 }
 
 const TIERS: readonly TierLevel[] = ['personal', 'confidential', 'public'];
@@ -67,13 +70,26 @@ function readMissionScope(missionId: string): EventScope | null {
     state.relationships.project.project_id.trim()
       ? state.relationships.project.project_id.trim()
       : undefined;
+  const relationOrganizationId =
+    typeof state.relationships?.project?.organization_id === 'string' &&
+    state.relationships.project.organization_id.trim()
+      ? state.relationships.project.organization_id.trim()
+      : undefined;
+  const projectRecord = projectId ? loadProjectRecord(projectId) : null;
+  const registryOrganizationId =
+    projectRecord &&
+    projectRecord.tier === tier &&
+    (!tenantSlug || projectRecord.tenant_slug === tenantSlug)
+      ? projectRecord.organization_id
+      : undefined;
+  const resolvedOrganizationId = registryOrganizationId || organizationId || relationOrganizationId;
 
   return normalizeEventScope({
     scope_kind: 'mission',
     tier,
     mission_id: missionId,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(resolvedOrganizationId ? { organization_id: resolvedOrganizationId } : {}),
     ...(projectId ? { project_id: projectId } : {}),
   });
 }
