@@ -30,6 +30,8 @@ export interface PipelineStepBudget {
   max_response_chars?: number;
   max_combined_chars?: number;
   approval_required?: boolean;
+  /** Context key containing a persisted, step-bound approval decision. */
+  approval_ref?: string;
 }
 
 export interface PipelineStepReasoning {

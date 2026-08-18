@@ -60,6 +60,13 @@ describe('viewer-context', () => {
     );
   });
 
+  it('denies a data route from selecting a tier outside the resolved viewer scope', async () => {
+    const { strictViewerTier } = await import('./viewer-context.js');
+    const viewer = { role: 'readonly' as const, tenantSlugs: 'all', source: 'token' as const };
+    expect(strictViewerTier(viewer, 'public')).toBe('public');
+    expect(() => strictViewerTier(viewer, 'personal')).toThrow('viewer tier scope denied');
+  });
+
   it('only allows organization and project selections inside the registered sets', async () => {
     const { strictViewerScopeOrganizationIds, strictViewerScopeProjectIds } =
       await import('./viewer-context.js');
