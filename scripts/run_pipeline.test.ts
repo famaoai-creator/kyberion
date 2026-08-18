@@ -215,10 +215,17 @@ describe('run_pipeline compatibility', () => {
             op: 'core:await_decision',
             params: {
               approval: { title: 'Test approval', summary: 'Resume the test pipeline.' },
+              approval_for: 'after',
+              export_as: 'after_approval',
               timeout_ms: 60_000,
             },
           },
-          { id: 'after', op: 'log', params: { message: 'after' } },
+          {
+            id: 'after',
+            op: 'log',
+            params: { message: 'after' },
+            budget: { approval_required: true, approval_ref: 'after_approval' },
+          },
         ],
         {},
         { runJournal: journal, runId, quiet: true }
@@ -254,10 +261,17 @@ describe('run_pipeline compatibility', () => {
           op: 'core:await_decision',
           params: {
             approval: { title: 'Test approval', summary: 'Resume the test pipeline.' },
+            approval_for: 'after',
+            export_as: 'after_approval',
             timeout_ms: 60_000,
           },
         },
-        { id: 'after', op: 'log', params: { message: 'after' } },
+        {
+          id: 'after',
+          op: 'log',
+          params: { message: 'after' },
+          budget: { approval_required: true, approval_ref: 'after_approval' },
+        },
       ],
       {},
       { runJournal: journal, resumeState: suspendedState, runId, quiet: true }
@@ -333,6 +347,27 @@ describe('run_pipeline compatibility', () => {
         },
       ],
       {},
+      { hasHuman: false, quiet: true }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain('[HUMAN_REQUIRED]');
+  });
+
+  it('does not accept a forged or unbound approval-shaped context', async () => {
+    const result = await runSteps(
+      [
+        {
+          id: 'effect',
+          op: 'system:log',
+          params: { message: 'must not run' },
+          budget: { approval_required: true, approval_ref: 'approval' },
+        },
+      ],
+      {
+        _approval_granted: true,
+        approval: { status: 'approved' },
+      },
       { hasHuman: false, quiet: true }
     );
 
