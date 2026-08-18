@@ -4,6 +4,8 @@ import {
   pathResolver,
   persistTrace,
   TraceContext,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
@@ -53,15 +55,13 @@ function missingRequiredFields(action: CalendarAction): string[] {
     if (!params.start_date?.trim()) {
       missing.push('params.start_date (例: "2026-07-25T10:00:00+09:00")');
     }
-    if (
-      !(
-        params.calendar_names?.some((name) => name.trim()) ||
-        params.calendar_id?.trim() ||
-        params.calendar_targets?.some(
-          (target) => target.calendar_id?.trim() || target.calendar_name?.trim()
-        )
+    if (!(
+      params.calendar_names?.some((name) => name.trim()) ||
+      params.calendar_id?.trim() ||
+      params.calendar_targets?.some(
+        (target) => target.calendar_id?.trim() || target.calendar_name?.trim()
       )
-    ) {
+    )) {
       missing.push(
         'params.calendar_names[0]、params.calendar_id、または params.calendar_targets[0] (例: "primary")'
       );
@@ -155,7 +155,21 @@ export async function handleAction(
   action: CalendarAction,
   registry: CalendarBackendRegistry = calendarBackendRegistry
 ): Promise<unknown> {
-  const valid = validateAction(action);
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `calendar:${action.op}`,
+    params: (action.params || {}) as Record<string, unknown>,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation calendar:${action.op} was not admitted.`}`
+    );
+  }
+  const valid = validateAction({
+    ...action,
+    params: preflight.input as CalendarAction['params'],
+  });
   const params = valid.params || {};
   const selections =
     valid.op === 'list_calendars'

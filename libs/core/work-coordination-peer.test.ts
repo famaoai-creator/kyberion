@@ -119,8 +119,11 @@ describe('work coordination peer bridge', () => {
       },
     });
 
-    await expect(server.processEnvelope(untrustedEnvelope)).rejects.toThrow(
-      'untrusted_peer:untrusted-peer'
-    );
+    const response = await server.processEnvelope(untrustedEnvelope);
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      ok: false,
+      error_code: 'internal',
+    });
   });
 });

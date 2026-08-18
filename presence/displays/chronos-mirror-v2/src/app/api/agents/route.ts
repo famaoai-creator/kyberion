@@ -5,7 +5,7 @@ import {
   requireChronosAccess,
   roleToMissionRole,
 } from '../../../lib/api-guard';
-import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
+import { resolveViewerContextForRequest, viewerErrorResponse } from '../../../lib/viewer-context';
 
 /**
  * /api/agents - Thin wrapper over Agent-Actuator
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({ status: 'ok', accessRole, ...(healthOverride || snapshot), agents });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return viewerErrorResponse(err, 500);
   }
 }
 
@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return viewerErrorResponse(err, 500);
   }
 }
 
@@ -328,6 +328,6 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ status: 'shutdown', agentId: body.agentId });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return viewerErrorResponse(err, 500);
   }
 }

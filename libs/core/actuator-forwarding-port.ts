@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export type ActuatorForwardStatus = 'succeeded' | 'failed' | 'blocked';
 
@@ -34,7 +35,12 @@ class MissingActuatorForwardingPort implements ActuatorForwardingPort {
   }
 }
 
-let registeredActuatorForwardingPort: ActuatorForwardingPort | undefined;
+const actuatorForwardingPortSeam = defineSeam<ActuatorForwardingPort>({
+  key: 'actuator-forwarding-port',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 const forwardingPortStorage = new AsyncLocalStorage<ActuatorForwardingPort>();
 
 export function withActuatorForwardingPort<T>(
@@ -44,17 +50,23 @@ export function withActuatorForwardingPort<T>(
   return forwardingPortStorage.run(port, task);
 }
 
-export function registerActuatorForwardingPort(port: ActuatorForwardingPort): void {
-  registeredActuatorForwardingPort = port;
+export function registerActuatorForwardingPort(port: ActuatorForwardingPort): () => void {
+  registeredDisposer = actuatorForwardingPortSeam.register('default', port, {
+    provenance: 'builtin',
+    source: 'actuator-forwarding-port',
+  });
+  return registeredDisposer;
 }
 
 export function resetActuatorForwardingPort(): void {
-  registeredActuatorForwardingPort = undefined;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 export function getActuatorForwardingPort(): ActuatorForwardingPort {
   return (
     forwardingPortStorage.getStore() ||
-    (registeredActuatorForwardingPort ||= new MissingActuatorForwardingPort())
+    actuatorForwardingPortSeam.getOptional() ||
+    new MissingActuatorForwardingPort()
   );
 }

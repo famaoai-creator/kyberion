@@ -4,6 +4,8 @@ import {
   applyCacheBreakpointToSystemBlocks,
   applyCacheBreakpointToTools,
   computeStablePrefixFingerprint,
+  appendDeferredToolAnnouncement,
+  planDeferredToolLoading,
   promoteDeferredToolDeclarations,
   PromptCachePrefixMutationError,
   renderDeferredToolAnnouncement,
@@ -112,6 +114,43 @@ describe('renderDeferredToolAnnouncement / promoteDeferredToolDeclarations', () 
     // Pure: neither input array is mutated.
     expect(stable).toEqual([{ name: 'read_file' }]);
     expect(deferred).toEqual([{ name: 'compute_stats' }]);
+  });
+
+  it('plans a role-scoped active set and keeps deferred tools out of the schema prefix', () => {
+    const plan = planDeferredToolLoading(
+      [
+        { name: 'read_file', description: 'Read a file.' },
+        { name: 'deploy', description: 'Deploy a release.', allowed_roles: ['operator'] },
+        { name: 'search', description: 'Search knowledge.', allowed_roles: ['operator', 'agent'] },
+      ],
+      { role: 'agent', deferredToolNames: ['search'] }
+    );
+    expect(plan.active.map((tool) => tool.name)).toEqual(['read_file']);
+    expect(plan.deferred.map((tool) => tool.name)).toEqual(['search']);
+    expect(plan.announcement).toContain('search');
+    expect(appendDeferredToolAnnouncement('base prompt', plan.announcement)).toContain(
+      'base prompt\n\n'
+    );
+    expect(plan.active).not.toContainEqual(expect.objectContaining({ name: 'search' }));
+  });
+
+  it('fails closed for unknown or role-denied deferred tools', () => {
+    const tools = [{ name: 'deploy', description: 'Deploy.', allowed_roles: ['operator'] }];
+    expect(() => planDeferredToolLoading(tools, { deferredToolNames: ['missing'] })).toThrow(
+      /DEFERRED_TOOL_UNKNOWN/
+    );
+    expect(() =>
+      planDeferredToolLoading(tools, { role: 'agent', deferredToolNames: ['deploy'] })
+    ).toThrow(/DEFERRED_TOOL_ROLE_DENIED/);
+  });
+
+  it('rejects duplicate catalog names before producing a model-visible plan', () => {
+    expect(() =>
+      planDeferredToolLoading([
+        { name: 'read_file', description: 'first' },
+        { name: 'read_file', description: 'second' },
+      ])
+    ).toThrow(/DEFERRED_TOOL_DUPLICATE/);
   });
 });
 

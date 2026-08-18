@@ -14,6 +14,7 @@
  */
 
 import { logger } from './core.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 import { assertOperationPolicy, currentDelegationDepth } from './operation-policy-gate.js';
 import type { A2ATaskContract, PlanningPacket, TaskResultBlock } from './channel-surface-types.js';
 import { slugify } from './text-utils.js';
@@ -34,7 +35,7 @@ import {
 import { enforceSpendGuardForReasoning } from './spend-guard.js';
 import { metrics } from './metrics.js';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
+import { findMissionPath, pathResolver } from './path-resolver.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { z } from 'zod';
 import {
@@ -47,6 +48,16 @@ import { createDelegationHandle, type DelegationHandle } from './delegated-task-
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import { AdvisoryPolicyViolation } from './ce-adoption.js';
 import { assertDistillationTextEgress } from './frame-redaction.js';
+import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
+import {
+  resolveConstrainedSampling,
+  type BackendCapabilityProfile,
+  type ConstrainedSampling,
+} from './backend-capability-profile.js';
+import {
+  appendDeferredToolAnnouncement,
+  planDeferredToolLoading,
+} from './prompt-cache-discipline.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -409,6 +420,8 @@ export interface DecomposedTaskPlan {
 export interface ToolDefinition {
   name: string;
   description: string;
+  /** PI-17: optional governed role visibility for deferred tool planning. */
+  allowed_roles?: readonly string[];
   inputSchema: {
     type: 'object';
     properties: Record<string, any>;
@@ -424,6 +437,8 @@ export interface ToolCall {
 export interface GenerateWithToolsResult {
   text?: string;
   toolCalls?: ToolCall[];
+  /** PI-17: provider-native deferred tools returned as references. */
+  deferredToolReferences?: string[];
 }
 
 export interface ReasoningCallBudget {
@@ -432,6 +447,17 @@ export interface ReasoningCallBudget {
   max_response_chars?: number;
   max_combined_chars?: number;
   approval_required?: boolean;
+}
+
+/** DH-06: mission context required to audit a model-visible reasoning call. */
+export interface ReasoningPromptVisibilityContext {
+  missionPath: string;
+  missionId: string;
+  taskId?: string;
+  contextPackId?: string;
+  knowledgeRefs?: string[];
+  source?: string;
+  form?: string;
 }
 
 export interface ReasoningCallOptions {
@@ -459,8 +485,16 @@ export interface ReasoningCallOptions {
   signal?: AbortSignal;
   /** Whether this call starts a fresh task context or continues the current one. */
   context_mode?: import('./context-boundary.js').AgentContextMode;
+  /** DH-12: persist a child session that can be cold-resumed once. */
+  continuable?: boolean;
   /** CE-11: this call is advice-only and must never produce a tool call. */
   advisory?: boolean;
+  /** PI-17: role-visible tools to announce in the message tail, not the stable prefix. */
+  deferred_tool_names?: string[];
+  /** PI-17: governed definitions passed to a provider-native deferred-tool wire. */
+  deferred_tool_definitions?: ToolDefinition[];
+  /** DH-06: append a metadata-only visibility receipt before provider execution. */
+  prompt_visibility?: ReasoningPromptVisibilityContext;
 }
 
 /**
@@ -476,6 +510,13 @@ export type ReasoningTextStream = AsyncIterable<string>;
 export interface StructuredDelegationOptions {
   context?: string;
   maxRetries?: number;
+  /** Optional native constrained-sampling request. Validation remains the fallback. */
+  constrainedSampling?: ConstrainedSampling;
+  /** Required when constrainedSampling is used; no profile means fail-closed for `require`. */
+  capabilityProfile?: Pick<
+    BackendCapabilityProfile['capabilities'],
+    'supportsStrictTools' | 'supportsGrammarTools'
+  >;
 }
 
 export interface BestOfDelegationOptions extends StructuredDelegationOptions {
@@ -713,6 +754,54 @@ function normalizeProviderName(value?: string): string | null {
 
 function candidateLabel(candidate: ReasoningBackendCandidate): string {
   return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
+}
+
+function recordReasoningPromptVisibility(
+  content: string,
+  options: ReasoningCallOptions | undefined,
+  defaultForm: string
+): void {
+  const visibility = options?.prompt_visibility || inferAmbientPromptVisibility();
+  if (!visibility) return;
+  appendPromptVisibilityRecord({
+    missionPath: visibility.missionPath,
+    missionId: visibility.missionId,
+    source: visibility.source || 'reasoning-backend',
+    form: visibility.form || defaultForm,
+    content,
+    ...(visibility.contextPackId ? { contextPackId: visibility.contextPackId } : {}),
+    ...(visibility.taskId ? { taskId: visibility.taskId } : {}),
+    knowledgeRefs: visibility.knowledgeRefs,
+  });
+}
+
+/**
+ * DH-06: direct reasoning callers may not have a pipeline context object, but
+ * mission-controller entry points still expose a validated mission id. Use
+ * that id only to locate an existing mission directory; never invent a
+ * ledger path from an arbitrary environment value. Explicit visibility wins
+ * at the call site and can carry task/context-pack/knowledge references.
+ */
+function inferAmbientPromptVisibility(): ReasoningPromptVisibilityContext | undefined {
+  const missionId = String(process.env.MISSION_ID || '').trim();
+  if (!missionId) return undefined;
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return undefined;
+  const knowledgeRefs = String(process.env.KYBERION_KNOWLEDGE_REFS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const taskId = String(process.env.KYBERION_TASK_ID || '').trim();
+  const contextPackId = String(process.env.KYBERION_CONTEXT_PACK_ID || '').trim();
+  return {
+    missionPath,
+    missionId,
+    ...(taskId ? { taskId } : {}),
+    ...(contextPackId ? { contextPackId } : {}),
+    knowledgeRefs,
+    source: 'reasoning-backend:ambient-mission',
+    form: 'reasoning_ambient',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1113,6 +1202,11 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     options?: ReasoningCallOptions
   ): Promise<string> {
     assertDistillationTextEgress([instruction, context].filter(Boolean).join('\n\n'));
+    recordReasoningPromptVisibility(
+      [instruction, context].filter(Boolean).join('\n\n'),
+      options,
+      'reasoning_delegate_task'
+    );
     let servedBackendName = '';
     const first = await this.runWithFailover(
       'delegateTask',
@@ -1129,16 +1223,18 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       `[reasoning-backend] delegation report too brief (${first.trim().length} chars < ${DELEGATION_SUMMARY_MIN_CHARS}); requesting one continuation`
     );
     // KC-06: exactly one continuation — the second result passes through as-is.
+    const continuationPrompt = buildDelegationSummaryContinuationPrompt(instruction, first);
+    recordReasoningPromptVisibility(
+      [continuationPrompt, context].filter(Boolean).join('\n\n'),
+      options,
+      'reasoning_delegate_task_continuation'
+    );
     return this.runWithFailover(
       'delegateTask',
       (backend) => {
         servedBackendName = backend.name;
         assertDistillationTextEgress([instruction, first, context].filter(Boolean).join('\n\n'));
-        return backend.delegateTask(
-          buildDelegationSummaryContinuationPrompt(instruction, first),
-          context,
-          options
-        );
+        return backend.delegateTask(continuationPrompt, context, options);
       },
       options?.signal
     );
@@ -1153,6 +1249,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       instruction,
       ...(context ? { context } : {}),
       backendName: this.name,
+      ...(options?.continuable ? { continuable: true } : {}),
       execute: (signal) =>
         this.delegateTask(instruction, context, { ...options, ...(signal ? { signal } : {}) }),
     });
@@ -1160,6 +1257,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     assertDistillationTextEgress(prompt);
+    recordReasoningPromptVisibility(prompt, options, 'reasoning_prompt');
     return this.runWithFailover(
       'prompt',
       (backend) => backend.prompt(prompt, options),
@@ -1185,6 +1283,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           .egressEndpoint;
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
         else assertReasoningEgressAllowed(candidate.backend.name);
+        recordReasoningPromptVisibility(prompt, options, 'reasoning_stream_prompt');
         for await (const delta of stream.call(candidate.backend, prompt, options)) {
           yielded = true;
           yield delta;
@@ -1210,6 +1309,16 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     options?: ReasoningCallOptions
   ): Promise<GenerateWithToolsResult> {
     assertDistillationTextEgress(prompt);
+    const toolPlan = planDeferredToolLoading(tools, {
+      ...(options?.role ? { role: options.role } : {}),
+      ...(options?.deferred_tool_names ? { deferredToolNames: options.deferred_tool_names } : {}),
+    });
+    const effectivePrompt = appendDeferredToolAnnouncement(prompt, toolPlan.announcement);
+    recordReasoningPromptVisibility(
+      `${effectivePrompt}\n\n[tool definitions]\n${JSON.stringify(toolPlan.active)}`,
+      options,
+      'reasoning_generate_with_tools'
+    );
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
     let primaryCandidate: ReasoningBackendCandidate | undefined;
@@ -1223,7 +1332,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         'generateWithTools',
         candidate,
         provider,
-        (backend) => backend.generateWithTools!(prompt, tools, options)
+        (backend) =>
+          backend.generateWithTools!(
+            effectivePrompt,
+            toolPlan.active,
+            toolPlan.deferred.length > 0
+              ? { ...(options || {}), deferred_tool_definitions: toolPlan.deferred }
+              : options
+          )
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
@@ -1259,6 +1375,13 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     options?: ReasoningCallOptions
   ): Promise<string> {
     assertDistillationTextEgress(prompt);
+    recordReasoningPromptVisibility(
+      `${prompt}\n\n[image attachments]\n${JSON.stringify(
+        images.map(({ path: imagePath, media_type }) => ({ path: imagePath, media_type }))
+      )}`,
+      options,
+      'reasoning_prompt_with_images'
+    );
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
     let primaryCandidate: ReasoningBackendCandidate | undefined;
@@ -1391,6 +1514,7 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
           instruction,
           ...(context ? { context } : {}),
           backendName: backend.name,
+          ...(options?.continuable ? { continuable: true } : {}),
           execute: (signal) =>
             backend.delegateTask(instruction, context, {
               ...options,
@@ -1481,6 +1605,10 @@ export async function delegateStructured<T>(
   options: StructuredDelegationOptions = {}
 ): Promise<T> {
   const maxRetries = Math.max(0, options.maxRetries ?? 2);
+  const constrainedSampling = resolveConstrainedSampling(
+    options.constrainedSampling,
+    options.capabilityProfile ?? { supportsStrictTools: false, supportsGrammarTools: false }
+  );
   const resolvedSchema = resolveStructuredOutputSchema(schema);
   const schemaJson = z.toJSONSchema(resolvedSchema) as Record<string, unknown>;
   if ('$schema' in schemaJson) delete schemaJson['$schema'];
@@ -1491,6 +1619,11 @@ export async function delegateStructured<T>(
       'Do not wrap the JSON in markdown fences.',
       'Do not add explanatory prose.',
       attempt > 0 ? `Retry attempt ${attempt} after schema mismatch: ${priorError}` : '',
+      constrainedSampling.mode === 'fallback'
+        ? 'Native constrained sampling is unavailable; use the existing schema validator as the fallback.'
+        : constrainedSampling.mode === 'native'
+          ? 'The selected adapter declares native constrained sampling support; keep output strictly within the schema.'
+          : '',
       'Schema:',
       JSON.stringify(schemaJson, null, 2),
       '',
@@ -1669,21 +1802,37 @@ export async function requestPeerAdvice(
   };
 }
 
-let registered: ReasoningBackend | null = null;
+const reasoningBackendSeam = defineSeam<ReasoningBackend>({
+  key: 'reasoning-backend',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+
+let registeredDisposer: (() => void) | null = null;
 
 /** Register a real backend. Most deployments do this in a bootstrap module. */
-export function registerReasoningBackend(backend: ReasoningBackend): void {
-  registered = backend;
+export function registerReasoningBackend(
+  backend: ReasoningBackend,
+  metadata: SeamProviderMetadata = { provenance: 'builtin', source: backend.name }
+): () => void {
+  const rawDisposer = reasoningBackendSeam.register('active', backend, metadata);
+  const disposer = () => {
+    rawDisposer();
+    if (registeredDisposer === disposer) registeredDisposer = null;
+  };
+  registeredDisposer = disposer;
+  return disposer;
 }
 
 /** Get the active backend, falling back to the deterministic stub. */
 export function getReasoningBackend(): ReasoningBackend {
-  return registered ?? stubReasoningBackend;
+  return reasoningBackendSeam.getOptional() ?? stubReasoningBackend;
 }
 
 /** Clear the registered backend. Used by tests. */
 export function resetReasoningBackend(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
   resetStubServedOps();
 }
 
@@ -1904,6 +2053,7 @@ export const stubReasoningBackend: ReasoningBackend = {
       instruction,
       ...(context ? { context } : {}),
       backendName: 'stub',
+      ...(options?.continuable ? { continuable: true } : {}),
       execute: (signal) =>
         stubReasoningBackend.delegateTask(instruction, context, {
           ...options,

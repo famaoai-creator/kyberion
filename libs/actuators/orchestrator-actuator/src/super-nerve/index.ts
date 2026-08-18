@@ -13,6 +13,8 @@ import {
   safeExec,
   safeReadFile,
   suggestClosestStrings,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { pathToFileURL } from 'node:url';
 
@@ -231,6 +233,23 @@ function buildUnknownCoreActionMessage(action: string): string {
 }
 
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
+  ensureDefaultOpPreflight();
+  const inputParams = params && typeof params === 'object' ? params : {};
+  const approvalGranted = inputParams._approval_granted === true || ctx?._approval_granted === true;
+  const preflight = await runOpPreflight({
+    op: `${domain}:${action}`,
+    params: inputParams,
+    context: ctx,
+    source: 'actuator',
+    requiresApproval: inputParams._approval_required === true || ctx?._approval_required === true,
+    approvalGranted,
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${domain}:${action} was not admitted.`}`
+    );
+  }
+  params = preflight.input;
   const rootDir = pathResolver.rootDir();
   if (domain === 'system') {
     if (action === 'shell') {

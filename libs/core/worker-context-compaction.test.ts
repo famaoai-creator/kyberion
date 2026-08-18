@@ -5,11 +5,13 @@ import {
   WorkerContextCompactor,
   compactWorkerContext,
   compactionThresholdTokens,
+  estimateContextTokenDetails,
   estimateContextTokens,
   isPromptTooLongError,
   loadCarryover,
   resolveContextWindowProfile,
   type CompactionCarryover,
+  type CompactionSummaryContext,
   type CompactionEvent,
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
@@ -32,6 +34,26 @@ afterEach(() => {
 });
 
 describe('worker-context-compaction (OH-01)', () => {
+  it('uses provider usage as an anchor and estimates only the trailing messages', () => {
+    const messages: WorkerContextMessage[] = [
+      { role: 'user', content: 'measured prefix' },
+      { role: 'assistant', content: 'x'.repeat(40) },
+      { role: 'tool_result', content: 'y'.repeat(20) },
+    ];
+    expect(
+      estimateContextTokenDetails(messages, {
+        providerUsageTokens: 500,
+        providerUsageMessageCount: 1,
+      })
+    ).toEqual({
+      tokens: 515,
+      strategy: 'hybrid',
+      usageTokens: 500,
+      estimatedTrailingTokens: 15,
+      trailingMessageCount: 2,
+    });
+  });
+
   it('respects env-configured window profile and threshold math', () => {
     process.env.KYBERION_CONTEXT_WINDOW_TOKENS = '10000';
     process.env.KYBERION_CONTEXT_RESERVE_TOKENS = '2000';
@@ -114,6 +136,90 @@ describe('worker-context-compaction (OH-01)', () => {
     // Summary message present and context actually shrank.
     expect(survivors.some((m) => m.content.includes('<summary>'))).toBe(true);
     expect(result.tokensAfter).toBeLessThan(result.tokensBefore);
+  });
+
+  it('updates a previous summary with cumulative details and carries a self-contained tail', async () => {
+    const big = 'u'.repeat(1_500);
+    let prompt = '';
+    let summaryContext: CompactionSummaryContext | undefined;
+    const result = await compactWorkerContext(
+      [
+        { role: 'user', content: '<summary>keep the original decision</summary>' },
+        { role: 'assistant', content: `new work ${big}` },
+        { role: 'tool_use', content: `tool ${big}`, pairId: 'tail' },
+        { role: 'tool_result', content: `result ${big}`, pairId: 'tail' },
+      ],
+      {
+        profile: { contextWindowTokens: 2_000, reserveTokens: 500, bufferTokens: 500 },
+        keepRecentToolResults: 0,
+        previousSummary: 'explicit previous summary',
+        details: { readFiles: ['src/a.ts'], modifiedFiles: ['src/b.ts'] },
+        reason: 'threshold',
+        summarize: async (input, context) => {
+          prompt = input;
+          summaryContext = context;
+          return 'updated summary preserving the original decision';
+        },
+      }
+    );
+    expect(prompt).toContain('explicit previous summary');
+    expect(prompt).toContain('src/a.ts');
+    expect(summaryContext).toMatchObject({
+      reason: 'threshold',
+      details: { readFiles: ['src/a.ts'], modifiedFiles: ['src/b.ts'] },
+    });
+    expect(result.reason).toBe('threshold');
+    expect(result.retainedTail.length).toBeGreaterThan(0);
+    const summaryMessage = result.messages.find((message) => message.content.includes('<summary>'));
+    expect(summaryMessage?.retained_tail?.length).toBe(result.retainedTail.length);
+  });
+
+  it('preserves a governing decision across five consecutive summary compactions', async () => {
+    const decision = 'DECISION: preserve the tenant boundary and never widen scope.';
+    const previousSummaries: string[] = [];
+    const compactor = new WorkerContextCompactor({
+      profile: { contextWindowTokens: 2_000, reserveTokens: 500, bufferTokens: 500 },
+      keepRecentToolResults: 0,
+      summarize: async (prompt, context) => {
+        previousSummaries.push(context?.previousSummary ?? '');
+        expect(prompt).toContain(decision);
+        return `${decision}\nSUMMARY_CYCLE:${previousSummaries.length}`;
+      },
+    });
+
+    let messages: WorkerContextMessage[] = [
+      { role: 'user', content: `<summary>${decision}</summary>` },
+    ];
+    for (let cycle = 1; cycle <= 5; cycle += 1) {
+      messages = [
+        ...messages,
+        ...Array.from({ length: 12 }, (_, index) => [
+          {
+            role: 'tool_use' as const,
+            content: `cycle-${cycle}-call-${index}: ${'x'.repeat(1_500)}`,
+            pairId: `cycle-${cycle}-pair-${index}`,
+          },
+          {
+            role: 'tool_result' as const,
+            content: `cycle-${cycle}-result-${index}: ${'y'.repeat(1_500)}`,
+            pairId: `cycle-${cycle}-pair-${index}`,
+          },
+        ]).flat(),
+      ];
+
+      const result = await compactor.maybeCompact(messages, { reason: 'threshold' });
+      expect(result.stage).toBe('summary');
+      expect(result.retainedTail.length).toBeGreaterThan(0);
+      const summaryMessage = result.messages.find((message) =>
+        message.content.includes('<summary>')
+      );
+      expect(summaryMessage?.content).toContain(decision);
+      expect(summaryMessage?.retained_tail?.length).toBe(result.retainedTail.length);
+      messages = result.messages;
+    }
+
+    expect(previousSummaries).toHaveLength(5);
+    expect(previousSummaries.slice(1).every((summary) => summary.includes(decision))).toBe(true);
   });
 
   it('persists the summary artifact under the governed tmp area and registers it', async () => {
@@ -204,5 +310,6 @@ describe('worker-context-compaction (OH-01)', () => {
     // Forced compaction fires even though the context is far below threshold.
     expect(reactive?.compacted).toBe(true);
     expect(estimateContextTokens(reactive!.messages)).toBeLessThan(estimateContextTokens(messages));
+    expect(reactive?.reason).toBe('overflow');
   });
 });

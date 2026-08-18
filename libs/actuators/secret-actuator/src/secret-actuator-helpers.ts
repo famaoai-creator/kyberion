@@ -15,6 +15,8 @@ import {
   listSecrets as coreListSecrets,
   pathResolver,
   secureIo,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -192,20 +194,30 @@ async function withGovernedMutation(
 
 export async function handleAction(input: SecretAction) {
   const platform = process.platform;
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `secret:${input.action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation secret:${input.action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input as SecretAction['params'];
 
   switch (input.action) {
     case 'get':
-      return await getSecret(input.params, platform);
+      return await getSecret(params, platform);
     case 'set':
-      return await withGovernedMutation('set', input.params, platform, () =>
-        setSecret(input.params, platform)
-      );
+      return await withGovernedMutation('set', params, platform, () => setSecret(params, platform));
     case 'delete':
-      return await withGovernedMutation('delete', input.params, platform, () =>
-        deleteSecret(input.params, platform)
+      return await withGovernedMutation('delete', params, platform, () =>
+        deleteSecret(params, platform)
       );
     case 'list':
-      return listSecrets(input.params);
+      return listSecrets(params);
     default:
       throw new Error(`Unsupported secret action: ${(input as any).action}`);
   }

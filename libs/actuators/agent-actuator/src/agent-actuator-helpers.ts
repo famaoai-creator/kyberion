@@ -28,6 +28,8 @@ import {
   buildGovernedRetryOptions,
   classifyError,
   retry,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { AgentTaskEnvelope, CoordinatedAgentTaskEnvelope } from '@agent/core';
@@ -114,7 +116,20 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     });
   }
 
-  const { params } = input as AgentAction;
+  let { params } = input as AgentAction;
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `agent:${action}`,
+    params: params || {},
+    context: ctx,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation agent:${action} was not admitted.`}`
+    );
+  }
+  params = preflight.input as AgentAction['params'];
 
   switch (action) {
     case 'spawn': {

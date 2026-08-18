@@ -25,6 +25,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -53,18 +54,31 @@ export interface DeploymentAdapter {
   deploy(input: DeployInput): Promise<DeployResult>;
 }
 
-let registered: DeploymentAdapter | null = null;
+const deploymentAdapterSeam = defineSeam<DeploymentAdapter>({
+  key: 'deployment-adapter',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerDeploymentAdapter(adapter: DeploymentAdapter): void {
-  registered = adapter;
+export function registerDeploymentAdapter(adapter: DeploymentAdapter): () => void {
+  if (!adapter || typeof adapter.name !== 'string' || !adapter.name.trim()) {
+    throw new TypeError('Deployment adapter must have a non-empty name');
+  }
+  registeredDisposer = deploymentAdapterSeam.register(adapter.name, adapter, {
+    provenance: 'builtin',
+    source: 'deployment-adapter',
+  });
+  return registeredDisposer;
 }
 
 export function getDeploymentAdapter(): DeploymentAdapter {
-  return registered ?? stubDeploymentAdapter;
+  return deploymentAdapterSeam.getOptional() ?? stubDeploymentAdapter;
 }
 
 export function resetDeploymentAdapter(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 export const stubDeploymentAdapter: DeploymentAdapter = {
@@ -195,6 +209,7 @@ export function installShellDeploymentAdapterIfAvailable(
 ): boolean {
   const command = env.KYBERION_DEPLOY_COMMAND?.trim();
   if (!command) return false;
+  resetDeploymentAdapter();
   registerDeploymentAdapter(
     new ShellDeploymentAdapter({
       command,
@@ -214,6 +229,7 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
 ): boolean {
   const loaded = loadShellDeploymentAdapterConfig(env);
   if (!loaded) return false;
+  resetDeploymentAdapter();
   // E2E-05 Task 6: config can select the fastlane-delegating mobile adapter.
   if (loaded.config.adapter === 'mobile-beta') {
     if (!loaded.config.platform || !loaded.config.project_dir) {

@@ -55,4 +55,34 @@ describe('LiveSyncScheduler', () => {
     scheduler.stop();
     vi.useRealTimers();
   });
+
+  it('rejects an older authoritative snapshot without applying its payload', () => {
+    const onSnapshot = vi.fn();
+    const scheduler = new LiveSyncScheduler({
+      fetchSnapshot: async () => ({ revision: 1, items: [] }),
+      onSnapshot,
+      revisionOf: (snapshot) => snapshot.revision,
+    });
+
+    expect(scheduler.applySnapshot({ revision: 4, items: ['new'] })).toBe(true);
+    expect(scheduler.applySnapshot({ revision: 3, items: ['stale'] })).toBe(false);
+    expect(scheduler.snapshot).toEqual({ revision: 4, items: ['new'] });
+    expect(scheduler.revision).toBe(4);
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a newer snapshot even when an event arrived out of order', () => {
+    const onSnapshot = vi.fn();
+    const scheduler = new LiveSyncScheduler({
+      fetchSnapshot: async () => ({ revision: 1, items: [] }),
+      onSnapshot,
+      revisionOf: (snapshot) => snapshot.revision,
+    });
+
+    scheduler.applySnapshot({ revision: 2, items: ['second'] });
+    expect(scheduler.applySnapshot({ revision: 5, items: ['fifth'] })).toBe(true);
+    expect(scheduler.snapshot).toEqual({ revision: 5, items: ['fifth'] });
+    expect(scheduler.revision).toBe(5);
+    expect(onSnapshot).toHaveBeenCalledTimes(2);
+  });
 });

@@ -59,4 +59,17 @@ describe('vad registry', () => {
     expect(created).toBe(1);
     expect(listVadBackends()).toContain('custom');
   });
+
+  it('returns a disposer and rejects duplicate backend ids', () => {
+    const backend = {
+      backend_id: 'disposable',
+      needsCalibration: false,
+      probe: () => ({ available: true }),
+      create: () => new EnergyVad(),
+    };
+    const dispose = registerVadBackend(backend);
+    expect(() => registerVadBackend(backend)).toThrow(/already registered/);
+    dispose();
+    expect(listVadBackends()).not.toContain('disposable');
+  });
 });

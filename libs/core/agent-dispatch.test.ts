@@ -19,6 +19,7 @@ import {
   resetDefaultWorkerEventStream,
   type WorkerEventEnvelope,
 } from './worker-event-stream.js';
+import { registerOpPreflightListener, resetOpPreflight } from './op-preflight.js';
 
 vi.mock('./a2a-bridge.js', () => ({
   a2aBridge: {
@@ -34,6 +35,8 @@ vi.mock('./kill-switch.js', () => ({
   // unsubscribe keeps that wiring quiet in tests that don't care about it.
   onKillSwitchTermination: vi.fn(() => () => {}),
 }));
+
+afterEach(() => resetOpPreflight());
 
 /** Minimal fake backend that records delegation and supports tool-use opt-in. */
 function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend & {
@@ -103,6 +106,25 @@ describe('agent-dispatch', () => {
     expect(backend.prompt).toHaveBeenCalledWith('hi');
     await wrapped.extractRequirements({} as any);
     expect((backend as any).extractRequirements).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs delegateTask through the serial preflight repair entrance', async () => {
+    registerOpPreflightListener({
+      id: 'test.delegate.repair',
+      run: (call) =>
+        call.source === 'delegate'
+          ? { repaired_input: { instruction: 'repaired task' } }
+          : undefined,
+    });
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+
+    await wrapped.delegateTask('original task');
+
+    expect(backend.delegateTask).toHaveBeenCalledWith(
+      'repaired task',
+      expect.stringContaining('<delegation-chain>')
+    );
   });
 
   it('InSessionDispatcher breaks a dead-end invoke_agent loop via process-spawn fallback (KC-01)', async () => {

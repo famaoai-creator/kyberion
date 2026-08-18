@@ -85,9 +85,6 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     if (err?.message?.includes('viewer') || err?.message?.includes('tenant'))
       return viewerErrorResponse(err);
-    return NextResponse.json(
-      { error: err.message || 'Failed to build plan preview' },
-      { status: 500 }
-    );
+    return viewerErrorResponse(err, 500);
   }
 }

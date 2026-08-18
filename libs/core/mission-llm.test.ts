@@ -192,6 +192,18 @@ describe('mission-llm resolution', () => {
     expect(result).toEqual({ answer: 11 });
   });
 
+  it('uses a reversible named seam for structured runners', () => {
+    const name = `test-seam-runner-${process.pid}`;
+    const runner = async () => ({ answer: 1 });
+    const dispose = registerStructuredRunner(name, runner, {
+      provenance: 'generated',
+      source: 'mission-llm.test.ts',
+    });
+
+    expect(() => registerStructuredRunner(name, runner)).toThrow(/already registered/);
+    dispose();
+  });
+
   it('automatically falls back to the next profile on QUOTA_EXHAUSTED', async () => {
     const calls: string[] = [];
     registerStructuredRunner('quota-first', async () => {

@@ -8,6 +8,7 @@ import { pathResolver } from './path-resolver.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { toWireError } from './wire-error.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -602,6 +603,13 @@ class RequestBodyTooLargeError extends Error {
   }
 }
 
+function isRequestBodyTooLargeError(error: unknown): boolean {
+  return (
+    error instanceof RequestBodyTooLargeError ||
+    (error instanceof Error && error.message === 'request_body_too_large')
+  );
+}
+
 function parseRequestBody(
   req: http.IncomingMessage,
   maxBytes = MAX_REQUEST_BODY_BYTES
@@ -729,10 +737,28 @@ export class PeerMessagingServer {
     const processedAt = nowIso();
     let response: unknown = { accepted: true };
     if (this.options.responder) {
-      response = await this.options.responder({
-        peerId: this.options.peerId,
-        envelope: normalized,
-      });
+      try {
+        response = await this.options.responder({
+          peerId: this.options.peerId,
+          envelope: normalized,
+        });
+      } catch (error) {
+        const safe = toWireError(error, normalized.correlation_id);
+        recordPeerEvent(this.options.tenantId, this.options.peerId, {
+          type: 'message_error',
+          message_id: normalized.message_id,
+          reason: safe.code,
+        });
+        return {
+          status: 500,
+          body: {
+            ok: false,
+            error: safe.message,
+            error_code: safe.code,
+            correlation_id: safe.correlation_id,
+          },
+        };
+      }
     }
 
     recordPeerEvent(this.options.tenantId, this.options.peerId, {
@@ -794,14 +820,20 @@ export class PeerMessagingServer {
         const result = await this.processEnvelope(body as PeerMessageEnvelope);
         return sendJson(res, result.status, result.body);
       } catch (error: any) {
-        if (error instanceof RequestBodyTooLargeError) {
-          return sendJson(res, 413, { ok: false, error: error.message });
+        if (isRequestBodyTooLargeError(error)) {
+          return sendJson(res, 413, { ok: false, error: 'request_body_too_large' });
         }
+        const safe = toWireError(error);
         recordPeerEvent(this.options.tenantId, this.options.peerId, {
           type: 'message_error',
-          reason: error?.message || String(error),
+          reason: safe.code,
         });
-        return sendJson(res, 500, { ok: false, error: error?.message || String(error) });
+        return sendJson(res, 500, {
+          ok: false,
+          error: safe.message,
+          error_code: safe.code,
+          correlation_id: safe.correlation_id,
+        });
       }
     });
 

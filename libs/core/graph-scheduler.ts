@@ -26,6 +26,8 @@ export interface GraphNode<T> {
   outgoing: GraphEdge[];
   when?: unknown;
   merge: GraphMergePolicy;
+  /** Optional operation budget carried from the governed op definition. */
+  timeoutMs?: number;
 }
 
 export interface ExecutionGraph<T> {
@@ -53,6 +55,7 @@ export interface GraphStepLike {
   merge?: GraphMergePolicy;
   resource_claims?: Array<string | ResourceClaim>;
   params?: Record<string, unknown>;
+  timeout_ms?: number;
 }
 
 export interface GraphBuildResult<T> {
@@ -70,6 +73,11 @@ function producedChannel(step: GraphStepLike): string | undefined {
   }
   const exportAs = step.params?.export_as;
   return typeof exportAs === 'string' && exportAs.length > 0 ? exportAs : undefined;
+}
+
+function declaredTimeoutMs(step: GraphStepLike): number | undefined {
+  const value = step.timeout_ms ?? step.params?.timeout_ms;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
 function addEdge(edges: GraphEdge[], edge: GraphEdge): void {
@@ -216,6 +224,9 @@ export function deriveExecutionGraph<T>(
     outgoing: edges.filter((edge) => edge.from === id),
     when: graphSteps[index].when,
     merge: graphSteps[index].merge || 'last',
+    ...(declaredTimeoutMs(graphSteps[index]) !== undefined
+      ? { timeoutMs: declaredTimeoutMs(graphSteps[index]) }
+      : {}),
   }));
 
   const remaining = new Map(nodes.map((node) => [node.id, node.dependencies.length]));

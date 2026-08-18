@@ -11,7 +11,11 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
   backendCapabilityProfile,
+  resolveConstrainedSampling,
+  resolveThinkingLevel,
   type BackendCapabilityProfile,
+  type ConstrainedSampling,
+  type ThinkingLevel,
 } from './backend-capability-profile.js';
 
 const ajv = new Ajv({ allErrors: true });
@@ -140,6 +144,8 @@ export interface ResolvedReasoningRoute {
   toolsEnabled: boolean;
   allowedTools: ReasoningToolName[];
   parameters: SamplingParams;
+  thinkingLevel?: { requested: ThinkingLevel; wireValue: string };
+  constrainedSampling: ReturnType<typeof resolveConstrainedSampling>;
   limits: { contextWindowTokens?: number; maxCompletionTokens?: number; timeoutMs: number };
   candidates: string[];
   governance: { dataTier: string; egress: 'enforced'; spend: 'enforced' };
@@ -367,6 +373,8 @@ export function resolveReasoningRoute(
     requestedModel?: string;
     requiredCapabilities?: ReasoningCapability[];
     sampling?: SamplingParams;
+    thinkingLevel?: ThinkingLevel;
+    constrainedSampling?: ConstrainedSampling;
     env?: NodeJS.ProcessEnv;
     policy?: ReasoningRoutePolicy;
     userConfig?: ReasoningRouteUserConfig;
@@ -476,13 +484,74 @@ export function resolveReasoningRoute(
     // is the authoritative declaration of what the selected transport can
     // actually provide. Keep custom test/local policy modes valid while
     // applying the registry to every built-in mode.
-    const backendProfile = Object.prototype.hasOwnProperty.call(BACKEND_CAPABILITY_PROFILES, mode)
+    const baseBackendProfile = Object.prototype.hasOwnProperty.call(
+      BACKEND_CAPABILITY_PROFILES,
+      mode
+    )
       ? backendCapabilityProfile(mode as ReasoningBackendMode)
+      : undefined;
+    const modelCompatibility = model
+      ? loadModelRegistry().models.find((entry) => entry.model_id === model)?.compat
+      : undefined;
+    const backendProfile = baseBackendProfile
+      ? {
+          ...baseBackendProfile,
+          capabilities: {
+            ...baseBackendProfile.capabilities,
+            ...(modelCompatibility
+              ? {
+                  thinkingLevelMap: {
+                    ...baseBackendProfile.capabilities.thinkingLevelMap,
+                    ...(modelCompatibility.thinkingLevelMap || {}),
+                  },
+                  ...(modelCompatibility.supportsStrictTools === undefined
+                    ? {}
+                    : { supportsStrictTools: modelCompatibility.supportsStrictTools }),
+                  ...(modelCompatibility.supportsGrammarTools === undefined
+                    ? {}
+                    : { supportsGrammarTools: modelCompatibility.supportsGrammarTools }),
+                }
+              : {}),
+          },
+        }
       : undefined;
     if (backendProfile) {
       if (!backendProfile.capabilities.structured_output) capabilitySet.delete('structured_output');
       if (!backendProfile.capabilities.images) capabilitySet.delete('vision');
       provenance.push({ source: 'backend-profile', field: `${mode}.capabilities` });
+    }
+    let resolvedThinkingLevel: { requested: ThinkingLevel; wireValue: string } | undefined;
+    let constrainedSampling: ReturnType<typeof resolveConstrainedSampling> = {
+      mode: 'disabled',
+      reason: 'not-requested',
+    };
+    if (backendProfile) {
+      const thinking = resolveThinkingLevel(backendProfile, input.thinkingLevel);
+      if (!thinking.supported) {
+        rejectedCandidates.push({
+          profile: profileRef,
+          reason: `thinking level ${input.thinkingLevel} is unavailable: ${thinking.reason}`,
+        });
+        continue;
+      }
+      if (input.thinkingLevel && thinking.wireValue) {
+        resolvedThinkingLevel = {
+          requested: input.thinkingLevel,
+          wireValue: thinking.wireValue,
+        };
+      }
+      try {
+        constrainedSampling = resolveConstrainedSampling(input.constrainedSampling, {
+          supportsStrictTools: backendProfile.capabilities.supportsStrictTools,
+          supportsGrammarTools: backendProfile.capabilities.supportsGrammarTools,
+        });
+      } catch (error) {
+        rejectedCandidates.push({
+          profile: profileRef,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
     }
     if (!toolsEnabled || allowedTools.length === 0) capabilitySet.delete('tools');
     const capabilities = Array.from(capabilitySet);
@@ -524,6 +593,8 @@ export function resolveReasoningRoute(
       toolsEnabled,
       allowedTools,
       parameters: sampling,
+      ...(resolvedThinkingLevel ? { thinkingLevel: resolvedThinkingLevel } : {}),
+      constrainedSampling,
       limits: {
         contextWindowTokens: overlay?.context_window_tokens ?? base.context_window_tokens,
         maxCompletionTokens: overlay?.max_completion_tokens ?? base.max_completion_tokens,

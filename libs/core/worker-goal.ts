@@ -119,6 +119,26 @@ export const GOAL_UPDATE_OP = 'goal:update';
 /** Tool-safe surface name for the `goal:update` op (colons are not tool-safe). */
 export const GOAL_UPDATE_TOOL_NAME = 'goal_update';
 
+/** PI-17: stable, read-only discovery tool for additive tool loading. */
+export const TOOL_SEARCH_TOOL_NAME = 'tool_search';
+
+export function buildToolSearchToolDefinition(): ToolDefinition {
+  return {
+    name: TOOL_SEARCH_TOOL_NAME,
+    description:
+      'Search the governed capability catalog for additional tools. This only returns tool descriptions; it does not execute an operation.',
+    allowed_roles: ['agent', 'operator', 'orchestrator'],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', minLength: 1 },
+        max_results: { type: 'integer', minimum: 1, maximum: 20 },
+      },
+      required: ['query'],
+    },
+  };
+}
+
 export type GoalUpdateStatus = 'continue' | 'complete' | 'blocked';
 
 export interface GoalUpdateSignal {

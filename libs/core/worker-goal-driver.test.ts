@@ -23,8 +23,15 @@ vi.mock('./kill-switch.js', () => ({
 }));
 
 import { RewindableWorkerContext } from './context-rewind.js';
-import { resetDefaultDynamicInjectionRegistry } from './dynamic-injection.js';
-import type { GenerateWithToolsResult, ReasoningBackend } from './reasoning-backend.js';
+import {
+  resetDefaultDynamicInjectionRegistry,
+  ScopedDynamicInjectionRegistry,
+} from './dynamic-injection.js';
+import type {
+  GenerateWithToolsResult,
+  ReasoningBackend,
+  ReasoningCallOptions,
+} from './reasoning-backend.js';
 import {
   runGoalDrivenLoop,
   type GoalWallClockScheduler,
@@ -107,6 +114,222 @@ describe('runGoalDrivenLoop — acceptance #1: create → 3 turns → complete �
     // turn_begin present for every turn, in order.
     const turnBegins = events.filter((e) => e.type === 'turn_begin').map((e) => e.payload.turn);
     expect(turnBegins).toEqual([1, 2, 3, 4]);
+  });
+
+  it('forwards PI-17 role and deferred tool settings at the goal boundary', async () => {
+    const seenOptions: ReasoningCallOptions[] = [];
+    const backend: ToolBackend = {
+      prompts: [],
+      async generateWithTools(_prompt, _tools, options) {
+        if (options) seenOptions.push(options);
+        return goalUpdate({ status: 'complete', reason: 'tool surface forwarded' });
+      },
+    };
+
+    await runGoalDrivenLoop({
+      objective: 'use a role-scoped tool surface',
+      goalId: 'g-deferred-tools',
+      backend,
+      toolRole: 'agent',
+      deferredToolNames: ['search'],
+    });
+
+    expect(seenOptions).toEqual([{ role: 'agent', deferred_tool_names: ['search'] }]);
+  });
+
+  it('discovers and additively exposes governed tools through tool_search', async () => {
+    const seen: Array<{ prompt: string; tools: string[] }> = [];
+    const toolSearch = vi.fn(async (query: string) => {
+      expect(query).toBe('search capabilities');
+      return [
+        {
+          name: 'capability_read',
+          description: 'Read a governed capability description.',
+          allowed_roles: ['agent'],
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ];
+    });
+    let turn = 0;
+    const backend: ToolBackend = {
+      prompts: [],
+      async generateWithTools(prompt, tools) {
+        turn += 1;
+        seen.push({ prompt, tools: tools.map((tool) => tool.name) });
+        return turn === 1
+          ? { toolCalls: [{ name: 'tool_search', input: { query: 'search capabilities' } }] }
+          : goalUpdate({ status: 'complete', reason: 'discovered tool loaded' });
+      },
+    };
+
+    const result = await runGoalDrivenLoop({
+      objective: 'discover a capability and finish',
+      goalId: 'g-tool-search',
+      backend,
+      toolRole: 'agent',
+      toolSearch,
+    });
+
+    expect(result.finalState).toBe('complete');
+    expect(toolSearch).toHaveBeenCalledOnce();
+    expect(seen[0]?.tools).toContain('tool_search');
+    expect(seen[1]?.tools).toContain('capability_read');
+    expect(seen[1]?.prompt).toContain('capability_read');
+    expect(seen[1]?.prompt).toContain('trust="governed"');
+  });
+
+  it('promotes native deferred-tool references only at the next turn boundary', async () => {
+    const seen: Array<{ prompt: string; tools: string[] }> = [];
+    const toolSearch = vi.fn(async (query: string) => {
+      expect(query).toBe('capability_read');
+      return [
+        {
+          name: 'capability_read',
+          description: 'Read a governed capability description.',
+          allowed_roles: ['agent'],
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ];
+    });
+    let turn = 0;
+    const backend: ToolBackend = {
+      prompts: [],
+      async generateWithTools(prompt, tools) {
+        turn += 1;
+        seen.push({ prompt, tools: tools.map((tool) => tool.name) });
+        return turn === 1
+          ? { deferredToolReferences: ['capability_read'] }
+          : goalUpdate({ status: 'complete', reason: 'native deferred tool loaded' });
+      },
+    };
+
+    const result = await runGoalDrivenLoop({
+      objective: 'promote a native deferred tool safely',
+      goalId: 'g-native-deferred-tool',
+      backend,
+      toolRole: 'agent',
+      toolSearch,
+    });
+
+    expect(result.finalState).toBe('complete');
+    expect(toolSearch).toHaveBeenCalledOnce();
+    expect(seen[0]?.tools).not.toContain('capability_read');
+    expect(seen[1]?.tools).toContain('capability_read');
+    expect(seen[1]?.prompt).toContain('capability_read');
+    expect(
+      events
+        .map((event) => event.payload)
+        .some(
+          (payload) => (payload as { goal_event?: string }).goal_event === 'deferred_tools_promoted'
+        )
+    ).toBe(true);
+  });
+
+  it('cooperatively yields after a completed turn without interrupting the turn', async () => {
+    const backend = scriptedBackend([
+      goalUpdate({ status: 'continue' }),
+      goalUpdate({ status: 'complete', reason: 'should not be reached' }),
+    ]);
+    const shouldStopAfterTurn = vi.fn(async ({ turnNumber }) => turnNumber === 1);
+    const result = await runGoalDrivenLoop({
+      objective: 'yield after one turn',
+      goalId: 'g-yield',
+      backend,
+      shouldStopAfterTurn,
+    });
+
+    expect(result.finalState).toBe('paused');
+    expect(result.turnsRun).toBe(1);
+    expect(shouldStopAfterTurn).toHaveBeenCalledWith(expect.objectContaining({ turnNumber: 1 }));
+    expect(appliedSequence()).toEqual(['continue']);
+    expect(goalEventSequence()).toContain('paused');
+  });
+
+  it('appends turn-boundary queued input before sending the next prompt', async () => {
+    const backend = scriptedBackend([goalUpdate({ status: 'complete', reason: 'verified' })]);
+    await runGoalDrivenLoop({
+      objective: 'consume queued input',
+      goalId: 'g-queue-prompt',
+      backend,
+      getTurnPrompt: () =>
+        '<kyberion-queued-inputs trust="untrusted">message</kyberion-queued-inputs>',
+    });
+    expect(backend.prompts[0]).toContain('trust="untrusted"');
+  });
+
+  it('runs pre-step admission hooks serially and appends their messages in order', async () => {
+    const backend = scriptedBackend([goalUpdate({ status: 'complete', reason: 'admitted' })]);
+    const seen: string[][] = [];
+    await runGoalDrivenLoop({
+      objective: 'admission order',
+      goalId: 'g-pre-step-enter',
+      backend,
+      preStep: [
+        ({ messages }) => {
+          seen.push([...messages]);
+          return { decision: 'enter', messages: ['first admission message'] };
+        },
+        async ({ messages }) => {
+          seen.push([...messages]);
+          return { decision: 'enter', messages: ['second admission message'] };
+        },
+      ],
+    });
+
+    expect(seen).toEqual([[], ['first admission message']]);
+    expect(backend.prompts[0].indexOf('first admission message')).toBeLessThan(
+      backend.prompts[0].indexOf('second admission message')
+    );
+  });
+
+  it('rejects before model entry and pauses without invoking the backend', async () => {
+    const backend = scriptedBackend([goalUpdate({ status: 'complete', reason: 'must not run' })]);
+    const result = await runGoalDrivenLoop({
+      objective: 'blocked admission',
+      goalId: 'g-pre-step-reject',
+      backend,
+      preStep: [
+        () => ({ decision: 'reject', reason: 'approval is required' }),
+        () => ({ decision: 'enter', messages: ['must not execute'] }),
+      ],
+    });
+
+    expect(result.finalState).toBe('paused');
+    expect(result.turnsRun).toBe(0);
+    expect(backend.prompts).toHaveLength(0);
+    expect(goalEventSequence()).toContain('pre_step_rejected');
+    expect(result.goal.terminalReason).toContain('approval is required');
+  });
+
+  it('collects inherited and task-scoped injections through the DH-09 registry', async () => {
+    const backend = scriptedBackend([goalUpdate({ status: 'complete', reason: 'scoped' })]);
+    const scoped = new ScopedDynamicInjectionRegistry();
+    scoped.register(
+      { mission: 'M-SCOPE' },
+      {
+        id: 'mission-policy',
+        collect: () => 'mission policy',
+      }
+    );
+    scoped.register(
+      { mission: 'M-SCOPE', task: 'TASK-SCOPE' },
+      {
+        id: 'task-policy',
+        collect: () => 'task policy',
+      }
+    );
+
+    await runGoalDrivenLoop({
+      objective: 'scoped injection',
+      goalId: 'g-scoped-injection',
+      missionId: 'M-SCOPE',
+      backend,
+      scopedInjectionRegistry: scoped,
+      injectionScope: { mission: 'M-SCOPE', task: 'TASK-SCOPE', session: 'S-1' },
+    });
+
+    expect(backend.prompts[0]).toContain('mission policy');
+    expect(backend.prompts[0]).toContain('task policy');
   });
 });
 

@@ -545,6 +545,116 @@ function makePrunablePack(): MissionContextPack {
 }
 
 describe('mission-context-pack', () => {
+  it('adds a metadata-only progressive skill index without exposing the body', () => {
+    const skillDir = `${missionPath}/skills/demo-skill`;
+    safeMkdir(skillDir, { recursive: true });
+    safeWriteFile(
+      `${skillDir}/SKILL.md`,
+      [
+        '---',
+        'name: demo-context-skill',
+        'description: A context-pack skill descriptor',
+        'disable-model-invocation: true',
+        'allowed-tools: Read',
+        '---',
+        '',
+        '# Secret skill body',
+      ].join('\n')
+    );
+    const pack = buildMissionContextPack({
+      missionPath,
+      skillPaths: [skillDir],
+      missionState: {
+        mission_id: `${missionId}-SKILL`,
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        execution_mode: 'local',
+        priority: 3,
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      },
+    });
+
+    expect(pack.skill_resources).toHaveLength(1);
+    expect(pack.skill_resources?.[0]?.frontmatter.allowed_tools).toEqual(['Read']);
+    const rendered = renderMissionContextPack(pack);
+    expect(rendered).toContain('<skill name="demo-context-skill"');
+    expect(rendered).not.toContain('Secret skill body');
+  });
+
+  it('propagates the pre-trust boundary to project-local skill paths', () => {
+    expect(() =>
+      buildMissionContextPack({
+        missionPath,
+        skillPaths: ['skills/project-local'],
+        trustResolved: false,
+        missionState: {
+          mission_id: `${missionId}-SKILL-PRETRUST`,
+          tier: 'public',
+          status: 'active',
+          assigned_persona: 'worker',
+          execution_mode: 'local',
+          priority: 3,
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+          history: [],
+        },
+      })
+    ).toThrow('[TRUST_REQUIRED]');
+  });
+
+  it('omits restricted skills from the model-visible context-pack index', () => {
+    const allowedDir = `${missionPath}/skills/allowed-skill`;
+    const restrictedDir = `${missionPath}/skills/restricted-skill`;
+    safeMkdir(allowedDir, { recursive: true });
+    safeMkdir(restrictedDir, { recursive: true });
+    safeWriteFile(
+      `${allowedDir}/SKILL.md`,
+      [
+        '---',
+        'name: allowed-context-skill',
+        'description: Allowed fixture',
+        '---',
+        '',
+        'Body',
+      ].join('\n')
+    );
+    safeWriteFile(
+      `${restrictedDir}/SKILL.md`,
+      [
+        '---',
+        'name: mock-malicious-skill',
+        'description: Restricted fixture',
+        '---',
+        '',
+        'Must not be indexed',
+      ].join('\n')
+    );
+
+    const pack = buildMissionContextPack({
+      missionPath,
+      skillPaths: [allowedDir, restrictedDir],
+      missionState: {
+        mission_id: `${missionId}-RESTRICTED-SKILL`,
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        execution_mode: 'local',
+        priority: 3,
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      },
+    });
+
+    expect(pack.skill_resources?.map((resource) => resource.name)).toEqual([
+      'allowed-context-skill',
+    ]);
+    expect(renderMissionContextPack(pack)).not.toContain('mock-malicious-skill');
+  });
+
   it('builds a scoped role-specific pack with traceable sources', () => {
     const pack = makePack();
 

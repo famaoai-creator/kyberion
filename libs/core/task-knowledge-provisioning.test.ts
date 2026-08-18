@@ -299,6 +299,11 @@ describe('provisionTaskKnowledge', () => {
 
       const expectedPath = `${missionPath}/coordination/context-packs/${pack.context_pack_id}.json`;
       expect(result.missionContextPackPath).toBe(expectedPath);
+      expect(result.promptVisibilityRecord).toMatchObject({
+        mission_id: pack.mission.mission_id,
+        context_pack_id: pack.context_pack_id,
+        form: 'pack',
+      });
       expect(safeExistsSync(expectedPath)).toBe(true);
       const saved = JSON.parse(safeReadFile(expectedPath, { encoding: 'utf8' }) as string);
       expect(saved.context_pack_id).toBe(pack.context_pack_id);

@@ -8,6 +8,7 @@
  */
 
 import { logger } from './core.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 import type { IntentBody } from './intent-delta.js';
 import {
   listDemotedProviders,
@@ -34,7 +35,9 @@ export interface IntentExtractorCandidate {
 }
 
 function normalizeProviderName(value?: string): string | null {
-  const provider = String(value || '').trim().toLowerCase();
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase();
   return provider || null;
 }
 
@@ -86,25 +89,39 @@ export function buildFailoverIntentExtractor(
   return new FailoverIntentExtractor(candidates);
 }
 
-let registered: IntentExtractor | null = null;
+const intentExtractorSeam = defineSeam<IntentExtractor>({
+  key: 'intent-extractor',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+let registeredDisposer: (() => void) | null = null;
 
-export function registerIntentExtractor(extractor: IntentExtractor): void {
-  registered = extractor;
+export function registerIntentExtractor(extractor: IntentExtractor): () => void {
+  if (!extractor || typeof extractor.name !== 'string' || !extractor.name.trim()) {
+    throw new TypeError('Intent extractor must have a non-empty name');
+  }
+  registeredDisposer = intentExtractorSeam.register(extractor.name, extractor, {
+    provenance: 'builtin',
+    source: 'intent-extractor',
+  });
+  return registeredDisposer;
 }
 
 export function getIntentExtractor(): IntentExtractor {
-  return registered ?? stubIntentExtractor;
+  return intentExtractorSeam.getOptional() ?? stubIntentExtractor;
 }
 
 export function resetIntentExtractor(): void {
-  registered = null;
+  registeredDisposer?.();
+  registeredDisposer = null;
 }
 
 function summarizeGoal(text: string): string {
-  const firstLine = text
-    .split(/\r?\n/u)
-    .map((l) => l.trim())
-    .filter(Boolean)[0] ?? text.trim();
+  const firstLine =
+    text
+      .split(/\r?\n/u)
+      .map((l) => l.trim())
+      .filter(Boolean)[0] ?? text.trim();
   if (firstLine.length <= 200) return firstLine;
   return `${firstLine.slice(0, 197)}...`;
 }
@@ -123,9 +140,7 @@ export const stubIntentExtractor: IntentExtractor = {
       return { goal: '(no utterance)' };
     }
     const stakeholders = Array.from(
-      new Set(
-        (input.text.match(/@[A-Za-z0-9_\-.]+/gu) ?? []).map((m) => m.slice(1)),
-      ),
+      new Set((input.text.match(/@[A-Za-z0-9_\-.]+/gu) ?? []).map((m) => m.slice(1)))
     );
     const body: IntentBody = { goal: summarizeGoal(input.text) };
     if (stakeholders.length > 0) body.stakeholders = stakeholders;

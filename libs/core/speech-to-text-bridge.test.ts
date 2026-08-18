@@ -67,17 +67,27 @@ describe('speech-to-text-bridge', () => {
   it('stub throws when no sidecar is present', async () => {
     fs.writeFileSync(path.join(tmpDir, 'call.wav'), 'fake-audio');
     await expect(stubSpeechToTextBridge.transcribe({ audioPath: 'call.wav' })).rejects.toThrow(
-      /no transcript backend/u,
+      /no transcript backend/u
     );
   });
 
   it('resolves a registered bridge', () => {
     const fake: SpeechToTextBridge = {
       name: 'fake',
-      transcribe: async () => ({ text: 'x', backend: 'fake', started_at: new Date().toISOString() } as any),
+      transcribe: async () =>
+        ({ text: 'x', backend: 'fake', started_at: new Date().toISOString() }) as any,
     };
     registerSpeechToTextBridge(fake);
     expect(getSpeechToTextBridge().name).toBe('fake');
+  });
+
+  it('rejects duplicate names in the named seam', () => {
+    const fake: SpeechToTextBridge = {
+      name: 'duplicate',
+      transcribe: async () => ({ text: 'x', backend: 'duplicate' }),
+    };
+    registerSpeechToTextBridge(fake);
+    expect(() => registerSpeechToTextBridge(fake)).toThrow(/already registered/);
   });
 
   it('exposes timestamp capability for a timestamped backend', () => {
@@ -99,7 +109,11 @@ describe('speech-to-text-bridge', () => {
   });
 
   it('keeps multiple registered bridges available for capability-based selection', () => {
-    registerSpeechToTextBridge({ name: 'plain', priority: 1, transcribe: async () => ({ text: 'plain', backend: 'plain' }) });
+    registerSpeechToTextBridge({
+      name: 'plain',
+      priority: 1,
+      transcribe: async () => ({ text: 'plain', backend: 'plain' }),
+    });
     registerSpeechToTextBridge({
       name: 'timestamped',
       priority: 2,
@@ -117,7 +131,7 @@ describe('speech-to-text-bridge', () => {
   it('downgrades a falsely declared timestamp capability when no valid segments are returned', () => {
     const result = normalizeSpeechToTextResult(
       { name: 'bad-backend', capabilities: { timestamps: true, granularity: 'segment' } },
-      { text: 'x', backend: 'bad-backend', segments: [{ start_sec: -1, end_sec: 0, text: 'x' }] },
+      { text: 'x', backend: 'bad-backend', segments: [{ start_sec: -1, end_sec: 0, text: 'x' }] }
     );
     expect(result.capabilities).toEqual({ timestamps: false, granularity: 'none' });
     expect(result.segments).toEqual([]);

@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check dependency pinning and install-script policy
+        run: |
+          pnpm run check:pinned-deps
+          pnpm run check:install-script-allowlist
+          pnpm run check:lockfile-commit-gate
+
       - name: Build @agent/core
         run: pnpm --filter '@agent/core' build
 
@@ -48,6 +54,19 @@ jobs:
 
       - name: Build project
         run: pnpm run build
+
+      # These checkers import @agent/core through its package entrypoint.
+      # Run them after the build so fresh runners have dist/index.js.
+      - name: Check operation preflight and seam bindings
+        run: |
+          pnpm run check:op-preflight-coverage
+          pnpm run check:extension-order
+          pnpm run check:design-ledger
+          pnpm run check:module-invariants
+          pnpm run check:seam-multiplicity
+          pnpm run check:capability-seams
+          pnpm run check:capability-seams-ast
+          pnpm run check:reasoning-provider-registry
 
       - name: Type check
         run: pnpm run typecheck

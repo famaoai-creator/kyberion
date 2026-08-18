@@ -25,7 +25,7 @@
       "role": "sink",
       "op": "system:shell",
       "params": {
-        "cmd": "git add ."
+        "cmd": "git add -- $(git diff --name-only --diff-filter=ACMRTUXB)"
       }
     },
     {
@@ -52,11 +52,7 @@
       "produces": { "channel": "pr_creation_result", "type": "ShellResult" },
       "params": {
         "command": "gh",
-        "args": [
-          "pr", "create",
-          "--title", "{{pr_title}}",
-          "--body", "{{pr_body}}"
-        ]
+        "args": ["pr", "create", "--title", "{{pr_title}}", "--body", "{{pr_body}}"]
       }
     },
     {
@@ -82,7 +78,8 @@
             "params": {
               "command": "gh",
               "args": [
-                "pr", "merge",
+                "pr",
+                "merge",
                 "{{pr_creation_result.stdout}}",
                 "--merge",
                 "--delete-branch"

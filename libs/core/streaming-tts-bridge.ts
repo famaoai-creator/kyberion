@@ -15,6 +15,7 @@
 
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import { executeServicePreset } from './service-engine.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 export interface StreamingTextToSpeechBridge {
   readonly bridge_id: string;
@@ -103,13 +104,31 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
   }
 }
 
-const _streamingTtsRegistry = new Map<string, () => StreamingTextToSpeechBridge>();
+const streamingTtsSeam = defineSeam<() => StreamingTextToSpeechBridge>({
+  key: 'streaming-tts-bridge',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const streamingTtsDisposers = new Map<string, () => void>();
 
 export function registerStreamingTtsBridge(
   id: string,
   factory: () => StreamingTextToSpeechBridge
-): void {
-  _streamingTtsRegistry.set(id, factory);
+): () => void {
+  const seamDispose = streamingTtsSeam.register(id, factory, {
+    provenance: 'builtin',
+    source: 'streaming-tts-bridge',
+  });
+  const dispose = () => {
+    seamDispose();
+    if (streamingTtsDisposers.get(id) === dispose) streamingTtsDisposers.delete(id);
+  };
+  streamingTtsDisposers.set(id, dispose);
+  return dispose;
+}
+
+export function resetStreamingTtsBridges(): void {
+  for (const dispose of [...streamingTtsDisposers.values()]) dispose();
 }
 
 export function getStreamingTtsBridge(
@@ -117,7 +136,7 @@ export function getStreamingTtsBridge(
 ): StreamingTextToSpeechBridge {
   if (id === 'stub') return new StubStreamingTextToSpeechBridge();
   if (id === 'gemini') return new GeminiStreamingTextToSpeechBridge();
-  const factory = _streamingTtsRegistry.get(id);
+  const factory = streamingTtsSeam.getOptional(id);
   if (!factory) throw new Error(`[streaming-tts] unknown bridge id '${id}'`);
   return factory();
 }

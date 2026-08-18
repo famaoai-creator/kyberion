@@ -45,6 +45,9 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
+  formatWireError,
+  runOpPreflight,
+  ensureDefaultOpPreflight,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { recordHumanKnowledgeFeedback } from '@agent/core';
@@ -236,6 +239,7 @@ function registerGovernedTool(
 ): void {
   server.tool(name, description, schema, async (args: any) => {
     try {
+      ensureDefaultOpPreflight();
       const entry = catalogEntry(catalog, name);
       const context = resolveMcpRequestContext({
         requested_tenant: typeof args?.tenant === 'string' ? args.tenant : undefined,
@@ -254,10 +258,35 @@ function registerGovernedTool(
         throw new Error(`[MCP_TIER_DENIED] tier '${requestedTier}' is not allowed for ${name}`);
       }
       assertMcpCallerRole(context, entry.allowed_caller_roles!, name);
-      return await handler(args);
+      const preflight = await runOpPreflight({
+        op: name,
+        params: args as Record<string, unknown>,
+        context: context as unknown as Record<string, unknown>,
+        source: 'mcp',
+        // Approval-gated MCP tools perform their scope-bound approval check
+        // inside the handler; do not duplicate that check before its payload
+        // hash and exact scope are available.
+        requiresApproval: entry.requires_approval === true,
+        approvalGranted: entry.requires_approval === true,
+      });
+      if (preflight.decision !== 'allow') {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: formatWireError(
+                new Error(preflight.reason || `MCP operation ${name} was not admitted`),
+                'MCP operation blocked'
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+      return await handler(preflight.input);
     } catch (err) {
       return {
-        content: [{ type: 'text' as const, text: `MCP tool access denied: ${err}` }],
+        content: [{ type: 'text' as const, text: formatWireError(err, 'MCP tool request failed') }],
         isError: true,
       };
     }
@@ -451,6 +480,22 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
   return results;
 }
 
+function searchCapabilities(
+  query: string,
+  maxResults: number
+): { actuator: string; ops: string[] }[] {
+  const normalizedQuery = String(query || '')
+    .trim()
+    .toLowerCase();
+  if (!normalizedQuery) return [];
+  return listCapabilities()
+    .filter((capability) => {
+      const haystack = `${capability.actuator} ${capability.ops.join(' ')}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    })
+    .slice(0, Math.max(1, Math.min(20, Math.floor(maxResults) || 5)));
+}
+
 function getMissionStatus(missionId: string, tenant: string): string {
   return safeExec(
     'node',
@@ -619,7 +664,9 @@ export function createKyberionMcpServer(): McpServer {
         };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Error listing pipelines: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Error listing pipelines') },
+          ],
           isError: true,
         };
       }
@@ -710,7 +757,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Pipeline execution failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Pipeline execution failed') },
+          ],
           isError: true,
         };
       }
@@ -775,7 +824,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Knowledge search failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Knowledge search failed') },
+          ],
           isError: true,
         };
       }
@@ -797,7 +848,34 @@ export function createKyberionMcpServer(): McpServer {
         };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Failed to list capabilities: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Failed to list capabilities') },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── kyberion.capability.search (PI-17 deferred tool discovery) ────────────
+  registerGovernedTool(
+    server,
+    catalog,
+    'kyberion.capability.search',
+    'Search governed actuator capability descriptions before loading an additional tool surface.',
+    {
+      query: z.string().min(1).describe('Capability or operation to search for'),
+      max_results: z.number().int().min(1).max(20).optional().default(5),
+    },
+    async ({ query, max_results }) => {
+      try {
+        const results = searchCapabilities(query, max_results ?? 5);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }] };
+      } catch (err) {
+        return {
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Failed to search capabilities') },
+          ],
           isError: true,
         };
       }
@@ -863,7 +941,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Service actuate failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Service actuate failed') },
+          ],
           isError: true,
         };
       }
@@ -918,7 +998,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Mission creation failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Mission creation failed') },
+          ],
           isError: true,
         };
       }
@@ -946,7 +1028,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Mission status query failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Mission status query failed') },
+          ],
           isError: true,
         };
       }
@@ -974,7 +1058,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Mission journal read failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Mission journal read failed') },
+          ],
           isError: true,
         };
       }
@@ -1016,7 +1102,9 @@ export function createKyberionMcpServer(): McpServer {
         };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Cowork delivery failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Cowork delivery failed') },
+          ],
           isError: true,
         };
       }
@@ -1036,7 +1124,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(packets, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Failed to list Cowork outbox: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Failed to list Cowork outbox') },
+          ],
           isError: true,
         };
       }
@@ -1086,7 +1176,7 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Knowledge sync failed: ${err}` }],
+          content: [{ type: 'text' as const, text: formatWireError(err, 'Knowledge sync failed') }],
           isError: true,
         };
       }
@@ -1110,7 +1200,12 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(pending, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Failed to list pending approvals: ${err}` }],
+          content: [
+            {
+              type: 'text' as const,
+              text: formatWireError(err, 'Failed to list pending approvals'),
+            },
+          ],
           isError: true,
         };
       }
@@ -1151,7 +1246,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Approval decision failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Approval decision failed') },
+          ],
           isError: true,
         };
       }
@@ -1207,7 +1304,7 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Audit export failed: ${err}` }],
+          content: [{ type: 'text' as const, text: formatWireError(err, 'Audit export failed') }],
           isError: true,
         };
       }
@@ -1257,7 +1354,9 @@ export function createKyberionMcpServer(): McpServer {
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
-          content: [{ type: 'text' as const, text: `Audit verification failed: ${err}` }],
+          content: [
+            { type: 'text' as const, text: formatWireError(err, 'Audit verification failed') },
+          ],
           isError: true,
         };
       }

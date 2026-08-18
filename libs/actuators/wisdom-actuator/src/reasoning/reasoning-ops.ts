@@ -1,6 +1,7 @@
 import {
   getReasoningBackend,
   requestPeerAdvice,
+  renderDeferredToolAnnouncement,
   type GenerateWithToolsResult,
   type PeerAdviceResult,
   type ReasoningCallOptions,
@@ -85,6 +86,10 @@ export interface ReasoningLoopInput {
   goal: string;
   maxSteps: number;
   tools: ToolDefinition[];
+  /** PI-17: governed catalog lookup for provider-native deferred references. */
+  toolSearch?: (query: string) => Promise<readonly ToolDefinition[]> | readonly ToolDefinition[];
+  /** PI-17: role used to filter discovered tools before promotion. */
+  toolRole?: string;
 }
 
 export interface ReasoningLoopStep {
@@ -102,17 +107,27 @@ export interface ReasoningLoopResult {
 export async function runReasoningLoop(input: ReasoningLoopInput): Promise<ReasoningLoopResult> {
   const backend = getReasoningBackend();
   const history: ReasoningLoopStep[] = [];
+  const activeTools = [...input.tools];
+  let promotedAnnouncement: string | null = null;
   let finalAnswer = '';
 
   for (let step = 0; step < input.maxSteps; step++) {
     const historyText = history.map((entry) => `[${entry.role}] ${entry.content}`).join('\n');
-    const prompt =
+    const prompt = [
       `Goal: ${input.goal}\n\nHistory:\n${historyText || '(none yet)'}\n\n` +
-      'Think step by step. Either produce FINAL ANSWER: <answer> or describe the next concrete action needed.';
+        'Think step by step. Either produce FINAL ANSWER: <answer> or describe the next concrete action needed.',
+      promotedAnnouncement,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join('\n\n');
 
     const response =
-      input.tools.length > 0 && backend.generateWithTools
-        ? await backend.generateWithTools(prompt, input.tools)
+      activeTools.length > 0 && backend.generateWithTools
+        ? await backend.generateWithTools(
+            prompt,
+            activeTools,
+            input.toolRole ? { role: input.toolRole } : undefined
+          )
         : { text: await backend.prompt(prompt) };
     const responseText = response.text || '';
     history.push({ role: 'thought', content: responseText });
@@ -126,6 +141,56 @@ export async function runReasoningLoop(input: ReasoningLoopInput): Promise<Reaso
         role: 'observation',
         content: `Tool "${call.name}" → ${JSON.stringify(call.input)}`,
       });
+    }
+
+    // PI-17: a provider-native reference is only a catalog query. Resolve it
+    // through the governed callback and add schemas at the next loop boundary.
+    // The current request has already completed, so its stable tool prefix is
+    // never mutated in place.
+    if (response.deferredToolReferences?.length && input.toolSearch) {
+      const promoted: ToolDefinition[] = [];
+      for (const reference of response.deferredToolReferences) {
+        const query = String(reference || '').trim();
+        if (!query) continue;
+        const discovered = await input.toolSearch(query);
+        if (!Array.isArray(discovered)) {
+          throw new Error('[TOOL_SEARCH_INVALID_RESULT] catalog callback must return an array.');
+        }
+        for (const tool of discovered) {
+          const name = String(tool?.name || '').trim();
+          if (!name || !tool.description || !tool.inputSchema) {
+            throw new Error('[TOOL_SEARCH_INVALID_RESULT] discovered tool is incomplete.');
+          }
+          if (
+            input.toolRole &&
+            tool.allowed_roles?.length &&
+            !tool.allowed_roles.includes(input.toolRole)
+          ) {
+            throw new Error(
+              `[TOOL_SEARCH_ROLE_DENIED] role "${input.toolRole}" cannot access tool "${name}".`
+            );
+          }
+          const existing = activeTools.find((candidate) => candidate.name === name);
+          if (existing) {
+            if (JSON.stringify(existing) !== JSON.stringify(tool)) {
+              throw new Error(
+                `[TOOL_SEARCH_DUPLICATE] tool "${name}" has conflicting definitions.`
+              );
+            }
+            continue;
+          }
+          const normalized = { ...tool, name };
+          activeTools.push(normalized);
+          promoted.push(normalized);
+        }
+      }
+      promotedAnnouncement = renderDeferredToolAnnouncement(promoted);
+      if (promoted.length > 0) {
+        history.push({
+          role: 'observation',
+          content: `Deferred tools promoted for the next turn: ${promoted.map((tool) => tool.name).join(', ')}`,
+        });
+      }
     }
   }
 

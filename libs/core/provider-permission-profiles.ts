@@ -1,4 +1,5 @@
 import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import { resolveSandboxPolicy } from './sandbox-policy.js';
 
 /**
  * Provider-neutral permission projection + child-process env minimization
@@ -162,8 +163,7 @@ export function resolveProviderPermissionArgs(
   // Validates the tier exists at all; throws SUBAGENT_PROFILE_UNKNOWN otherwise.
   const profile = getSubagentCapabilityProfile(profileName);
   const row = (PROVIDER_PERMISSION_MATRIX as Record<string, unknown>)[profile.name] as
-    | Readonly<Record<ProviderId, ProviderPermissionResolution>>
-    | undefined;
+    Readonly<Record<ProviderId, ProviderPermissionResolution>> | undefined;
   if (!row) {
     return refused(
       `No provider permission mapping is registered for KD-05 tier "${profile.name}". ` +
@@ -176,6 +176,17 @@ export function resolveProviderPermissionArgs(
       `No provider permission mapping is registered for tier "${profile.name}" × provider "${provider}". ` +
         'Fail-closed: refusing delegation until a mapping is added to PROVIDER_PERMISSION_MATRIX.'
     );
+  }
+  // DH-11: an advertised CLI flag is not enough to claim a full sandbox.
+  // agy has no verified read-only filesystem mode, so its explorer mapping
+  // must refuse rather than silently presenting a partial policy as safe.
+  if (profile.name === 'explorer' && provider === 'agy' && resolution.kind === 'ok') {
+    const policy = resolveSandboxPolicy({ provider: 'agy', mode: 'read-only' });
+    if (policy.enforcement !== 'full') {
+      return refused(
+        `Provider "agy" cannot satisfy the explorer read-only sandbox contract: ${policy.enforcement_reason}`
+      );
+    }
   }
   return resolution;
 }

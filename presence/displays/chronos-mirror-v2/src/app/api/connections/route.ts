@@ -89,11 +89,8 @@ export async function POST(req: NextRequest) {
       err instanceof Error &&
       /viewer tenant scope|invalid viewer tenant scope/u.test(err.message)
     ) {
-      return NextResponse.json({ error: err.message }, { status: 403 });
+      return viewerErrorResponse(err, 403);
     }
-    return NextResponse.json(
-      { error: err.message || 'Failed to review connection' },
-      { status: 500 }
-    );
+    return viewerErrorResponse(err, 500);
   }
 }

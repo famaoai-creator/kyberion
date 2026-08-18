@@ -1,8 +1,13 @@
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import {
+  compileSchemaFromPath,
+  pathResolver,
+  registerOpPreflightListener,
+  resetOpPreflight,
+} from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
@@ -72,6 +77,29 @@ describe('service-actuator handleAction', () => {
     delete process.env.MISSION_ID;
   });
 
+  afterEach(() => resetOpPreflight());
+
+  it('routes direct service execution through the shared preflight waterfall', async () => {
+    const seen: string[] = [];
+    registerOpPreflightListener({
+      id: 'service-actuator-test-observer',
+      run: (call) => {
+        seen.push(`${call.source}:${call.op}`);
+      },
+    });
+    mocks.executeServicePreset.mockResolvedValue({ ok: true });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'create_issue',
+      params: { owner: 'famaoai', repo: 'kyberion' },
+    });
+
+    expect(seen).toEqual(['actuator:service:preset:create_issue']);
+  });
+
   it('uses the manifest retry policy for service pipeline steps', async () => {
     mocks.executeServicePreset.mockResolvedValue({ ok: true });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
@@ -138,6 +166,89 @@ describe('service-actuator handleAction', () => {
       'secret-guard'
     );
     expect(result).toEqual({ ok: true });
+  });
+
+  it('records a canonical PRESET call when a recording session is attached', async () => {
+    mocks.executeServicePreset.mockResolvedValue({
+      number: 42,
+      html_url: 'https://example.invalid/42',
+    });
+    const { startServiceRecordingSession } = await import('@agent/core');
+    const session = startServiceRecordingSession({
+      target_name: 'Issue intake',
+      recording_id: 'svc-actuator-test',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'create_issue',
+      params: {
+        owner: 'famaoai',
+        repo: 'kyberion',
+        title: '{{input.title}}',
+      },
+      auth: 'secret-guard',
+      context: { service_recording_session_id: session.recording_id },
+    });
+
+    expect(session.toRecording().steps[0]).toMatchObject({
+      service_id: 'github',
+      action: 'create_issue',
+      result_summary: { kind: 'object', keys: ['number', 'html_url'] },
+    });
+  });
+
+  it('exposes side-effect-free Service Harness describe and plan actions', async () => {
+    const { handleAction } = await import('./index.js');
+
+    const descriptor = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'describe',
+      params: { detail: false },
+    });
+    expect(descriptor).toMatchObject({
+      kind: 'service-harness-descriptor.v1',
+      service_id: 'github',
+    });
+
+    const plan = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'plan',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion' },
+      },
+    });
+    expect(plan).toMatchObject({
+      kind: 'service-operation-plan.v1',
+      service_id: 'github',
+      action: 'create_issue',
+      valid: false,
+      approval_required: true,
+    });
+
+    const receipt = await handleAction({
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'receipt',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion', access_token: 'hidden' },
+        result: { id: 42 },
+        error: 'token=hidden',
+      },
+    });
+    expect(receipt).toMatchObject({
+      kind: 'service-execution-receipt.v1',
+      status: 'succeeded',
+      inputs: { access_token: '[REDACTED]' },
+      error: 'token=[REDACTED]',
+    });
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 
   it('enforces an explicitly requested resource introduction before service execution', async () => {
@@ -379,6 +490,15 @@ describe('service-actuator handleAction', () => {
         args: ['-y', '@modelcontextprotocol/server-github'],
       },
     };
+    const harnessRequest = {
+      service_id: 'github',
+      mode: 'HARNESS',
+      action: 'plan',
+      params: {
+        operation: 'create_issue',
+        inputs: { owner: 'famaoai', repo: 'kyberion' },
+      },
+    };
     const pipelineRequest = {
       action: 'pipeline',
       context: {
@@ -408,6 +528,7 @@ describe('service-actuator handleAction', () => {
 
     expect(validate(directRequest), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(mcpRequest), JSON.stringify(validate.errors || [])).toBe(true);
+    expect(validate(harnessRequest), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(pipelineRequest), JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

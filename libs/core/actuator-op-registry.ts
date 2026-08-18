@@ -2,8 +2,32 @@ import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { suggestClosestStrings } from './op-suggestions.js';
+import { loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
 
 export type PipelineStepType = 'capture' | 'transform' | 'apply' | 'control';
+
+export interface ResolvedActuatorOperation {
+  domain: string;
+  action: string;
+  actuatorId: string;
+  modulePath: string;
+  stepType: PipelineStepType;
+  source: 'actuator-op-registry' | 'plugin';
+  manifestPath: string;
+  /** Governed per-operation budget, when the op definition declares one. */
+  timeoutMs?: number;
+  pluginId?: string;
+  handler?: ActuatorOperationHandler;
+}
+
+export type ActuatorOperationHandler = (
+  op: string,
+  params: Record<string, unknown>,
+  context: Record<string, unknown>,
+  stepType: PipelineStepType,
+  trace?: unknown,
+  policy?: unknown
+) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 interface DomainOpRegistry {
   capture?: string[];
@@ -15,6 +39,7 @@ interface ActuatorOpRegistryFile {
   shared_capture_ops: string[];
   shared_transform_ops: string[];
   shared_apply_ops: string[];
+  operation_timeouts_ms?: Record<string, number>;
   domains: Record<string, DomainOpRegistry>;
 }
 
@@ -34,8 +59,78 @@ const DEFAULT_CONTROL_OPS = [
   'await_decision',
 ];
 
+const pluginOperations = new Map<string, ResolvedActuatorOperation>();
+
+export function registerPluginActuatorOperation(input: {
+  domain: string;
+  action: string;
+  stepType: Exclude<PipelineStepType, 'control'>;
+  pluginId: string;
+  modulePath: string;
+  handler: ActuatorOperationHandler;
+  timeoutMs?: number;
+}): () => void {
+  const domain = input.domain.trim();
+  const action = input.action.trim();
+  const pluginId = input.pluginId.trim();
+  if (!domain || !action || !pluginId || !input.modulePath.trim()) {
+    throw new Error(
+      '[OP_REGISTRY_PLUGIN_CONFIG] domain, action, pluginId, and modulePath are required'
+    );
+  }
+  const key = `${domain}:${action}`;
+  if (pluginOperations.has(key)) {
+    throw new Error(`[OP_REGISTRY_PLUGIN_CONFIG] duplicate plugin operation: ${key}`);
+  }
+  const resolved: ResolvedActuatorOperation = {
+    domain,
+    action,
+    actuatorId: pluginId,
+    modulePath: input.modulePath,
+    stepType: input.stepType,
+    source: 'plugin',
+    manifestPath: input.modulePath,
+    pluginId,
+    handler: input.handler,
+    ...(isValidTimeoutMs(input.timeoutMs) ? { timeoutMs: input.timeoutMs } : {}),
+  };
+  pluginOperations.set(key, resolved);
+  return () => {
+    if (pluginOperations.get(key) === resolved) pluginOperations.delete(key);
+  };
+}
+
+export function listPluginActuatorOperations(): readonly ResolvedActuatorOperation[] {
+  return [...pluginOperations.values()].sort((left, right) =>
+    `${left.domain}:${left.action}`.localeCompare(`${right.domain}:${right.action}`)
+  );
+}
+
+export function resetPluginActuatorOperationsForTests(): void {
+  pluginOperations.clear();
+}
+
 function unique(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function isValidTimeoutMs(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function operationTimeoutMs(domain: string, action: string): number | undefined {
+  const plugin = pluginOperations.get(`${domain}:${action}`);
+  if (plugin?.timeoutMs !== undefined) return plugin.timeoutMs;
+  const declared = loadActuatorOpRegistry().operation_timeouts_ms?.[`${domain}:${action}`];
+  return isValidTimeoutMs(declared) ? declared : undefined;
+}
+
+/** Return the declared budget without resolving/importing an actuator. */
+export function resolveActuatorOperationTimeout(
+  domain: string,
+  action: string
+): number | undefined {
+  return operationTimeoutMs(domain.trim(), action.trim());
 }
 
 function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): string[] {
@@ -62,6 +157,7 @@ function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
       shared_capture_ops: [],
       shared_transform_ops: [],
       shared_apply_ops: [],
+      operation_timeouts_ms: {},
       domains: {},
     };
     recordConfigFallback({
@@ -76,7 +172,13 @@ function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
 
 export function listKnownActuatorOps(domain: string, extraOps: string[] = []): string[] {
   const registry = loadActuatorOpRegistry();
-  return unique([...collectKnownOps(domain, registry), ...extraOps]);
+  return unique([
+    ...collectKnownOps(domain, registry),
+    ...listPluginActuatorOperations()
+      .filter((entry) => entry.domain === domain)
+      .map((entry) => entry.action),
+    ...extraOps,
+  ]);
 }
 
 export function buildUnknownActuatorOpError(
@@ -94,6 +196,8 @@ export function buildUnknownActuatorOpError(
 }
 
 export function determineActuatorStepType(domain: string, action: string): PipelineStepType {
+  const plugin = pluginOperations.get(`${domain}:${action}`);
+  if (plugin) return plugin.stepType;
   const { shared_capture_ops, shared_transform_ops, shared_apply_ops, domains } =
     loadActuatorOpRegistry();
   const registry = domains[domain];
@@ -108,6 +212,77 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   throw buildUnknownActuatorOpError(domain, action);
 }
 
+/**
+ * DH-05: resolve an operation through the governed op and manifest catalogs.
+ * The runner keeps a convention fallback for managed/legacy actuators, but
+ * callers can use this result to retain explicit registry provenance.
+ */
+export function resolveActuatorOperation(
+  domain: string,
+  action: string
+): ResolvedActuatorOperation | null {
+  const stepType = determineActuatorStepType(domain, action);
+  const plugin = pluginOperations.get(`${domain}:${action}`);
+  if (plugin) return plugin;
+  const expectedIds = new Set([`${domain}-actuator`, domain]);
+  const manifest = loadActuatorManifestCatalog().find((entry) => expectedIds.has(entry.n));
+  if (!manifest) return null;
+  const modulePath = resolveActuatorModulePath(manifest.n, manifest.entrypoint || 'src/index.js');
+  return {
+    domain,
+    action,
+    actuatorId: manifest.n,
+    modulePath,
+    stepType,
+    source: 'actuator-op-registry',
+    manifestPath: manifest.manifest_path,
+    ...(operationTimeoutMs(domain, action) !== undefined
+      ? { timeoutMs: operationTimeoutMs(domain, action) }
+      : {}),
+  };
+}
+
+/**
+ * Convert a manifest entrypoint to the only module path the pipeline may
+ * import. Manifest data is governed, but still validated at the import
+ * boundary so a malformed or tampered catalog cannot escape the actuator
+ * directory through `..` or an absolute path.
+ */
+export function resolveActuatorModulePath(actuatorId: string, entrypoint: string): string {
+  const id = actuatorId.trim();
+  const normalized = entrypoint.trim().replaceAll('\\', '/');
+  const segments = normalized.split('/');
+  if (
+    !id ||
+    !normalized ||
+    normalized.startsWith('/') ||
+    segments.some((segment) => segment === '..' || segment === '.')
+  ) {
+    throw new Error(`[OP_RESOLUTION_MANIFEST] invalid entrypoint for ${id || 'unknown actuator'}`);
+  }
+  const jsEntrypoint = normalized.replace(/\.[^./]+$/u, '.js');
+  return `dist/libs/actuators/${id}/${jsEntrypoint}`;
+}
+
 export function listRegisteredDomainOps(domain: string): DomainOpRegistry {
-  return loadActuatorOpRegistry().domains[domain] || {};
+  const declared = loadActuatorOpRegistry().domains[domain] || {};
+  const pluginOps = listPluginActuatorOperations().filter((entry) => entry.domain === domain);
+  const merge = (
+    stepType: Exclude<PipelineStepType, 'control'>,
+    declaredOps: string[] | undefined
+  ): string[] | undefined => {
+    const contributed = pluginOps
+      .filter((entry) => entry.stepType === stepType)
+      .map((entry) => entry.action);
+    const values = unique([...(declaredOps || []), ...contributed]);
+    return values.length > 0 ? values : undefined;
+  };
+  const capture = merge('capture', declared.capture);
+  const transform = merge('transform', declared.transform);
+  const apply = merge('apply', declared.apply);
+  return {
+    ...(capture ? { capture } : {}),
+    ...(transform ? { transform } : {}),
+    ...(apply ? { apply } : {}),
+  };
 }

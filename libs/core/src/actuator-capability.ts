@@ -11,6 +11,7 @@ import { pathResolver } from '../path-resolver.js';
 import * as path from 'path';
 import { safeExec, safeExistsSync, safeReadFile } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
+import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ActuatorCapability {
   op: string;
@@ -46,15 +47,24 @@ interface ManifestCapability {
   };
 }
 
-// Registry of capability probe functions
-const capabilityProbes = new Map<string, () => Promise<ActuatorCapability[]>>();
+export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
+
+const capabilityProbeSeam = defineSeam<ActuatorCapabilityProbe>({
+  key: 'actuator.capability-probe',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 let actuatorCatalogOrderCache: Map<string, number> | null = null;
 
 export function registerCapabilityProbe(
   actuatorId: string,
-  probe: () => Promise<ActuatorCapability[]>
-) {
-  capabilityProbes.set(actuatorId, probe);
+  probe: ActuatorCapabilityProbe,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/src/actuator-capability.ts',
+  }
+): () => void {
+  return capabilityProbeSeam.register(actuatorId, probe, metadata);
 }
 
 function loadActuatorCatalogOrder(): Map<string, number> {
@@ -188,7 +198,7 @@ export async function checkActuatorCapabilities(
   );
 
   // Run registered probe if exists
-  const probe = capabilityProbes.get(actuatorId);
+  const probe = capabilityProbeSeam.getOptional(actuatorId);
   if (probe) {
     const probed = await probe();
     const probedOps = new Set(probed.map((capability) => capability.op));

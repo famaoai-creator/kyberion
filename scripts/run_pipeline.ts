@@ -38,6 +38,8 @@ import {
   resolveStepReasoningRoute,
   runFeedbackLoop,
   determineActuatorStepType,
+  resolveActuatorOperation,
+  resolveActuatorOperationTimeout,
   getSemanticDecideDegradations,
   appendSemanticDegradationRun,
   recordAdhocPipelineRun,
@@ -59,6 +61,7 @@ import {
   type AdfRunResult,
   type AdfSkippedStep,
   type ReasoningCallOptions,
+  type ReasoningPromptVisibilityContext,
   executeProgrammaticToolCall,
   getDefaultWorkerEventStream,
   getDefaultLifecycleHookEngine,
@@ -86,6 +89,8 @@ import {
   type GraphRunArtifact,
   assessPipelineDryRun,
 } from '@agent/core';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { z } from 'zod';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -559,9 +564,17 @@ interface RunStepsOptions {
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;
   quiet?: boolean;
+  /** Trusted execution-boundary signal for human-gated operations. */
+  hasHuman?: boolean;
   runJournal?: PipelineRunJournalHandle;
   resumeState?: PipelineRunJournalState;
   runId?: string;
+}
+
+function resolvePipelineHumanPresence(): boolean | undefined {
+  if (process.env.KYBERION_NON_INTERACTIVE === '1') return false;
+  if (process.stdin.isTTY && process.stdout.isTTY) return true;
+  return undefined;
 }
 
 class PipelineSuspendedError extends Error {
@@ -596,7 +609,15 @@ function resolveParamsRecursive(params: any, ctx: any): any {
 // an unwanted second dispatch attempt via the legacy direct-action fallback.
 class ActuatorStepFailedError extends Error {}
 
-async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
+async function loadActuatorDispatch(
+  domain: string,
+  resolvedOperation?: ReturnType<typeof resolveActuatorOperation>
+): Promise<DispatchFunc> {
+  if (resolvedOperation?.handler) {
+    const handler = resolvedOperation.handler;
+    return (op, params, ctx, type, trace, policy) =>
+      handler(op, params, ctx, type as any, trace, policy);
+  }
   if (dispatchCache[domain]) return dispatchCache[domain];
 
   if (domain === 'reasoning') {
@@ -622,10 +643,12 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           _trace
         );
         const facetNote = resolvePipelineFacetNote(params, ctx);
+        const promptVisibility = buildPipelinePromptVisibilityContext(ctx);
         const reasoningCallOptions = {
           effort: reasoningPolicy?.effort,
           budget: reasoningPolicy?.budget,
           ...routeOptions,
+          ...(promptVisibility ? { prompt_visibility: promptVisibility } : {}),
         };
         const runtimeNote = renderRuntimeInstructions(
           getReasoningRuntimeInstructions(backend, reasoningCallOptions)
@@ -724,7 +747,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
 
     try {
       if (!moduleCache[domain]) {
-        let entry = capabilityEntry(`${domain}-actuator`);
+        let entry = resolvedOperation
+          ? pathResolver.rootResolve(resolvedOperation.modulePath)
+          : capabilityEntry(`${domain}-actuator`);
         if (!safeExistsSync(entry)) {
           const directEntry = capabilityEntry(domain);
           if (safeExistsSync(directEntry)) {
@@ -1220,22 +1245,38 @@ function resolveEngineStepType(step: PipelineAdfStep): 'apply' | 'control' {
 }
 
 function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
-  return steps.map((step) => ({
-    ...step,
-    params: step.params || {},
-    type: resolveEngineStepType(step),
-    // The engine's native on_error handling reads step.on_error.fallback
-    // directly (bypassing this function), so fallback steps need their
-    // type resolved here too, or they hit the engine as untyped steps.
-    ...(step.on_error?.fallback
-      ? {
-          on_error: {
-            ...step.on_error,
-            fallback: prepareEngineSteps(step.on_error.fallback) as unknown as PipelineAdfStep[],
-          },
-        }
-      : {}),
-  })) as unknown as AdfStep[];
+  return steps.map((step) => {
+    const normalizedOp = normalizePipelineOp(step.op);
+    const [domain, action] = normalizedOp.split(':');
+    const declaredTimeoutMs =
+      domain && action ? resolveActuatorOperationTimeout(domain, action) : undefined;
+    const params = { ...(step.params || {}) };
+    // A caller-supplied budget remains authoritative.  The governed op
+    // declaration supplies a safe default so actuator-owned runners and
+    // system commands do not silently run without a budget.
+    if (declaredTimeoutMs !== undefined && params.timeout_ms === undefined) {
+      params.timeout_ms = declaredTimeoutMs;
+    }
+    return {
+      ...step,
+      params,
+      ...(declaredTimeoutMs !== undefined && step.timeout_ms === undefined
+        ? { timeout_ms: declaredTimeoutMs }
+        : {}),
+      type: resolveEngineStepType(step),
+      // The engine's native on_error handling reads step.on_error.fallback
+      // directly (bypassing this function), so fallback steps need their
+      // type resolved here too, or they hit the engine as untyped steps.
+      ...(step.on_error?.fallback
+        ? {
+            on_error: {
+              ...step.on_error,
+              fallback: prepareEngineSteps(step.on_error.fallback) as unknown as PipelineAdfStep[],
+            },
+          }
+        : {}),
+    };
+  }) as unknown as AdfStep[];
 }
 
 function parseFragmentJson(fragmentRaw: string, fragmentRef: string): any {
@@ -1281,10 +1322,12 @@ async function dispatchReasoningLeaf(
     undefined
   );
   const facetNote = resolvePipelineFacetNote(params, ctx);
+  const promptVisibility = buildPipelinePromptVisibilityContext(ctx);
   const reasoningCallOptions = {
     effort: stepPolicy.effort,
     budget: stepPolicy.budget,
     ...routeOptions,
+    ...(promptVisibility ? { prompt_visibility: promptVisibility } : {}),
   };
   const runtimeNote = renderRuntimeInstructions(
     getReasoningRuntimeInstructions(backend, reasoningCallOptions)
@@ -1337,6 +1380,29 @@ async function dispatchReasoningLeaf(
   const reasoningExportKey =
     typeof params.export_as === 'string' && params.export_as ? params.export_as : 'last_reasoning';
   return { ...ctx, [reasoningExportKey]: rawResponse };
+}
+
+/** DH-06: bind pipeline model visibility to the mission-local durable ledger. */
+function buildPipelinePromptVisibilityContext(
+  ctx: Record<string, unknown>
+): ReasoningPromptVisibilityContext | undefined {
+  const missionId = String(ctx.mission_id || process.env.MISSION_ID || '').trim();
+  if (!missionId) return undefined;
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return undefined;
+  const rawKnowledgeRefs = ctx.__knowledge_refs;
+  const knowledgeRefs = Array.isArray(rawKnowledgeRefs)
+    ? rawKnowledgeRefs.filter((value): value is string => typeof value === 'string')
+    : [];
+  return {
+    missionPath,
+    missionId,
+    ...(typeof ctx.task_id === 'string' ? { taskId: ctx.task_id } : {}),
+    ...(typeof ctx.context_pack_id === 'string' ? { contextPackId: ctx.context_pack_id } : {}),
+    knowledgeRefs,
+    source: 'run_pipeline',
+    form: 'pipeline_reasoning',
+  };
 }
 
 /**
@@ -1406,6 +1472,7 @@ async function dispatchLeafOp(
   opts: RunStepsOptions,
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
+  ensureDefaultOpPreflight();
   const normalizedOp = normalizePipelineOp(step.op);
   const [domain, action] = normalizedOp.split(':');
   const rawParams = (step.params || {}) as Record<string, unknown>;
@@ -1414,10 +1481,40 @@ async function dispatchLeafOp(
       ? step.produces
       : step.produces.channel
     : undefined;
-  const params =
+  let params =
     _producedChannel && !rawParams.export_as
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
+
+  const approvalGranted =
+    params._approval_granted === true ||
+    Object.values(ctx).some(
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        (value as Record<string, unknown>).status === 'approved'
+    );
+  const preflight = await runOpPreflight({
+    op: normalizedOp,
+    params,
+    context: ctx,
+    source: 'pipeline',
+    requiresApproval: step.budget?.approval_required === true,
+    approvalGranted,
+    ...(opts.hasHuman !== undefined ? { hasHuman: opts.hasHuman } : {}),
+  });
+  opts.trace?.addEvent('op.preflight', {
+    op: normalizedOp,
+    decision: preflight.decision,
+    listener_count: preflight.listener_ids.length,
+    guard_count: preflight.guard_ids.length,
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${normalizedOp} was not admitted.`}`
+    );
+  }
+  params = preflight.input;
 
   if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
     return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
@@ -1465,8 +1562,27 @@ async function dispatchLeafOp(
   }
   validatePipelineOpInput(domain, action, params);
   await assertPipelineStepCapabilityAvailable(domain, action);
+  const resolvedOperation = resolveActuatorOperation(domain, action);
+  if (opts.trace) {
+    opts.trace.addEvent('actuator.resolved', {
+      domain,
+      action,
+      ...(resolvedOperation
+        ? {
+            actuator_id: resolvedOperation.actuatorId,
+            module_path: resolvedOperation.modulePath,
+            manifest_path: resolvedOperation.manifestPath,
+            resolution_source: resolvedOperation.source,
+            ...(resolvedOperation.timeoutMs !== undefined
+              ? { timeout_ms: resolvedOperation.timeoutMs }
+              : {}),
+            ...(resolvedOperation.pluginId ? { plugin_id: resolvedOperation.pluginId } : {}),
+          }
+        : { resolution_source: 'filesystem-convention' }),
+    });
+  }
   const effectiveType = resolveStepType(step);
-  const dispatch = await loadActuatorDispatch(domain);
+  const dispatch = await loadActuatorDispatch(domain, resolvedOperation);
   const result = await dispatch(
     action,
     {
@@ -2542,20 +2658,33 @@ async function runStepsInternal(
         duration_ms: durationMs,
         ...(outcome.error ? { error: outcome.error } : {}),
       });
-      void fireLifecycleHooks(
-        getDefaultLifecycleHookEngine(),
-        outcome.status === 'failed' ? 'post_tool_use_failure' : 'post_tool_use',
-        {
-          matcher_value: normalizedOp,
-          op: normalizedOp,
-          status: outcome.status,
-          ...(outcome.error ? { error: outcome.error } : {}),
-        }
-      ).catch((error) => {
+      let postToolHookOutcome: { resultPatch: Record<string, unknown> };
+      try {
+        postToolHookOutcome = await fireLifecycleHooks(
+          getDefaultLifecycleHookEngine(),
+          outcome.status === 'failed' ? 'post_tool_use_failure' : 'post_tool_use',
+          {
+            matcher_value: normalizedOp,
+            op: normalizedOp,
+            status: outcome.status,
+            result: outcome,
+            ...(outcome.error ? { error: outcome.error } : {}),
+          }
+        );
+      } catch (error) {
         logger.error(
           `[LIFECYCLE_HOOK] post-tool hook telemetry failed: ${error instanceof Error ? error.message : String(error)}`
         );
-      });
+        postToolHookOutcome = { resultPatch: {} };
+      }
+      if (Object.keys(postToolHookOutcome.resultPatch).length > 0) {
+        ctx = { ...ctx, ...postToolHookOutcome.resultPatch };
+        lastKnownCtx = ctx;
+        opts.trace?.addEvent('tool.result_patched', {
+          ...stepTraceBase,
+          patch_keys: Object.keys(postToolHookOutcome.resultPatch).sort().join(','),
+        });
+      }
       if (!opts.quiet && (outcome.status === 'success' || outcome.status === 'failed')) {
         logger.info(
           `[step ${stepNumber}/${totalTopLevelSteps}] ${normalizedOp} ${outcome.status} in ${Math.round(durationMs / 1000)}s`
@@ -2946,6 +3075,8 @@ export async function main() {
   );
 
   let runJournal: PipelineRunJournalHandle | undefined;
+  let settledLifecycleHookEmitted = false;
+  let agentStartAdmitted = false;
   try {
     const stepsToRun = (pipeline.steps || []).map((step) => ({
       ...step,
@@ -2981,6 +3112,31 @@ export async function main() {
         `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
       );
     }
+    // PI-08: expose the governed agent-entry boundary before any pipeline
+    // step can reach a reasoning/model-backed operation. Only metadata is
+    // exposed here; prompt content remains at its ledgered call boundary.
+    const beforeAgentStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'before_agent_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        ...(missionId ? { mission_id: missionId } : {}),
+        systemPromptOptions: {
+          pipelineId,
+          ...(missionId ? { missionId } : {}),
+          promptVisibility: 'ledgered',
+          resumed: Boolean(resumeState),
+          stepCount: stepsToRun.length,
+        },
+      }
+    );
+    if (beforeAgentStart.blocked) {
+      throw new Error(
+        `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
+      );
+    }
+    agentStartAdmitted = true;
     // SA-04: declare the payload tier once, at the mission boundary, so every
     // reasoning call made anywhere inside this run inherits it. Annotating each
     // call site individually would be missed the first time someone adds a new
@@ -2998,6 +3154,7 @@ export async function main() {
         trace,
         pipelinePath: argv.input as string,
         quiet: argv.quiet as boolean,
+        hasHuman: resolvePipelineHumanPresence(),
         runJournal: activeRunJournal,
         resumeState,
         runId,
@@ -3013,25 +3170,42 @@ export async function main() {
             },
             runSteps
           );
+    const failed = result.results.find((entry) => entry.status === 'failed');
+    const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
+    const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
+    const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
+    // PI-08: settled is deliberately after fallback/repair work. It is a
+    // receipt point, not another execution gate, so a blocking hook is
+    // recorded but cannot retroactively change the completed result.
+    if (agentStartAdmitted && !settledLifecycleHookEmitted) {
+      settledLifecycleHookEmitted = true;
+      const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        status: pipelineStatus,
+        recovered,
+      });
+      if (settled.blocked) {
+        logger.warn(
+          `[PI-08] task_settled observer blocked after result was finalized: ${settled.reasons.join('; ')}`
+        );
+      }
+    }
     const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
       matcher_value: pipelineId,
       pipeline_id: pipelineId,
-      status: result.status,
+      status: pipelineStatus,
     });
     if (sessionEnd.blocked) {
       throw new Error(
         `[SAFETY_LIMIT][HOOK_BLOCKED] session_end blocked: ${sessionEnd.reasons.join('; ')}`
       );
     }
-    const failed = result.results.find((entry) => entry.status === 'failed');
-    const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
-    const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
     const persisted = finalizePipelineTrace(trace, recovered);
     result.context.trace_summary = persisted.trace.rootSpan.status;
     result.context.trace_persisted_path =
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
-    const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
     activeRunJournal.append('run_finished', { status: pipelineStatus });
     getDefaultWorkerEventStream().emit(
       'turn_end',
@@ -3122,6 +3296,21 @@ export async function main() {
     }
     const failure = formatPipelineFailure(err);
     const recovered = tryPermissionFallback(pipeline, failure, trace);
+    if (agentStartAdmitted && !settledLifecycleHookEmitted) {
+      settledLifecycleHookEmitted = true;
+      const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        status: recovered ? 'succeeded' : 'failed',
+        recovered,
+        error: err?.message ?? String(err),
+      });
+      if (settled.blocked) {
+        logger.warn(
+          `[PI-08] task_settled observer blocked after failure was finalized: ${settled.reasons.join('; ')}`
+        );
+      }
+    }
     getDefaultWorkerEventStream().emit(
       'turn_end',
       {

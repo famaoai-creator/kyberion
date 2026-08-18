@@ -26,6 +26,7 @@ type SupervisorMethod =
   | 'shutdown'
   | 'refresh'
   | 'restart'
+  | 'delegated_enqueue'
   | 'terminate';
 
 interface SupervisorRequest<T = Record<string, unknown>> {
@@ -114,6 +115,20 @@ export interface AgentRuntimeSupervisorAskPayload {
    * from an old client that omits it. No protocol version bump needed.
    */
   model_tier?: 'fast' | 'standard' | 'deep';
+}
+
+export interface DelegatedTaskSupervisorEnqueuePayload {
+  delegationId: string;
+  owner: string;
+  text: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface DelegatedTaskSupervisorEnqueueResult {
+  delegation_id: string;
+  entry_id: string;
+  resource_id: string;
+  pid?: number;
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
@@ -382,6 +397,20 @@ export async function restartAgentRuntimeViaDaemon(
     makeRequest('restart', payload),
     ENSURE_TIMEOUT_MS
   );
+}
+
+/**
+ * DH-12: enqueue a durable child-session input and ask the supervisor daemon
+ * to ensure exactly one cold-resume worker process owns the wake path.
+ */
+export async function enqueueDelegatedTaskViaSupervisor(
+  payload: DelegatedTaskSupervisorEnqueuePayload
+): Promise<DelegatedTaskSupervisorEnqueueResult> {
+  await ensureAgentRuntimeSupervisorDaemon();
+  return sendSupervisorRequest<
+    DelegatedTaskSupervisorEnqueuePayload,
+    DelegatedTaskSupervisorEnqueueResult
+  >(makeRequest('delegated_enqueue', payload), ENSURE_TIMEOUT_MS);
 }
 
 export function createSupervisorBackedAgentHandle(

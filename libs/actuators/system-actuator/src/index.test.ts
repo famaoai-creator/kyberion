@@ -20,6 +20,13 @@ const assertExecutionBounds = vi.fn(
     }
   }
 );
+const ensureDefaultOpPreflight = vi.fn();
+const runOpPreflight = vi.fn(async () => ({
+  decision: 'allow' as const,
+  input: {},
+  listener_ids: [],
+  guard_ids: [],
+}));
 const withinLoopBounds = vi.fn(
   (iteration: number, maxIterations?: number) =>
     iteration < (maxIterations ?? DEFAULT_MAX_LOOP_ITERATIONS)
@@ -926,6 +933,8 @@ vi.mock('@agent/core', () => ({
   DEFAULT_MAX_LOOP_ITERATIONS,
   derivePipelineStatus,
   executeAdfSteps,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
   resolveVars,
   evaluateCondition,
   getPathValue,
@@ -1088,6 +1097,52 @@ beforeEach(() => {
     })
   );
   restorePlatform();
+});
+
+describe('system-actuator reconcile admission', () => {
+  it('blocks direct reconcile before reading the strategy when preflight denies it', async () => {
+    const core = await import('@agent/core');
+    vi.mocked(core.runOpPreflight).mockResolvedValueOnce({
+      decision: 'block',
+      reason: 'test system admission denial',
+      terminate: true,
+      input: {},
+      listener_ids: ['test'],
+      guard_ids: [],
+    });
+
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: 'knowledge/product/governance/system-strategy.json',
+      })
+    ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test system admission denial');
+    expect(core.safeReadFile).not.toHaveBeenCalled();
+    expect(core.ensureDefaultOpPreflight).toHaveBeenCalled();
+  });
+
+  it('blocks computer interaction before invoking OS automation when preflight denies it', async () => {
+    const core = await import('@agent/core');
+    vi.mocked(core.runOpPreflight).mockResolvedValueOnce({
+      decision: 'block',
+      reason: 'test computer interaction denial',
+      terminate: true,
+      input: {},
+      listener_ids: ['test'],
+      guard_ids: [],
+    });
+
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: { type: 'left_click', coordinate: { x: 10, y: 20 } },
+      })
+    ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test computer interaction denial');
+    expect(core.clickAt).not.toHaveBeenCalled();
+  });
 });
 
 describe('system-actuator computer_interaction adapter', () => {

@@ -10,6 +10,8 @@ import {
   classifyError,
   retry,
   resolveShellAdapter,
+  runOpPreflight,
+  ensureDefaultOpPreflight,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -111,7 +113,19 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
   if ((input as any).kind === 'computer_interaction') {
     return await handleComputerInteraction(input as unknown as ComputerInteractionAction);
   }
-  const { action, params } = input;
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `terminal:${input.action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation terminal:${input.action} was not admitted.`}`
+    );
+  }
+  const action = input.action;
+  const params = preflight.input as TerminalAction['params'];
   const rootDir = pathResolver.rootDir();
 
   switch (action) {

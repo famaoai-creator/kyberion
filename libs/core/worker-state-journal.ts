@@ -40,6 +40,7 @@
  */
 
 import { z } from 'zod';
+import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -50,6 +51,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
+import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 import {
   demoteActiveOnResume,
   GOAL_CANCEL_SYSTEM_REMINDER,
@@ -117,9 +119,17 @@ export function appendValidatedJournalEvent<TEnvelope>(
     ts: (options.now ?? (() => new Date().toISOString()))(),
     payload: validated,
   });
-  ensureJournalDirectory(options.journalPath);
-  safeAppendFileSync(options.journalPath, `${JSON.stringify(envelope)}\n`);
-  return envelope;
+  const leasePath = path.join(path.dirname(options.journalPath), 'writer-lease.json');
+  return withFencedWriterLeaseSync({
+    resourceId: writerLeaseResourceId(leasePath),
+    ownerId: `process:${process.pid}`,
+    leasePath,
+    fn: () => {
+      ensureJournalDirectory(options.journalPath);
+      safeAppendFileSync(options.journalPath, `${JSON.stringify(envelope)}\n`);
+      return envelope;
+    },
+  });
 }
 
 /**

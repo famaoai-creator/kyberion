@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ChainSecretResolver,
+  describeSecretResolver,
   getSecretResolver,
   registerSecretResolver,
   resetSecretResolver,
   resolveSecretAsync,
+  resolveSecretReferenceAsync,
+  resolveSecretReferenceSync,
   resolveSecretSync,
   type SecretResolver,
 } from './secret-resolver.js';
@@ -24,6 +27,42 @@ describe('secret-resolver', () => {
     });
     expect(resolveSecretSync({ key: 'FOO' })).toBe('bar');
     expect(resolveSecretSync({ key: 'MISS' })).toBeNull();
+  });
+
+  it('passes an operation-scoped env reference and does not cache rotation', async () => {
+    const seen: string[] = [];
+    let value = 'before-rotation';
+    registerSecretResolver({
+      name: 'rotating',
+      resolve: (input) => {
+        seen.push(`${input.key}:${input.operation}`);
+        return value;
+      },
+      describe: () => ({ configured: true, writable: false }),
+    });
+    expect(resolveSecretReferenceSync({ env: 'SERVICE_TOKEN', operation: 'browser.login' })).toBe(
+      'before-rotation'
+    );
+    value = 'after-rotation';
+    await expect(
+      resolveSecretReferenceAsync({ env: 'SERVICE_TOKEN', operation: 'browser.login' })
+    ).resolves.toBe('after-rotation');
+    expect(seen).toEqual(['SERVICE_TOKEN:browser.login', 'SERVICE_TOKEN:browser.login']);
+    expect(describeSecretResolver()).toEqual({ configured: true, writable: false });
+  });
+
+  it('rejects references that are not env-name identifiers', () => {
+    registerSecretResolver({ name: 'mem', resolve: () => 'secret' });
+    expect(() => resolveSecretReferenceSync({ env: 'op://vault/item' })).toThrow(
+      'SECRET_REFERENCE_INVALID'
+    );
+  });
+
+  it('rejects a second sole resolver instead of silently replacing the first', () => {
+    registerSecretResolver({ name: 'first', resolve: () => 'first' });
+    expect(() => registerSecretResolver({ name: 'second', resolve: () => 'second' })).toThrow(
+      /already has provider first/
+    );
   });
 
   it('sync path returns null for async resolvers (async path handles them)', async () => {

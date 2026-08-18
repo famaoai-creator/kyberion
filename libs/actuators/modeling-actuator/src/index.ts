@@ -1,4 +1,10 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  pathResolver,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
@@ -15,6 +21,18 @@ import { runActuatorCli } from '@agent/core';
  */
 export async function handleAction(input: ModelingAction) {
   if (input.action === 'reconcile') {
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'modeling:reconcile',
+      params: input as unknown as Record<string, unknown>,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation modeling:reconcile was not admitted.'}`
+      );
+    }
+    input = { ...(input as any), ...preflight.input, action: 'reconcile' };
     return await performReconcile(input);
   }
   return await executePipeline(input.steps || [], input.context || {}, input.options);

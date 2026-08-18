@@ -80,6 +80,23 @@ describe('service-binding', () => {
       hasAccessToken: true,
       hasAppToken: true,
     });
+    expect(binding.secretReferences?.accessToken).toEqual([
+      {
+        env: 'SLACK_ACCESS_TOKEN',
+        scope: 'slack',
+        operation: 'service.binding',
+      },
+      {
+        env: 'SLACK_BOT_TOKEN',
+        scope: 'slack',
+        operation: 'service.binding',
+      },
+      {
+        env: 'SLACK_TOKEN',
+        scope: 'slack',
+        operation: 'service.binding',
+      },
+    ]);
   });
 
   it('resolves oauth-style service credentials for secret-guard mode', () => {

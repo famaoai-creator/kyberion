@@ -19,6 +19,8 @@ import {
   classifyError,
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
@@ -311,7 +313,24 @@ function buildRetryOptions(stepParams: Record<string, any>) {
  */
 async function handleAction(input: BrowserAction) {
   if ((input as any).kind === 'computer_interaction') {
-    return await browserInteractionHelpers.handleComputerInteraction(input as any);
+    ensureDefaultOpPreflight();
+    const interactionType = String((input as any).action?.type || 'unknown');
+    const preflight = await runOpPreflight({
+      op: `browser:computer_interaction:${interactionType}`,
+      params: input as unknown as Record<string, unknown>,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation browser:computer_interaction:${interactionType} was not admitted.`}`
+      );
+    }
+    const admitted = {
+      ...(input as unknown as Record<string, unknown>),
+      ...preflight.input,
+      kind: 'computer_interaction',
+    };
+    return await browserInteractionHelpers.handleComputerInteraction(admitted as any);
   }
   if (input.action !== 'pipeline') {
     throw new Error(

@@ -23,6 +23,9 @@ export interface EnsureMissionTeamRuntimeOptions {
   missionId: string;
   teamRoles?: string[];
   scope?: EventScopeInput;
+  /** Stable supervisor/process identity used by runtime ownership records. */
+  runtimeOwnerId?: string;
+  runtimeOwnerType?: string;
 }
 
 function isReady(
@@ -42,6 +45,8 @@ export async function ensureMissionTeamRuntime(
   const missionId = typeof input === 'string' ? input : input.missionId;
   const teamRoles = typeof input === 'string' ? undefined : input.teamRoles;
   const requestedScope = typeof input === 'string' ? undefined : input.scope;
+  const runtimeOwnerId = typeof input === 'string' ? undefined : input.runtimeOwnerId;
+  const runtimeOwnerType = typeof input === 'string' ? undefined : input.runtimeOwnerType;
   const requestedRoles = teamRoles ? new Set(teamRoles) : null;
 
   const plan = loadMissionTeamPlan(missionId);
@@ -109,6 +114,8 @@ export async function ensureMissionTeamRuntime(
             : {}),
         },
         requestedBy: 'mission_team_orchestrator',
+        ...(runtimeOwnerId ? { runtimeOwnerId } : {}),
+        ...(runtimeOwnerType ? { runtimeOwnerType } : {}),
       };
       try {
         await ensureAgentRuntimeViaDaemon(spawnPayload);

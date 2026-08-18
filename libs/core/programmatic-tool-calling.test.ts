@@ -93,6 +93,33 @@ describe('programmatic-tool-calling', () => {
     expect(events).toEqual([{ op: 'system:write_file', status: 'denied' }]);
   });
 
+  it('reports repeat advice without exposing raw arguments', async () => {
+    const repeats: Array<{ repeat_count: number; advice?: string }> = [];
+    const events: Array<{ status: string; repeat_count?: number }> = [];
+    await expect(
+      executeProgrammaticToolCall({
+        runner: sourceRunner(),
+        request: {
+          code: `
+            await callOp('system:read_file', { path: 'secret/path', content: 'hidden' });
+            await callOp('system:read_file', { path: 'secret/path', content: 'hidden' });
+            await callOp('system:read_file', { path: 'secret/path', content: 'hidden' });
+          `,
+          allowed_ops: ['system:read_file'],
+          granted_ops: ['system:read_file'],
+        },
+        invoke: async () => null,
+        on_repeat: (observation) =>
+          repeats.push({ repeat_count: observation.repeat_count, advice: observation.advice }),
+        on_call: (event) => events.push({ status: event.status, repeat_count: event.repeat_count }),
+      })
+    ).resolves.toMatchObject({ calls: 3 });
+    expect(repeats).toHaveLength(1);
+    expect(repeats[0]?.repeat_count).toBe(3);
+    expect(repeats[0]?.advice).not.toContain('secret/path');
+    expect(events.map((event) => event.repeat_count)).toEqual([1, 1, 2, 2, 3, 3]);
+  });
+
   it('stops at the call limit and reports the bounded failure', async () => {
     await expect(
       executeProgrammaticToolCall({

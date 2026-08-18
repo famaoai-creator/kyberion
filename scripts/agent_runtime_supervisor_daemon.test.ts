@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
@@ -14,9 +15,15 @@ const mocks = vi.hoisted(() => ({
   refreshAgentRuntime: vi.fn(),
   restartAgentRuntime: vi.fn(),
   stopAgentRuntime: vi.fn(),
+  enqueueDelegatedTaskInbox: vi.fn(),
+  hasPendingDelegatedTaskInbox: vi.fn(),
+  loadDelegatedTaskRecord: vi.fn(),
+  recordDelegatedTaskActivationFailure: vi.fn(),
+  spawnDelegatedTaskWorkerProcess: vi.fn(),
   recordDaemonHeartbeat: vi.fn(),
   runtimeSupervisor: {
     touch: vi.fn(),
+    get: vi.fn(),
   },
   sendOpsAlert: vi.fn(),
   appendSupervisorEvent: vi.fn(),
@@ -40,6 +47,11 @@ vi.mock('@agent/core', async () => {
     refreshAgentRuntime: mocks.refreshAgentRuntime,
     restartAgentRuntime: mocks.restartAgentRuntime,
     stopAgentRuntime: mocks.stopAgentRuntime,
+    enqueueDelegatedTaskInbox: mocks.enqueueDelegatedTaskInbox,
+    hasPendingDelegatedTaskInbox: mocks.hasPendingDelegatedTaskInbox,
+    loadDelegatedTaskRecord: mocks.loadDelegatedTaskRecord,
+    recordDelegatedTaskActivationFailure: mocks.recordDelegatedTaskActivationFailure,
+    spawnDelegatedTaskWorkerProcess: mocks.spawnDelegatedTaskWorkerProcess,
     recordDaemonHeartbeat: mocks.recordDaemonHeartbeat,
     runtimeSupervisor: mocks.runtimeSupervisor,
     sendOpsAlert: mocks.sendOpsAlert,
@@ -127,6 +139,16 @@ describe('agent_runtime_supervisor_daemon', () => {
       },
     ]);
     mocks.listAgentRuntimeSnapshots.mockReturnValue([mocks.getAgentRuntimeSnapshot()]);
+    mocks.runtimeSupervisor.get.mockReturnValue(undefined);
+    mocks.enqueueDelegatedTaskInbox.mockResolvedValue({ id: 'entry-1' });
+    mocks.hasPendingDelegatedTaskInbox.mockResolvedValue(false);
+    mocks.loadDelegatedTaskRecord.mockReturnValue({ activation_count: 0 });
+    const child = new EventEmitter() as EventEmitter & { pid?: number };
+    child.pid = 4321;
+    mocks.spawnDelegatedTaskWorkerProcess.mockReturnValue({
+      resourceId: 'delegated-task-worker:child-1',
+      child,
+    });
   });
 
   afterEach(async () => {
@@ -184,6 +206,84 @@ describe('agent_runtime_supervisor_daemon', () => {
       ok: true,
       result: { text: 'daemon-ask' },
     });
+  }, 90000);
+
+  it('enqueues a durable child input before spawning its supervised worker', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    await expect(
+      sendRequest(socketPath, {
+        id: 'delegated-1',
+        method: 'delegated_enqueue',
+        payload: {
+          delegationId: 'child-1',
+          owner: 'owner-1',
+          text: 'continue from the persisted checkpoint',
+          metadata: { source: 'surface', attempt: 1 },
+        },
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        delegation_id: 'child-1',
+        entry_id: 'entry-1',
+        resource_id: 'delegated-task-worker:child-1',
+        pid: 4321,
+      },
+    });
+    expect(mocks.enqueueDelegatedTaskInbox).toHaveBeenCalledWith('child-1', {
+      text: 'continue from the persisted checkpoint',
+      requestedBy: 'owner-1',
+      metadata: { source: 'surface', attempt: 1 },
+      wake: false,
+    });
+    expect(mocks.spawnDelegatedTaskWorkerProcess).toHaveBeenCalledWith('child-1', 'owner-1');
+  }, 90000);
+
+  it('restarts a worker that exits while its durable inbox is still pending', async () => {
+    const firstChild = new EventEmitter() as EventEmitter & { pid?: number };
+    const secondChild = new EventEmitter() as EventEmitter & { pid?: number };
+    firstChild.pid = 5001;
+    secondChild.pid = 5002;
+    mocks.enqueueDelegatedTaskInbox.mockResolvedValue({ id: 'entry-crash' });
+    mocks.hasPendingDelegatedTaskInbox.mockResolvedValue(true);
+    mocks.loadDelegatedTaskRecord.mockReturnValue({ activation_count: 0 });
+    mocks.spawnDelegatedTaskWorkerProcess
+      .mockReturnValueOnce({ resourceId: 'delegated-task-worker:crash-1', child: firstChild })
+      .mockReturnValueOnce({ resourceId: 'delegated-task-worker:crash-1', child: secondChild });
+
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    await expect(
+      sendRequest(socketPath, {
+        id: 'delegated-crash-1',
+        method: 'delegated_enqueue',
+        payload: { delegationId: 'crash-1', owner: 'owner-1', text: 'resume me' },
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    firstChild.emit('exit', 137, null);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(mocks.spawnDelegatedTaskWorkerProcess).toHaveBeenCalledTimes(2);
+    expect(mocks.appendSupervisorEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decision: 'delegated_task_worker_restart_scheduled',
+        delegation_id: 'crash-1',
+      })
+    );
   }, 90000);
 
   it('keeps serving after a timed-out client closes before the provider replies', async () => {

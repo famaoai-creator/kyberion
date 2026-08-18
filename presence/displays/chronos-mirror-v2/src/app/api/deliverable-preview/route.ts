@@ -6,6 +6,7 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -84,9 +85,6 @@ export function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to load deliverable preview' },
-      { status: 403 }
-    );
+    return viewerErrorResponse(error, 403);
   }
 }

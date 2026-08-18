@@ -31,11 +31,19 @@ import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 function extractUsageTokens(message: unknown): {
   prompt_tokens: number;
   completion_tokens: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
 } {
   const usage = (message as { usage?: Record<string, number> })?.usage ?? {};
   return {
-    prompt_tokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+    prompt_tokens: usage.input_tokens ?? 0,
     completion_tokens: usage.output_tokens ?? 0,
+    ...(usage.cache_read_input_tokens === undefined
+      ? {}
+      : { cache_read_tokens: usage.cache_read_input_tokens }),
+    ...(usage.cache_creation_input_tokens === undefined
+      ? {}
+      : { cache_write_tokens: usage.cache_creation_input_tokens }),
   };
 }
 
@@ -56,6 +64,7 @@ function recordClaudeAgentMetrics(
     metrics.record(label, durationMs, status, {
       model,
       agent: 'claude-agent',
+      cause: 'subagent',
       usage: extractUsageTokens(message),
       sdk_cost_usd: totalCostUsd,
     });

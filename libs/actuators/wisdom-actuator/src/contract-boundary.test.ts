@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   pathResolver,
+  safeMkdir,
   safeReadFile,
+  safeRmSync,
+  safeWriteFile,
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
 } from '@agent/core';
@@ -47,16 +50,116 @@ describe('wisdom public contract boundaries', () => {
     await expect(
       handleAction({ action: 'knowledge_inject', params: { mission_id: 'mission-1' } })
     ).rejects.toThrow('[INVALID_PARAMS] knowledge_inject requires params.knowledge_path');
+    await expect(handleAction({ action: 'knowledge_read', params: {} })).rejects.toThrow(
+      '[INVALID_PARAMS] knowledge_read requires params.path'
+    );
+  });
+
+  it('reads a trusted skill only through an explicit mission-scoped knowledge_read action', async () => {
+    const missionId = `MSN-KNOWLEDGE-READ-${process.pid}`;
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    try {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      const result = await handleAction({
+        action: 'knowledge_read',
+        params: {
+          path: 'plugins/kyberion/SKILL.md',
+          export_as: 'skill_body',
+        },
+        context: {
+          security_scope: {
+            tenant_slug: 'tenant-acme',
+            mission_id: missionId,
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'contract test',
+          },
+        },
+      });
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.skill_body).toContain('# Kyberion Skill');
+      expect(result.context.skill_body_receipt).toMatchObject({
+        mission_id: missionId,
+        form: 'skill_body',
+      });
+      expect(JSON.stringify(result.context.skill_body_receipt)).not.toContain(
+        pathResolver.rootDir()
+      );
+      expect(result.context.skill_body_provenance.base_dir).not.toContain(pathResolver.rootDir());
+      const ledger = String(
+        safeReadFile(`${missionPath}/coordination/prompt-visibility.jsonl`, {
+          encoding: 'utf8',
+        }) || ''
+      );
+      expect(ledger).not.toContain('# Kyberion Skill');
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
+  });
+
+  it('rejects knowledge_read without a mission security scope', async () => {
+    const result = await handleAction({
+      action: 'knowledge_read',
+      params: { path: 'plugins/kyberion/SKILL.md' },
+    });
+    expect(result.status).toBe('failed');
+    expect(JSON.stringify(result.results)).toContain('KNOWLEDGE_READ_SCOPE_REQUIRED');
+  });
+
+  it('rejects a temporary skill resource before model visibility', async () => {
+    const missionId = `MSN-KNOWLEDGE-READ-UNTRUSTED-${process.pid}`;
+    const resourceDir = pathResolver.sharedTmp(`wisdom-untrusted-skill-${process.pid}`);
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    try {
+      safeMkdir(resourceDir, { recursive: true });
+      safeWriteFile(
+        `${resourceDir}/SKILL.md`,
+        [
+          '---',
+          'name: temporary-skill',
+          'description: untrusted fixture',
+          '---',
+          '',
+          'secret',
+        ].join('\n')
+      );
+      const result = await handleAction({
+        action: 'knowledge_read',
+        params: { path: pathResolver.toRepoRelative(`${resourceDir}/SKILL.md`) },
+        context: {
+          security_scope: {
+            tenant_slug: 'tenant-acme',
+            mission_id: missionId,
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'contract test',
+          },
+        },
+      });
+      expect(result.status).toBe('failed');
+      expect(JSON.stringify(result.results)).toContain('KNOWLEDGE_READ_RESOURCE_SCOPE');
+    } finally {
+      safeRmSync(resourceDir, { recursive: true, force: true });
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
   });
 
   it('fails closed when non-public knowledge is requested without a tenant scope', async () => {
-    const result = await handleAction({
-      action: 'knowledge_search',
-      params: { query: 'architecture', tier: 'confidential' },
-    });
-
-    expect(result.status).toBe('failed');
-    expect(JSON.stringify(result.results)).toContain('KNOWLEDGE_SCOPE_REQUIRED');
+    await expect(
+      handleAction({
+        action: 'knowledge_search',
+        params: { query: 'architecture', tier: 'confidential' },
+      })
+    ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] [OP_SCOPE_DENIED] tenant_slug is required');
   });
 
   it('publishes pipeline and reconcile in the schema contract', () => {

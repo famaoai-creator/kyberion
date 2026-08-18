@@ -50,6 +50,8 @@ import {
   type AudioChunk,
   type AudioFormat,
   checkMeetingParticipationConsent,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createHash, randomUUID } from 'node:crypto';
@@ -132,6 +134,22 @@ type VoiceAction =
   | Record<string, any>;
 
 export async function handleSingleAction(input: VoiceAction) {
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `voice:${String((input as any).action || '')}`,
+    params: input as unknown as Record<string, unknown>,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation voice:${String((input as any).action || '')} was not admitted.`}`
+    );
+  }
+  input = {
+    ...(input as Record<string, unknown>),
+    ...preflight.input,
+    action: (input as any).action,
+  } as VoiceAction;
   if (input.action === 'health') {
     return voiceHealth(input as any);
   }

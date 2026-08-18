@@ -9,6 +9,7 @@ import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
+import { sanitizeTraceForPersistence, validateTraceReplay } from '../trace-schema.js';
 
 export interface TraceEvent {
   name: string;
@@ -244,15 +245,24 @@ export function traceLogDir(): string {
  * to scan recent activity without parsing the whole history.
  */
 export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
+  const replayIssues = validateTraceReplay(trace);
+  if (replayIssues.length > 0) {
+    throw new Error(
+      `[TRACE_SCHEMA_INVALID] ${replayIssues
+        .map((issue) => `${issue.path}: ${issue.message}`)
+        .join('; ')}`
+    );
+  }
   const dir = opts?.dir ?? traceLogDir();
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const file = path.join(dir, `traces-${day}.jsonl`);
-  const record = { ...trace, _persistedAt: new Date().toISOString() };
+  const safeTrace = sanitizeTraceForPersistence(trace);
+  const record = { ...safeTrace, _persistedAt: new Date().toISOString() };
   safeAppendFileSync(file, JSON.stringify(record) + '\n');
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
-  void exportTraceOtlp(trace).catch(() => undefined);
+  void exportTraceOtlp(safeTrace).catch(() => undefined);
   return file;
 }
 

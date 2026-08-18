@@ -10,6 +10,8 @@ import {
   safeReaddir,
   safeStat,
   safeWriteFile,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 
 /**
@@ -283,7 +285,24 @@ export function scaffoldApp(input: BuildActuatorInput): BuildActuatorResult {
 }
 
 export async function handleAction(rawInput: unknown): Promise<BuildActuatorResult> {
-  const input = rawInput as BuildActuatorInput;
+  const candidate = rawInput as BuildActuatorInput;
+  const op = String(candidate?.op || 'unknown');
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `build:${op}`,
+    params: (candidate || {}) as unknown as Record<string, unknown>,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation build:${op} was not admitted.`}`
+    );
+  }
+  const input = {
+    ...(candidate || {}),
+    ...preflight.input,
+    op: candidate?.op,
+  } as BuildActuatorInput;
   if (!input || typeof input !== 'object' || !input.op) {
     throw new Error('build-actuator input requires an op');
   }

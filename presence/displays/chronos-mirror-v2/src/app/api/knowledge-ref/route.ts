@@ -6,6 +6,7 @@ import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -41,10 +42,7 @@ export async function GET(req: NextRequest) {
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Tenant scope denied' },
-      { status: 403 }
-    );
+    return viewerErrorResponse(error, 403);
   }
   const pathParts = logicalPath.split('/');
   const pathTenant =

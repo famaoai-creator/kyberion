@@ -1059,7 +1059,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16411,
+      "size": 16536,
       "type": "json"
     },
     {
@@ -1365,7 +1365,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 85304,
+      "size": 85871,
       "type": "json"
     },
     {
@@ -1516,6 +1516,12 @@
       "path": "product/governance/ingestion-rules.json",
       "tier": "public",
       "size": 140,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/install-script-allowlist.json",
+      "tier": "public",
+      "size": 1679,
       "type": "json"
     },
     {
@@ -1671,7 +1677,7 @@
     {
       "path": "product/governance/mcp-tool-catalog.json",
       "tier": "public",
-      "size": 7255,
+      "size": 7731,
       "type": "json"
     },
     {
@@ -1857,7 +1863,7 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1671,
+      "size": 1950,
       "type": "json"
     },
     {
@@ -2008,6 +2014,12 @@
       "path": "product/governance/path-scope-policy.json",
       "tier": "public",
       "size": 2720,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/permission-presets.json",
+      "tier": "public",
+      "size": 454,
       "type": "json"
     },
     {
@@ -2221,6 +2233,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/reasoning-provider-registry.json",
+      "tier": "public",
+      "size": 6850,
+      "type": "json"
+    },
+    {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
       "size": 13560,
@@ -2325,7 +2343,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 13058,
+      "size": 13398,
       "type": "json"
     },
     {
@@ -3201,7 +3219,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 91245,
+      "size": 91404,
       "type": "json"
     },
     {
@@ -3549,7 +3567,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 18537,
+      "size": 18563,
       "type": "json"
     },
     {
@@ -4342,6 +4360,12 @@
       "path": "product/orchestration/service-endpoints/zendesk.json",
       "tier": "public",
       "size": 249,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-harness-registry.json",
+      "tier": "public",
+      "size": 62635,
       "type": "json"
     },
     {
@@ -5644,6 +5668,12 @@
       "path": "product/prompts/README.md",
       "tier": "public",
       "size": 790,
+      "type": "md"
+    },
+    {
+      "path": "product/prompts/worker-context-update-summary.md",
+      "tier": "public",
+      "size": 717,
       "type": "md"
     },
     {
@@ -6963,7 +6993,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 17177,
+      "size": 17796,
       "type": "json"
     },
     {
@@ -7113,7 +7143,7 @@
     {
       "path": "product/schemas/model-registry.schema.json",
       "tier": "public",
-      "size": 2822,
+      "size": 3441,
       "type": "json"
     },
     {
@@ -7705,6 +7735,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/service-harness-registry.schema.json",
+      "tier": "public",
+      "size": 1727,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/service-onboarding-catalog.schema.json",
       "tier": "public",
       "size": 933,
@@ -7713,13 +7749,13 @@
     {
       "path": "product/schemas/service-presets.schema.json",
       "tier": "public",
-      "size": 714,
+      "size": 3325,
       "type": "json"
     },
     {
       "path": "product/schemas/service-recording.schema.json",
       "tier": "public",
-      "size": 3139,
+      "size": 4226,
       "type": "json"
     },
     {

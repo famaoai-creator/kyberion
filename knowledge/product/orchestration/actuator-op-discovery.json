@@ -2516,6 +2516,10 @@
           "kind": "capture"
         },
         {
+          "op": "harness",
+          "kind": "capture"
+        },
+        {
           "op": "api",
           "kind": "apply"
         },
@@ -3600,6 +3604,10 @@
         },
         {
           "op": "knowledge_search",
+          "kind": "capture"
+        },
+        {
+          "op": "knowledge_read",
           "kind": "capture"
         },
         {

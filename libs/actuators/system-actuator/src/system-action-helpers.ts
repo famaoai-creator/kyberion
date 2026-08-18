@@ -1,4 +1,11 @@
-import { logger, safeReadFile, safeExistsSync, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeExistsSync,
+  pathResolver,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
+} from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -112,7 +119,7 @@ function detectFocusedInputWithGuard(
     role?: string;
   } | null,
   targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   return systemFocusHelpers.detectFocusedInputWithGuard(rememberedTarget, targetId, matchPolicy);
 }
@@ -122,7 +129,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   const focusTargetId = interaction.focus_target_id || input.target?.focus_target_id;
   const focusTargetMatchPolicy = input.target?.focus_target_match_policy || 'strict';
   const rememberedTarget = loadRememberedFocusTarget(focusTargetId);
-  const application = interaction.application || input.target?.application || rememberedTarget?.application;
+  const application =
+    interaction.application || input.target?.application || rememberedTarget?.application;
   const sessionId = input.session_id || 'computer-system';
 
   const emitPatch = (
@@ -130,7 +138,7 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     latestAction: string,
     detail?: string,
     target?: string,
-    metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>
   ) => {
     emitComputerSurfacePatch({
       sessionId,
@@ -161,7 +169,10 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       activateApplication(application);
     }
     const focusedInput = detectFocusedInput();
-    const targetId = rememberFocusedTarget(interaction.focus_target_id || input.target?.focus_target_id, focusedInput);
+    const targetId = rememberFocusedTarget(
+      interaction.focus_target_id || input.target?.focus_target_id,
+      focusedInput
+    );
     return {
       status: 'succeeded',
       results: [{ op: 'remember_focused_target', status: 'success' }],
@@ -177,18 +188,24 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     if (application) {
       activateApplication(application);
     }
-    const focusedInput = detectFocusedInputWithGuard(rememberedTarget, focusTargetId, focusTargetMatchPolicy);
+    const focusedInput = detectFocusedInputWithGuard(
+      rememberedTarget,
+      focusTargetId,
+      focusTargetMatchPolicy
+    );
     if (!focusedInput.editable) {
       throw new Error(`Focused element is not editable (${focusedInput.role || 'unknown'})`);
     }
     return executePipeline(
-      [{
-        type: 'apply',
-        op: interaction.input_strategy === 'keystroke' ? 'keyboard' : 'paste_text',
-        params: { text: interaction.text || '' },
-      }],
+      [
+        {
+          type: 'apply',
+          op: interaction.input_strategy === 'keystroke' ? 'keyboard' : 'paste_text',
+          params: { text: interaction.text || '' },
+        },
+      ],
       { focused_input: focusedInput },
-      { timeout_ms: interaction.timeout_ms || 60000 },
+      { timeout_ms: interaction.timeout_ms || 60000 }
     );
   }
 
@@ -196,14 +213,18 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     if (application) {
       activateApplication(application);
     }
-    const focusedInput = detectFocusedInputWithGuard(rememberedTarget, focusTargetId, focusTargetMatchPolicy);
+    const focusedInput = detectFocusedInputWithGuard(
+      rememberedTarget,
+      focusTargetId,
+      focusTargetMatchPolicy
+    );
     if (!focusedInput.editable) {
       throw new Error(`Focused element is not editable (${focusedInput.role || 'unknown'})`);
     }
     return executePipeline(
       [{ type: 'apply', op: 'press_key', params: { key: 'enter' } }],
       { focused_input: focusedInput },
-      { timeout_ms: interaction.timeout_ms || 60000 },
+      { timeout_ms: interaction.timeout_ms || 60000 }
     );
   }
 
@@ -245,9 +266,15 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
 
   if (interaction.type === 'list_tabs') {
     const tabs = listChromeTabs(application || 'Google Chrome');
-    emitPatch('succeeded', interaction.type, `${tabs.length} tabs`, application || 'Google Chrome', {
-      tabCount: tabs.length,
-    });
+    emitPatch(
+      'succeeded',
+      interaction.type,
+      `${tabs.length} tabs`,
+      application || 'Google Chrome',
+      {
+        tabCount: tabs.length,
+      }
+    );
     return {
       status: 'succeeded',
       results: [{ op: 'list_tabs', status: 'success' }],
@@ -259,11 +286,20 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   }
 
   if (interaction.type === 'activate_tab_by_title') {
-    const result = activateChromeTabByTitle(interaction.title || '', application || 'Google Chrome');
-    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.title || '', application || 'Google Chrome', {
-      title: interaction.title || '',
-      matched: result.matched,
-    });
+    const result = activateChromeTabByTitle(
+      interaction.title || '',
+      application || 'Google Chrome'
+    );
+    emitPatch(
+      result.matched ? 'succeeded' : 'failed',
+      interaction.type,
+      interaction.title || '',
+      application || 'Google Chrome',
+      {
+        title: interaction.title || '',
+        matched: result.matched,
+      }
+    );
     return {
       status: result.matched ? 'succeeded' : 'failed',
       results: [{ op: 'activate_tab_by_title', status: result.matched ? 'success' : 'failed' }],
@@ -279,11 +315,20 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   }
 
   if (interaction.type === 'activate_tab_by_url') {
-    const result = activateChromeTabByUrl(interaction.url || interaction.title || '', application || 'Google Chrome');
-    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.url || interaction.title || '', application || 'Google Chrome', {
-      url: interaction.url || interaction.title || '',
-      matched: result.matched,
-    });
+    const result = activateChromeTabByUrl(
+      interaction.url || interaction.title || '',
+      application || 'Google Chrome'
+    );
+    emitPatch(
+      result.matched ? 'succeeded' : 'failed',
+      interaction.type,
+      interaction.url || interaction.title || '',
+      application || 'Google Chrome',
+      {
+        url: interaction.url || interaction.title || '',
+        matched: result.matched,
+      }
+    );
     return {
       status: result.matched ? 'succeeded' : 'failed',
       results: [{ op: 'activate_tab_by_url', status: result.matched ? 'success' : 'failed' }],
@@ -321,7 +366,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           runtimeId: input.session_id,
         },
         justification: {
-          reason: 'Potentially destructive desktop operation requested through computer_interaction.',
+          reason:
+            'Potentially destructive desktop operation requested through computer_interaction.',
           impactSummary: 'The first matching Chrome tab will be closed.',
           requestedEffects: ['close_chrome_tab'],
         },
@@ -386,10 +432,16 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     }
 
     const result = closeChromeTabByTitle(interaction.title || '', application || 'Google Chrome');
-    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.title || '', application || 'Google Chrome', {
-      title: interaction.title || '',
-      matched: result.matched,
-    });
+    emitPatch(
+      result.matched ? 'succeeded' : 'failed',
+      interaction.type,
+      interaction.title || '',
+      application || 'Google Chrome',
+      {
+        title: interaction.title || '',
+        matched: result.matched,
+      }
+    );
     return {
       status: result.matched ? 'succeeded' : 'failed',
       results: [{ op: 'close_tab_by_title', status: result.matched ? 'success' : 'failed' }],
@@ -427,7 +479,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           runtimeId: sessionId,
         },
         justification: {
-          reason: 'Potentially destructive desktop operation requested through computer_interaction.',
+          reason:
+            'Potentially destructive desktop operation requested through computer_interaction.',
           impactSummary: 'The first matching Chrome tab URL will be closed.',
           requestedEffects: ['close_chrome_tab'],
         },
@@ -491,11 +544,20 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       };
     }
 
-    const result = closeChromeTabByUrl(interaction.url || interaction.title || '', application || 'Google Chrome');
-    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.url || interaction.title || '', application || 'Google Chrome', {
-      url: interaction.url || interaction.title || '',
-      matched: result.matched,
-    });
+    const result = closeChromeTabByUrl(
+      interaction.url || interaction.title || '',
+      application || 'Google Chrome'
+    );
+    emitPatch(
+      result.matched ? 'succeeded' : 'failed',
+      interaction.type,
+      interaction.url || interaction.title || '',
+      application || 'Google Chrome',
+      {
+        url: interaction.url || interaction.title || '',
+        matched: result.matched,
+      }
+    );
     return {
       status: result.matched ? 'succeeded' : 'failed',
       results: [{ op: 'close_tab_by_url', status: result.matched ? 'success' : 'failed' }],
@@ -738,14 +800,18 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       });
       break;
     default:
-      throw new Error(`Unsupported computer interaction action for system-actuator: ${interaction.type}`);
+      throw new Error(
+        `Unsupported computer interaction action for system-actuator: ${interaction.type}`
+      );
   }
 
   return executePipeline(steps, {}, { timeout_ms: interaction.timeout_ms || 60000 });
 }
 
 async function performReconcile(input: SystemAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/system-strategy.json');
+  const strategyPath = pathResolver.rootResolve(
+    input.strategy_path || 'knowledge/product/governance/system-strategy.json'
+  );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -754,12 +820,61 @@ async function performReconcile(input: SystemAction) {
   return { status: 'reconciled' };
 }
 
-export async function handleSystemAction(input: SystemAction | ComputerInteractionAction): Promise<any> {
+export async function handleSystemAction(
+  input: SystemAction | ComputerInteractionAction
+): Promise<any> {
   if ((input as any).kind === 'computer_interaction') {
-    return await handleComputerInteraction(input as ComputerInteractionAction);
+    const interaction = input as ComputerInteractionAction;
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: `system:computer_interaction:${interaction.action.type}`,
+      params: interaction.action as unknown as Record<string, unknown>,
+      context: {
+        ...(interaction.session_id ? { session_id: interaction.session_id } : {}),
+        ...(interaction.target ? { target: interaction.target } : {}),
+      },
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation system:computer_interaction:${interaction.action.type} was not admitted.`}`
+      );
+    }
+    return await handleComputerInteraction({
+      ...interaction,
+      action: { ...interaction.action, ...preflight.input },
+    });
   }
   if ((input as SystemAction).action === 'reconcile') {
-    return await performReconcile(input as SystemAction);
+    const systemInput = input as SystemAction;
+    ensureDefaultOpPreflight();
+    const preflight = await runOpPreflight({
+      op: 'system:reconcile',
+      params: {
+        ...(systemInput.strategy_path ? { strategy_path: systemInput.strategy_path } : {}),
+        ...(systemInput.options ? { options: systemInput.options } : {}),
+      },
+      context: systemInput.context,
+      source: 'actuator',
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation system:reconcile was not admitted.'}`
+      );
+    }
+    const strategyPath =
+      typeof preflight.input.strategy_path === 'string'
+        ? preflight.input.strategy_path
+        : systemInput.strategy_path;
+    const options =
+      preflight.input.options && typeof preflight.input.options === 'object'
+        ? (preflight.input.options as SystemAction['options'])
+        : systemInput.options;
+    return await performReconcile({ ...systemInput, strategy_path: strategyPath, options });
   }
-  return await executePipeline((input as SystemAction).steps || [], (input as SystemAction).context || {}, (input as SystemAction).options);
+  return await executePipeline(
+    (input as SystemAction).steps || [],
+    (input as SystemAction).context || {},
+    (input as SystemAction).options
+  );
 }
