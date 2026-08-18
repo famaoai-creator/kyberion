@@ -24,6 +24,7 @@ import {
   projectOperationalStatePath,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
+import { loadProjectRecord } from './project-registry.js';
 import { loadProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
 import {
   getMissionTeamPlanPath,
@@ -1285,7 +1286,18 @@ function organizationIdFromContext(input: {
 }): string | undefined {
   const fromMission = input.missionState.relationships?.project?.organization_id;
   const fromProject = input.projectState?.metadata?.organization_id;
-  const value = String(fromMission || fromProject || '').trim();
+  const projectId = String(
+    input.projectState?.project_id || input.missionState.relationships?.project?.project_id || ''
+  ).trim();
+  const projectRecord = projectId ? loadProjectRecord(projectId) : null;
+  const missionTenant = String(input.missionState.tenant_slug || '').trim();
+  const registryMatchesScope = Boolean(
+    projectRecord &&
+    projectRecord.tier === input.missionState.tier &&
+    (!missionTenant || projectRecord.tenant_slug === missionTenant)
+  );
+  const fromRegistry = registryMatchesScope ? projectRecord?.organization_id : undefined;
+  const value = String(fromRegistry || fromMission || fromProject || '').trim();
   return value || undefined;
 }
 

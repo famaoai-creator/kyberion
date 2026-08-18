@@ -1,0 +1,30 @@
+name: Q&A
+description: Ask how to install, configure, or use Kyberion.
+title: '[Q&A] '
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing discussions first. For a reproducible defect, use the bug issue template.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Node.js, pnpm, Kyberion commit or version, and relevant backend/surface.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What have you tried?
+      description: Include commands, logs, or links. Remove secrets and personal data.
+    validations:
+      required: true
