@@ -7,7 +7,9 @@ import {
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
+  serviceRecordingContentHash,
   startServiceRecordingSession,
+  type ServiceRecording,
   validatePipelineAdf,
   validatePipelineGuardrails,
   validateServiceRecording,
@@ -196,8 +198,8 @@ function review(args: Record<string, string>): void {
     throw new Error('review requires --recording and exactly one of --approve/--reject');
   }
   const loaded = loadRecording(args.recording);
-  const status = args.approve === 'true' ? 'approved' : 'rejected';
-  const updated = {
+  const status: 'approved' | 'rejected' = args.approve === 'true' ? 'approved' : 'rejected';
+  const updated: ServiceRecording = {
     ...loaded.value,
     review: {
       status,
@@ -207,6 +209,9 @@ function review(args: Record<string, string>): void {
       ...(args.note ? { note: args.note } : {}),
     },
   };
+  if (status === 'approved') {
+    updated.review.content_hash = serviceRecordingContentHash(updated);
+  }
   withExecutionContext('surface_runtime', () =>
     safeWriteFile(loaded.absolute, `${JSON.stringify(updated, null, 2)}\n`)
   );

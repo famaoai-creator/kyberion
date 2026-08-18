@@ -288,7 +288,6 @@ function mergeScopeSources(
         );
   const inferred = options.inferFromCwd === false ? {} : inferFromCwd();
   const gitInferred = options.inferFromCwd === false ? {} : inferFromGit();
-  const defaults: ScopeContextInput = { tier: 'public' };
   const fields = [
     'tier',
     'tenant_slug',
@@ -297,7 +296,7 @@ function mergeScopeSources(
     'mission_id',
     'task_id',
   ] as const;
-  const values: ScopeContextInput = { ...defaults };
+  const values: ScopeContextInput = {};
   for (const source of [persisted, envValues, input]) {
     for (const [key, value] of Object.entries(source)) {
       if (clean(value) !== undefined) values[key as keyof ScopeContextInput] = value as never;
@@ -332,6 +331,10 @@ function mergeScopeSources(
     if (!value && clean(gitInferred[field])) {
       values[field] = gitInferred[field] as never;
       value = clean(gitInferred[field]);
+    }
+    if (!value && field === 'tier') {
+      values.tier = 'public';
+      value = 'public';
     }
     if (!clean(input[field]) && !clean(envValues[field]) && !clean(persisted[field])) {
       provenance[field] = clean(mission[field])
