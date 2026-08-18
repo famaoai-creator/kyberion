@@ -638,6 +638,27 @@ class A2ABridgeImpl {
   ): Promise<AgentHandle> {
     this.syncCachedHandle(agentId);
 
+    const securityScope = this.extractSecurityScope(payload);
+    const runtimeMissionId =
+      securityScope?.mission_id ||
+      (typeof (payload as any)?.context?.mission_id === 'string'
+        ? String((payload as any).context.mission_id)
+        : undefined);
+    const runtimeScope = securityScope
+      ? {
+          scope_kind: 'mission' as const,
+          tier: securityScope.write_tier,
+          ...(securityScope.tenant_slug || securityScope.tenant_id
+            ? { tenant_slug: securityScope.tenant_slug || securityScope.tenant_id }
+            : {}),
+          ...(securityScope.organization_id
+            ? { organization_id: securityScope.organization_id }
+            : {}),
+          ...(securityScope.project_id ? { project_id: securityScope.project_id } : {}),
+          mission_id: securityScope.mission_id,
+        }
+      : undefined;
+
     const supervisorHandle = getAgentRuntimeHandle(agentId);
     const existing = supervisorHandle || this.handles.get(agentId);
     const requestedProvider = this.extractProvider(payload) || provider;
@@ -741,6 +762,8 @@ class A2ABridgeImpl {
       agentId,
       provider: resolvedProvider,
       modelId: resolvedModelId,
+      ...(runtimeMissionId ? { missionId: runtimeMissionId } : {}),
+      ...(runtimeScope ? { scope: runtimeScope } : {}),
       systemPrompt: manifest.systemPrompt,
       capabilities: manifest.capabilities,
       cwd,

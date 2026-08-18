@@ -18,6 +18,7 @@ import {
 } from './mission-context-pack.js';
 import { _resetKnowledgeSlicesCacheForTests } from './knowledge-slices.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+import { projectRecordPath, saveProjectRecord } from './project-registry.js';
 
 vi.mock('./distill-knowledge-injector.js', () => ({
   findRelevantDistilledKnowledge: vi.fn(async () => []),
@@ -26,19 +27,30 @@ vi.mock('./distill-knowledge-injector.js', () => ({
 const missionId = 'MSN-CONTEXT-PACK-TEST-001';
 const missionPath = pathResolver.sharedTmp(`mission-context-pack/${missionId}`);
 const artifactRegistryPath = artifactOwnershipRegistryPath();
+const registryProjectId = 'PRJ-CONTEXT-PACK-REGISTRY-001';
+const registryProjectPath = projectRecordPath(registryProjectId);
 let originalArtifactRegistryRaw: string | null = null;
+let originalRegistryProjectRaw: string | null = null;
 
 if (safeExistsSync(artifactRegistryPath)) {
   originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
+}
+if (safeExistsSync(registryProjectPath)) {
+  originalRegistryProjectRaw = safeReadFile(registryProjectPath, { encoding: 'utf8' }) as string;
 }
 
 afterEach(() => {
   safeRmSync(missionPath, { recursive: true, force: true });
   if (originalArtifactRegistryRaw !== null) {
     safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);
-    return;
+  } else if (safeExistsSync(artifactRegistryPath)) {
+    safeRmSync(artifactRegistryPath);
   }
-  if (safeExistsSync(artifactRegistryPath)) safeRmSync(artifactRegistryPath);
+  if (originalRegistryProjectRaw !== null) {
+    safeWriteFile(registryProjectPath, originalRegistryProjectRaw);
+  } else if (safeExistsSync(registryProjectPath)) {
+    safeRmSync(registryProjectPath);
+  }
 });
 
 function seedContextPackArtifacts(projectId: string): void {
@@ -113,6 +125,18 @@ function seedPriorWorkItemDispatchManifest(): void {
       2
     )
   );
+}
+
+function seedRegistryProject(): void {
+  saveProjectRecord({
+    project_id: registryProjectId,
+    name: 'Context pack registry project',
+    summary: 'Project registry fallback fixture.',
+    status: 'active',
+    tier: 'confidential',
+    organization_id: 'ORG-CONTEXT-PACK-REGISTRY-001',
+    tenant_slug: 'acme',
+  });
 }
 
 function makePack(): MissionContextPack {
@@ -769,6 +793,76 @@ describe('mission-context-pack', () => {
     });
 
     expect(pack.context_pack_id).toMatch(/^CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-[A-Z0-9]{8}$/);
+  });
+
+  it('derives organization scope from the canonical project registry when the mission relation omits it', () => {
+    seedRegistryProject();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-REGISTRY-SCOPE`,
+        tier: 'confidential',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-registry-scope',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: { project_id: registryProjectId, relationship_type: 'supports' },
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.security_scope).toMatchObject({
+      tenant_slug: 'acme',
+      organization_id: 'ORG-CONTEXT-PACK-REGISTRY-001',
+      project_id: registryProjectId,
+    });
+  });
+
+  it('does not let a stale mission relation override the scoped project registry', () => {
+    seedRegistryProject();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-REGISTRY-PRECEDENCE`,
+        tier: 'confidential',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-registry-precedence',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: {
+            project_id: registryProjectId,
+            organization_id: 'ORG-STALE-RELATION',
+            relationship_type: 'supports',
+          },
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.security_scope.organization_id).toBe('ORG-CONTEXT-PACK-REGISTRY-001');
   });
 
   it('saves the pack in mission-local coordination storage', () => {
