@@ -23,6 +23,16 @@ export interface CompileServiceOptions {
 
 export interface CompileServiceResult {
   procedureEntry: ProcedureEntry;
+  /** Draft ADF that can be preflighted and promoted after review. */
+  pipeline: {
+    action: 'pipeline';
+    pipeline_id: string;
+    name: string;
+    version: '2.0.0';
+    description: string;
+    _draft: true;
+    steps: Array<Record<string, unknown>>;
+  };
   goldenScenario: GoldenScenario;
   /** True iff every step is read-only (safe to dry-run). */
   isReadOnly: boolean;
@@ -38,7 +48,10 @@ function deriveProcedureId(recording: ServiceRecording): string {
 function extractSuccessConditions(recording: ServiceRecording): GoldenSuccessCondition[] {
   const conditions: GoldenSuccessCondition[] = recording.steps
     .filter((s) => s.produces)
-    .map((s) => ({ kind: 'response_field', params: { channel: s.produces, service_id: s.service_id, action: s.action } }));
+    .map((s) => ({
+      kind: 'response_field',
+      params: { channel: s.produces, service_id: s.service_id, action: s.action },
+    }));
   if (conditions.length === 0) {
     conditions.push({ kind: 'response_field', params: { anchor: 'last_service_result' } });
   }
@@ -54,7 +67,7 @@ function extractSuccessConditions(recording: ServiceRecording): GoldenSuccessCon
  */
 export function compileServiceRecording(
   recording: ServiceRecording,
-  opts: CompileServiceOptions,
+  opts: CompileServiceOptions
 ): CompileServiceResult {
   if (opts.intentPhrases.length === 0) {
     throw new Error('[service-recording-compiler] intentPhrases must be non-empty');
@@ -67,12 +80,28 @@ export function compileServiceRecording(
 
   if (hasExternalEffect) {
     warnings.push(
-      `${recording.steps.filter(isExternalEffectStep).length} external-effect step(s) require approval before execution.`,
+      `${recording.steps.filter(isExternalEffectStep).length} external-effect step(s) require approval before execution.`
     );
+  }
+
+  for (const step of recording.steps) {
+    if (step.validation_errors?.length) {
+      warnings.push(
+        `${step.step_id} has plan validation errors: ${step.validation_errors.join('; ')}`
+      );
+    }
+    if (step.secret_refs?.length) {
+      warnings.push(
+        `${step.step_id} requires human secret binding: ${step.secret_refs.join(', ')}`
+      );
+    }
   }
 
   const inputNames = collectServiceInputNames(recording);
   const requiredInputs = inputNames.map((name) => ({ name, label: name, type: 'string' as const }));
+  const approvalChannel = `service-recording-${recording.recording_id
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/gu, '-')}`.slice(0, 64);
 
   const procedureEntry: ProcedureEntry = {
     procedure_id: procedureId,
@@ -103,5 +132,49 @@ export function compileServiceRecording(
     version: '1.0.0',
   };
 
-  return { procedureEntry, goldenScenario, isReadOnly, warnings };
+  const pipelineSteps: Array<Record<string, unknown>> = [];
+  for (const step of recording.steps) {
+    if (step.risk_class === 'high') {
+      pipelineSteps.push({
+        id: `${step.step_id}-approval`,
+        role: 'gate',
+        op: 'core:await_decision',
+        params: {
+          approval: {
+            title: `Service execution: ${recording.target.name}`,
+            summary: `Approve ${step.service_id}.${step.action} before external execution.`,
+            severity: 'high',
+          },
+          storage_channel: approvalChannel,
+          export_as: `${step.step_id}_approval`,
+        },
+      });
+    }
+    pipelineSteps.push({
+      id: step.step_id,
+      role: step.risk_class === 'read' ? 'source' : 'sink',
+      op: 'service:preset',
+      ...(step.produces ? { produces: { channel: step.produces, type: 'ServiceResult' } } : {}),
+      ...(step.consumes?.length ? { consumes: step.consumes } : {}),
+      ...(step.risk_class === 'high' ? { budget: { approval_required: true } } : {}),
+      params: {
+        service_id: step.service_id,
+        action: step.action,
+        auth: 'secret-guard',
+        params: step.params || {},
+      },
+    });
+  }
+
+  const pipeline = {
+    action: 'pipeline' as const,
+    pipeline_id: procedureId,
+    name: procedureId,
+    version: '2.0.0' as const,
+    description: `Draft service procedure for ${recording.target.name}.`,
+    _draft: true as const,
+    steps: pipelineSteps,
+  };
+
+  return { procedureEntry, pipeline, goldenScenario, isReadOnly, warnings };
 }

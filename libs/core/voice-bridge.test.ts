@@ -27,6 +27,16 @@ describe('voice-bridge', () => {
     expect(getVoiceBridge().name).toBe('fake');
   });
 
+  it('rejects a second sole provider instead of silently replacing the first', () => {
+    const makeBridge = (name: string): VoiceBridge => ({
+      name,
+      runRoleplaySession: stubVoiceBridge.runRoleplaySession,
+      runOneOnOneSession: stubVoiceBridge.runOneOnOneSession,
+    });
+    registerVoiceBridge(makeBridge('first'));
+    expect(() => registerVoiceBridge(makeBridge('second'))).toThrow(/already has provider first/);
+  });
+
   it('fails over to the next bridge when the first one throws', async () => {
     const calls: string[] = [];
     const bridge = buildFailoverVoiceBridge([

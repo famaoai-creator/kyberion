@@ -29,6 +29,8 @@ function retainEquivalent<T>(previous: T | undefined, next: T): T {
 export interface LiveSyncSchedulerOptions<T> {
   fetchSnapshot: () => Promise<T>;
   onSnapshot: (snapshot: T) => void;
+  /** PI-07: authoritative snapshot revision; older snapshots are discarded. */
+  revisionOf?: (snapshot: T) => number | undefined;
   debounceMs?: number;
   backgroundMs?: number;
   isVisible?: () => boolean;
@@ -44,6 +46,7 @@ export interface LiveSyncSchedulerOptions<T> {
  */
 export class LiveSyncScheduler<T> {
   private current: T | undefined;
+  private currentRevision: number | undefined;
   private inFlight = false;
   private queued = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -84,9 +87,7 @@ export class LiveSyncScheduler<T> {
     this.queued = false;
     try {
       const next = await this.options.fetchSnapshot();
-      const stable = retainEquivalent(this.current, next);
-      if (!this.current || !areEquivalent(this.current, next)) this.options.onSnapshot(stable);
-      this.current = stable;
+      this.applySnapshot(next);
     } finally {
       this.inFlight = false;
       if (this.queued) this.invalidate();
@@ -119,6 +120,32 @@ export class LiveSyncScheduler<T> {
 
   get snapshot(): T | undefined {
     return this.current;
+  }
+
+  /**
+   * Apply a REST snapshot as the source of truth. SSE callers should invoke
+   * `invalidate()` instead of mutating state from an event payload. Returning
+   * false makes stale-snapshot rejection observable to tests and adapters.
+   */
+  applySnapshot(next: T): boolean {
+    const nextRevision = this.options.revisionOf?.(next);
+    if (
+      nextRevision !== undefined &&
+      this.currentRevision !== undefined &&
+      nextRevision < this.currentRevision
+    ) {
+      return false;
+    }
+    const stable = retainEquivalent(this.current, next);
+    const changed = !this.current || !areEquivalent(this.current, next);
+    this.current = stable;
+    if (nextRevision !== undefined) this.currentRevision = nextRevision;
+    if (changed) this.options.onSnapshot(stable);
+    return true;
+  }
+
+  get revision(): number | undefined {
+    return this.currentRevision;
   }
 }
 

@@ -341,55 +341,43 @@ describe('agy-cli-backend', () => {
       expect(argv).not.toContain('--add-dir');
     });
 
-    it('explorer profile: argv contains the sandbox mapping and not --dangerously-skip-permissions', async () => {
-      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
-
+    it('explorer profile is refused until AGY exposes a verified read-only sandbox', async () => {
       const backend = new AgyCliBackend({
         bin: 'agy',
         model: 'agy',
         sandbox: true,
         logFile: '/tmp/agy-cli.log',
       });
-      await backend.prompt('hello', { profile: 'explorer' });
-
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-      const [, argv] = spawnMock.mock.calls[0];
-      expect(argv).toContain('--sandbox');
-      expect(argv).not.toContain('--dangerously-skip-permissions');
+      await expect(backend.prompt('hello', { profile: 'explorer' })).rejects.toThrow(
+        /permission profile "explorer" refused/
+      );
+      expect(spawnMock).not.toHaveBeenCalled();
     });
 
-    it('reviewer team role: resolves to explorer capability tier (sandbox, no skip-permissions)', async () => {
-      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
-
+    it('reviewer team role is refused under AGY until read-only mode is verified', async () => {
       const backend = new AgyCliBackend({
         bin: 'agy',
         model: 'agy',
         sandbox: true,
         logFile: '/tmp/agy-cli.log',
       });
-      await backend.prompt('hello', { role: 'reviewer' });
-
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-      const [, argv] = spawnMock.mock.calls[0];
-      expect(argv).toContain('--sandbox');
-      expect(argv).not.toContain('--dangerously-skip-permissions');
+      await expect(backend.prompt('hello', { role: 'reviewer' })).rejects.toThrow(
+        /permission profile "explorer" refused/
+      );
+      expect(spawnMock).not.toHaveBeenCalled();
     });
 
-    it('unknown role or profile: resolves to default explorer capability tier instead of full skip-permissions', async () => {
-      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
-
+    it('unknown role or profile fails closed through the explorer tier', async () => {
       const backend = new AgyCliBackend({
         bin: 'agy',
         model: 'agy',
         sandbox: true,
         logFile: '/tmp/agy-cli.log',
       });
-      await backend.prompt('hello', { role: 'unknown_custom_role' });
-
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-      const [, argv] = spawnMock.mock.calls[0];
-      expect(argv).toContain('--sandbox');
-      expect(argv).not.toContain('--dangerously-skip-permissions');
+      await expect(backend.prompt('hello', { role: 'unknown_custom_role' })).rejects.toThrow(
+        /permission profile "explorer" refused/
+      );
+      expect(spawnMock).not.toHaveBeenCalled();
     });
 
     it('planner profile: typed refusal, no spawn attempted', async () => {

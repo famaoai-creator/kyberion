@@ -14,6 +14,7 @@ import {
   type OneOnOneSessionResult,
   type RoleplayTurn,
   registerVoiceBridge,
+  resetVoiceBridge,
 } from './voice-bridge.js';
 
 export interface PythonVoiceBridgeOptions {
@@ -134,6 +135,10 @@ export function installPythonVoiceBridgeIfAvailable(
     playThroughBlackhole,
   });
 
+  // This installer is an explicit bootstrap selector. Dispose the prior
+  // sole bridge before promoting the Python bridge; ordinary callers still
+  // receive duplicate-provider protection from the seam.
+  resetVoiceBridge();
   registerVoiceBridge(bridge);
   return true;
 }

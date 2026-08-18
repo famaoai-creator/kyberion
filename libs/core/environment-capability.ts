@@ -34,6 +34,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
+import { coreSeamCatalog, defineSeam } from './seam.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -153,14 +154,35 @@ const _trustedExecutableManifests = new WeakSet<EnvironmentManifest>();
  * ------------------------------------------------------------------ */
 
 export type RegisteredProbe = () => Promise<{ available: boolean; reason?: string }>;
-const _probeRegistry = new Map<string, RegisteredProbe>();
+const environmentProbeSeam = defineSeam<RegisteredProbe>({
+  key: 'environment.capability-probe',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const probeDisposers = new Map<string, () => void>();
 
-export function registerEnvironmentCapabilityProbe(probe_id: string, probe: RegisteredProbe): void {
-  _probeRegistry.set(probe_id, probe);
+export function registerEnvironmentCapabilityProbe(
+  probe_id: string,
+  probe: RegisteredProbe
+): () => void {
+  const dispose = environmentProbeSeam.register(probe_id, probe, {
+    provenance: 'plugin',
+    source: `environment-probe:${probe_id}`,
+  });
+  const wrappedDispose = () => {
+    dispose();
+    if (probeDisposers.get(probe_id) === wrappedDispose) probeDisposers.delete(probe_id);
+  };
+  probeDisposers.set(probe_id, wrappedDispose);
+  return wrappedDispose;
 }
 
 export function resetEnvironmentCapabilityProbeRegistry(): void {
-  _probeRegistry.clear();
+  for (const dispose of [...probeDisposers.values()]) dispose();
+}
+
+export function hasEnvironmentCapabilityProbe(probe_id: string): boolean {
+  return environmentProbeSeam.list().some((provider) => provider.id === probe_id);
 }
 
 /* ------------------------------------------------------------------ *
@@ -305,7 +327,9 @@ async function runProbe(
       }
     }
     case 'probe': {
-      const fn = _probeRegistry.get(probe.probe_id);
+      const fn = environmentProbeSeam
+        .list()
+        .find((provider) => provider.id === probe.probe_id)?.implementation;
       if (!fn)
         return { available: false, reason: `no probe registered for id '${probe.probe_id}'` };
       try {

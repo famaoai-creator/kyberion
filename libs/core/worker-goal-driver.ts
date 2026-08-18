@@ -64,8 +64,11 @@ import {
   getDefaultDynamicInjectionRegistry,
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
+  ScopedDynamicInjectionRegistry,
   type DynamicInjectionProvider,
 } from './dynamic-injection.js';
+import type { ScopedRegistryScope } from './scoped-registry.js';
+import type { AgentInputQueueScope } from './agent-input-queue.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import type {
   GenerateWithToolsResult,
@@ -86,11 +89,13 @@ import {
   blockGoalOnBudget,
   buildGoalStatusReminder,
   buildGoalUpdateToolDefinition,
+  buildToolSearchToolDefinition,
   checkGoalBudgetReached,
   createGoal,
   demoteActiveOnResume,
   GOAL_BUDGET_GRACE_STEP_PROMPT,
   GOAL_UPDATE_TOOL_NAME,
+  TOOL_SEARCH_TOOL_NAME,
   incrementGoalTurn,
   parseGoalUpdateSignal,
   pauseGoal,
@@ -201,6 +206,34 @@ export interface GoalTurnContext {
   checkpointId: string;
 }
 
+export interface GoalTurnYieldContext {
+  goal: GoalRuntimeState;
+  turnNumber: number;
+}
+
+/** PI-17: governed catalog lookup used by the additive `tool_search` tool. */
+export type GoalToolSearch = (
+  query: string,
+  context: GoalTurnContext
+) => Promise<readonly ToolDefinition[]> | readonly ToolDefinition[];
+
+/** Context passed through the serial model-entry admission chain. */
+export interface GoalPreStepContext {
+  goal: GoalRuntimeState;
+  turnNumber: number;
+  checkpointId: string;
+  /** Messages already admitted by earlier hooks in this same chain. */
+  messages: readonly string[];
+}
+
+export type GoalPreStepDecision =
+  { decision: 'enter'; messages?: readonly string[] } | { decision: 'reject'; reason: string };
+
+/** One ordered admission hook; later hooks never run after a rejection. */
+export type GoalPreStepHook = (
+  context: GoalPreStepContext
+) => GoalPreStepDecision | Promise<GoalPreStepDecision>;
+
 export interface RunGoalDrivenLoopOptions {
   objective: string;
   goalId?: string;
@@ -209,8 +242,32 @@ export interface RunGoalDrivenLoopOptions {
   systemPrompt?: string;
   /** Per-turn instruction appended after the injected goal reminders. */
   turnPrompt?: string;
+  /** DH-06: called immediately before a model-visible turn is sent. */
+  onPromptVisible?: (content: string, form: string) => void;
+  /**
+   * PI-15/DH-10: cooperative yield requested after the current turn. The
+   * driver never interrupts an in-flight model/tool call; a true result
+   * pauses the goal at the turn boundary for an explicit later resume.
+   */
+  shouldStopAfterTurn?: ((context: GoalTurnYieldContext) => boolean | Promise<boolean>) | undefined;
+  /**
+   * PI-15/DH-10: ordered model-entry admission hooks. Each hook may append
+   * model-visible messages or reject the step. Rejection pauses before any
+   * model/tool call; hooks run serially and are never skipped by parallel
+   * registration timing.
+   */
+  preStep?: readonly GoalPreStepHook[];
+  /** PI-15: collect queued input at the next-turn boundary. */
+  getTurnPrompt?:
+    ((context: GoalTurnContext) => string | undefined | Promise<string | undefined>) | undefined;
   /** Extra main-worker tools exposed alongside goal_update + context_rewind. */
   extraTools?: ToolDefinition[];
+  /** PI-17: optional governed discovery callback for additive tool loading. */
+  toolSearch?: GoalToolSearch;
+  /** PI-17: governed role used to filter the model-visible tool surface. */
+  toolRole?: string;
+  /** PI-17: additional tools announced in the message tail, not stable schema. */
+  deferredToolNames?: string[];
   /** Execute a non-goal, non-rewind tool call and return its result. */
   executeTool?: (
     call: ToolCall,
@@ -222,6 +279,10 @@ export interface RunGoalDrivenLoopOptions {
   stream?: WorkerEventStream;
   /** Injection registry override; defaults to mission-scoped or the global one. */
   injectionRegistry?: DynamicInjectionRegistry;
+  /** DH-09: optional tenant/org/project/mission/task/session registry. */
+  scopedInjectionRegistry?: ScopedDynamicInjectionRegistry;
+  /** Scope used when collecting/registering providers in the scoped registry. */
+  injectionScope?: ScopedRegistryScope;
   /** Rewind context override; defaults to a fresh one. */
   rewindContext?: RewindableWorkerContext;
   repeatGovernorConfig?: ToolCallRepeatGovernorConfig;
@@ -272,9 +333,64 @@ const CONTEXT_REWIND_TOOL_NAME = 'context_rewind';
 
 /** The tool surface exposed to the MAIN worker goal loop (never to subagents). */
 export function buildMainWorkerGoalTools(
-  extraTools: readonly ToolDefinition[] = []
+  extraTools: readonly ToolDefinition[] = [],
+  options: { includeToolSearch?: boolean } = {}
 ): ToolDefinition[] {
-  return [buildGoalUpdateToolDefinition(), buildContextRewindToolDefinition(), ...extraTools];
+  return [
+    buildGoalUpdateToolDefinition(),
+    buildContextRewindToolDefinition(),
+    ...(options.includeToolSearch ? [buildToolSearchToolDefinition()] : []),
+    ...extraTools,
+  ];
+}
+
+function escapeToolSearchText(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function addDiscoveredTools(
+  tools: ToolDefinition[],
+  discovered: readonly ToolDefinition[] | unknown,
+  role?: string
+): ToolDefinition[] {
+  if (!Array.isArray(discovered)) {
+    throw new Error('[TOOL_SEARCH_INVALID_RESULT] catalog callback must return an array.');
+  }
+  const byName = new Map(tools.map((tool) => [tool.name, tool]));
+  const added: ToolDefinition[] = [];
+  for (const tool of discovered) {
+    const name = String(tool?.name || '').trim();
+    if (!name || !tool.description || !tool.inputSchema) {
+      throw new Error('[TOOL_SEARCH_INVALID_RESULT] discovered tool is incomplete.');
+    }
+    if (role && tool.allowed_roles?.length && !tool.allowed_roles.includes(role)) {
+      throw new Error(`[TOOL_SEARCH_ROLE_DENIED] role "${role}" cannot access tool "${name}".`);
+    }
+    const existing = byName.get(name);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(tool)) {
+        throw new Error(`[TOOL_SEARCH_DUPLICATE] tool "${name}" has conflicting definitions.`);
+      }
+      continue;
+    }
+    const normalized = { ...tool, name };
+    byName.set(name, normalized);
+    tools.push(normalized);
+    added.push(normalized);
+  }
+  return added;
+}
+
+function renderToolSearchResults(tools: readonly ToolDefinition[]): string {
+  if (tools.length === 0) return '<tool-search-results count="0" />';
+  return [
+    `<tool-search-results count="${tools.length}" trust="governed">`,
+    ...tools.map(
+      (tool) =>
+        `  <tool name="${escapeToolSearchText(tool.name)}">${escapeToolSearchText(tool.description)}</tool>`
+    ),
+    '</tool-search-results>',
+  ].join('\n');
 }
 
 function resolveInjectionRegistry(
@@ -370,7 +486,19 @@ export async function runGoalDrivenLoop(
 
   const rewindContext = options.rewindContext ?? new RewindableWorkerContext([], options.missionId);
   const registry = resolveInjectionRegistry(options.injectionRegistry, options.missionId);
-  const tools = buildMainWorkerGoalTools(options.extraTools);
+  const scopedRegistry = options.scopedInjectionRegistry;
+  const injectionScope: ScopedRegistryScope =
+    options.injectionScope ?? (options.missionId ? { mission: options.missionId } : {});
+  const registerInjection = (provider: DynamicInjectionProvider): (() => void) =>
+    scopedRegistry
+      ? scopedRegistry.register(injectionScope, provider)
+      : registry.register(provider);
+  const collectInjections = (state: { step?: number }) =>
+    scopedRegistry ? scopedRegistry.collect(injectionScope, state) : registry.collect(state);
+  const tools = buildMainWorkerGoalTools(options.extraTools, {
+    includeToolSearch: Boolean(options.toolSearch),
+  });
+  let toolSearchAnnouncement = '';
 
   // Live view of the goal + current checkpoints, read by the injection
   // providers so goal state is injected only at the (collected) turn boundary.
@@ -427,7 +555,7 @@ export async function runGoalDrivenLoop(
       );
 
       live.state = goal; // keep the status provider's view current for the grace prompt
-      const graceInjections = registry.collect({ step: goal.turnCount });
+      const graceInjections = collectInjections({ step: goal.turnCount });
       const gracePrompt = [
         options.systemPrompt ?? '',
         renderInjectionsAsSystemReminders(graceInjections),
@@ -437,6 +565,7 @@ export async function runGoalDrivenLoop(
         .filter((part) => part && part.trim())
         .join('\n\n');
 
+      options.onPromptVisible?.(gracePrompt, 'goal_grace_step');
       const graceResult = await backend.generateWithTools(gracePrompt, tools);
       for (const call of graceResult.toolCalls ?? []) {
         // Synthetic rejection: never executed, never applied (not even
@@ -472,27 +601,73 @@ export async function runGoalDrivenLoop(
   }
 
   try {
-    unregister.push(registry.register(statusProvider));
-    unregister.push(registry.register(objectiveProvider));
+    unregister.push(registerInjection(statusProvider));
+    unregister.push(registerInjection(objectiveProvider));
 
     while (goal.state === 'active' && goal.turnCount < maxTurns) {
       const turnNumber = goal.turnCount + 1;
-      turnsRun += 1;
       rewindContext.beginTurn();
       const checkpointId = rewindContext.checkpoint();
       live.state = goal;
       live.checkpointIds = [checkpointId];
 
+      const preStepMessages: string[] = [];
+      let preStepRejection: string | undefined;
+      for (const preStep of options.preStep ?? []) {
+        const decision = await preStep({
+          goal,
+          turnNumber,
+          checkpointId,
+          messages: preStepMessages,
+        });
+        if (decision.decision === 'reject') {
+          preStepRejection = decision.reason.trim() || 'pre-step admission rejected';
+          break;
+        }
+        for (const message of decision.messages ?? []) {
+          if (message.trim()) preStepMessages.push(message);
+        }
+      }
+      if (preStepRejection) {
+        stream.emit(
+          'status_update',
+          {
+            goal_event: 'pre_step_rejected',
+            goal_id: goal.goalId,
+            turn: turnNumber,
+            reason: preStepRejection,
+          },
+          source
+        );
+        goal = pauseGoal(goal, `pre-step admission rejected: ${preStepRejection}`, now);
+        stream.emit(
+          'status_update',
+          { goal_event: 'paused', goal_id: goal.goalId, reason: goal.terminalReason ?? '' },
+          source
+        );
+        break;
+      }
+
+      turnsRun += 1;
+
       stream.emit('turn_begin', { goal_id: goal.goalId, turn: turnNumber }, source);
 
-      const injections = registry.collect({ step: goal.turnCount });
+      const injections = collectInjections({ step: goal.turnCount });
+      const queuedTurnPrompt = options.getTurnPrompt
+        ? (await options.getTurnPrompt({ goal, turnNumber, checkpointId }))?.trim()
+        : undefined;
       const prompt = [
         options.systemPrompt ?? '',
         renderInjectionsAsSystemReminders(injections),
+        toolSearchAnnouncement,
+        ...preStepMessages,
         options.turnPrompt ?? '',
+        queuedTurnPrompt ?? '',
       ]
         .filter((part) => part && part.trim())
         .join('\n\n');
+
+      options.onPromptVisible?.(prompt, 'goal_turn');
 
       let signal: GoalUpdateSignal | null = null;
       let forceStopTool: string | undefined;
@@ -503,13 +678,22 @@ export async function runGoalDrivenLoop(
       // ever settles) is never awaited further or applied to the goal.
       const turnStartMs = wallClockScheduler.now();
       let result: GenerateWithToolsResult;
+      const toolLoadingOptions =
+        options.toolRole || options.deferredToolNames?.length
+          ? {
+              ...(options.toolRole ? { role: options.toolRole } : {}),
+              ...(options.deferredToolNames?.length
+                ? { deferred_tool_names: options.deferredToolNames }
+                : {}),
+            }
+          : undefined;
       let wallClockDeadlineHit = false;
       if (budgetLimits?.wallClockBudgetMs !== undefined) {
         const remainingMs =
           budgetLimits.wallClockBudgetMs - (goal.budgetStats?.wallClockMsUsed ?? 0);
         const deadline = armWallClockDeadline(wallClockScheduler, remainingMs);
         const raced = await Promise.race([
-          backend.generateWithTools(prompt, tools),
+          backend.generateWithTools(prompt, tools, toolLoadingOptions),
           deadline.promise,
         ]);
         deadline.cancel();
@@ -520,7 +704,7 @@ export async function runGoalDrivenLoop(
           result = raced as GenerateWithToolsResult;
         }
       } else {
-        result = await backend.generateWithTools(prompt, tools);
+        result = await backend.generateWithTools(prompt, tools, toolLoadingOptions);
       }
 
       if (wallClockDeadlineHit) {
@@ -543,6 +727,37 @@ export async function runGoalDrivenLoop(
           source
         );
         break;
+      }
+
+      // PI-17: native provider deferred-tool responses are references, not
+      // executable schemas. Resolve them through the same governed catalog
+      // callback as explicit tool_search and add them only for the next turn;
+      // the current turn's stable prefix remains unchanged.
+      if (result.deferredToolReferences?.length && options.toolSearch) {
+        const promoted: ToolDefinition[] = [];
+        for (const reference of result.deferredToolReferences) {
+          const query = String(reference || '').trim();
+          if (!query) continue;
+          const discovered = await options.toolSearch(query, {
+            goal,
+            turnNumber,
+            checkpointId,
+          });
+          promoted.push(...addDiscoveredTools(tools, discovered, options.toolRole));
+        }
+        if (promoted.length > 0) {
+          toolSearchAnnouncement = renderToolSearchResults(promoted);
+          stream.emit(
+            'status_update',
+            {
+              goal_event: 'deferred_tools_promoted',
+              goal_id: goal.goalId,
+              turn: turnNumber,
+              tools: promoted.map((tool) => tool.name),
+            },
+            source
+          );
+        }
       }
 
       const thisTurnHadToolCalls = (result.toolCalls?.length ?? 0) > 0;
@@ -573,6 +788,17 @@ export async function runGoalDrivenLoop(
           // Existing guards (one-per-turn, external-effect, lesson length)
           // stay intact; the module emits its own context_rewind event.
           rewindContext.rewindTo(checkpoint, lesson);
+        } else if (call.name === TOOL_SEARCH_TOOL_NAME && options.toolSearch) {
+          const input = call.input as Record<string, unknown>;
+          const query = String(input.query ?? '').trim();
+          if (!query) throw new Error('[TOOL_SEARCH_INPUT] query is required.');
+          const discovered = await options.toolSearch(query, {
+            goal,
+            turnNumber,
+            checkpointId,
+          });
+          const added = addDiscoveredTools(tools, discovered, options.toolRole);
+          toolSearchAnnouncement = renderToolSearchResults(added);
         } else if (options.executeTool) {
           const exec = await options.executeTool(call, { goal, turnNumber, checkpointId });
           if (exec.externalEffect) rewindContext.recordExternalEffect(exec.effectDescription);
@@ -666,6 +892,15 @@ export async function runGoalDrivenLoop(
           source
         );
         if (await maybeTerminateOnBudget(result, thisTurnHadToolCalls)) break;
+        if (await options.shouldStopAfterTurn?.({ goal, turnNumber })) {
+          goal = pauseGoal(goal, `cooperative yield requested after turn ${turnNumber}`, now);
+          stream.emit(
+            'status_update',
+            { goal_event: 'paused', goal_id: goal.goalId, reason: goal.terminalReason ?? '' },
+            source
+          );
+          break;
+        }
         continue;
       }
 
@@ -677,6 +912,15 @@ export async function runGoalDrivenLoop(
         source
       );
       if (await maybeTerminateOnBudget(result, thisTurnHadToolCalls)) break;
+      if (await options.shouldStopAfterTurn?.({ goal, turnNumber })) {
+        goal = pauseGoal(goal, `cooperative yield requested after turn ${turnNumber}`, now);
+        stream.emit(
+          'status_update',
+          { goal_event: 'paused', goal_id: goal.goalId, reason: goal.terminalReason ?? '' },
+          source
+        );
+        break;
+      }
     }
 
     if (goal.state === 'active') {

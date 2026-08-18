@@ -12,6 +12,8 @@ import {
   retry,
   buildGovernedRetryOptions,
   classifyError,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
 import * as path from 'node:path';
@@ -84,15 +86,28 @@ export async function executePipeline(
   for (const step of steps) {
     try {
       logger.info(`  [IOS_PIPELINE] ${step.type}:${step.op}...`);
+      ensureDefaultOpPreflight();
+      const preflight = await runOpPreflight({
+        op: `ios:${step.op}`,
+        params: step.params || {},
+        context: ctx,
+        source: 'actuator',
+      });
+      if (preflight.decision !== 'allow') {
+        throw new Error(
+          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ios:${step.op} was not admitted.`}`
+        );
+      }
+      const params = preflight.input;
       switch (step.type) {
         case 'capture':
-          ctx = await opCapture(step.op, step.params, ctx, resolve, options);
+          ctx = await opCapture(step.op, params, ctx, resolve, options);
           break;
         case 'transform':
-          ctx = await opTransform(step.op, step.params, ctx, resolve);
+          ctx = await opTransform(step.op, params, ctx, resolve);
           break;
         case 'apply':
-          ctx = await opApply(step.op, step.params, ctx, resolve, options);
+          ctx = await opApply(step.op, params, ctx, resolve, options);
           break;
         default:
           logger.warn(`[IOS_PIPELINE] Unsupported step type: ${step.type}`);

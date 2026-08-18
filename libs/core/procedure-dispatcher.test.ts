@@ -929,6 +929,7 @@ describe('dispatchProcedure — service:preset', () => {
 
   it('blocks a step whose service is not in the procedure allowlist', async () => {
     const offlist = serviceRecording({
+      target: { name: 'Deal Intake', services: ['box'] },
       steps: [
         { step_id: 's1', service_id: 'box', action: 'upload', summary: 'x', risk_class: 'high' },
       ],
@@ -944,5 +945,20 @@ describe('dispatchProcedure — service:preset', () => {
     const result = await dispatchProcedure({ ...baseInput(), serviceRecording: pending });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('approved recording review');
+  });
+
+  it('blocks an approved recording whose review decisions do not match its steps', async () => {
+    const malformed = serviceRecording({
+      review: {
+        status: 'approved',
+        decisions: [
+          { step_id: 's1', status: 'approved' },
+          { step_id: 'unknown', status: 'approved' },
+        ],
+      },
+    });
+    const result = await dispatchProcedure({ ...baseInput(), serviceRecording: malformed });
+    expect(result.status).toBe('blocked');
+    expect(result.errors.join(' ')).toContain('unknown step unknown');
   });
 });

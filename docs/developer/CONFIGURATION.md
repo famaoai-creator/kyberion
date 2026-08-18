@@ -287,7 +287,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_WINDOWS_AI_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 | `KYBERION_WINDOWS_STT_BACKEND`            | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                                                                                              |
 
-## runtime (171)
+## runtime (174)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -299,6 +299,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_AGENT_TIER`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGY_SANDBOX`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGY_SDK_CWD`                         | string | no       | Working directory passed from the AGY SDK adapter to its Python bridge.                                 |
+| `KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS`     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM_SAMPLE_AUDIO`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIO_BUS`                           | string | no       | _undocumented_                                                                                          |
@@ -324,6 +325,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CODEX_INSTANCES`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CODEX_MODE`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_COMPUTER_SURFACE_PRINCIPAL`          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CONTEXT_PACK_ID`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CURATION_SCAN_ROOTS`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CURATION_TENANT_ROOTDIR`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CUSTOMER`                            | string | no       | Active customer profile slug used to resolve the profile root.                                          |
@@ -359,6 +361,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INJECTION_SUSPECTED`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KI_CACHE_MAX_MB`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_KNOWLEDGE_REFS`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KNOWLEDGE_TIER`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LIVE_BLACKHOLE_TEST`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                     | string | no       | _undocumented_                                                                                          |

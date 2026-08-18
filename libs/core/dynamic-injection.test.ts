@@ -6,6 +6,7 @@ vi.mock('./core.js', () => ({
 
 import {
   DynamicInjectionRegistry,
+  ScopedDynamicInjectionRegistry,
   buildWorkingPrinciplesInjectionProvider,
   getDefaultDynamicInjectionRegistry,
   getMissionDynamicInjectionRegistry,
@@ -84,6 +85,49 @@ describe('DynamicInjectionRegistry', () => {
     notifyAllDynamicInjectionRegistries();
     expect(missionA.collect()).toHaveLength(1);
     expect(missionB.collect()).toHaveLength(1);
+  });
+});
+
+describe('ScopedDynamicInjectionRegistry (DH-09)', () => {
+  it('inherits ancestor providers and shadows by most-specific scope', () => {
+    const registry = new ScopedDynamicInjectionRegistry();
+    registry.register({ tenant: 'acme' }, { id: 'policy', collect: () => 'tenant policy' });
+    registry.register(
+      { tenant: 'acme', organization: 'org-a' },
+      { id: 'policy', collect: () => 'organization policy' }
+    );
+
+    expect(
+      registry.collect({ tenant: 'acme', organization: 'org-a', project: 'project-a' })
+    ).toEqual([{ providerId: 'policy', text: 'organization policy' }]);
+    expect(registry.collect({ tenant: 'acme', organization: 'org-b' })).toEqual([
+      { providerId: 'policy', text: 'tenant policy' },
+    ]);
+  });
+
+  it('resets visible one-shots and rejects ambiguous equal-depth providers', () => {
+    const registry = new ScopedDynamicInjectionRegistry();
+    registry.register(
+      { tenant: 'acme', project: 'project-a' },
+      { id: 'reminder', oneShot: true, collect: () => 'project reminder' }
+    );
+    registry.register(
+      { tenant: 'acme', organization: 'org-a' },
+      { id: 'reminder', oneShot: true, collect: () => 'organization reminder' }
+    );
+    expect(() =>
+      registry.collect({ tenant: 'acme', organization: 'org-a', project: 'project-a' })
+    ).toThrow('[SCOPED_REGISTRY_AMBIGUOUS]');
+
+    const clean = new ScopedDynamicInjectionRegistry();
+    clean.register(
+      { tenant: 'acme' },
+      { id: 'reminder', oneShot: true, collect: () => 'reminder' }
+    );
+    expect(clean.collect({ tenant: 'acme' })).toHaveLength(1);
+    expect(clean.collect({ tenant: 'acme' })).toHaveLength(0);
+    clean.notifyContextCompacted();
+    expect(clean.collect({ tenant: 'acme' })).toHaveLength(1);
   });
 });
 

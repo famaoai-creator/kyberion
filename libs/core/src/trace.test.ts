@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { exportTraceOtlp, TraceContext } from './trace.js';
+import { exportTraceOtlp, finalizeAndPersist, persistTrace, TraceContext } from './trace.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile, safeRmSync } from '../secure-io.js';
+import { validateTraceReplay } from '../trace-schema.js';
 
 const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const originalFetch = globalThis.fetch;
+const traceTestDir = pathResolver.sharedTmp(`trace-schema-replay-${process.pid}`);
 
 afterEach(() => {
   if (originalEndpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = originalEndpoint;
   globalThis.fetch = originalFetch;
+  safeRmSync(traceTestDir, { recursive: true, force: true });
 });
 
 describe('trace OTLP bridge', () => {
@@ -35,5 +40,28 @@ describe('trace OTLP bridge', () => {
     const body = JSON.parse(request?.body || '{}');
     expect(body.resourceSpans[0].scopeSpans[0].spans).toHaveLength(2);
     expect(body.resourceSpans[0].scopeSpans[0].spans[1].name).toBe('step.judge');
+  });
+
+  it('validates persisted traces at the write boundary and replays the persisted record', () => {
+    const persisted = finalizeAndPersist(new TraceContext('workflow.replay'), {
+      dir: traceTestDir,
+    });
+    const record = JSON.parse(
+      String(safeReadFile(persisted.path, { encoding: 'utf8' })).trim()
+    ) as unknown;
+    expect(validateTraceReplay(record)).toEqual([]);
+
+    const malformed = {
+      traceId: 'trace-invalid',
+      rootSpan: {
+        name: 'workflow.replay',
+        status: 'invalid',
+        events: [],
+        children: [],
+      },
+    };
+    expect(() => persistTrace(malformed as never, { dir: traceTestDir })).toThrow(
+      '[TRACE_SCHEMA_INVALID]'
+    );
   });
 });

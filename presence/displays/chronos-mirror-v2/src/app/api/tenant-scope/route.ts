@@ -6,6 +6,7 @@ import {
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
+  viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -81,9 +82,6 @@ export function GET(req: NextRequest) {
       source: resolvedViewer.context.source,
     });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'Tenant scope unavailable' },
-      { status: 403 }
-    );
+    return viewerErrorResponse(error, 403);
   }
 }

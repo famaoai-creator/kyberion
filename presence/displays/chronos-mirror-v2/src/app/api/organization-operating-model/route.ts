@@ -55,9 +55,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof ViewerContextError) return viewerErrorResponse(error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to load organization model' },
-      { status: 500 }
-    );
+    return viewerErrorResponse(error, 500);
   }
 }

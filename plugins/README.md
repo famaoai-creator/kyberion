@@ -97,9 +97,38 @@ export const afterSkill = (skillName, output) => {
 };
 ```
 
+Approved plugins may also declare governed runtime contributions in their
+manifest. The names in `provides` are an allowlist: the exported
+`registerKyberionContributions(api)` callback must register every executable
+entry, and activation is rolled back if a name is undeclared or missing.
+
+```json
+{
+  "plugin_id": "example-pack",
+  "provides": {
+    "ops": ["example:run"],
+    "providers": ["stub"],
+    "hooks": ["settlement-audit"],
+    "prompt_sections": ["operator-note"],
+    "facets": ["example-policy"]
+  }
+}
+```
+
+Contribution activation is provenance-gated and reversible. `ops` are
+resolved through the actuator registry, `providers` through the governed
+reasoning-provider registry, hooks through the lifecycle engine, and
+prompt/facet entries carry the plugin provenance. Deactivation disposes
+all registrations; a manifest alone never grants execution authority.
+
 **Rules:**
 
 - Plugins MUST NOT throw errors that break skill execution
+- Non-stub reasoning providers MUST pass a versioned live conformance receipt
+  when they register. The prompt, structured-output, and abort checks must be
+  `verified`; usage may remain `declared` when it is recorded at the adapter
+  boundary. An offline receipt records what was not exercised but cannot grant
+  activation authority.
 - Each hook is wrapped in try-catch by the skill-wrapper
 - Plugins load in array order; a failing plugin doesn't block others
 - A plugin path is only ever `import()`-ed if it passes the trust gate above

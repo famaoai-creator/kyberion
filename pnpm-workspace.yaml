@@ -5,6 +5,10 @@ packages:
   - 'satellites/*'
   - 'presence/displays/*'
   - 'presence/bridge/*'
+# PI-12: do not immediately trust newly published versions. Non-auth pnpm
+# settings are kept in this workspace file so CI and local installs agree.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
 allowBuilds:
   '@anthropic-ai/claude-code': true
   '@scarf/scarf': false

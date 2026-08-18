@@ -61,6 +61,7 @@ describe('wisdom-actuator handleAction', () => {
           params: {
             package_path: 'knowledge/public/tmp/package.kkp',
             tier: 'confidential',
+            tenant_slug: 'tenant-acme',
           },
         },
       ],

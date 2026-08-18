@@ -36,6 +36,8 @@ import {
   resolveIdentityContext,
   executeAdfSteps,
   resolveVars,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -525,6 +527,18 @@ export async function handleAction(
       },
     };
   }
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `meeting:${input.action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation meeting:${input.action} was not admitted.`}`
+    );
+  }
+  input = { ...input, params: preflight.input as MeetingAction['params'] };
   const traceCtx = createActuatorTrace('meeting-actuator', input.action, {
     pipelineId: input.params.meeting_id,
   });

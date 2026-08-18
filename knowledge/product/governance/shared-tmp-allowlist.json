@@ -124,6 +124,12 @@
       "note": "delegation request/result IPC files"
     },
     {
+      "file": "libs/core/spill-result.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "bounded secure spill for oversized text results"
+    },
+    {
       "file": "libs/core/email-workflow.ts",
       "count": 1,
       "classification": "migrate-candidate",
@@ -338,6 +344,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "dry-run receipt before an approved governed cleanup; apply receipts are mission evidence"
+    },
+    {
+      "file": "scripts/eval_harness.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "deterministic evaluation receipt stream"
     },
     {
       "file": "scripts/generate_project_os.ts",

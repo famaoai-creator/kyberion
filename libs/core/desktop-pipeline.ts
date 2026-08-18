@@ -4,6 +4,7 @@ import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
+import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -70,9 +71,21 @@ export function resolveDesktopPipelineRef(ref: string | undefined): string | nul
   return absolute.startsWith(`${root}${path.sep}`) ? absolute : null;
 }
 
-export function loadDesktopPipeline(ref: string | undefined): DesktopPipelineValidationResult {
+export function loadDesktopPipeline(
+  ref: string | undefined,
+  options: { trustResolved?: boolean } = {}
+): DesktopPipelineValidationResult {
   const absolute = resolveDesktopPipelineRef(ref);
   if (!absolute) return { valid: false, errors: ['desktop pipeline_ref is not allowlisted'] };
+  const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
+  if (options.trustResolved === false && requiresProjectTrust(relative)) {
+    return {
+      valid: false,
+      errors: [
+        '[TRUST_REQUIRED] project-local desktop pipeline cannot be loaded before trust resolution',
+      ],
+    };
+  }
   try {
     const raw = JSON.parse(safeReadFile(absolute, { encoding: 'utf8' }) as string);
     return validateDesktopPipeline(raw);

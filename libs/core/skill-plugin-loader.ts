@@ -40,12 +40,20 @@ import {
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import type { ScopeContext } from './scope-context.js';
+import { applyNarrowOnlyFilter } from './resource-provenance.js';
+import {
+  activatePluginContributions,
+  type PluginContributionActivation,
+  type PluginContributionDeclaration,
+  type PluginContributionModule,
+} from './plugin-contributions.js';
 
 export const SKILL_PLUGINS_CONFIG_FILENAME = '.kyberion-plugins.json';
 
 export interface SkillPluginHookModule {
   beforeSkill?: (skillName: string, args: unknown) => unknown;
   afterSkill?: (skillName: string, output: unknown) => unknown;
+  registerKyberionContributions?: PluginContributionModule['registerKyberionContributions'];
   [exportName: string]: unknown;
 }
 
@@ -65,6 +73,7 @@ export interface LoadedSkillPlugin {
   configuredPath: string;
   resolvedPath: string;
   module: SkillPluginHookModule;
+  contributions?: PluginContributionActivation;
 }
 
 export interface SkillPluginLoadResult {
@@ -73,10 +82,29 @@ export interface SkillPluginLoadResult {
   diagnostics: SkillPluginAuthorization[];
 }
 
-interface RestrictedSkillRecord {
+export interface RestrictedSkillRecord {
   name?: string;
   status?: string;
   allow_override?: boolean;
+}
+
+/**
+ * Overlay policy is narrow-only: a local record may restrict a skill, but it
+ * cannot turn a globally restricted skill back on.  Human approval remains a
+ * separate, explicit gate rather than an implicit manifest escape hatch.
+ */
+export function evaluateSkillRestrictionRecords(
+  skillName: string,
+  records: RestrictedSkillRecord[]
+): { allowed: boolean; reason?: string } {
+  const restricted = records.find(
+    (record) => record.name === skillName && record.status === 'restricted'
+  );
+  if (!restricted) return { allowed: true };
+  return {
+    allowed: false,
+    reason: `skill '${skillName}' is restricted by governed policy`,
+  };
 }
 
 /** Consume the governed restricted-skills catalog at the skill execution gate. */
@@ -105,14 +133,7 @@ export function isSkillAllowed(
         ? parsed.project_overrides?.[scope.project_id]?.restrictions || []
         : []),
     ];
-    const restricted = records.find(
-      (record) => record.name === skillName && record.status === 'restricted'
-    );
-    if (!restricted) return { allowed: true };
-    return {
-      allowed: restricted.allow_override === true,
-      reason: `skill '${skillName}' is restricted by governed policy`,
-    };
+    return evaluateSkillRestrictionRecords(skillName, records);
   } catch {
     return { allowed: false, reason: 'restricted-skills policy is unreadable' };
   }
@@ -143,18 +164,16 @@ export function readSkillPluginsConfig(cwd: string, scope?: ScopeContext): strin
       scope?.organization_id ? parsed.organization_overrides?.[scope.organization_id] : undefined,
       scope?.project_id ? parsed.project_overrides?.[scope.project_id] : undefined,
     ];
-    return Array.from(
-      new Set([
-        ...base,
-        ...overlays.flatMap((overlay) =>
-          Array.isArray(overlay?.plugins)
-            ? overlay.plugins.filter(
-                (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
-              )
-            : []
-        ),
-      ])
-    );
+    let selected = base;
+    for (const overlay of overlays) {
+      if (!Array.isArray(overlay?.plugins)) continue;
+      const selectors = overlay.plugins.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
+      );
+      if (selectors.length === 0) continue;
+      selected = applyNarrowOnlyFilter(selected, selectors).values;
+    }
+    return selected;
   } catch (err) {
     logger.warn(
       `[skill-plugin-loader] Failed to read ${SKILL_PLUGINS_CONFIG_FILENAME}: ${
@@ -172,6 +191,50 @@ function findManagedRecordFor(
   return listManagedPlugins(managedRoot).find((record) =>
     isPathContainedIn(record.managedPath, resolvedPath)
   );
+}
+
+function readPluginManifestProvides(resolvedPath: string): {
+  pluginId?: string;
+  provides?: PluginContributionDeclaration;
+} {
+  let cursor = path.dirname(resolvedPath);
+  for (let depth = 0; depth < 6; depth += 1) {
+    const candidates = [
+      path.join(cursor, 'plugin-manifest.json'),
+      path.join(cursor, 'plugin.json'),
+      path.join(cursor, '.claude-plugin', 'plugin.json'),
+    ];
+    const manifestPath = candidates.find((candidate) => safeExistsSync(candidate));
+    if (manifestPath) {
+      try {
+        const parsed = JSON.parse(
+          String(safeReadFile(manifestPath, { encoding: 'utf8' }))
+        ) as Record<string, unknown>;
+        const rawProvides = parsed.provides;
+        const provides =
+          rawProvides && typeof rawProvides === 'object' && !Array.isArray(rawProvides)
+            ? (rawProvides as PluginContributionDeclaration)
+            : undefined;
+        return {
+          pluginId:
+            typeof parsed.plugin_id === 'string'
+              ? parsed.plugin_id
+              : typeof parsed.name === 'string'
+                ? parsed.name
+                : undefined,
+          provides,
+        };
+      } catch (error) {
+        throw new Error(
+          `[PLUGIN_MANIFEST_INVALID] ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+  return {};
 }
 
 /**
@@ -270,8 +333,27 @@ export function authorizeConfiguredSkillPlugins(
 export async function loadAuthorizedSkillPlugins(
   cwd: string = process.cwd(),
   managedRoot?: string,
-  scope?: ScopeContext
+  scope?: ScopeContext,
+  options: { trustResolved?: boolean } = {}
 ): Promise<SkillPluginLoadResult> {
+  // PI-03: `.kyberion-plugins.json` is itself a trust-sensitive project
+  // resource. A pre-trust caller may observe that the resource exists for
+  // diagnostics, but must not parse selectors or import any configured code.
+  const configPath = path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME);
+  if (options.trustResolved === false && safeExistsSync(configPath)) {
+    return {
+      loaded: [],
+      diagnostics: [
+        {
+          configuredPath: configPath,
+          resolvedPath: configPath,
+          trust: 'third-party',
+          allowed: false,
+          reason: 'project trust is unresolved; plugin configuration was not consumed',
+        },
+      ],
+    };
+  }
   const authorizations = authorizeConfiguredSkillPlugins(cwd, managedRoot, scope);
   const loaded: LoadedSkillPlugin[] = [];
   const diagnostics: SkillPluginAuthorization[] = [];
@@ -289,10 +371,32 @@ export async function loadAuthorizedSkillPlugins(
         /* webpackIgnore: true */
         pathToFileURL(authorization.resolvedPath).href
       )) as SkillPluginHookModule;
+      let contributions: PluginContributionActivation | undefined;
+      if (typeof mod.registerKyberionContributions === 'function') {
+        const manifest = readPluginManifestProvides(authorization.resolvedPath);
+        if (!manifest.provides) {
+          throw new Error(
+            '[PLUGIN_CONTRIBUTION_DENIED] registerKyberionContributions requires manifest provides declaration'
+          );
+        }
+        contributions = await activatePluginContributions(
+          manifest.provides,
+          {
+            pluginId:
+              authorization.managedPluginId ||
+              manifest.pluginId ||
+              path.basename(authorization.resolvedPath),
+            sourcePath: authorization.resolvedPath,
+            trust: authorization.trust === 'official' ? 'official' : 'third-party',
+          },
+          mod
+        );
+      }
       loaded.push({
         configuredPath: authorization.configuredPath,
         resolvedPath: authorization.resolvedPath,
         module: mod,
+        ...(contributions ? { contributions } : {}),
       });
     } catch (err) {
       const diagnostic: SkillPluginAuthorization = {
@@ -333,6 +437,19 @@ export async function fireSkillPluginHook(
         `[skill-plugin-loader] Plugin '${plugin.configuredPath}' ${hook} hook threw (ignored, fail-open): ${
           err instanceof Error ? err.message : String(err)
         }`
+      );
+    }
+  }
+}
+
+/** Dispose dynamic contributions after a skill so one invocation cannot widen the next. */
+export function disposeSkillPluginContributions(plugins: LoadedSkillPlugin[]): void {
+  for (const plugin of [...plugins].reverse()) {
+    try {
+      plugin.contributions?.dispose();
+    } catch (err) {
+      logger.warn(
+        `[skill-plugin-loader] Failed to dispose contributions for '${plugin.configuredPath}': ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }

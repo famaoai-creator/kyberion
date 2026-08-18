@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-13T15:20:57.206Z",
+  "generated_at": "2026-08-17T17:24:11.287Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -95,7 +95,7 @@
     "libs/core/src/native-pdf-engine/engine.ts": 1,
     "libs/core/surface-approval-ui.ts": 24,
     "libs/core/surface-mission-proposals.ts": 3,
-    "libs/core/surface-mission-steering.ts": 67,
+    "libs/core/surface-mission-steering.ts": 69,
     "libs/core/surface-query-helpers.ts": 6,
     "libs/core/surface-runtime-helpers.ts": 25,
     "libs/core/surface-runtime-orchestrator.ts": 38,

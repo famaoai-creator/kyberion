@@ -91,6 +91,8 @@ export interface PipelineAdfStep {
   comment?: string;
   effort?: 'low' | 'medium' | 'high';
   budget?: PipelineStepBudget;
+  /** Optional per-operation execution budget declared by the op definition. */
+  timeout_ms?: number;
   reasoning?: PipelineStepReasoning;
   facets?: PipelineStepFacets;
   /** Optional perform -> report phase contract. */
