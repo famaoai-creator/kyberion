@@ -5,7 +5,7 @@
  * 5 events) into an engine any internal loop can fire: pipelines, workers,
  * delegation, compaction. Modeled on kimi-cli's HookEngine:
  *
- * - 13-event vocabulary (Claude Code taxonomy mapped to Kyberion names)
+ * - lifecycle vocabulary (Claude Code taxonomy mapped to Kyberion names)
  * - hooks match on a regex over the event's matcher value (e.g. op name)
  * - all matching hooks run in parallel; any block ⇒ blocked
  * - **fail-open**: an engine/hook failure never stops the worker — EXCEPT
@@ -18,9 +18,15 @@
  */
 
 import { logger } from './core.js';
+import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeReadFile } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import {
+  createApprovalRequest,
+  listApprovalRequests,
+  type ApprovalRequestRecord,
+} from './approval-store.js';
 
 export const LIFECYCLE_HOOK_EVENTS = [
   'pre_tool_use',
@@ -30,12 +36,16 @@ export const LIFECYCLE_HOOK_EVENTS = [
   'stop',
   'stop_failure',
   'session_start',
+  /** Fired after session setup and before the agent receives its first prompt. */
+  'before_agent_start',
   'session_end',
   'subagent_start',
   'subagent_stop',
   'pre_compact',
   'post_compact',
   'notification',
+  /** Emitted once after the run's retry/repair/compaction work is complete. */
+  'task_settled',
 ] as const;
 
 export type LifecycleHookEvent = (typeof LIFECYCLE_HOOK_EVENTS)[number];
@@ -48,9 +58,14 @@ export interface LifecycleHookPayload {
 
 export interface LifecycleHookDecision {
   block: boolean;
+  /** External hook compatibility: deny > ask > allow. Ask is fail-closed at
+   * execution boundaries that do not expose an interactive approval surface. */
+  decision?: 'allow' | 'ask' | 'block';
   reason?: string;
   /** Extra context appended to the worker's view (non-blocking hooks). */
   additional_context?: string;
+  /** Partial tool-result/context patch applied after the operation settles. */
+  result_patch?: Record<string, unknown>;
 }
 
 export type LifecycleHookHandler = (
@@ -71,16 +86,43 @@ export interface LifecycleHookRegistration {
 
 export interface LifecycleHookOutcome {
   blocked: boolean;
+  /** Strongest disposition across all matching hooks. */
+  decision: 'allow' | 'ask' | 'block';
+  asked: boolean;
   reasons: string[];
   additionalContext: string[];
+  /** Deterministic shallow patch collected from post-tool middleware. */
+  resultPatch: Record<string, unknown>;
   /** Hook ids that failed to run (fail-open — informational only). */
   failedHooks: string[];
+  /** PI-08: pending human approval created for an interactive ask. */
+  approvalRequestId?: string;
+}
+
+export interface LifecycleHookApprovalSurface {
+  channel: string;
+  threadTs: string;
+  correlationId: string;
+  requestedBy: string;
+  storageChannel?: string;
+  title?: string;
+  summary?: string;
+  details?: string;
+  severity?: 'low' | 'medium' | 'high';
+}
+
+export interface LifecycleHookEngineOptions {
+  /** Keep a security block active until an explicit operator reset. */
+  stickyHalt?: boolean;
 }
 
 const ALLOW_OUTCOME: LifecycleHookOutcome = {
   blocked: false,
+  decision: 'allow',
+  asked: false,
   reasons: [],
   additionalContext: [],
+  resultPatch: {},
   failedHooks: [],
 };
 
@@ -89,6 +131,14 @@ const CONFIG_LOGICAL_PATH = 'knowledge/product/governance/lifecycle-hooks.json';
 
 export class LifecycleHookEngine {
   private readonly hooks: LifecycleHookRegistration[] = [];
+  private readonly stickyHalt: boolean;
+  private haltedReason: string | undefined;
+  private activeFires = 0;
+  private readonly idleWaiters: Array<() => void> = [];
+
+  constructor(options: LifecycleHookEngineOptions = {}) {
+    this.stickyHalt = options.stickyHalt === true;
+  }
 
   register(hook: LifecycleHookRegistration): () => void {
     this.validate(hook);
@@ -111,6 +161,22 @@ export class LifecycleHookEngine {
 
   hookCountFor(event: LifecycleHookEvent): number {
     return this.matching(event, undefined).length;
+  }
+
+  /** Whether this engine has latched a sticky security halt. */
+  get isHalted(): boolean {
+    return this.haltedReason !== undefined;
+  }
+
+  /** Explicit operator/mission-owner reset for an opt-in sticky halt. */
+  clearHalt(): void {
+    this.haltedReason = undefined;
+  }
+
+  /** Resolve after all hook fires already in progress have settled. */
+  whenIdle(): Promise<void> {
+    if (this.activeFires === 0) return Promise.resolve();
+    return new Promise<void>((resolve) => this.idleWaiters.push(resolve));
   }
 
   private matching(
@@ -138,6 +204,36 @@ export class LifecycleHookEngine {
     event: LifecycleHookEvent,
     payload: LifecycleHookPayload = {}
   ): Promise<LifecycleHookOutcome> {
+    this.activeFires += 1;
+    try {
+      return await this.fireInternal(event, payload);
+    } finally {
+      this.activeFires -= 1;
+      if (this.activeFires === 0) {
+        const waiters = this.idleWaiters.splice(0);
+        for (const resolve of waiters) resolve();
+      }
+    }
+  }
+
+  private async fireInternal(
+    event: LifecycleHookEvent,
+    payload: LifecycleHookPayload
+  ): Promise<LifecycleHookOutcome> {
+    if (this.haltedReason !== undefined) {
+      const reason = `sticky lifecycle halt: ${this.haltedReason}`;
+      const halted: LifecycleHookOutcome = {
+        blocked: true,
+        decision: 'block',
+        asked: false,
+        reasons: [reason],
+        additionalContext: [],
+        resultPatch: {},
+        failedHooks: [],
+      };
+      assertModuleInvariant('lifecycle-hook-engine', 'outcome-shape', halted);
+      return halted;
+    }
     let matched: LifecycleHookRegistration[];
     try {
       matched = this.matching(event, payload.matcher_value);
@@ -164,8 +260,11 @@ export class LifecycleHookEngine {
 
     const outcome: LifecycleHookOutcome = {
       blocked: false,
+      decision: 'allow',
+      asked: false,
       reasons: [],
       additionalContext: [],
+      resultPatch: {},
       failedHooks: [],
     };
     for (const entry of outcomes) {
@@ -174,14 +273,34 @@ export class LifecycleHookEngine {
         continue;
       }
       if (!entry.decision) continue;
-      if (entry.decision.block) {
+      const disposition = entry.decision.block ? 'block' : entry.decision.decision || 'allow';
+      if (disposition === 'block') {
+        outcome.decision = 'block';
+        outcome.asked = false;
         outcome.blocked = true;
         outcome.reasons.push(entry.decision.reason || `blocked by hook ${entry.hook.id}`);
+        if (this.stickyHalt && this.haltedReason === undefined) {
+          this.haltedReason = outcome.reasons[outcome.reasons.length - 1];
+        }
+      } else if (disposition === 'ask' && outcome.decision !== 'block') {
+        outcome.decision = 'ask';
+        outcome.asked = true;
+        // A non-interactive execution boundary cannot safely continue after
+        // an ask. Keep the legacy `blocked` projection true so existing
+        // callers fail closed without having to understand the new field.
+        outcome.blocked = true;
+        outcome.reasons.push(entry.decision.reason || `approval required by hook ${entry.hook.id}`);
       }
       if (entry.decision.additional_context) {
         outcome.additionalContext.push(entry.decision.additional_context);
       }
+      if (entry.decision.result_patch) {
+        for (const [key, value] of Object.entries(entry.decision.result_patch)) {
+          outcome.resultPatch[key] = value;
+        }
+      }
     }
+    assertModuleInvariant('lifecycle-hook-engine', 'outcome-shape', outcome);
     return outcome;
   }
 }
@@ -197,17 +316,49 @@ function runCommandHook(
     input: JSON.stringify({ event, ...payload }),
   });
   // Exit 2 = block (claude-code-hook convention); stdout may refine it.
-  let parsed: { decision?: string; reason?: string; additional_context?: string } = {};
+  let parsed: {
+    decision?: string;
+    reason?: string;
+    additional_context?: string;
+    result_patch?: Record<string, unknown>;
+    hookSpecificOutput?: {
+      permissionDecision?: string;
+      permissionDecisionReason?: string;
+    };
+  } = {};
   try {
     parsed = JSON.parse(result.stdout.trim() || '{}');
   } catch {
     /* non-JSON stdout is fine for allow/exit-code-only hooks */
   }
-  const block = result.status === 2 || parsed.decision === 'block';
+  const externalDecision = parsed.hookSpecificOutput?.permissionDecision?.toLowerCase();
+  const decision =
+    result.status === 2 ||
+    parsed.decision === 'block' ||
+    parsed.decision === 'deny' ||
+    externalDecision === 'deny'
+      ? 'block'
+      : parsed.decision === 'ask' || externalDecision === 'ask'
+        ? 'ask'
+        : 'allow';
+  const reason =
+    parsed.reason ||
+    parsed.hookSpecificOutput?.permissionDecisionReason ||
+    result.stderr.trim() ||
+    undefined;
   return {
-    block,
-    ...(block ? { reason: parsed.reason || result.stderr.trim() || `hook ${hook.id} blocked` } : {}),
+    block: decision === 'block',
+    decision,
+    ...(decision !== 'allow'
+      ? {
+          reason:
+            reason || `hook ${hook.id} ${decision === 'ask' ? 'requires approval' : 'blocked'}`,
+        }
+      : {}),
     ...(parsed.additional_context ? { additional_context: parsed.additional_context } : {}),
+    ...(parsed.result_patch && typeof parsed.result_patch === 'object'
+      ? { result_patch: parsed.result_patch }
+      : {}),
   };
 }
 
@@ -249,6 +400,48 @@ export async function fireLifecycleHooks(
     }
   }
   return outcome;
+}
+
+/**
+ * Materialize an interactive `ask` into the shared approval store. Plain
+ * `fireLifecycleHooks` intentionally remains a fail-closed, non-interactive
+ * boundary; callers with a real surface opt into this adapter explicitly.
+ * Pending requests are reused by correlation id so retries do not fan out
+ * duplicate approval prompts.
+ */
+export async function fireLifecycleHooksWithApproval(
+  engine: LifecycleHookEngine,
+  event: LifecycleHookEvent,
+  payload: LifecycleHookPayload = {},
+  surface: LifecycleHookApprovalSurface
+): Promise<LifecycleHookOutcome> {
+  const outcome = await fireLifecycleHooks(engine, event, payload);
+  if (outcome.decision !== 'ask') return outcome;
+
+  const pending = listApprovalRequests({ status: 'pending', kind: 'channel-approval' }).find(
+    (record) =>
+      record.correlationId === surface.correlationId &&
+      record.channel === surface.channel &&
+      record.requestedBy === surface.requestedBy
+  );
+  const request: ApprovalRequestRecord =
+    pending ||
+    createApprovalRequest('surface_runtime', {
+      channel: surface.channel,
+      storageChannel: surface.storageChannel || surface.channel,
+      threadTs: surface.threadTs,
+      correlationId: surface.correlationId,
+      requestedBy: surface.requestedBy,
+      draft: {
+        title: surface.title || `Lifecycle approval required: ${event}`,
+        summary: surface.summary || outcome.reasons.join('; ') || 'Operator approval is required.',
+        ...(surface.details ? { details: surface.details } : {}),
+        severity: surface.severity || 'medium',
+      },
+      accountability: { finalDecision: 'human_only' },
+      sourceText: `lifecycle-hook:${event}:${payload.matcher_value || ''}`,
+    });
+  return { ...outcome, approvalRequestId: request.id };
 }
 
 interface LifecycleHookConfigFile {

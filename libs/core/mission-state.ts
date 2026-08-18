@@ -15,6 +15,7 @@ import {
 import { logger } from './core.js';
 import { safeExistsSync, safeLstat, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
+import { withFencedWriterLease, writerLeaseResourceId } from './writer-lease.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { hasAuthority } from './governance.js';
 import { readJsonFile } from './cli-input.js';
@@ -252,10 +253,19 @@ export async function saveState(
     safeWriteFile(path.join(dir, 'mission-state.json'), JSON.stringify(state, null, 2));
   };
 
+  const leasePath = path.join(dir, 'coordination', 'writer-lease.json');
+  const doFencedWrite = () =>
+    withFencedWriterLease({
+      resourceId: writerLeaseResourceId(leasePath),
+      ownerId: `process:${process.pid}`,
+      leasePath,
+      fn: doWrite,
+    });
+
   if (alreadyLocked) {
-    await doWrite();
+    await doFencedWrite();
   } else {
-    await withLock(`mission-${id}`, doWrite);
+    await withLock(`mission-${id}`, doFencedWrite);
   }
 }
 

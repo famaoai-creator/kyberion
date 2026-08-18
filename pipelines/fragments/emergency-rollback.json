@@ -10,7 +10,7 @@
       "role": "sink",
       "op": "system:shell",
       "params": {
-        "cmd": "git reset --hard HEAD"
+        "cmd": "git restore --source=HEAD --worktree --staged -- :/"
       }
     },
     {
@@ -18,7 +18,7 @@
       "role": "sink",
       "op": "system:shell",
       "params": {
-        "cmd": "git clean -fd"
+        "cmd": "find active/shared/tmp -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +"
       }
     },
     {

@@ -162,7 +162,7 @@ describe('mission-gate-engine', () => {
     expect(stubGate.verdict).toBe('fail');
     expect(stubGate.reasons.join(' ')).toContain('real reasoning backend');
 
-    registerReasoningBackend({
+    const disposeFirstBackend = registerReasoningBackend({
       name: 'fake-llm',
       prompt: async () => '{"pass": true, "reasons": ["根拠と結論が対応"]}',
     } as never);
@@ -172,6 +172,7 @@ describe('mission-gate-engine', () => {
       evidenceDir: `${missionPath}/gates`,
     });
     expect(passGate.verdict).toBe('pass');
+    disposeFirstBackend();
 
     registerReasoningBackend({
       name: 'fake-llm',

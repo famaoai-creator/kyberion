@@ -676,9 +676,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
 
     const dispatchedPromise = dispatchMissionNextTasks('MSN-FOLLOWUP');
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(2), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(
       mocks.route.mock.calls.map((call) =>
         String((call[0] as any)?.payload?.context?.task_id || '')
@@ -1211,6 +1212,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeReadFile } = await import('./secure-io.js');
     const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
+    const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
 
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     persistPlanningPacket('MSN-FOLLOWUP', {
@@ -1247,6 +1249,11 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         estimated_scope: 'M',
       }),
     ]);
+    expect(
+      loadProvisionedEntryRecords('MSN-FOLLOWUP')
+        .slice(-2)
+        .map((record) => record.phase)
+    ).toEqual(['provisioned', 'verified']);
   });
 
   it('preserves process-template-seeded tasks when persisting a planner packet', async () => {
@@ -1727,9 +1734,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
 
     const dispatchedPromise = dispatchMissionNextTasks('MSN-FOLLOWUP');
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(1), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
       'task-bootstrap'
     );
@@ -1746,9 +1754,10 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       },
     });
 
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mocks.route).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(mocks.route).toHaveBeenCalledTimes(2), {
+      timeout: 10_000,
+      interval: 10,
+    });
     expect(String((mocks.route.mock.calls[1]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
       'task-followup'
     );

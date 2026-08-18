@@ -20,6 +20,8 @@ import {
   validatePipelineAdf,
   registerTaskPlanCoordinator,
   evaluateTaskPlanReadyGate,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -139,18 +141,32 @@ export async function executePipeline(
     try {
       logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
 
+      ensureDefaultOpPreflight();
+      const preflight = await runOpPreflight({
+        op: `orchestrator:${step.op}`,
+        params: step.params || {},
+        context: ctx,
+        source: 'actuator',
+      });
+      if (preflight.decision !== 'allow') {
+        throw new Error(
+          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation orchestrator:${step.op} was not admitted.`}`
+        );
+      }
+      const params = preflight.input;
+
       if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state);
+        ctx = await opControl(step.op, params, ctx, options, state);
       } else {
         switch (step.type) {
           case 'capture':
-            ctx = await opCapture(step.op, step.params, ctx);
+            ctx = await opCapture(step.op, params, ctx);
             break;
           case 'transform':
-            ctx = await opTransform(step.op, step.params, ctx);
+            ctx = await opTransform(step.op, params, ctx);
             break;
           case 'apply':
-            ctx = await opApply(step.op, step.params, ctx);
+            ctx = await opApply(step.op, params, ctx);
             break;
         }
       }

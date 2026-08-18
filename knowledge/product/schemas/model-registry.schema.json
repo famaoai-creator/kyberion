@@ -68,6 +68,23 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "compat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "thinkingLevelMap": {
+              "type": "object",
+              "additionalProperties": { "type": ["string", "null"] },
+              "properties": {
+                "low": { "type": ["string", "null"] },
+                "medium": { "type": ["string", "null"] },
+                "high": { "type": ["string", "null"] }
+              }
+            },
+            "supportsStrictTools": { "type": "boolean" },
+            "supportsGrammarTools": { "type": "boolean" }
+          }
+        },
         "notes": { "type": "string" }
       },
       "required": [

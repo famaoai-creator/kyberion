@@ -216,6 +216,8 @@ export async function processMissionTeamPrewarmRequest(
     missionId: request.mission_id,
     teamRoles: request.team_roles,
     scope: request.scope,
+    runtimeOwnerId: `agent-runtime-supervisor:${request.request_id}`,
+    runtimeOwnerType: 'agent-runtime-supervisor',
   });
 
   const result: AgentRuntimeEnsureResult = {

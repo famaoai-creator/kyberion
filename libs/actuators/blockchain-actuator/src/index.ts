@@ -9,6 +9,8 @@ import {
   buildGovernedRetryOptions,
   classifyError,
   retry,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -54,13 +56,25 @@ function buildRetryOptions(override?: Record<string, any>) {
 }
 
 async function handleAction(input: BlockchainAction) {
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `blockchain:${input.action}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation blockchain:${input.action} was not admitted.`}`
+    );
+  }
+  const params = preflight.input as BlockchainAction['params'];
   switch (input.action) {
     case 'anchor_mission':
-      return await anchorMission(input.params);
+      return await anchorMission(params);
     case 'anchor_trust':
-      return await anchorTrust(input.params);
+      return await anchorTrust(params);
     case 'verify_anchor':
-      return await verifyAnchor(input.params);
+      return await verifyAnchor(params);
     default:
       throw new Error(`Unsupported blockchain action: ${input.action}`);
   }

@@ -73,6 +73,13 @@ describe('provider-permission-profiles', () => {
       }
     });
 
+    it('refuses agy explorer because its read-only sandbox is only partial', () => {
+      expect(resolveProviderPermissionArgs('explorer', 'agy')).toEqual({
+        kind: 'refused',
+        reason: expect.stringContaining('cannot satisfy the explorer read-only sandbox contract'),
+      });
+    });
+
     it('grants planner no write/exec permissions for any provider (grant or refusal)', () => {
       for (const provider of PROVIDER_IDS) {
         const resolution = resolveProviderPermissionArgs('planner', provider);

@@ -114,7 +114,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
 }
 
 function buildIndexTs(fullName: string, pascalName: string): string {
-  return `import { logger, classifyError } from '@agent/core';
+  return `import { ensureDefaultOpPreflight, logger, classifyError, runOpPreflight } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 // ── Op dispatch ─────────────────────────────────────────────────────────────
@@ -125,9 +125,26 @@ export async function dispatch${pascalName}Op(
   ctx: Record<string, unknown>,
 ): Promise<{ handled: boolean; ctx: Record<string, unknown> }> {
   try {
+    ensureDefaultOpPreflight();
+    const approvalGranted = params._approval_granted === true || ctx._approval_granted === true;
+    const preflight = await runOpPreflight({
+      op: '${fullName}:' + op,
+      params,
+      context: ctx,
+      source: 'actuator',
+      requiresApproval: params._approval_required === true || ctx._approval_required === true,
+      approvalGranted,
+    });
+    if (preflight.decision !== 'allow') {
+      throw new Error(
+        '[OP_PREFLIGHT_' + preflight.decision.toUpperCase() + '] ' +
+          (preflight.reason || 'Operation was not admitted.')
+      );
+    }
+    const admittedParams = preflight.input;
     switch (op) {
       case 'execute':
-        return { handled: true, ctx: await opExecute(params, ctx) };
+        return { handled: true, ctx: await opExecute(admittedParams, ctx) };
 
       default:
         logger.warn(\`[${fullName}] Unknown op: \${op}\`);

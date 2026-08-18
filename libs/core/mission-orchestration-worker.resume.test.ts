@@ -80,6 +80,9 @@ describe('mission-orchestration-worker resume replay', () => {
     await processMissionOrchestrationEventPath(
       `${pathResolver.shared('coordination/orchestration/events')}/${controlEvent.event_id}.json`
     );
+    await processMissionOrchestrationEventPath(
+      `${pathResolver.shared('coordination/orchestration/events')}/${controlEvent.event_id}.json`
+    );
 
     expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -95,6 +98,17 @@ describe('mission-orchestration-worker resume replay', () => {
       ['dist/scripts/mission_controller.js', 'resume', missionId],
       expect.objectContaining({ timeoutMs: expect.any(Number) })
     );
+    const orchestrationWorkerCalls = mocks.spawnManagedProcess.mock.calls.filter(
+      ([spec]) => spec?.args?.[0] === 'dist/scripts/run_mission_orchestration_event_worker.js'
+    );
+    expect(orchestrationWorkerCalls).toHaveLength(1);
+    const resumeCommands = mocks.safeExec.mock.calls.filter(
+      ([command, args]) =>
+        command === 'node' &&
+        args?.[0] === 'dist/scripts/mission_controller.js' &&
+        args?.[1] === 'resume'
+    );
+    expect(resumeCommands).toHaveLength(1);
 
     const journal = loadMissionOrchestrationJournal(missionId);
     expect(journal.map((entry) => entry.status)).toEqual([

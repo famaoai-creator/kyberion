@@ -459,6 +459,86 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
+    "./agent-execution-port": {
+      "types": "./dist/agent-execution-port.d.ts",
+      "default": "./dist/agent-execution-port.js"
+    },
+    "./actuator-forwarding-port": {
+      "types": "./dist/actuator-forwarding-port.d.ts",
+      "default": "./dist/actuator-forwarding-port.js"
+    },
+    "./actuator-capability": {
+      "types": "./dist/src/actuator-capability.d.ts",
+      "default": "./dist/src/actuator-capability.js"
+    },
+    "./audit-forwarder": {
+      "types": "./dist/audit-forwarder.d.ts",
+      "default": "./dist/audit-forwarder.js"
+    },
+    "./deployment-adapter": {
+      "types": "./dist/deployment-adapter.d.ts",
+      "default": "./dist/deployment-adapter.js"
+    },
+    "./email-account-catalog": {
+      "types": "./dist/email-account-catalog.d.ts",
+      "default": "./dist/email-account-catalog.js"
+    },
+    "./environment-capability": {
+      "types": "./dist/environment-capability.d.ts",
+      "default": "./dist/environment-capability.js"
+    },
+    "./intent-extractor": {
+      "types": "./dist/intent-extractor.d.ts",
+      "default": "./dist/intent-extractor.js"
+    },
+    "./lifecycle-hook-engine": {
+      "types": "./dist/lifecycle-hook-engine.d.ts",
+      "default": "./dist/lifecycle-hook-engine.js"
+    },
+    "./meeting-join-driver": {
+      "types": "./dist/meeting-join-driver.d.ts",
+      "default": "./dist/meeting-join-driver.js"
+    },
+    "./reasoning-backend": {
+      "types": "./dist/reasoning-backend.d.ts",
+      "default": "./dist/reasoning-backend.js"
+    },
+    "./secret-resolver": {
+      "types": "./dist/secret-resolver.d.ts",
+      "default": "./dist/secret-resolver.js"
+    },
+    "./speech-to-text-bridge": {
+      "types": "./dist/speech-to-text-bridge.d.ts",
+      "default": "./dist/speech-to-text-bridge.js"
+    },
+    "./streaming-stt-bridge": {
+      "types": "./dist/streaming-stt-bridge.d.ts",
+      "default": "./dist/streaming-stt-bridge.js"
+    },
+    "./streaming-tts-bridge": {
+      "types": "./dist/streaming-tts-bridge.d.ts",
+      "default": "./dist/streaming-tts-bridge.js"
+    },
+    "./surface-interaction-model": {
+      "types": "./dist/surface-interaction-model.d.ts",
+      "default": "./dist/surface-interaction-model.js"
+    },
+    "./task-plan-coordinator-port": {
+      "types": "./dist/task-plan-coordinator-port.d.ts",
+      "default": "./dist/task-plan-coordinator-port.js"
+    },
+    "./task-session": {
+      "types": "./dist/task-session.d.ts",
+      "default": "./dist/task-session.js"
+    },
+    "./voice-bridge": {
+      "types": "./dist/voice-bridge.d.ts",
+      "default": "./dist/voice-bridge.js"
+    },
+    "./vad-registry": {
+      "types": "./dist/vad-registry.d.ts",
+      "default": "./dist/vad-registry.js"
+    },
     "./operator-home-summary": {
       "types": "./dist/operator-home-summary.d.ts",
       "default": "./dist/operator-home-summary.js"
@@ -482,6 +562,10 @@
     "./reasoning-model-routing": {
       "types": "./dist/reasoning-model-routing.d.ts",
       "default": "./dist/reasoning-model-routing.js"
+    },
+    "./backend-capability-profile": {
+      "types": "./dist/backend-capability-profile.d.ts",
+      "default": "./dist/backend-capability-profile.js"
     },
     "./tenant-design-resolver": {
       "types": "./dist/tenant-design-resolver.d.ts",
@@ -558,6 +642,22 @@
     "./reasoning-backend-policy": {
       "types": "./dist/reasoning-backend-policy.d.ts",
       "default": "./dist/reasoning-backend-policy.js"
+    },
+    "./reasoning-provider-registry": {
+      "types": "./dist/reasoning-provider-registry.d.ts",
+      "default": "./dist/reasoning-provider-registry.js"
+    },
+    "./trace-schema": {
+      "types": "./dist/trace-schema.d.ts",
+      "default": "./dist/trace-schema.js"
+    },
+    "./testing/reasoning-backend-conformance": {
+      "types": "./dist/testing/reasoning-backend-conformance.d.ts",
+      "default": "./dist/testing/reasoning-backend-conformance.js"
+    },
+    "./reasoning-auth-preflight": {
+      "types": "./dist/reasoning-auth-preflight.d.ts",
+      "default": "./dist/reasoning-auth-preflight.js"
     },
     "./voice-task-profile-catalog": {
       "types": "./dist/voice-task-profile-catalog.d.ts",
@@ -646,6 +746,10 @@
     "./distill-candidate-registry": {
       "types": "./dist/distill-candidate-registry.d.ts",
       "default": "./dist/distill-candidate-registry.js"
+    },
+    "./service-distill-candidate": {
+      "types": "./dist/service-distill-candidate.d.ts",
+      "default": "./dist/service-distill-candidate.js"
     },
     "./mission-ledger-policy": {
       "types": "./dist/mission-ledger-policy.d.ts",
@@ -842,6 +946,70 @@
     "./op-input-contracts": {
       "types": "./dist/op-input-contracts.d.ts",
       "default": "./dist/op-input-contracts.js"
+    },
+    "./op-preflight": {
+      "types": "./dist/op-preflight.d.ts",
+      "default": "./dist/op-preflight.js"
+    },
+    "./op-preflight-defaults": {
+      "types": "./dist/op-preflight-defaults.d.ts",
+      "default": "./dist/op-preflight-defaults.js"
+    },
+    "./invariants": {
+      "types": "./dist/invariants.d.ts",
+      "default": "./dist/invariants.js"
+    },
+    "./reasoning-openai-compatible-provider": {
+      "types": "./dist/reasoning-openai-compatible-provider.d.ts",
+      "default": "./dist/reasoning-openai-compatible-provider.js"
+    },
+    "./reasoning-cli-provider": {
+      "types": "./dist/reasoning-cli-provider.d.ts",
+      "default": "./dist/reasoning-cli-provider.js"
+    },
+    "./reasoning-api-provider": {
+      "types": "./dist/reasoning-api-provider.d.ts",
+      "default": "./dist/reasoning-api-provider.js"
+    },
+    "./plugin-contributions": {
+      "types": "./dist/plugin-contributions.d.ts",
+      "default": "./dist/plugin-contributions.js"
+    },
+    "./seam": {
+      "types": "./dist/seam.d.ts",
+      "default": "./dist/seam.js"
+    },
+    "./wire-error": {
+      "types": "./dist/wire-error.d.ts",
+      "default": "./dist/wire-error.js"
+    },
+    "./trust-requiring-resources": {
+      "types": "./dist/trust-requiring-resources.d.ts",
+      "default": "./dist/trust-requiring-resources.js"
+    },
+    "./resource-provenance": {
+      "types": "./dist/resource-provenance.d.ts",
+      "default": "./dist/resource-provenance.js"
+    },
+    "./skill-resource-loader": {
+      "types": "./dist/skill-resource-loader.d.ts",
+      "default": "./dist/skill-resource-loader.js"
+    },
+    "./agent-instruction-loader": {
+      "types": "./dist/agent-instruction-loader.d.ts",
+      "default": "./dist/agent-instruction-loader.js"
+    },
+    "./prompt-visibility-ledger": {
+      "types": "./dist/prompt-visibility-ledger.d.ts",
+      "default": "./dist/prompt-visibility-ledger.js"
+    },
+    "./scoped-registry": {
+      "types": "./dist/scoped-registry.d.ts",
+      "default": "./dist/scoped-registry.js"
+    },
+    "./usage-accounting": {
+      "types": "./dist/usage-accounting.d.ts",
+      "default": "./dist/usage-accounting.js"
     },
     "./presence-bridge": {
       "types": "./dist/presence-bridge.d.ts",

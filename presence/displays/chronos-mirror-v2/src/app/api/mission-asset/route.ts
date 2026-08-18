@@ -13,6 +13,7 @@ import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
   ViewerContextError,
+  viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 
@@ -190,9 +191,6 @@ export async function GET(req: NextRequest) {
       });
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to load mission asset' },
-      { status: err instanceof ViewerContextError ? err.status : 500 }
-    );
+    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
   }
 }

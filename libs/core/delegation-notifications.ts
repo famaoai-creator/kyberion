@@ -37,6 +37,12 @@ export interface DelegationNotification {
   enqueued_at: string;
   claimed: boolean;
   claimed_at?: string;
+  /** Provenance of the report excerpt; settlement remains owner-side. */
+  report_provenance: {
+    source: 'child';
+    delegation_id: string;
+    child_session_id?: string;
+  };
 }
 
 export const DELEGATION_NOTIFICATION_CLAIM_LIMIT = 4;
@@ -75,7 +81,16 @@ function parseJsonl(raw: string): DelegationNotification[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as DelegationNotification);
+    .map((line) => {
+      const parsed = JSON.parse(line) as Partial<DelegationNotification>;
+      return {
+        ...(parsed as DelegationNotification),
+        report_provenance: parsed.report_provenance ?? {
+          source: 'child' as const,
+          delegation_id: String(parsed.delegation_id || ''),
+        },
+      };
+    });
 }
 
 export function enqueueDelegationNotification(input: {
@@ -87,6 +102,7 @@ export function enqueueDelegationNotification(input: {
   instruction: string;
   result?: string;
   error?: string;
+  childSessionId?: string;
   completedAt?: string;
 }): DelegationNotification {
   const now = new Date().toISOString();
@@ -103,6 +119,11 @@ export function enqueueDelegationNotification(input: {
     completed_at: input.completedAt || now,
     enqueued_at: now,
     claimed: false,
+    report_provenance: {
+      source: 'child',
+      delegation_id: String(input.delegationId || '').trim(),
+      ...(input.childSessionId ? { child_session_id: input.childSessionId } : {}),
+    },
   };
   if (!notification.delegation_id) {
     throw new Error('Delegation notification requires a delegation_id.');

@@ -23,7 +23,11 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
-import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
+import {
+  hasEnvironmentCapabilityProbe,
+  registerEnvironmentCapabilityProbe,
+  type RegisteredProbe,
+} from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
 import {
   probeNemotronBackendAvailability,
@@ -44,11 +48,16 @@ import {
 } from './reasoning-backend-policy.js';
 
 export function installCoreEnvironmentProbes(): void {
-  registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
-  registerEnvironmentCapabilityProbe('audit-chain.integrity', probeAuditChain);
-  registerEnvironmentCapabilityProbe('repo-build.receipt', probeRepoBuild);
-  registerEnvironmentCapabilityProbe('node-version.floor', probeNodeVersionFloor);
-  registerEnvironmentCapabilityProbe('playwright.chromium-browser', probePlaywrightChromium);
+  const coreProbes: Array<[string, RegisteredProbe]> = [
+    ['reasoning-backend.any-real', probeReasoningBackend],
+    ['audit-chain.integrity', probeAuditChain],
+    ['repo-build.receipt', probeRepoBuild],
+    ['node-version.floor', probeNodeVersionFloor],
+    ['playwright.chromium-browser', probePlaywrightChromium],
+  ];
+  for (const [probeId, probe] of coreProbes) {
+    if (!hasEnvironmentCapabilityProbe(probeId)) registerEnvironmentCapabilityProbe(probeId, probe);
+  }
 }
 
 /* ------------------------------------------------------------------ *

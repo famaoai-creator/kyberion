@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { startInRoomMinutesSession } from './in-room-minutes-recorder.js';
-import { registerSpeechToTextBridge } from './speech-to-text-bridge.js';
+import { registerSpeechToTextBridge, resetSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -36,6 +36,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.KYBERION_SUDO;
+  resetSpeechToTextBridge();
   safeRmSync(missionPath, { recursive: true, force: true });
 });
 

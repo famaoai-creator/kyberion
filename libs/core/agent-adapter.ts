@@ -5,6 +5,8 @@ import { safeExistsSync, safeExecResult, safeReaddir, safeReadFile } from './sec
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { resolveCodexBinary } from './codex-cli-query.js';
+import { loadAgentInstructionResource } from './agent-instruction-loader.js';
+import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
@@ -946,20 +948,19 @@ ${prompt}`;
   private loadExecutionContext(): string {
     if (this.cachedContext !== null) return this.cachedContext;
     const maxChars = this.options.maxContractChars || 4000;
-    const agentsPath = path.join(PROJECT_ROOT, 'AGENTS.md');
-    if (!safeExistsSync(agentsPath)) {
+    const agents = loadAgentInstructionResource(PROJECT_ROOT);
+    if (!agents) {
       this.cachedContext = '';
       return this.cachedContext;
     }
     try {
-      const agents = safeReadFile(agentsPath, { encoding: 'utf8' }) as string;
       const header = [
         'Repository execution contract (excerpt):',
         '- Follow AGENTS.md repository rules.',
         '- Prefer non-destructive deterministic operations.',
         '- Preserve existing unrelated changes.',
       ].join('\n');
-      const excerpt = agents.slice(0, maxChars).trim();
+      const excerpt = agents.content.slice(0, maxChars).trim();
       this.cachedContext = `${header}\n\n${excerpt}`;
       return this.cachedContext;
     } catch (error: any) {
@@ -1278,23 +1279,14 @@ export class CodexAppServerAdapter implements AgentAdapter {
         excludeTmpdirEnvVar: boolean;
         excludeSlashTmp: boolean;
       } {
-    const sandboxMode = this.getSandboxMode();
-    if (sandboxMode === 'danger-full-access') {
-      return { type: 'dangerFullAccess' };
-    }
-    if (sandboxMode === 'read-only') {
-      return {
-        type: 'readOnly',
+    return toCodexSandboxPolicy(
+      resolveSandboxPolicy({
+        provider: 'codex',
+        mode: this.getSandboxMode(),
         networkAccess: this.options.networkAccess ?? true,
-      };
-    }
-    return {
-      type: 'workspaceWrite',
-      writableRoots: this.options.writableRoots,
-      networkAccess: this.options.networkAccess ?? true,
-      excludeTmpdirEnvVar: false,
-      excludeSlashTmp: false,
-    };
+        writableRoots: this.options.writableRoots,
+      })
+    ) as ReturnType<CodexAppServerAdapter['buildSandboxPolicy']>;
   }
 
   public async boot(): Promise<void> {

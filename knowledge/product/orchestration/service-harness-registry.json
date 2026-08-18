@@ -1,0 +1,1928 @@
+{
+  "version": "1.0.0",
+  "kind": "service-harness-registry",
+  "services": [
+    {
+      "service_id": "asana",
+      "display_name": "Asana API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/asana.json",
+      "operations": [
+        {
+          "action": "list_projects",
+          "description": "Lists Asana projects.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_task",
+          "description": "Creates an Asana task.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_task",
+          "description": "Fetches an Asana task.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "search_tasks",
+          "description": "Searches for Asana tasks by text.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "aws-ce",
+      "display_name": "AWS Cost Explorer API Presets",
+      "auth_strategy": "AWS_SIGV4",
+      "operation_count": 1,
+      "detail_ref": "knowledge/product/orchestration/service-presets/aws-ce.json",
+      "operations": [
+        {
+          "action": "get_cost_and_usage",
+          "description": "Retrieves cost and usage metrics.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "backlog",
+      "display_name": "Backlog REST API v2 Presets",
+      "auth_strategy": "api_key_query",
+      "operation_count": 15,
+      "detail_ref": "knowledge/product/orchestration/service-presets/backlog.json",
+      "operations": [
+        {
+          "action": "get_projects",
+          "description": "プロジェクト一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_project",
+          "description": "プロジェクトを取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issues",
+          "description": "課題一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issue",
+          "description": "課題を取得する（例: PROJECT-123）",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_issue",
+          "description": "課題を作成する",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "update_issue",
+          "description": "課題を更新する",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "add_comment",
+          "description": "課題にコメントを追加する",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_comments",
+          "description": "課題のコメント一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issue_types",
+          "description": "プロジェクトの課題種別一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_categories",
+          "description": "プロジェクトのカテゴリ一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_versions",
+          "description": "プロジェクトのマイルストーン／バージョン一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_users",
+          "description": "プロジェクトのメンバー一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_myself",
+          "description": "認証中のユーザー情報を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_notifications",
+          "description": "お知らせ一覧を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_recent_updates",
+          "description": "プロジェクトの最近の更新を取得する",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "box",
+      "display_name": "Box Content API v2 Presets (read-only ingestion)",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/box.json",
+      "operations": [
+        {
+          "action": "get_folder_items",
+          "description": "List items in a Box folder. Marker-based pagination: pass usemarker=true and the marker cursor from the previous response's next_marker so incremental sync (DA-03) can resume where it left off.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_file_info",
+          "description": "Get metadata for a Box file (etag/sha1/modified_at support change detection).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "download_file",
+          "description": "Download Box file content (the API answers with a redirect to the download URL; the HTTP client follows it).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "search",
+          "description": "Search content in Box (offset-paginated).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "brave-search",
+      "display_name": "Brave Search MCP Server",
+      "description": "MCP-based web search via Brave Search API",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/brave-search.json",
+      "operations": [
+        {
+          "action": "brave_web_search",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "brave_local_search",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "canva",
+      "display_name": "Canva Connect API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 8,
+      "detail_ref": "knowledge/product/orchestration/service-presets/canva.json",
+      "operations": [
+        {
+          "action": "exchange_oauth_code",
+          "description": "Exchanges an OAuth authorization code for Canva access and refresh tokens.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "refresh_oauth_token",
+          "description": "Refreshes a Canva access token using a refresh token.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_design",
+          "description": "Creates a Canva design using a preset design type or explicit dimensions.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_design_export_job",
+          "description": "Creates an asynchronous Canva export job for a design.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_url_import_job",
+          "description": "Creates an asynchronous Canva import job from a publicly reachable document URL.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_url_asset_upload_job",
+          "description": "Uploads an image or other supported asset to Canva from a public URL.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_folder",
+          "description": "Creates a folder in Canva Projects or Uploads.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "list_folder_items",
+          "description": "Lists folder contents from Canva Projects.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "cloudflare",
+      "display_name": "Cloudflare API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/cloudflare.json",
+      "operations": [
+        {
+          "action": "list_zones",
+          "description": "Lists Cloudflare zones.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_zone",
+          "description": "Fetches a Cloudflare zone.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_dns_records",
+          "description": "Lists DNS records for a zone.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_dns_record",
+          "description": "Creates a DNS record.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "comfyui",
+      "display_name": "ComfyUI Management Presets",
+      "operation_count": 6,
+      "detail_ref": "knowledge/product/orchestration/service-presets/comfyui.json",
+      "operations": [
+        {
+          "action": "get_stats",
+          "description": "Get ComfyUI server system statistics",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_queue",
+          "description": "Get ComfyUI active and pending queue",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_history",
+          "description": "Get ComfyUI job execution history",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_outputs",
+          "description": "List generated artifacts in the ComfyUI output directory",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "inspect_config",
+          "description": "Inspect ComfyUI startup configuration",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_custom_nodes",
+          "description": "List installed ComfyUI custom nodes",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "confluence",
+      "display_name": "Confluence Cloud REST API v2 Presets",
+      "auth_strategy": "basic",
+      "operation_count": 11,
+      "detail_ref": "knowledge/product/orchestration/service-presets/confluence.json",
+      "operations": [
+        {
+          "action": "get_pages",
+          "description": "Get all pages in the instance.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_page",
+          "description": "Get a specific page by ID.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_page",
+          "description": "Create a new page.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "update_page",
+          "description": "Update an existing page.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_space_pages",
+          "description": "Get all pages in a specific space.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_spaces",
+          "description": "Get all spaces.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_space",
+          "description": "Get space details.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "search_content",
+          "description": "Search content using CQL (Confluence Query Language).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_content_full",
+          "description": "Get full page content including body using v1 API.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_page_with_body",
+          "description": "Get a specific page with body content.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_page_children",
+          "description": "Get child pages of a specific page.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "discord",
+      "display_name": "Discord API Presets",
+      "auth_strategy": "Bot",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/discord.json",
+      "operations": [
+        {
+          "action": "post_message",
+          "description": "Sends a message to a Discord channel.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "trigger_webhook",
+          "description": "Triggers a channel webhook without bot token.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "figma",
+      "display_name": "Figma API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/figma.json",
+      "operations": [
+        {
+          "action": "get_file",
+          "description": "Fetches a Figma file.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_comments",
+          "description": "Lists comments for a Figma file.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_team_projects",
+          "description": "Lists projects for a Figma team.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_components",
+          "description": "Lists reusable components for a Figma file.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "gemini",
+      "display_name": "Google AI Studio Gemini API presets",
+      "auth_strategy": "api_key_query",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/gemini.json",
+      "operations": [
+        {
+          "action": "generate_image",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "generate_tts",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "github",
+      "display_name": "GitHub REST API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 10,
+      "detail_ref": "knowledge/product/orchestration/service-presets/github.json",
+      "operations": [
+        {
+          "action": "create_issue",
+          "description": "Creates a new issue in a repository.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "update_issue",
+          "description": "Updates a GitHub issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "add_comment",
+          "description": "Adds a comment to a GitHub issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "close_issue",
+          "description": "Closes a GitHub issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "list_repos",
+          "description": "Lists repositories for the authenticated user.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "actions_list_runs",
+          "description": "Lists workflow runs for a repository.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "actions_get_run",
+          "description": "Gets a single workflow run and its status metadata.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "actions_dispatch_workflow",
+          "description": "Dispatches a GitHub Actions workflow run.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_pull_request",
+          "description": "Creates a pull request.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "merge_pull_request",
+          "description": "Merges a pull request.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "github-mcp",
+      "display_name": "GitHub MCP Server",
+      "description": "MCP-based GitHub interactions (search, create issues, etc.)",
+      "operation_count": 3,
+      "detail_ref": "knowledge/product/orchestration/service-presets/github-mcp.json",
+      "operations": [
+        {
+          "action": "search_repositories",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_file_contents",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_issue",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "gitlab",
+      "display_name": "GitLab REST API v4 Presets",
+      "auth_strategy": "bearer",
+      "operation_count": 5,
+      "detail_ref": "knowledge/product/orchestration/service-presets/gitlab.json",
+      "operations": [
+        {
+          "action": "get_projects",
+          "description": "List projects.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_project",
+          "description": "Get project details.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issues",
+          "description": "List project issues.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_issue",
+          "description": "Create a new issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_merge_requests",
+          "description": "List project merge requests.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "google-maps",
+      "display_name": "Google Maps MCP Server",
+      "description": "MCP-based Google Maps interactions",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/google-maps.json",
+      "operations": [
+        {
+          "action": "maps_search",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "maps_geocode",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "google-workspace",
+      "display_name": "Google Workspace CLI Presets",
+      "auth_strategy": "session",
+      "operation_count": 29,
+      "detail_ref": "knowledge/product/orchestration/service-presets/google-workspace.json",
+      "operations": [
+        {
+          "action": "auth_status",
+          "description": "Check whether Google Workspace CLI authentication is available.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "schema_method",
+          "description": "Inspect the request/response schema for a Google Workspace discovery method.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "drive_files_list",
+          "description": "List Google Drive files using the discovery-backed CLI.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "drive_file_download",
+          "description": "Download Google Drive file content via the discovery method drive.files.get; pass params like {\"fileId\": \"...\", \"alt\": \"media\"}.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "drive_file_export",
+          "description": "Export a Google-native document (Docs/Sheets/Slides) via the discovery method drive.files.export; pass params like {\"fileId\": \"...\", \"mimeType\": \"text/plain\"}.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_triage",
+          "description": "Summarize unread Gmail inbox items.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_messages_list",
+          "description": "List Gmail messages with the discovery-backed Gmail API.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_message_get",
+          "description": "Get a Gmail message with metadata headers.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_attachment_get",
+          "description": "Fetch a Gmail message attachment body via the discovery method users.messages.attachments.get; pass params like {\"messageId\": \"...\", \"id\": \"<attachmentId>\"}.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_filters_list",
+          "description": "List Gmail filters for the authenticated user.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_filters_create",
+          "description": "Create a Gmail filter.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_messages_batch_modify",
+          "description": "Batch modify Gmail messages, including archiving by removing the INBOX label.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_send",
+          "description": "Send a Gmail message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_send_draft",
+          "description": "Create a Gmail draft instead of sending.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_reply",
+          "description": "Reply to a Gmail message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_reply_draft",
+          "description": "Create a Gmail reply draft.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_reply_all",
+          "description": "Reply-all to a Gmail message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_reply_all_draft",
+          "description": "Create a Gmail reply-all draft.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_agenda",
+          "description": "Show the upcoming Google Calendar agenda.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_calendarList_list",
+          "description": "List the authenticated user's calendars.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_list",
+          "description": "List Google Calendar events for a calendar.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_freebusy_query",
+          "description": "Query free/busy windows for one or more calendars.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_insert",
+          "description": "Create a Google Calendar event, optionally with Google Meet.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_spaces_create",
+          "description": "Create a Google Meet space using the authenticated Google account.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_spaces_get",
+          "description": "Fetch a Google Meet space by name or resource identifier.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_spaces_patch",
+          "description": "Update a Google Meet space using the authenticated Google account.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_spaces_end_active_conference",
+          "description": "End the active conference attached to a Google Meet space.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_conference_records_list",
+          "description": "List Google Meet conference records.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meet_conference_records_get",
+          "description": "Fetch a Google Meet conference record by name.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "jira",
+      "display_name": "Jira Cloud REST API v3 Presets",
+      "auth_strategy": "basic",
+      "operation_count": 10,
+      "detail_ref": "knowledge/product/orchestration/service-presets/jira.json",
+      "operations": [
+        {
+          "action": "get_myself",
+          "description": "Get current user profile.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_projects",
+          "description": "Get all visible projects.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_project",
+          "description": "Get project details by key.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "search_issues",
+          "description": "Search issues using JQL.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_issue",
+          "description": "Get issue details.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_transitions",
+          "description": "Get available transitions for an issue.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_issue",
+          "description": "Create a new issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "update_issue",
+          "description": "Update an issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "add_comment",
+          "description": "Add a comment to an issue.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "transition_issue",
+          "description": "Transition an issue status.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "linear",
+      "display_name": "Linear API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/linear.json",
+      "operations": [
+        {
+          "action": "query",
+          "description": "Executes a raw GraphQL query against the Linear API.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_issue",
+          "description": "Creates a new issue in Linear.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "m365",
+      "display_name": "Microsoft 365 CLI Presets",
+      "auth_strategy": "none",
+      "operation_count": 17,
+      "detail_ref": "knowledge/product/orchestration/service-presets/m365.json",
+      "operations": [
+        {
+          "action": "auth_status",
+          "description": "Check whether the Microsoft 365 CLI is authenticated.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_list",
+          "description": "List the signed-in user's calendars.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_list",
+          "description": "List calendar events for the requested window.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_freebusy_query",
+          "description": "Query free/busy windows for one or more calendars.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_insert",
+          "description": "Create a Microsoft 365 calendar event.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_messages_list",
+          "description": "List messages from the signed-in user's Outlook inbox.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_message_get",
+          "description": "Get one Outlook message by ID.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_attachments_list",
+          "description": "List attachments on an Outlook message (read-only).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_attachment_get",
+          "description": "Fetch one Outlook message attachment; fileAttachment responses include contentBytes (read-only).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_send",
+          "description": "Send a new Outlook message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_message_draft",
+          "description": "Create an Outlook message draft.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_reply",
+          "description": "Reply to an Outlook message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_reply_all",
+          "description": "Reply to all recipients of an Outlook message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_create_reply",
+          "description": "Create an Outlook reply draft.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_create_reply_all",
+          "description": "Create an Outlook reply-all draft.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_message_update",
+          "description": "Update an Outlook draft message.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "outlook_message_move",
+          "description": "Move an Outlook message to another mail folder.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "media-generation",
+      "display_name": "Kyberion Generative Media and Capture Unified Presets",
+      "operation_count": 6,
+      "detail_ref": "knowledge/product/orchestration/service-presets/media-generation.json",
+      "operations": [
+        {
+          "action": "generate_image",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "generate_video",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "generate_music",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "run_workflow",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "capture_screen",
+          "description": "macOS Native Screen Capture",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "record_screen",
+          "description": "Screen Recording via FFmpeg",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "meeting",
+      "display_name": "Kyberion Unified Meeting Presets",
+      "operation_count": 6,
+      "detail_ref": "knowledge/product/orchestration/service-presets/meeting.json",
+      "operations": [
+        {
+          "action": "join",
+          "description": "Join an online meeting (Zoom/Teams/Meet) via Bridge",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "join_meeting",
+          "description": "Intent-aligned meeting join via Bridge",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "status",
+          "description": "Get current meeting status",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "meeting_status",
+          "description": "Intent-aligned meeting status check",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "leave",
+          "description": "Leave the current meeting",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "leave_meeting",
+          "description": "Intent-aligned meeting leave",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "notion",
+      "display_name": "Notion API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 3,
+      "detail_ref": "knowledge/product/orchestration/service-presets/notion.json",
+      "operations": [
+        {
+          "action": "exchange_oauth_code",
+          "description": "Exchanges an OAuth authorization code for Notion access tokens.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_page",
+          "description": "Creates a new page in a database.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "query_database",
+          "description": "Queries a database.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "paper2any",
+      "display_name": "Paper2Any REST API",
+      "description": "Convert PDF/text/topics into PPTX, draw.io, SVG figures, posters, and video scripts via the Paper2Any FastAPI server.",
+      "auth_strategy": "none",
+      "operation_count": 7,
+      "detail_ref": "knowledge/product/orchestration/service-presets/paper2any.json",
+      "operations": [
+        {
+          "action": "paper2ppt",
+          "description": "Convert a PDF paper or topic text into an editable PPTX slide deck.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "paper2figure",
+          "description": "Extract or generate figures from a paper: architecture diagrams, roadmaps, experiment plots.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "paper2drawio",
+          "description": "Convert PDF, text, or a screenshot of a diagram into draw.io XML (editable).",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "paper2poster",
+          "description": "Generate an academic-style poster (PPTX or PNG) from a PDF paper.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "paper2video",
+          "description": "Generate a video script and TTS audio assets from a PPTX or PDF.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "paper2rebuttal",
+          "description": "Draft a structured rebuttal from reviewer comments + the original paper.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "health",
+          "description": "Check if the Paper2Any server is running.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "slack",
+      "display_name": "Slack Web API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/slack.json",
+      "operations": [
+        {
+          "action": "post_message",
+          "description": "Sends a message to a channel.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "conversations_history",
+          "description": "Fetch message history for a channel (read-only; cursor pagination via response_metadata.next_cursor, incremental sync via oldest).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "conversations_replies",
+          "description": "Fetch a thread of messages anchored at a parent message ts (read-only; cursor-paginated).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "files_list",
+          "description": "List files visible to the authed token, optionally scoped to a channel (read-only; page-numbered pagination).",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "smoke-test",
+      "display_name": "Adaptive Execution Smoke Test",
+      "operation_count": 1,
+      "detail_ref": "knowledge/product/orchestration/service-presets/smoke-test.json",
+      "operations": [
+        {
+          "action": "test_fallback",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "sqlite",
+      "display_name": "SQLite MCP Server",
+      "description": "MCP-based SQLite database interactions",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/sqlite.json",
+      "operations": [
+        {
+          "action": "query",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_tables",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "stripe",
+      "display_name": "Stripe API Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/stripe.json",
+      "operations": [
+        {
+          "action": "list_customers",
+          "description": "Lists Stripe customers.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_customer",
+          "description": "Creates a Stripe customer.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "list_payment_intents",
+          "description": "Lists recent payment intents.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_payment_intent",
+          "description": "Creates a payment intent.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
+      "service_id": "telegram",
+      "display_name": "Telegram Bot API Presets",
+      "auth_strategy": "none",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/telegram.json",
+      "operations": [
+        {
+          "action": "post_message",
+          "description": "Sends a message to a Telegram chat/channel.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_updates",
+          "description": "Gets incoming updates/messages for the bot.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "video-analysis",
+      "display_name": "Kyberion Video Keyframe and Narrative Analysis Service",
+      "operation_count": 1,
+      "detail_ref": "knowledge/product/orchestration/service-presets/video-analysis.json",
+      "operations": [
+        {
+          "action": "analyze_video",
+          "description": "Run local video analysis using the claude-real-video (crv) package via uv run",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "vision",
+      "display_name": "Kyberion Visual Generation and Capture Compatibility Alias",
+      "operation_count": 3,
+      "detail_ref": "knowledge/product/orchestration/service-presets/vision.json",
+      "operations": [
+        {
+          "action": "generate_image",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "capture_screen",
+          "description": "macOS Native Screen Capture",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "record_screen",
+          "description": "Screen Recording via FFmpeg",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "voice",
+      "display_name": "Kyberion Voice Synthesis and Playback Unified Presets",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/voice.json",
+      "operations": [
+        {
+          "action": "speak_local",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "generate_voice",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "voice-local",
+      "display_name": "Local Generative TTS Presets",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/voice-local.json",
+      "operations": [
+        {
+          "action": "speak_jp",
+          "description": "Speaks Japanese using local engine.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "speak_en",
+          "description": "Speaks English using local engine.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "whisper",
+      "display_name": "Whisper STT Management Presets",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/whisper.json",
+      "operations": [
+        {
+          "action": "transcribe",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "transcribe_audio",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "stream",
+          "description": "Real-time Whisper streaming",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "stream_transcribe",
+          "description": "Intent-aligned real-time transcription stream",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "x-docs",
+      "display_name": "X Documentation MCP Presets",
+      "description": "Official hosted MCP server for X documentation at docs.x.com/mcp.",
+      "auth_strategy": "none",
+      "operation_count": 3,
+      "detail_ref": "knowledge/product/orchestration/service-presets/x-docs.json",
+      "operations": [
+        {
+          "action": "list_tools",
+          "description": "List the X documentation MCP tools.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_resources",
+          "description": "List X documentation MCP resources.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "call_tool",
+          "description": "Invoke an X documentation MCP tool by name with structured arguments.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "xapi",
+      "display_name": "X API MCP Presets",
+      "description": "Official X hosted MCP server reached through the xurl stdio bridge.",
+      "auth_strategy": "session",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/xapi.json",
+      "operations": [
+        {
+          "action": "auth_status",
+          "description": "Check whether xurl has a usable X OAuth session cached for MCP use.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "auth_oauth2_headless",
+          "description": "Bootstrap the xurl OAuth session on a headless machine using X's out-of-band login flow.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "list_tools",
+          "description": "List the official X MCP tools currently exposed through the hosted xapi bridge.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "call_tool",
+          "description": "Invoke any official X MCP tool by name with a structured arguments object.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "youtube",
+      "display_name": "YouTube upload staging presets",
+      "operation_count": 1,
+      "detail_ref": "knowledge/product/orchestration/service-presets/youtube.json",
+      "operations": [
+        {
+          "action": "prepare_upload_package",
+          "description": "Stages a narrated video upload package for browser-driven or manual YouTube upload.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
+      "service_id": "zendesk",
+      "display_name": "Zendesk Support REST API v2 Presets",
+      "auth_strategy": "basic",
+      "operation_count": 5,
+      "detail_ref": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "operations": [
+        {
+          "action": "get_tickets",
+          "description": "List tickets.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_ticket",
+          "description": "Get ticket details.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "create_ticket",
+          "description": "Create a new ticket.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_users",
+          "description": "List users.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_myself",
+          "description": "Get current user profile.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    }
+  ]
+}

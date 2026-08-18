@@ -27,6 +27,15 @@ import {
   CloudflareOsControlPlane,
   withEgressPayloadContext,
   validateContextSecurityScope,
+  describeServiceHarness,
+  planServiceOperation,
+  verifyServiceOperationResult,
+  createServiceExecutionReceipt,
+  persistServiceExecutionReceipt,
+  recordServiceCall,
+  runOpPreflight,
+  ensureDefaultOpPreflight,
+  type ServiceExecutionReceipt,
   type ContextSecurityScope,
   type EgressPayloadContext,
   type IntroductionMode,
@@ -39,7 +48,7 @@ import * as crypto from 'node:crypto';
 
 export interface ServiceAction {
   service_id: string;
-  mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP';
+  mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP' | 'HARNESS';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
@@ -220,6 +229,8 @@ async function startService(id: string, service: any, pids: any) {
 }
 
 export async function handleAction(input: ServiceAction, onEvent?: (data: any) => void) {
+  const admitted = await admitServiceAction(input);
+  input = admitted;
   if (input.action === 'pipeline') {
     const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
     let ctx = { ...input.context };
@@ -252,10 +263,15 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     }
     return { status: derivePipelineStatus(results), results, ...ctx };
   }
-  return await handleSingleAction(input, onEvent);
+  return await handleSingleAction(input, onEvent, true);
 }
 
-async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) => void) {
+async function handleSingleAction(
+  input: ServiceAction,
+  onEvent?: (data: any) => void,
+  alreadyAdmitted = false
+) {
+  if (!alreadyAdmitted) input = await admitServiceAction(input);
   logger.info(
     `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
   );
@@ -299,6 +315,9 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       case 'RECONCILE':
         return await reconcileServices(input);
 
+      case 'HARNESS':
+        return await executeHarnessRequest(input);
+
       case 'API':
         return await executeApiRequest(input);
 
@@ -314,8 +333,122 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
     ? await withEgressPayloadContext(egressContext, execute)
     : await execute();
 
+  // Capture only canonical PRESET calls when an explicit recording session is
+  // attached by the caller. The session stores operation metadata and bounded
+  // result shape; it redacts secret parameter values before persistence.
+  if (input.mode === 'PRESET') {
+    const sessionId = String(input.context?.service_recording_session_id || '').trim();
+    if (sessionId) {
+      try {
+        recordServiceCall(sessionId, {
+          service_id: input.service_id,
+          action: input.action,
+          params: input.params,
+          result,
+          summary: input.context?.service_recording_summary,
+          produces: input.context?.service_recording_produces,
+          consumes: Array.isArray(input.context?.service_recording_consumes)
+            ? input.context.service_recording_consumes.map(String)
+            : undefined,
+        });
+      } catch (error) {
+        // Recording is enrichment after the external call. Never throw here or
+        // a retry could duplicate a side effect that already completed.
+        logger.warn(
+          `[service-actuator] service recording failed after execution: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  }
+
   recordServiceObservation(preparedObservation, result);
   return result;
+}
+
+/**
+ * DH-01: service-actuator is also a public execution boundary. Pipeline
+ * dispatch normally arrives through run_pipeline, but direct CLI, harness,
+ * and embedded callers must receive the same serial preflight waterfall.
+ */
+async function admitServiceAction(input: ServiceAction): Promise<ServiceAction> {
+  ensureDefaultOpPreflight();
+  const approvalGranted =
+    input.params?._approval_granted === true || input.context?._approval_granted === true;
+  const preflight = await runOpPreflight({
+    op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
+    params: input as unknown as Record<string, unknown>,
+    context: input.context,
+    source: 'actuator',
+    requiresApproval:
+      input.params?._approval_required === true || input.context?._approval_required === true,
+    approvalGranted,
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Service operation was not admitted.'}`
+    );
+  }
+  return preflight.input as unknown as ServiceAction;
+}
+
+async function executeHarnessRequest(input: ServiceAction): Promise<unknown> {
+  const params = input.params && typeof input.params === 'object' ? input.params : {};
+  switch (input.action) {
+    case 'describe':
+      return describeServiceHarness(input.service_id, {
+        detail: params.detail !== false,
+      });
+    case 'plan': {
+      const action = String(params.operation || params.action || '').trim();
+      if (!action) throw new Error('HARNESS plan requires params.operation');
+      const inputs =
+        params.inputs && typeof params.inputs === 'object' && !Array.isArray(params.inputs)
+          ? params.inputs
+          : {};
+      return planServiceOperation(input.service_id, action, inputs);
+    }
+    case 'verify': {
+      const action = String(params.operation || '').trim();
+      if (!action) throw new Error('HARNESS verify requires params.operation');
+      const descriptor = describeServiceHarness(input.service_id, { detail: true });
+      const operation = descriptor.operations.find((candidate) => candidate.action === action);
+      if (!operation)
+        throw new Error(`Operation "${action}" not found for service ${input.service_id}`);
+      return verifyServiceOperationResult(operation, params.result);
+    }
+    case 'receipt': {
+      const requestedServiceId = String(params.service_id || input.service_id).trim();
+      if (requestedServiceId !== input.service_id) {
+        throw new Error('HARNESS receipt plan service_id must match the request service_id');
+      }
+      if (
+        params.plan &&
+        typeof params.plan === 'object' &&
+        String(params.plan.service_id || '').trim() !== input.service_id
+      ) {
+        throw new Error('HARNESS receipt plan service_id must match the request service_id');
+      }
+      const plan =
+        params.plan && typeof params.plan === 'object'
+          ? params.plan
+          : planServiceOperation(
+              input.service_id,
+              String(params.operation || '').trim(),
+              params.inputs && typeof params.inputs === 'object' ? params.inputs : {}
+            );
+      const receipt = createServiceExecutionReceipt(
+        plan as Parameters<typeof createServiceExecutionReceipt>[0],
+        params.result,
+        {
+          status: params.status as ServiceExecutionReceipt['status'] | undefined,
+          error: typeof params.error === 'string' ? params.error : undefined,
+        }
+      );
+      return params.persist === true ? persistServiceExecutionReceipt(receipt) : receipt;
+    }
+    default:
+      throw new Error(`Unsupported HARNESS action: ${input.action}`);
+  }
 }
 
 interface PreparedObservation {

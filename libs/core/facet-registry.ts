@@ -4,6 +4,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isManagedPluginActivationAllowed, listManagedPlugins } from './plugin-managed-install.js';
+import { type ResourceProvenance, type ResourceTrust } from './resource-provenance.js';
 
 export type FacetKind = 'persona' | 'policy' | 'instruction' | 'output-contract';
 export type FacetTier = 'personal' | 'confidential' | 'public';
@@ -13,6 +14,16 @@ export interface FacetScope {
   tenantSlug?: string;
   /** Test seam and controlled runtime override for the managed pack root. */
   managedRoot?: string;
+}
+
+export interface PluginFacetContribution {
+  name: string;
+  metadata: Record<string, unknown>;
+  provenance: {
+    pluginId: string;
+    sourcePath: string;
+    trust: 'official' | 'third-party';
+  };
 }
 
 export interface FacetRequest {
@@ -25,10 +36,11 @@ export interface FacetRequest {
 export interface ResolvedFacet {
   kind: FacetKind;
   name: string;
-  source: 'tenant' | 'product' | 'managed' | 'legacy' | 'builtin';
+  source: 'tenant' | 'product' | 'managed' | 'plugin' | 'legacy' | 'builtin';
   path?: string;
   content: string;
   frontmatter: Record<string, string | string[] | number | boolean>;
+  provenance: ResourceProvenance;
 }
 
 export interface ResolvedFacets {
@@ -54,12 +66,42 @@ const BUILTIN_FACETS: Record<string, string> = {
   'output-contract:default': 'Return a concise result with outcome, evidence, and unresolved gaps.',
 };
 
+const pluginFacetContributions = new Map<string, PluginFacetContribution>();
+
 function assertFacetName(name: string): string {
   const normalized = name.trim();
   if (!/^[a-z0-9][a-z0-9._-]*$/i.test(normalized)) {
     throw new Error(`[FACET_INVALID_NAME] invalid facet name: ${name}`);
   }
   return normalized;
+}
+
+/** Register a virtual facet from an already-authorized plugin activation. */
+export function registerPluginFacet(contribution: PluginFacetContribution): () => void {
+  const name = assertFacetName(contribution.name);
+  if (!contribution.provenance.pluginId.trim()) {
+    throw new Error('[FACET_PLUGIN_INVALID] pluginId is required');
+  }
+  const key = `${contribution.provenance.pluginId}:${name}`;
+  if (pluginFacetContributions.has(key)) {
+    throw new Error(`[FACET_PLUGIN_DUPLICATE] ${key}`);
+  }
+  const normalized = { ...contribution, name };
+  pluginFacetContributions.set(key, normalized);
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    if (pluginFacetContributions.get(key) === normalized) pluginFacetContributions.delete(key);
+  };
+}
+
+export function listPluginFacetContributions(): PluginFacetContribution[] {
+  return [...pluginFacetContributions.values()].sort((left, right) =>
+    `${left.provenance.pluginId}:${left.name}`.localeCompare(
+      `${right.provenance.pluginId}:${right.name}`
+    )
+  );
 }
 
 function parseFrontmatter(raw: string): {
@@ -160,7 +202,8 @@ function readFacet(
   kind: FacetKind,
   name: string,
   source: ResolvedFacet['source'],
-  filePath: string
+  filePath: string,
+  pluginId?: string
 ): ResolvedFacet {
   const parsed = parseFrontmatter(safeReadFile(filePath, { encoding: 'utf8' }) as string);
   return {
@@ -170,6 +213,64 @@ function readFacet(
     path: filePath,
     content: parsed.content,
     frontmatter: parsed.frontmatter,
+    provenance: facetProvenance(source, filePath, pluginId),
+  };
+}
+
+function facetProvenance(
+  source: ResolvedFacet['source'],
+  filePath: string,
+  pluginId?: string
+): ResourceProvenance {
+  const isTenant = source === 'tenant';
+  const isPlugin = source === 'managed' || source === 'plugin';
+  const trust: ResourceTrust = isPlugin ? 'approved' : isTenant ? 'trusted' : 'trusted';
+  return {
+    source: 'facet-registry',
+    scope: isTenant ? 'tenant' : 'repository',
+    origin: isTenant ? 'tenant-overlay' : isPlugin ? 'plugin' : 'builtin',
+    base_dir: path.dirname(filePath),
+    trust,
+    ...(pluginId ? { plugin_id: pluginId } : {}),
+  };
+}
+
+function resolvePluginFacet(kind: FacetKind, name: string): ResolvedFacet | undefined {
+  const matches = listPluginFacetContributions().filter(
+    (entry) =>
+      entry.name === name &&
+      entry.metadata.kind === kind &&
+      typeof entry.metadata.content === 'string'
+  );
+  if (matches.length > 1) {
+    throw new Error(
+      `[FACET_AMBIGUOUS] ${kind}:${name} is provided by multiple plugins: ${matches
+        .map((entry) => entry.provenance.pluginId)
+        .join(', ')}`
+    );
+  }
+  const entry = matches[0];
+  if (!entry) return undefined;
+  const sourcePath = entry.provenance.sourcePath;
+  const frontmatter =
+    entry.metadata.frontmatter && typeof entry.metadata.frontmatter === 'object'
+      ? (entry.metadata.frontmatter as ResolvedFacet['frontmatter'])
+      : { kind };
+  return {
+    kind,
+    name,
+    source: 'plugin',
+    ...(typeof entry.metadata.path === 'string' ? { path: entry.metadata.path } : {}),
+    content: entry.metadata.content as string,
+    frontmatter,
+    provenance: {
+      source: 'facet-registry',
+      scope: 'repository',
+      origin: 'plugin',
+      base_dir: path.dirname(sourcePath),
+      trust: entry.provenance.trust,
+      plugin_id: entry.provenance.pluginId,
+    },
   };
 }
 
@@ -183,6 +284,8 @@ function resolveOne(kind: FacetKind, requestedName: string, scope: FacetScope): 
       '[FACET_TIER_DENIED] public pipelines cannot resolve confidential tenant facets'
     );
   }
+  const plugin = resolvePluginFacet(kind, name);
+  if (plugin) return plugin;
   if (scope.tenantSlug && scope.tier !== 'public') {
     const tenantPath = facetPath(
       kind,
@@ -195,7 +298,7 @@ function resolveOne(kind: FacetKind, requestedName: string, scope: FacetScope): 
   if (safeExistsSync(productPath)) return readFacet(kind, name, 'product', productPath);
 
   const managed = managedFacetPath(kind, name, scope.managedRoot);
-  if (managed) return readFacet(kind, name, 'managed', managed.filePath);
+  if (managed) return readFacet(kind, name, 'managed', managed.filePath, managed.pluginId);
 
   // Existing role procedures remain a compatibility layer until every role has
   // a persona facet. They are still product-scoped and never tenant-scoped.
@@ -211,6 +314,13 @@ function resolveOne(kind: FacetKind, requestedName: string, scope: FacetScope): 
     source: 'builtin',
     content: builtin,
     frontmatter: { kind, purity: 'clean' },
+    provenance: {
+      source: 'facet-registry',
+      scope: 'repository',
+      origin: 'builtin',
+      base_dir: pathResolver.knowledge('product'),
+      trust: 'trusted',
+    },
   };
 }
 

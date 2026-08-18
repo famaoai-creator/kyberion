@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BACKEND_CAPABILITY_PROFILES,
+  availableThinkingLevels,
   backendCapabilityProfile,
   modesWithUtilityFit,
+  resolveConstrainedSampling,
+  resolveThinkingLevel,
 } from './backend-capability-profile.js';
 import {
   buildFailoverReasoningBackend,
@@ -41,6 +44,51 @@ describe('backend capability profiles (QM-06)', () => {
         ).toBe(false);
       }
     }
+  });
+
+  it('declares provider retry separately from orchestration retry', () => {
+    for (const profile of Object.values(BACKEND_CAPABILITY_PROFILES)) {
+      expect(profile.provider_retry.max_retries, profile.mode).toBe(0);
+      expect(profile.provider_retry.quota_errors_propagate, profile.mode).toBe(true);
+    }
+  });
+
+  it('exposes graded thinking levels and hides provider-default-only backends', () => {
+    const cliProfile = backendCapabilityProfile('claude-cli');
+    expect(availableThinkingLevels(cliProfile)).toEqual(['low', 'medium', 'high']);
+    expect(resolveThinkingLevel(cliProfile, 'high')).toMatchObject({
+      supported: true,
+      wireValue: 'high',
+    });
+
+    const localProfile = backendCapabilityProfile('ollama');
+    expect(availableThinkingLevels(localProfile)).toEqual([]);
+    expect(resolveThinkingLevel(localProfile, 'high')).toMatchObject({
+      supported: false,
+      reason: 'provider-default-only',
+    });
+  });
+
+  it('fails closed for required constrained sampling and degrades preferred requests', () => {
+    const request = { jsonSchema: { type: 'object' }, strict: 'require' as const };
+    expect(() =>
+      resolveConstrainedSampling(request, {
+        supportsStrictTools: false,
+        supportsGrammarTools: false,
+      })
+    ).toThrow(/required but not supported/);
+    expect(
+      resolveConstrainedSampling(
+        { ...request, strict: 'prefer' },
+        { supportsStrictTools: false, supportsGrammarTools: false }
+      )
+    ).toMatchObject({ mode: 'fallback' });
+    expect(
+      resolveConstrainedSampling(request, {
+        supportsStrictTools: true,
+        supportsGrammarTools: false,
+      })
+    ).toMatchObject({ mode: 'native' });
   });
 });
 

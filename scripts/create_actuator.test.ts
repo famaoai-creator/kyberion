@@ -37,6 +37,8 @@ describe('create_actuator', () => {
     expect(indexSource).not.toContain('TODO: implement');
     expect(indexSource).not.toContain('node:fs');
     expect(indexSource).toContain('received_params');
+    expect(indexSource).toContain('ensureDefaultOpPreflight');
+    expect(indexSource).toContain('runOpPreflight');
     expect(schemaSource).toContain('"execute"');
     expect(manifestSource).toContain('schemas/sample-feature-action.schema.json');
   });
@@ -50,7 +52,7 @@ describe('create_actuator', () => {
       createActuatorScaffold({
         name: 'sample-feature',
         rootDir: tmpRoot,
-      }),
+      })
     ).toThrow(`Directory already exists: ${existing}`);
   });
 });

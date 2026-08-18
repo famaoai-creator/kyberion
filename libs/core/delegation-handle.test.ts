@@ -55,4 +55,15 @@ describe('delegation handles', () => {
     await expect(handle.join()).resolves.toContain('[STUB]');
     expect(handle.status().status).toBe('completed');
   });
+
+  it('threads the continuable child-session option through the backend handle', async () => {
+    const backend = buildRoleAwareReasoningBackend(stubReasoningBackend);
+    const handle = backend.delegateTaskHandle!('continue me', undefined, { continuable: true });
+    expect(handle.status()).toMatchObject({
+      continuable: true,
+      child_session_id: expect.stringMatching(/^child-/u),
+      activation_count: 0,
+    });
+    await expect(handle.join()).resolves.toContain('[STUB]');
+  });
 });

@@ -8,6 +8,8 @@ import {
   retry,
   ocrImage as coreOcrImage,
   describeImage as coreDescribeImage,
+  ensureDefaultOpPreflight,
+  runOpPreflight,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -111,7 +113,19 @@ async function describeImage(params: any) {
 }
 
 async function handleSingleAction(input: any) {
-  const { action, params } = input;
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `vision:${String(input.action || '')}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation vision:${String(input.action || '')} was not admitted.`}`
+    );
+  }
+  const action = input.action;
+  const params = preflight.input;
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
   if (action === 'describe_image') return describeImage(params);

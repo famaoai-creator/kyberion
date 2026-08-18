@@ -2,6 +2,7 @@ import type { WisdomAction, WisdomDirectAction, PipelineStep } from '../wisdom-p
 
 const DIRECT_ACTIONS = new Set<WisdomAction['action']>([
   'knowledge_search',
+  'knowledge_read',
   'history_search',
   'knowledge_inject',
   'knowledge_export',
@@ -25,6 +26,9 @@ function assertDirectActionParams(
   switch (action) {
     case 'knowledge_search':
       assertRequiredString(params, action, 'query');
+      break;
+    case 'knowledge_read':
+      assertRequiredString(params, action, 'path');
       break;
     case 'knowledge_inject':
       assertRequiredString(params, action, 'knowledge_path');

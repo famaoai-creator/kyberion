@@ -21,6 +21,8 @@ import {
   getActiveTaskSession,
   getLatestCompletedTaskSession,
   loadTaskSession,
+  getTaskIntentBuilder,
+  registerTaskIntentBuilder,
   recordTaskSessionHistory,
   reopenTaskSession,
   saveTaskSession,
@@ -104,6 +106,30 @@ describe('task-session', () => {
     expect(session.outcome_contract.success_criteria.length).toBeGreaterThan(0);
     expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
     expect(session.work_loop?.intent.label).toBe('capture_photo');
+  });
+
+  it('uses a reversible named seam for task intent builders', () => {
+    const intentId = `test-intent-builder-${process.pid}`;
+    const builder = () => ({
+      taskType: 'analysis' as const,
+      intentId,
+      goal: { summary: 'test', success_condition: 'registered' },
+    });
+    const dispose = registerTaskIntentBuilder(intentId, builder, {
+      provenance: 'generated',
+      source: 'task-session.test.ts',
+    });
+
+    expect(getTaskIntentBuilder(intentId)).toBe(builder);
+    expect(() =>
+      registerTaskIntentBuilder(intentId, builder, {
+        provenance: 'generated',
+        source: 'task-session.test.ts',
+      })
+    ).toThrow(/already registered/);
+
+    dispose();
+    expect(getTaskIntentBuilder(intentId)).toBeUndefined();
   });
 
   it('persists and loads task sessions', () => {
