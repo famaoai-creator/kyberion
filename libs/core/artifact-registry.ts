@@ -140,7 +140,15 @@ export function appendArtifactOwnershipRecord(
 
 export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   if (!safeExistsSync(ARTIFACT_REGISTRY_PATH)) return [];
-  const raw = safeReadFile(ARTIFACT_REGISTRY_PATH, { encoding: 'utf8' }) as string;
+  let raw: string;
+  try {
+    raw = safeReadFile(ARTIFACT_REGISTRY_PATH, { encoding: 'utf8' }) as string;
+  } catch (error) {
+    // The registry is shared runtime state. A concurrent cleanup can remove it
+    // after the existence check; treat that race like an empty registry.
+    if (error instanceof Error && error.message.startsWith('File not found:')) return [];
+    throw error;
+  }
   return parseJsonl(raw);
 }
 

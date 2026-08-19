@@ -4,6 +4,9 @@ Thanks for your interest. Kyberion is OSS, in active pre-1.0 development.
 
 This document is the PR contract. For the architectural picture, read [`docs/developer/TOUR.md`](./docs/developer/TOUR.md) first.
 
+For choosing the right discussion, issue, or first contribution, see the
+[`community guide`](./docs/COMMUNITY.md).
+
 ## Quick start
 
 ```bash

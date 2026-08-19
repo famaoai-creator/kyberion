@@ -123,6 +123,8 @@ export async function createMission(args: {
   id: string;
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
+  /** Organization scope for the canonical work-item context chain. */
+  organizationId?: string;
   /**
    * Tenant slug for multi-tenant deployments. When set (and matches the
    * `^[a-z][a-z0-9-]{1,30}$` pattern), the resulting mission-state.json
@@ -150,6 +152,7 @@ export async function createMission(args: {
     id,
     tier = 'confidential',
     tenantId = 'default',
+    organizationId,
     tenantSlug: rawTenantSlug,
     missionType = 'development',
     visionRef,
@@ -359,6 +362,7 @@ export async function createMission(args: {
     is_ephemeral: isEphemeral,
     relationships: normalizedRelationships,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
     ...(intentHandoff?.correlation_id ? { correlation_id: intentHandoff.correlation_id } : {}),
     ...(intentHandoff?.origin_intent_id
       ? { origin_intent_id: intentHandoff.origin_intent_id }
@@ -454,6 +458,8 @@ export async function startMission(args: {
   tier?: 'personal' | 'confidential' | 'public';
   persona?: string;
   tenantId?: string;
+  /** Organization scope for the canonical work-item context chain. */
+  organizationId?: string;
   tenantSlug?: string;
   missionType?: string;
   visionRef?: string;
@@ -476,6 +482,7 @@ export async function startMission(args: {
     tier = 'confidential',
     persona = 'worker',
     tenantId = 'default',
+    organizationId,
     tenantSlug,
     missionType = 'development',
     visionRef,
@@ -537,6 +544,7 @@ export async function startMission(args: {
         tier: finalTier,
         tenantId,
         ...(tenantSlug ? { tenantSlug } : {}),
+        ...(organizationId ? { organizationId } : {}),
         missionType,
         visionRef,
         persona,
