@@ -439,7 +439,7 @@ async function createMission(
       persona,
       relationships,
       tenantSlug,
-      options
+      { ...options, organizationId }
     )
   );
 }
@@ -522,7 +522,7 @@ async function startMission(
       visionRef,
       relationships,
       tenantSlug,
-      options
+      { ...options, organizationId }
     )
   );
   const targetId = id.toUpperCase();
