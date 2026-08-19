@@ -1,0 +1,26 @@
+name: Show and tell
+description: Share a workflow, integration, artifact, or first successful run.
+title: '[Show and tell] '
+labels: ['show and tell']
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What did Kyberion help you accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: Which surface, actuators, backend, and operating system did you use?
+    validations:
+      required: true
+  - type: textarea
+    id: lessons
+    attributes:
+      label: Lessons or next step
+      description: What should the community know, reproduce, or improve?
+    validations:
+      required: true

@@ -194,6 +194,14 @@ Multi-tenant isolation, the organization operating model, and viewer-scoped surf
 | Check what is actually implemented | [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md)                             |
 | Report a security issue            | [`SECURITY.md`](./SECURITY.md)                                                                                                                 |
 
+## Community
+
+Questions, examples, and contribution paths are collected in the
+[`community guide`](./docs/COMMUNITY.md). Use GitHub Discussions for how-to
+questions and workflow showcases, Issues for reproducible bugs or focused
+feature proposals, and the private process in [`SECURITY.md`](./SECURITY.md)
+for vulnerabilities.
+
 Three audiences, three folders:
 
 - [`docs/user/`](./docs/user/) — using Kyberion to get work done.

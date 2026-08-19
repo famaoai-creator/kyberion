@@ -92,13 +92,14 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
        * these explicitly; the CLI router parses `--ephemeral` /
        * `--intent-goal <path>` from argv and forwards them here.
        */
-      options?: { ephemeral?: boolean; intentGoal?: string }
+      options?: { ephemeral?: boolean; intentGoal?: string; organizationId?: string }
     ) {
       const result = await _createMission({
         id,
         tier,
         tenantId,
         ...(tenantSlug ? { tenantSlug } : {}),
+        ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
         missionType,
         visionRef,
         persona,
@@ -120,7 +121,12 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       relationships: any = {},
       tenantSlug?: string,
       /** SO-01: see `create` above. */
-      options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
+      options?: {
+        ephemeral?: boolean;
+        intentGoal?: string;
+        force?: boolean;
+        organizationId?: string;
+      }
     ) {
       await _startMission({
         id,
@@ -128,6 +134,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         persona,
         tenantId,
         ...(tenantSlug ? { tenantSlug } : {}),
+        ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
         missionType,
         visionRef,
         relationships,

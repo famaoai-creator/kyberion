@@ -119,6 +119,7 @@ function missionLifecycleStatus(id?: string): MissionStatusView | MissionSummary
 export interface MissionLifecycleCreateOptions extends MissionLifecycleVerbOptions {
   ephemeral?: boolean;
   intentGoal?: string;
+  organizationId?: string;
 }
 
 export interface MissionLifecycleStartOptions extends MissionLifecycleCreateOptions {
@@ -226,7 +227,11 @@ export function buildMissionLifecycleService(
           persona,
           relationships,
           tenantSlug,
-          { ephemeral: options?.ephemeral, intentGoal: options?.intentGoal }
+          {
+            ephemeral: options?.ephemeral,
+            intentGoal: options?.intentGoal,
+            organizationId: options?.organizationId,
+          }
         )
       );
     },
@@ -256,6 +261,7 @@ export function buildMissionLifecycleService(
             ephemeral: options?.ephemeral,
             intentGoal: options?.intentGoal,
             force: options?.force,
+            organizationId: options?.organizationId,
           }
         )
       );
