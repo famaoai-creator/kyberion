@@ -82,16 +82,16 @@ import { safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
 ESM. Relative TS imports include `.js` extensions:
 
 ```typescript
-import { foo } from './foo.js';        // ✅
-import { foo } from '../foo';          // ❌ fails check:esm
+import { foo } from './foo.js'; // ✅
+import { foo } from '../foo'; // ❌ fails check:esm
 ```
 
 Workspace package imports use the package name:
 
 ```typescript
-import { logger } from '@agent/core';                       // ✅
-import { foo } from '@agent/core/customer-resolver';        // ✅ — sub-export
-import { logger } from '../../libs/core/index.js';          // ❌
+import { logger } from '@agent/core'; // ✅
+import { foo } from '@agent/core/customer-resolver'; // ✅ — sub-export
+import { logger } from '../../libs/core/index.js'; // ❌
 ```
 
 See [`docs/PACKAGING_CONTRACT.md`](./docs/PACKAGING_CONTRACT.md) for the full ESM discipline.
@@ -131,20 +131,20 @@ Per `docs/DOCUMENTATION_LOCALIZATION_POLICY.md`, README / Quickstart / WHY are k
 
 ### Comments
 
-Default to no comments. Add a comment only when the *why* is non-obvious — a hidden constraint, a workaround for a specific bug, or behavior that would surprise a future reader.
+Default to no comments. Add a comment only when the _why_ is non-obvious — a hidden constraint, a workaround for a specific bug, or behavior that would surprise a future reader.
 
 ## Conventional Commits
 
-| Type | Meaning | Bump |
-|---|---|---|
-| `feat:` | New feature | minor |
-| `fix:` | Bug fix | patch |
-| `perf:` | Performance improvement (no behavior change) | patch |
-| `refactor:` | Internal restructure (no behavior change) | patch |
-| `docs:` | Documentation only | none |
-| `test:` | Tests only | none |
-| `build:` / `ci:` / `chore:` | Tooling / dependencies | none |
-| Any with `!` after type or `BREAKING CHANGE:` footer | Breaking | major |
+| Type                                                 | Meaning                                      | Bump  |
+| ---------------------------------------------------- | -------------------------------------------- | ----- |
+| `feat:`                                              | New feature                                  | minor |
+| `fix:`                                               | Bug fix                                      | patch |
+| `perf:`                                              | Performance improvement (no behavior change) | patch |
+| `refactor:`                                          | Internal restructure (no behavior change)    | patch |
+| `docs:`                                              | Documentation only                           | none  |
+| `test:`                                              | Tests only                                   | none  |
+| `build:` / `ci:` / `chore:`                          | Tooling / dependencies                       | none  |
+| Any with `!` after type or `BREAKING CHANGE:` footer | Breaking                                     | major |
 
 Examples:
 
@@ -163,6 +163,10 @@ The PR title is what shows up in `CHANGELOG.md` after `pnpm tsx scripts/generate
 - We aim to first-respond within 7 days. Pre-1.0, this slips sometimes. Ping if it does.
 - Reviews focus on: correctness, clarity, alignment with stable contracts, test coverage. Style nits are auto-formatted by Prettier — don't litigate them.
 - A reviewer's `Request changes` is binding only on the area they're CODEOWNER for. Cross-area objections are advisory unless escalated per [`GOVERNANCE.md`](./GOVERNANCE.md).
+
+## Getting help
+
+Questions and support routes are described in [`.github/SUPPORT.md`](./.github/SUPPORT.md). In short: file bug reports with the [bug template](./.github/ISSUE_TEMPLATE/bug.md), feature requests with the [feature template](./.github/ISSUE_TEMPLATE/feature.md), and start your first contribution from the [good first issue guide](./.github/ISSUE_TEMPLATE/good-first-issue-guide.md).
 
 ## Security
 
