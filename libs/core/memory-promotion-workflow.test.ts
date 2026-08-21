@@ -1,11 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  safeExistsSync,
-  safeReaddir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import {
@@ -50,14 +44,12 @@ describe('memory-promotion-workflow', () => {
   const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
   const distillDir = pathResolver.shared('runtime/distill-candidates');
   let originalHintsRaw: string | null = null;
-  let distillEntriesBefore = new Set<string>();
+  const createdDistillCandidateIds = new Set<string>();
 
   function cleanupPromotionArtifacts(): void {
     withExecutionContext('ecosystem_architect', () => {
-      const entriesNow = safeExistsSync(distillDir) ? safeReaddir(distillDir) : [];
-      for (const entry of entriesNow) {
-        if (distillEntriesBefore.has(entry)) continue;
-        const recordPath = `${distillDir}/${entry}`;
+      for (const candidateId of createdDistillCandidateIds) {
+        const recordPath = `${distillDir}/${candidateId}.json`;
         try {
           const record = JSON.parse(safeReadFile(recordPath, { encoding: 'utf8' }) as string) as {
             promoted_ref?: string;
@@ -74,6 +66,7 @@ describe('memory-promotion-workflow', () => {
         }
         safeRmSync(recordPath);
       }
+      createdDistillCandidateIds.clear();
     });
   }
 
@@ -88,7 +81,6 @@ describe('memory-promotion-workflow', () => {
 
   beforeEach(() => {
     if (safeExistsSync(queuePath)) safeRmSync(queuePath);
-    distillEntriesBefore = new Set(safeExistsSync(distillDir) ? safeReaddir(distillDir) : []);
   });
 
   afterEach(() => {
@@ -151,6 +143,7 @@ describe('memory-promotion-workflow', () => {
       sensitivityTier: 'confidential',
       ratificationRequired: true,
     });
+    createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
     updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
@@ -218,6 +211,7 @@ describe('memory-promotion-workflow', () => {
       sensitivityTier: 'confidential',
       ratificationRequired: true,
     });
+    createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
     updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
@@ -252,6 +246,7 @@ describe('memory-promotion-workflow', () => {
       sensitivityTier: 'confidential',
       ratificationRequired: true,
     });
+    createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
 
     await expect(
@@ -271,6 +266,7 @@ describe('memory-promotion-workflow', () => {
       sensitivityTier: 'confidential',
       ratificationRequired: true,
     });
+    createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
     updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
@@ -304,6 +300,7 @@ describe('memory-promotion-workflow', () => {
       evidenceRefs: ['active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl'],
       sensitivityTier: 'personal',
     });
+    createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
 
     const result = await promotePersonalMemoryCandidates({
