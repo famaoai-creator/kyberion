@@ -1,5 +1,6 @@
 .gemini/
 .venv/
+.env.local
 
 # Provider state directories (XP-04 multi-provider-coexecution-contract):
 # gitignored, reproduced via generation ceremonies. Exception: .claude/agents/

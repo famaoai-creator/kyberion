@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 import {
   rootDir,
   capabilityEntry,
@@ -10,6 +12,7 @@ import {
   normalizeStoredPath,
   missionDir,
   projectWorkspaceDir,
+  findMissionPath,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -116,5 +119,21 @@ describe('path-resolver portability helpers', () => {
     expect(() => projectWorkspaceDir('PRJ-TEST', 'confidential', 'public')).toThrow(
       /invalid tenant slug/i
     );
+  });
+
+  it('ignores git-only mission shells but resolves a materialized mission', () => {
+    withExecutionContext('mission_controller', () => {
+      const missionId = `MSN-PATH-SHELL-${Date.now()}`;
+      const missionPath = missionDir(missionId, 'public');
+      safeMkdir(path.join(missionPath, '.git'), { recursive: true });
+
+      try {
+        expect(findMissionPath(missionId)).toBeNull();
+        safeWriteFile(path.join(missionPath, 'mission-state.json'), '{}');
+        expect(findMissionPath(missionId)).toBe(missionPath);
+      } finally {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      }
+    });
   });
 });
