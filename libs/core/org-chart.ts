@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { TeamRoleRecord } from './team-role-assignment-selection.js';
 
@@ -81,12 +81,7 @@ function normalizeRoleId(label: string): string {
 }
 
 function loadJsonIfPresent<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<T>(filePath);
 }
 
 function isOrgChartCandidate(value: unknown): value is OrganizationOrgChart {

@@ -1,6 +1,11 @@
 import * as path from 'node:path';
 import { customerRoot } from './customer-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import {
+  loadJsonIfPresent as loadOptionalJson,
+  safeExistsSync,
+  safeReaddir,
+  safeStat,
+} from './secure-io.js';
 
 export interface ResolveTenantDesignInput {
   rootDir?: string;
@@ -24,15 +29,7 @@ interface TenantEntry {
 }
 
 function readJsonIfPresent(filePath: string): Record<string, any> | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      any
-    >;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<Record<string, any>>(filePath);
 }
 
 function collectTenantOverridePaths(rootDir: string, customerId?: string): string[] {

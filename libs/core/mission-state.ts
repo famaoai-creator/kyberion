@@ -13,7 +13,14 @@ import {
   tenantMissionDir,
 } from './path-resolver.js';
 import { logger } from './core.js';
-import { safeExistsSync, safeLstat, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  loadJsonIfPresent as loadOptionalJson,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import { withFencedWriterLease, writerLeaseResourceId } from './writer-lease.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
@@ -343,10 +350,5 @@ export function listActiveMissions(
 }
 
 export function readJsonFileSafe(filePath: string): any | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return readJsonFile(filePath);
-  } catch (_) {
-    return null;
-  }
+  return loadOptionalJson(filePath);
 }

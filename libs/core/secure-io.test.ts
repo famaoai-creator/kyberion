@@ -7,6 +7,7 @@ import {
   buildSafeExecEnv,
   ensureDir,
   loadJson,
+  loadJsonIfPresent,
   safeExec,
   safeExecResult,
   safeReadFile,
@@ -152,6 +153,21 @@ describe('secure-io core', () => {
       const testFile = path.join(tmpDir, 'payload.json');
       fs.writeFileSync(testFile, JSON.stringify({ hello: 'world' }));
       expect(loadJson<{ hello: string }>(testFile)).toEqual({ hello: 'world' });
+    });
+
+    it('returns null for a missing or invalid optional JSON file', () => {
+      const missing = path.join(tmpDir, 'missing.json');
+      const invalid = path.join(tmpDir, 'invalid.json');
+      fs.writeFileSync(invalid, '{not-json');
+
+      expect(loadJsonIfPresent(missing)).toBeNull();
+      expect(loadJsonIfPresent(invalid)).toBeNull();
+    });
+
+    it('parses a valid optional JSON file', () => {
+      const testFile = path.join(tmpDir, 'optional.json');
+      fs.writeFileSync(testFile, JSON.stringify({ enabled: true }));
+      expect(loadJsonIfPresent<{ enabled: boolean }>(testFile)).toEqual({ enabled: true });
     });
   });
 

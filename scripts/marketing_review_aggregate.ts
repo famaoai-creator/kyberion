@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   aggregateMarketingReviews,
+  loadJson,
   logger,
   pathResolver,
   requiredMarketingControls,
@@ -20,18 +21,12 @@ interface ReviewPackage {
   artifacts: Array<{ name: string; path: string; sha256: string }>;
 }
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(filePath), { encoding: 'utf8' }) as string
-  ) as T;
-}
-
 export function runMarketingReviewAggregation(input: {
   reviewPackagePath: string;
   reviewPaths: string[];
   outputPath: string;
 }): { ready_for_approval: boolean; output_path: string } {
-  const reviewPackage = readJson<ReviewPackage>(input.reviewPackagePath);
+  const reviewPackage = loadJson<ReviewPackage>(pathResolver.rootResolve(input.reviewPackagePath));
   const artifacts: Record<string, ArtifactBinding> = Object.fromEntries(
     reviewPackage.artifacts
       .filter((artifact) => artifact.name !== 'completion-evidence.json')
@@ -45,7 +40,9 @@ export function runMarketingReviewAggregation(input: {
         ];
       })
   );
-  const reviews = input.reviewPaths.map((reviewPath) => readJson<MarketingReview>(reviewPath));
+  const reviews = input.reviewPaths.map((reviewPath) =>
+    loadJson<MarketingReview>(pathResolver.rootResolve(reviewPath))
+  );
   const controls = requiredMarketingControls(reviewPackage.risk_level);
   const gate = aggregateMarketingReviews({
     artifacts,

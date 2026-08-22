@@ -1,21 +1,21 @@
-import { createHash } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { auditChain } from '@agent/core/audit-chain';
-import { isValidTenantSlug, pathResolver, safeExistsSync, toWireError } from '@agent/core';
+import {
+  findChronosTokenRegistration,
+  isValidChronosScopeId,
+  isValidTenantSlug,
+  readChronosTokenRegistrations,
+  toWireError,
+} from '@agent/core';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { secretGuard } from '@agent/core/secret-guard';
 import {
   isChronosLoopbackRequest,
-  matchesChronosToken,
   resolveChronosAccessRole,
   resolveChronosToken,
   resolveChronosTokenRegistration,
   type ChronosAccessRole,
-  type ChronosTokenRegistration,
 } from './api-guard';
-import type { OsKnowledgeTier } from '@agent/core';
-
-const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
+import type { ChronosTokenRegistration, OsKnowledgeTier } from '@agent/core';
 
 export interface ViewerContext {
   role: ChronosAccessRole;
@@ -43,72 +43,9 @@ export class ViewerContextError extends Error {
   }
 }
 
-function registryPath(): string {
-  return pathResolver.knowledge('personal/connections/chronos-access.json');
-}
-
 function loadRegistry(): ChronosTokenRegistration[] | null {
-  if (!safeExistsSync(registryPath())) return null;
   try {
-    const document = secretGuard.loadConnectionDocument('chronos-access');
-    if (!document || !Array.isArray(document.tokens)) {
-      throw new Error('chronos access registry must contain tokens');
-    }
-    return document.tokens.map((entry: unknown) => {
-      if (!entry || typeof entry !== 'object') throw new Error('invalid chronos access entry');
-      const value = entry as Record<string, unknown>;
-      if (
-        typeof value.token_hash !== 'string' ||
-        (value.role !== 'readonly' && value.role !== 'localadmin') ||
-        !Array.isArray(value.tenant_slugs) ||
-        !value.tenant_slugs.every(
-          (tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)
-        ) ||
-        (value.organization_ids !== undefined &&
-          (!Array.isArray(value.organization_ids) ||
-            !value.organization_ids.every(
-              (organization) =>
-                typeof organization === 'string' && SCOPE_ID_PATTERN.test(organization)
-            ))) ||
-        (value.project_ids !== undefined &&
-          (!Array.isArray(value.project_ids) ||
-            !value.project_ids.every(
-              (project) => typeof project === 'string' && SCOPE_ID_PATTERN.test(project)
-            ))) ||
-        (value.tier_access !== undefined &&
-          (!Array.isArray(value.tier_access) ||
-            value.tier_access.length === 0 ||
-            !value.tier_access.every(
-              (tier) => tier === 'public' || tier === 'confidential' || tier === 'personal'
-            )))
-      ) {
-        throw new Error('invalid chronos access entry');
-      }
-      return {
-        token_hash: value.token_hash,
-        role: value.role,
-        tenant_slugs: value.tenant_slugs.map((tenant) => String(tenant).trim()),
-        ...(Array.isArray(value.organization_ids)
-          ? {
-              organization_ids: value.organization_ids.map((organization) =>
-                String(organization).trim()
-              ),
-            }
-          : {}),
-        ...(Array.isArray(value.project_ids)
-          ? { project_ids: value.project_ids.map((project) => String(project).trim()) }
-          : {}),
-        ...(Array.isArray(value.tier_access)
-          ? {
-              tier_access: value.tier_access.filter(
-                (tier): tier is OsKnowledgeTier =>
-                  tier === 'public' || tier === 'confidential' || tier === 'personal'
-              ),
-            }
-          : {}),
-        ...(typeof value.label === 'string' ? { label: value.label } : {}),
-      } as ChronosTokenRegistration;
-    });
+    return readChronosTokenRegistrations();
   } catch {
     throw new ViewerContextError(401, 'Chronos viewer token registry is unavailable.');
   }
@@ -117,8 +54,7 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
 function resolveRegisteredEntry(token: string): ChronosTokenRegistration | null {
   const registry = loadRegistry();
   if (!registry) return resolveChronosTokenRegistration(token);
-  const digest = createHash('sha256').update(token).digest('hex');
-  return registry.find((entry) => matchesChronosToken(digest, entry.token_hash)) || null;
+  return findChronosTokenRegistration(token, registry);
 }
 
 export function resolveViewerContext(req: NextRequest): ViewerContext {
@@ -278,7 +214,7 @@ function strictViewerScopeIds(
   requested?: string
 ): string[] | 'all' {
   const normalized = requested?.trim() || undefined;
-  if (normalized && !SCOPE_ID_PATTERN.test(normalized)) {
+  if (normalized && !isValidChronosScopeId(normalized)) {
     throw new ViewerContextError(403, `invalid viewer ${kind} scope: ${normalized}`);
   }
   if (normalized && allowed !== 'all' && !allowed.includes(normalized)) {
