@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
 
 export interface DecisionThreshold {
   metric: string;
@@ -70,12 +70,7 @@ function resolveBaseDir(rootDir?: string): string {
 }
 
 function loadJsonIfPresent<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<T>(filePath);
 }
 
 function isDecisionRightsMatrix(value: unknown): value is DecisionRightsMatrix {

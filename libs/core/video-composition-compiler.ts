@@ -18,6 +18,7 @@ import { getVideoCompositionTemplateRecord } from './video-composition-template-
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
 import { slugify } from './text-utils.js';
+import { escapeHtml } from './text-escaping.js';
 import { safeCopyFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { buildVideoDesignCssVars } from './video-design-system.js';
 import type {
@@ -1741,13 +1742,4 @@ function safeSceneKey(value: string): string {
 
 function sanitizeCssClass(value: string): string {
   return safeSceneKey(value);
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

@@ -12,20 +12,12 @@ import {
   resolveMediaDrawioTypeRank,
   resolveMediaDrawioSecurityGroupRelationPrefix,
 } from '@agent/core';
-import { safeExistsSync, safeReadFile, pathResolver } from '@agent/core';
+import { escapeXml, safeExistsSync, safeReadFile, pathResolver } from '@agent/core';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
 function normalizeFontFamily(input: string): string {
   return input.split(',')[0].trim();
-}
-
-function escapeXml(input: string): string {
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function awsIconCandidatesForResourceType(resourceType: string): string[] {
