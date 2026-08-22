@@ -6,6 +6,7 @@
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
+import { escapeXml as sharedEscapeXml } from '../../text-escaping.js';
 import {
   KYBERION_BRAND_FONT_STACK,
   resolveEastAsianFontFamily,
@@ -39,13 +40,7 @@ const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationsh
 const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const RT_BASE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
-function escXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+const escXml = sharedEscapeXml;
 
 // ─── XML Generators ─────────────────────────────────────────
 

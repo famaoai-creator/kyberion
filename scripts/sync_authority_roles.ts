@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import {
+  loadJson,
   pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -23,12 +23,8 @@ type AuthorityRoleFile = AuthorityRoleRecord & { role: string };
 const DIRECTORY = pathResolver.knowledge('product/governance/authority-roles');
 const SNAPSHOT = pathResolver.knowledge('product/governance/authority-role-index.json');
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
 function loadSnapshotRoles(): Record<string, AuthorityRoleRecord> {
-  const snapshot = readJson<{ authority_roles?: Record<string, AuthorityRoleRecord> }>(SNAPSHOT);
+  const snapshot = loadJson<{ authority_roles?: Record<string, AuthorityRoleRecord> }>(SNAPSHOT);
   return snapshot.authority_roles || {};
 }
 
@@ -37,7 +33,9 @@ function loadDirectoryRoles(): Record<string, AuthorityRoleRecord> | null {
     return null;
   }
 
-  const files = safeReaddir(DIRECTORY).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(DIRECTORY)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
     return null;
   }
@@ -45,7 +43,7 @@ function loadDirectoryRoles(): Record<string, AuthorityRoleRecord> | null {
   const roles: Record<string, AuthorityRoleRecord> = {};
   for (const file of files) {
     const filePath = path.join(DIRECTORY, file);
-    const payload = readJson<AuthorityRoleFile>(filePath);
+    const payload = loadJson<AuthorityRoleFile>(filePath);
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Authority role file ${file} must declare a role id`);
@@ -75,7 +73,9 @@ function writeDirectoryRoles(roles: Record<string, AuthorityRoleRecord>) {
 
 function writeSnapshot(roles: Record<string, AuthorityRoleRecord>) {
   const authority_roles: Record<string, AuthorityRoleRecord> = {};
-  for (const [role, record] of Object.entries(roles).sort(([left], [right]) => left.localeCompare(right))) {
+  for (const [role, record] of Object.entries(roles).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
     authority_roles[role] = record;
   }
 
@@ -87,32 +87,29 @@ function writeSnapshot(roles: Record<string, AuthorityRoleRecord>) {
         authority_roles,
       },
       null,
-      2,
-    )}\n`,
+      2
+    )}\n`
   );
 }
 
 function main() {
-  return withExecutionContext(
-    'ecosystem_architect',
-    () => {
-      const roles = loadDirectoryRoles() || loadSnapshotRoles();
-      writeDirectoryRoles(roles);
-      writeSnapshot(roles);
-      console.log(
-        JSON.stringify(
-          {
-            status: 'ok',
-            role_count: Object.keys(roles).length,
-            canonical_directory: path.relative(pathResolver.rootDir(), DIRECTORY),
-            snapshot_path: path.relative(pathResolver.rootDir(), SNAPSHOT),
-          },
-          null,
-          2,
-        ),
-      );
-    },
-  );
+  return withExecutionContext('ecosystem_architect', () => {
+    const roles = loadDirectoryRoles() || loadSnapshotRoles();
+    writeDirectoryRoles(roles);
+    writeSnapshot(roles);
+    console.log(
+      JSON.stringify(
+        {
+          status: 'ok',
+          role_count: Object.keys(roles).length,
+          canonical_directory: path.relative(pathResolver.rootDir(), DIRECTORY),
+          snapshot_path: path.relative(pathResolver.rootDir(), SNAPSHOT),
+        },
+        null,
+        2
+      )
+    );
+  });
 }
 
 main();

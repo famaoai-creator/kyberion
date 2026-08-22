@@ -2,10 +2,7 @@
  * worksheet XML generator for XLSX packages
  */
 import type { XlsxWorksheet, XlsxCell, XlsxRow, XlsxColumn } from '../types/xlsx-protocol.js';
-
-function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeXml as escXml } from '../../text-escaping.js';
 
 function cellXml(cell: XlsxCell, sstMap?: Map<string, number>): string {
   // If raw XML preserved, use it
@@ -105,7 +102,11 @@ function colXml(col: XlsxColumn): string {
   return xml;
 }
 
-export function generateWorksheet(sheet: XlsxWorksheet, drawingRId?: string, sstMap?: Map<string, number>): string {
+export function generateWorksheet(
+  sheet: XlsxWorksheet,
+  drawingRId?: string,
+  sstMap?: Map<string, number>
+): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3">`;
 
@@ -228,18 +229,22 @@ export function generateWorksheet(sheet: XlsxWorksheet, drawingRId?: string, sst
         const m = sheet.pageSetup.margins;
         xml += `<pageMargins left="${m.left}" right="${m.right}" top="${m.top}" bottom="${m.bottom}" header="${m.header}" footer="${m.footer}"/>`;
       } else {
-        xml += '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
+        xml +=
+          '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
       }
       xml += '<pageSetup';
       if (sheet.pageSetup.paperSize) xml += ` paperSize="${sheet.pageSetup.paperSize}"`;
       if (sheet.pageSetup.orientation) xml += ` orientation="${sheet.pageSetup.orientation}"`;
       if (sheet.pageSetup.scale) xml += ` scale="${sheet.pageSetup.scale}"`;
-      if (sheet.pageSetup.fitToWidth !== undefined) xml += ` fitToWidth="${sheet.pageSetup.fitToWidth}"`;
-      if (sheet.pageSetup.fitToHeight !== undefined) xml += ` fitToHeight="${sheet.pageSetup.fitToHeight}"`;
+      if (sheet.pageSetup.fitToWidth !== undefined)
+        xml += ` fitToWidth="${sheet.pageSetup.fitToWidth}"`;
+      if (sheet.pageSetup.fitToHeight !== undefined)
+        xml += ` fitToHeight="${sheet.pageSetup.fitToHeight}"`;
       xml += '/>';
     }
   } else {
-    xml += '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
+    xml +=
+      '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
   }
 
   // Drawing reference

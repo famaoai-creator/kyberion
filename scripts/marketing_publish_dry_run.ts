@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import {
   evaluatePublicationVerification,
+  escapeHtml,
+  loadJson,
   loadApprovalRequest,
   logger,
   loadMarketingRiskPolicy,
@@ -19,21 +21,6 @@ import {
   type PublicationApproval,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function readJson<T>(filePath: string): T {
-  return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(filePath), { encoding: 'utf8' }) as string
-  ) as T;
-}
 
 function currentArtifactBindings(
   approved: Record<string, ArtifactBinding>
@@ -64,7 +51,7 @@ export function runMarketingPublishDryRun(input: {
   preview: string;
   verification: string;
 } {
-  const approval = readJson<PublicationApproval>(input.approvalPath);
+  const approval = loadJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
   const sharedApprovalRequest =
     input.sharedApprovalRequest ||
     loadApprovalRequest(

@@ -8,6 +8,7 @@ import {
   resolveCapabilityBundlesForUtterance,
 } from './capability-bundle-registry.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
+import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -192,14 +193,6 @@ function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[]
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
-function sanitizePathSegment(value: string): string {
-  return value
-    .trim()
-    .replace(/[\\/]+/g, '-')
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 function defaultTenantId(): string | undefined {
   const tenant = process.env.KYBERION_TENANT?.trim() || process.env.KYBERION_CUSTOMER?.trim() || '';
   return tenant || undefined;
@@ -211,7 +204,7 @@ function buildIntentOverlayPaths(options: IntentResolutionOptions): string[] {
     paths.push(PERSONAL_INTENT_OVERLAY_PATH);
   } else if (options.tier === 'confidential') {
     paths.push(PERSONAL_INTENT_OVERLAY_PATH);
-    const tenantId = sanitizePathSegment(options.tenantId || defaultTenantId() || '');
+    const tenantId = sanitizeIntentPathSegment(options.tenantId || defaultTenantId() || '');
     if (tenantId) {
       paths.push(
         pathResolver.knowledge(
@@ -270,7 +263,7 @@ function mergeIntentDefinition(
 function resolvedCatalogCacheKey(options: IntentResolutionOptions): string {
   return JSON.stringify({
     tier: options.tier || 'public',
-    tenantId: sanitizePathSegment(options.tenantId || defaultTenantId() || ''),
+    tenantId: sanitizeIntentPathSegment(options.tenantId || defaultTenantId() || ''),
     overlayPaths: [...new Set(options.overlayPaths || [])].sort(),
   });
 }

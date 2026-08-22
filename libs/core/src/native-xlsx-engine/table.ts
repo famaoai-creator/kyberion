@@ -2,10 +2,7 @@
  * Table XML generator for XLSX packages
  */
 import type { XlsxTable } from '../types/xlsx-protocol.js';
-
-function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeXml as escXml } from '../../text-escaping.js';
 
 export function generateTable(table: XlsxTable): string {
   if (table.rawXml) return table.rawXml;
