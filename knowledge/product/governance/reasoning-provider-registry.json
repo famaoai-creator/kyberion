@@ -9,7 +9,7 @@
         "reasoning": true,
         "structured_output": true,
         "abort": true,
-        "session_continuity": true,
+        "session_continuity": false,
         "images": false
       },
       "env_keys": ["CLAUDECODE"]
@@ -22,7 +22,7 @@
         "reasoning": true,
         "structured_output": true,
         "abort": true,
-        "session_continuity": true,
+        "session_continuity": false,
         "images": false
       },
       "env_keys": ["CODEX_CLI", "CODEX_VERSION"]
@@ -36,7 +36,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": true,
-        "images": false
+        "images": true
       },
       "env_keys": ["CLAUDECODE", "ANTHROPIC_API_KEY"]
     },
@@ -140,7 +140,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_LOCAL_LLM_URL"]
     },
@@ -153,7 +153,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_OLLAMA_URL"]
     },
@@ -166,7 +166,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_VLLM_URL"]
     },
@@ -179,7 +179,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_LMSTUDIO_URL", "KYBERION_LM_STUDIO_URL"]
     },
@@ -192,7 +192,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_LLAMACPP_URL"]
     },
@@ -205,7 +205,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_MLX_URL"]
     },
@@ -218,7 +218,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_LOCALAI_URL"]
     },
@@ -231,7 +231,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["KYBERION_NEMOTRON_URL"]
     },
@@ -244,7 +244,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "images": true
+        "images": false
       },
       "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
     },
@@ -255,7 +255,7 @@
       "capabilities": {
         "reasoning": true,
         "structured_output": true,
-        "abort": false,
+        "abort": true,
         "session_continuity": false,
         "images": false
       },

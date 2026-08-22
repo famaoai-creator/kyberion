@@ -3,10 +3,13 @@ import {
   BACKEND_CAPABILITY_PROFILES,
   availableThinkingLevels,
   backendCapabilityProfile,
+  backendRouteCapabilities,
   modesWithUtilityFit,
   resolveConstrainedSampling,
   resolveThinkingLevel,
 } from './backend-capability-profile.js';
+import { loadReasoningRoutePolicy } from './reasoning-route-resolver.js';
+import { listReasoningProviderDescriptors } from './reasoning-provider-registry.js';
 import {
   buildFailoverReasoningBackend,
   stubReasoningBackend,
@@ -17,6 +20,78 @@ describe('backend capability profiles (QM-06)', () => {
   it('every profile is self-consistent (mode key matches declaration)', () => {
     for (const [mode, profile] of Object.entries(BACKEND_CAPABILITY_PROFILES)) {
       expect(profile.mode).toBe(mode);
+      expect(['local-only', 'external-api']).toContain(profile.data_egress);
+    }
+  });
+
+  it('separates local adapter execution from the data egress boundary', () => {
+    expect(backendCapabilityProfile('agy-cli')).toMatchObject({
+      transport: 'cli',
+      data_egress: 'external-api',
+    });
+    expect(backendCapabilityProfile('ollama')).toMatchObject({
+      transport: 'local-server',
+      data_egress: 'local-only',
+    });
+  });
+
+  it('declares the expanded execution capability dimensions', () => {
+    expect(backendCapabilityProfile('gemini-api').capabilities).toMatchObject({
+      streaming: true,
+      tool_calling: true,
+    });
+    expect(backendCapabilityProfile('claude-agent').capabilities).toMatchObject({
+      input_modalities: ['text', 'image'],
+      native_subagent: true,
+    });
+    expect(backendRouteCapabilities(backendCapabilityProfile('ollama'))).toEqual([
+      'text',
+      'structured_output',
+      'tools',
+      'streaming',
+    ]);
+  });
+
+  it('keeps route policy declarations within canonical backend capabilities', () => {
+    const policy = loadReasoningRoutePolicy();
+    const declarations = [
+      ...Object.entries(policy.runtime_adapters).map(
+        ([mode, adapter]) => [mode, adapter.capabilities] as const
+      ),
+      ...Object.entries(policy.profiles).map(
+        ([profileRef, profile]) =>
+          [`${profileRef} (${profile.mode})`, profile.capabilities ?? [], profile.mode] as const
+      ),
+    ];
+
+    for (const [label, requested, explicitMode] of declarations) {
+      const mode = explicitMode ?? label;
+      if (!Object.prototype.hasOwnProperty.call(BACKEND_CAPABILITY_PROFILES, mode)) continue;
+      const supported = backendRouteCapabilities(
+        backendCapabilityProfile(mode as keyof typeof BACKEND_CAPABILITY_PROFILES)
+      );
+      for (const capability of requested) {
+        expect(
+          supported,
+          `${label} requests ${capability}, but ${mode} does not declare it`
+        ).toContain(capability);
+      }
+    }
+  });
+
+  it('keeps overlapping provider registry fields synchronized', () => {
+    for (const descriptor of listReasoningProviderDescriptors()) {
+      const profile = backendCapabilityProfile(descriptor.mode);
+      expect(descriptor.capabilities.structured_output, descriptor.mode).toBe(
+        profile.capabilities.structured_output
+      );
+      expect(descriptor.capabilities.abort, descriptor.mode).toBe(profile.capabilities.abort);
+      expect(descriptor.capabilities.session_continuity, descriptor.mode).toBe(
+        profile.capabilities.session_continuity
+      );
+      expect(descriptor.capabilities.images, descriptor.mode).toBe(
+        profile.capabilities.input_modalities.includes('image')
+      );
     }
   });
 

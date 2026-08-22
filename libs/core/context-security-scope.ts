@@ -1,5 +1,6 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 
 const TIER_SENSITIVITY: Record<TierLevel, number> = {
   public: 1,
@@ -238,8 +239,6 @@ export function validateContextOutputTier(
   return { allowed: true };
 }
 
-const LOCAL_REASONING_BACKENDS = /^(stub|local|ollama|mlx|apple-intelligence)$/u;
-
 export function validateReasoningEgress(
   scope: ContextSecurityScope,
   backendName: string
@@ -256,7 +255,7 @@ export function validateReasoningEgress(
       reason: `[CONTEXT_EGRESS_DENIED] Backend ${backendName} is outside allowed_reasoning_backends`,
     };
   }
-  if (scope.external_egress === 'deny' && !LOCAL_REASONING_BACKENDS.test(backendName)) {
+  if (scope.external_egress === 'deny' && !isLocalOnlyReasoningBackend(backendName)) {
     return {
       allowed: false,
       reason: `[CONTEXT_EGRESS_DENIED] External backend ${backendName} is forbidden by security_scope`,
