@@ -18,6 +18,9 @@ describe('backend conformance matrix (QM-06)', () => {
     expect(report.results.every((result) => result.help.status === 'verified')).toBe(true);
     expect(report.results[0]?.capabilities.structured_output.status).toBe('verified');
     expect(report.results[0]?.capabilities.session_continuity.status).toBe('declared');
+    expect(report.results[0]?.capabilities.streaming.status).toBe('declared');
+    expect(report.results[0]?.capabilities.tool_calling.status).toBe('declared');
+    expect(report.results[0]?.capabilities.native_subagent.status).toBe('declared');
   });
 
   it('marks a missing CLI unavailable without converting its declaration into proof', () => {
@@ -30,6 +33,9 @@ describe('backend conformance matrix (QM-06)', () => {
     expect(report.results.every((result) => result.help.status === 'unavailable')).toBe(true);
     expect(
       report.results.every((result) => result.capabilities.abort.status === 'unavailable')
+    ).toBe(true);
+    expect(
+      report.results.every((result) => result.capabilities.native_subagent.status === 'unavailable')
     ).toBe(true);
   });
 });

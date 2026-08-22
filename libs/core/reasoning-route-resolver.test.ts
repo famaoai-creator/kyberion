@@ -241,6 +241,39 @@ describe('reasoning-route-resolver', () => {
     ).toThrow(/missing capabilities: vision/);
   });
 
+  it('applies canonical capability bounds to route declarations before serving', () => {
+    expect(() =>
+      resolveReasoningRoute({
+        role: 'reviewer',
+        requiredCapabilities: ['streaming'],
+        env: {},
+        policy: {
+          version: 'test',
+          runtime_adapters: {
+            stub: {
+              adapter: 'test',
+              model_policy: 'local-unregistered',
+              capabilities: ['text', 'structured_output', 'streaming'],
+              supported_parameters: [],
+            },
+          },
+          profiles: {
+            'declared-streaming': {
+              mode: 'stub',
+              capabilities: ['text', 'structured_output', 'streaming'],
+            },
+          },
+          roles: { reviewer: { candidates: ['declared-streaming'] } },
+          fallback: {
+            max_attempts: 1,
+            max_in_place_retries: 0,
+            on_unsupported_parameter: 'reject',
+          },
+        },
+      })
+    ).toThrow(/missing capabilities: streaming/);
+  });
+
   it('resolves step routing by tag and records the winning layer', () => {
     const policy = {
       version: 'test',
