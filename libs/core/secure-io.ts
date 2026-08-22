@@ -188,6 +188,16 @@ export function loadJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
 }
 
+/** Read and parse an optional JSON file, returning null for missing or invalid input. */
+export function loadJsonIfPresent<T>(filePath: string): T | null {
+  if (!safeExistsSync(filePath)) return null;
+  try {
+    return loadJson<T>(filePath);
+  } catch {
+    return null;
+  }
+}
+
 let _policyCheckInProgress = false;
 
 /**

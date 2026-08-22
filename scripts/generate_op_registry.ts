@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { loadActuatorManifestCatalog } from '@agent/core';
+import { loadActuatorManifestCatalog, loadJson } from '@agent/core';
 import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
@@ -138,10 +138,6 @@ function normalizeDomainRegistry(registry: DomainOpRegistry | undefined): Domain
     transform: uniqueSorted(registry?.transform ?? []),
     apply: uniqueSorted(registry?.apply ?? []),
   };
-}
-
-function loadJson<T>(filePath: string): T {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')) as T;
 }
 
 function annotateOp(domain: string, op: string, kind: PipelineOpKind) {

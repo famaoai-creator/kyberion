@@ -55,6 +55,7 @@ export {
   safeFsyncFile,
   safeCreateExclusiveFileSync,
   safeChmodSync,
+  loadJsonIfPresent,
 } from './secure-io.js';
 
 // Backward compatibility aliases
@@ -63,6 +64,8 @@ export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } fr
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
 export * from './model-registry-directory.js';
+export * from './model-registry-contract.js';
+export * from './chronos-access-registry.js';
 export * from './context-boundary.js';
 export * from './scope-context.js';
 export * from './knowledge-scope.js';
@@ -168,6 +171,7 @@ export * from './voice-capability-bridge.js';
 export * from './voice-path-policy.js';
 export * from './ledger.js';
 export * from './text-utils.js';
+export * from './text-escaping.js';
 export * from './src/logic-utils.js';
 export * from './src/lock-utils.js';
 export * from './src/retry-utils.js';

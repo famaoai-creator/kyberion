@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import {
+  loadJson,
   pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -29,12 +29,8 @@ type TeamRoleFile = TeamRoleRecord & { role: string };
 const DIRECTORY = pathResolver.knowledge('product/orchestration/team-roles');
 const SNAPSHOT = pathResolver.knowledge('product/orchestration/team-role-index.json');
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
 function loadSnapshotRoles(): Record<string, TeamRoleRecord> {
-  const snapshot = readJson<{ team_roles?: Record<string, TeamRoleRecord> }>(SNAPSHOT);
+  const snapshot = loadJson<{ team_roles?: Record<string, TeamRoleRecord> }>(SNAPSHOT);
   return snapshot.team_roles || {};
 }
 
@@ -43,7 +39,9 @@ function loadDirectoryRoles(): Record<string, TeamRoleRecord> | null {
     return null;
   }
 
-  const files = safeReaddir(DIRECTORY).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(DIRECTORY)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
     return null;
   }
@@ -51,7 +49,7 @@ function loadDirectoryRoles(): Record<string, TeamRoleRecord> | null {
   const roles: Record<string, TeamRoleRecord> = {};
   for (const file of files) {
     const filePath = path.join(DIRECTORY, file);
-    const payload = readJson<TeamRoleFile>(filePath);
+    const payload = loadJson<TeamRoleFile>(filePath);
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Team role file ${file} must declare a role id`);
@@ -80,7 +78,9 @@ function writeDirectoryRoles(roles: Record<string, TeamRoleRecord>) {
 
 function writeSnapshot(roles: Record<string, TeamRoleRecord>) {
   const team_roles: Record<string, TeamRoleRecord> = {};
-  for (const [role, record] of Object.entries(roles).sort(([left], [right]) => left.localeCompare(right))) {
+  for (const [role, record] of Object.entries(roles).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
     team_roles[role] = record;
   }
 
@@ -92,8 +92,8 @@ function writeSnapshot(roles: Record<string, TeamRoleRecord>) {
         team_roles,
       },
       null,
-      2,
-    )}\n`,
+      2
+    )}\n`
   );
 }
 
@@ -111,8 +111,8 @@ function main() {
           snapshot_path: path.relative(pathResolver.rootDir(), SNAPSHOT),
         },
         null,
-        2,
-      ),
+        2
+      )
     );
   });
 }

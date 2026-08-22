@@ -21,6 +21,7 @@ import { createRequire } from 'node:module';
 import fontkit from './fontkit-shim.js';
 import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
+import { escapeXml } from '../../text-escaping.js';
 import { createLogger } from '../../logger.js';
 
 const logger = createLogger('native-pdf-engine');
@@ -223,15 +224,6 @@ function encodePdfString(s: string, unicode: boolean): string {
 
 function escapeLit(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 // ─── XMP Metadata ────────────────────────────────────────────

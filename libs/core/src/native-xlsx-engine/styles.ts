@@ -14,6 +14,7 @@ import type {
   XlsxDxfStyle,
 } from '../types/xlsx-protocol.js';
 import { resolveLatinFontFamily } from '../../design-fonts.js';
+import { escapeXml as escXml } from '../../text-escaping.js';
 
 function colorXml(color: XlsxColor | undefined, tagName: string): string {
   if (!color) return '';
@@ -146,14 +147,6 @@ function xfXml(
     xml += '</xf>';
   }
   return xml;
-}
-
-function escXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export function generateStyles(protocol: XlsxDesignProtocol): string {

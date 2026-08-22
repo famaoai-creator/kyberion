@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
+import { escapeXml, stripXmlControlCharacters } from '../../text-escaping.js';
 import type { PptxDesignProtocol } from '../types/pptx-protocol.js';
 import { generateContentTypes } from './content-types.js';
 import {
@@ -64,8 +65,8 @@ export async function generateNativePptx(
       // Apply text replacements to raw XML using proven <a:t> patching
       if (Object.keys(textReplacements).length > 0) {
         for (const [orig, repl] of Object.entries(textReplacements)) {
-          const escapedOrig = escapeXml(orig);
-          const escapedRepl = escapeXml(repl);
+          const escapedOrig = escapePptxXml(orig);
+          const escapedRepl = escapePptxXml(repl);
 
           // Strategy 1: Direct <a:t> replacement
           const pattern = `<a:t>${escapedOrig}</a:t>`;
@@ -677,7 +678,7 @@ export function patchPptxParagraphs(
 
         const newCombined =
           mode === 'contains' ? combined.split(original).join(replacement) : replacement;
-        const escapedNew = escapeXml(newCombined);
+        const escapedNew = escapePptxXml(newCombined);
 
         let firstRun = true;
         const newPara = para.replace(/<a:t>[^<]*<\/a:t>/g, () => {
@@ -727,7 +728,7 @@ export function patchPptxText(
   // Build a mapping of escaped XML text for safe replacement
   const xmlReplacements: { original: string; replacement: string }[] = [];
   for (const [orig, repl] of Object.entries(textReplacements)) {
-    xmlReplacements.push({ original: escapeXml(orig), replacement: escapeXml(repl) });
+    xmlReplacements.push({ original: escapePptxXml(orig), replacement: escapePptxXml(repl) });
   }
 
   // Process each slide XML
@@ -751,9 +752,9 @@ export function patchPptxText(
     // Strategy 2: For multi-run text, try to find and replace concatenated text
     // across adjacent <a:t> tags within the same <a:p> paragraph
     for (const [orig, repl] of Object.entries(textReplacements)) {
-      if (modified && !xml.includes(escapeXml(orig))) continue;
+      if (modified && !xml.includes(escapePptxXml(orig))) continue;
       // Find paragraphs containing the text spread across runs
-      const escapedOrig = escapeXml(orig);
+      const escapedOrig = escapePptxXml(orig);
       const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
       for (const para of paragraphs) {
         const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
@@ -761,7 +762,7 @@ export function patchPptxText(
         const combined = textParts.map((t) => t.replace(/<\/?a:t>/g, '')).join('');
         if (combined === escapedOrig) {
           // Replace: keep the first run's formatting, put all text there, empty others
-          const escapedRepl = escapeXml(repl);
+          const escapedRepl = escapePptxXml(repl);
           let newPara = para;
           let firstRun = true;
           newPara = newPara.replace(/<a:t>[^<]*<\/a:t>/g, (match) => {
@@ -785,14 +786,8 @@ export function patchPptxText(
   zip.writeZip(outputPath);
 }
 
-function escapeXml(str: string): string {
-  return str
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+function escapePptxXml(value: string): string {
+  return escapeXml(stripXmlControlCharacters(value));
 }
 
 function unescapeXml(str: string): string {

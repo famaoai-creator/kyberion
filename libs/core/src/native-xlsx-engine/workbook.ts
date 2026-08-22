@@ -2,10 +2,7 @@
  * workbook.xml generator for XLSX packages
  */
 import type { XlsxDesignProtocol } from '../types/xlsx-protocol.js';
-
-function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeXml as escXml } from '../../text-escaping.js';
 
 export function generateWorkbook(protocol: XlsxDesignProtocol): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -17,7 +14,8 @@ export function generateWorkbook(protocol: XlsxDesignProtocol): string {
   } else {
     xml += '<workbookPr';
     if (protocol.workbookProperties?.date1904) xml += ' date1904="1"';
-    if (protocol.workbookProperties?.defaultThemeVersion) xml += ` defaultThemeVersion="${protocol.workbookProperties.defaultThemeVersion}"`;
+    if (protocol.workbookProperties?.defaultThemeVersion)
+      xml += ` defaultThemeVersion="${protocol.workbookProperties.defaultThemeVersion}"`;
     xml += '/>';
   }
 

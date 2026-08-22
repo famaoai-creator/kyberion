@@ -7,6 +7,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
+  loadJsonIfPresent as loadOptionalJson,
 } from './secure-io.js';
 import { logger } from './core.js';
 import { getReasoningBackend } from './reasoning-backend.js';
@@ -200,12 +201,7 @@ function readJsonl(filePath: string): Array<Record<string, unknown>> {
 }
 
 function readJsonIfPresent<T>(filePath: string): T | null {
-  try {
-    if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as T;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<T>(filePath);
 }
 
 /**

@@ -2,10 +2,7 @@
  * sharedStrings.xml generator for XLSX packages
  */
 import type { XlsxDesignProtocol, XlsxTextRun } from '../types/xlsx-protocol.js';
-
-function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeXml as escXml } from '../../text-escaping.js';
 
 function richTextRunXml(run: XlsxTextRun): string {
   let xml = '<r>';
