@@ -89,8 +89,8 @@ describe('backend capability profiles (QM-06)', () => {
       expect(descriptor.capabilities.session_continuity, descriptor.mode).toBe(
         profile.capabilities.session_continuity
       );
-      expect(descriptor.capabilities.images, descriptor.mode).toBe(
-        profile.capabilities.input_modalities.includes('image')
+      expect(descriptor.capabilities.input_modalities, descriptor.mode).toEqual(
+        profile.capabilities.input_modalities
       );
     }
   });
