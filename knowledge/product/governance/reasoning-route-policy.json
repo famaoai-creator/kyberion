@@ -31,7 +31,7 @@
         "discovery_provider": "claude",
         "availability": { "kind": "provider_discovery" }
       },
-      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
     "grok-cli": {
@@ -74,7 +74,7 @@
         "discovery_provider": "gemini",
         "availability": { "kind": "provider_discovery" }
       },
-      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
     "copilot": {
@@ -125,7 +125,7 @@
       },
       "endpoint_policy": "public",
       "model_policy": "approved",
-      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": [
         "temperature",
         "top_p",
@@ -353,7 +353,7 @@
     },
     "openrouter-default": {
       "mode": "openrouter",
-      "capabilities": ["text", "structured_output", "tools", "vision"]
+      "capabilities": ["text", "structured_output", "tools"]
     },
     "nemotron-default": { "mode": "nemotron-api", "capabilities": ["text", "structured_output"] },
     "ollama-default": { "mode": "ollama", "capabilities": ["text", "structured_output"] },

@@ -2552,6 +2552,9 @@ export {
 
 // QM-06: declared backend capability profiles + failover reset-on-switch.
 export type {
+  BackendDataEgress,
+  BackendInputModality,
+  BackendRouteCapability,
   BackendCapabilityProfile,
   BackendTransport,
   BackendUtilityFit,
@@ -2564,7 +2567,10 @@ export type {
 export {
   BACKEND_CAPABILITY_PROFILES,
   availableThinkingLevels,
+  backendRouteCapabilities,
   backendCapabilityProfile,
+  backendCapabilityProfileForIdentifier,
+  isLocalOnlyReasoningBackend,
   modesWithUtilityFit,
   resolveConstrainedSampling,
   resolveThinkingLevel,
