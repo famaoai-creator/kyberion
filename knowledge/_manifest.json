@@ -1873,6 +1873,138 @@
       "type": "json"
     },
     {
+      "path": "product/governance/model-registry/README.md",
+      "tier": "public",
+      "size": 783,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/model-registry/index.json",
+      "tier": "public",
+      "size": 679,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6661626c652d35.json",
+      "tier": "public",
+      "size": 726,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6861696b752d342d352d3230323531303031.json",
+      "tier": "public",
+      "size": 665,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6f7075732d342d38.json",
+      "tier": "public",
+      "size": 742,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6f7075732d35.json",
+      "tier": "public",
+      "size": 825,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d736f6e6e65742d342d36.json",
+      "tier": "public",
+      "size": 701,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d736f6e6e65742d342e35.json",
+      "tier": "public",
+      "size": 680,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d736f6e6e65742d35.json",
+      "tier": "public",
+      "size": 660,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e352d666c617368.json",
+      "tier": "public",
+      "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e362d666c617368.json",
+      "tier": "public",
+      "size": 677,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e372d666c617368.json",
+      "tier": "public",
+      "size": 749,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d666c6173682d6c6174657374.json",
+      "tier": "public",
+      "size": 695,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e34.json",
+      "tier": "public",
+      "size": 689,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e342d6d696e69.json",
+      "tier": "public",
+      "size": 662,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e35.json",
+      "tier": "public",
+      "size": 680,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e362d6c756e61.json",
+      "tier": "public",
+      "size": 670,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e362d736f6c.json",
+      "tier": "public",
+      "size": 670,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e362d7465727261.json",
+      "tier": "public",
+      "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-7861693a67726f6b2d342e35.json",
+      "tier": "public",
+      "size": 660,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-7861693a67726f6b2d342e352d6275696c64.json",
+      "tier": "public",
+      "size": 677,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-7861693a67726f6b2d342e36.json",
+      "tier": "public",
+      "size": 665,
+      "type": "json"
+    },
+    {
       "path": "product/governance/monitoring-rules.json",
       "tier": "public",
       "size": 716,
@@ -7138,6 +7270,12 @@
       "path": "product/schemas/model-profile.schema.json",
       "tier": "public",
       "size": 2048,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-registry-index.schema.json",
+      "tier": "public",
+      "size": 507,
       "type": "json"
     },
     {

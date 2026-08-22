@@ -327,6 +327,8 @@ export const VALUE_FLAGS = new Set([
   '--supersedes',
   '--execution-role',
   '--routing-decision',
+  '--goal',
+  '--success-condition',
   '--intent-id',
   '--intent-goal',
   '--intent-confidence',

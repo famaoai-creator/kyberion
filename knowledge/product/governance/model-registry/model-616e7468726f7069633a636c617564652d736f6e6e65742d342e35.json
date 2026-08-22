@@ -1,0 +1,22 @@
+{
+  "model_id": "anthropic:claude-sonnet-4.5",
+  "provider": "anthropic",
+  "family": "claude-sonnet",
+  "status": "candidate",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "secondary",
+    "analysis": "primary",
+    "coding": "secondary"
+  },
+  "cost_band": "high",
+  "latency_band": "medium",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["long_context_analysis", "strategy_review", "artifact_planning"],
+  "notes": "Candidate for shadow evaluation in analysis-heavy flows."
+}
