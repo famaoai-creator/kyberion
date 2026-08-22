@@ -211,6 +211,9 @@
 ## 📁 product/governance/authority-roles
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)
 
+## 📁 product/governance/model-registry
+- [Model Registry Canonical Directory](./product/governance/model-registry/README.md) (public | Unknown)
+
 ## 📁 product/governance/organization-team-template-catalogs
 - [Organization Team Template Catalogs](./product/governance/organization-team-template-catalogs/README.md) (public | Ecosystem Architect)
 

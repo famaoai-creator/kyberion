@@ -461,6 +461,18 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'model-registry-index',
+      schemaPath: 'knowledge/product/schemas/model-registry-index.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/model-registry/index.json')],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          default_model_id: 'openai:gpt-5.4',
+          model_order: [123],
+        },
+      ],
+    },
+    {
       id: 'model-adaptation-policy',
       schemaPath: 'knowledge/product/schemas/model-adaptation-policy.schema.json',
       validPayloads: [

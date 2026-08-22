@@ -1,0 +1,22 @@
+{
+  "model_id": "anthropic:claude-haiku-4-5-20251001",
+  "provider": "anthropic",
+  "family": "claude-haiku",
+  "status": "approved",
+  "tier": "small",
+  "execution_tier": "fast",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["fast_iteration", "low_latency", "structured_output"],
+  "notes": "Current fastest Claude model for low-latency work."
+}

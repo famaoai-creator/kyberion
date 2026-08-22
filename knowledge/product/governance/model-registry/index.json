@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "default_model_id": "openai:gpt-5.6-sol",
+  "model_order": [
+    "openai:gpt-5.6-sol",
+    "openai:gpt-5.6-terra",
+    "openai:gpt-5.6-luna",
+    "openai:gpt-5.5",
+    "anthropic:claude-fable-5",
+    "anthropic:claude-opus-5",
+    "anthropic:claude-opus-4-8",
+    "anthropic:claude-sonnet-5",
+    "anthropic:claude-haiku-4-5-20251001",
+    "openai:gpt-5.4",
+    "openai:gpt-5.4-mini",
+    "anthropic:claude-sonnet-4-6",
+    "gemini:gemini-3.7-flash",
+    "gemini:gemini-3.6-flash",
+    "gemini:gemini-3.5-flash",
+    "gemini:gemini-flash-latest",
+    "anthropic:claude-sonnet-4.5",
+    "xai:grok-4.6",
+    "xai:grok-4.5",
+    "xai:grok-4.5-build"
+  ]
+}

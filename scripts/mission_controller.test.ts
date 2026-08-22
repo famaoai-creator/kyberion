@@ -363,6 +363,29 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['start', 'MSN-5B']);
   });
 
+  it('treats mission goal flags as named options instead of positional context', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-GOAL-FLAGS',
+      '--tier',
+      'confidential',
+      '--tenant-slug',
+      'kyberion-service-studio',
+      '--organization-id',
+      'kyberion-development-team',
+      '--goal',
+      'Implement the production improvement',
+      '--success-condition',
+      'Agent runtime completes with evidence',
+      '--vision-ref',
+      'company://kyberion-service-studio/vision',
+    ]);
+
+    expect(positionalArgs).toEqual(['create', 'MSN-GOAL-FLAGS']);
+  });
+
   it('extracts named mission start/create options safely', () => {
     const options = extractMissionStartCreateOptionsFromArgv([
       'node',

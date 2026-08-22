@@ -3,6 +3,7 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { loadActuatorManifestCatalog } from './index.js';
+import { modelRegistryFileName } from './model-registry-directory.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 
@@ -1056,6 +1057,59 @@ describe('governance contracts', () => {
     ).toEqual(
       (engineSnapshot.engines || []).map((entry: { engine_id?: string }) => entry.engine_id).sort()
     );
+  });
+
+  it('keeps the canonical model registry directory aligned with the snapshot', () => {
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const modelSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/model-registry.schema.json')
+    );
+    const indexSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/model-registry-index.schema.json')
+    );
+    const snapshot = JSON.parse(
+      safeReadFile(
+        path.resolve(process.cwd(), 'knowledge/product/governance/model-registry.json'),
+        { encoding: 'utf8' }
+      ) as string
+    ) as {
+      version?: string;
+      default_model_id?: string;
+      models?: Array<{ model_id?: string }>;
+    };
+    const directory = path.resolve(process.cwd(), 'knowledge/product/governance/model-registry');
+    const index = JSON.parse(
+      safeReadFile(path.join(directory, 'index.json'), { encoding: 'utf8' }) as string
+    ) as { version?: string; default_model_id?: string; model_order?: string[] };
+    const files = safeReaddir(directory)
+      .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+      .sort();
+
+    expect(files).toHaveLength(snapshot.models?.length || 0);
+    expect(indexSchema(index)).toBe(true);
+    expect(index.version).toBe(snapshot.version);
+    expect(index.default_model_id).toBe(snapshot.default_model_id);
+    expect(index.model_order).toEqual((snapshot.models || []).map((model) => model.model_id));
+
+    for (const file of files) {
+      const model = JSON.parse(
+        safeReadFile(path.join(directory, file), { encoding: 'utf8' }) as string
+      ) as { model_id?: string };
+      const modelId = String(model.model_id || '');
+      expect(
+        modelSchema({
+          version: snapshot.version,
+          default_model_id: snapshot.default_model_id,
+          models: [model],
+        })
+      ).toBe(true);
+      expect((snapshot.models || []).find((entry) => entry.model_id === modelId)).toEqual(model);
+      expect(modelRegistryFileName(modelId)).toBe(file);
+    }
+    expect(modelRegistryFileName('vendor:a')).not.toBe(modelRegistryFileName('vendor--a'));
   });
 
   it('keeps the canonical actuator manifests aligned with the runtime snapshot', () => {

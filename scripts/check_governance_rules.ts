@@ -2,6 +2,7 @@ import * as AjvModule from 'ajv';
 import * as path from 'node:path';
 import {
   loadActuatorManifestCatalog,
+  readModelRegistryDirectory,
   pathResolver,
   safeExistsSync,
   safeReaddir,
@@ -1313,6 +1314,71 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push(
         'model-registry: at least one candidate model is required for shadow adaptation'
       );
+    }
+
+    const directory = pathResolver.rootResolve('knowledge/product/governance/model-registry');
+    const indexPath = path.join(directory, 'index.json');
+    if (!safeExistsSync(directory)) {
+      violations.push('model-registry: canonical directory is missing');
+      return;
+    }
+    if (!safeExistsSync(indexPath)) {
+      violations.push('model-registry: canonical directory index is missing');
+      return;
+    }
+
+    const directoryData = readModelRegistryDirectory<Record<string, unknown>>(directory);
+    if (!directoryData) {
+      violations.push('model-registry: canonical directory is missing');
+      return;
+    }
+    const { index, entries } = directoryData;
+    const snapshotIds = (typed.models || []).map((model) => String(model.model_id || ''));
+    const indexIds = index.model_order;
+    if (index.version !== String((data as { version?: string }).version || '')) {
+      violations.push('model-registry: directory index version must match the snapshot');
+    }
+    if (index.default_model_id !== String(typed.default_model_id || '')) {
+      violations.push('model-registry: directory index default_model_id must match the snapshot');
+    }
+    if (JSON.stringify(indexIds) !== JSON.stringify(snapshotIds)) {
+      violations.push('model-registry: directory index model_order must match the snapshot');
+    }
+
+    const directoryModels = new Map<string, Record<string, unknown>>();
+    for (const { file, model } of entries) {
+      const modelId = model.model_id as string;
+      if (directoryModels.has(modelId)) {
+        violations.push(`model-registry/${file}: duplicate model_id ${modelId}`);
+        continue;
+      }
+      const itemValid = validate({
+        version: data.version,
+        default_model_id: typed.default_model_id,
+        models: [model],
+      });
+      if (!itemValid) {
+        for (const error of validate.errors || []) {
+          violations.push(
+            `model-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+          );
+        }
+      }
+      const snapshotModel = (typed.models || []).find(
+        (entry) => String(entry.model_id || '') === modelId
+      );
+      if (!snapshotModel) {
+        violations.push(`model-registry/${file}: snapshot is missing model ${modelId}`);
+      } else if (JSON.stringify(model) !== JSON.stringify(snapshotModel)) {
+        violations.push(`model-registry/${file}: directory entry does not match snapshot`);
+      }
+      directoryModels.set(modelId, model);
+    }
+
+    if (
+      JSON.stringify([...directoryModels.keys()].sort()) !== JSON.stringify([...snapshotIds].sort())
+    ) {
+      violations.push('model-registry: snapshot and canonical directory model IDs diverge');
     }
   }
 

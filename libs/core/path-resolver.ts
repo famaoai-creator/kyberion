@@ -403,6 +403,13 @@ function currentTenantSlug(): string | undefined {
   return isValidTenantSlug(value) ? value : undefined;
 }
 
+function isMissionDirectory(candidate: string): boolean {
+  // A mission must be loadable by the lifecycle/state facades. A mission-local
+  // .git alone is not sufficient: archived/exported shells can retain .git
+  // while lacking mission-state.json and must not shadow a real mission path.
+  return rawExistsSync(path.join(candidate, 'mission-state.json'));
+}
+
 /**
  * Searches for a mission directory across all available tiers.
  * Priority: personal -> confidential -> public
@@ -420,10 +427,10 @@ export function findMissionPath(missionId: string): string | null {
           const tenant = currentTenantSlug();
           if (tenant) {
             const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
-            if (rawExistsSync(scopedPath)) return scopedPath;
+            if (isMissionDirectory(scopedPath)) return scopedPath;
           }
           const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-          if (rawExistsSync(fullPath)) return fullPath;
+          if (isMissionDirectory(fullPath)) return fullPath;
         }
       }
     } catch (_) {
@@ -433,7 +440,7 @@ export function findMissionPath(missionId: string): string | null {
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (rawExistsSync(legacyPath)) return legacyPath;
+  if (isMissionDirectory(legacyPath)) return legacyPath;
 
   return null;
 }
