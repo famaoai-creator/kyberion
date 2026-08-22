@@ -2235,13 +2235,13 @@
     {
       "path": "product/governance/reasoning-provider-registry.json",
       "tier": "public",
-      "size": 6850,
+      "size": 7159,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 13560,
+      "size": 13520,
       "type": "json"
     },
     {

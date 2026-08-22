@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from './logger.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
+import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -42,12 +43,8 @@ export function getReasoningPayloadScope(): ReasoningPayloadScope | undefined {
   return scopeStorage.getStore();
 }
 
-/** Backends that keep material on this machine. */
-const LOCAL_BACKENDS =
-  /^(stub|local|ollama|vllm|lmstudio|llamacpp|mlx|localai|apple-intelligence)$/u;
-
 export function isLocalReasoningBackend(backendName: string): boolean {
-  return LOCAL_BACKENDS.test(backendName);
+  return isLocalOnlyReasoningBackend(backendName);
 }
 
 /**
@@ -94,6 +91,10 @@ export class ReasoningEgressDeniedError extends Error {
  * into unrestricted external egress.
  */
 export function assertReasoningEgressAllowed(backendName: string): void {
+  // This overload has no endpoint information. The endpoint-aware path below
+  // is the enforcement point for configurable adapters; preserve the
+  // name-only local declaration for callers that only have a backend id.
+  if (isLocalReasoningBackend(backendName)) return;
   assertReasoningEgressAllowedAtEndpoint(backendName, reasoningBackendEndpoint(backendName));
 }
 
@@ -102,13 +103,19 @@ export function assertReasoningEgressAllowedAtEndpoint(
   backendName: string,
   endpoint: string
 ): void {
+  const localEndpoint = isLocalReasoningEndpoint(endpoint);
+  if (isLocalReasoningBackend(backendName) && !localEndpoint) {
+    throw new ReasoningEgressDeniedError(
+      `[REASONING_EGRESS_DENIED] Local-only backend ${backendName} must use a local endpoint: ${endpoint}`
+    );
+  }
   const scope = getReasoningPayloadScope();
   if (!scope) {
     // A missing scope is treated as public only after the destination itself
     // is approved. This preserves ordinary public prompts while preventing a
     // forgotten scope declaration from becoming an unrestricted exfiltration
     // path to arbitrary endpoints.
-    if (isLocalReasoningBackend(backendName) || isLocalReasoningEndpoint(endpoint)) return;
+    if (localEndpoint) return;
     const decision = evaluateEgressPolicy(endpoint, { tier: 'public' });
     if (decision.verdict !== 'allow') {
       throw new ReasoningEgressDeniedError(
@@ -118,7 +125,9 @@ export function assertReasoningEgressAllowedAtEndpoint(
     return;
   }
   if (scope.tier === 'public') return;
-  if (isLocalReasoningBackend(backendName)) return;
+  // A local endpoint is safe even when the adapter uses a provider-neutral
+  // runtime name such as `openai-compatible`.
+  if (localEndpoint) return;
 
   const decision = evaluateEgressPolicy(endpoint, {
     tier: scope.tier,
