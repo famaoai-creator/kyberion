@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
 /**
@@ -404,10 +404,18 @@ function currentTenantSlug(): string | undefined {
 }
 
 function isMissionDirectory(candidate: string): boolean {
-  // A mission must be loadable by the lifecycle/state facades. A mission-local
-  // .git alone is not sufficient: archived/exported shells can retain .git
-  // while lacking mission-state.json and must not shadow a real mission path.
-  return rawExistsSync(path.join(candidate, 'mission-state.json'));
+  // A mission-local .git alone is not sufficient: archived/exported shells can
+  // retain .git while lacking mission state and must not shadow a real mission
+  // path. Tests and early lifecycle phases may legitimately create the mission
+  // directory before mission-state.json is materialized, so do not require the
+  // state file here; reject only the git-only shell shape.
+  if (!rawExistsSync(candidate)) return false;
+  try {
+    const entries = rawReaddir(candidate);
+    return !entries.includes('.git') || entries.some((entry) => entry !== '.git');
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
