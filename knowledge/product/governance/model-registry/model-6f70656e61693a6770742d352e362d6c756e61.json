@@ -1,0 +1,22 @@
+{
+  "model_id": "openai:gpt-5.6-luna",
+  "provider": "openai",
+  "family": "gpt-5.6",
+  "status": "approved",
+  "tier": "small",
+  "execution_tier": "fast",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["agentic_coding", "fast_iteration", "tool_first_execution"],
+  "notes": "Codex CLI catalog priority 3: fast and affordable agentic coding model."
+}

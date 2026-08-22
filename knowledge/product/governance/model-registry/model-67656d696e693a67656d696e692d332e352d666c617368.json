@@ -1,0 +1,22 @@
+{
+  "model_id": "gemini:gemini-3.5-flash",
+  "provider": "gemini",
+  "family": "gemini-3",
+  "status": "candidate",
+  "tier": "small",
+  "execution_tier": "fast",
+  "role_fit": {
+    "intent_compiler": "not_recommended",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["fast_iteration", "surface_reply", "tool_first_execution"],
+  "notes": "Gemini fast-path option for lightweight replies and delegation."
+}

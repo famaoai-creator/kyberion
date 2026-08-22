@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
 /**
@@ -403,6 +403,21 @@ function currentTenantSlug(): string | undefined {
   return isValidTenantSlug(value) ? value : undefined;
 }
 
+function isMissionDirectory(candidate: string): boolean {
+  // A mission-local .git alone is not sufficient: archived/exported shells can
+  // retain .git while lacking mission state and must not shadow a real mission
+  // path. Tests and early lifecycle phases may legitimately create the mission
+  // directory before mission-state.json is materialized, so do not require the
+  // state file here; reject only the git-only shell shape.
+  if (!rawExistsSync(candidate)) return false;
+  try {
+    const entries = rawReaddir(candidate);
+    return !entries.includes('.git') || entries.some((entry) => entry !== '.git');
+  } catch (_) {
+    return false;
+  }
+}
+
 /**
  * Searches for a mission directory across all available tiers.
  * Priority: personal -> confidential -> public
@@ -420,10 +435,10 @@ export function findMissionPath(missionId: string): string | null {
           const tenant = currentTenantSlug();
           if (tenant) {
             const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
-            if (rawExistsSync(scopedPath)) return scopedPath;
+            if (isMissionDirectory(scopedPath)) return scopedPath;
           }
           const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-          if (rawExistsSync(fullPath)) return fullPath;
+          if (isMissionDirectory(fullPath)) return fullPath;
         }
       }
     } catch (_) {
@@ -433,7 +448,7 @@ export function findMissionPath(missionId: string): string | null {
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (rawExistsSync(legacyPath)) return legacyPath;
+  if (isMissionDirectory(legacyPath)) return legacyPath;
 
   return null;
 }

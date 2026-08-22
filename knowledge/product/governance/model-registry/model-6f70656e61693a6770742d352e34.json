@@ -1,0 +1,22 @@
+{
+  "model_id": "openai:gpt-5.4",
+  "provider": "openai",
+  "family": "gpt-5",
+  "status": "candidate",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "not_recommended",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "primary"
+  },
+  "cost_band": "medium",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["fast_iteration", "balanced_reasoning", "tool_use", "structured_output"],
+  "notes": "Mid-tier OpenAI option for balanced implementation and orchestration."
+}

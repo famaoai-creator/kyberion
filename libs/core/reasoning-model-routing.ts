@@ -1,5 +1,6 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
+import { readModelRegistryDirectory } from './model-registry-directory.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
@@ -19,6 +20,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const MODEL_REGISTRY_PATH = pathResolver.knowledge('product/governance/model-registry.json');
+const MODEL_REGISTRY_DIRECTORY = pathResolver.knowledge('product/governance/model-registry');
 const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/model-registry.schema.json'
 );
@@ -113,9 +115,21 @@ function loadRegistryFile(): ModelRegistryFile | null {
   return validateRegistry(parsed, MODEL_REGISTRY_PATH);
 }
 
+function loadRegistryDirectory(): ModelRegistryFile | null {
+  const directory = readModelRegistryDirectory<ModelRegistryEntry>(MODEL_REGISTRY_DIRECTORY);
+  if (!directory) return null;
+  const { index, modelsById } = directory;
+  const registry: ModelRegistryFile = {
+    version: index.version,
+    default_model_id: index.default_model_id,
+    models: index.model_order.map((modelId) => modelsById.get(modelId)!),
+  };
+  return validateRegistry(registry, MODEL_REGISTRY_DIRECTORY);
+}
+
 export function loadModelRegistry(): ModelRegistryFile {
   if (cachedRegistry && cachedRegistryPath === MODEL_REGISTRY_PATH) return cachedRegistry;
-  const registry = loadRegistryFile();
+  const registry = loadRegistryDirectory() || loadRegistryFile();
   if (!registry) {
     throw new Error(`Model registry missing at ${MODEL_REGISTRY_PATH}`);
   }

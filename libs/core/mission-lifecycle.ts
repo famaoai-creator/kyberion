@@ -50,6 +50,7 @@ import {
 } from './intent-reconciliation.js';
 import { loadState, saveState } from './mission-state.js';
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import {
   readTrustLedger,
   recordAgentRuntimeEvent,
@@ -1903,6 +1904,12 @@ function inferMissionTierFromPath(
   ) {
     return relative[2];
   }
+  if (relative[0] === 'active' && relative[1] === 'missions' && relative.length === 3) {
+    // Legacy roots were historically emitted without a tier directory. The
+    // audit records for these unscoped missions use public scope, so repair
+    // them into the governed public lifecycle before any transition.
+    return 'public';
+  }
   return null;
 }
 
@@ -1949,6 +1956,8 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
     );
   }
   state.tier = tierFromPath;
+  if (state.tenant_id && !isValidTenantSlug(state.tenant_id)) delete state.tenant_id;
+  if (state.tenant_slug && !isValidTenantSlug(state.tenant_slug)) delete state.tenant_slug;
   state.execution_mode = state.execution_mode === 'delegated' ? 'delegated' : 'local';
   state.priority = typeof state.priority === 'number' ? state.priority : 3;
   state.assigned_persona = state.assigned_persona || 'operator';

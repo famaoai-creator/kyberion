@@ -1,0 +1,22 @@
+{
+  "model_id": "gemini:gemini-3.6-flash",
+  "provider": "gemini",
+  "family": "gemini-3.6",
+  "status": "approved",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "primary",
+    "analysis": "primary",
+    "coding": "primary"
+  },
+  "cost_band": "medium",
+  "latency_band": "low",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "balanced_reasoning", "tool_use", "multimodal"],
+  "notes": "Current Google Gemini model for agentic and multimodal workflows."
+}

@@ -1,0 +1,22 @@
+{
+  "model_id": "xai:grok-4.6",
+  "provider": "xai",
+  "family": "grok-4",
+  "status": "approved",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "primary",
+    "surface_agent": "primary",
+    "analysis": "primary",
+    "coding": "primary"
+  },
+  "cost_band": "high",
+  "latency_band": "medium",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "long_context"],
+  "notes": "xAI Grok 4.6 flagship for Grok Build CLI and the xAI API reasoning backend."
+}

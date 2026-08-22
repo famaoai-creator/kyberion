@@ -1,0 +1,114 @@
+import * as path from 'node:path';
+
+import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+
+export type ModelRegistryDirectoryIndex = {
+  version: string;
+  default_model_id: string;
+  model_order: string[];
+};
+
+export type ModelRegistryDirectoryEntry<T> = {
+  file: string;
+  model: T;
+};
+
+export type ModelRegistryDirectory<T> = {
+  index: ModelRegistryDirectoryIndex;
+  entries: Array<ModelRegistryDirectoryEntry<T>>;
+  modelsById: Map<string, T>;
+};
+
+function readJson<T>(filePath: string): T {
+  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(value: Record<string, unknown>, expected: string[]): boolean {
+  return JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expected].sort());
+}
+
+function assertDirectoryIndex(value: unknown, indexPath: string): ModelRegistryDirectoryIndex {
+  if (!isRecord(value) || !hasExactKeys(value, ['version', 'default_model_id', 'model_order'])) {
+    throw new Error(`Invalid model registry directory index at ${indexPath}`);
+  }
+
+  const { version, default_model_id: defaultModelId, model_order: modelOrder } = value;
+  if (
+    typeof version !== 'string' ||
+    version.length === 0 ||
+    typeof defaultModelId !== 'string' ||
+    defaultModelId.length === 0 ||
+    !Array.isArray(modelOrder) ||
+    modelOrder.length === 0 ||
+    modelOrder.some((modelId) => typeof modelId !== 'string' || modelId.length === 0) ||
+    new Set(modelOrder).size !== modelOrder.length ||
+    !modelOrder.includes(defaultModelId)
+  ) {
+    throw new Error(`Invalid model registry directory index at ${indexPath}`);
+  }
+
+  return {
+    version,
+    default_model_id: defaultModelId,
+    model_order: [...modelOrder],
+  };
+}
+
+/**
+ * Encode the canonical model ID as a portable, injective filename component.
+ * Lowercase hex avoids path separators, Windows-reserved characters, and
+ * case-folding collisions on case-insensitive filesystems, while remaining
+ * injective instead of making lossy substitutions such as mapping both `a:b`
+ * and `a--b` to the same filename.
+ */
+export function modelRegistryFileName(modelId: string): string {
+  if (typeof modelId !== 'string' || modelId.length === 0) {
+    throw new Error('Model registry file name requires a non-empty model_id');
+  }
+  return `model-${Buffer.from(modelId, 'utf8').toString('hex')}.json`;
+}
+
+export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
+  directory: string
+): ModelRegistryDirectory<T> | null {
+  if (!safeExistsSync(directory)) return null;
+
+  const indexPath = path.join(directory, 'index.json');
+  if (!safeExistsSync(indexPath)) {
+    throw new Error(`Model registry directory index missing at ${indexPath}`);
+  }
+  const index = assertDirectoryIndex(readJson<unknown>(indexPath), indexPath);
+
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+    .sort();
+  if (!files.length) throw new Error(`Model registry directory is empty: ${directory}`);
+
+  const entries: Array<ModelRegistryDirectoryEntry<T>> = [];
+  const modelsById = new Map<string, T>();
+  for (const file of files) {
+    const model = readJson<T>(path.join(directory, file));
+    const modelId = model.model_id;
+    if (typeof modelId !== 'string' || modelId.length === 0) {
+      throw new Error(`Model registry item ${file} must define a non-empty string model_id`);
+    }
+    if (modelRegistryFileName(modelId) !== file) {
+      throw new Error(`Model registry item ${file} must match model_id ${modelId}`);
+    }
+    if (modelsById.has(modelId)) throw new Error(`Duplicate model_id in directory: ${modelId}`);
+    modelsById.set(modelId, model);
+    entries.push({ file, model });
+  }
+
+  const directoryIds = [...modelsById.keys()].sort();
+  const orderedIds = [...index.model_order].sort();
+  if (JSON.stringify(directoryIds) !== JSON.stringify(orderedIds)) {
+    throw new Error('Model registry directory items do not match index.model_order');
+  }
+
+  return { index, entries, modelsById };
+}
