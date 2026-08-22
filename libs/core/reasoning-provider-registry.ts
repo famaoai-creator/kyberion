@@ -11,6 +11,7 @@ import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import type { ReasoningBackendCandidate } from './reasoning-backend.js';
 import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
+import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { assertModuleInvariant } from './invariants.js';
@@ -20,7 +21,7 @@ export interface ReasoningProviderCapabilities {
   structured_output: boolean;
   abort: boolean;
   session_continuity: boolean;
-  images: boolean;
+  input_modalities: readonly BackendInputModality[];
 }
 
 export interface ReasoningProviderDescriptor {
@@ -114,8 +115,10 @@ const FALLBACK_CAPABILITIES: ReasoningProviderCapabilities = {
   structured_output: true,
   abort: false,
   session_continuity: false,
-  images: false,
+  input_modalities: ['text'],
 };
+
+const INPUT_MODALITIES = new Set<BackendInputModality>(['text', 'image', 'audio']);
 
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
@@ -128,6 +131,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function isInputModality(value: unknown): value is BackendInputModality {
+  return typeof value === 'string' && INPUT_MODALITIES.has(value as BackendInputModality);
+}
+
+function parseInputModalities(
+  rawCapabilities: Record<string, unknown>
+): readonly BackendInputModality[] {
+  if (Array.isArray(rawCapabilities.input_modalities)) {
+    const modalities = rawCapabilities.input_modalities.filter(isInputModality);
+    if (modalities.includes('text')) return modalities;
+  }
+
+  // Read legacy registries during the migration window, but never expose the
+  // legacy boolean as part of the runtime capability contract.
+  return parseBoolean(rawCapabilities.images, false) ? ['text', 'image'] : ['text'];
 }
 
 function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
@@ -156,7 +176,7 @@ function parseDescriptor(value: unknown): ReasoningProviderDescriptor | null {
         rawCapabilities.session_continuity,
         FALLBACK_CAPABILITIES.session_continuity
       ),
-      images: parseBoolean(rawCapabilities.images, FALLBACK_CAPABILITIES.images),
+      input_modalities: parseInputModalities(rawCapabilities),
     },
     env_keys: rawEnvKeys.filter((entry): entry is string => typeof entry === 'string'),
   };
