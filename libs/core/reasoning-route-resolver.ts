@@ -10,10 +10,12 @@ import { loadModelRegistry } from './reasoning-model-routing.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
+  backendRouteCapabilities,
   backendCapabilityProfile,
   resolveConstrainedSampling,
   resolveThinkingLevel,
   type BackendCapabilityProfile,
+  type BackendRouteCapability,
   type ConstrainedSampling,
   type ThinkingLevel,
 } from './backend-capability-profile.js';
@@ -27,7 +29,7 @@ const USER_SCHEMA_PATH = pathResolver.knowledge(
 const USER_CONFIG_PATH = pathResolver.shared('state/reasoning-route-user-config.json');
 
 export type ReasoningRole = string;
-export type ReasoningCapability = 'text' | 'structured_output' | 'tools' | 'vision' | 'streaming';
+export type ReasoningCapability = BackendRouteCapability;
 export type UnsupportedParameterPolicy = 'reject' | 'warn-and-drop' | 'translate';
 export type ReasoningToolName = 'read_file' | 'write_file' | 'list_directory' | 'shell_exec';
 export type SamplingParams = {
@@ -516,8 +518,16 @@ export function resolveReasoningRoute(
         }
       : undefined;
     if (backendProfile) {
-      if (!backendProfile.capabilities.structured_output) capabilitySet.delete('structured_output');
-      if (!backendProfile.capabilities.images) capabilitySet.delete('vision');
+      const supportedRouteCapabilities = new Set(backendRouteCapabilities(backendProfile));
+      for (const capability of [
+        'text',
+        'structured_output',
+        'tools',
+        'vision',
+        'streaming',
+      ] as const) {
+        if (!supportedRouteCapabilities.has(capability)) capabilitySet.delete(capability);
+      }
       provenance.push({ source: 'backend-profile', field: `${mode}.capabilities` });
     }
     let resolvedThinkingLevel: { requested: ThinkingLevel; wireValue: string } | undefined;

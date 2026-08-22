@@ -3,7 +3,7 @@
  *
  * The probe intentionally separates what can be exercised without spending a
  * model turn (binary/version/help) from capabilities that remain adapter
- * declarations (abort/session continuity/images). This keeps the matrix
+ * declarations (abort/session continuity/input modalities). This keeps the matrix
  * useful in CI and prevents a successful `--help` call from overstating a
  * provider capability.
  */
@@ -37,8 +37,11 @@ const BOOLEAN_CAPABILITIES = [
   'structured_output',
   'session_continuity',
   'abort',
+  'streaming',
+  'tool_calling',
+  'native_subagent',
   'images',
-] as const satisfies readonly (keyof BackendCapabilityProfile['capabilities'])[];
+] as const;
 type BooleanCapability = (typeof BOOLEAN_CAPABILITIES)[number];
 
 export type ConformanceEvidenceStatus = 'verified' | 'declared' | 'unavailable';
@@ -97,7 +100,10 @@ function capabilityEvidence(
   capability: BooleanCapability,
   help: BackendConformanceResult['help']
 ): { declared: boolean; status: ConformanceEvidenceStatus; evidence: string } {
-  const declared = profile.capabilities[capability];
+  const declared =
+    capability === 'images'
+      ? profile.capabilities.input_modalities.includes('image')
+      : profile.capabilities[capability as Exclude<BooleanCapability, 'images'>];
   if (capability === 'structured_output' && help.status === 'verified') {
     const helpText = help.output?.toLowerCase() || '';
     const markers = ['schema', 'json', 'structured'];
