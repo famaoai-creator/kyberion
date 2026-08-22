@@ -1,0 +1,22 @@
+{
+  "model_id": "openai:gpt-5.6-sol",
+  "provider": "openai",
+  "family": "gpt-5.6",
+  "status": "approved",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "primary",
+    "surface_agent": "primary",
+    "analysis": "primary",
+    "coding": "primary"
+  },
+  "cost_band": "high",
+  "latency_band": "medium",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "ultra_reasoning"],
+  "notes": "Codex CLI catalog priority 1: latest frontier agentic coding model."
+}

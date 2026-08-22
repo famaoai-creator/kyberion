@@ -1,0 +1,22 @@
+{
+  "model_id": "anthropic:claude-sonnet-4-6",
+  "provider": "anthropic",
+  "family": "claude-sonnet",
+  "status": "candidate",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "not_recommended",
+    "surface_agent": "secondary",
+    "analysis": "primary",
+    "coding": "secondary"
+  },
+  "cost_band": "medium",
+  "latency_band": "medium",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["long_context_analysis", "strategy_review", "structured_output"],
+  "notes": "Standard Anthropic option for balanced reasoning and analysis."
+}

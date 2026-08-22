@@ -1,0 +1,22 @@
+{
+  "model_id": "openai:gpt-5.4-mini",
+  "provider": "openai",
+  "family": "gpt-5",
+  "status": "candidate",
+  "tier": "small",
+  "execution_tier": "fast",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "medium",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["fast_iteration", "tool_first_execution", "surface_reply"],
+  "notes": "Candidate for low-latency surfaces and lightweight delegation."
+}
