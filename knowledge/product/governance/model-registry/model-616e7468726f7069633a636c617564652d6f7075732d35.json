@@ -1,0 +1,22 @@
+{
+  "model_id": "anthropic:claude-opus-5",
+  "provider": "anthropic",
+  "family": "claude-opus",
+  "status": "approved",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "primary",
+    "analysis": "primary",
+    "coding": "primary"
+  },
+  "cost_band": "high",
+  "latency_band": "medium",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
+  "notes": "Current Claude Opus for complex agentic coding and enterprise work; drop-in successor to claude-opus-4-8 at the same price band. Adaptive thinking is on by default (disabling it is rejected above effort=high)."
+}

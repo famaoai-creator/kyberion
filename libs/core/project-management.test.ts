@@ -22,6 +22,7 @@ import { saveState } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 
 const PROJECT_ID = 'PRJ-PMC-TEST-001';
+const TRACK_PROJECT_ID = 'PRJ-PMC-TRACK';
 const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
 const CALLBACK_ROOT = pathResolver.sharedTmp('project-management-callback-test');
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
@@ -74,6 +75,15 @@ function cleanup(): void {
     'shared'
   );
   if (safeExistsSync(sharedWorkspace)) safeRmSync(sharedWorkspace);
+
+  const trackProjectWorkspace = pathResolver.projectWorkspaceDir(
+    TRACK_PROJECT_ID,
+    'confidential',
+    'tenant-pmc-test'
+  );
+  if (safeExistsSync(trackProjectWorkspace)) {
+    safeRmSync(trackProjectWorkspace, { recursive: true, force: true });
+  }
 }
 
 describe('project-management facade', () => {
