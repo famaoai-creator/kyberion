@@ -15,6 +15,9 @@
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 export type BackendTransport = 'cli' | 'sdk' | 'api' | 'local-server' | 'in-process';
+/** Whether prompts stay on this machine or are sent to a hosted provider. */
+export type BackendDataEgress = 'local-only' | 'external-api';
+export type BackendInputModality = 'text' | 'image' | 'audio';
 
 export type BackendUtilityFit = 'judge' | 'classify' | 'summarize' | 'divergent';
 export type ThinkingLevel = 'low' | 'medium' | 'high';
@@ -34,13 +37,22 @@ export type ConstrainedSampling = false | ConstrainedSamplingRequest | GrammarSa
 export interface BackendCapabilityProfile {
   mode: ReasoningBackendMode;
   transport: BackendTransport;
+  /**
+   * A CLI or SDK adapter runs locally even when it sends the payload to a
+   * hosted provider. Keep this separate from transport so local-only policy
+   * cannot mistake a local process for local data residency.
+   */
+  data_egress: BackendDataEgress;
   /** Provider SDK retry contract; orchestration retries remain explicit in reasoning-backend. */
   provider_retry: { max_retries: number; quota_errors_propagate: boolean };
   capabilities: {
+    input_modalities: readonly BackendInputModality[];
     structured_output: boolean;
     session_continuity: boolean;
     abort: boolean;
-    images: boolean;
+    streaming: boolean;
+    tool_calling: boolean;
+    native_subagent: boolean;
     /** Provider wire value by requested cognitive level; null means hidden/unsupported. */
     thinkingLevelMap: ThinkingLevelMap;
     supportsStrictTools: boolean;
@@ -56,12 +68,16 @@ const cli = (
 ): BackendCapabilityProfile => ({
   mode,
   transport: 'cli',
+  data_egress: 'external-api',
   provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
+    input_modalities: ['text'],
     structured_output: true,
     session_continuity: true,
     abort: true,
-    images: false,
+    streaming: false,
+    tool_calling: true,
+    native_subagent: false,
     thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
     supportsStrictTools: false,
     supportsGrammarTools: false,
@@ -77,12 +93,16 @@ const api = (
 ): BackendCapabilityProfile => ({
   mode,
   transport: 'api',
+  data_egress: 'external-api',
   provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
+    input_modalities: ['text'],
     structured_output: true,
     session_continuity: false,
     abort: true,
-    images: false,
+    streaming: false,
+    tool_calling: true,
+    native_subagent: false,
     thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
     supportsStrictTools: false,
     supportsGrammarTools: false,
@@ -94,15 +114,19 @@ const api = (
 const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
   mode,
   transport: 'local-server',
+  data_egress: 'local-only',
   provider_retry: { max_retries: 0, quota_errors_propagate: true },
   capabilities: {
+    input_modalities: ['text'],
     // The local OpenAI-compatible adapters can enforce the repository's
     // structured response envelope even though the model server itself does
     // not expose a native schema API.
     structured_output: true,
     session_continuity: false,
     abort: true,
-    images: false,
+    streaming: true,
+    tool_calling: true,
+    native_subagent: false,
     thinkingLevelMap: {},
     supportsStrictTools: false,
     supportsGrammarTools: false,
@@ -112,29 +136,39 @@ const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
 
 export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCapabilityProfile> = {
   // ShellClaudeCliBackend spawns a fresh CLI per call — no session continuity.
-  'claude-cli': cli('claude-cli', { session_continuity: false }),
-  'codex-cli': cli('codex-cli'),
+  'claude-cli': cli('claude-cli', { session_continuity: false, native_subagent: true }),
+  'codex-cli': cli('codex-cli', { session_continuity: false, native_subagent: true }),
   'claude-agent': {
     mode: 'claude-agent',
     transport: 'sdk',
+    data_egress: 'external-api',
     provider_retry: { max_retries: 0, quota_errors_propagate: true },
     capabilities: {
+      input_modalities: ['text', 'image'],
       structured_output: true,
       session_continuity: true,
       abort: true,
-      images: true,
+      streaming: false,
+      tool_calling: true,
+      native_subagent: true,
       thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
       supportsStrictTools: true,
       supportsGrammarTools: false,
     },
     utility_fit: ['judge', 'classify', 'summarize', 'divergent'],
   },
-  anthropic: api('anthropic', { images: true }),
-  'gemini-cli': cli('gemini-cli'),
-  'gemini-api': api('gemini-api', { images: true }),
-  'agy-cli': cli('agy-cli'),
-  'grok-cli': cli('grok-cli'),
-  'grok-api': api('grok-api', { images: true }),
+  anthropic: api('anthropic', { input_modalities: ['text', 'image'] }),
+  'gemini-cli': cli('gemini-cli', { session_continuity: false }),
+  'gemini-api': api('gemini-api', {
+    input_modalities: ['text', 'image'],
+    streaming: true,
+  }),
+  'agy-cli': cli('agy-cli', { native_subagent: true }),
+  'grok-cli': cli('grok-cli', { native_subagent: true }),
+  'grok-api': api('grok-api', {
+    input_modalities: ['text', 'image'],
+    streaming: true,
+  }),
   // CopilotAcpReasoningBackend holds a persistent ACP mediator session.
   copilot: cli('copilot', { session_continuity: true }),
   local: localServer('local'),
@@ -150,12 +184,16 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   stub: {
     mode: 'stub',
     transport: 'in-process',
+    data_egress: 'local-only',
     provider_retry: { max_retries: 0, quota_errors_propagate: true },
     capabilities: {
+      input_modalities: ['text'],
       structured_output: true,
       session_continuity: false,
       abort: true,
-      images: false,
+      streaming: false,
+      tool_calling: false,
+      native_subagent: false,
       thinkingLevelMap: {},
       supportsStrictTools: false,
       supportsGrammarTools: false,
@@ -169,6 +207,44 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
 
 export function backendCapabilityProfile(mode: ReasoningBackendMode): BackendCapabilityProfile {
   return BACKEND_CAPABILITY_PROFILES[mode];
+}
+
+const BACKEND_MODE_ALIASES: Record<string, ReasoningBackendMode> = {
+  'shell-claude-cli': 'claude-cli',
+  'copilot-acp': 'copilot',
+};
+
+/** Capability declarations for local bridges that are not reasoning modes. */
+const LOCAL_ONLY_BACKEND_IDENTIFIERS = new Set(['apple-intelligence']);
+
+export function backendCapabilityProfileForIdentifier(
+  identifier: string
+): BackendCapabilityProfile | undefined {
+  const mode = BACKEND_MODE_ALIASES[identifier] ?? identifier;
+  if (!Object.prototype.hasOwnProperty.call(BACKEND_CAPABILITY_PROFILES, mode)) return undefined;
+  return BACKEND_CAPABILITY_PROFILES[mode as ReasoningBackendMode];
+}
+
+/** Resolve the data-boundary capability for an adapter name, failing closed. */
+export function isLocalOnlyReasoningBackend(identifier: string): boolean {
+  if (LOCAL_ONLY_BACKEND_IDENTIFIERS.has(identifier)) return true;
+  return backendCapabilityProfileForIdentifier(identifier)?.data_egress === 'local-only';
+}
+
+export type BackendRouteCapability =
+  'text' | 'structured_output' | 'tools' | 'vision' | 'streaming';
+
+/** Project detailed backend declarations onto the route-policy vocabulary. */
+export function backendRouteCapabilities(
+  profile: BackendCapabilityProfile
+): BackendRouteCapability[] {
+  const capabilities: BackendRouteCapability[] = [];
+  if (profile.capabilities.input_modalities.includes('text')) capabilities.push('text');
+  if (profile.capabilities.structured_output) capabilities.push('structured_output');
+  if (profile.capabilities.tool_calling) capabilities.push('tools');
+  if (profile.capabilities.input_modalities.includes('image')) capabilities.push('vision');
+  if (profile.capabilities.streaming) capabilities.push('streaming');
+  return capabilities;
 }
 
 export function availableThinkingLevels(profile: BackendCapabilityProfile): ThinkingLevel[] {

@@ -14,6 +14,7 @@ import { resetEgressPolicyCache } from './egress-policy.js';
 import {
   ReasoningEgressDeniedError,
   assertReasoningEgressAllowed,
+  assertReasoningEgressAllowedAtEndpoint,
   getReasoningPayloadScope,
   isLocalReasoningBackend,
   reasoningBackendEndpoint,
@@ -83,6 +84,7 @@ describe('assertReasoningEgressAllowed', () => {
   it('permits public material to any backend', () => {
     withReasoningPayloadScope({ tier: 'public' }, () => {
       expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
+      expect(() => assertReasoningEgressAllowed('agy-cli')).not.toThrow();
     });
   });
 
@@ -101,6 +103,22 @@ describe('assertReasoningEgressAllowed', () => {
   it('permits confidential material to a local backend', () => {
     withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
       expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
+    });
+  });
+
+  it('allows a provider-neutral local adapter name when its endpoint is local', () => {
+    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
+      expect(() =>
+        assertReasoningEgressAllowedAtEndpoint('openai-compatible', 'http://127.0.0.1:11434/v1')
+      ).not.toThrow();
+    });
+  });
+
+  it('rejects a local-only backend when its configured endpoint is external', () => {
+    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
+      expect(() =>
+        assertReasoningEgressAllowedAtEndpoint('ollama', 'https://attacker.example/v1')
+      ).toThrow(ReasoningEgressDeniedError);
     });
   });
 
@@ -138,9 +156,11 @@ describe('backend classification', () => {
       'local',
       'mlx',
       'localai',
+      'apple-intelligence',
     ]) {
       expect(isLocalReasoningBackend(name)).toBe(true);
     }
+    expect(isLocalReasoningBackend('agy-cli')).toBe(false);
     expect(isLocalReasoningBackend('anthropic')).toBe(false);
   });
 

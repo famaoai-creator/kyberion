@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   compileScopedContextPack,
+  validateReasoningEgress,
   validateContextOutputTier,
   type ContextSecurityScope,
   type GovernedContextFragment,
@@ -133,5 +134,15 @@ describe('validateContextOutputTier', () => {
   it('allows persistence at the effective input tier', () => {
     const pack = compileScopedContextPack(scope, [fragment()]);
     expect(validateContextOutputTier(pack, 'confidential')).toEqual({ allowed: true });
+  });
+});
+
+describe('validateReasoningEgress', () => {
+  it('uses backend capabilities for local-only scopes', () => {
+    const localOnly = { ...scope, external_egress: 'deny' as const };
+
+    expect(validateReasoningEgress(localOnly, 'ollama')).toEqual({ allowed: true });
+    expect(validateReasoningEgress(localOnly, 'vllm')).toEqual({ allowed: true });
+    expect(validateReasoningEgress(localOnly, 'agy-cli')).toMatchObject({ allowed: false });
   });
 });

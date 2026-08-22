@@ -212,9 +212,6 @@ export interface RunVisualReviewInput {
   rubric?: VisualReviewRubric;
 }
 
-/** Backends that keep the material on this machine. */
-const LOCAL_BACKENDS = /^(stub|local|ollama|mlx|apple-intelligence)$/u;
-
 const TIER_ORDER = { public: 0, confidential: 1, personal: 2 } as const;
 
 /** The most sensitive tier present decides how the payload must be treated. */
@@ -330,7 +327,7 @@ export async function runVisualReview(input: RunVisualReviewInput): Promise<Visu
   }
 
   // A stub backend cannot judge pixels.
-  if (!input.critique && LOCAL_BACKENDS.test(input.backendName) && input.backendName === 'stub') {
+  if (!input.critique && input.backendName === 'stub') {
     return {
       status: 'skipped',
       findings: [],
