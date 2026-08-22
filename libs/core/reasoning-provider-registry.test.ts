@@ -16,7 +16,7 @@ describe('reasoning provider registry', () => {
     expect(getReasoningProviderDescriptor('anthropic')).toMatchObject({
       provider: 'anthropic',
       module: './reasoning-api-provider',
-      capabilities: { structured_output: true, images: true },
+      capabilities: { structured_output: true, input_modalities: ['text', 'image'] },
     });
   });
 
