@@ -301,6 +301,7 @@ interface VocabularyCatalogShape {
 const VOCABULARY_SCAN_DIRS = [
   'libs/core',
   'scripts',
+  'presence/displays/presence-studio',
   'presence/displays/chronos-mirror-v2/src',
   'presence/displays/operator-surface/src',
   'presence/displays/concierge/src',
@@ -413,11 +414,20 @@ function findUndefinedKeyReferences(files: string[]): string[] {
  * risk. I18N-08's translation-ops audit is the place to make this stricter
  * once a lower-false-positive detector exists.
  */
-function findUnusedKeys(catalog: VocabularyCatalogShape, haystack: string): string[] {
+export function findUnusedVocabularyKeys(
+  catalog: VocabularyCatalogShape,
+  haystack: string
+): string[] {
   const unused: string[] = [];
   for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
     for (const key of Object.keys(entries || {})) {
-      if (!haystack.includes(`'${key}'`) && !haystack.includes(`"${key}"`)) {
+      const quotedForms = [
+        `'${key}'`,
+        `"${key}"`,
+        `'${namespace}:${key}'`,
+        `"${namespace}:${key}"`,
+      ];
+      if (!quotedForms.some((quotedKey) => haystack.includes(quotedKey))) {
         unused.push(
           `user-facing-vocabulary: ${namespace}.${key} is not referenced anywhere scanned`
         );
@@ -503,7 +513,7 @@ function validateUserFacingVocabulary(
   const haystack = files
     .map((file) => String(safeReadFile(file, { encoding: 'utf8' }) || ''))
     .join('\n');
-  warnings.push(...findUnusedKeys(data as VocabularyCatalogShape, haystack));
+  warnings.push(...findUnusedVocabularyKeys(data as VocabularyCatalogShape, haystack));
 }
 
 export interface ThemeEntryShape {

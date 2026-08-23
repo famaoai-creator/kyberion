@@ -2287,6 +2287,12 @@
       "type": "md"
     },
     {
+      "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
+      "tier": "public",
+      "size": 11292,
+      "type": "md"
+    },
+    {
       "path": "product/governance/presentation-preference-registry.json",
       "tier": "public",
       "size": 3914,
