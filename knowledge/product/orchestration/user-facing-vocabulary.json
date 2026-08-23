@@ -8576,12 +8576,12 @@
       "tui_cockpit_voice_hint": {
         "en": "Ctrl+V voice input · transcript is placed in the composer; review before sending",
         "ja": "Ctrl+V 音声入力 · 文字起こしは送信前に入力欄で確認できます",
-        "qps-ploc": "⟦Ƈŧřŀ+ṽ ṽőïƈė ïñṗůŧ · ŧřȧñşƈřïṗŧ ïş ṗŀȧƈėḓ ïñ ŧħė ƈőɱṗőşėř; řėṽïėẇ ƀėƒőřė şėñḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė ïñṗůŧ · ŧřȧñşƈřïṗŧ ïş ṗŀȧƈėḓ ïñ ŧħė ƈőɱṗőşėř; řėṽïėẇ ƀėƒőřė şėñḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "tui_cockpit_voice_recording": {
         "en": "Recording… press Ctrl+V to stop",
         "ja": "録音中… Ctrl+V で停止",
-        "qps-ploc": "⟦Řėƈőřḓïñɠ… ṗřėşş Ƈŧřŀ+ṽ ŧő şŧőṗ ŀőřėɱ ïṗ⟧"
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ṗřėşş Ƈŧřŀ+Ṽ ŧő şŧőṗ ŀőřėɱ ïṗşů⟧"
       },
       "tui_cockpit_voice_transcribing": {
         "en": "Transcribing voice input…",
@@ -8611,12 +8611,12 @@
       "tui_cockpit_shape_task_session": {
         "en": "task session",
         "ja": "タスク実行",
-        "qps-ploc": "⟦ŧȧşķ şėşşïőñ ŀőřė⟧"
+        "qps-ploc": "⟦ŧȧşķ şėşşïőñ ŀőř⟧"
       },
       "tui_cockpit_shape_mission": {
         "en": "mission",
         "ja": "ミッション",
-        "qps-ploc": "⟦ɱïşşïőñ ŀőřė⟧"
+        "qps-ploc": "⟦ɱïşşïőñ ŀőř⟧"
       },
       "tui_cockpit_shape_project_bootstrap": {
         "en": "project setup",
@@ -8631,17 +8631,17 @@
       "tui_cockpit_outcome_answer": {
         "en": "answer",
         "ja": "回答",
-        "qps-ploc": "⟦ȧñşẇėř ŀőřė⟧"
+        "qps-ploc": "⟦ȧñşẇėř ŀőř⟧"
       },
       "tui_cockpit_outcome_artifact": {
         "en": "artifact",
         "ja": "成果物",
-        "qps-ploc": "⟦ȧřŧïƒȧƈŧ ŀőřė⟧"
+        "qps-ploc": "⟦ȧřŧïƒȧƈŧ ŀőř⟧"
       },
       "tui_cockpit_outcome_approval_ready_plan": {
         "en": "approval-ready plan",
         "ja": "承認可能な計画",
-        "qps-ploc": "⟦ȧṗṗřőṽȧŀ-řėȧḓẏ ṗŀȧñ ŀőřė⟧"
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀ-řėȧḓẏ ṗŀȧñ ŀőřėɱ ⟧"
       },
       "tui_cockpit_outcome_service_change": {
         "en": "service change",
@@ -8681,7 +8681,7 @@
       "tui_cockpit_input_hint": {
         "en": "Ctrl+V voice · Enter send · Esc cancel",
         "ja": "Ctrl+V 音声 · Enter 送信 · Esc キャンセル",
-        "qps-ploc": "⟦Ƈŧřŀ+ṽ ṽőïƈė · Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ïṗşůɱ⟧"
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė · Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "tui_tab_missions": {
         "en": "Missions",
