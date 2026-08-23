@@ -6,6 +6,7 @@ import {
 } from './oauth-callback-result.js';
 import {
   completeOAuthCallback,
+  escapeHtml,
   logger,
   pathResolver,
   safeMkdir,
@@ -28,20 +29,6 @@ function ensureRuntimeDir() {
   if (!safeExistsSync(RUNTIME_DIR)) {
     safeMkdir(RUNTIME_DIR, { recursive: true });
   }
-}
-
-function escapeHtml(value: string) {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-      })[character]!
-  );
 }
 
 function renderHtml(title: string, body: string, tone: 'success' | 'error' = 'success') {

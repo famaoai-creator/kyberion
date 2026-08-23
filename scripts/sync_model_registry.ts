@@ -1,67 +1,40 @@
 import * as path from 'node:path';
-import { Ajv } from 'ajv';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import {
+  loadJson,
   modelRegistryFileName,
+  modelRegistrySnapshotFromDirectory,
   readModelRegistryDirectory,
   type ModelRegistryDirectoryIndex,
+  type GovernedModelRegistryEntry,
+  type GovernedModelRegistrySnapshot,
   pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeReadFile,
   safeWriteFile,
+  validateModelRegistrySnapshot,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
-
-const ajv = new Ajv({ allErrors: true });
 
 const DIRECTORY = pathResolver.rootResolve('knowledge/product/governance/model-registry');
 const INDEX_PATH = path.join(DIRECTORY, 'index.json');
 const SNAPSHOT_PATH = pathResolver.rootResolve('knowledge/product/governance/model-registry.json');
-const SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/model-registry.schema.json'
-);
-
-export type ModelRegistryEntry = Record<string, unknown> & { model_id: string };
-
-export type ModelRegistrySnapshot = {
-  version: string;
-  default_model_id: string;
-  models: ModelRegistryEntry[];
-};
-
-function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
-function validateSnapshot(value: unknown, label: string): asserts value is ModelRegistrySnapshot {
-  const schema = readJson<Record<string, unknown>>(SCHEMA_PATH);
-  const validate = ajv.compile(schema);
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`model-registry schema violation at ${label}: ${errors}`);
-  }
-}
+export type ModelRegistryEntry = GovernedModelRegistryEntry;
+export type ModelRegistrySnapshot = GovernedModelRegistrySnapshot<ModelRegistryEntry>;
 
 function readDirectorySnapshot(): ModelRegistrySnapshot {
   const directory = readModelRegistryDirectory<ModelRegistryEntry>(DIRECTORY);
   if (!directory) throw new Error(`Model registry directory not found: ${DIRECTORY}`);
-  const { index, modelsById } = directory;
-  const snapshot: ModelRegistrySnapshot = {
-    version: index.version,
-    default_model_id: index.default_model_id,
-    models: index.model_order.map((modelId) => modelsById.get(modelId)!),
-  };
-  validateSnapshot(snapshot, DIRECTORY);
-  return snapshot;
+  return validateModelRegistrySnapshot(modelRegistrySnapshotFromDirectory(directory), DIRECTORY);
 }
 
 export function bootstrapModelRegistryDirectory(): void {
-  const snapshot = readJson<ModelRegistrySnapshot>(SNAPSHOT_PATH);
-  validateSnapshot(snapshot, SNAPSHOT_PATH);
+  const snapshot = validateModelRegistrySnapshot(
+    loadJson<ModelRegistrySnapshot>(SNAPSHOT_PATH),
+    SNAPSHOT_PATH
+  );
   safeMkdir(DIRECTORY, { recursive: true });
 
   const existingItems = safeReaddir(DIRECTORY).filter(

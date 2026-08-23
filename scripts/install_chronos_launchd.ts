@@ -23,6 +23,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   createStandardYargs,
+  escapeXml,
   logger,
   pathResolver,
   safeExecResult,
@@ -44,15 +45,6 @@ export interface ChronosLaunchdPlistOptions {
    */
   logDir: string;
   label?: string;
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 /** Pure plist generation — string in, string out, no I/O. */

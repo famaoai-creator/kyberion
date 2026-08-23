@@ -19,6 +19,14 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
+    loadJsonIfPresent: <T>(p: string): T | null => {
+      if (!actual.existsSync(p)) return null;
+      try {
+        return JSON.parse(actual.readFileSync(p, 'utf8')) as T;
+      } catch {
+        return null;
+      }
+    },
   };
 });
 

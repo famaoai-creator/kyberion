@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, mission-playbooks, security, audit, static-analysis, service-delivery]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-07-08
+last_updated: 2026-08-23
 workflow_ids: [security-audit-service]
 ---
 
@@ -14,31 +14,31 @@ workflow_ids: [security-audit-service]
 
 このプレイブックは「何を」「どの順で」「誰が」「どこで人間が承認するか」を定義する。実装の実体は以下に分散して登録済み。
 
-| 要素                                             | 実体                                                                                                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| インテント                                       | `standard-intents.json` の `security-audit-service`（`mission_class: customer_engagement` / `risk_profile: approval_required`） |
-| ルーティング                                     | `intent-routing-map.json`（`pipeline_intent_map` / `track_intent_policy_map`）                                                  |
-| ミッション・ワークフロー（フェーズ＋承認ゲート） | `mission-workflow-catalog.json` の `security-audit-service` テンプレート                                                        |
-| 静的解析エンジン（決定的パイプライン）           | `knowledge/product/pipeline-templates/security-audit-static-analysis.json`                                                      |
-| preflight ゲート                                 | `pipelines/fragments/security-audit-preflight.json`                                                                             |
-| チーム構成                                       | `organization-team-template-catalogs/it-managed-services.json` の `security_audit`                                              |
-| 納品承認ポリシー                                 | `approval-policy.json` の `security-audit-deliver`                                                                              |
-| 提案デック生成                                   | `pipelines/fragments/pptx-produce-from-brief.json`（再利用）                                                                    |
+| 要素                                                         | 実体                                                                                                                                |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| インテント                                                   | `standard-intents.json` の `security-audit-service`（`mission_class: customer_engagement` / `risk_profile: approval_required`）     |
+| ルーティング                                                 | `intent-routing-map.json`（`pipeline_intent_map` / `track_intent_policy_map`）                                                      |
+| ミッション・ワークフロー（フェーズ＋承認ゲート）             | `mission-workflow-catalog.json` の `security-audit-service` テンプレート                                                            |
+| 静的解析・エージェントレビューエンジン（決定的パイプライン） | `pipelines/agentic-source-code-review.json`（互換参照: `knowledge/product/pipeline-templates/security-audit-static-analysis.json`） |
+| preflight ゲート                                             | `pipelines/fragments/security-audit-preflight.json`                                                                                 |
+| チーム構成                                                   | `organization-team-template-catalogs/it-managed-services.json` の `security_audit`                                                  |
+| 納品承認ポリシー                                             | `approval-policy.json` の `security-audit-deliver`                                                                                  |
+| 提案デック生成                                               | `pipelines/fragments/pptx-produce-from-brief.json`（再利用）                                                                        |
 
 ## 1. フェーズと承認ゲート
 
 `stage_gated_delivery` パターン。各フェーズは `exit_gate` を満たすまで次に進まない。`human_override` を含むゲートは**人間の承認が必須**。
 
-| #   | フェーズ                 | 種別          | 主な成果物                                  | 退出ゲート             | 人間承認              |
-| --- | ------------------------ | ------------- | ------------------------------------------- | ---------------------- | --------------------- |
-| 1   | 提案・見積り             | approval      | `evidence/proposal-brief.json` + 提案デック | `PROPOSAL_APPROVED`    | ✅ 顧客承認・NDA/契約 |
-| 2   | 監査スコープ・要件合意   | judgment      | `evidence/audit-scope.json`                 | `SCOPE_AGREED`         | ✅ スコープ合意       |
-| 3   | preflight                | gate          | semgrep/git/対象確認                        | （自動）               | —                     |
-| 4   | 静的解析実行             | deterministic | `evidence/audit-findings.json`              | `STATIC_ANALYSIS_DONE` | —                     |
-| 5   | 所見整合・重大度較正     | judgment      | `evidence/audit-findings-aligned.json`      | `FINDINGS_ALIGNED`     | —                     |
-| 6   | Round 1 報告書・レビュー | review        | `evidence/audit-report-r1.md`               | `R1_REVIEW_PASSED`     | ✅ 納品判定           |
-| 7   | 修正対応検証（Round 2）  | judgment      | `evidence/remediation-verification.md`      | `REMEDIATION_VERIFIED` | —                     |
-| 8   | 最終報告書・サインオフ   | approval      | `evidence/audit-report-final.md`            | `FINAL_SIGNOFF`        | ✅ 最終サインオフ     |
+| #   | フェーズ                 | 種別          | 主な成果物                                            | 退出ゲート             | 人間承認              |
+| --- | ------------------------ | ------------- | ----------------------------------------------------- | ---------------------- | --------------------- |
+| 1   | 提案・見積り             | approval      | `evidence/proposal-brief.json` + 提案デック           | `PROPOSAL_APPROVED`    | ✅ 顧客承認・NDA/契約 |
+| 2   | 監査スコープ・要件合意   | judgment      | `evidence/audit-scope.json`                           | `SCOPE_AGREED`         | ✅ スコープ合意       |
+| 3   | preflight                | gate          | semgrep/git/対象確認                                  | （自動）               | —                     |
+| 4   | 静的解析・仮説生成       | deterministic | `evidence/agentic-source-review-plan.json` + 仮説証跡 | `STATIC_ANALYSIS_DONE` | —                     |
+| 5   | 所見整合・重大度較正     | judgment      | `evidence/audit-findings-aligned.json`                | `FINDINGS_ALIGNED`     | —                     |
+| 6   | Round 1 報告書・レビュー | review        | `evidence/audit-report-r1.md`                         | `R1_REVIEW_PASSED`     | ✅ 納品判定           |
+| 7   | 修正対応検証（Round 2）  | judgment      | `evidence/remediation-verification.md`                | `REMEDIATION_VERIFIED` | —                     |
+| 8   | 最終報告書・サインオフ   | approval      | `evidence/audit-report-final.md`                      | `FINAL_SIGNOFF`        | ✅ 最終サインオフ     |
 
 `mission_class: customer_engagement` + `risk_profile: approval_required` により**レビューモードは strict** に自動選択され、レジストリ側の全体ゲート（`CONTRACT_VALID` / `SECURITY_READY` / `REQUIREMENTS_COMPLETENESS` / `CUSTOMER_SIGNOFF` / `DELIVERABLE_QUALITY`）も併せて発火する。フェーズ内の `exit_gate` はプロセス固有、レジストリ・ゲートは横断ポリシー。両者は補完関係。
 
@@ -46,7 +46,7 @@ workflow_ids: [security-audit-service]
 
 - [ ] **提案承認**: `PROPOSAL_APPROVED` を人間承認で通過（顧客承認・NDA/契約前提の確認）。
 - [ ] **スコープ固定**: 対象コミット・重大度定義・参照基準・突合対象（ADR/設計）が `audit-scope.json` に確定。
-- [ ] **所見の裏付け**: 全所見に安定 FIND-ID・重大度・該当箇所（file:line）・リスク・推奨策があり、ブルーチーム批判で反証された仮説は除外済み。
+- [ ] **所見の裏付け**: 仮説は独立批判を通過し、全所見に安定 FIND-ID・重大度・該当箇所（file:line）・リスク・推奨策があり、専門家の検証記録がある。反証された仮説は除外済み。
 - [ ] **設計判断の分離**: ADR/設計判断として受容した項目が根拠つきで分離されている。
 - [ ] **2ラウンド完結**: Round 1 納品 → 修正コミット検証 → 最終報告書に各所見の [重大度 → 対応状況] 遷移が反映。
 - [ ] **サインオフ**: `FINAL_SIGNOFF` を reviewer 承認＋人間承認で通過。
@@ -99,18 +99,20 @@ node dist/scripts/mission_controller.js distill MSN-SECAUDIT-<customer>
 node dist/scripts/mission_controller.js finish  MSN-SECAUDIT-<customer> --seal
 ```
 
-静的解析フェーズのパイプラインを単体で回す場合:
+脅威モデル先行のレビューを単体で回す場合（承認前は計画だけが生成される）:
 
 ```bash
-pnpm pipeline --input knowledge/confidential/<customer>/pipelines/security-audit-static-analysis.json
+pnpm pipeline --input pipelines/agentic-source-code-review.json \
+  --context '{"tenant_slug":"<customer>","project_id":"<project>","mission_id":"<mission>","output_dir":"active/missions/confidential/<mission>/evidence/agentic-source-review"}'
 ```
 
 ## 5. 顧客ごとの実体化（テナント・インスタンス）
 
 再利用テンプレートは product ティア（`knowledge/product/…`）に置き、**顧客固有の実体は confidential ティアに置く**。ティアを跨いだ漏洩は禁止（上位→下位への流出禁止）。
 
-1. `knowledge/confidential/<customer>/pipelines/security-audit-static-analysis.json` を product テンプレートから複製し、`context` を実値で埋める:
-   - `target_dir`（対象リポジトリのパス）、`semgrep_config`、`tenant_slug`、`reference_standards`。
+1. `pipelines/agentic-source-code-review.json` を使用し、`context` に実値を渡す:
+   - `target_dir` / `source_root`（対象リポジトリのパス）、`tenant_slug`、`project_id`、`mission_id`、`output_dir`（必ず該当ミッション配下）。
+   - `threat_model_approved` と `approval_ref` は、資産・信頼境界・除外・到達可能性を人間が確認した後にだけ設定する。
    - 言語・フレームワーク固有の観点（例: Solana/Anchor なら Missing Signer Check・Account Ownership・PDA seed・CPI reentrancy）を `topic` に補う。
 2. 顧客の重大度定義・レポートテンプレート・ブランドデザイン（提案デック用）を `knowledge/confidential/<customer>/` に配置。
 3. 監査対象コード・設計/ADR などの受領物は confidential ティアのミッション証跡に取り込む。

@@ -19,7 +19,7 @@
     "assimilate-gateway-capability": "assimilate-gateway-capability",
     "diverge-hypotheses": "knowledge/product/pipeline-templates/hypothesis-tree",
     "multi-agent-consensus": "knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator",
-    "security-audit-service": "knowledge/product/pipeline-templates/security-audit-static-analysis"
+    "security-audit-service": "pipelines/agentic-source-code-review"
   },
   "mission_intent_action_map": {
     "create-mission": "create",

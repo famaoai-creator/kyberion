@@ -2,7 +2,11 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
-import { modelRegistryFileName, readModelRegistryDirectory } from './model-registry-directory.js';
+import {
+  modelRegistryFileName,
+  modelRegistrySnapshotFromDirectory,
+  readModelRegistryDirectory,
+} from './model-registry-directory.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const TEST_ROOT = pathResolver.sharedTmp('model-registry-directory-tests');
@@ -50,6 +54,36 @@ describe('model-registry-directory', () => {
     );
 
     expect(() => readModelRegistryDirectory(TEST_ROOT)).toThrow(/Invalid model registry directory/);
+  });
+
+  it('projects directory order into the canonical snapshot shape', () => {
+    safeMkdir(TEST_ROOT, { recursive: true });
+    const first = { model_id: 'vendor:first', provider: 'vendor' };
+    const second = { model_id: 'vendor:second', provider: 'vendor' };
+    safeWriteFile(
+      path.join(TEST_ROOT, 'index.json'),
+      JSON.stringify({
+        version: '1.0.0',
+        default_model_id: first.model_id,
+        model_order: [first.model_id, second.model_id],
+      })
+    );
+    safeWriteFile(
+      path.join(TEST_ROOT, modelRegistryFileName(first.model_id)),
+      JSON.stringify(first)
+    );
+    safeWriteFile(
+      path.join(TEST_ROOT, modelRegistryFileName(second.model_id)),
+      JSON.stringify(second)
+    );
+
+    const directory = readModelRegistryDirectory<typeof first>(TEST_ROOT);
+    expect(directory).not.toBeNull();
+    expect(modelRegistrySnapshotFromDirectory(directory!)).toEqual({
+      version: '1.0.0',
+      default_model_id: first.model_id,
+      models: [first, second],
+    });
   });
 
   it('rejects a directory item whose filename does not encode model_id', () => {

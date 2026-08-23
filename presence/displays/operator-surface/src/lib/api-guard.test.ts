@@ -16,9 +16,10 @@ function makeRequest(url: string, headers: Record<string, string> = {}) {
 }
 
 describe('operator-surface api guard', () => {
-  it('allows loopback hosts without a token', () => {
+  it('rejects loopback hosts without request authentication', () => {
     const decision = authorizeOperatorSurfaceMutation(makeRequest('http://localhost/api/inbox'));
-    expect(decision.ok).toBe(true);
+    expect(decision.ok).toBe(false);
+    expect(decision.status).toBe(403);
   });
 
   it('allows same-origin mutations', () => {

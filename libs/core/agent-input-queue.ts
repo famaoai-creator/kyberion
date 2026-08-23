@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { missionDir } from './path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
 
 /** `inject` is a non-wake, process-local inbox delivery (DH-10). */
@@ -426,23 +427,6 @@ export function getMissionAgentInputQueue(options: AgentInputQueueOptions): Agen
   const queue = new AgentInputQueue(options);
   registry.set(key, queue);
   return queue;
-}
-
-function escapeXml(value: string): string {
-  return value.replace(/[&<>"']/gu, (character) => {
-    switch (character) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      default:
-        return '&apos;';
-    }
-  });
 }
 
 /** Render queued input as explicitly untrusted model-visible data. */

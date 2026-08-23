@@ -1,0 +1,71 @@
+{
+  "kind": "agentic-source-review-rules",
+  "version": "1.0.0",
+  "description": "Deterministic rule hierarchy for selecting domain, language, framework and vulnerability review guidance.",
+  "rules": [
+    {
+      "id": "domain:web",
+      "category": "domain",
+      "title": "Web service entry-point review",
+      "purpose": "Treat routes and request inputs as candidate attack entry points.",
+      "stages": ["threat_model", "entry_point_discovery", "context_enrichment"],
+      "match": { "domain": "web" }
+    },
+    {
+      "id": "domain:infrastructure",
+      "category": "domain",
+      "title": "Infrastructure boundary review",
+      "purpose": "Review provider, deployment and trust-boundary assumptions before IaC use.",
+      "stages": ["threat_model", "context_enrichment"],
+      "match": { "domain": "infrastructure" }
+    },
+    {
+      "id": "language:typescript",
+      "category": "language",
+      "title": "TypeScript source-flow review",
+      "purpose": "Apply TypeScript import, async, serialization and runtime-boundary heuristics.",
+      "stages": ["context_enrichment", "hypothesis_generation"],
+      "match": { "language": "typescript" }
+    },
+    {
+      "id": "language:python",
+      "category": "language",
+      "title": "Python source-flow review",
+      "purpose": "Apply Python request, serialization and process-boundary heuristics.",
+      "stages": ["context_enrichment", "hypothesis_generation"],
+      "match": { "language": "python" }
+    },
+    {
+      "id": "framework:express",
+      "category": "framework",
+      "title": "Express route and middleware review",
+      "purpose": "Trace middleware, route parameters and authorization checks across Express handlers.",
+      "stages": ["entry_point_discovery", "context_enrichment", "hypothesis_generation"],
+      "match": { "dependency": "express" }
+    },
+    {
+      "id": "vulnerability:access-control",
+      "category": "vulnerability",
+      "title": "Access-control and privilege review",
+      "purpose": "Look for missing, misplaced or confused identity, tenant and privilege checks.",
+      "stages": ["hypothesis_generation", "hypothesis_validation"],
+      "match": { "always": true }
+    },
+    {
+      "id": "vulnerability:data-flow",
+      "category": "vulnerability",
+      "title": "Input-to-sink data-flow review",
+      "purpose": "Trace user-controlled data through sanitizers and dangerous execution or storage sinks.",
+      "stages": ["hypothesis_generation", "hypothesis_validation"],
+      "match": { "always": true }
+    },
+    {
+      "id": "vulnerability:dependency-supply-chain",
+      "category": "vulnerability",
+      "title": "Dependency and supply-chain review",
+      "purpose": "Correlate dependency signals with SBOM and threat-intelligence context.",
+      "stages": ["context_enrichment", "hypothesis_generation", "hypothesis_validation"],
+      "match": { "always": true }
+    }
+  ]
+}
