@@ -765,6 +765,9 @@ function buildFallbackIntentContract(
   executionBrief?: ActuatorExecutionBrief
 ): IntentContract {
   const packet = resolveIntentPacketForInput(input);
+  const selectedIntent = packet.selected_intent_id
+    ? findStandardIntentById(packet.selected_intent_id)
+    : undefined;
   const selectedPlatformId =
     typeof input.runtimeContext?.platform_id === 'string'
       ? input.runtimeContext.platform_id
@@ -840,9 +843,13 @@ function buildFallbackIntentContract(
         : 'task_session';
     const shape = packet.selected_resolution?.shape ? selectedShape : classifiedShape;
     const normalizedShape = toWorkflowShape(shape);
-    const requiredInputs = [
-      ...(executionBrief?.missing_inputs || classified.requirements?.missing || []),
-    ];
+    const requiredInputs = Array.from(
+      new Set([
+        ...(executionBrief?.missing_inputs || []),
+        ...(classified.requirements?.missing || []),
+        ...(selectedIntent?.intake_requirements || []),
+      ])
+    );
     if (packet.selected_intent_id === 'setup-messaging-bridge') {
       if (selectedPlatformId) {
         const platformIndex = requiredInputs.indexOf('platform_id');
@@ -864,7 +871,15 @@ function buildFallbackIntentContract(
       attachCapabilityBundle({
         kind: 'intent-contract',
         source_text: input.text,
-        intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
+        // The Stage-1 packet is the canonical resolver decision. Preserve it
+        // when the execution-brief fallback is generic (for example a
+        // booking request), otherwise the surface preview and execution
+        // contract drift to `general-request`.
+        intent_id:
+          packet.selected_intent_id ||
+          executionBrief?.archetype_id ||
+          classified.intentId ||
+          classified.taskType,
         ...(correlationId ? { correlation_id: correlationId } : {}),
         goal: {
           summary: executionBrief?.summary || classified.goal.summary,
@@ -877,9 +892,15 @@ function buildFallbackIntentContract(
             : classified.taskType,
         },
         required_inputs: effectiveRequiredInputs,
-        outcome_ids: executionBrief?.deliverables || [],
+        outcome_ids: Array.from(
+          new Set([...(executionBrief?.deliverables || []), ...(selectedIntent?.outcome_ids || [])])
+        ),
         approval: {
-          requires_approval: Boolean(classified.payload?.approval_required),
+          requires_approval:
+            Boolean(classified.payload?.approval_required) ||
+            selectedIntent?.risk_profile === 'approval_required' ||
+            selectedIntent?.risk_profile === 'high_stakes' ||
+            Boolean(selectedIntent?.outcome_ids?.includes('approval_request')),
         },
         delivery_mode:
           normalizedShape === 'project_bootstrap'
@@ -898,7 +919,10 @@ function buildFallbackIntentContract(
   }
 
   const requiredInputs = (() => {
-    const required = [...(executionBrief?.missing_inputs || ['goal_or_target'])];
+    const required = [
+      ...(executionBrief?.missing_inputs || []),
+      ...(packet.selected_intent_id ? [] : ['goal_or_target']),
+    ];
     if (packet.selected_intent_id === 'setup-messaging-bridge') {
       if (selectedPlatformId) {
         return required.filter((item) => item !== 'platform_id');

@@ -6,6 +6,7 @@ import {
   listSurfaceOutboxMessages,
   listSurfaceDeadLetters,
   buildAgentCollaborationProjection,
+  currentScope,
   pathResolver,
   type AgentRuntimeSupervisorSnapshot,
 } from '@agent/core';
@@ -35,6 +36,7 @@ function supervisorDaemonHealthy(): boolean {
 }
 
 export async function loadCoordination(): Promise<CoordinationData> {
+  const scope = currentScope();
   // The IPC client auto-spawns the supervisor daemon on every call; an
   // observability panel must not have that side effect, so only talk to the
   // daemon when its heartbeat already reports healthy.
@@ -66,8 +68,8 @@ export async function loadCoordination(): Promise<CoordinationData> {
   const outboxLines: string[] = [];
   for (const surface of OUTBOX_SURFACES) {
     try {
-      const pending = listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true }).length;
-      const dead = listSurfaceDeadLetters(surface).length;
+      const pending = listSurfaceOutboxMessages(surface, { scope }).length;
+      const dead = listSurfaceDeadLetters(surface, { scope }).length;
       if (pending > 0 || dead > 0) {
         outboxLines.push(`${surface}: ${pending} pending, ${dead} dead`);
       }
