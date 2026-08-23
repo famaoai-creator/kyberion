@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
+  loadJson,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   type SoftwareQualityContract,
   type TestExecutionRecord,
@@ -24,10 +24,6 @@ export interface SoftwareQualityReportInput {
   now?: Date;
 }
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
 function writeJson(filePath: string, value: unknown): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8' });
@@ -39,9 +35,9 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   recommendation: string;
   defectCount: number;
 } {
-  const contract = readJson<SoftwareQualityContract>(input.contractPath);
-  const inventory = readJson<TestInventory>(input.inventoryPath);
-  const execution = readJson<TestExecutionRecord>(input.executionPath);
+  const contract = loadJson<SoftwareQualityContract>(input.contractPath);
+  const inventory = loadJson<TestInventory>(input.inventoryPath);
+  const execution = loadJson<TestExecutionRecord>(input.executionPath);
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,

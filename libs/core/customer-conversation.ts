@@ -1,6 +1,10 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import {
+  loadJsonIfPresent as loadOptionalJson,
+  safeExistsSync,
+  safeReadFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -96,15 +100,7 @@ export interface CustomerConversationResult {
 }
 
 function readJsonIfPresent(filePath: string): Record<string, unknown> | null {
-  try {
-    if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      unknown
-    >;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<Record<string, unknown>>(filePath);
 }
 
 function loadGroundingSources(tenantSlug: string): {

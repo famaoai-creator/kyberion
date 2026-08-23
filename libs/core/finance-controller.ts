@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
 import {
   resolveFinancialModel,
   summarizeFinancialModel,
@@ -80,12 +80,7 @@ function toNumber(value: unknown): number | null {
 }
 
 function readJsonIfPresent<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<T>(filePath);
 }
 
 function resolveCostReport(baseDir: string): FinanceControllerCostReport | null {

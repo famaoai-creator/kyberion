@@ -1,0 +1,70 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "source-to-engineering-artifacts",
+  "version": "1.0.0",
+  "name": "Source To Engineering Artifacts",
+  "description": "Analyze a workspace source tree and compile evidence-backed design documentation, test inventory, safe test scenarios, and proposal-only IaC artifacts.",
+  "context": {
+    "source_root": ".",
+    "project_id": "source-analysis",
+    "target_provider": "",
+    "max_files": 2000,
+    "output_dir": "active/shared/tmp/source-engineering"
+  },
+  "steps": [
+    {
+      "id": "analyze_source",
+      "role": "transform",
+      "op": "modeling:analyze_source_tree",
+      "produces": {
+        "channel": "source_analysis_ir",
+        "type": "SourceAnalysisIR"
+      },
+      "params": {
+        "source_root": "{{source_root}}",
+        "max_files": "{{max_files}}",
+        "export_as": "source_analysis_ir"
+      }
+    },
+    {
+      "id": "compile_artifacts",
+      "role": "transform",
+      "op": "modeling:compile_engineering_artifacts",
+      "consumes": "source_analysis_ir",
+      "produces": {
+        "channel": "engineering_artifacts",
+        "type": "EngineeringArtifactBundle"
+      },
+      "params": {
+        "from": "source_analysis_ir",
+        "project_id": "{{project_id}}",
+        "target_provider": "{{target_provider}}",
+        "export_as": "engineering_artifacts"
+      }
+    },
+    {
+      "id": "write_artifacts",
+      "role": "sink",
+      "op": "modeling:write_engineering_artifacts",
+      "consumes": "engineering_artifacts",
+      "produces": {
+        "channel": "engineering_outputs",
+        "type": "EngineeringArtifactPaths"
+      },
+      "params": {
+        "from": "engineering_artifacts",
+        "output_dir": "{{output_dir}}",
+        "export_as": "engineering_outputs"
+      }
+    },
+    {
+      "id": "review_handoff",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "engineering_outputs",
+      "params": {
+        "message": "Source engineering artifacts generated under {{output_dir}}. Review design evidence, deferred tests, and IaC proposal before any apply."
+      }
+    }
+  ]
+}
