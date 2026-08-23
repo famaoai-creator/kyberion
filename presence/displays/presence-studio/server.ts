@@ -28,8 +28,9 @@ import {
   validateLocalServiceUrl,
 } from './security.js';
 import {
-  buildPresenceHeadlessManifest,
+  authorizePresenceOperation,
   buildPresenceOverviewA2UI,
+  presenceManifestForViewer,
   presenceAvailableOperations,
   presenceEnvelope,
   readPresenceHeadlessOverview,
@@ -944,7 +945,7 @@ app.get('/api/headless/manifest', (req, res) => {
     const viewer = resolvePresenceStudioViewerContext(req);
     res.json({
       ok: true,
-      manifest: buildPresenceHeadlessManifest(),
+      manifest: presenceManifestForViewer(viewer),
       viewer: {
         scope: presenceStudioHeadlessScope(viewer),
         available_operations: presenceAvailableOperations(viewer),
@@ -960,6 +961,9 @@ app.get('/api/headless/overview', (req, res) => {
   try {
     const viewer = resolvePresenceStudioViewerContext(req);
     const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    authorizePresenceOperation(viewer, 'presence.overview.read', {
+      tenantSlug: requestedTenant,
+    });
     const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
     const scopedViewer = { ...viewer, tenantSlugs: scoped };
     res.json(
@@ -975,6 +979,9 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
   try {
     const viewer = resolvePresenceStudioViewerContext(req);
     const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    authorizePresenceOperation(viewer, 'presence.overview.a2ui', {
+      tenantSlug: requestedTenant,
+    });
     const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
     const scopedViewer = { ...viewer, tenantSlugs: scoped };
     const overview = readPresenceHeadlessOverview(scopedViewer);

@@ -23,6 +23,7 @@ describe('headless surface contract', () => {
     expect(update).toMatchObject({
       effect: 'write',
       required_role: 'localadmin',
+      required_permissions: ['surface.headless.write'],
       method: 'POST',
     });
     expect(update?.input_schema.required).toEqual(['item_id', 'status']);

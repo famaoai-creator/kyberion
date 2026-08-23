@@ -2,6 +2,7 @@ import {
   availableHeadlessOperationIds,
   buildCeoSurfaceSummary,
   createHeadlessEnvelope,
+  filterHeadlessManifestForViewer,
   type CeoSurfaceSummary,
   type HeadlessApiManifest,
   type HeadlessOperationDescriptor,
@@ -12,9 +13,12 @@ import type { A2UIMessage } from '@agent/core/a2ui';
 import {
   conciergeHeadlessScope,
   narrowConciergeScope,
+  toSurfaceAuthorizationContext,
   withConciergeViewerContext,
   type ConciergeViewerContext,
 } from './viewer-context';
+import { ConciergeViewerError } from './viewer-context';
+import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -25,6 +29,7 @@ const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
     description: 'Read the scoped Concierge secretary home projection.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: {
@@ -46,6 +51,7 @@ const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
     description: 'Read the scoped Concierge home as A2UI messages.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: {
@@ -83,6 +89,35 @@ export function buildConciergeHeadlessManifest(): HeadlessApiManifest {
   };
 }
 
+export function conciergeManifestForViewer(viewer: ConciergeViewerContext): HeadlessApiManifest {
+  return filterHeadlessManifestForViewer(
+    toSurfaceAuthorizationContext(viewer),
+    buildConciergeHeadlessManifest()
+  );
+}
+
+export function authorizeConciergeOperation(
+  viewer: ConciergeViewerContext,
+  operationId: string,
+  resource?: { tenantSlug?: string; organizationId?: string; projectId?: string; tier?: string }
+): void {
+  const operation = buildConciergeHeadlessManifest().operations.find(
+    (candidate) => candidate.operation_id === operationId
+  );
+  if (!operation) throw new ConciergeViewerError(403, `unknown headless operation: ${operationId}`);
+  const decision = authorizeSurfaceOperation({
+    context: toSurfaceAuthorizationContext(viewer),
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource,
+  });
+  if (!decision.allowed) throw new ConciergeViewerError(403, decision.reason);
+}
+
 export function readConciergeHome(
   viewer: ConciergeViewerContext,
   query: {
@@ -105,18 +140,22 @@ export function readConciergeHome(
 }
 
 export function conciergeEnvelope<T>(resource: string, data: T, viewer: ConciergeViewerContext) {
-  const manifest = buildConciergeHeadlessManifest();
+  const manifest = conciergeManifestForViewer(viewer);
   return createHeadlessEnvelope({
     surface: 'concierge',
     resource,
     data,
     scope: conciergeHeadlessScope(viewer),
     manifest,
+    authorizationContext: toSurfaceAuthorizationContext(viewer),
   });
 }
 
 export function conciergeAvailableOperations(viewer: ConciergeViewerContext): string[] {
-  return availableHeadlessOperationIds(viewer.role, buildConciergeHeadlessManifest());
+  return availableHeadlessOperationIds(
+    toSurfaceAuthorizationContext(viewer),
+    buildConciergeHeadlessManifest()
+  );
 }
 
 export function buildConciergeHomeA2UI(summary: CeoSurfaceSummary): A2UIMessage[] {

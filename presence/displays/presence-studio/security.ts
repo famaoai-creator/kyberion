@@ -2,6 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { isValidTenantSlug, logger } from '@agent/core';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -184,6 +185,23 @@ export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext)
       viewer.source === 'loopback'
         ? ['personal', 'confidential', 'public']
         : ['confidential', 'public'],
+  };
+}
+
+export function toSurfaceAuthorizationContext(
+  viewer: PresenceStudioViewerContext
+): SurfaceAuthorizationContext {
+  return {
+    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    tenantSlugs: viewer.tenantSlugs,
+    organizationIds: 'all',
+    projectIds: 'all',
+    tierAccess:
+      viewer.source === 'loopback'
+        ? ['personal', 'confidential', 'public']
+        : ['confidential', 'public'],
+    principalId: viewer.principalId,
+    source: viewer.source,
   };
 }
 
