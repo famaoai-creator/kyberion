@@ -1,3 +1,10 @@
+import {
+  authorizeSurfaceOperation,
+  type SurfaceAuthorizationContext,
+  type SurfaceAuthorizationRole,
+  type SurfacePermission,
+} from './surface-authorization.js';
+
 /**
  * Framework-neutral contracts for surface APIs.
  *
@@ -8,7 +15,8 @@
 export const HEADLESS_API_VERSION = '1' as const;
 
 export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio';
-export type HeadlessViewerRole = 'readonly' | 'localadmin';
+export type HeadlessViewerRole = SurfaceAuthorizationRole;
+export type HeadlessOperationPermission = SurfacePermission;
 export type HeadlessOperationEffect = 'read' | 'write';
 
 export interface HeadlessJsonSchema {
@@ -38,6 +46,7 @@ export interface HeadlessOperationDescriptor {
   description: string;
   effect: HeadlessOperationEffect;
   required_role: HeadlessViewerRole;
+  required_permissions: readonly HeadlessOperationPermission[];
   input_schema: HeadlessJsonSchema;
   output_schema: HeadlessJsonSchema;
   a2ui_projection: boolean;
@@ -82,6 +91,7 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
     description: 'Read the scoped operator home projection.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: {
@@ -104,6 +114,7 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
     description: 'Read scoped work items with lineage and quality metadata.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: {
@@ -127,6 +138,7 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
     description: 'Read the tenant-scoped collaboration projection.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: {
@@ -152,6 +164,7 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
     description: 'Update one work item status through the localadmin authority.',
     effect: 'write',
     required_role: 'localadmin',
+    required_permissions: ['surface.headless.write'],
     input_schema: {
       type: 'object',
       properties: {
@@ -200,12 +213,64 @@ export function buildChronosHeadlessManifest(): HeadlessApiManifest {
 }
 
 export function availableHeadlessOperationIds(
-  role: HeadlessViewerRole,
+  viewer: HeadlessViewerRole | SurfaceAuthorizationContext,
   manifest: HeadlessApiManifest = buildChronosHeadlessManifest()
 ): string[] {
+  const context: SurfaceAuthorizationContext =
+    typeof viewer === 'string'
+      ? {
+          role: viewer,
+          tenantSlugs: 'all',
+          organizationIds: 'all',
+          projectIds: 'all',
+          tierAccess: ['personal', 'confidential', 'public'],
+        }
+      : viewer;
   return manifest.operations
-    .filter((operation) => role === 'localadmin' || operation.required_role === 'readonly')
+    .filter(
+      (operation) =>
+        authorizeSurfaceOperation({
+          context,
+          operation: {
+            operationId: operation.operation_id,
+            effect: operation.effect,
+            requiredRole: operation.required_role,
+            requiredPermissions: operation.required_permissions,
+          },
+        }).allowed
+    )
     .map((operation) => operation.operation_id);
+}
+
+export function filterHeadlessManifestForViewer(
+  viewer: HeadlessViewerRole | SurfaceAuthorizationContext,
+  manifest: HeadlessApiManifest
+): HeadlessApiManifest {
+  const context: SurfaceAuthorizationContext =
+    typeof viewer === 'string'
+      ? {
+          role: viewer,
+          tenantSlugs: 'all',
+          organizationIds: 'all',
+          projectIds: 'all',
+          tierAccess: ['personal', 'confidential', 'public'],
+        }
+      : viewer;
+  return {
+    ...manifest,
+    operations: manifest.operations.filter(
+      (operation) =>
+        authorizeSurfaceOperation({
+          context,
+          operation: {
+            operationId: operation.operation_id,
+            effect: operation.effect,
+            requiredRole: operation.required_role,
+            requiredPermissions: operation.required_permissions,
+          },
+        }).allowed
+    ),
+  };
 }
 
 export function createHeadlessEnvelope<T>(input: {
@@ -215,6 +280,7 @@ export function createHeadlessEnvelope<T>(input: {
   scope: HeadlessViewerScope;
   generatedAt?: string;
   manifest?: HeadlessApiManifest;
+  authorizationContext?: SurfaceAuthorizationContext;
 }): HeadlessApiEnvelope<T> {
   const manifest = input.manifest || buildChronosHeadlessManifest();
   return {
@@ -224,7 +290,10 @@ export function createHeadlessEnvelope<T>(input: {
     resource: input.resource,
     generated_at: input.generatedAt || new Date().toISOString(),
     scope: input.scope,
-    available_operations: availableHeadlessOperationIds(input.scope.role, manifest),
+    available_operations: availableHeadlessOperationIds(
+      input.authorizationContext || input.scope.role,
+      manifest
+    ),
     data: input.data,
   };
 }
