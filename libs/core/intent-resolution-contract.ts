@@ -1,9 +1,20 @@
 import { createHash } from 'node:crypto';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket, type StandardIntentDefinition } from './intent-resolution.js';
+import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
+import { classifyTaskSessionIntent } from './task-session.js';
+import {
+  loadStandardIntentCatalog,
+  resolveIntentResolutionPacket,
+  type IntentResolutionPacket,
+  type StandardIntentDefinition,
+} from './intent-resolution.js';
 
-export type IntentResolutionShape = 'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
-export type IntentOutcomeKind = 'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
-export type IntentAuthorityLevel = 'autonomous' | 'approval_required' | 'human_clarification_required';
+export type IntentResolutionShape =
+  'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
+export type IntentOutcomeKind =
+  'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
+export type IntentAuthorityLevel =
+  'autonomous' | 'approval_required' | 'human_clarification_required';
 
 export interface IntentResolutionContract {
   request_id: string;
@@ -19,6 +30,12 @@ export interface IntentResolutionContract {
   rationale: string;
 }
 
+export interface IntentResolutionContractOptions {
+  packet?: IntentResolutionPacket;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+}
+
 function normalizeShape(shape?: string): IntentResolutionShape {
   if (shape === 'project_bootstrap') return 'project_bootstrap';
   if (shape === 'mission') return 'mission';
@@ -27,7 +44,10 @@ function normalizeShape(shape?: string): IntentResolutionShape {
   return 'task_session';
 }
 
-function inferOutcomeKind(intent?: StandardIntentDefinition, resultShape?: string): IntentOutcomeKind {
+function inferOutcomeKind(
+  intent?: StandardIntentDefinition,
+  resultShape?: string
+): IntentOutcomeKind {
   const outcomeIds = intent?.outcome_ids || [];
   if (resultShape === 'artifact' || outcomeIds.some((id) => String(id).startsWith('artifact:'))) {
     return 'artifact';
@@ -55,34 +75,94 @@ function requestIdFrom(text: string): string {
   return `ir_${digest}`;
 }
 
-function inferProjectContext(shape: IntentResolutionShape): IntentResolutionContract['project_context'] | undefined {
+function inferProjectContext(
+  shape: IntentResolutionShape
+): IntentResolutionContract['project_context'] | undefined {
   if (shape === 'project_bootstrap') {
     return { confidence: 0.8 };
   }
   return undefined;
 }
 
-export function resolveIntentResolutionContract(utterance: string): IntentResolutionContract {
+function uniqueInputs(values: Array<string | undefined>): string[] {
+  return Array.from(
+    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))
+  );
+}
+
+function resolveRequiredInputs(
+  packet: IntentResolutionPacket,
+  selectedIntent?: StandardIntentDefinition,
+  taskSessionIntent?: ReturnType<typeof classifyTaskSessionIntent>
+): string[] {
+  if (!packet.selected_intent_id) return [];
+
+  return uniqueInputs([
+    ...(taskSessionIntent?.requirements?.missing || []),
+    ...(selectedShapeForIntent(packet) === 'direct_answer'
+      ? []
+      : selectedIntent?.intake_requirements || []),
+    packet.selected_intent_id === 'setup-messaging-bridge' &&
+    !packet.selected_parameters?.platform_id
+      ? 'platform_id'
+      : undefined,
+  ]);
+}
+
+function selectedShapeForIntent(packet: IntentResolutionPacket): IntentResolutionShape {
+  return normalizeShape(packet.selected_resolution?.shape);
+}
+
+export function resolveIntentResolutionContract(
+  utterance: string,
+  options: IntentResolutionContractOptions = {}
+): IntentResolutionContract {
   const trimmed = utterance.trim();
-  const packet = resolveIntentResolutionPacket(trimmed);
+  const packet =
+    options.packet ||
+    resolveIntentResolutionPacket(trimmed, {
+      tier: options.tier,
+      tenantId: options.tenantId,
+    });
   const catalog = loadStandardIntentCatalog();
   const selectedIntent = catalog.find((intent) => intent.id === packet.selected_intent_id);
   const selectedShape = normalizeShape(packet.selected_resolution?.shape);
-  const inferredPlatformId = packet.selected_parameters?.platform_id;
+  const taskSessionIntent =
+    packet.selected_intent_id &&
+    ['task_session', 'mission', 'project_bootstrap'].includes(selectedShape)
+      ? classifyTaskSessionIntent(trimmed)
+      : undefined;
+  const requiredInputs = resolveRequiredInputs(packet, selectedIntent, taskSessionIntent);
+  const clarificationShape = selectedShape === 'direct_answer' ? 'direct_reply' : selectedShape;
+  const clarification = packet.selected_intent_id
+    ? assessContextualClarification({
+        intentId: packet.selected_intent_id,
+        text: trimmed,
+        executionShape: clarificationShape,
+        requiredInputs,
+        confidence: taskSessionIntent?.executionBrief?.confidence ?? packet.selected_confidence,
+        contextualFrame: buildContextualIntentFrame(trimmed),
+      })
+    : undefined;
   const missingInputs = packet.selected_intent_id
-    ? [
-        ...(packet.selected_intent_id === 'setup-messaging-bridge' && !inferredPlatformId
-          ? ['platform_id']
-          : []),
-        ...((packet.selected_confidence || 0) < 0.5 ? ['intent_confirmation'] : []),
-      ]
+    ? clarification?.shouldClarify
+      ? uniqueInputs([
+          ...requiredInputs,
+          requiredInputs.length === 0 ? 'intent_confirmation' : undefined,
+        ])
+      : []
     : ['intent_or_goal'];
-  const authorityLevel: IntentAuthorityLevel = missingInputs.length > 0
-    ? 'human_clarification_required'
-    : (selectedIntent?.outcome_ids || []).includes('approval_request')
-      ? 'approval_required'
-      : 'autonomous';
-  const resolutionShape: IntentResolutionShape = packet.selected_intent_id ? selectedShape : 'direct_answer';
+  const authorityLevel: IntentAuthorityLevel =
+    missingInputs.length > 0
+      ? 'human_clarification_required'
+      : selectedIntent?.risk_profile === 'approval_required' ||
+          selectedIntent?.risk_profile === 'high_stakes' ||
+          (selectedIntent?.outcome_ids || []).includes('approval_request')
+        ? 'approval_required'
+        : 'autonomous';
+  const resolutionShape: IntentResolutionShape = packet.selected_intent_id
+    ? selectedShape
+    : 'direct_answer';
   const rationale = packet.selected_intent_id
     ? `resolved from intent '${packet.selected_intent_id}' with confidence ${String(packet.selected_confidence || 0)}`
     : 'no confident intent match; clarification required';

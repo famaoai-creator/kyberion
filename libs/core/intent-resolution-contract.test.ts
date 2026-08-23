@@ -1,5 +1,6 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
+import { compileUserIntentFlow } from './intent-contract.js';
 import { describe, expect, it } from 'vitest';
 import { resolveIntentResolutionContract } from './intent-resolution-contract.js';
 import { pathResolver } from './path-resolver.js';
@@ -14,12 +15,14 @@ describe('intent-resolution-contract', () => {
       shape: string;
       outcomeKind: string;
       authority: string;
+      missingInputs?: string[];
     }> = [
       {
         utterance: 'Webサービスを作って',
         shape: 'project_bootstrap',
         outcomeKind: 'answer',
-        authority: 'autonomous',
+        authority: 'human_clarification_required',
+        missingInputs: ['project_brief'],
       },
       {
         utterance: 'このPDFをパワポにして',
@@ -64,6 +67,12 @@ describe('intent-resolution-contract', () => {
         authority: 'approval_required',
       },
       {
+        utterance: '動画を生成して',
+        shape: 'task_session',
+        outcomeKind: 'artifact',
+        authority: 'approval_required',
+      },
+      {
         utterance: '今夜のレストランを予約したい',
         shape: 'task_session',
         outcomeKind: 'approval_ready_plan',
@@ -88,10 +97,17 @@ describe('intent-resolution-contract', () => {
         authority: 'autonomous',
       },
       {
+        utterance: '来週の予定教えて',
+        shape: 'direct_answer',
+        outcomeKind: 'status_report',
+        authority: 'autonomous',
+      },
+      {
         utterance: 'このエージェントのハーネスを benchmark ベースで改善して',
         shape: 'task_session',
         outcomeKind: 'answer',
-        authority: 'autonomous',
+        authority: 'human_clarification_required',
+        missingInputs: ['target harness', 'evaluation corpus or benchmark', 'success metric'],
       },
     ];
 
@@ -99,7 +115,7 @@ describe('intent-resolution-contract', () => {
       const contract = resolveIntentResolutionContract(fixture.utterance);
       expect(contract.resolution_shape, fixture.utterance).toBe(fixture.shape);
       expect(contract.outcome_kind, fixture.utterance).toBe(fixture.outcomeKind);
-      expect(contract.missing_inputs.length, fixture.utterance).toBe(0);
+      expect(contract.missing_inputs, fixture.utterance).toEqual(fixture.missingInputs || []);
       expect(contract.authority_level, fixture.utterance).toBe(fixture.authority);
     }
   });
@@ -119,5 +135,46 @@ describe('intent-resolution-contract', () => {
     const contract = resolveIntentResolutionContract('今週の進捗レポートを作って');
     const valid = validate(contract);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('converges the surface preview with the deterministic compiler fallback', async () => {
+    const fixtures = [
+      {
+        utterance: 'Webサービスを作って',
+        intent: 'bootstrap-project',
+        missing: ['project_brief'],
+        clarification: true,
+      },
+      {
+        utterance: '6/6-6/8で沖縄のホテルを探して',
+        intent: 'lifestyle-booking',
+        missing: [],
+        clarification: false,
+      },
+      {
+        utterance: 'zzzzzzzzqqqq',
+        intent: 'unresolved_intent',
+        missing: ['intent_or_goal'],
+        clarification: true,
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      const preview = resolveIntentResolutionContract(fixture.utterance);
+      const flow = await compileUserIntentFlow(
+        { text: fixture.utterance, correlationId: `contract-${fixture.intent}` },
+        { askFn: async () => 'not json' }
+      );
+
+      expect(preview.normalized_intent, fixture.utterance).toBe(fixture.intent);
+      expect(preview.missing_inputs, fixture.utterance).toEqual(fixture.missing);
+      expect(flow.intentContract.intent_id, fixture.utterance).toBe(
+        fixture.intent === 'unresolved_intent' ? 'general-request' : fixture.intent
+      );
+      expect(flow.intentContract.required_inputs, fixture.utterance).toEqual(
+        fixture.intent === 'unresolved_intent' ? ['goal_or_target'] : fixture.missing
+      );
+      expect(Boolean(flow.clarificationPacket), fixture.utterance).toBe(fixture.clarification);
+    }
   });
 });
