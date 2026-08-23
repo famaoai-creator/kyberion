@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJsonIfPresent as loadOptionalJson, safeExistsSync } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -376,15 +376,7 @@ const DEFAULT_STYLE_PACK_BASE = {
 };
 
 function readJsonIfPresent(filePath: string): Record<string, any> | null {
-  try {
-    if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      any
-    >;
-  } catch {
-    return null;
-  }
+  return loadOptionalJson<Record<string, any>>(filePath);
 }
 
 function loadBrandTokens(mode: CreativeDesignMode): {

@@ -16,11 +16,13 @@ last_updated: 2026-03-06
 **定義**: 対象となるソースコード、ユーザーデータ、環境設定の改変を一切行わず、現在の環境で「何ができるか」「何が不足しているか」を純粋に評価・診断するミッション。
 
 ### 1.1 実行原則 (The Zero-Write Rule)
+
 - **改変禁止**: `write_file`, `replace`, `run_shell_command` による破壊的操作、Gitのステージング/コミットは厳禁とする。
 - **観察優先**: 既存のログ、ソースコード、ドキュメントの読み取り (`read_file`, `grep_search`, `glob`) を中心に実行する。
 - **検証環境**: 動作確認が必要な場合は、`active/shared/tmp/` または mission-local な一時領域でのみ一時的な実行を許可する。
 
 ### 1.2 主な目的
+
 - 新機能導入前の現状分析 (Capability Gap Analysis)。
 - セキュリティ、パフォーマンス、またはコード品質の現状診断。
 - 既存シナリオの動作可否判定 (Dry-run)。
@@ -30,6 +32,7 @@ last_updated: 2026-03-06
 **定義**: 目的達成のために、物理的な資産（コード、ドキュメント）の追加、修正、削除を行うミッション。
 
 ### 2.1 実行原則 (Surgical Refit)
+
 - `Plan -> Act -> Validate` のサイクルを遵守する。
 - `AGENTS.md` の標準規程に従い、Git Checkpointing を行いながら物理的な成果物を構築する。
 
@@ -40,6 +43,7 @@ last_updated: 2026-03-06
 **定義**: 収束の前に意図的に発散を起こし、反対意見を資産として残すミッション。創造的判断、新規事業、組織設計、技術選定などで使用する。
 
 ### 3.1 実行原則
+
 - [hypothesis-tree-protocol.md](knowledge/product/orchestration/hypothesis-tree-protocol.md) に従い、divergence → critique → convergence の 3 段階を必ず通す。
 - 不採用仮説は `dissent-log.json` に保存する (judgment-rules.json の `require_dissent_quorum` に従う)。
 - 重大判断 (priority 8+) では [counterfactual-simulation-protocol.md](knowledge/product/orchestration/counterfactual-simulation-protocol.md) の適用を推奨する。
@@ -49,18 +53,20 @@ last_updated: 2026-03-06
 **定義**: 成果物がコードではなく **合意** であるミッション。投資家面談、顧客提案、ベンダー交渉、M&A、組織内合意など。
 
 ### 4.1 実行原則
+
 - [negotiation-protocol.md](knowledge/product/orchestration/negotiation-protocol.md) に従い、`negotiation` ブロック (BATNA/ZOPA/concession_ladder/red_lines) を planning 段階で必ず埋める。
 - 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](knowledge/product/orchestration/real-time-coaching-protocol.md) の補助に徹する。
 - 相手情報は [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md) から取得する。
 
 ## 5. セキュリティ検査ミッション (Security Scan Mission)
 
-**定義**: Anthropic Mythos のアプローチに基づき、コードベースの静的解析（Semgrep等）と自律エージェントによる脆弱性仮説の創出、相互批判、およびPoC検証を行うミッション。
+**定義**: 脅威モデルを人間が承認した後、コードベースの静的解析（Semgrep等）とスコープ付きエージェントによる脆弱性仮説の創出、相互批判を行うミッション。仮説は人間の専門家が検証し、PoCは別途承認された安全なサンドボックスでのみ実行する。
 
 ### 5.1 実行原則
-- **3-Phase 検査**: 探索(Divergence)、批判(Critique)、検証(Simulation)の3フェーズを順守すること。
-- **サンドボックス検証**: PoCの実行は必ず独立した Git Worktree などの安全なサンドボックスで行い、本番データ・インフラに影響を与えないこと。
-- `knowledge/product/pipeline-templates/security-vulnerability-scan.json` パイプラインをベースに実行される。
+
+- **段階ゲート**: 探索(Reconnaissance)、脅威モデル承認、入口・コンテキスト発見、仮説生成、独立批判、専門家検証の順に進めること。
+- **サンドボックス検証**: PoCの実行は自動化せず、人間承認後に独立した Git Worktree 等の安全なサンドボックスでのみ行い、本番データ・インフラに影響を与えないこと。
+- `pipelines/agentic-source-code-review.json` を新規実行の標準とし、`knowledge/product/pipeline-templates/security-vulnerability-scan.json` は同じ安全契約を持つ互換テンプレートとして扱う。
 
 ## 6. ミッション状態への反映
 
@@ -70,4 +76,4 @@ last_updated: 2026-03-06
 - `type: "development"` : 構築ミッション（書き込み許可）
 - `type: "hypothesis-tree"` : 仮説探索ミッション（発散→批判→収束）
 - `type: "negotiation"` : 交渉ミッション（合意形成、人間主導）
-- `type: "security-scan"` : セキュリティ検査ミッション（自動脆弱性探索・PoC検証）
+- `type: "security-scan"` : セキュリティ検査ミッション（承認済みスコープ内の仮説探索・人間主導の検証）

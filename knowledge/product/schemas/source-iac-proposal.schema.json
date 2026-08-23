@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/source-iac-proposal.schema.json",
+  "title": "Source-derived IaC Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "status",
+    "source_refs",
+    "target_provider",
+    "candidate_resources",
+    "validation_commands",
+    "terraform"
+  ],
+  "properties": {
+    "kind": { "const": "iac-proposal" },
+    "version": { "const": "1.0.0" },
+    "status": { "enum": ["proposal-only", "blocked-no-target-provider"] },
+    "source_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "target_provider": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "candidate_resources": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "validation_commands": { "type": "array", "items": { "type": "string" } },
+    "terraform": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,12 +1,11 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { secretGuard } from '@agent/core/secret-guard';
 import {
   consumeTenantBudget,
-  isValidTenantSlug,
-  pathResolver,
-  safeExistsSync,
-  type OsKnowledgeTier,
+  findChronosTokenRegistration,
+  matchesChronosToken,
+  readChronosTokenRegistrations,
+  type ChronosAccessRole,
+  type ChronosTokenRegistration,
 } from '@agent/core';
 
 /**
@@ -20,71 +19,20 @@ const API_TOKEN = process.env.KYBERION_API_TOKEN;
 const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
 const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
 const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false';
-const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
 
-function isValidScopeId(value: unknown): value is string {
-  return typeof value === 'string' && SCOPE_ID_PATTERN.test(value);
-}
-
-export type ChronosAccessRole = 'readonly' | 'localadmin';
-
-export interface ChronosTokenRegistration {
-  token_hash: string;
-  role: ChronosAccessRole;
-  tenant_slugs: string[];
-  organization_ids?: string[];
-  project_ids?: string[];
-  tier_access?: OsKnowledgeTier[];
-  label?: string;
-}
-
-export function matchesChronosToken(candidate: string, configured: string | undefined): boolean {
-  if (!candidate || !configured) return false;
-  const left = Buffer.from(candidate);
-  const right = Buffer.from(configured);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
+export type { ChronosAccessRole, ChronosTokenRegistration } from '@agent/core';
+export { matchesChronosToken } from '@agent/core';
 
 function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
-  const path = pathResolver.knowledge('personal/connections/chronos-access.json');
-  if (!safeExistsSync(path)) return [];
   try {
-    const document = secretGuard.loadConnectionDocument('chronos-access');
-    if (!document || !Array.isArray(document.tokens)) return [];
-    return document.tokens.filter((entry: unknown): entry is ChronosTokenRegistration => {
-      if (!entry || typeof entry !== 'object') return false;
-      const value = entry as Record<string, unknown>;
-      return (
-        typeof value.token_hash === 'string' &&
-        (value.role === 'readonly' || value.role === 'localadmin') &&
-        Array.isArray(value.tenant_slugs) &&
-        value.tenant_slugs.every(
-          (tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)
-        ) &&
-        (value.organization_ids === undefined ||
-          (Array.isArray(value.organization_ids) &&
-            value.organization_ids.every(isValidScopeId))) &&
-        (value.project_ids === undefined ||
-          (Array.isArray(value.project_ids) && value.project_ids.every(isValidScopeId))) &&
-        (value.tier_access === undefined ||
-          (Array.isArray(value.tier_access) &&
-            value.tier_access.every(
-              (tier) => tier === 'public' || tier === 'confidential' || tier === 'personal'
-            )))
-      );
-    });
+    return readChronosTokenRegistrations() || [];
   } catch {
     return [];
   }
 }
 
 export function resolveChronosTokenRegistration(token: string): ChronosTokenRegistration | null {
-  const digest = createHash('sha256').update(token).digest('hex');
-  return (
-    loadChronosTokenRegistrations().find((entry) =>
-      matchesChronosToken(digest, entry.token_hash)
-    ) || null
-  );
+  return findChronosTokenRegistration(token, loadChronosTokenRegistrations());
 }
 
 // In-memory rate limit store

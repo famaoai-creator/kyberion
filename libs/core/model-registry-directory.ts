@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 
-import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
 
 export type ModelRegistryDirectoryIndex = {
   version: string;
@@ -19,9 +19,11 @@ export type ModelRegistryDirectory<T> = {
   modelsById: Map<string, T>;
 };
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
+export type ModelRegistryDirectorySnapshot<T> = {
+  version: string;
+  default_model_id: string;
+  models: T[];
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -81,7 +83,7 @@ export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
   if (!safeExistsSync(indexPath)) {
     throw new Error(`Model registry directory index missing at ${indexPath}`);
   }
-  const index = assertDirectoryIndex(readJson<unknown>(indexPath), indexPath);
+  const index = assertDirectoryIndex(loadJson<unknown>(indexPath), indexPath);
 
   const files = safeReaddir(directory)
     .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
@@ -91,7 +93,7 @@ export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
   const entries: Array<ModelRegistryDirectoryEntry<T>> = [];
   const modelsById = new Map<string, T>();
   for (const file of files) {
-    const model = readJson<T>(path.join(directory, file));
+    const model = loadJson<T>(path.join(directory, file));
     const modelId = model.model_id;
     if (typeof modelId !== 'string' || modelId.length === 0) {
       throw new Error(`Model registry item ${file} must define a non-empty string model_id`);
@@ -111,4 +113,18 @@ export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
   }
 
   return { index, entries, modelsById };
+}
+
+export function modelRegistrySnapshotFromDirectory<T extends { model_id?: unknown }>(
+  directory: ModelRegistryDirectory<T>
+): ModelRegistryDirectorySnapshot<T> {
+  return {
+    version: directory.index.version,
+    default_model_id: directory.index.default_model_id,
+    models: directory.index.model_order.map((modelId) => {
+      const model = directory.modelsById.get(modelId);
+      if (!model) throw new Error(`Model registry directory is missing model ${modelId}`);
+      return model;
+    }),
+  };
 }

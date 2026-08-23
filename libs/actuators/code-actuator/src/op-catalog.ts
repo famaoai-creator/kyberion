@@ -9,6 +9,7 @@ export const CODE_ACTUATOR_CAPTURE_OPS = [
   'discover_skills',
   'glob_files',
   'read_file',
+  'run_tests',
   'semgrep_scan',
   'shell',
 ] as const;

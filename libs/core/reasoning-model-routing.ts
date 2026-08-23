@@ -1,9 +1,10 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
-import { readModelRegistryDirectory } from './model-registry-directory.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
+import {
+  modelRegistrySnapshotFromDirectory,
+  readModelRegistryDirectory,
+} from './model-registry-directory.js';
+import { validateModelRegistrySnapshot } from './model-registry-contract.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import type {
   ReasoningLevel,
   ReasoningLevelDecision,
@@ -16,14 +17,8 @@ import { loadReasoningLevelPolicy } from './reasoning-level-policy.js';
 export { resolveRuntimeModelId, type RuntimeModelRole } from './runtime-model-defaults.js';
 export type { TaskModelEffort, TaskModelTier } from './reasoning-level-policy.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const MODEL_REGISTRY_PATH = pathResolver.knowledge('product/governance/model-registry.json');
 const MODEL_REGISTRY_DIRECTORY = pathResolver.knowledge('product/governance/model-registry');
-const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/model-registry.schema.json'
-);
 
 type ModelRoleFit = 'primary' | 'secondary' | 'not_recommended';
 type ModelStatus = 'approved' | 'candidate' | 'deprecated' | 'blocked';
@@ -85,46 +80,24 @@ export interface TaskModelHintInput {
   model_id?: string;
 }
 
-let validateFn: ValidateFunction | null = null;
 let cachedRegistry: ModelRegistryFile | null = null;
 let cachedRegistryPath: string | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, MODEL_REGISTRY_SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateRegistry(value: unknown, label = MODEL_REGISTRY_PATH): ModelRegistryFile {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid model registry at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as ModelRegistryFile;
-}
-
 function loadRegistryFile(): ModelRegistryFile | null {
   if (!safeExistsSync(MODEL_REGISTRY_PATH)) return null;
-  const parsed = JSON.parse(safeReadFile(MODEL_REGISTRY_PATH, { encoding: 'utf8' }) as string);
-  return validateRegistry(parsed, MODEL_REGISTRY_PATH);
+  return validateModelRegistrySnapshot<ModelRegistryEntry>(
+    loadJson<unknown>(MODEL_REGISTRY_PATH),
+    MODEL_REGISTRY_PATH
+  );
 }
 
 function loadRegistryDirectory(): ModelRegistryFile | null {
   const directory = readModelRegistryDirectory<ModelRegistryEntry>(MODEL_REGISTRY_DIRECTORY);
   if (!directory) return null;
-  const { index, modelsById } = directory;
-  const registry: ModelRegistryFile = {
-    version: index.version,
-    default_model_id: index.default_model_id,
-    models: index.model_order.map((modelId) => modelsById.get(modelId)!),
-  };
-  return validateRegistry(registry, MODEL_REGISTRY_DIRECTORY);
+  return validateModelRegistrySnapshot<ModelRegistryEntry>(
+    modelRegistrySnapshotFromDirectory(directory),
+    MODEL_REGISTRY_DIRECTORY
+  );
 }
 
 export function loadModelRegistry(): ModelRegistryFile {

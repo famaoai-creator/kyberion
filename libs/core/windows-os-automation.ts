@@ -1,5 +1,6 @@
 import { safeExec, safeExecResult } from './secure-io.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
+import { escapeXml } from './text-escaping.js';
 
 const PS = 'powershell.exe';
 
@@ -173,14 +174,6 @@ export function systemNotify(title: string, message: string): void {
   }
 }
 
-function escapeXml(value: string): string {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 export function clipboardRead(): string {
   return runResult('Get-Clipboard -Raw');
 }
