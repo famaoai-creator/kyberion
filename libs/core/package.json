@@ -43,6 +43,14 @@
       "types": "./dist/agent-collaboration-projection.d.ts",
       "default": "./dist/agent-collaboration-projection.js"
     },
+    "./a2ui": {
+      "types": "./dist/a2ui.d.ts",
+      "default": "./dist/a2ui.js"
+    },
+    "./headless-surface-contract": {
+      "types": "./dist/headless-surface-contract.d.ts",
+      "default": "./dist/headless-surface-contract.js"
+    },
     "./acp-mediator": {
       "types": "./dist/acp-mediator.d.ts",
       "default": "./dist/acp-mediator.js"
