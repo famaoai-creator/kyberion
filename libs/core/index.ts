@@ -2028,6 +2028,7 @@ export * from './op-preflight.js';
 export * from './op-preflight-defaults.js';
 export * from './promoted-memory.js';
 export * from './memory-promotion-queue.js';
+export * from './memory-promotion-review.js';
 export * from './memory-promotion-workflow.js';
 export * from './background-review-policy.js';
 export * from './background-review-curator.js';

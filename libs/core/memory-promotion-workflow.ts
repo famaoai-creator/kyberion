@@ -20,6 +20,7 @@ import {
   type MemoryCandidate,
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import {
   savePromotedMemoryRecord,
@@ -433,10 +434,11 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   executionRole?: PromotedMemoryExecutionRole;
   ratificationNote?: string;
   supersedes?: string;
+  scope?: MemoryScopeEnvelope;
 }): Promise<{ candidate: MemoryCandidate; promotedRef: string; review: PromotionReview }> {
   const candidateId = String(input.candidateId || '').trim();
   if (!candidateId) throw new Error('candidateId is required.');
-  const candidate = loadMemoryPromotionCandidate(candidateId);
+  const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
   if (candidate.status === 'rejected') {
     throw new Error(
