@@ -1,12 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import type { SupportedLocale } from '@agent/core/locale';
-import { listDaemonHeartbeatStatuses } from '@agent/core';
+import {
+  currentScope,
+  listDaemonHeartbeatStatuses,
+  resolveIntentResolutionContract,
+} from '@agent/core';
 import { I18nContext, defaultLocale, makeI18n, toggleLocale } from './i18n.js';
 import { nextPanel, panelForDigit, type PanelId } from './keymap.js';
 import { TabBar } from './components/tab-bar.js';
 import { HudHeader } from './components/hud-header.js';
 import { StatusBar } from './components/status-bar.js';
+import { OperatorCockpit } from './components/operator-cockpit.js';
 import { HelpOverlay } from './components/help-overlay.js';
 import { PanelBoundary } from './components/panel-boundary.js';
 import { InputBar } from './components/input-bar.js';
@@ -21,6 +26,7 @@ import { SettingsPanel } from './panels/settings-panel.js';
 import { heartbeatSummary } from './store/processes.js';
 import { loadSettings } from './store/settings.js';
 import { usePollWatch } from './store/use-poll-watch.js';
+import { loadOperatorHome, operatorHomeWatchPaths } from './store/operator-home.js';
 import { askKyberion } from './actions/ask.js';
 import { runPaletteCommand, PALETTE_USAGE } from './actions/palette.js';
 import { useVoiceInput } from './voice/use-voice-input.js';
@@ -59,7 +65,12 @@ function loadStatusLine() {
     // heartbeat store may not exist yet
   }
   const settings = loadSettings();
-  return { online, total, backend: settings.reasoningMode, customer: settings.customer };
+  return {
+    online,
+    total,
+    backend: settings.reasoningMode,
+    customer: settings.customer,
+  };
 }
 
 export function App({ initialPanel, initialLocale }: AppProps) {
@@ -70,17 +81,61 @@ export function App({ initialPanel, initialLocale }: AppProps) {
   const [panel, setPanel] = useState<PanelId>(initialPanel ?? 'missions');
   const [showHelp, setShowHelp] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [inputFocused, setInputFocused] = useState(false);
+  // Conversation is the primary entry point: launch with the composer ready.
+  // Esc returns the operator to panel navigation and shortcuts.
+  const [inputFocused, setInputFocused] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [conversation, setConversation] = useState<ConversationLine[]>([]);
+  const [lastIntentResolution, setLastIntentResolution] = useState<
+    ReturnType<typeof resolveIntentResolutionContract> | undefined
+  >();
   const [askBusy, setAskBusy] = useState(false);
   const voice = useVoiceInput();
 
   const statusLine = usePollWatch({ load: loadStatusLine, intervalMs: 15000 });
+  const operatorHome = usePollWatch({
+    load: loadOperatorHome,
+    watchPaths: operatorHomeWatchPaths(),
+    intervalMs: 15000,
+    refreshNonce,
+  });
+  const operatorScope = useMemo(() => {
+    try {
+      return currentScope();
+    } catch {
+      return undefined;
+    }
+  }, []);
+  const intentPreview = useMemo(() => {
+    const candidate = inputValue.trim();
+    if (!inputFocused || !candidate || candidate.startsWith(':')) return undefined;
+    try {
+      return resolveIntentResolutionContract(candidate, {
+        tier: operatorScope?.tier,
+        tenantId: operatorScope?.tenant_slug,
+      });
+    } catch {
+      return undefined;
+    }
+  }, [inputFocused, inputValue, operatorScope]);
 
   const appendConversation = useCallback((line: ConversationLine) => {
     setConversation((current) => [...current, line].slice(-MAX_CONVERSATION_LINES * 3));
   }, []);
+
+  const toggleVoice = useCallback(async () => {
+    const outcome = await voice.toggle();
+    if (outcome.error) {
+      appendConversation({
+        who: 'sys',
+        text: i18n.tr('tui:tui_voice_unavailable', { reason: outcome.error }),
+      });
+    } else if (outcome.text !== undefined) {
+      setInputValue(outcome.text);
+      setInputFocused(true);
+      appendConversation({ who: 'sys', text: i18n.tr('tui:tui_voice_filled') });
+    }
+  }, [appendConversation, i18n, voice.toggle]);
 
   const submitInput = useCallback(
     async (raw: string) => {
@@ -113,6 +168,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
       setAskBusy(true);
       try {
         const reply = await askKyberion(text);
+        setLastIntentResolution(reply.intentResolution);
         appendConversation({
           who: 'kyb',
           text: reply.text || i18n.tr('tui:tui_ask_empty_reply'),
@@ -130,6 +186,9 @@ export function App({ initialPanel, initialLocale }: AppProps) {
         if (key.escape) {
           setInputFocused(false);
           setInputValue('');
+        }
+        if (key.ctrl && input.toLowerCase() === 'v') {
+          void toggleVoice();
         }
         return;
       }
@@ -155,19 +214,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
         return;
       }
       if (input === 'v') {
-        void (async () => {
-          const outcome = await voice.toggle();
-          if (outcome.error) {
-            appendConversation({
-              who: 'sys',
-              text: i18n.tr('tui:tui_voice_unavailable', { reason: outcome.error }),
-            });
-          } else if (outcome.text !== undefined) {
-            setInputValue(outcome.text);
-            setInputFocused(true);
-            appendConversation({ who: 'sys', text: i18n.tr('tui:tui_voice_filled') });
-          }
-        })();
+        void toggleVoice();
         return;
       }
       if (input === 'L') {
@@ -204,6 +251,16 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           active={panel}
           daemonsOnline={statusLine.data?.online}
           daemonsTotal={statusLine.data?.total}
+        />
+        <OperatorCockpit
+          summary={operatorHome.data?.summary}
+          loading={operatorHome.loading}
+          error={operatorHome.error}
+          intentPreview={inputFocused ? intentPreview : lastIntentResolution}
+          backend={statusLine.data?.backend}
+          customer={statusLine.data?.customer}
+          tenant={operatorHome.data?.scope.tenant_slug || operatorScope?.tenant_slug}
+          voiceState={voice.state}
         />
         <TabBar active={panel} />
         <Box flexDirection="column" borderStyle="round" paddingX={1} minHeight={8}>

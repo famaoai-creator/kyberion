@@ -1,6 +1,6 @@
 # @presence/terminal-hud — Kyberion Terminal HUD
 
-Kyberion のフルスクリーン対話型 TUI（Ink / React）。画面の役割を「現在地」「状態」「次の操作」に分け、オペレーターが迷わず観測・操作できる 8 パネルのコンソールです。
+Kyberion のフルスクリーン対話型 TUI（Ink / React）。起動直後は `Operator Cockpit` が Mission・承認・成果物・次アクションを要約し、入力欄を会話の主入口にします。8 パネルは詳細確認・操作用のドリルダウンです。
 
 ## 起動
 
@@ -12,7 +12,7 @@ pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必
 
 `pnpm tui` は実 TTY では対話画面を起動し、CI・パイプ・IDE のタスク実行など TTY がない場合は自動的に snapshot を表示して正常終了します。raw mode が使えない環境でも起動エラーにはなりません。
 
-画面上部は `KYBERION / Terminal HUD`、現在のパネル、デーモン状態を表示します。中央が選択中のデータ、下部が質問・コマンド入力とショートカットです。
+画面上部は `KYBERION / Terminal HUD`、現在のパネル、デーモン状態を表示します。その下の `Operator Cockpit` に現在の運用状態、承認待ち、ブロック、次アクション、ローカル operator / tenant scope を表示します。中央が選択中のデータ、下部が質問・コマンド入力とショートカットです。
 
 すべて `KYBERION_PERSONA=sovereign` で動作する（personal tier ミッションの読み取りに必要。書き込みは各公認 API 経由）。
 
@@ -33,9 +33,10 @@ pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必
 
 ## 入力欄
 
-- `i` / `/` でフォーカス。自由文は `runSurfaceMessageConversation`（cli surface / channel `terminal-hud`）経由で推論バックエンドへ。
+- 起動時は入力欄にフォーカス済みです。自由文は `runSurfaceMessageConversation`（cli surface / channel `terminal-hud`）経由で推論バックエンドへ。`Esc` でパネル操作に戻り、`i` / `/` で再フォーカスできます。
+- 入力中は全 surface 共通の Intent Resolution Contract のプレビュー（意図、実行形状、成果形状、権限境界、不足情報）を表示します。送信後も同じ gateway 結果を保持し、プレビューは実行経路の承認・ADF・mission gate を置き換えません。
 - `:` でコマンドパレット（whitelist 動詞のみ、任意シェル不可）: `:panel` `:mission` `:task` `:schedule` `:surface`。
-- `v` で push-to-talk 音声入力: mic-capture（ffmpeg/arecord）→ STT ブリッジ → 入力欄へ転記（自動送信しない）。STT/mic 不在時は理由を表示して劣化。
+- 入力欄フォーカス中は `Ctrl+V`、パネル操作中は `v` で push-to-talk 音声入力: mic-capture（ffmpeg/arecord）→ STT ブリッジ → 入力欄へ転記（自動送信しない）。STT/mic 不在時は理由を表示して劣化。
 
 ## 設計上の制約
 

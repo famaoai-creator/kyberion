@@ -8518,6 +8518,171 @@
       }
     },
     "tui": {
+      "tui_cockpit_title": {
+        "en": "Operator Cockpit",
+        "ja": "オペレーター・コックピット",
+        "qps-ploc": "⟦Őṗėřȧŧőř Ƈőƈķṗïŧ ŀőřėɱ⟧"
+      },
+      "tui_cockpit_scope": {
+        "en": "Scope",
+        "ja": "スコープ",
+        "qps-ploc": "⟦Şƈőṗė ŀőř⟧"
+      },
+      "tui_cockpit_scope_local": {
+        "en": "local operator",
+        "ja": "ローカル・オペレーター",
+        "qps-ploc": "⟦ŀőƈȧŀ őṗėřȧŧőř ŀőřė⟧"
+      },
+      "tui_cockpit_scope_tenant": {
+        "en": "configured tenant: {tenant}",
+        "ja": "設定済みテナント: {tenant}",
+        "qps-ploc": "⟦ƈőñƒïɠůřėḓ ŧėñȧñŧ: {tenant} ŀőřėɱ ïṗ⟧"
+      },
+      "tui_cockpit_scope_unconfigured": {
+        "en": "tenant not configured",
+        "ja": "テナント未設定",
+        "qps-ploc": "⟦ŧėñȧñŧ ñőŧ ƈőñƒïɠůřėḓ ŀőřėɱ ⟧"
+      },
+      "tui_cockpit_active": {
+        "en": "active",
+        "ja": "稼働中",
+        "qps-ploc": "⟦ȧƈŧïṽė ŀőř⟧"
+      },
+      "tui_cockpit_blocked": {
+        "en": "blocked",
+        "ja": "ブロック中",
+        "qps-ploc": "⟦ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "tui_cockpit_approvals": {
+        "en": "approvals",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "tui_cockpit_inbox": {
+        "en": "unread inbox",
+        "ja": "未読インボックス",
+        "qps-ploc": "⟦ůñřėȧḓ ïñƀőẋ ŀőř⟧"
+      },
+      "tui_cockpit_next": {
+        "en": "Next",
+        "ja": "次の操作",
+        "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
+      },
+      "tui_cockpit_attention": {
+        "en": "Needs attention",
+        "ja": "要対応",
+        "qps-ploc": "⟦Ñėėḓş ȧŧŧėñŧïőñ ŀőřė⟧"
+      },
+      "tui_cockpit_voice_hint": {
+        "en": "Ctrl+V voice input · transcript is placed in the composer; review before sending",
+        "ja": "Ctrl+V 音声入力 · 文字起こしは送信前に入力欄で確認できます",
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė ïñṗůŧ · ŧřȧñşƈřïṗŧ ïş ṗŀȧƈėḓ ïñ ŧħė ƈőɱṗőşėř; řėṽïėẇ ƀėƒőřė şėñḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "tui_cockpit_voice_recording": {
+        "en": "Recording… press Ctrl+V to stop",
+        "ja": "録音中… Ctrl+V で停止",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ṗřėşş Ƈŧřŀ+Ṽ ŧő şŧőṗ ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_cockpit_voice_transcribing": {
+        "en": "Transcribing voice input…",
+        "ja": "音声を文字起こし中…",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ ṽőïƈė ïñṗůŧ… ŀőřėɱ ïṗ⟧"
+      },
+      "tui_cockpit_intent_preview": {
+        "en": "Intent preview",
+        "ja": "意図プレビュー",
+        "qps-ploc": "⟦Ïñŧėñŧ ṗřėṽïėẇ ŀőřė⟧"
+      },
+      "tui_cockpit_intent": {
+        "en": "intent",
+        "ja": "意図",
+        "qps-ploc": "⟦ïñŧėñŧ ŀőř⟧"
+      },
+      "tui_cockpit_shape": {
+        "en": "shape",
+        "ja": "実行形状",
+        "qps-ploc": "⟦şħȧṗė ŀőř⟧"
+      },
+      "tui_cockpit_shape_direct_answer": {
+        "en": "direct answer",
+        "ja": "直接回答",
+        "qps-ploc": "⟦ḓïřėƈŧ ȧñşẇėř ŀőřė⟧"
+      },
+      "tui_cockpit_shape_task_session": {
+        "en": "task session",
+        "ja": "タスク実行",
+        "qps-ploc": "⟦ŧȧşķ şėşşïőñ ŀőř⟧"
+      },
+      "tui_cockpit_shape_mission": {
+        "en": "mission",
+        "ja": "ミッション",
+        "qps-ploc": "⟦ɱïşşïőñ ŀőř⟧"
+      },
+      "tui_cockpit_shape_project_bootstrap": {
+        "en": "project setup",
+        "ja": "プロジェクト準備",
+        "qps-ploc": "⟦ṗřőĵėƈŧ şėŧůṗ ŀőřė⟧"
+      },
+      "tui_cockpit_outcome": {
+        "en": "outcome",
+        "ja": "成果形状",
+        "qps-ploc": "⟦őůŧƈőɱė ŀőř⟧"
+      },
+      "tui_cockpit_outcome_answer": {
+        "en": "answer",
+        "ja": "回答",
+        "qps-ploc": "⟦ȧñşẇėř ŀőř⟧"
+      },
+      "tui_cockpit_outcome_artifact": {
+        "en": "artifact",
+        "ja": "成果物",
+        "qps-ploc": "⟦ȧřŧïƒȧƈŧ ŀőř⟧"
+      },
+      "tui_cockpit_outcome_approval_ready_plan": {
+        "en": "approval-ready plan",
+        "ja": "承認可能な計画",
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀ-řėȧḓẏ ṗŀȧñ ŀőřėɱ ⟧"
+      },
+      "tui_cockpit_outcome_service_change": {
+        "en": "service change",
+        "ja": "サービス変更",
+        "qps-ploc": "⟦şėřṽïƈė ƈħȧñɠė ŀőřė⟧"
+      },
+      "tui_cockpit_outcome_status_report": {
+        "en": "status report",
+        "ja": "状況レポート",
+        "qps-ploc": "⟦şŧȧŧůş řėṗőřŧ ŀőřė⟧"
+      },
+      "tui_cockpit_authority": {
+        "en": "authority",
+        "ja": "権限",
+        "qps-ploc": "⟦ȧůŧħőřïŧẏ ŀőř⟧"
+      },
+      "tui_cockpit_authority_autonomous": {
+        "en": "autonomous",
+        "ja": "自動実行候補",
+        "qps-ploc": "⟦ȧůŧőñőɱőůş ŀőř⟧"
+      },
+      "tui_cockpit_authority_approval": {
+        "en": "human approval required",
+        "ja": "人間の承認が必要",
+        "qps-ploc": "⟦ħůɱȧñ ȧṗṗřőṽȧŀ řėɋůïřėḓ ŀőřėɱ ï⟧"
+      },
+      "tui_cockpit_authority_clarification": {
+        "en": "human clarification required",
+        "ja": "人間の確認が必要",
+        "qps-ploc": "⟦ħůɱȧñ ƈŀȧřïƒïƈȧŧïőñ řėɋůïřėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "tui_cockpit_missing": {
+        "en": "missing",
+        "ja": "不足情報",
+        "qps-ploc": "⟦ɱïşşïñɠ ŀőř⟧"
+      },
+      "tui_cockpit_input_hint": {
+        "en": "Ctrl+V voice · Enter send · Esc cancel",
+        "ja": "Ctrl+V 音声 · Enter 送信 · Esc キャンセル",
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė · Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ïṗşůɱ ⟧"
+      },
       "tui_tab_missions": {
         "en": "Missions",
         "ja": "ミッション",
