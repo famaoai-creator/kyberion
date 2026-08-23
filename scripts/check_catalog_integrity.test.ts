@@ -3,6 +3,7 @@ import {
   collectThemeCatalogViolations,
   collectUndefinedKeyReferenceViolations,
   collectVocabularyCatalogViolations,
+  findUnusedVocabularyKeys,
   type ThemeEntryShape,
 } from './check_catalog_integrity.js';
 
@@ -210,6 +211,40 @@ describe('check_catalog_integrity', () => {
       expect(violations.join('\n')).toContain(
         'references ambiguous key "ambiguous_key" (matches 2 domains)'
       );
+    });
+  });
+
+  describe('unused vocabulary references', () => {
+    it('accepts namespaced catalogT references and surface registries', () => {
+      const catalog = {
+        domains: {
+          minutes_record: {
+            recording_short: { en: 'short' },
+          },
+          presence_studio: {
+            recording_started: { en: 'started' },
+          },
+        },
+      };
+
+      expect(
+        findUnusedVocabularyKeys(
+          catalog,
+          [
+            "catalogT('minutes_record:recording_short')",
+            "'presence_studio:recording_started'",
+          ].join('\n')
+        )
+      ).toEqual([]);
+    });
+
+    it('reports a key that has no quoted bare or namespaced reference', () => {
+      expect(
+        findUnusedVocabularyKeys(
+          { domains: { cli: { cli_readiness: { en: 'Ready' } } } },
+          "catalogT('cli:other')"
+        )
+      ).toEqual(['user-facing-vocabulary: cli.cli_readiness is not referenced anywhere scanned']);
     });
   });
 });
