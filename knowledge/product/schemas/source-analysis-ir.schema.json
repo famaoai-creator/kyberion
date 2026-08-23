@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/source-analysis-ir.schema.json",
+  "title": "Source Analysis IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "source_root",
+    "file_count",
+    "source_file_count",
+    "test_file_count",
+    "iac_file_count",
+    "scan",
+    "languages",
+    "dependencies",
+    "routes",
+    "files",
+    "tests",
+    "iac",
+    "evidence",
+    "limitations"
+  ],
+  "properties": {
+    "kind": { "const": "source-analysis-ir" },
+    "version": { "const": "1.0.0" },
+    "source_root": { "type": "string", "minLength": 1 },
+    "file_count": { "type": "integer", "minimum": 0 },
+    "source_file_count": { "type": "integer", "minimum": 0 },
+    "test_file_count": { "type": "integer", "minimum": 0 },
+    "iac_file_count": { "type": "integer", "minimum": 0 },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_files", "files_observed", "truncated"],
+      "properties": {
+        "max_files": { "type": "integer", "minimum": 1 },
+        "files_observed": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "languages": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "dependencies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path", "source"],
+        "properties": {
+          "method": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "source": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "kind",
+          "bytes",
+          "lines",
+          "sha256",
+          "imports",
+          "exports",
+          "routes",
+          "test_names",
+          "iac_kinds"
+        ],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "kind": {
+            "type": "string",
+            "enum": ["source", "test", "iac", "config", "documentation", "other"]
+          },
+          "language": { "type": "string", "minLength": 1 },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "lines": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "imports": { "type": "array", "items": { "type": "string" } },
+          "exports": { "type": "array", "items": { "type": "string" } },
+          "routes": { "type": "array", "items": { "type": "string" } },
+          "test_names": { "type": "array", "items": { "type": "string" } },
+          "iac_kinds": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "path",
+          "framework",
+          "test_names",
+          "assertion_count",
+          "behavior_categories",
+          "side_effect_signals",
+          "execution_mode",
+          "reason"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "framework": { "type": "string", "minLength": 1 },
+          "test_names": { "type": "array", "items": { "type": "string" } },
+          "assertion_count": { "type": "integer", "minimum": 0 },
+          "behavior_categories": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "side_effect_signals": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "execution_mode": { "enum": ["safe_auto", "approval_required", "manual_only"] },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "iac": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "blocks"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "blocks": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  }
+}

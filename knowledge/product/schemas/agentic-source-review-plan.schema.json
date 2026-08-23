@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/agentic-source-review-plan.schema.json",
+  "title": "Agentic Source Review Plan",
+  "type": "object",
+  "required": [
+    "kind",
+    "version",
+    "project_id",
+    "source_root",
+    "threat_model",
+    "context_enrichment",
+    "selected_rules",
+    "coverage",
+    "review_tracks",
+    "stages",
+    "validation_policy",
+    "limitations"
+  ],
+  "properties": {
+    "kind": { "const": "agentic-source-review-plan" },
+    "version": { "const": "1.0.0" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "source_root": { "type": "string", "minLength": 1 },
+    "threat_model": {
+      "type": "object",
+      "required": [
+        "status",
+        "approval_ref",
+        "domain",
+        "assets",
+        "trust_boundaries",
+        "entry_points",
+        "exclusions",
+        "assumptions"
+      ],
+      "properties": {
+        "status": { "enum": ["pending_human_approval", "approved"] },
+        "approval_ref": { "type": ["string", "null"] },
+        "domain": { "type": "string", "minLength": 1 },
+        "assets": { "type": "array", "items": { "type": "string" } },
+        "trust_boundaries": { "type": "array", "items": { "type": "string" } },
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "method", "path", "source", "input_sources", "review_tracks"],
+            "properties": {
+              "id": { "type": "string" },
+              "method": { "type": "string" },
+              "path": { "type": "string" },
+              "source": { "type": "string" },
+              "input_sources": { "type": "array", "items": { "type": "string" } },
+              "review_tracks": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "properties": { "path": { "type": "string" }, "reason": { "type": "string" } }
+          }
+        },
+        "assumptions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "context_enrichment": {
+      "type": "object",
+      "required": [
+        "documentation_refs",
+        "dependency_signals",
+        "architecture_refs",
+        "sbom_refs",
+        "threat_intelligence_refs"
+      ],
+      "properties": {
+        "documentation_refs": { "type": "array", "items": { "type": "string" } },
+        "dependency_signals": { "type": "array", "items": { "type": "string" } },
+        "architecture_refs": { "type": "array", "items": { "type": "string" } },
+        "sbom_refs": { "type": "array", "items": { "type": "string" } },
+        "threat_intelligence_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "selected_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "title", "purpose", "stages", "selection_reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "enum": ["domain", "language", "framework", "vulnerability"] },
+          "title": { "type": "string" },
+          "purpose": { "type": "string" },
+          "stages": { "type": "array", "items": { "type": "string" } },
+          "selection_reason": { "type": "string" }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "source_root",
+        "source_snapshot_sha256",
+        "source_files_observed",
+        "source_files_total",
+        "source_scan_truncated",
+        "entry_points_total",
+        "entry_points_selected",
+        "entry_points_uncovered",
+        "tracks",
+        "follow_up_required",
+        "limitations"
+      ],
+      "properties": {
+        "kind": { "const": "agentic-source-review-coverage" },
+        "version": { "const": "1.0.0" },
+        "source_root": { "type": "string", "minLength": 1 },
+        "source_snapshot_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source_files_observed": { "type": "integer", "minimum": 0 },
+        "source_files_total": { "type": "integer", "minimum": 0 },
+        "source_scan_truncated": { "type": "boolean" },
+        "entry_points_total": { "type": "integer", "minimum": 0 },
+        "entry_points_selected": { "type": "integer", "minimum": 0 },
+        "entry_points_uncovered": { "type": "integer", "minimum": 0 },
+        "tracks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "entry_points_total",
+              "entry_points_selected",
+              "entry_points_uncovered"
+            ],
+            "properties": {
+              "id": { "enum": ["access_control", "data_flow", "dependency_supply_chain"] },
+              "entry_points_total": { "type": "integer", "minimum": 0 },
+              "entry_points_selected": { "type": "integer", "minimum": 0 },
+              "entry_points_uncovered": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "follow_up_required": { "type": "boolean" },
+        "limitations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "review_tracks": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "objective", "entry_condition"],
+        "properties": {
+          "id": { "enum": ["access_control", "data_flow", "dependency_supply_chain"] },
+          "objective": { "type": "string", "minLength": 1 },
+          "entry_condition": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "gate", "output"],
+        "properties": {
+          "id": {
+            "enum": [
+              "reconnaissance",
+              "threat_model",
+              "entry_point_discovery",
+              "context_enrichment",
+              "hypothesis_generation",
+              "hypothesis_validation",
+              "expert_validation"
+            ]
+          },
+          "status": { "enum": ["complete", "pending_human_approval", "blocked", "manual_only"] },
+          "gate": { "type": "string", "minLength": 1 },
+          "output": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "validation_policy": {
+      "type": "object",
+      "required": [
+        "hypothesis_confidence_gate",
+        "independent_critique",
+        "deduplicate_before_human_review",
+        "proof_of_concept_execution",
+        "automatic_remediation"
+      ],
+      "properties": {
+        "hypothesis_confidence_gate": { "const": "required" },
+        "independent_critique": { "const": "required" },
+        "deduplicate_before_human_review": { "const": true },
+        "proof_of_concept_execution": { "const": "human_approval_required" },
+        "automatic_remediation": { "const": false }
+      }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}
