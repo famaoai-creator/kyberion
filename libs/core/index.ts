@@ -2645,6 +2645,9 @@ export type {
   SoftwareQualityReportSummary,
 } from './software-quality.js';
 export * from './software-quality-operations.js';
+export * from './source-analysis.js';
+export * from './agentic-source-review.js';
+export * from './agentic-source-review-verification.js';
 export * from './windows-local-assist-bridge.js';
 export * from './windows-native-image-recognition-bridge.js';
 export * from './image-description-types.js';

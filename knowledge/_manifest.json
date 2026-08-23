@@ -913,6 +913,12 @@
       "type": "json"
     },
     {
+      "path": "product/capability-assets/security-scanner/agentic-rule-hierarchy.json",
+      "tier": "public",
+      "size": 2929,
+      "type": "json"
+    },
+    {
       "path": "product/capability-assets/security-scanner/compliance-mapping.json",
       "tier": "public",
       "size": 370,
@@ -1059,7 +1065,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16536,
+      "size": 16916,
       "type": "json"
     },
     {
@@ -1581,7 +1587,7 @@
     {
       "path": "product/governance/intent-routing-map.json",
       "tier": "public",
-      "size": 4064,
+      "size": 4033,
       "type": "json"
     },
     {
@@ -1845,7 +1851,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 208799,
+      "size": 208803,
       "type": "json"
     },
     {
@@ -3351,7 +3357,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 91404,
+      "size": 92301,
       "type": "json"
     },
     {
@@ -3843,7 +3849,7 @@
     {
       "path": "product/orchestration/mission-playbooks/security-audit-service.md",
       "tier": "public",
-      "size": 12300,
+      "size": 12947,
       "type": "md"
     },
     {
@@ -3861,7 +3867,7 @@
     {
       "path": "product/orchestration/mission-types.md",
       "tier": "public",
-      "size": 4735,
+      "size": 5074,
       "type": "md"
     },
     {
@@ -5649,13 +5655,13 @@
     {
       "path": "product/pipeline-templates/security-audit-static-analysis.json",
       "tier": "public",
-      "size": 4417,
+      "size": 7557,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/security-vulnerability-scan.json",
       "tier": "public",
-      "size": 2659,
+      "size": 7432,
       "type": "json"
     },
     {
@@ -6388,6 +6394,18 @@
       "path": "product/schemas/agent-routing-decision.schema.json",
       "tier": "public",
       "size": 1469,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/agentic-source-review-plan.schema.json",
+      "tier": "public",
+      "size": 7308,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/agentic-source-review-verification.schema.json",
+      "tier": "public",
+      "size": 7690,
       "type": "json"
     },
     {
@@ -7942,6 +7960,24 @@
       "path": "product/schemas/software-test-viewpoints.schema.json",
       "tier": "public",
       "size": 1143,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/source-analysis-ir.schema.json",
+      "tier": "public",
+      "size": 4999,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/source-iac-proposal.schema.json",
+      "tier": "public",
+      "size": 994,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/source-test-scenarios.schema.json",
+      "tier": "public",
+      "size": 2416,
       "type": "json"
     },
     {

@@ -4029,7 +4029,7 @@
       "id": "security-audit-service",
       "playbook_ref": "knowledge/product/orchestration/mission-playbooks/security-audit-service.md",
       "pattern": "stage_gated_delivery",
-      "description": "ソースコード静的解析セキュリティ診断をサービスとして提供するステージゲート型プロセス。提案・承認 → スコープ合意 → 静的解析(security-audit-static-analysis パイプライン) → 所見の重大度較正・ADR突合 → Round 1 報告書レビュー・納品 → 修正対応検証(Round 2) → 最終報告書サインオフ。判断フェーズは semantic brief、静的解析は決定的パイプラインを再利用する。顧客ごとの実体化は knowledge/confidential/{tenant}/pipelines/ に置く。詳細は mission-playbooks/security-audit-service.md。",
+      "description": "脅威モデルの人間承認を起点にソースコード静的解析とスコープ付きエージェント仮説レビューを提供するステージゲート型プロセス。提案・承認 → スコープ合意 → 探索・静的解析・独立批判 → 所見の重大度較正・ADR突合 → Round 1 報告書レビュー・納品 → 修正対応検証(Round 2) → 最終報告書サインオフ。PoCと修正適用は人間承認後の別フェーズとする。詳細は mission-playbooks/security-audit-service.md。",
       "match": {
         "mission_classes": ["customer_engagement"],
         "delivery_shapes": ["multi_artifact_pipeline"],
@@ -4117,18 +4117,18 @@
         "preflight",
         {
           "id": "static_analysis",
-          "title": "静的解析実行",
+          "title": "静的解析・仮説レビュー",
           "kind": "deterministic",
-          "pipeline_ref": "knowledge/product/pipeline-templates/security-audit-static-analysis.json",
+          "pipeline_ref": "pipelines/agentic-source-code-review.json",
           "default_tasks": [
             {
               "task_id_suffix": "run-scan",
               "team_role": "implementer",
-              "description": "security-audit-static-analysis パイプラインで semgrep 静的解析とレッド/ブルーチーム多視点の脆弱性検証を実行し、検証済み所見を evidence/audit-findings.json に出力する",
-              "deliverable": "evidence/audit-findings.json",
+              "description": "agentic-source-code-review パイプラインで探索・脅威モデル・Semgrep・多視点仮説・独立批判を実行し、agentic-source-review-plan.json と仮説証跡を evidence に出力する。仮説は所見ではなく、専門家検証へ引き渡す",
+              "deliverable": "evidence/agentic-source-review-plan.json",
               "acceptance_criteria": [
                 "semgrep スキャンが完了している",
-                "検証済み所見が統一 content-JSON(title/summary/sections)で出力されている"
+                "脅威モデル承認・スコープ・独立批判の証跡があり、仮説が所見と明確に区別されている"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "L",
@@ -4141,7 +4141,7 @@
               {
                 "kind": "evidence_exists",
                 "params": {
-                  "path": "evidence/audit-findings.json"
+                  "path": "evidence/agentic-source-review-plan.json"
                 }
               }
             ]

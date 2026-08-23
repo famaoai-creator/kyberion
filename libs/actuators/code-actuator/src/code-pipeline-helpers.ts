@@ -358,6 +358,48 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           }
         }, buildRetryOptions()),
       };
+    case 'run_tests': {
+      const testPath = String(resolve(params.test_path || '')).trim();
+      const framework = String(resolve(params.framework || ''))
+        .trim()
+        .toLowerCase();
+      if (!testPath) throw new Error('[run_tests] test_path is required');
+      const absoluteTestPath = path.resolve(rootDir, testPath);
+      const relativeTestPath = path.relative(rootDir, absoluteTestPath);
+      if (
+        relativeTestPath.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativeTestPath) ||
+        !safeExistsSync(absoluteTestPath)
+      ) {
+        throw new Error(`[run_tests] test_path must point to a workspace file: ${testPath}`);
+      }
+      const command = framework === 'pytest' ? 'pytest' : framework === 'go-test' ? 'go' : 'pnpm';
+      const args =
+        framework === 'pytest'
+          ? [relativeTestPath]
+          : framework === 'go-test'
+            ? ['test', `./${path.dirname(relativeTestPath) || '.'}`]
+            : framework === 'jest'
+              ? ['exec', 'jest', '--runInBand', relativeTestPath]
+              : framework === 'playwright'
+                ? ['exec', 'playwright', 'test', relativeTestPath]
+                : ['exec', 'vitest', 'run', relativeTestPath];
+      const result = await retry(
+        async () => runGovernedCommand(command, args, { maxOutputMB: 20 }),
+        buildRetryOptions()
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'test_execution']: {
+          test_path: relativeTestPath.replaceAll(path.sep, '/'),
+          framework: framework || 'vitest',
+          status: result.status === 0 ? 'passed' : 'failed',
+          exit_code: result.status,
+          stdout: String(result.stdout || '').trim(),
+          stderr: String(result.stderr || '').trim(),
+        },
+      };
+    }
     case 'discover_skills':
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
     default:

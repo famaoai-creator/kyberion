@@ -218,6 +218,7 @@
         "discover_skills",
         "glob_files",
         "read_file",
+        "run_tests",
         "semgrep_scan",
         "shell"
       ],
@@ -352,6 +353,11 @@
       "capture": ["glob_files", "read_file", "read_json", "shell"],
       "transform": [
         "ajv_validate",
+        "analyze_source_tree",
+        "build_agentic_source_review_participants",
+        "compile_agentic_source_review_plan",
+        "compile_agentic_source_review_verification",
+        "compile_engineering_artifacts",
         "json_query",
         "mermaid_gen",
         "terraform_to_architecture_adf",
@@ -371,7 +377,10 @@
         "extract_requirements",
         "extract_test_plan",
         "log",
+        "write_agentic_source_review_plan",
+        "write_agentic_source_review_verification",
         "write_artifact",
+        "write_engineering_artifacts",
         "write_file"
       ]
     },

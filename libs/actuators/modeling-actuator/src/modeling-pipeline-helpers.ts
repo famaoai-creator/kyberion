@@ -14,6 +14,14 @@ import {
   buildGovernedRetryOptions,
   runGovernedCommand,
   classifyError,
+  analyzeSourceTree,
+  buildAgenticSourceReviewParticipants,
+  compileEngineeringArtifacts,
+  compileAgenticSourceReviewPlan,
+  validateAgenticSourceReviewPlan,
+  compileAgenticSourceReviewVerification,
+  validateAgenticSourceReviewVerification,
+  writeEngineeringArtifactBundle,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -227,6 +235,122 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
 
 async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   switch (op) {
+    case 'analyze_source_tree': {
+      const sourceRoot = String(resolve(params.source_root || params.dir || '.'));
+      return {
+        ...ctx,
+        [params.export_as || 'source_analysis_ir']: analyzeSourceTree({
+          sourceRoot,
+          maxFiles: params.max_files,
+        }),
+      };
+    }
+    case 'compile_engineering_artifacts': {
+      const analysis = ctx[params.from || 'source_analysis_ir'];
+      if (!analysis || analysis.kind !== 'source-analysis-ir') {
+        throw new Error('compile_engineering_artifacts requires source-analysis-ir');
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'engineering_artifacts']: compileEngineeringArtifacts({
+          analysis,
+          projectId: resolve(params.project_id || ctx.project_id || 'source-analysis'),
+          targetProvider: resolve(params.target_provider || ctx.target_provider || ''),
+        }),
+      };
+    }
+    case 'compile_agentic_source_review_plan': {
+      const analysis = ctx[params.from || 'source_analysis_ir'];
+      if (!analysis || analysis.kind !== 'source-analysis-ir') {
+        throw new Error('compile_agentic_source_review_plan requires source-analysis-ir');
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'agentic_source_review_plan']: compileAgenticSourceReviewPlan({
+          analysis,
+          projectId: resolve(params.project_id || ctx.project_id || 'source-analysis'),
+          threatModelApproved:
+            String(resolve(params.threat_model_approved ?? ctx.threat_model_approved ?? '')) ===
+            'true',
+          approvalRef: resolve(params.approval_ref || ctx.approval_ref || ''),
+          architectureRefs: Array.isArray(
+            resolve(params.architecture_refs || ctx.architecture_refs)
+          )
+            ? resolve(params.architecture_refs || ctx.architecture_refs)
+            : [],
+          sbomRefs: Array.isArray(resolve(params.sbom_refs || ctx.sbom_refs))
+            ? resolve(params.sbom_refs || ctx.sbom_refs)
+            : [],
+          threatIntelligenceRefs: Array.isArray(
+            resolve(params.threat_intelligence_refs || ctx.threat_intelligence_refs)
+          )
+            ? resolve(params.threat_intelligence_refs || ctx.threat_intelligence_refs)
+            : [],
+        }),
+      };
+    }
+    case 'build_agentic_source_review_participants': {
+      return {
+        ...ctx,
+        [params.export_as || 'review_participants']: buildAgenticSourceReviewParticipants({
+          tenantSlug: resolve(params.tenant_slug || ctx.tenant_slug),
+          projectId: resolve(params.project_id || ctx.project_id),
+          missionId: resolve(params.mission_id || ctx.mission_id),
+          outputTier: resolve(params.output_tier || ctx.output_tier || 'confidential'),
+          externalEgress: resolve(params.external_egress || ctx.external_egress || 'deny'),
+          externalEgressApproved:
+            String(
+              resolve(params.external_egress_approved ?? ctx.external_egress_approved ?? '')
+            ) === 'true',
+          allowedReasoningBackends: Array.isArray(
+            resolve(params.allowed_reasoning_backends || ctx.allowed_reasoning_backends)
+          )
+            ? resolve(params.allowed_reasoning_backends || ctx.allowed_reasoning_backends)
+            : [],
+        }),
+      };
+    }
+    case 'compile_agentic_source_review_verification': {
+      const analysis = ctx[params.analysis_from || 'source_analysis_ir'];
+      const plan = ctx[params.plan_from || 'agentic_source_review_plan'];
+      if (!analysis || analysis.kind !== 'source-analysis-ir') {
+        throw new Error('compile_agentic_source_review_verification requires source-analysis-ir');
+      }
+      if (!plan || plan.kind !== 'agentic-source-review-plan') {
+        throw new Error(
+          'compile_agentic_source_review_verification requires agentic-source-review-plan'
+        );
+      }
+      validateAgenticSourceReviewPlan(plan);
+      const candidates = ctx[params.candidates_from || 'review_hypotheses_verified'];
+      const knownFindingFingerprintsValue = resolve(
+        params.known_finding_fingerprints || ctx.known_finding_fingerprints
+      );
+      const knownFindingFingerprints = Array.isArray(knownFindingFingerprintsValue)
+        ? knownFindingFingerprintsValue
+        : [];
+      const currentScope = {
+        tenant_slug: String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim(),
+        project_id: String(resolve(params.project_id || ctx.project_id || plan.project_id)).trim(),
+        mission_id: String(resolve(params.mission_id || ctx.mission_id || '')).trim(),
+      };
+      const knownFindingScopeValue = resolve(params.known_finding_scope || ctx.known_finding_scope);
+      return {
+        ...ctx,
+        [params.export_as || 'agentic_source_review_verification']:
+          compileAgenticSourceReviewVerification({
+            analysis,
+            entryPoints: plan.threat_model.entry_points,
+            candidates,
+            knownFindingFingerprints,
+            scope: currentScope,
+            knownFindingScope:
+              knownFindingScopeValue && typeof knownFindingScopeValue === 'object'
+                ? knownFindingScopeValue
+                : undefined,
+          }),
+      };
+    }
     case 'ajv_validate':
       const validate = ajv.compile(ctx[params.schema_from || 'last_schema_data']);
       const valid = validate(ctx[params.data_from || 'last_capture_data']);
@@ -634,7 +758,126 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+
+  const assertMissionEvidenceOutput = (
+    outputDir: string,
+    missionId: string,
+    tenantSlug: string
+  ) => {
+    if (!missionId || !tenantSlug) {
+      throw new Error(
+        '[AGENTIC_SOURCE_REVIEW_MISSION_OUTPUT_REQUIRED] approved review artifacts require tenant_slug and mission_id'
+      );
+    }
+    const evidenceRoot = path.resolve(
+      pathResolver.missionDir(missionId, 'confidential', tenantSlug),
+      'evidence'
+    );
+    const outputPath = path.resolve(rootDir, outputDir);
+    const relativeToEvidence = path.relative(evidenceRoot, outputPath);
+    if (relativeToEvidence.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToEvidence)) {
+      throw new Error(
+        '[AGENTIC_SOURCE_REVIEW_MISSION_OUTPUT_REQUIRED] approved review artifacts must be written under the current tenant mission evidence directory'
+      );
+    }
+  };
+
   switch (op) {
+    case 'write_engineering_artifacts': {
+      const bundle = ctx[params.from || 'engineering_artifacts'];
+      if (!bundle || bundle.analysis_ir?.kind !== 'source-analysis-ir') {
+        throw new Error('write_engineering_artifacts requires engineering artifacts');
+      }
+      const outputDir = String(
+        resolve(params.output_dir || 'active/shared/tmp/source-engineering')
+      );
+      const relative = path
+        .relative(rootDir, path.resolve(rootDir, outputDir))
+        .replaceAll(path.sep, '/');
+      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+        throw new Error(
+          'write_engineering_artifacts output_dir must stay under active/shared/tmp or active/missions'
+        );
+      }
+      const outputs = writeEngineeringArtifactBundle(bundle, outputDir);
+      Object.assign(ctx, { [params.export_as || 'engineering_outputs']: outputs });
+      break;
+    }
+    case 'write_agentic_source_review_plan': {
+      const plan = ctx[params.from || 'agentic_source_review_plan'];
+      if (!plan || plan.kind !== 'agentic-source-review-plan') {
+        throw new Error('write_agentic_source_review_plan requires an agentic source review plan');
+      }
+      validateAgenticSourceReviewPlan(plan);
+      const outputDir = String(
+        resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
+      );
+      const relative = path
+        .relative(rootDir, path.resolve(rootDir, outputDir))
+        .replaceAll(path.sep, '/');
+      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+        throw new Error(
+          'write_agentic_source_review_plan output_dir must stay under active/shared/tmp or active/missions'
+        );
+      }
+      if (plan.threat_model.status === 'approved') {
+        const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
+        const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
+        assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
+      }
+      const outputPath = path.join(
+        path.resolve(rootDir, outputDir),
+        'agentic-source-review-plan.json'
+      );
+      if (!safeExistsSync(path.dirname(outputPath)))
+        safeMkdir(path.dirname(outputPath), { recursive: true });
+      safeWriteFile(outputPath, JSON.stringify(plan, null, 2));
+      return {
+        ...ctx,
+        [params.export_as || 'agentic_source_review_output']: path
+          .relative(rootDir, outputPath)
+          .replaceAll(path.sep, '/'),
+      };
+    }
+    case 'write_agentic_source_review_verification': {
+      const report = ctx[params.from || 'agentic_source_review_verification'];
+      if (!report || report.kind !== 'agentic-source-review-verification') {
+        throw new Error(
+          'write_agentic_source_review_verification requires an agentic source review verification report'
+        );
+      }
+      validateAgenticSourceReviewVerification(report);
+      const outputDir = String(
+        resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
+      );
+      const relative = path
+        .relative(rootDir, path.resolve(rootDir, outputDir))
+        .replaceAll(path.sep, '/');
+      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+        throw new Error(
+          'write_agentic_source_review_verification output_dir must stay under active/shared/tmp or active/missions'
+        );
+      }
+      const plan = ctx[params.plan_from || 'agentic_source_review_plan'];
+      if (plan?.threat_model?.status === 'approved') {
+        const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
+        const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
+        assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
+      }
+      const outputPath = path.join(
+        path.resolve(rootDir, outputDir),
+        'agentic-source-review-verification.json'
+      );
+      if (!safeExistsSync(path.dirname(outputPath)))
+        safeMkdir(path.dirname(outputPath), { recursive: true });
+      safeWriteFile(outputPath, JSON.stringify(report, null, 2));
+      return {
+        ...ctx,
+        [params.export_as || 'agentic_source_review_verification_output']: path
+          .relative(rootDir, outputPath)
+          .replaceAll(path.sep, '/'),
+      };
+    }
     case 'write_file':
     case 'write_artifact':
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
