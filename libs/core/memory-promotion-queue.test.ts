@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -267,5 +273,29 @@ describe('memory-promotion-queue', () => {
       if (originalOverride === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
       else process.env.KYBERION_MEMORY_QUEUE_PATH = originalOverride;
     }
+  });
+
+  it('updates every duplicate in one scope only when explicitly requested', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-TEST-ALL-DUPLICATES',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-ALL-DUPLICATES',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Reject every physical duplicate in this scope.',
+      evidenceRefs: ['artifact:ART-TEST-ALL-DUPLICATES'],
+      sensitivityTier: 'public',
+    });
+    enqueueMemoryPromotionCandidate(candidate);
+    safeAppendFileSync(queuePath, `${JSON.stringify(candidate)}\n`);
+
+    const updated = updateMemoryPromotionCandidateStatus({
+      candidateId: candidate.candidate_id,
+      status: 'rejected',
+      allMatching: true,
+    });
+    expect(updated?.status).toBe('rejected');
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.status === 'rejected')).toBe(true);
   });
 });
