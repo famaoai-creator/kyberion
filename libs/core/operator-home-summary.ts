@@ -127,6 +127,7 @@ export interface OperatorHomeSummary {
 }
 
 export interface OperatorHomeScopeFilter {
+  tiers?: Array<'personal' | 'confidential' | 'public'> | 'all';
   tenantSlugs?: string[] | 'all';
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
@@ -138,10 +139,11 @@ function scopeAllows(allowed: string[] | 'all' | undefined, value: string | unde
 }
 
 function missionMatchesScope(
-  mission: Pick<OperatorHomeMissionItem, 'tenantSlug' | 'organizationId' | 'projectId'>,
+  mission: Pick<OperatorHomeMissionItem, 'tier' | 'tenantSlug' | 'organizationId' | 'projectId'>,
   scope?: OperatorHomeScopeFilter
 ): boolean {
   return (
+    scopeAllows(scope?.tiers, mission.tier) &&
     scopeAllows(scope?.tenantSlugs, mission.tenantSlug) &&
     scopeAllows(scope?.organizationIds, mission.organizationId) &&
     scopeAllows(scope?.projectIds, mission.projectId)
@@ -270,7 +272,7 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
           const projectId = state.project_id || state.relationships?.project?.project_id;
           if (
             !missionMatchesScope(
-              { tenantSlug: state.tenant_slug, organizationId, projectId },
+              { tier: state.tier, tenantSlug: state.tenant_slug, organizationId, projectId },
               scope
             )
           ) {
@@ -487,9 +489,12 @@ export function collectOperatorHomeSummary(
   const scopedMissionIds = new Set(missionItems.map((mission) => mission.missionId.toUpperCase()));
   const isScoped = Boolean(
     input.scope &&
-    [input.scope.tenantSlugs, input.scope.organizationIds, input.scope.projectIds].some((allowed) =>
-      Array.isArray(allowed)
-    )
+    [
+      input.scope.tiers,
+      input.scope.tenantSlugs,
+      input.scope.organizationIds,
+      input.scope.projectIds,
+    ].some((allowed) => Array.isArray(allowed))
   );
   const approvalMatchesScope = (approval: OperatorHomeApprovalItem): boolean => {
     if (!input.scope || !isScoped) return true;
@@ -497,9 +502,13 @@ export function collectOperatorHomeSummary(
     const missionId =
       scope?.mission_id || approval.requestedByContext?.missionId || approval.steering?.missionId;
     const tenantSlug = scope?.tenant_slug;
+    const tier = scope?.tier;
     const organizationId = scope?.organization_id;
     const projectId = scope?.project_id;
-    if (scope?.tenant_slug || scope?.organization_id || scope?.project_id) {
+    if (scope?.tier || scope?.tenant_slug || scope?.organization_id || scope?.project_id) {
+      if (Array.isArray(input.scope.tiers) && !scopeAllows(input.scope.tiers, tier)) {
+        return Boolean(missionId && scopedMissionIds.has(missionId.toUpperCase()));
+      }
       return (
         scopeAllows(input.scope.tenantSlugs, tenantSlug) &&
         scopeAllows(input.scope.organizationIds, organizationId) &&
@@ -510,6 +519,10 @@ export function collectOperatorHomeSummary(
   };
   const inboxMatchesScope = (entry: DeliverableInboxEntry): boolean => {
     if (!input.scope || !isScoped) return true;
+    if (Array.isArray(input.scope.tiers)) {
+      if (!entry.mission_id) return false;
+      if (!scopedMissionIds.has(entry.mission_id.toUpperCase())) return false;
+    }
     if (!scopeAllows(input.scope.tenantSlugs, entry.tenant_slug)) return false;
     if (Array.isArray(input.scope.organizationIds) || Array.isArray(input.scope.projectIds)) {
       return Boolean(entry.mission_id && scopedMissionIds.has(entry.mission_id.toUpperCase()));
