@@ -187,17 +187,17 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
   if (audit.status === 'missing_ref') {
     blockers.push({
       code: 'missing_audit_ref',
-      detail: '候補に監査参照がありません。新しい governed enqueue が必要です。',
+      detail: 'The candidate has no audit reference; enqueue it through the governed path again.',
     });
   } else if (audit.status === 'missing_entry') {
     blockers.push({
       code: 'missing_audit_entry',
-      detail: `監査エントリ ${audit.audit_id} が現在のaudit chainにありません。`,
+      detail: `Audit entry ${audit.audit_id} is not present in the current audit chain.`,
     });
   } else if (audit.status === 'tenant_mismatch') {
     blockers.push({
       code: 'audit_tenant_mismatch',
-      detail: `監査エントリのtenant (${audit.tenant_slug || 'なし'}) が候補scopeと一致しません。`,
+      detail: `The audit tenant (${audit.tenant_slug || 'none'}) does not match the candidate scope.`,
     });
   }
 
@@ -205,7 +205,7 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
   if (missingEvidence.length > 0) {
     blockers.push({
       code: 'missing_evidence',
-      detail: `evidence ${missingEvidence.length}件の参照先が存在しません。`,
+      detail: `${missingEvidence.length} evidence reference(s) are missing.`,
     });
   }
 
@@ -213,10 +213,12 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
     if (candidate.sensitivity_tier === 'confidential') {
       blockers.push({
         code: 'missing_tenant_scope',
-        detail: 'confidential候補にtenant scopeがありません。',
+        detail: 'A confidential candidate must include a tenant scope.',
       });
     } else {
-      warnings.push('legacy候補: scope envelopeがありません。公開前に由来を確認してください。');
+      warnings.push(
+        'Legacy candidate without a scope envelope; verify provenance before publication.'
+      );
     }
   } else {
     try {
@@ -232,13 +234,13 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
   if (group.length > 1) {
     blockers.push({
       code: 'duplicate_records',
-      detail: `同じcandidate/scopeの物理レコードが${group.length}件あります。`,
+      detail: `${group.length} physical records share the same candidate and scope.`,
     });
   }
   if (recordConflicts.length > 0) {
     blockers.push({
       code: 'conflicting_records',
-      detail: `重複レコードの内容が一致しません: ${recordConflicts.join(', ')}`,
+      detail: `Duplicate records disagree on: ${recordConflicts.join(', ')}`,
     });
   }
 
@@ -246,7 +248,7 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
     !candidate.source_ref.startsWith('mission:') &&
     !candidate.source_ref.startsWith('task_session:')
   ) {
-    warnings.push('legacy source_ref: source_refに種別prefixがありません。');
+    warnings.push('Legacy source_ref without a type prefix.');
   }
 
   const statuses = Array.from(new Set(group.map((row) => row.status)));
