@@ -47,6 +47,7 @@ import { WorkItemsWorkspace } from '../components/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../components/SurfaceControlWorkspace';
 import { OrganizationOperatingModel } from '../components/OrganizationOperatingModel';
 import { CloudflareOsPanel } from '../components/CloudflareOsPanel';
+import { HeadlessA2UIWorkspace } from '../components/HeadlessA2UIWorkspace';
 import { ApprovalsWorkspace } from '../components/ApprovalsWorkspace';
 import { DeliverablesWorkspace } from '../components/DeliverablesWorkspace';
 import { KnowledgeWorkspace } from '../components/KnowledgeWorkspace';
@@ -3393,16 +3394,23 @@ function ChronosMirrorV2Content() {
                     }
                   />
                 ) : (
-                  <MissionIntelligence
-                    tenant={tenant}
-                    focusedView={missionIntelligenceFocus}
-                    hideSurfaceControl
-                    onClearFocus={() => {
-                      setMissionIntelligenceFocus(null);
-                      setMissionIntelligenceFocusedMissionId(null);
-                    }}
-                    focusedMissionId={missionIntelligenceFocusedMissionId}
-                  />
+                  <div className="flex flex-col gap-6">
+                    <MissionIntelligence
+                      tenant={tenant}
+                      focusedView={missionIntelligenceFocus}
+                      hideSurfaceControl
+                      onClearFocus={() => {
+                        setMissionIntelligenceFocus(null);
+                        setMissionIntelligenceFocusedMissionId(null);
+                      }}
+                      focusedMissionId={missionIntelligenceFocusedMissionId}
+                    />
+                    <HeadlessA2UIWorkspace
+                      tenant={tenant || undefined}
+                      organizationId={organizationId || undefined}
+                      projectId={projectId || undefined}
+                    />
+                  </div>
                 )}
               </div>
             </section>
