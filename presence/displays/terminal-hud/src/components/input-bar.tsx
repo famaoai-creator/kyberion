@@ -41,6 +41,7 @@ export function InputBar({ focused, value, onChange, onSubmit, busy, voiceState 
           placeholder={tr('tui:tui_input_placeholder')}
         />
       )}
+      <Text dimColor> · {tr('tui:tui_cockpit_input_hint')}</Text>
     </Box>
   );
 }

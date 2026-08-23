@@ -1,4 +1,5 @@
 import { classifyTaskSessionIntent } from './task-session.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
   resolveSurfaceConversationReceiverForProvider,
@@ -137,7 +138,6 @@ export function shouldCompileSurfaceIntent(
   routingText: string,
   ruleBasedReceiver?: SurfaceDelegationReceiver
 ): boolean {
-  if (input.forcedReceiver || ruleBasedReceiver) return false;
   const originalText = (input.surfaceText || input.query || '').trim();
   const normalized = routingText.trim();
   if (!normalized || !originalText) return false;
@@ -147,6 +147,38 @@ export function shouldCompileSurfaceIntent(
   ) {
     return false;
   }
-  if (classifyTaskSessionIntent(originalText)) return true;
+  // Presence already owns an explicit receiver route that must remain a
+  // direct A2A handoff. Other surfaces still pass forced receivers through
+  // the shared compiler so a caller cannot bypass governed classification.
+  if (input.agentId === 'presence-surface-agent' && ruleBasedReceiver) return false;
+  const packet = resolveIntentResolutionPacket(originalText, {
+    tier: input.scope?.tier,
+    tenantId: input.scope?.tenant_slug,
+  });
+  const selectedShape = packet.selected_resolution?.shape;
+  const governedShape =
+    selectedShape === 'task_session' ||
+    selectedShape === 'mission' ||
+    selectedShape === 'project_bootstrap' ||
+    selectedShape === 'pipeline';
+  const approvalIntent = packet.candidates.some(
+    (candidate) =>
+      candidate.intent_id === packet.selected_intent_id &&
+      candidate.resolution?.result_shape === 'plan'
+  );
+  const confidentGovernedIntent = (packet.selected_confidence || 0) >= 0.8 && governedShape;
+
+  // Lightweight direct replies can keep their deterministic route. Governed
+  // shapes, unresolved requests, and approval-ready plans must pass through
+  // the shared compiler before any surface-specific delegation is selected.
+  if (!packet.selected_intent_id) return true;
+  if (
+    confidentGovernedIntent ||
+    ((packet.selected_confidence || 0) >= 0.8 && approvalIntent) ||
+    classifyTaskSessionIntent(originalText)
+  ) {
+    return true;
+  }
+  if (ruleBasedReceiver) return false;
   return originalText.length > 80 || originalText.includes('\n');
 }
