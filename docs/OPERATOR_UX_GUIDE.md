@@ -180,6 +180,29 @@ Typical service presets include:
 - `notion`
 - `jira`
 
+### Memory promotion review
+
+The promotion queue is a review lane, not an automatic publish queue. Use the
+candidate review before approving anything:
+
+```bash
+node --import ./scripts/ts-loader.mjs scripts/mission_controller.ts memory-queue queued
+node --import ./scripts/ts-loader.mjs scripts/mission_controller.ts memory-review <CANDIDATE_ID>
+```
+
+`memory-review` shows the proposed knowledge, target path, tier and tenant
+scope, evidence presence, audit status, and physical duplicate count.
+`memory-approve` is blocked while any of those checks has a blocker. Approval
+only changes the candidate to `approved`; `memory-promote` is the separate
+operation that writes governed knowledge. Resolve every `HOLD` before using
+`memory-promote-pending`.
+
+When a candidate has duplicate physical records, `memory-reject` also stops by
+default. After confirming the same candidate and tenant scope, use
+`memory-reject <CANDIDATE_ID> --tenant-slug <SLUG> --all-duplicates` to reject
+all matching records together; approval and promotion never bypass the
+duplicate blocker.
+
 Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
 
 Use `pnpm surfaces:repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.

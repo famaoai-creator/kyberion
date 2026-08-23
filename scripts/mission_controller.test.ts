@@ -213,6 +213,20 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['memory-promote', 'MEM-123']);
   });
 
+  it('treats memory review selectors as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'memory-review',
+      'MEM-123',
+      '--tenant-slug',
+      'acme-corp',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['memory-review', 'MEM-123']);
+  });
+
   it('treats memory bulk promotion flags as named options', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',

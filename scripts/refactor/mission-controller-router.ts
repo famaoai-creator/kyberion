@@ -129,13 +129,20 @@ export interface MissionControllerRoutingContext {
   dispatchNextMission: () => Awaitable<void>;
   acceptRubricOverride: (id: string, reason?: string, severity?: string) => void;
   listMemoryQueue: (filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') => void;
-  approveMemoryCandidate: (candidateId: string, note?: string) => void;
-  rejectMemoryCandidate: (candidateId: string, note?: string) => void;
+  showMemoryReview: (candidateId: string, tenantSlug?: string, jsonOutput?: boolean) => void;
+  approveMemoryCandidate: (candidateId: string, note?: string, tenantSlug?: string) => void;
+  rejectMemoryCandidate: (
+    candidateId: string,
+    note?: string,
+    tenantSlug?: string,
+    allDuplicates?: boolean
+  ) => void;
   promoteMemoryCandidate: (
     candidateId: string,
     executionRole?: 'mission_controller' | 'chronos_gateway',
     note?: string,
-    supersedes?: string
+    supersedes?: string,
+    tenantSlug?: string
   ) => void;
   promotePendingMemoryCandidates: (input: {
     executionRole?: 'mission_controller' | 'chronos_gateway';
@@ -776,11 +783,27 @@ export async function runMissionControllerAction(
     case 'memory-queue':
       context.listMemoryQueue(arg1 as any);
       break;
+    case 'memory-review':
+      context.showMemoryReview(
+        arg1!,
+        getValue('--tenant-slug', context.argv),
+        context.argv.includes('--json')
+      );
+      break;
     case 'memory-approve':
-      context.approveMemoryCandidate(arg1!, getValue('--note', context.argv));
+      context.approveMemoryCandidate(
+        arg1!,
+        getValue('--note', context.argv),
+        getValue('--tenant-slug', context.argv)
+      );
       break;
     case 'memory-reject':
-      context.rejectMemoryCandidate(arg1!, getValue('--note', context.argv));
+      context.rejectMemoryCandidate(
+        arg1!,
+        getValue('--note', context.argv),
+        getValue('--tenant-slug', context.argv),
+        context.argv.includes('--all-duplicates')
+      );
       break;
     case 'memory-promote':
       await context.promoteMemoryCandidate(
@@ -788,7 +811,8 @@ export async function runMissionControllerAction(
         (getValue('--execution-role', context.argv) as 'mission_controller' | 'chronos_gateway') ||
           'mission_controller',
         getValue('--note', context.argv),
-        getValue('--supersedes', context.argv)
+        getValue('--supersedes', context.argv),
+        getValue('--tenant-slug', context.argv)
       );
       break;
     case 'memory-promote-pending':

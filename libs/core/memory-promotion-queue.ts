@@ -150,6 +150,11 @@ function resolveScopeKey(scope?: MemoryScopeEnvelope): string {
   });
 }
 
+/** Stable identity used when comparing or updating physical queue records. */
+export function memoryPromotionScopeKey(scope?: MemoryScopeEnvelope): string {
+  return resolveScopeKey(scope);
+}
+
 function normalizeOccurrenceCount(value: unknown): number {
   const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
   return Math.max(1, count);
@@ -377,43 +382,84 @@ export function updateMemoryPromotionCandidateStatus(input: {
   ratificationNote?: string;
   promotedRef?: string;
   scope?: MemoryScopeEnvelope;
+  /** Update every physical duplicate in the selected scope. */
+  allMatching?: boolean;
 }): MemoryCandidate | null {
+  const requestedScopeKey = input.scope ? resolveScopeKey(input.scope) : undefined;
   const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
-  const matchingQueuePaths = candidateQueuePath
-    ? [candidateQueuePath]
-    : queuePathsForAllScopes().filter((candidatePath) => {
-        if (!safeExistsSync(candidatePath)) return false;
-        const rows = parseJsonl(safeReadFile(candidatePath, { encoding: 'utf8' }) as string);
-        return rows.some((row) => row.candidate_id === input.candidateId);
-      });
-  if (!candidateQueuePath && matchingQueuePaths.length > 1) {
+  const candidatePaths = input.allMatching
+    ? queuePathsForAllScopes()
+    : candidateQueuePath
+      ? [candidateQueuePath]
+      : queuePathsForAllScopes();
+  const matchingQueuePaths = candidatePaths.filter((candidatePath) => {
+    if (!safeExistsSync(candidatePath)) return false;
+    const rows = parseJsonl(safeReadFile(candidatePath, { encoding: 'utf8' }) as string);
+    return rows.some(
+      (row) =>
+        row.candidate_id === input.candidateId &&
+        (!requestedScopeKey || resolveScopeKey(row.scope) === requestedScopeKey)
+    );
+  });
+  if (!input.allMatching && !candidateQueuePath && matchingQueuePaths.length > 1) {
     throw new Error(
       `[MEMORY_PROMOTION_AMBIGUOUS] candidate '${input.candidateId}' exists in multiple scope queues; provide scope`
     );
   }
-  const queuePath = matchingQueuePaths[0];
-  if (!queuePath || !safeExistsSync(queuePath)) return null;
-  const rows = parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string);
-  const index = rows.findIndex((row) => row.candidate_id === input.candidateId);
-  if (index < 0) return null;
-  const current = rows[index] as MemoryCandidate;
-  const next: MemoryCandidate = {
-    ...current,
-    status: input.status,
-    ...(input.status === 'approved' || input.status === 'promoted'
-      ? { ratified_at: new Date().toISOString() }
-      : {}),
-    ...(input.ratificationNote ? { ratification_note: input.ratificationNote.trim() } : {}),
-    ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
-  };
-  const validation = validateMemoryPromotionCandidate(next);
-  if (!validation.valid) {
-    throw new Error(`Invalid memory promotion candidate update: ${validation.errors.join('; ')}`);
+  if (input.allMatching && !requestedScopeKey) {
+    const matched = matchingQueuePaths.flatMap((queuePath) =>
+      parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string).filter(
+        (row) => row.candidate_id === input.candidateId
+      )
+    );
+    const scopeKeys = new Set(matched.map((row) => resolveScopeKey(row.scope)));
+    if (scopeKeys.size > 1) {
+      throw new Error(
+        `[MEMORY_PROMOTION_AMBIGUOUS] candidate '${input.candidateId}' exists in multiple scopes; provide scope`
+      );
+    }
   }
-  rows[index] = next;
-  ensureQueueDir(queuePath);
-  safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
-  return next;
+  if (matchingQueuePaths.length === 0) return null;
+
+  let firstUpdated: MemoryCandidate | null = null;
+  const ratifiedAt = new Date().toISOString();
+  for (const queuePath of matchingQueuePaths) {
+    const rows = parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string);
+    let changed = false;
+    for (let index = 0; index < rows.length; index += 1) {
+      const current = rows[index] as MemoryCandidate;
+      if (
+        current.candidate_id !== input.candidateId ||
+        (requestedScopeKey && resolveScopeKey(current.scope) !== requestedScopeKey)
+      ) {
+        continue;
+      }
+      const next: MemoryCandidate = {
+        ...current,
+        status: input.status,
+        ...(input.status === 'approved' || input.status === 'promoted'
+          ? { ratified_at: ratifiedAt }
+          : {}),
+        ...(input.ratificationNote ? { ratification_note: input.ratificationNote.trim() } : {}),
+        ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
+      };
+      const validation = validateMemoryPromotionCandidate(next);
+      if (!validation.valid) {
+        throw new Error(
+          `Invalid memory promotion candidate update: ${validation.errors.join('; ')}`
+        );
+      }
+      rows[index] = next;
+      firstUpdated ||= next;
+      changed = true;
+      if (!input.allMatching) break;
+    }
+    if (changed) {
+      ensureQueueDir(queuePath);
+      safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    }
+  }
+  return firstUpdated;
 }
 
 export function queueMissionMemoryPromotionCandidate(input: {
