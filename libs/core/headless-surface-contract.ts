@@ -7,7 +7,7 @@
 
 export const HEADLESS_API_VERSION = '1' as const;
 
-export type HeadlessSurfaceId = 'chronos';
+export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio';
 export type HeadlessViewerRole = 'readonly' | 'localadmin';
 export type HeadlessOperationEffect = 'read' | 'write';
 
@@ -209,6 +209,7 @@ export function availableHeadlessOperationIds(
 }
 
 export function createHeadlessEnvelope<T>(input: {
+  surface?: HeadlessSurfaceId;
   resource: string;
   data: T;
   scope: HeadlessViewerScope;
@@ -219,7 +220,7 @@ export function createHeadlessEnvelope<T>(input: {
   return {
     ok: true,
     api_version: HEADLESS_API_VERSION,
-    surface: 'chronos',
+    surface: input.surface || 'chronos',
     resource: input.resource,
     generated_at: input.generatedAt || new Date().toISOString(),
     scope: input.scope,

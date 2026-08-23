@@ -23,8 +23,17 @@ import {
   presenceStudioVoiceSelectionSchema,
   presenceStudioVoiceStimulusSchema,
   resolvePresenceStudioViewerContext,
+  presenceStudioHeadlessScope,
+  narrowPresenceStudioTenant,
   validateLocalServiceUrl,
 } from './security.js';
+import {
+  buildPresenceHeadlessManifest,
+  buildPresenceOverviewA2UI,
+  presenceAvailableOperations,
+  presenceEnvelope,
+  readPresenceHeadlessOverview,
+} from './headless.js';
 import {
   buildPresenceSurfaceFrame,
   CloudflareOsSurface,
@@ -100,6 +109,10 @@ import { collectDoctorReport } from '../../../scripts/run_doctor.js';
 installProcessGuards('presence-studio');
 
 type Client = express.Response;
+
+function safeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 interface SurfaceSnapshot {
   catalogId?: string;
@@ -477,6 +490,65 @@ function rememberStimulus(stimulus: Record<string, unknown>): void {
   state.recentStimuli.push(stimulus);
   state.recentStimuli = state.recentStimuli.slice(-20);
   state.lastUpdatedAt = new Date().toISOString();
+}
+
+const A2UI_SURFACE_ID = /^[a-z0-9][a-z0-9:_-]{0,80}$/u;
+const A2UI_COMPONENT_TYPE = /^[a-z0-9][a-z0-9:._-]{0,80}$/u;
+
+function validateA2UIMessage(value: unknown): A2UIMessage {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('A2UI message must be an object.');
+  }
+  const message = value as Record<string, unknown>;
+  const operations = [
+    'createSurface',
+    'updateComponents',
+    'updateDataModel',
+    'deleteSurface',
+  ].filter((key) => message[key] !== undefined);
+  if (operations.length !== 1) throw new Error('A2UI message must contain exactly one operation.');
+
+  const operation = message[operations[0]];
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
+    throw new Error(`A2UI ${operations[0]} payload must be an object.`);
+  }
+  const payload = operation as Record<string, unknown>;
+  const surfaceId = payload.surfaceId;
+  if (typeof surfaceId !== 'string' || !A2UI_SURFACE_ID.test(surfaceId)) {
+    throw new Error('A2UI surfaceId is invalid.');
+  }
+  if (operations[0] === 'createSurface') {
+    if (typeof payload.catalogId !== 'string' || !A2UI_SURFACE_ID.test(payload.catalogId)) {
+      throw new Error('A2UI catalogId is invalid.');
+    }
+    if (payload.title !== undefined && typeof payload.title !== 'string') {
+      throw new Error('A2UI title must be a string.');
+    }
+  }
+  if (operations[0] === 'updateComponents') {
+    if (!Array.isArray(payload.components)) throw new Error('A2UI components must be an array.');
+    for (const component of payload.components) {
+      if (!component || typeof component !== 'object' || Array.isArray(component)) {
+        throw new Error('A2UI component must be an object.');
+      }
+      const item = component as Record<string, unknown>;
+      if (typeof item.id !== 'string' || !A2UI_SURFACE_ID.test(item.id)) {
+        throw new Error('A2UI component id is invalid.');
+      }
+      if (typeof item.type !== 'string' || !A2UI_COMPONENT_TYPE.test(item.type)) {
+        throw new Error('A2UI component type is invalid.');
+      }
+      if (!item.props || typeof item.props !== 'object' || Array.isArray(item.props)) {
+        throw new Error('A2UI component props must be an object.');
+      }
+    }
+  }
+  if (operations[0] === 'updateDataModel') {
+    if (!payload.data || typeof payload.data !== 'object' || Array.isArray(payload.data)) {
+      throw new Error('A2UI data model must be an object.');
+    }
+  }
+  return value as A2UIMessage;
 }
 
 function applyA2UIMessage(message: A2UIMessage): void {
@@ -866,6 +938,58 @@ app.post(
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
 app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
+
+app.get('/api/headless/manifest', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    res.json({
+      ok: true,
+      manifest: buildPresenceHeadlessManifest(),
+      viewer: {
+        scope: presenceStudioHeadlessScope(viewer),
+        available_operations: presenceAvailableOperations(viewer),
+      },
+    });
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+  }
+});
+
+app.get('/api/headless/overview', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
+    const scopedViewer = { ...viewer, tenantSlugs: scoped };
+    res.json(
+      presenceEnvelope('overview', readPresenceHeadlessOverview(scopedViewer), scopedViewer)
+    );
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+  }
+});
+
+app.get('/api/headless/a2ui/overview', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
+    const scopedViewer = { ...viewer, tenantSlugs: scoped };
+    const overview = readPresenceHeadlessOverview(scopedViewer);
+    res.json(
+      presenceEnvelope(
+        'overview',
+        { source_resource: 'overview', a2ui: buildPresenceOverviewA2UI(overview) },
+        scopedViewer
+      )
+    );
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
+  }
+});
 
 app.get('/onboarding', (_req, res) => {
   res.sendFile(path.join(staticDir, 'onboarding.html'));
@@ -1753,8 +1877,21 @@ app.post('/a2ui/dispatch', (req, res) => {
       body_kind: Array.isArray(body) ? 'array' : typeof body,
     })
   );
-  for (const message of messages) {
-    applyA2UIMessage(message as A2UIMessage);
+  try {
+    for (const message of messages) {
+      applyA2UIMessage(validateA2UIMessage(message));
+    }
+  } catch (error) {
+    logger.warn(
+      presenceStudioAuditLine(req, 'a2ui/dispatch.reject', {
+        messages: messages.length,
+        status: 400,
+        error: safeErrorMessage(error),
+      })
+    );
+    return res
+      .status(400)
+      .json({ ok: false, error: safeErrorMessage(error) || 'Invalid A2UI message.' });
   }
   emitState();
   logger.info(

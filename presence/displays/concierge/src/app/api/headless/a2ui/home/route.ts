@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseConciergeLimit, readConciergeHome } from '../../../lib/headless-projections';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import {
+  buildConciergeHomeA2UI,
+  conciergeEnvelope,
+  parseConciergeLimit,
+  readConciergeHome,
+} from '../../../../../lib/headless-projections';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +19,13 @@ export function GET(req: NextRequest) {
       projectId: req.nextUrl.searchParams.get('project_id'),
       limit: parseConciergeLimit(req.nextUrl.searchParams.get('limit')),
     });
-    return NextResponse.json({ ok: true, summary });
+    return NextResponse.json(
+      conciergeEnvelope(
+        'home',
+        { source_resource: 'home', a2ui: buildConciergeHomeA2UI(summary) },
+        resolved.context
+      )
+    );
   } catch (error) {
     return conciergeErrorResponse(error);
   }

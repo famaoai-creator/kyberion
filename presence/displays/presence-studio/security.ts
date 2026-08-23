@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { logger } from '@agent/core';
+import { isValidTenantSlug, logger } from '@agent/core';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -129,7 +129,11 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   if (process.env.PRESENCE_STUDIO_ALLOW_REMOTE === 'true') {
     const token = getPresenceStudioAuthToken();
     if (!token) {
-      return { ok: true, status: 200, reason: 'remote_allowed' };
+      return {
+        ok: false,
+        status: 401,
+        reason: 'Remote access requires PRESENCE_STUDIO_TOKEN or KYBERION_API_TOKEN.',
+      };
     }
     const presented = extractPresenceStudioToken(req);
     if (presented === token) {
@@ -167,6 +171,56 @@ export interface PresenceStudioViewerContext {
   principalId: string;
   tenantSlugs: string[] | 'all';
   source: 'loopback' | 'token';
+}
+
+export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
+  return {
+    role: viewer.source === 'loopback' ? ('localadmin' as const) : ('readonly' as const),
+    principal_id: viewer.principalId,
+    tenant_slugs: viewer.tenantSlugs,
+    organization_ids: 'all' as const,
+    project_ids: 'all' as const,
+    tier_access:
+      viewer.source === 'loopback'
+        ? ['personal', 'confidential', 'public']
+        : ['confidential', 'public'],
+  };
+}
+
+function recordTenant(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const direct = record.tenant_slug;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  for (const key of ['scope', 'project', 'project_context', 'requestedByContext', 'context']) {
+    const nested = recordTenant(record[key]);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+/** Unknown tenant records are denied for a scoped remote viewer. */
+export function presenceStudioRecordInScope(
+  viewer: PresenceStudioViewerContext,
+  value: unknown
+): boolean {
+  if (viewer.tenantSlugs === 'all') return true;
+  const tenant = recordTenant(value);
+  return Boolean(tenant && viewer.tenantSlugs.includes(tenant));
+}
+
+export function narrowPresenceStudioTenant(
+  viewer: PresenceStudioViewerContext,
+  requested?: string
+): string[] | 'all' {
+  const tenant = requested?.trim() || undefined;
+  if (tenant && !isValidTenantSlug(tenant)) {
+    throw new PresenceStudioViewerError(403, `invalid viewer tenant scope: ${tenant}`);
+  }
+  if (tenant && viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(tenant)) {
+    throw new PresenceStudioViewerError(403, `viewer tenant scope denied: ${tenant}`);
+  }
+  return tenant ? [tenant] : viewer.tenantSlugs;
 }
 
 export class PresenceStudioViewerError extends Error {
@@ -224,6 +278,16 @@ export function requirePresenceStudioAccess(): RequestHandler {
         `[presence-studio][auth] denied method=${String(req.method || 'UNKNOWN').toUpperCase()} path=${String(req.path || req.url || '')} client=${getPresenceStudioClientAddress(req)} status=${auth.status} reason=${auth.reason}`
       );
       return res.status(auth.status).json({ ok: false, error: auth.reason });
+    }
+    const remote = !isLoopbackAddress(getPresenceStudioClientAddress(req));
+    const path = String(req.originalUrl || req.url || '');
+    const remoteSafe = path.startsWith('/api/headless/') || path.startsWith('/api/os/');
+    if (remote && auth.reason === 'token' && !remoteSafe) {
+      return res.status(403).json({
+        ok: false,
+        error:
+          'Remote Presence Studio access is limited to scoped headless and OS control-plane APIs.',
+      });
     }
     return next();
   };
