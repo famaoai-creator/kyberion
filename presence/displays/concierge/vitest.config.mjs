@@ -8,6 +8,10 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@agent\/core$/, replacement: resolve(here, '../../../libs/core/index.ts') },
+      {
+        find: /^@agent\/core\/(.+)$/,
+        replacement: resolve(here, '../../../libs/core/$1.ts'),
+      },
       { find: '@', replacement: resolve(here, 'src') },
     ],
   },

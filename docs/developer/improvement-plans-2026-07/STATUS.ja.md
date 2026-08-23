@@ -27,6 +27,14 @@
 | ---------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05](./VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05.ja.md) | PARTIAL | ViewerContext、server-side tenant scope、既存 Organization Operating Model view の scoped read、work item tenant filter、Chronos 全 API route の viewer contract、middleware、loopback 固定、Computer Surface / supervisor guard、`KYBERION_VIEWER_SCOPE` 段階導入、運用文書を実装。IdP と隣接 inbound bridge は計画外。残りは warn 期間の audit 観測、enforce モードの全 route/core 回帰確認、既定値の単独コミット切替。 |
 
+### Surface / Tenant Scoped RBAC 認可（2026-08-24）
+
+正本: [SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24](../improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md)
+
+| 計画                              | 状態 | 実装状況                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface / Tenant Scoped RBAC 認可 | DONE | 共通 `SurfaceAuthorizationContext` / permission evaluator、headless `required_permissions`、Chronos / Concierge / Presence の manifest・envelope・headless route 接続、tenant/org/project/tier の fail-closed 判定と回帰テストを実装。SaaS の hosted account management、IdP/SSO、billing、公開 API/SDK は引き続き対象外。 |
+
 ### CN(Claude ネイティブ・サブエージェント委譲、2026-08-12)
 
 正本: [CLAUDE_NATIVE_SUBAGENT_PLAN_2026-08-12.ja.md](../improvement-plans-2026-08/CLAUDE_NATIVE_SUBAGENT_PLAN_2026-08-12.ja.md)(CT-05 の Claude 側続き)

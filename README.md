@@ -171,7 +171,7 @@ For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md)
 
 The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists. See `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list.
 
-Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. Implementation status per improvement plan is tracked in the canonical ledger: [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md).
+Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, shared operation permissions, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. The scoped RBAC boundary is documented in [`SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md`](./docs/developer/improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md), and implementation status per improvement plan is tracked in the canonical ledger: [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md).
 
 ---
 
