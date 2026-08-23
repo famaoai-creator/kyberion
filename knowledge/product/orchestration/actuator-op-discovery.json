@@ -993,6 +993,10 @@
           "kind": "capture"
         },
         {
+          "op": "run_tests",
+          "kind": "capture"
+        },
+        {
           "op": "semgrep_scan",
           "kind": "capture"
         },
@@ -2266,6 +2270,26 @@
           "kind": "transform"
         },
         {
+          "op": "analyze_source_tree",
+          "kind": "transform"
+        },
+        {
+          "op": "build_agentic_source_review_participants",
+          "kind": "transform"
+        },
+        {
+          "op": "compile_agentic_source_review_plan",
+          "kind": "transform"
+        },
+        {
+          "op": "compile_agentic_source_review_verification",
+          "kind": "transform"
+        },
+        {
+          "op": "compile_engineering_artifacts",
+          "kind": "transform"
+        },
+        {
           "op": "test_inventory_to_browser_pipeline",
           "kind": "transform"
         },
@@ -2311,6 +2335,18 @@
         },
         {
           "op": "extract_test_plan",
+          "kind": "apply"
+        },
+        {
+          "op": "write_engineering_artifacts",
+          "kind": "apply"
+        },
+        {
+          "op": "write_agentic_source_review_plan",
+          "kind": "apply"
+        },
+        {
+          "op": "write_agentic_source_review_verification",
           "kind": "apply"
         },
         {

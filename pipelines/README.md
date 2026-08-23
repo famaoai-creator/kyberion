@@ -118,14 +118,31 @@ Rules of thumb:
 
 ### Verification
 
-| Pipeline                  | Description                                                                                                                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verify-discovery-ops`    | Verify provider discovery and op registry                                                                                                                                                |
-| `verify-session`          | Verify surface session lifecycle                                                                                                                                                         |
-| `verify-session-fallback` | Verify session fallback behaviour                                                                                                                                                        |
-| `service-lifecycle-smoke` | Service start/stop/health smoke test                                                                                                                                                     |
-| `orchestration-jobs`      | Run scheduled orchestration batch                                                                                                                                                        |
-| `ai-audit`                | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend) |
+| Pipeline                     | Description                                                                                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `verify-discovery-ops`       | Verify provider discovery and op registry                                                                                                                                                        |
+| `verify-session`             | Verify surface session lifecycle                                                                                                                                                                 |
+| `verify-session-fallback`    | Verify session fallback behaviour                                                                                                                                                                |
+| `service-lifecycle-smoke`    | Service start/stop/health smoke test                                                                                                                                                             |
+| `orchestration-jobs`         | Run scheduled orchestration batch                                                                                                                                                                |
+| `ai-audit`                   | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend)         |
+| `agentic-source-code-review` | Threat-model-first source review: deterministic reconnaissance/rule selection, human approval gate, scoped multi-perspective hypotheses, independent critique, and human-only validation handoff |
+
+### Source Engineering
+
+| Pipeline                          | Description                                                                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source-to-engineering-artifacts` | Analyze a workspace source tree and emit an evidence-backed design document, test inventory, safe test scenario pipeline, and proposal-only IaC artifacts under governed active storage.                  |
+| `agentic-source-code-review`      | Generate a threat-model plan first; only after explicit human approval does it run scoped static analysis, multi-perspective hypotheses, and independent critique. PoC and remediation remain human-only. |
+
+Example:
+
+```bash
+pnpm pipeline --input pipelines/source-to-engineering-artifacts.json \
+  --context '{"source_root":".","project_id":"repo-audit","target_provider":"aws","output_dir":"active/shared/tmp/source-engineering"}'
+```
+
+The generated `source-test-scenarios.json` may be run after review. Tests with a supported framework and no detected network/process/filesystem mutation are `safe_auto`; side-effect tests become `approval_required`, while inferred routes and unknown frameworks remain deferred. The design document includes dependency/import/export signals, and the IR, inventory, scenario, and IaC outputs are schema-validated before writing. IaC output is never an apply operation.
 
 ### Chaos & Resilience
 
