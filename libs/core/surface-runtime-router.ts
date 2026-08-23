@@ -147,6 +147,9 @@ export function shouldCompileSurfaceIntent(
   ) {
     return false;
   }
+  // Mission-team handoff already has a dedicated delegation path and must
+  // not be replaced by a clarification response from the shared compiler.
+  if (input.missionId && input.teamRole) return false;
   // Presence already owns an explicit receiver route that must remain a
   // direct A2A handoff. Other surfaces still pass forced receivers through
   // the shared compiler so a caller cannot bypass governed classification.
@@ -171,7 +174,7 @@ export function shouldCompileSurfaceIntent(
   // Lightweight direct replies can keep their deterministic route. Governed
   // shapes, unresolved requests, and approval-ready plans must pass through
   // the shared compiler before any surface-specific delegation is selected.
-  if (!packet.selected_intent_id) return true;
+  if (!packet.selected_intent_id) return input.agentId !== 'slack-surface-agent';
   if (
     confidentGovernedIntent ||
     ((packet.selected_confidence || 0) >= 0.8 && approvalIntent) ||
