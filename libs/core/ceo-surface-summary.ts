@@ -8,7 +8,11 @@
  * 語彙で表現する。
  */
 
-import { collectOperatorHomeSummary, type OperatorHomeSummary } from './operator-home-summary.js';
+import {
+  collectOperatorHomeSummary,
+  type OperatorHomeScopeFilter,
+  type OperatorHomeSummary,
+} from './operator-home-summary.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
 
 export interface CeoIntentItem {
@@ -90,6 +94,43 @@ const MISSION_STATUS_JA: Record<string, string> = {
 
 const ATTENTION_STATUSES = new Set(['paused', 'failed', 'validating']);
 const EXCEPTION_NOTIFICATION_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
+
+function notificationMatchesScope(
+  notification: Record<string, unknown>,
+  scope?: OperatorHomeScopeFilter
+): boolean {
+  const scoped = Boolean(
+    scope &&
+    [scope.tiers, scope.tenantSlugs, scope.organizationIds, scope.projectIds].some((value) =>
+      Array.isArray(value)
+    )
+  );
+  if (!scoped) return true;
+  const notificationScope = notification.scope;
+  if (!notificationScope || typeof notificationScope !== 'object') return false;
+  const scopedRecord = notificationScope as Record<string, unknown>;
+  if (
+    Array.isArray(scope?.tiers) &&
+    !scope.tiers.includes(scopedRecord.tier as 'personal' | 'confidential' | 'public')
+  )
+    return false;
+  if (
+    Array.isArray(scope?.tenantSlugs) &&
+    !scope.tenantSlugs.includes(String(scopedRecord.tenant_slug || ''))
+  )
+    return false;
+  if (
+    Array.isArray(scope?.organizationIds) &&
+    !scope.organizationIds.includes(String(scopedRecord.organization_id || ''))
+  )
+    return false;
+  if (
+    Array.isArray(scope?.projectIds) &&
+    !scope.projectIds.includes(String(scopedRecord.project_id || ''))
+  )
+    return false;
+  return true;
+}
 
 function toIntentItem(mission: OperatorHomeSummary['activeMissions'][number]): CeoIntentItem {
   const status = String(mission.status || '').toLowerCase();
@@ -203,11 +244,18 @@ export function composeCeoSurfaceSummary(input: {
   };
 }
 
-export function buildCeoSurfaceSummary(): CeoSurfaceSummary {
-  const home = collectOperatorHomeSummary({ limit: 20 });
+export function buildCeoSurfaceSummary(
+  input: {
+    scope?: OperatorHomeScopeFilter;
+    limit?: number;
+  } = {}
+): CeoSurfaceSummary {
+  const home = collectOperatorHomeSummary({ limit: input.limit || 20, scope: input.scope });
   let notifications: Array<Record<string, any>> = [];
   try {
-    notifications = listSurfaceNotificationsAcrossChannels();
+    notifications = listSurfaceNotificationsAcrossChannels().filter((notification) =>
+      notificationMatchesScope(notification, input.scope)
+    );
   } catch {
     notifications = [];
   }
