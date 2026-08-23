@@ -25,6 +25,10 @@ import {
   installReasoningBackends,
   customerResolver,
   listMemoryPromotionCandidates,
+  reviewMemoryPromotionCandidate,
+  reviewMemoryPromotionQueue,
+  assertMemoryPromotionReviewReady,
+  type MemoryPromotionReview,
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
   loadProjectRecord,
   loadProjectTrackRecord,
@@ -224,10 +228,28 @@ async function dispatchNextMission() {
   );
 }
 
+function reviewForCli(candidateId: string, tenantSlug?: string): MemoryPromotionReview {
+  const reviews = reviewMemoryPromotionCandidate(candidateId).filter((review) =>
+    tenantSlug ? review.candidate.scope?.tenant_slug === tenantSlug : true
+  );
+  if (reviews.length === 0) {
+    throw new Error(
+      `Memory promotion candidate not found: ${candidateId}${tenantSlug ? ` (tenant=${tenantSlug})` : ''}`
+    );
+  }
+  if (reviews.length > 1) {
+    const scopes = reviews
+      .map((review) => review.candidate.scope?.tenant_slug || 'legacy/global')
+      .join(', ');
+    throw new Error(
+      `[MEMORY_PROMOTION_AMBIGUOUS] candidate '${candidateId}' exists in multiple scopes: ${scopes}; use --tenant-slug <slug>`
+    );
+  }
+  return reviews[0];
+}
+
 function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') {
-  const rows = listMemoryPromotionCandidates()
-    .filter((row) => (filterStatus ? row.status === filterStatus : true))
-    .sort((a, b) => b.queued_at.localeCompare(a.queued_at));
+  const rows = reviewMemoryPromotionQueue(filterStatus);
   if (rows.length === 0) {
     logger.info(
       filterStatus
@@ -236,33 +258,118 @@ function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'pr
     );
     return;
   }
-  const header = `${'CANDIDATE_ID'.padEnd(30)} ${'STATUS'.padEnd(10)} ${'KIND'.padEnd(20)} ${'TIER'.padEnd(13)} SOURCE`;
+  const header = `${'CANDIDATE_ID'.padEnd(30)} ${'STATUS'.padEnd(10)} ${'DECISION'.padEnd(17)} ${'BLOCKERS'.padEnd(8)} ${'RECORDS'.padEnd(8)} ${'KIND'.padEnd(18)} ${'TIER'.padEnd(13)} SOURCE`;
   console.log('');
   console.log(header);
   console.log('-'.repeat(header.length + 6));
-  for (const row of rows) {
+  for (const review of rows) {
+    const candidate = review.candidate;
     console.log(
-      `${row.candidate_id.padEnd(30)} ${row.status.padEnd(10)} ${row.proposed_memory_kind.padEnd(20)} ${row.sensitivity_tier.padEnd(13)} ${row.source_ref}`
+      `${review.candidate_id.padEnd(30)} ${candidate.status.padEnd(10)} ${review.review_status.padEnd(17)} ${String(review.blockers.length).padEnd(8)} ${String(review.physical_record_count).padEnd(8)} ${candidate.proposed_memory_kind.padEnd(18)} ${candidate.sensitivity_tier.padEnd(13)} ${candidate.source_ref}`
     );
   }
   console.log('');
 }
 
-function approveMemoryCandidate(candidateId: string, note?: string) {
+function showMemoryReview(candidateId: string, tenantSlug?: string, jsonOutput = false) {
+  const review = reviewForCli(candidateId, tenantSlug);
+  if (jsonOutput) {
+    console.log(JSON.stringify(review, null, 2));
+    return;
+  }
+  const candidate = review.candidate;
+  console.log('');
+  console.log(`Candidate: ${review.candidate_id}`);
+  console.log(`Decision: ${review.review_status}`);
+  console.log(`Summary: ${candidate.summary}`);
+  console.log(`Source: ${candidate.source_type} / ${candidate.source_ref}`);
+  console.log(`Kind: ${candidate.proposed_memory_kind} -> ${review.target_kind}`);
+  console.log(`Target: ${review.target_path}`);
+  console.log(`Tier: ${candidate.sensitivity_tier}`);
+  console.log(`Scope: ${candidate.scope?.tenant_slug || 'legacy/global'}`);
+  console.log(`Ratification required: ${review.approval_required ? 'yes' : 'no'}`);
+  console.log(`Physical records: ${review.physical_record_count}`);
+  console.log(
+    `Audit: ${review.audit.status}${review.audit.audit_id ? ` (${review.audit.audit_id})` : ''}`
+  );
+  console.log('Evidence:');
+  for (const evidence of review.evidence) {
+    console.log(`  - [${evidence.status}] ${evidence.ref}`);
+  }
+  if (review.blockers.length > 0) {
+    console.log('Blockers:');
+    for (const blocker of review.blockers) console.log(`  - ${blocker.code}: ${blocker.detail}`);
+  }
+  if (review.warnings.length > 0) {
+    console.log('Warnings:');
+    for (const warning of review.warnings) console.log(`  - ${warning}`);
+  }
+  console.log('');
+  console.log(
+    review.review_status === 'ready_to_approve'
+      ? 'Next: memory-approve <CANDIDATE_ID> --note "<reason>"'
+      : review.review_status === 'ready_to_promote'
+        ? 'Next: memory-promote <CANDIDATE_ID> --note "<reason>"'
+        : 'Next: resolve the blockers before approval or promotion.'
+  );
+}
+
+function approveMemoryCandidate(candidateId: string, note?: string, tenantSlug?: string) {
   if (!candidateId) {
-    logger.error('Usage: mission_controller memory-approve <CANDIDATE_ID> [--note <TEXT>]');
+    logger.error(
+      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]'
+    );
     return;
   }
-  const updated = updateMemoryPromotionCandidateStatus({
-    candidateId,
-    status: 'approved',
-    ratificationNote: note || 'Approved for promotion.',
-  });
-  if (!updated) {
-    logger.error(`Memory promotion candidate not found: ${candidateId}`);
+  try {
+    const review = reviewForCli(candidateId, tenantSlug);
+    assertMemoryPromotionReviewReady(review, 'approve');
+    const updated = updateMemoryPromotionCandidateStatus({
+      candidateId,
+      status: 'approved',
+      ratificationNote: note || 'Approved for promotion.',
+      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
+    });
+    if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+    logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+function rejectMemoryCandidate(
+  candidateId: string,
+  note?: string,
+  tenantSlug?: string,
+  allDuplicates = false
+) {
+  if (!candidateId) {
+    logger.error(
+      'Usage: mission_controller memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]'
+    );
     return;
   }
-  logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
+  try {
+    const review = reviewForCli(candidateId, tenantSlug);
+    if (review.duplicate_count > 0 && !allDuplicates) {
+      throw new Error(
+        `[MEMORY_PROMOTION_DUPLICATES] ${candidateId} has ${review.physical_record_count} physical records; re-run with --all-duplicates to reject every record in this scope.`
+      );
+    }
+    const updated = updateMemoryPromotionCandidateStatus({
+      candidateId,
+      status: 'rejected',
+      ratificationNote: note || 'Rejected by operator review.',
+      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
+      allMatching: allDuplicates,
+    });
+    if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+    logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }
 
 /**
@@ -323,44 +430,36 @@ function acceptRubricOverride(hypothesisOrBranchId: string, reason?: string, sev
   );
 }
 
-function rejectMemoryCandidate(candidateId: string, note?: string) {
-  if (!candidateId) {
-    logger.error('Usage: mission_controller memory-reject <CANDIDATE_ID> [--note <TEXT>]');
-    return;
-  }
-  const updated = updateMemoryPromotionCandidateStatus({
-    candidateId,
-    status: 'rejected',
-    ratificationNote: note || 'Rejected by operator review.',
-  });
-  if (!updated) {
-    logger.error(`Memory promotion candidate not found: ${candidateId}`);
-    return;
-  }
-  logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
-}
-
 async function promoteMemoryCandidate(
   candidateId: string,
   executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
   note?: string,
-  supersedes?: string
+  supersedes?: string,
+  tenantSlug?: string
 ) {
   if (!candidateId) {
     logger.error(
-      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]'
+      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]'
     );
     return;
   }
-  const result = await promoteMemoryCandidateToKnowledge({
-    candidateId,
-    executionRole,
-    ratificationNote: note,
-    supersedes,
-  });
-  logger.success(
-    `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
-  );
+  try {
+    const review = reviewForCli(candidateId, tenantSlug);
+    assertMemoryPromotionReviewReady(review, 'promote');
+    const result = await promoteMemoryCandidateToKnowledge({
+      candidateId,
+      executionRole,
+      ratificationNote: note,
+      supersedes,
+      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
+    });
+    logger.success(
+      `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
+    );
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }
 
 async function promotePendingMemoryCandidates(input: {
@@ -383,18 +482,31 @@ async function promotePendingMemoryCandidates(input: {
   if (input.dryRun && pending.length > 0) {
     logger.info(`Dry run: ${pending.length} approved memory candidate(s) would be promoted.`);
     for (const row of pending) {
-      console.log(
-        `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) ${row.source_ref}`
-      );
+      try {
+        const review = reviewForCli(row.candidate_id);
+        console.log(
+          `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) -> ${review.target_path}`
+        );
+        if (review.blockers.length > 0) {
+          console.log(`  HOLD: ${review.blockers.map((blocker) => blocker.code).join(', ')}`);
+        }
+      } catch (error) {
+        console.log(
+          `- ${row.candidate_id} HOLD: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
   } else {
     for (const row of pending) {
       try {
+        const review = reviewForCli(row.candidate_id);
+        assertMemoryPromotionReviewReady(review, 'promote');
         const result = await promoteMemoryCandidateToKnowledge({
           candidateId: row.candidate_id,
           executionRole,
           ratificationNote: input.note,
           supersedes: input.supersedes,
+          ...(row.scope ? { scope: row.scope } : {}),
         });
         promoted += 1;
         logger.info(`🟢 promoted ${result.candidate.candidate_id} -> ${result.promotedRef}`);
@@ -1440,11 +1552,14 @@ Queue Commands:
                                  Add a mission to the dispatch queue
   dispatch                       Start the next queued mission
   memory-queue [status]          List memory promotion candidates
-  memory-approve <CANDIDATE_ID> [--note <TEXT>]
-                                 Mark a memory candidate as approved
-  memory-reject <CANDIDATE_ID> [--note <TEXT>]
+                                 Show readiness, blockers, and physical duplicate count
+  memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
+                                 Show summary, target, evidence, scope, audit, and next action
+  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]
+                                 Approve only when review preflight is clear
+  memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]
                                  Mark a memory candidate as rejected
-  memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
+  memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
                                  Promote an approved candidate to governed knowledge
   memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--dry-run]
                                  Bulk promote approved memory candidates in queue order
@@ -2019,6 +2134,7 @@ export async function main() {
     dispatchNextMission,
     acceptRubricOverride,
     listMemoryQueue,
+    showMemoryReview,
     approveMemoryCandidate,
     rejectMemoryCandidate,
     promoteMemoryCandidate,
