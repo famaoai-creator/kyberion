@@ -46,6 +46,7 @@ Surface と tenant が増えたため、認証済み `ViewerContext` だけで�
 | SR-05 | tenant/org/project/tier の拒否、permission 欠落、role mismatch の回帰テストを追加                            | DONE     |
 | SR-06 | SaaS 方針と tenant/surface 認可基盤の境界をロードマップ・surface・glossary に記載                            | DONE     |
 | SR-07 | IdP/SSO、role grant 管理 UI、cross-tenant broker、revocation store を本番運用で実装                          | DEFERRED |
+| SR-08 | Computer Surface の manifest、state/stream/OS read、A2UI dispatch を共通 evaluator に接続                    | DONE     |
 
 ## 受入条件
 
@@ -64,4 +65,4 @@ Surface と tenant が増えたため、認証済み `ViewerContext` だけで�
 
 ## 実装状況
 
-2026-08-24 時点で SR-01〜SR-06 を実装し、core authorization test、headless contract test、Chronos/Concierge/Presence の targeted test、typecheck を実行した。SaaS 運用面は未実装かつ本計画の対象外である。
+2026-08-25 時点で SR-01〜SR-06 と SR-08 を実装し、core authorization test、headless contract test、Chronos/Concierge/Presence の targeted test、Computer Surface の viewer/auth・route 回帰テストを実行した。SaaS 運用面は未実装かつ本計画の対象外である。

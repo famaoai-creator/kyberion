@@ -15,6 +15,7 @@ describe('a2ui dispatch', () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
     globalThis.fetch = fetchMock as typeof fetch;
     process.env.KYBERION_A2UI_BRIDGE_URL = 'http://127.0.0.1:3031';
+    delete process.env.KYBERION_LOCALADMIN_TOKEN;
 
     const { dispatchA2UI } = await import('./a2ui.js');
 
@@ -35,5 +36,21 @@ describe('a2ui dispatch', () => {
     expect(String(init?.body)).toContain('[REDACTED_SECRET]');
     expect(String(init?.body)).not.toContain('top-secret-token');
     expect(String(init?.body)).not.toContain('sk-test-1234567890abcdef');
+  });
+
+  it('forwards the localadmin bearer token for guarded remote dispatch', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    process.env.KYBERION_A2UI_BRIDGE_URL = 'https://surface.example.test';
+    process.env.KYBERION_LOCALADMIN_TOKEN = 'surface-admin-token';
+
+    const { dispatchA2UI } = await import('./a2ui.js');
+    dispatchA2UI({ updateDataModel: { surfaceId: 'surface-1', data: { state: 'ready' } } });
+    await Promise.resolve();
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init?.headers as Record<string, string>).Authorization).toBe(
+      'Bearer surface-admin-token'
+    );
   });
 });
