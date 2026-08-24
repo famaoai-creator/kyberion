@@ -13,6 +13,7 @@
 import * as path from 'node:path';
 import {
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeExistsSync,
   safeLstat,
@@ -118,7 +119,7 @@ export interface MissionDetail extends MissionRow {
 function readJsonSafe<T>(absPath: string): T | null {
   try {
     if (!safeExistsSync(absPath)) return null;
-    return JSON.parse(safeReadFile(absPath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(absPath);
   } catch {
     return null;
   }
@@ -431,7 +432,7 @@ export function getProviderPins(): Record<string, any> {
   const defaultPath = pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
   if (safeExistsSync(defaultPath)) {
     try {
-      const data = JSON.parse(safeReadFile(defaultPath, { encoding: 'utf8' }) as string);
+      const data = loadJson<{ pins?: Record<string, unknown> }>(defaultPath);
       Object.assign(pins, data.pins || {});
     } catch (err) {
       logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
@@ -446,7 +447,7 @@ export function getProviderPins(): Record<string, any> {
       for (const file of files) {
         if (file === 'default.json' || !file.endsWith('.json')) continue;
         const fullPath = path.join(dirPath, file);
-        const data = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        const data = loadJson<{ pins?: Record<string, unknown> }>(fullPath);
         Object.assign(pins, data.pins || {});
       }
     } catch (err) {
