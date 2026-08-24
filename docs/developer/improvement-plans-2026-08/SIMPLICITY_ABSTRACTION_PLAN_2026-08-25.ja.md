@@ -283,6 +283,8 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
+> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。今回の実装波の検証値は `JSON.parse(safeReadFile(` が **285 occurrences / 221 files**、`loadJson` が **167 occurrences / 44 files**、`process.env.KYBERION_*` が **1,708 occurrences / 419 files**、`getRegisteredEnv` が **13 occurrences** となった。目標未達の項目は引き続き PARTIAL とする。
+
 | 指標                                    | 現状      | 目標   | 担当     |
 | --------------------------------------- | --------- | ------ | -------- |
 | `JSON.parse(safeReadFile(`              | 489       | 0      | SX-03    |
@@ -322,22 +324,22 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 7. 実装状況
 
-| ID    | 状態        | 備考                                                                                                                                                                                                           |
-| ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SX-01 | IMPLEMENTED | `check:first-win-docs` と 3 文書の機械検証を追加。clean-clone の実行証跡は未完。                                                                                                                               |
-| SX-02 | BASELINED   | 4 層宣言、cycle/方向チェッカー、baseline ratchet を追加。既存違反は baseline 内。                                                                                                                              |
-| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し主要 helper の一部を移行。governance checker の Ajv / JSON 読み込みを foundation に移行。全 codemod は未完。                                                     |
-| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio policy 5系統を移行。全 catalog/schema 統合と未参照 catalog 処分は未完。                                                                                                   |
-| SX-05 | PARTIAL     | command registry と `bin`/`pnpm kyberion` の単一入口を追加。doctor/alias/script 削減は未完。                                                                                                                   |
-| SX-06 | PARTIAL     | `defineScript`/`defineGenerator` と harness test を追加。pseudo-locale / vocabulary-types / env-registry / op-registry を共通 generator へ移行。既存 script 全移行は未完。                                     |
-| SX-07 | PARTIAL     | manifest-driven `pnpm check` と PR workflow gate を追加し、未知 scope・空集合・scope 外 `--only` を fail-closed 化、release を production evidence gate に接続。`validate` は full manifest 集合へ統合済み。   |
-| SX-08 | PARTIAL     | voice の旧梯子を削除し共有 `generateReply` を入口化。intent CLI 統合、全 surface 描画、approval 本番経路は未完。                                                                                               |
-| SX-09 | PARTIAL     | `ChannelAdapter`/`runChannelTurn` を追加し、4 bridge の共通 turn lifecycle を移行。viewer の scope/tier narrowing とブラウザ vocabulary lookup を core に統合済み。認証 resolver・read-model・配送統合は未完。 |
-| SX-10 | PARTIAL     | `runActuatorCli` を SDK dispatch へ移行し、`executePipelineFile()` と html-to-pptx の in-process 経路を追加。全 ABI/schema 統合は未完。                                                                        |
-| SX-11 | PARTIAL     | `runAdfLifecycle` と canonical repair を実行入口へ接続し、`core:include` に fragment context/result envelope を追加。super-nerve の重複 repair・script wrapper・語彙移行は未完。                               |
-| SX-12 | PARTIAL     | 21 seam の生成入口を `createSeam<T>()` に統一。god module/store/façade の分割は未着手。                                                                                                                        |
-| SX-13 | PARTIAL     | 2026-08 計画群36文書へ metadata checker/gate を追加し frontmatter を補正。状態正本・知識コーパス整理は未完。                                                                                                   |
-| SX-14 | PARTIAL     | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。                                                                  |
+| ID    | 状態        | 備考                                                                                                                                                                                                                                                                                                                 |
+| ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SX-01 | IMPLEMENTED | `check:first-win-docs` と 3 文書の機械検証を追加。clean-clone の実行証跡は未完。                                                                                                                                                                                                                                     |
+| SX-02 | BASELINED   | 4 層宣言、cycle/方向チェッカー、baseline ratchet を追加。既存違反は baseline 内。                                                                                                                                                                                                                                    |
+| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し主要 helper の一部を移行。governance checker、media/bridge/chronos/task-session、surface coordination、mission worker、intent/terminal/operator/computer/organization の JSON 読み込みを共有 `loadJson` に移行。実測値は上記の通りで、Ajv/env/JSON 全 codemod は未完。 |
+| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio policy 5系統を移行。全 catalog/schema 統合と未参照 catalog 処分は未完。                                                                                                                                                                                                         |
+| SX-05 | PARTIAL     | command registry と `bin`/`pnpm kyberion` の単一入口を追加。doctor/alias/script 削減は未完。                                                                                                                                                                                                                         |
+| SX-06 | PARTIAL     | `defineScript`/`defineGenerator` と harness test を追加。pseudo-locale / vocabulary-types / env-registry / op-registry を共通 generator へ移行。既存 script 全移行は未完。                                                                                                                                           |
+| SX-07 | PARTIAL     | manifest-driven `pnpm check` と PR workflow gate を追加し、未知 scope・空集合・scope 外 `--only` を fail-closed 化、release を production evidence gate に接続。`validate` は full manifest 集合へ統合済み。                                                                                                         |
+| SX-08 | PARTIAL     | voice の旧梯子を削除し共有 `generateReply` を入口化。intent CLI 統合、全 surface 描画、approval 本番経路は未完。                                                                                                                                                                                                     |
+| SX-09 | PARTIAL     | `ChannelAdapter`/`runChannelTurn` を追加し、4 bridge の共通 turn lifecycle を移行。viewer の scope/tier narrowing とブラウザ vocabulary lookup を core に統合済み。認証 resolver・read-model・配送統合は未完。                                                                                                       |
+| SX-10 | PARTIAL     | `runActuatorCli` を SDK dispatch へ移行し、`executePipelineFile()` と html-to-pptx の in-process 経路を追加。全 ABI/schema 統合は未完。                                                                                                                                                                              |
+| SX-11 | PARTIAL     | `runAdfLifecycle` と canonical repair を実行入口へ接続し、`core:include` に fragment context/result envelope を追加。super-nerve の重複 repair・script wrapper・語彙移行は未完。                                                                                                                                     |
+| SX-12 | PARTIAL     | 21 seam の生成入口を `createSeam<T>()` に統一。god module/store/façade の分割は未着手。                                                                                                                                                                                                                              |
+| SX-13 | PARTIAL     | 2026-08 計画群36文書へ metadata checker/gate を追加し frontmatter を補正。状態正本・知識コーパス整理は未完。                                                                                                                                                                                                         |
+| SX-14 | PARTIAL     | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。                                                                                                                                                                        |
 
 ## 参照
 
