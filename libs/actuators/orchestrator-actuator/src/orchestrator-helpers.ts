@@ -1962,7 +1962,7 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   );
   const missions = missionFiles.map((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = loadJson<Record<string, any>>(filePath) as Record<string, any>;
+    const state = loadJson(filePath) as Record<string, any>;
     return {
       mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
       tier: String(state.tier || 'unknown'),
