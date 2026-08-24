@@ -1,15 +1,25 @@
 import express from 'express';
 import { createServer } from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import {
+  assertSurfaceOperation,
+  buildComputerSurfaceManifest,
+  filterHeadlessManifestForViewer,
   pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  SurfaceAuthorizationError,
   withExecutionContext,
   type A2UIMessage,
+  type SurfaceAuthorizationContext,
 } from '@agent/core';
+import {
+  assertComputerSurfacePayloadInScope,
+  computerSurfaceServerTenantResource,
+  ComputerSurfaceViewerError,
+  resolveComputerSurfaceViewerContext,
+} from './auth.js';
 import {
   getComputerSurfaceAccess,
   getComputerSurfaceGuardedSurfaceUrl,
@@ -33,35 +43,57 @@ const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/computer-
 const PORT = Number(process.env.COMPUTER_SURFACE_PORT || 3040);
 const HOST = process.env.COMPUTER_SURFACE_HOST || '127.0.0.1';
 const sseClients = new Set<Client>();
+const computerSurfaceManifest = buildComputerSurfaceManifest();
 
-function tokenMatches(candidate: string, configured: string | undefined): boolean {
-  if (!candidate || !configured) return false;
-  const left = Buffer.from(candidate);
-  const right = Buffer.from(configured);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
-function isLoopback(req: express.Request): boolean {
-  const remote = req.socket.remoteAddress || '';
-  const forwarded = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim();
-  const loopbackAddresses = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
-  return (
-    loopbackAddresses.includes(remote) && (!forwarded || loopbackAddresses.includes(forwarded))
-  );
-}
-
-function authorizeSurface(req: express.Request, res: express.Response): boolean {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const configured = process.env.KYBERION_LOCALADMIN_TOKEN || process.env.KYBERION_API_TOKEN;
-  if (
-    tokenMatches(token, configured) ||
-    (isLoopback(req) && process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false')
-  ) {
-    return true;
+function authorizeSurface(
+  req: express.Request,
+  res: express.Response,
+  operationId: string,
+  resource?: { tenantSlug?: string; tier?: string }
+): SurfaceAuthorizationContext | null {
+  let context: SurfaceAuthorizationContext;
+  try {
+    context = resolveComputerSurfaceViewerContext(req);
+  } catch (error) {
+    const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
+    res
+      .status(status)
+      .json({ ok: false, error: error instanceof Error ? error.message : 'Unauthorized.' });
+    return null;
   }
-  res.status(401).json({ ok: false, error: 'Unauthorized.' });
-  return false;
+
+  const operation = computerSurfaceManifest.operations.find(
+    (candidate) => candidate.operation_id === operationId
+  );
+  if (!operation) {
+    res
+      .status(403)
+      .json({ ok: false, error: `unknown Computer Surface operation: ${operationId}` });
+    return null;
+  }
+
+  try {
+    assertSurfaceOperation({
+      context,
+      operation: {
+        operationId: operation.operation_id,
+        effect: operation.effect,
+        requiredRole: operation.required_role,
+        requiredPermissions: operation.required_permissions,
+      },
+      resource: { ...computerSurfaceServerTenantResource(context), ...resource },
+    });
+    return context;
+  } catch (error) {
+    const message =
+      error instanceof SurfaceAuthorizationError
+        ? error.decision.reason
+        : error instanceof Error
+          ? error.message
+          : 'Forbidden.';
+    res.status(403).json({ ok: false, error: message });
+    return null;
+  }
 }
 
 const state: {
@@ -149,8 +181,19 @@ app.get('/favicon.ico', (_req, res) => {
   res.status(204).end();
 });
 
+app.get('/api/headless/manifest', (req, res) => {
+  const context = authorizeSurface(req, res, 'computer_surface.manifest.read');
+  if (!context) return;
+  res.json(filterHeadlessManifestForViewer(context, computerSurfaceManifest));
+});
+
 app.get('/api/identity', (req, res) => {
-  if (!authorizeSurface(req, res)) return;
+  if (
+    !authorizeSurface(req, res, 'computer_surface.identity.read', {
+      tier: 'personal',
+    })
+  )
+    return;
   try {
     const personalDir = pathResolver.knowledge('personal');
     const result = withExecutionContext('ecosystem_architect', () => {
@@ -195,12 +238,12 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/api/state', (req, res) => {
-  if (!authorizeSurface(req, res)) return;
+  if (!authorizeSurface(req, res, 'computer_surface.state.read')) return;
   res.json(state);
 });
 
 app.get('/api/os/control-plane', (req, res) => {
-  if (!authorizeSurface(req, res)) return;
+  if (!authorizeSurface(req, res, 'computer_surface.os_control_plane.read')) return;
   const rawMissionId = req.query.mission_id;
   if (Array.isArray(rawMissionId)) {
     res.status(400).json({ ok: false, error: 'mission_id must be a single value' });
@@ -234,7 +277,7 @@ app.get('/api/os/control-plane', (req, res) => {
 });
 
 app.get('/api/stream', (req, res) => {
-  if (!authorizeSurface(req, res)) return;
+  if (!authorizeSurface(req, res, 'computer_surface.stream.read')) return;
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -245,8 +288,18 @@ app.get('/api/stream', (req, res) => {
 });
 
 app.post('/a2ui/dispatch', (req, res) => {
-  if (!authorizeSurface(req, res)) return;
+  const context = authorizeSurface(req, res, 'computer_surface.a2ui.dispatch');
+  if (!context) return;
   const body = req.body;
+  try {
+    assertComputerSurfacePayloadInScope(context, body);
+  } catch (error) {
+    const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
+    res
+      .status(status)
+      .json({ ok: false, error: error instanceof Error ? error.message : 'Forbidden.' });
+    return;
+  }
   const messages = Array.isArray(body) ? body : [body];
   for (const message of messages) applyA2UIMessage(message as A2UIMessage);
   emitState();
