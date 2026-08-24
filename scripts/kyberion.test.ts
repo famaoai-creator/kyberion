@@ -12,8 +12,8 @@ describe('kyberion command router', () => {
     expect(selectEntrypoint('schedule').id).toBe('operator-cli');
   });
 
-  it('keeps unknown commands on the operator-home surface', () => {
-    expect(selectEntrypoint('unknown-command').id).toBe('operator-home');
+  it('rejects unknown commands instead of falling back to an executable surface', () => {
+    expect(() => selectEntrypoint('unknown-command')).toThrow('Unknown kyberion command');
   });
 
   it('exposes command metadata from the governed registry', () => {
