@@ -2,7 +2,14 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import {
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 
@@ -133,7 +140,7 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
 function loadBaseline(baselinePath: string): RatchetBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return JSON.parse(safeReadFile(baselinePath, { encoding: 'utf8' }) as string) as RatchetBaseline;
+  return loadJson<RatchetBaseline>(baselinePath);
 }
 
 function compareBuckets(current: RatchetBucket, baseline: RatchetBucket, label: string): string[] {

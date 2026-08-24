@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
@@ -71,7 +72,7 @@ function listActuatorManifests(): string[] {
 }
 
 function readManifest(p: string): Manifest {
-  return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  return loadJson<Manifest>(p);
 }
 
 function sha256(content: string): string {
@@ -231,7 +232,7 @@ function check(prev: BaselineFile, current: ActuatorFingerprint[]): Diagnostic[]
 
 function loadBaseline(): BaselineFile | null {
   if (!safeExistsSync(BASELINE_PATH)) return null;
-  return JSON.parse(safeReadFile(BASELINE_PATH, { encoding: 'utf8' }) as string) as BaselineFile;
+  return loadJson<BaselineFile>(BASELINE_PATH);
 }
 
 function writeBaseline(file: BaselineFile): void {

@@ -35,7 +35,7 @@ import {
   pathResolver,
   resolveTenant,
   safeExistsSync,
-  safeReadFile,
+  loadJson,
   safeReaddir,
   safeStat,
   listProjectRecords,
@@ -87,7 +87,7 @@ export interface CheckOptions {
 
 function readJsonIfExists<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(filePath);
 }
 
 export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsSnapshot {

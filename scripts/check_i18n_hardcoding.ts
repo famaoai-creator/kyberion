@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -210,7 +211,7 @@ function scanTree(scanRoots: string[]): {
 
 function loadBaseline(baselinePath: string): I18nBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return JSON.parse(safeReadFile(baselinePath, { encoding: 'utf8' }) as string) as I18nBaseline;
+  return loadJson<I18nBaseline>(baselinePath);
 }
 
 function writeBaselineFile(

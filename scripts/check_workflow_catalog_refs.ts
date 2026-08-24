@@ -18,9 +18,9 @@ import * as path from 'node:path';
 import {
   expandProcessTemplateTasks,
   normalizeWorkflowPhases,
+  loadJson,
   pathResolver,
   safeExistsSync,
-  safeReadFile,
 } from '@agent/core';
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
@@ -31,9 +31,9 @@ type CatalogTemplate = {
 };
 
 function main(): number {
-  const catalog = JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string) as {
+  const catalog = loadJson<{
     templates: CatalogTemplate[];
-  };
+  }>(CATALOG_PATH);
   const violations: string[] = [];
 
   for (const template of catalog.templates) {
@@ -52,9 +52,7 @@ function main(): number {
       // Every task-bearing phase needs an exit gate — otherwise gate-pass
       // can never mark its tasks completed (SR-01 finding #2).
       if ((spec.default_tasks?.length ?? 0) > 0 && !spec.exit_gate) {
-        violations.push(
-          `${template.id}: phase ${spec.id} has default_tasks but no exit_gate`
-        );
+        violations.push(`${template.id}: phase ${spec.id} has default_tasks but no exit_gate`);
       }
       for (const task of spec.default_tasks ?? []) {
         if (typeof task.pipeline_ref === 'string' && task.pipeline_ref.trim()) {
