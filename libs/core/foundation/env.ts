@@ -34,3 +34,14 @@ export function getRegisteredEnv<T = string>(
   if (options.strict) throw new Error(`Invalid value for registered environment variable ${name}`);
   return options.defaultValue;
 }
+
+/**
+ * Read a registered setting using the string representation expected by
+ * legacy call sites. Boolean registry values preserve the historical `1`/`0`
+ * convention while numeric values remain parseable by existing callers.
+ */
+export function getRegisteredEnvText(name: string): string | undefined {
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+}

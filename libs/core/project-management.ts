@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { getRegisteredEnv } from './env-validator.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   buildProjectBootstrapWorkItems,
   listProjectRecords,
@@ -24,9 +24,7 @@ import {
 } from './project-track-registry.js';
 
 function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+  return getRegisteredEnvText(name);
 }
 import { missionSeedRecordPath, saveMissionSeedRecord } from './mission-seed-registry.js';
 import {

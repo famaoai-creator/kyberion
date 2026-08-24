@@ -23,12 +23,10 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
-import { getRegisteredEnv } from './env-validator.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+  return getRegisteredEnvText(name);
 }
 import {
   hasEnvironmentCapabilityProbe,
