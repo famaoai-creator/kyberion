@@ -19,7 +19,8 @@ vi.mock('@agent/core', async () => {
 });
 
 vi.mock('@agent/core/foundation', async () => {
-  const actual = (await vi.importActual('@agent/core/foundation')) as any;
+  const actual =
+    await vi.importActual<typeof import('@agent/core/foundation')>('@agent/core/foundation');
   return {
     ...actual,
     readJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath) || '')),

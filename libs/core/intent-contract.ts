@@ -14,7 +14,6 @@ import {
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
 import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
-import { getRegisteredEnv } from './env-validator.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -734,8 +733,8 @@ function resolveTenantId(input: CompileUserIntentFlowInput): string | undefined 
     typeof runtime.tenantId === 'string' ? runtime.tenantId : undefined,
     typeof runtime.tenant_slug === 'string' ? runtime.tenant_slug : undefined,
     typeof runtime.tenantSlug === 'string' ? runtime.tenantSlug : undefined,
-    getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined,
-    getRegisteredEnv<string>('KYBERION_CUSTOMER') as string | undefined,
+    process.env.KYBERION_TENANT,
+    process.env.KYBERION_CUSTOMER,
   ];
   return candidates
     .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
@@ -1206,23 +1205,19 @@ export function resolveIntentCompilerTarget(
 
   const rawProvider = (
     options.provider ||
-    (getRegisteredEnv<string>('KYBERION_INTENT_COMPILER_PROVIDER') as string | undefined) ||
+    process.env.KYBERION_INTENT_COMPILER_PROVIDER ||
     'codex'
   ).toLowerCase();
   const provider: IntentCompilerProvider =
     rawProvider === 'claude' || rawProvider === 'gemini' ? rawProvider : 'codex';
-  const explicitModel =
-    options.model ||
-    (getRegisteredEnv<string>('KYBERION_INTENT_COMPILER_MODEL') as string | undefined);
+  const explicitModel = options.model || process.env.KYBERION_INTENT_COMPILER_MODEL;
   const explicitModelProvider =
-    options.modelProvider ||
-    (getRegisteredEnv<string>('KYBERION_INTENT_COMPILER_MODEL_PROVIDER') as string | undefined);
+    options.modelProvider || process.env.KYBERION_INTENT_COMPILER_MODEL_PROVIDER;
 
   if (provider === 'claude') {
     return {
       provider,
-      model:
-        explicitModel || (getRegisteredEnv<string>('KYBERION_CLAUDE_MODEL') as string | undefined),
+      model: explicitModel || process.env.KYBERION_CLAUDE_MODEL,
     };
   }
 
@@ -1235,11 +1230,8 @@ export function resolveIntentCompilerTarget(
 
   return {
     provider: 'codex',
-    model:
-      explicitModel || (getRegisteredEnv<string>('KYBERION_CODEX_MODEL') as string | undefined),
-    modelProvider:
-      explicitModelProvider ||
-      (getRegisteredEnv<string>('KYBERION_CODEX_MODEL_PROVIDER') as string | undefined),
+    model: explicitModel || process.env.KYBERION_CODEX_MODEL,
+    modelProvider: explicitModelProvider || process.env.KYBERION_CODEX_MODEL_PROVIDER,
   };
 }
 
