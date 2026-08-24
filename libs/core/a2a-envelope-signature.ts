@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
@@ -32,7 +33,7 @@ export function resetA2ASecretCache(): void {
 export function resolveA2ASecret(): string {
   if (cachedSecret) return cachedSecret;
 
-  const fromEnv = process.env.KYBERION_A2A_SECRET?.trim();
+  const fromEnv = getRegisteredEnvText('KYBERION_A2A_SECRET')?.trim();
   if (fromEnv) {
     cachedSecret = fromEnv;
     return cachedSecret;
@@ -69,7 +70,7 @@ export function resolveA2ASecret(): string {
 
 /** AA-03 Task 2: staged rollout — warn (default) records failures, enforce rejects. */
 export function resolveA2ASignatureMode(): A2ASignatureMode {
-  return process.env.KYBERION_A2A_SIGNATURE === 'enforce' ? 'enforce' : 'warn';
+  return getRegisteredEnvText('KYBERION_A2A_SIGNATURE') === 'enforce' ? 'enforce' : 'warn';
 }
 
 /**
