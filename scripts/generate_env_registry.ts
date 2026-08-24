@@ -23,9 +23,10 @@
 
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { getRegisteredEnv, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { withExecutionContext } from '@agent/core/governance';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 export type EnvCategory = 'secret' | 'path' | 'flag' | 'tuning' | 'provider' | 'runtime';
 export type EnvType = 'string' | 'boolean' | 'number' | 'enum' | 'path';
@@ -212,76 +213,39 @@ async function formatWithPrettier(content: string, filePath: string): Promise<st
   return prettierFormat(content, { ...config, parser });
 }
 
-function readIfExists(filePath: string): string | null {
-  return safeExistsSync(filePath)
-    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    : null;
-}
-
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const strictDocumentation = process.env.KYBERION_ENV_REGISTRY_STRICT === '1';
-  const rootDir = pathResolver.rootDir();
-
-  const built = withExecutionContext('ecosystem_architect', () => {
+export const main = defineGenerator({
+  id: 'env-registry',
+  outputs: [REGISTRY_PATH, ENV_EXAMPLE_PATH, CONFIGURATION_DOC_PATH],
+  async render(context) {
+    const strictDocumentation =
+      getRegisteredEnv<boolean>('KYBERION_ENV_REGISTRY_STRICT', { defaultValue: false }) === true;
+    const rootDir = pathResolver.rootDir();
     const discovered = discoverEnvNames(rootDir);
-    const existingRaw = readIfExists(REGISTRY_PATH);
-    const existing = existingRaw ? (JSON.parse(existingRaw) as EnvRegistryFile) : null;
-    return mergeRegistry(discovered, existing);
-  });
-
-  const registryJson = await formatWithPrettier(JSON.stringify(built, null, 2), REGISTRY_PATH);
-  const envExample = renderEnvExample(built);
-  const configurationDoc = await formatWithPrettier(
-    renderConfigurationDoc(built),
-    CONFIGURATION_DOC_PATH
-  );
-
-  const targets: Array<{ label: string; filePath: string; next: string }> = [
-    { label: 'env registry', filePath: REGISTRY_PATH, next: registryJson },
-    // docs/developer/ writes are allowlisted for the ecosystem_architect
-    // persona in security-policy.json (registration ceremony, same pattern
-    // as CAPABILITIES_GUIDE.md).
-    { label: 'env.example', filePath: ENV_EXAMPLE_PATH, next: envExample },
-    { label: 'configuration doc', filePath: CONFIGURATION_DOC_PATH, next: configurationDoc },
-  ];
-
-  if (shouldCheck) {
-    const drifted = targets.filter((target) => readIfExists(target.filePath) !== target.next);
-    if (drifted.length === 0) {
-      if (strictDocumentation) {
-        const undocumented = built.entries.filter((entry) => !entry.documented);
-        if (undocumented.length > 0) {
-          console.error(
-            `env registry has ${undocumented.length} undocumented entr${undocumented.length === 1 ? 'y' : 'ies'} — ` +
-              'curate descriptions/documented before enabling strict mode'
-          );
-          process.exitCode = 1;
-          return;
-        }
+    const existing = safeExistsSync(REGISTRY_PATH)
+      ? readJson<EnvRegistryFile>(REGISTRY_PATH)
+      : null;
+    const built = mergeRegistry(discovered, existing);
+    if (strictDocumentation && context.check) {
+      const undocumented = built.entries.filter((entry) => !entry.documented);
+      if (undocumented.length > 0) {
+        throw new Error(
+          `env registry has ${undocumented.length} undocumented entr${undocumented.length === 1 ? 'y' : 'ies'}`
+        );
       }
-      console.log('env registry is up to date');
-      return;
     }
-    console.error('env registry drift detected — run pnpm generate:env-registry');
-    for (const target of drifted) {
-      console.error(`- ${path.relative(rootDir, target.filePath)} differs`);
-    }
-    process.exitCode = 1;
-    return;
-  }
 
-  return withExecutionContext('ecosystem_architect', () => {
-    for (const target of targets) {
-      safeWriteFile(target.filePath, target.next);
-      console.log(`wrote ${path.relative(rootDir, target.filePath)}`);
-    }
-  });
-}
+    return [
+      {
+        path: REGISTRY_PATH,
+        content: await formatWithPrettier(JSON.stringify(built, null, 2), REGISTRY_PATH),
+      },
+      { path: ENV_EXAMPLE_PATH, content: renderEnvExample(built) },
+      {
+        path: CONFIGURATION_DOC_PATH,
+        content: await formatWithPrettier(renderConfigurationDoc(built), CONFIGURATION_DOC_PATH),
+      },
+    ];
+  },
+});
 
-if (process.argv[1] && /generate_env_registry\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (isDirectScript(import.meta.url, 'generate_env_registry.ts')) void main();
