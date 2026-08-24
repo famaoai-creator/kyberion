@@ -1,9 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
@@ -66,9 +66,6 @@ import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { TraceContext } from './src/trace.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract.schema.json'
@@ -280,25 +277,25 @@ let workPolicyValidateFn: ValidateFunction | null = null;
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
-  intentContractValidateFn = compileSchemaFromPath(ajv, INTENT_CONTRACT_SCHEMA_PATH);
+  intentContractValidateFn = compileSchema(INTENT_CONTRACT_SCHEMA_PATH);
   return intentContractValidateFn;
 }
 
 function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
-  workLoopValidateFn = compileSchemaFromPath(ajv, WORK_LOOP_SCHEMA_PATH);
+  workLoopValidateFn = compileSchema(WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
 }
 
 function ensureIntentPolicyValidator(): ValidateFunction {
   if (intentPolicyValidateFn) return intentPolicyValidateFn;
-  intentPolicyValidateFn = compileSchemaFromPath(ajv, INTENT_POLICY_SCHEMA_PATH);
+  intentPolicyValidateFn = compileSchema(INTENT_POLICY_SCHEMA_PATH);
   return intentPolicyValidateFn;
 }
 
 function ensureWorkPolicyValidator(): ValidateFunction {
   if (workPolicyValidateFn) return workPolicyValidateFn;
-  workPolicyValidateFn = compileSchemaFromPath(ajv, WORK_POLICY_SCHEMA_PATH);
+  workPolicyValidateFn = compileSchema(WORK_POLICY_SCHEMA_PATH);
   return workPolicyValidateFn;
 }
 

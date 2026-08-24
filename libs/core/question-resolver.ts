@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { safeReadFile } from './secure-io.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
@@ -18,9 +18,6 @@ import { slugify } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { logger } from './core.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/question-resolution-policy.schema.json'
@@ -187,7 +184,7 @@ let policyValidateFn: ValidateFunction | null = null;
 
 function ensurePolicyValidator(): ValidateFunction {
   if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
+  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
   return policyValidateFn;
 }
 
