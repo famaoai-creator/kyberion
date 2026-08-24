@@ -1,4 +1,5 @@
 import type { ValidateFunction } from 'ajv';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -79,7 +80,7 @@ function tenantQueueScope(scope: MemoryScopeEnvelope): {
 // tenant runtime namespace; legacy/unscoped candidates remain in the global
 // queue until the migration steward adopts them.
 function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
-  const override = process.env.KYBERION_MEMORY_QUEUE_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   if (scope?.tenant_slug) {
     return pathResolver.rootResolve(
@@ -95,7 +96,7 @@ function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
 }
 
 function queuePathsForAllScopes(): string[] {
-  if (process.env.KYBERION_MEMORY_QUEUE_PATH?.trim()) return [resolveQueuePath()];
+  if (getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim()) return [resolveQueuePath()];
   const paths = [resolveQueuePath()];
   const tenantRoot = pathResolver.rootResolve(TENANT_RUNTIME_ROOT);
   if (!safeExistsSync(tenantRoot) || !safeStat(tenantRoot).isDirectory()) return paths;
@@ -327,7 +328,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!nextCandidate.audit_ref && process.env.NODE_ENV !== 'test') {
     try {
       const audit = auditChain.record({
-        agentId: process.env.KYBERION_AGENT_ID || 'knowledge-promotion-queue',
+        agentId: getRegisteredEnvText('KYBERION_AGENT_ID') || 'knowledge-promotion-queue',
         action: 'knowledge_promotion_candidate',
         operation: 'enqueue',
         result: 'completed',

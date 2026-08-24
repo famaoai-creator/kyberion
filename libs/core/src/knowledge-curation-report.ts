@@ -24,6 +24,7 @@
  * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md §KP-06.
  */
 import * as path from 'node:path';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -124,19 +125,19 @@ type ArchiveHistoryEntry = {
 };
 
 function sloConfigPath(): string {
-  const override = process.env.KYBERION_CURATION_SLO_CONFIG_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_SLO_CONFIG_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/knowledge-curation-slo.json');
 }
 
 function taxonomyPath(): string {
-  const override = process.env.KYBERION_CURATION_TAXONOMY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_TAXONOMY_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
 }
 
 function reportPath(): string {
-  const override = process.env.KYBERION_CURATION_REPORT_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_REPORT_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/CURATION_REPORT.md');
 }
@@ -151,7 +152,7 @@ function archiveHistoryPath(tenantSlug?: string): string {
       )
     );
   }
-  const override = process.env.KYBERION_CURATION_ARCHIVE_HISTORY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_ARCHIVE_HISTORY_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('runtime/feedback-loop/curation-archive-history.json');
 }
@@ -367,7 +368,7 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
  * hermetic tests via `KYBERION_CURATION_SCAN_ROOTS` (comma-separated).
  */
 function scanRoots(): string[] {
-  const override = process.env.KYBERION_CURATION_SCAN_ROOTS?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_SCAN_ROOTS')?.trim();
   if (override) {
     return override
       .split(',')

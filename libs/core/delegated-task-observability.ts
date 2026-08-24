@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent-input-queue.js';
 import { enqueueDelegationNotification } from './delegation-notifications.js';
@@ -113,13 +114,13 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
 // KYBERION_DELEGATION_STORE_DIR so parallel suites never clobber the real
 // observability files (resolved lazily per call).
 function resolveTracePath(): string {
-  const override = process.env.KYBERION_DELEGATION_TRACE_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('observability/delegations.jsonl');
 }
 
 function resolveStoreDir(): string {
-  const override = process.env.KYBERION_DELEGATION_STORE_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('observability/delegations');
 }
@@ -695,7 +696,7 @@ export function createDelegationHandle(input: {
     owner:
       input.owner ||
       process.env.MISSION_ROLE ||
-      process.env.KYBERION_PERSONA ||
+      getRegisteredEnvText('KYBERION_PERSONA') ||
       'reasoning-backend',
     instruction: input.instruction,
     ...(input.context ? { context: input.context } : {}),

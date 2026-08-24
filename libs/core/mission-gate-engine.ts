@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import {
   type StructuredOutputSchemaName,
@@ -50,7 +51,9 @@ export type GateOverrideSignatureMode = 'warn' | 'enforce';
 
 /** MO-02: staged enforcement for human_override signatures (warn -> enforce). */
 export function resolveGateOverrideSignatureMode(): GateOverrideSignatureMode {
-  return process.env.KYBERION_GATE_OVERRIDE_SIGNATURE === 'enforce' ? 'enforce' : 'warn';
+  return getRegisteredEnvText('KYBERION_GATE_OVERRIDE_SIGNATURE') === 'enforce'
+    ? 'enforce'
+    : 'warn';
 }
 
 function overrideSignatureContent(gateId: string, approvedBy: string, approvedAt: string): string {
@@ -207,8 +210,7 @@ async function evaluateGateCheck(
     case 'schema_valid': {
       const params = check.params || {};
       const schemaName = firstString(params.schema, params.schema_name, params.schemaName) as
-        | StructuredOutputSchemaName
-        | undefined;
+        StructuredOutputSchemaName | undefined;
       if (!schemaName) {
         return { passed: false, reason: 'No schema name was provided.' };
       }
@@ -488,8 +490,7 @@ async function evaluateGateCheck(
     case 'custom': {
       const params = check.params || {};
       const evaluate = params.evaluate as
-        | ((input: { params: Record<string, unknown> }) => unknown | Promise<unknown>)
-        | undefined;
+        ((input: { params: Record<string, unknown> }) => unknown | Promise<unknown>) | undefined;
       if (typeof evaluate !== 'function') {
         return { passed: false, reason: 'Custom gate missing evaluate() callback.' };
       }

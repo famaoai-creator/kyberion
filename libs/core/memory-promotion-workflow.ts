@@ -20,6 +20,7 @@ import {
   type MemoryCandidate,
   updateMemoryPromotionCandidateStatus,
 } from './memory-promotion-queue.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import {
@@ -333,7 +334,7 @@ function defaultPromotionReview(): PromotionReview {
 }
 
 function resolveAutopromoteMode(): 'personal' | null {
-  return String(process.env.KYBERION_MEMORY_AUTOPROMOTE || '')
+  return String(getRegisteredEnvText('KYBERION_MEMORY_AUTOPROMOTE') || '')
     .trim()
     .toLowerCase() === 'personal'
     ? 'personal'

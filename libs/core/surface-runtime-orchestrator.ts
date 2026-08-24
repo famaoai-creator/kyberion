@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { deriveSurfaceSessionId } from './orchestrator-session.js';
 import { missionSteeringRouteHandler } from './surface-mission-steering.js';
@@ -289,7 +290,7 @@ async function handleSurfaceQueryRoute(
   const queryType = resolved.queryType || 'knowledge_search';
   const providerConfig = getSurfaceQueryProviderConfig({
     role: deriveSurfaceQueryRole(context),
-    phase: process.env.KYBERION_SURFACE_QUERY_PHASE?.trim() || undefined,
+    phase: getRegisteredEnvText('KYBERION_SURFACE_QUERY_PHASE')?.trim() || undefined,
     scope: currentScope(),
   });
 
@@ -1807,7 +1808,7 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
     },
   } as const;
 
-  if (process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON === '1') {
+  if (getRegisteredEnvText('KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON') === '1') {
     return ensureAgentRuntime(spawnOptions);
   }
 
