@@ -370,6 +370,34 @@ describe('validateAndRepairAdf', () => {
     expect(delegateTask).not.toHaveBeenCalled();
   });
 
+  it('uses the canonical repair path for an explicit execution step failure', async () => {
+    const delegateTask = vi.fn(async (instruction: string) => {
+      expect(instruction).toContain('## Failed Step');
+      expect(instruction).toContain('demo:step');
+      return JSON.stringify({ steps: [{ op: 'demo:step', params: {} }] });
+    });
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture(
+      'execution-step-failure.json',
+      JSON.stringify({ steps: [{ op: 'demo:step', params: {} }] }, null, 2)
+    );
+
+    const result = await validateAndRepairAdf(filePath, 'pipeline-adf', {
+      step: { op: 'demo:step', id: 'failed-step', params: { value: 'before' } },
+      failure: {
+        category: 'runtime_error',
+        detail: 'the demo actuator rejected the input',
+        repairAction: 'repair the step parameters',
+      },
+    });
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(readFixture(filePath))).toEqual({
+      steps: [{ op: 'demo:step', params: {} }],
+    });
+  });
+
   describe('KP-02: delegateTask knowledge context', () => {
     it('attaches a "Relevant knowledge" section to the delegation context when hints are found', async () => {
       vi.mocked(findRelevantDistilledKnowledge).mockResolvedValueOnce([
