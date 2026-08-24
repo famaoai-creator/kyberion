@@ -34,7 +34,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -154,7 +154,7 @@ const _trustedExecutableManifests = new WeakSet<EnvironmentManifest>();
  * ------------------------------------------------------------------ */
 
 export type RegisteredProbe = () => Promise<{ available: boolean; reason?: string }>;
-const environmentProbeSeam = defineSeam<RegisteredProbe>({
+const environmentProbeSeam = createSeam<RegisteredProbe>({
   key: 'environment.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
