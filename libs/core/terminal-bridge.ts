@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import {
   safeExec,
   safeExistsSync,
+  loadJson,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -32,7 +33,7 @@ function listReflexTerminalSessions() {
     const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
     if (!safeExistsSync(stateFile)) continue;
     try {
-      const state = JSON.parse(safeReadFile(stateFile, { encoding: 'utf8' }) as string);
+      const state = loadJson<{ pid: number; status?: string }>(stateFile);
       process.kill(state.pid, 0);
       sessions.push({
         winId: 'rt-main',
@@ -58,7 +59,7 @@ const STRATEGIES: Record<string, any> = {
         const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
         if (safeExistsSync(stateFile)) {
           try {
-            const state = JSON.parse(safeReadFile(stateFile, { encoding: 'utf8' }) as string);
+            const state = loadJson<{ pid: number; status?: string }>(stateFile);
             // Simple check if the process is still alive
             process.kill(state.pid, 0);
             return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
@@ -219,7 +220,7 @@ export const terminalBridge = {
       const latestPath = path.join(RUNTIME_BASE, sessionId, 'out', 'latest_response.json');
       if (safeExistsSync(latestPath)) {
         try {
-          const content = JSON.parse(safeReadFile(latestPath, { encoding: 'utf8' }) as string);
+          const content = loadJson<{ data?: { message?: string } }>(latestPath);
           return content.data.message || '';
         } catch (_) {
           return '';

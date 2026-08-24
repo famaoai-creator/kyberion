@@ -3,6 +3,7 @@ import {
   summarizeSemanticDegradations,
   listPromotionCandidates,
   logger,
+  loadJson,
   safeReadFile,
   safeWriteFile,
   safeExec,
@@ -1057,7 +1058,7 @@ export function loadActuatorRequestArchetypes(): any {
   if (!safeExistsSync(ACTUATOR_ARCHETYPES_PATH)) {
     throw new Error(`Archetype catalog not found: ${ACTUATOR_ARCHETYPES_PATH}`);
   }
-  return JSON.parse(safeReadFile(ACTUATOR_ARCHETYPES_PATH, { encoding: 'utf8' }) as string);
+  return loadJson<unknown>(ACTUATOR_ARCHETYPES_PATH);
 }
 
 export function detectRequestArchetype(requestText: string, catalog: any): any {
@@ -1521,10 +1522,7 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const raw = JSON.parse(safeReadFile(templateFullPath, { encoding: 'utf8' }) as string) as Record<
-    string,
-    unknown
-  >;
+  const raw = loadJson<Record<string, unknown>>(templateFullPath) as Record<string, unknown>;
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);
   return {
     ...job,
@@ -1964,10 +1962,7 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   );
   const missions = missionFiles.map((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      any
-    >;
+    const state = loadJson<Record<string, any>>(filePath) as Record<string, any>;
     return {
       mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
       tier: String(state.tier || 'unknown'),
@@ -2009,7 +2004,7 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
       const titleLine =
         readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
       const ledger = safeExistsSync(ledgerPath)
-        ? JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string)
+        ? loadJson<{ entries?: unknown }>(ledgerPath)
         : { entries: [] };
       const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
       projectEntries.push({

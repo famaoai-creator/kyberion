@@ -5,7 +5,7 @@ import { listArtifactRecords } from './artifact-record.js';
 import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 
@@ -181,7 +181,7 @@ function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
   const reportPath = pathResolver.shared('runtime/qa/latest-quality-report.json');
   if (!safeExistsSync(reportPath)) return undefined;
   try {
-    const report = JSON.parse(safeReadFile(reportPath, { encoding: 'utf8' }) as string) as {
+    const report = loadJson<{
       report_id?: string;
       project_id?: string;
       subject_ref?: string;
@@ -191,7 +191,7 @@ function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
       generated_at?: string;
       residual_risks?: string[];
       evidence_refs?: string[];
-    };
+    }>(reportPath);
     if (!report.report_id || !report.recommendation || !report.accountable_human_id)
       return undefined;
     return {
@@ -214,9 +214,9 @@ function readMissionManagementDirs(): string[] {
   const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
   if (safeExistsSync(configPath)) {
     try {
-      const raw = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string) as {
+      const raw = loadJson<{
         directories?: Record<string, string>;
-      };
+      }>(configPath);
       const dirs = raw.directories || {};
       return ['personal', 'confidential', 'public']
         .map((tier) => dirs[tier])
@@ -245,7 +245,7 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
         const statePath = path.join(root, entry, 'mission-state.json');
         if (!safeExistsSync(statePath)) continue;
         try {
-          const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+          const state = loadJson<{
             mission_id: string;
             status: string;
             tier: 'personal' | 'confidential' | 'public';
@@ -265,7 +265,7 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
               goal_summary?: string;
               success_condition?: string;
             };
-          };
+          }>(statePath);
           if (!state?.mission_id) continue;
           const organizationId =
             state.organization_id || state.relationships?.organization?.organization_id;
