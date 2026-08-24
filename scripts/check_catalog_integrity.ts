@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import {
   extractPlaceholderNames,
   loadActuatorManifestCatalog,
+  loadJson,
   pathResolver,
   resolveVocabularyEntry,
   safeExistsSync,
@@ -149,7 +150,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryServiceIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      const payload = loadJson<typeof typed>(filePath) as {
         default_pattern?: string;
         services?: Record<string, unknown>;
       };
@@ -252,7 +253,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      const payload = loadJson<typeof typed>(filePath) as {
         version?: string;
         specialists?: Record<string, unknown>;
       };
@@ -613,9 +614,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const raw = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    ) as ThemeCatalogShape;
+    const raw = loadJson<ThemeCatalogShape>(filePath);
     violations.push(
       ...collectThemeCatalogViolations({
         label: path.relative(pathResolver.rootDir(), filePath),
@@ -631,12 +630,8 @@ function validateDesignTokenCatalog(violations: string[]) {
   // E2E-02: the flat catalog and the decomposed directory copy are a generated
   // pair; their theme maps must stay identical so neither drifts silently.
   try {
-    const flat = JSON.parse(String(safeReadFile(themeFiles[0], { encoding: 'utf8' }) || '')) as {
-      themes?: Record<string, unknown>;
-    };
-    const nested = JSON.parse(String(safeReadFile(themeFiles[1], { encoding: 'utf8' }) || '')) as {
-      themes?: Record<string, unknown>;
-    };
+    const flat = loadJson<{ themes?: Record<string, unknown> }>(themeFiles[0]);
+    const nested = loadJson<{ themes?: Record<string, unknown> }>(themeFiles[1]);
     if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
       violations.push(
         'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
