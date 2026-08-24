@@ -1,5 +1,6 @@
 import type vocabulary from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
-import { renderBrowserVocabularyMessage } from '@agent/core/locale-normalize';
+import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
+import { createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
 
 /**
  * CS-04 (I18N-04): concierge strings live in the shared user-facing
@@ -12,6 +13,7 @@ import { renderBrowserVocabularyMessage } from '@agent/core/locale-normalize';
 export type ConciergeLocale = 'en' | 'ja';
 export type ConciergeMessageKey = keyof (typeof vocabulary)['domains']['concierge'];
 type MessageParams = Record<string, string | number>;
+const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
 
 export function resolveConciergeLocale(value?: string): ConciergeLocale {
   return value?.toLowerCase().startsWith('en') ? 'en' : 'ja';
@@ -27,5 +29,5 @@ export function conciergeText(
   locale: ConciergeLocale,
   params: MessageParams = {}
 ): string {
-  return renderBrowserVocabularyMessage(`concierge:${String(key)}`, params, locale);
+  return browserVocabulary.renderMessage(`concierge:${String(key)}`, params, locale);
 }
