@@ -1,4 +1,4 @@
-import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
+import { draftDeckSectionBodies, loadJson, selectDeckTheme } from '@agent/core';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import {
   logger,
@@ -247,7 +247,7 @@ function loadBodyZoneLayouts(rootDir: string): any {
     rootDir,
     'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json'
   );
-  _cachedBzl = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  _cachedBzl = loadJson<any>(p);
   return _cachedBzl;
 }
 
@@ -343,7 +343,7 @@ function loadLayoutTemplateCatalog(rootDir: string): any {
       rootDir,
       'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
     );
-    _cachedLayoutTemplates = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+    _cachedLayoutTemplates = loadJson<any>(p);
   } catch {
     _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
   }
@@ -357,7 +357,7 @@ function loadTenantEntries(rootDir: string): { override_path: string }[] {
   const entries: { override_path: string }[] = [];
   const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
   try {
-    const registry = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
+    const registry = loadJson<any>(indexPath);
     if (Array.isArray(registry.tenants)) {
       entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
     }
@@ -405,7 +405,7 @@ function resolveConfidentialTenantOverride(
     for (const entry of _cachedTenantRegistry.entries || []) {
       const overridePath = path.resolve(rootDir, entry.override_path);
       try {
-        const override = JSON.parse(safeReadFile(overridePath, { encoding: 'utf8' }) as string);
+        const override = loadJson<any>(overridePath);
         if (
           designSystemId &&
           override.design_system_id &&
@@ -453,7 +453,7 @@ function resolveLayoutTemplate(
   if (tenantOverride?.layout_template_catalog) {
     try {
       const catalogPath = path.resolve(rootDir, tenantOverride.layout_template_catalog);
-      const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      const catalog = loadJson<any>(catalogPath);
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
       if (tpl) return tpl;
@@ -1799,7 +1799,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'json_read': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const parsed = JSON.parse(safeReadFile(sourcePath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<any>(sourcePath);
       return { ...ctx, [params.export_as || 'last_json']: parsed };
     }
     case 'pptx_extract': {
@@ -2362,7 +2362,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (!safeExistsSync(patternPath)) {
         throw new Error(`Design pattern not found: ${patternPath}`);
       }
-      const pattern = JSON.parse(safeReadFile(patternPath, { encoding: 'utf8' }) as string);
+      const pattern = loadJson<any>(patternPath);
       return { ...ctx, active_pattern: pattern, pattern_id: pattern.pattern_id };
     }
     case 'merge_content': {
@@ -2429,9 +2429,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (tenantSlug) {
         const confPath = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
         try {
-          const confCatalog = JSON.parse(
-            safeReadFile(path.resolve(rootDir, confPath), { encoding: 'utf8' }) as string
-          );
+          const confCatalog = loadJson<any>(path.resolve(rootDir, confPath));
           const m = matchLayoutTemplate(geometry, confCatalog);
           if (m) confMatch = { ...m, catalog: confPath };
         } catch {
@@ -3629,7 +3627,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const registryPath = path.resolve(rootDir, 'knowledge/confidential/tenants/index.json');
       let registry: any = { tenants: [] };
       try {
-        registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+        registry = loadJson<any>(registryPath);
       } catch {
         /* create new */
       }
@@ -3694,7 +3692,7 @@ function readJsonFilesRecursively(dirPath: string): any[] {
       continue;
     }
     if (!entry.endsWith('.json')) continue;
-    docs.push(JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string));
+    docs.push(loadJson<any>(fullPath));
   }
   return docs;
 }
@@ -3714,7 +3712,7 @@ function loadJsonCatalog(
     return docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(input.fallback));
   }
   if (safeExistsSync(filePath)) {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    return loadJson<any>(filePath);
   }
   return cloneJsonValue(input.fallback);
 }
@@ -3786,7 +3784,7 @@ function loadConfidentialThemePackEntries(
       const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
       if (!safeExistsSync(themePackPath)) continue;
       try {
-        const pack = JSON.parse(safeReadFile(themePackPath, { encoding: 'utf8' }) as string);
+        const pack = loadJson<any>(themePackPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
@@ -3829,7 +3827,7 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     const directPath = path.join(rootDir, 'knowledge/confidential', slug, 'design/theme.json');
     if (safeExistsSync(directPath)) {
       try {
-        const pack = JSON.parse(safeReadFile(directPath, { encoding: 'utf8' }) as string);
+        const pack = loadJson<any>(directPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
@@ -3858,7 +3856,7 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     }
     try {
       const packPath = path.resolve(rootDir, entry.pack_path);
-      return JSON.parse(safeReadFile(packPath, { encoding: 'utf8' }) as string);
+      return loadJson<any>(packPath);
     } catch {
       continue;
     }
