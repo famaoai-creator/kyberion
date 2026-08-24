@@ -1,7 +1,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import AjvModule, { type ValidateFunction } from 'ajv';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';

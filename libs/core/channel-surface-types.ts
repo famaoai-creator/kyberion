@@ -10,6 +10,7 @@ import type { A2AMessage } from './a2a-bridge.js';
 import type { A2UIMessage } from './a2ui.js';
 import type { AgentContextMode } from './context-boundary.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
+import type { IntentResolutionContract } from './intent-resolution-contract.js';
 import type {
   ExecutionFeedbackInput,
   ExecutionFeedbackRecord,
@@ -402,6 +403,7 @@ export interface SurfaceConversationResult {
   taskResultRepairRequiresReview?: boolean;
   surfaceParseErrors?: string[];
   routingDecision?: AgentRoutingDecision;
+  intentResolution?: IntentResolutionContract;
   executionFeedbackRequest?: ExecutionFeedbackRequest;
   executionFeedbackRecord?: ExecutionFeedbackRecord;
 }

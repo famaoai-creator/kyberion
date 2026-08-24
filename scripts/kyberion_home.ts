@@ -313,11 +313,6 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
     return;
   }
   const correlationId = `kyberion-ask-${Date.now().toString(36)}`;
-  const intentResolution = await withExecutionContext(
-    'sovereign_concierge',
-    () => resolveProcedure(text),
-    'sovereign'
-  );
   const result = await runSurfaceMessageConversation({
     surface: 'cli',
     text,
@@ -331,6 +326,7 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
     delegationSummaryInstruction:
       'Produce a concise terminal-friendly reply in the operator language. No A2A blocks.',
   });
+  const intentResolution = result.intentResolution;
   const improvement = result.executionFeedbackRecord
     ? materializeExecutionFeedbackCandidate({ feedback: result.executionFeedbackRecord })
     : null;
@@ -338,12 +334,12 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
     console.log(JSON.stringify({ ...result, intentResolution, improvement }, null, 2));
     return;
   }
-  if (intentResolution.outcome === 'matched' && intentResolution.best) {
+  if (intentResolution && intentResolution.normalized_intent !== 'unresolved_intent') {
     console.log(
-      `[intent] ${intentResolution.best.procedure_id} ` +
-        `(confidence=${intentResolution.best.confidence.toFixed(2)})`
+      `[intent] ${intentResolution.normalized_intent} ` +
+        `(shape=${intentResolution.resolution_shape}, authority=${intentResolution.authority_level})`
     );
-  } else if (intentResolution.outcome === 'ambiguous') {
+  } else if (intentResolution?.authority_level === 'human_clarification_required') {
     console.log(ui('recorder:recorder_intent_ambiguous'));
   }
   const reply = (result as { text?: string })?.text;
@@ -1503,7 +1499,7 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
   console.log(ui('recorder:recorder_deal_requirements_command'));
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
@@ -1740,4 +1736,12 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+const isDirectRun =
+  process.argv[1] && /(?:^|[/\\])kyberion_home\.(?:ts|js)$/u.test(process.argv[1]);
+
+if (isDirectRun) {
+  void main().catch((error: unknown) => {
+    console.error(String(error));
+    process.exitCode = 1;
+  });
+}

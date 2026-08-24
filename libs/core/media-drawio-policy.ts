@@ -1,8 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
 import { resolveDrawioBoundaryPaletteOverride } from './media-drawio-boundary-policy.js';
 
 export interface MediaDrawioBoundaryPaletteEntry {
@@ -25,15 +23,8 @@ interface MediaDrawioPolicyCatalog {
   node_sizes: MediaDrawioNodeSizeEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-drawio-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-drawio-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MediaDrawioPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_BOUNDARY_PALETTES: MediaDrawioBoundaryPaletteEntry[] = [
   { boundary: 'account', type: 'aws_account', fill: '#F8FAFC', stroke: '#0F172A' },
@@ -54,44 +45,21 @@ const FALLBACK_NODE_SIZES: MediaDrawioNodeSizeEntry[] = [
   { tier: 'app', width: 88, height: 88 },
 ];
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MediaDrawioPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid media drawio policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as MediaDrawioPolicyCatalog;
-}
+const catalog = defineCatalog<MediaDrawioPolicyCatalog>({
+  id: 'media-drawio-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: () => ({
+    version: '1.0.0',
+    boundary_palettes: FALLBACK_BOUNDARY_PALETTES,
+    node_sizes: FALLBACK_NODE_SIZES,
+  }),
+  onFallback: (error, fallback) =>
+    recordConfigFallback({ knowledgePath: CATALOG_PATH, error, defaults: fallback }),
+});
 
 export function loadMediaDrawioPolicyCatalog(): MediaDrawioPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = {
-      version: '1.0.0',
-      boundary_palettes: FALLBACK_BOUNDARY_PALETTES,
-      node_sizes: FALLBACK_NODE_SIZES,
-    };
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolveMediaDrawioBoundaryPalette(input: {
@@ -103,7 +71,9 @@ export function resolveMediaDrawioBoundaryPalette(input: {
 }): { fill: string; stroke: string } {
   const normalizedBoundary = String(input.boundary || '').trim();
   const normalizedType = String(input.type || '').trim();
-  const normalizedName = String(input.name || '').trim().toLowerCase();
+  const normalizedName = String(input.name || '')
+    .trim()
+    .toLowerCase();
   const override = resolveDrawioBoundaryPaletteOverride({
     boundary: normalizedBoundary,
     type: normalizedType,
@@ -112,9 +82,10 @@ export function resolveMediaDrawioBoundaryPalette(input: {
   if (override) return override;
   const catalog = loadMediaDrawioPolicyCatalog();
 
-  const palette = catalog.boundary_palettes.find((entry) =>
-    (entry.boundary === normalizedBoundary && (!entry.type || entry.type === normalizedType))
-      || (entry.type === normalizedType && !entry.boundary)
+  const palette = catalog.boundary_palettes.find(
+    (entry) =>
+      (entry.boundary === normalizedBoundary && (!entry.type || entry.type === normalizedType)) ||
+      (entry.type === normalizedType && !entry.boundary)
   );
   if (palette) return { fill: palette.fill, stroke: palette.stroke };
 
@@ -128,16 +99,17 @@ export function resolveMediaDrawioNodeSize(input: {
   tier?: string;
 }): { width: number; height: number } | null {
   const normalizedType = String(input.type || '').trim();
-  const normalizedTier = String(input.tier || '').trim().toLowerCase();
+  const normalizedTier = String(input.tier || '')
+    .trim()
+    .toLowerCase();
   const catalog = loadMediaDrawioPolicyCatalog();
-  const match = catalog.node_sizes.find((entry) =>
-    (entry.type && entry.type === normalizedType)
-      || (entry.tier && entry.tier === normalizedTier)
+  const match = catalog.node_sizes.find(
+    (entry) =>
+      (entry.type && entry.type === normalizedType) || (entry.tier && entry.tier === normalizedTier)
   );
   return match ? { width: match.width, height: match.height } : null;
 }
 
 export function resetMediaDrawioPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

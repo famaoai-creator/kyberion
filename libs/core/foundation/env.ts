@@ -1,0 +1,36 @@
+import { readJsonIfPresent } from './json.js';
+import { pathResolver } from '../path-resolver.js';
+
+export interface FoundationEnvEntry {
+  name: string;
+  type: 'string' | 'boolean' | 'number' | 'enum' | 'path';
+  enum?: string[];
+}
+
+const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
+
+function entries(): FoundationEnvEntry[] {
+  const parsed = readJsonIfPresent<{ entries?: FoundationEnvEntry[] }>(REGISTRY_PATH);
+  return Array.isArray(parsed?.entries) ? parsed.entries : [];
+}
+
+export function getRegisteredEnv<T = string>(
+  name: string,
+  options: { env?: Record<string, string | undefined>; defaultValue?: T; strict?: boolean } = {}
+): string | number | boolean | T | undefined {
+  const raw = (options.env ?? process.env)[name];
+  if (raw === undefined || raw === '') return options.defaultValue;
+  const entry = entries().find((candidate) => candidate.name === name);
+  if (!entry || entry.type === 'string' || entry.type === 'path') return raw;
+  if (entry.type === 'boolean') {
+    if (/^(1|true|yes|on)$/i.test(raw)) return true;
+    if (/^(0|false|no|off)$/i.test(raw)) return false;
+  } else if (entry.type === 'number') {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) return parsed;
+  } else if (entry.type === 'enum' && entry.enum?.includes(raw)) {
+    return raw;
+  }
+  if (options.strict) throw new Error(`Invalid value for registered environment variable ${name}`);
+  return options.defaultValue;
+}

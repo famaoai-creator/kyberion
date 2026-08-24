@@ -1267,6 +1267,18 @@
       "type": "json"
     },
     {
+      "path": "product/governance/ci-gates.json",
+      "tier": "public",
+      "size": 2010,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/cli-commands.json",
+      "tier": "public",
+      "size": 873,
+      "type": "json"
+    },
+    {
       "path": "product/governance/config-protocol.md",
       "tier": "public",
       "size": 2523,
@@ -2011,6 +2023,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/module-layer-boundaries.json",
+      "tier": "public",
+      "size": 1073,
+      "type": "json"
+    },
+    {
       "path": "product/governance/monitoring-rules.json",
       "tier": "public",
       "size": 716,
@@ -2284,6 +2302,12 @@
       "path": "product/governance/portfolio-status.md",
       "tier": "public",
       "size": 2789,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
+      "tier": "public",
+      "size": 11292,
       "type": "md"
     },
     {
@@ -2631,7 +2655,7 @@
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 2749,
+      "size": 2988,
       "type": "json"
     },
     {
@@ -4989,7 +5013,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 453779,
+      "size": 460114,
       "type": "json"
     },
     {

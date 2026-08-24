@@ -54,6 +54,7 @@ import {
   validateOpInput,
   resolveIdentityContext,
   executeAdfSteps,
+  runAdfLifecycle,
   skipAdfStep,
   type AdfStep,
   type AdfStepHandlers,
@@ -2917,7 +2918,20 @@ export async function runValidatedSteps(
   opts: RunStepsOptions = {}
 ) {
   const flowErrors = validateFlow(steps, initialCtx);
-  if (flowErrors.length === 0) return runSteps(steps, initialCtx, opts);
+  if (flowErrors.length === 0) {
+    return (
+      await runAdfLifecycle({
+        draft: () => steps,
+        preflight: (draft) => {
+          const errors = validateFlow(draft, initialCtx);
+          if (errors.length > 0) throw new Error(formatFlowValidationErrors(errors));
+          return draft;
+        },
+        commit: (prepared) => prepared,
+        execute: (committed) => runSteps(committed, initialCtx, opts),
+      })
+    ).result;
+  }
 
   const error = formatFlowValidationErrors(flowErrors);
   for (const flowError of flowErrors) {

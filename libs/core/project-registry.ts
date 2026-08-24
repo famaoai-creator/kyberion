@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 export interface ProjectRecord {
   project_id: string;

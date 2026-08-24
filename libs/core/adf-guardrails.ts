@@ -242,6 +242,20 @@ export function validatePipelineGuardrails(
               path: `${stepPath}.params.cmd`,
             });
           }
+          if (
+            /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
+              command
+            ) ||
+            /dist\/libs\/actuators\//iu.test(command)
+          ) {
+            findings.push({
+              code: 'script-wrapper-forbidden',
+              severity: 'error',
+              message:
+                'ADF shell steps must not wrap scripts or actuators; use a typed operation or core:include.',
+              path: `${stepPath}.params.cmd`,
+            });
+          }
         }
       }
       if (opName === 'core:include' || opName === 'include') {
@@ -293,7 +307,7 @@ export function validatePipelineGuardrails(
         if (script.length > policy.limits.max_transform_script_chars) {
           findings.push({
             code: 'transform-script-oversized',
-            severity: 'warn',
+            severity: 'error',
             message: `core:transform script is ${script.length} chars (limit ${policy.limits.max_transform_script_chars}) — move this logic into a typed actuator op instead of JS-in-a-string`,
             path: stepPath,
           });

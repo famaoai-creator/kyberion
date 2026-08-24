@@ -23,7 +23,9 @@
 
 <p align="center">Intent → Plan → Result</p>
 
-Kyberion turns intent into governed execution. You ask `今週の進捗レポートを作って` or `この PDF をパワポにして`, and it picks the right actuators, runs the work, asks only when something is genuinely ambiguous, and returns the result plus an artifact plus a trace that next runs can learn from.
+Every request has a visible plan, result, and next action.
+
+Kyberion turns a request into a clear plan and a verified result. You ask `今週の進捗レポートを作って` or `この PDF をパワポにして`, and it selects the right tools, asks only when something is genuinely ambiguous, and returns the result plus an artifact plus evidence that future work can build on.
 
 **For people new to the repo**
 
@@ -43,8 +45,8 @@ Kyberion turns intent into governed execution. You ask `今週の進捗レポー
 
 Most agent frameworks stop at "execute". Kyberion closes the loop:
 
-- **No evidence, no "done".** Finishing a mission runs a goal-satisfaction gate: every success criterion is reconciled against actual artifacts and verifications. Unsatisfied gaps automatically dispatch gap-closing tasks — the letter of a task never substitutes for its purpose.
-- **The agent org improves itself.** Every finished mission runs a retrospective: deterministic execution stats ground LLM improvement proposals (human-ratified, never auto-applied), and measured agent×role outcomes feed the _next_ mission's team staffing. Your instance gets measurably better the more you use it.
+- **No evidence, no "done".** Finishing a work cycle checks every success criterion against actual artifacts and verifications. Unsatisfied gaps automatically dispatch gap-closing work — the wording of a request never substitutes for its purpose.
+- **The work loop improves itself.** Every finished work cycle runs a retrospective: deterministic execution stats ground improvement proposals (human-ratified, never auto-applied), and measured outcomes improve future staffing. Your instance gets measurably better the more you use it.
 - **Frontier-model discipline on any model.** The working philosophy — read before write, one change one verification, no retry without a new hypothesis, evidence-based completion — is codified as mechanical rules ([working-philosophy](./knowledge/product/governance/working-philosophy.md)) and injected into every worker prompt, so fast/small models inherit the habits that make frontier models reliable.
 - **Governance by architecture, not by prompt.** Three-tier knowledge isolation is enforced at the file-IO boundary. Customer conversations are physically separated from mission state. Outbound sends always pass an approval gate. An append-only audit chain records everything.
 - **Workers get briefed, not dumped.** Each dispatched worker receives a role-scoped mission context pack — the mission goal, acceptance criteria, and the top knowledge hints distilled from previous runs — under an explicit size budget, with automatic compaction on long runs. Delegation is a briefing, not a context dump.
@@ -53,7 +55,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).** The commands below are a summary; if anything conflicts, INITIALIZATION.md wins. tenant / organization / activation までの実行順は [`onboarding-flow.md`](./knowledge/product/governance/onboarding-flow.md) を参照してください。
+> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is a short overview; use Quickstart for the exact first-win command order. Day-2 tenant / organization / activation work is documented in [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).
 
 Kyberion's first visible result comes in three short paths:
 
@@ -63,20 +65,22 @@ Kyberion's first visible result comes in three short paths:
 
 ### First-win shortest paths (one table)
 
-| Path              | Prerequisites                                           | Time         | Command                                               | Notes                                                                                                                                 |
-| :---------------- | :------------------------------------------------------ | :----------- | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| Readiness check   | Node 24+, pnpm (`pnpm install`)                         | ~30s         | `pnpm doctor`                                         | No build needed                                                                                                                       |
-| Browser first-win | + `pnpm build`, `pnpm exec playwright install chromium` | ~5min        | `pnpm pipeline --input pipelines/verify-session.json` | Writes `active/shared/tmp/first-win-session.png`                                                                                      |
-| Voice first-win   | macOS only (native TTS; not available in Docker)        | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json`    | Run after the browser smoke                                                                                                           |
-| Docker path       | Docker Desktop                                          | ~10min build | `docker compose --profile deploy up`                  | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is tracked in the ops backlog. |
+| Path            | Prerequisites                                    | Time         | Command                                            | Notes                                                                                                                                 |
+| :-------------- | :----------------------------------------------- | :----------- | :------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| First-win       | Node 24+, pnpm                                   | ~5min        | Quickstart's five commands                         | Writes `active/shared/tmp/first-win-session.png` (or the governed fallback)                                                           |
+| Voice first-win | macOS only (native TTS; not available in Docker) | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json` | Run after the browser smoke                                                                                                           |
+| Docker path     | Docker Desktop                                   | ~10min build | `docker compose --profile deploy up`               | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is tracked in the ops backlog. |
 
-If you want the shortest startup path first, run this:
+The canonical first-win command sequence is:
+
+# kyberion-first-win
 
 ```bash
 pnpm install
-pnpm prereq:check
 pnpm build
-pnpm setup:report --persona first-time-user
+pnpm prereq:check
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
 If a browser, voice, or media actuator is missing a local dependency, inspect it directly with the on-demand pull resolver:
@@ -93,13 +97,14 @@ Requires Node.js 24+ (`.nvmrc` / `package.json` engines) and pnpm.
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
-pnpm prereq:check                       # verifies Node 24+ floor; warns if Playwright browsers are missing
-pnpm exec playwright install chromium   # recommended: the browser smoke needs it
 pnpm build
-pnpm onboard
+pnpm prereq:check                       # verifies Node 24+ floor; warns if Playwright browsers are missing
 pnpm doctor
-pnpm setup:report --persona first-time-user
+pnpm pipeline --input pipelines/verify-session.json
 ```
+
+`pnpm exec playwright install chromium` is optional. If Chromium is unavailable, the
+pipeline writes its governed text fallback instead of hiding the readiness result.
 
 If you already have onboarding JSON, use Path B instead of the wizard:
 

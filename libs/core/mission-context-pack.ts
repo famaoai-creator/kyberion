@@ -34,7 +34,7 @@ import {
 } from './mission-team-plan-composer.js';
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 import {
   compileScopedContextPack,
   type ContextFragmentRejection,
