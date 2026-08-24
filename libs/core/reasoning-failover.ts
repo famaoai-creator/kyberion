@@ -4,6 +4,7 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  loadJson,
   safeReadFile,
   safeUnlink,
   safeWriteFile,
@@ -111,7 +112,7 @@ export function readReasoningFailover(): ReasoningFailoverMarker | null {
   try {
     const markerPath = reasoningFailoverMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    const parsed = JSON.parse(safeReadFile(markerPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<Partial<ReasoningFailoverMarker>>(markerPath);
     if (parsed && typeof parsed.from_mode === 'string' && typeof parsed.to_mode === 'string') {
       return parsed as ReasoningFailoverMarker;
     }

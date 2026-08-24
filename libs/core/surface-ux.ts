@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { secretGuard } from './secret-guard.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { getServicePresetPolicy } from './service-preset-policy.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
@@ -73,7 +73,7 @@ export interface SurfaceDoctorSummary {
 function readJsonSafe<T>(absPath: string): T | null {
   try {
     if (!safeExistsSync(absPath)) return null;
-    return JSON.parse(safeReadFile(absPath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(absPath);
   } catch {
     return null;
   }

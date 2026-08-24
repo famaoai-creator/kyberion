@@ -2,7 +2,7 @@ import path from 'node:path';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { validateBrowserExtensionRecording } from './browser-extension-bridge.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
@@ -43,7 +43,7 @@ export function promoteBrowserProcedure(
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
   let raw: unknown;
   try {
-    raw = JSON.parse(safeReadFile(recordingAbs, { encoding: 'utf8' }) as string);
+    raw = loadJson<unknown>(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`

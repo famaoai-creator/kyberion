@@ -12,6 +12,7 @@ import {
   safeReadFile,
   safeReaddir,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 
 export type GovernedArtifactRole =
@@ -85,7 +86,7 @@ export function appendGovernedArtifactJsonl(
 export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
   const resolved = resolveGovernedArtifactPath(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(resolved);
 }
 
 export function listGovernedArtifacts(logicalDir: string): string[] {

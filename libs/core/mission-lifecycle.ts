@@ -34,6 +34,7 @@ import {
   safeStat,
   safeRmSync,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
@@ -328,10 +329,7 @@ function extractPromotableMissionMemory(raw: string): string | null {
 function updateMissionMemorySidecar(mdPath: string, candidateId: string): void {
   const sidecarPath = sidecarPathForMarkdown(mdPath);
   if (!safeExistsSync(sidecarPath)) return;
-  const sidecar = JSON.parse(safeReadFile(sidecarPath, { encoding: 'utf8' }) as string) as Record<
-    string,
-    unknown
-  >;
+  const sidecar = loadJson<Record<string, unknown>>(sidecarPath);
   safeWriteFile(
     sidecarPath,
     JSON.stringify(
