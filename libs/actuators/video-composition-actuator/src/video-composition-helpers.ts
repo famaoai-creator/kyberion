@@ -1,6 +1,4 @@
-import AjvModule from 'ajv';
 import {
-  compileSchemaFromPath,
   logger,
   pathResolver,
   safeReadFile,
@@ -10,11 +8,9 @@ import {
   classifyError,
   VideoRenderRuntime,
 } from '@agent/core';
+import { compileSchema } from '@agent/core/foundation';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-export const videoCompositionActionValidate = compileSchemaFromPath(
-  ajv,
+export const videoCompositionActionValidate = compileSchema(
   pathResolver.rootResolve('schemas/video-composition-action.schema.json')
 );
 export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve(
