@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
@@ -217,16 +217,10 @@ export function getSurfaceQueryProviderConfig(
   }
 
   try {
-    let config = validateConfig(
-      JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string),
-      configPath
-    );
+    let config = validateConfig(loadJson(configPath), configPath);
     for (const overlayPath of overlayPaths) {
       if (!safeExistsSync(overlayPath)) continue;
-      const overlay = validateConfig(
-        JSON.parse(safeReadFile(overlayPath, { encoding: 'utf8' }) as string),
-        overlayPath
-      );
+      const overlay = validateConfig(loadJson(overlayPath), overlayPath);
       config = mergeConfigs(config, overlay);
     }
     cachedConfig = config;

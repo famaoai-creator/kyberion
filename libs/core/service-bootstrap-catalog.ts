@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
@@ -26,8 +26,12 @@ interface ServiceBootstrapCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_CATALOG_PATH = pathResolver.knowledge('product/governance/service-bootstrap-catalog.json');
-const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/governance/service-bootstrap-catalog.json');
+const PUBLIC_CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/service-bootstrap-catalog.json'
+);
+const PERSONAL_CATALOG_PATH = pathResolver.knowledge(
+  'personal/governance/service-bootstrap-catalog.json'
+);
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-bootstrap-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
@@ -49,20 +53,22 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): ServiceBootstrapCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid service bootstrap catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid service bootstrap catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as ServiceBootstrapCatalog;
 }
 
 function loadCatalogFile(catalogPath: string): ServiceBootstrapCatalog | null {
   if (!safeExistsSync(catalogPath)) return null;
-  return validateCatalog(
-    JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string),
-    catalogPath
-  );
+  return validateCatalog(loadJson(catalogPath), catalogPath);
 }
 
-function mergeCatalogs(base: ServiceBootstrapCatalog, overlay: ServiceBootstrapCatalog): ServiceBootstrapCatalog {
+function mergeCatalogs(
+  base: ServiceBootstrapCatalog,
+  overlay: ServiceBootstrapCatalog
+): ServiceBootstrapCatalog {
   const byId = new Map<string, ServiceBootstrapCatalogEntry>();
   for (const entry of base.entries) byId.set(entry.id, entry);
   for (const entry of overlay.entries) byId.set(entry.id, entry);
@@ -89,7 +95,9 @@ export function listServiceBootstrapCatalogEntries(): ServiceBootstrapCatalogEnt
   return loadServiceBootstrapCatalog().entries;
 }
 
-export function findServiceBootstrapEntriesByUtterance(utterance: string): ServiceBootstrapCatalogEntry[] {
+export function findServiceBootstrapEntriesByUtterance(
+  utterance: string
+): ServiceBootstrapCatalogEntry[] {
   const normalized = utterance.trim();
   if (!normalized) return [];
   return listServiceBootstrapCatalogEntries().filter((entry) =>
@@ -97,10 +105,14 @@ export function findServiceBootstrapEntriesByUtterance(utterance: string): Servi
   );
 }
 
-export function getServiceBootstrapCatalogEntryByServiceId(serviceId: string): ServiceBootstrapCatalogEntry | null {
+export function getServiceBootstrapCatalogEntryByServiceId(
+  serviceId: string
+): ServiceBootstrapCatalogEntry | null {
   const normalized = serviceId.trim();
   if (!normalized) return null;
-  return listServiceBootstrapCatalogEntries().find((entry) => entry.service_id === normalized) || null;
+  return (
+    listServiceBootstrapCatalogEntries().find((entry) => entry.service_id === normalized) || null
+  );
 }
 
 export function getDefaultServiceIdForSurface(surface: string): string | null {

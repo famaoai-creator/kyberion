@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
@@ -189,10 +189,7 @@ function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
 
 function loadPolicyFile(): ReasoningBackendPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  return validatePolicy(
-    JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string),
-    POLICY_PATH
-  );
+  return validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
 }
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
