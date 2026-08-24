@@ -8,6 +8,7 @@ import {
   installProcessGuards,
   logger,
   terminalBridge,
+  loadJson,
   safeReadFile,
   safeWriteFile,
   pathResolver,
@@ -192,7 +193,7 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
     try {
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
       if (safeExistsSync(registryPath)) {
-        const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+        const registry = loadJson<any>(registryPath);
         if (registry.profiles[profile]) {
           return { profile, cleanPayload };
         }
@@ -231,9 +232,9 @@ async function scanAndDispatch(channels: Channel[]) {
 
       if (safeExistsSync(metaPath) && safeExistsSync(responsePath)) {
         try {
-          const meta = JSON.parse(safeReadFile(metaPath, { encoding: 'utf8' }) as string);
+          const meta = loadJson<any>(metaPath);
           if (meta.stimulus_id === stimulus.id) {
-            const response = JSON.parse(safeReadFile(responsePath, { encoding: 'utf8' }) as string);
+            const response = loadJson<any>(responsePath);
             const text = response.data?.message || JSON.stringify(response.data || {}, null, 2);
 
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);
