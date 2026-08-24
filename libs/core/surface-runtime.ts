@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
@@ -17,8 +17,6 @@ import {
 } from './secure-io.js';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/runtime-surface-manifest.schema.json'
 );
@@ -93,7 +91,7 @@ let surfaceManifestValidateFn: ValidateFunction | null = null;
 
 function ensureSurfaceManifestValidator(): ValidateFunction {
   if (surfaceManifestValidateFn) return surfaceManifestValidateFn;
-  surfaceManifestValidateFn = compileSchemaFromPath(ajv, SURFACE_MANIFEST_SCHEMA_PATH);
+  surfaceManifestValidateFn = compileSchema(SURFACE_MANIFEST_SCHEMA_PATH);
   return surfaceManifestValidateFn;
 }
 

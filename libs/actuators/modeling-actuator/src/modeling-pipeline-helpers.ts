@@ -24,9 +24,9 @@ import {
   validateAgenticSourceReviewVerification,
   writeEngineeringArtifactBundle,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
@@ -61,9 +61,8 @@ export function buildRetryOptions() {
   });
 }
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
   'product/orchestration/browser-execution-presets.json'

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import {
   assertTenantOperational,
@@ -34,6 +34,7 @@ import { bootstrapManagedProject, type ProjectBootstrapResult } from './project-
 import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
@@ -44,15 +45,11 @@ import {
   loadJson,
 } from './secure-io.js';
 
-type AjvConstructor = typeof import('ajv').default;
 type AddFormatsPlugin = typeof import('ajv-formats').default;
-const AjvClass =
-  (AjvModule as unknown as { default?: AjvConstructor }).default ||
-  (AjvModule as unknown as AjvConstructor);
 const addFormats =
   (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
   (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = new AjvClass({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-context-binding.schema.json'

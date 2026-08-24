@@ -1,11 +1,9 @@
-import AjvModule from 'ajv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
+import { createAjv } from './foundation/ajv.js';
 
 /**
  * Creates a pre-configured yargs instance with common options.
@@ -94,9 +92,7 @@ export async function runActuatorCli(opts: {
   printResult?: (result: unknown) => void;
   args?: string[];
 }): Promise<void> {
-  const schemaValidator = opts.schema
-    ? new Ajv({ allErrors: true, allowUnionTypes: true }).compile(opts.schema)
-    : undefined;
+  const schemaValidator = opts.schema ? createAjv().compile(opts.schema) : undefined;
   const actuator = defineActuator({
     id: opts.name,
     ops: {

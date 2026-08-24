@@ -1,4 +1,4 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
@@ -14,6 +14,7 @@ import {
 } from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
+import { createAjv } from './foundation/ajv.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
@@ -21,8 +22,7 @@ export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
 /** Default execution lease lifetime: short-lived to bound replay risk. */
 const DEFAULT_LEASE_TTL_MS = 5 * 60_000;
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 addFormats(ajv);
 

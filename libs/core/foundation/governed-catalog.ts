@@ -1,6 +1,6 @@
 import { compileSchema } from './ajv.js';
 import { readJson } from './json.js';
-import { safeExistsSync } from '../secure-io.js';
+import { safeExistsSync, safeStat } from '../secure-io.js';
 import type { ValidateFunction } from 'ajv';
 
 export interface GovernedCatalogOptions<T> {
@@ -26,7 +26,7 @@ function cloneFallback<T>(fallback: T | (() => T)): T {
 export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCatalog<T> {
   let cached: T | undefined;
   let cachedPath: string | undefined;
-  let cachedRaw: string | undefined;
+  let cachedSignature: string | undefined;
   let validator: ValidateFunction<T> | undefined;
 
   const resolvePath = (): string =>
@@ -53,11 +53,14 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
     load(): T {
       const catalogPath = resolvePath();
       if (safeExistsSync(catalogPath)) {
-        const raw = JSON.stringify(readJson<unknown>(catalogPath));
-        if (cached !== undefined && cachedPath === catalogPath && cachedRaw === raw) return cached;
-        cached = validate(JSON.parse(raw), catalogPath);
+        const stat = safeStat(catalogPath);
+        const signature = `${stat.mtimeMs}:${stat.size}`;
+        if (cached !== undefined && cachedPath === catalogPath && cachedSignature === signature) {
+          return cached;
+        }
+        cached = validate(readJson<unknown>(catalogPath), catalogPath);
         cachedPath = catalogPath;
-        cachedRaw = raw;
+        cachedSignature = signature;
         return cached;
       }
       if (options.fallback === undefined) {
@@ -67,13 +70,13 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
       options.onFallback?.(new Error(`Catalog ${options.id} is missing: ${catalogPath}`), fallback);
       cached = fallback;
       cachedPath = catalogPath;
-      cachedRaw = undefined;
+      cachedSignature = undefined;
       return cached;
     },
     reset(): void {
       cached = undefined;
       cachedPath = undefined;
-      cachedRaw = undefined;
+      cachedSignature = undefined;
       validator = undefined;
     },
   };

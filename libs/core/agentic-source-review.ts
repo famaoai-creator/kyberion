@@ -1,10 +1,9 @@
 import * as path from 'node:path';
 
-import AjvModule, { type Ajv as AjvInstance } from 'ajv';
-
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 import type { SourceAnalysisIr } from './source-analysis.js';
 import type { ReasoningParticipant } from './reasoning-participant.js';
 import type { TierLevel } from './types.js';
@@ -19,13 +18,7 @@ const RULE_PACK_PATH = pathResolver.knowledge(
 const REVIEW_PLAN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agentic-source-review-plan.schema.json'
 );
-const ArtifactAjvCtor = AjvModule as unknown as new (options: {
-  allErrors: boolean;
-}) => AjvInstance;
-const validateReviewPlanSchema = compileSchemaFromPath(
-  new ArtifactAjvCtor({ allErrors: true }),
-  REVIEW_PLAN_SCHEMA_PATH
-);
+const validateReviewPlanSchema = compileSchemaFromPath(createAjv(), REVIEW_PLAN_SCHEMA_PATH);
 
 type ReviewStageStatus = 'complete' | 'pending_human_approval' | 'blocked' | 'manual_only';
 

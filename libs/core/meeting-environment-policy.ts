@@ -1,6 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type {
@@ -11,8 +12,7 @@ import type {
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/meeting-environment-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge(

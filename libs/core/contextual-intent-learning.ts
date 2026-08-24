@@ -1,4 +1,4 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -8,10 +8,10 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
+import { createAjv } from './foundation/ajv.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-learning.schema.json'

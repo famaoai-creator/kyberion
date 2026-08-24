@@ -1,5 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
@@ -38,8 +39,7 @@ export interface DistillCandidateRecord {
   scope?: MemoryScopeEnvelope;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/distill-candidate-record.schema.json');
 const DISTILL_DIR = pathResolver.shared('runtime/distill-candidates');
 let validateFn: ValidateFunction | null = null;

@@ -1,8 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   loadJson,
@@ -156,8 +157,7 @@ interface ValidationResult<T> {
   value?: T;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-session.schema.json');
 const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/task-session-policy.schema.json'

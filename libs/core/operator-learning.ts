@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { logger } from './core.js';
+import { createAjv as createFoundationAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -12,7 +13,6 @@ import {
   type StandardIntentDefinition,
 } from './intent-resolution.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 export type OperatorKnowledgeTier = 'personal' | 'confidential' | 'public';
@@ -260,7 +260,7 @@ let operatorLearningDispatchRegistryCachePath: string | null = null;
 let operatorLearningDispatchRegistryCache: OperatorLearningDispatchRegistry | null = null;
 
 function createAjv() {
-  const ajv = new Ajv({ allErrors: true });
+  const ajv = createFoundationAjv();
   addFormats(ajv);
   return ajv;
 }

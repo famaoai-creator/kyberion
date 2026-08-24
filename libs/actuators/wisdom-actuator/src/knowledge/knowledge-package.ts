@@ -1,6 +1,5 @@
-import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import type { Ajv as AjvInstance, Options, ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import {
   assetProvenanceRef,
   compileSchemaFromPath,
@@ -11,6 +10,7 @@ import {
   verifyA2AContent,
   type IngestLedgerPathOptions,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 
 export type KnowledgeTier = 'personal' | 'confidential' | 'public';
 export type KnowledgePackageSignatureStatus = 'absent' | 'verified' | 'rejected';
@@ -52,15 +52,8 @@ export interface KnowledgePackage {
 const AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const SCHEMA_PATH = pathResolver.rootResolve('schemas/knowledge-package.schema.json');
-type AjvConstructor = new (options?: Options) => AjvInstance;
-type AddFormats = (instance: AjvInstance) => AjvInstance;
-const AjvConstructor =
-  (AjvModule as unknown as { default?: AjvConstructor }).default ||
-  (AjvModule as unknown as AjvConstructor);
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormats }).default ||
-  (addFormatsModule as unknown as AddFormats);
-const ajv = new AjvConstructor({ allErrors: true });
+const addFormats = (addFormatsModule as any).default || addFormatsModule;
+const ajv = createAjv();
 addFormats(ajv);
 const validateSchema: ValidateFunction = compileSchemaFromPath(ajv, SCHEMA_PATH);
 

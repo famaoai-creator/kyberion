@@ -1,11 +1,10 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
-import {
-  type PresentationPreferenceProfile,
-} from './src/types/presentation-preference-profile.js';
+import { type PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
 
 export interface PresentationPreferenceRegistry {
   version: string;
@@ -13,8 +12,7 @@ export interface PresentationPreferenceRegistry {
   profiles: PresentationPreferenceProfile[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/presentation-preference-registry.schema.json'
 );
@@ -49,10 +47,7 @@ const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
         {
           label: 'Proposal deck',
           deck_purposes: ['proposal'],
-          questions: [
-            '誰に見せる資料ですか?',
-            '最終的に何を決めたいですか?',
-          ],
+          questions: ['誰に見せる資料ですか?', '最終的に何を決めたいですか?'],
         },
       ],
       theme_sets: [
@@ -97,7 +92,9 @@ function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegis
 }
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH
+  );
 }
 
 function getPersonalOverlayPath(): string | null {
@@ -168,7 +165,9 @@ export function getPresentationPreferenceRegistry(): PresentationPreferenceRegis
     return merged;
   } catch (error: any) {
     const target = overlayPath ? `${registryPath} or overlay ${overlayPath}` : registryPath;
-    logger.warn(`[PRESENTATION_PREFERENCE_REGISTRY] Failed to load registry at ${target}: ${error.message}`);
+    logger.warn(
+      `[PRESENTATION_PREFERENCE_REGISTRY] Failed to load registry at ${target}: ${error.message}`
+    );
     registryCacheKey = cacheKey;
     registryCache = FALLBACK_REGISTRY;
     return registryCache;

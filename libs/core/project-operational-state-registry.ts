@@ -1,5 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import { createAjv } from './foundation/ajv.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -111,8 +112,7 @@ export interface ProjectOperationalStateMissionContext {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const STATE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/project-operational-state.schema.json'
 );

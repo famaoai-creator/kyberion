@@ -1,4 +1,4 @@
-import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
@@ -35,9 +35,7 @@ let cachedBareIndex: Map<string, ResolvedVocabularyEntry[]> | undefined;
 export function loadVocabularyCatalog(): VocabularyCatalogFile | null {
   if (cachedCatalog !== undefined) return cachedCatalog;
   try {
-    cachedCatalog = JSON.parse(
-      String(safeReadFile(VOCABULARY_PATH, { label: 'user-facing vocabulary' }))
-    ) as VocabularyCatalogFile;
+    cachedCatalog = readJson<VocabularyCatalogFile>(VOCABULARY_PATH);
   } catch {
     cachedCatalog = null;
   }

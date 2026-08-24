@@ -1,5 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
@@ -35,8 +36,7 @@ export interface DelegationPreflightResult {
   warnings: string[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const PATH_SCOPE_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/path-scope-policy.schema.json'
 );

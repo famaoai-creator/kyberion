@@ -1,4 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
@@ -100,8 +101,7 @@ type ClassificationPolicy = {
   }>;
 };
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-classification-policy.schema.json'
 );

@@ -1,5 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -7,8 +8,7 @@ import { safeMkdir } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const MEMORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract-memory.schema.json'

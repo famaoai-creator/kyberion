@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import chalk from 'chalk';
 import {
@@ -25,6 +24,7 @@ import {
   withExecutionContext,
   withLock,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -51,9 +51,8 @@ import {
   resolveReasoningBackendMenuSelection,
 } from './reasoning_backend_selection.js';
 
-const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
-const onboardingStateAjv = new AjvCtor({ allErrors: true });
+const onboardingStateAjv = createAjv();
 addFormats(onboardingStateAjv);
 const onboardingStateValidate = compileSchemaFromPath(
   onboardingStateAjv,

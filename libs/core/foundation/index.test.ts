@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compileSchema } from './ajv.js';
+import { defineCatalog } from './governed-catalog.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
 import { clamp, normalizeText, parseIso, slugify } from './index.js';
 
 describe('foundation helpers', () => {
@@ -28,5 +31,22 @@ describe('foundation helpers', () => {
     expect(validateVideoAction({ action: 'list_video_composition_templates', params: {} })).toBe(
       true
     );
+  });
+
+  it('reloads governed catalogs when the file signature changes', () => {
+    const directory = pathResolver.sharedTmp('foundation-catalog-test');
+    const catalogPath = path.join(directory, 'catalog.json');
+    safeMkdir(directory, { recursive: true });
+    safeWriteFile(catalogPath, JSON.stringify({ version: 1 }));
+    const catalog = defineCatalog<{ version: number }>({
+      id: 'foundation-catalog-test',
+      path: catalogPath,
+      fallback: { version: 0 },
+    });
+
+    expect(catalog.load()).toEqual({ version: 1 });
+    safeWriteFile(catalogPath, JSON.stringify({ version: 200 }));
+    expect(catalog.load()).toEqual({ version: 200 });
+    safeRmSync(directory, { recursive: true, force: true });
   });
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { pathResolver, safeReadFile } from '@agent/core';
+import { loadJson, pathResolver } from '@agent/core';
 import { main as operatorCliMain } from './cli.js';
 import { main as operatorHomeMain } from './kyberion_home.js';
 
@@ -15,13 +15,7 @@ interface CliManifest {
 }
 
 function loadManifest(): CliManifest {
-  return JSON.parse(
-    String(
-      safeReadFile(pathResolver.knowledge('product/governance/cli-commands.json'), {
-        encoding: 'utf8',
-      })
-    )
-  ) as CliManifest;
+  return loadJson<CliManifest>(pathResolver.knowledge('product/governance/cli-commands.json'));
 }
 
 export function selectEntrypoint(command: string, manifest = loadManifest()): CliEntrypoint {

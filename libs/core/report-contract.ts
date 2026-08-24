@@ -7,7 +7,7 @@
  * `knowledge/product/schemas/`.
  */
 
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { parseStructuredJson } from './structured-reasoning.js';
 import {
@@ -18,6 +18,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
 export interface PipelineReportContract {
@@ -32,8 +33,6 @@ interface CompiledReportSchema {
   errors: () => string[];
   prompt: string;
 }
-
-type AjvConstructor = new (options?: object) => import('ajv').default;
 
 const BUILTIN_SCHEMA_NAMES = new Set([
   'planning_packet',
@@ -75,10 +74,7 @@ function compileReportSchema(schemaRef: string): CompiledReportSchema {
   }
 
   const schemaPath = schemaPathFromRef(schemaRef);
-  const Ajv =
-    (AjvModule as unknown as { default?: AjvConstructor }).default ??
-    (AjvModule as unknown as AjvConstructor);
-  const ajv = new Ajv({ allErrors: true, strict: false }) as import('ajv').default;
+  const ajv = createAjv({ strict: false });
   const validate: ValidateFunction = compileSchemaFromPath(ajv, schemaPath);
   return {
     validate: (value) => Boolean(validate(value)),

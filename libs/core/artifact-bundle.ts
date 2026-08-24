@@ -1,7 +1,7 @@
-import AjvModule from 'ajv';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   loadJson,
@@ -53,8 +53,7 @@ export interface ArtifactBundleFulfillmentReport {
   fulfilled: boolean;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const BUNDLE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/artifact-bundle.schema.json');
 let bundleValidateFn: ReturnType<typeof compileSchemaFromPath> | null = null;
 

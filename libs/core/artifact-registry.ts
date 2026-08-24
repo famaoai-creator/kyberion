@@ -1,4 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
@@ -31,8 +32,7 @@ export interface ArtifactOwnershipQuery {
   includeTmp?: boolean;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
   'schemas/artifact-record.schema.json'
 );

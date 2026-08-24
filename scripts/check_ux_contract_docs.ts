@@ -1,4 +1,4 @@
-import { pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
+import { loadJson, pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
 
 export const UX_CONTRACT_DOCS = [
   'README.md',
@@ -39,13 +39,9 @@ export function checkUxContractDocs(): string[] {
       if (!term.test(door)) failures.push(`${relativePath}: missing plain-language term ${term}`);
     }
   }
-  const roles = JSON.parse(
-    String(
-      safeReadFile(pathResolver.knowledge('product/governance/surface-roles.json'), {
-        encoding: 'utf8',
-      })
-    )
-  ) as { roles?: SurfaceRole[] };
+  const roles = loadJson<{ roles?: SurfaceRole[] }>(
+    pathResolver.knowledge('product/governance/surface-roles.json')
+  );
   for (const role of roles.roles || []) {
     if (!role.enabled) continue;
     if (!role.tagline_key) {

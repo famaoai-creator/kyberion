@@ -1,7 +1,5 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import AjvModule, { type Ajv as AjvInstance } from 'ajv';
-
 import {
   safeExistsSync,
   safeLstat,
@@ -12,6 +10,7 @@ import {
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 
 const SOURCE_EXTENSIONS = new Set([
   '.c',
@@ -149,10 +148,7 @@ const SOURCE_IAC_SCHEMA_PATH = pathResolver.knowledge(
 const TEST_INVENTORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/test-inventory.schema.json'
 );
-const ArtifactAjvCtor = AjvModule as unknown as new (options: {
-  allErrors: boolean;
-}) => AjvInstance;
-const artifactAjv = new ArtifactAjvCtor({ allErrors: true });
+const artifactAjv = createAjv();
 const validateSourceAnalysisSchema = compileSchemaFromPath(
   artifactAjv,
   SOURCE_ANALYSIS_SCHEMA_PATH
