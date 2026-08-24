@@ -5,7 +5,7 @@ import {
 } from './surface-query.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 
@@ -43,9 +43,7 @@ function loadIntentRoutingMap(): IntentRoutingMap {
   if (_cachedRoutingMap) return _cachedRoutingMap;
   try {
     const filePath = pathResolver.knowledge('product/governance/intent-routing-map.json');
-    _cachedRoutingMap = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as IntentRoutingMap;
+    _cachedRoutingMap = readJson<IntentRoutingMap>(filePath);
   } catch (err) {
     const defaults = {
       pipeline_intent_map: {},

@@ -1,12 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeAppendFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { sendIMessage } from './imessage-bridge.js';
@@ -58,9 +53,7 @@ export function loadNotificationPreferences(): NotificationPreferences {
   const filePath = notificationPreferencesPath();
   try {
     if (!safeExistsSync(filePath)) return {};
-    return JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as NotificationPreferences;
+    return readJson<NotificationPreferences>(filePath);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[operator-notifications] failed to read preferences: ${detail}`);

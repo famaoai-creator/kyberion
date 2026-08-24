@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
 
 export interface ServicePresetRecord {
@@ -33,9 +34,7 @@ function getServicePresetsDir(): string {
 
 function loadPresetFromPath(presetPath: string): ServicePresetRecord {
   try {
-    return JSON.parse(
-      safeReadFile(pathResolver.rootResolve(presetPath), { encoding: 'utf8' }) as string
-    ) as ServicePresetRecord;
+    return readJson<ServicePresetRecord>(pathResolver.rootResolve(presetPath));
   } catch (error: any) {
     throw new Error(`Failed to load service preset at ${presetPath}: ${error?.message || error}`);
   }

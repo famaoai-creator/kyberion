@@ -13,6 +13,7 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import {
   resolveVoiceEngineForPlatform,
   type VoiceEngineArtifactFormat,
@@ -132,9 +133,7 @@ function loadRealtimeVoiceConversationSession(
 ): RealtimeVoiceConversationSession | null {
   const targetPath = sessionPath(sessionId);
   if (!safeExistsSync(targetPath)) return null;
-  return JSON.parse(
-    safeReadFile(targetPath, { encoding: 'utf8' }) as string
-  ) as RealtimeVoiceConversationSession;
+  return readJson<RealtimeVoiceConversationSession>(targetPath);
 }
 
 function writeRealtimeVoiceConversationSession(session: RealtimeVoiceConversationSession): string {
