@@ -9,6 +9,7 @@ import {
   safeReadFile,
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -109,7 +110,7 @@ export function resolveHistoryTier(raw: unknown): HistorySearchTier | undefined 
 }
 
 function databasePath(): string {
-  const configured = process.env.KYBERION_HISTORY_SEARCH_DB?.trim();
+  const configured = getRegisteredEnvText('KYBERION_HISTORY_SEARCH_DB')?.trim();
   const resolved = configured
     ? pathResolver.rootResolve(configured)
     : pathResolver.shared('runtime/history-search/history.sqlite');
@@ -556,7 +557,8 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
 
 function assertMissionHistoryAccess(scope: MissionHistorySearchScope): void {
   const activeMission = process.env.MISSION_ID?.trim();
-  if (process.env.KYBERION_SUDO === 'true' || activeMission === scope.missionId) return;
+  const sudo = getRegisteredEnvText('KYBERION_SUDO');
+  if (sudo === '1' || sudo === 'true' || activeMission === scope.missionId) return;
   throw new Error(
     `[POLICY_VIOLATION] Governed history search requires MISSION_ID=${scope.missionId} or KYBERION_SUDO=true`
   );
@@ -736,7 +738,7 @@ function scopedDatabasePath(scope: MissionHistorySearchScope): string {
 }
 
 function withDatabasePath<T>(database: string, callback: () => T): T {
-  const previous = process.env.KYBERION_HISTORY_SEARCH_DB;
+  const previous = getRegisteredEnvText('KYBERION_HISTORY_SEARCH_DB');
   process.env.KYBERION_HISTORY_SEARCH_DB = database;
   try {
     return callback();

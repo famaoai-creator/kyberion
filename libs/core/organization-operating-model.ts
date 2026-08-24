@@ -11,6 +11,7 @@ import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeExistsSync,
   loadJson,
@@ -669,7 +670,7 @@ function assertRecordIdentity(
   recordTenant(record);
   if (
     record.tenant_slug &&
-    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
   ) {
     resolveTenant(record.tenant_slug, { rootDir });
   }
@@ -1143,7 +1144,7 @@ export function transitionOrganizationLifecycle(input: {
   };
   saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
     action: `organization.${input.verb}`,
     operation: `${input.verb}:${input.organizationId}`,
     result: 'completed',
@@ -1213,7 +1214,7 @@ export function retireOrganizationEntity(input: {
   else if (input.kind === 'operation') saveOrganizationOperation(next, { rootDir: input.rootDir });
   else saveOrganizationCadence(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
     action: `organization.${input.kind}.retire`,
     operation: `retire:${input.recordId}`,
     result: 'completed',
@@ -1307,7 +1308,7 @@ export function removeOrganizationEntity(input: {
     { force: true }
   );
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'organization_controller',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
     action: `organization.${input.kind}.remove`,
     operation: `remove:${input.recordId}`,
     result: 'completed',
@@ -2654,7 +2655,7 @@ function listOrganizationRecordFiles(
   query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): string[] {
   if (query.organizationId) assertOrganizationId(query.organizationId);
-  const tenantSlug = recordQueryTenant(query.tenantSlug || process.env.KYBERION_TENANT);
+  const tenantSlug = recordQueryTenant(query.tenantSlug || getRegisteredEnvText('KYBERION_TENANT'));
   const tiers = recordQueryTiers(query.tier);
   return tiers.flatMap((tier) => {
     const organizationRoot = path.resolve(
@@ -3152,7 +3153,7 @@ export function listOrganizationOperationalStates(
 ): OrganizationOperationalState[] {
   if (query.organizationId) assertOrganizationId(query.organizationId);
   if (query.tenantSlug) assertTenantSlug(query.tenantSlug);
-  const tenantSlug = recordQueryTenant(query.tenantSlug || process.env.KYBERION_TENANT);
+  const tenantSlug = recordQueryTenant(query.tenantSlug || getRegisteredEnvText('KYBERION_TENANT'));
   const files = recordQueryTiers(query.tier).flatMap((tier) =>
     organizationStateFiles(
       path.resolve(
