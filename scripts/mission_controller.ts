@@ -21,6 +21,7 @@ import {
   discoverProviders,
   discoverReasoningEndpoints,
   getInstalledReasoningMode,
+  getRegisteredEnv,
   getReasoningBackend,
   installReasoningBackends,
   customerResolver,
@@ -62,6 +63,10 @@ import {
   reassignMissionToProject,
   recordMissionHandoff,
 } from '@agent/core';
+
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 
 // --- Sub-module imports ---
 import {
@@ -409,7 +414,7 @@ function acceptRubricOverride(hypothesisOrBranchId: string, reason?: string, sev
   }
   const missionId = process.env.MISSION_ID || getOptionValue('--mission-id') || '';
   const entry = auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+    agentId: registeredEnv('KYBERION_PERSONA') || 'mission_controller',
     action: 'rubric.override_accepted',
     operation: `accept-with-override:${hypothesisOrBranchId}`,
     result: 'allowed',
@@ -1472,16 +1477,18 @@ function showReasoningBackendStatus() {
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
     process.argv.includes('--refresh-providers') ||
-    process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1';
+    registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
   const providers = discoverProviders(forceRefresh).filter((provider) =>
     ['claude', 'gemini', 'codex'].includes(provider.provider)
   );
 
   console.log('');
   console.log('  Reasoning Backend:');
-  console.log(`    Selected: ${selectedMode || process.env.KYBERION_REASONING_BACKEND || 'auto'}`);
   console.log(
-    `    Wisdom profile: ${process.env.KYBERION_WISDOM_LLM_PROFILE || 'distill policy default'}`
+    `    Selected: ${selectedMode || registeredEnv('KYBERION_REASONING_BACKEND') || 'auto'}`
+  );
+  console.log(
+    `    Wisdom profile: ${registeredEnv('KYBERION_WISDOM_LLM_PROFILE') || 'distill policy default'}`
   );
   for (const provider of providers) {
     const state = provider.installed
@@ -1919,7 +1926,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     if (stored.found && stored.evaluation) {
       const upperId = missionId.toUpperCase();
       auditChain.record({
-        agentId: process.env.KYBERION_PERSONA || 'operator',
+        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
         action: stored.evaluation.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
         operation: `gate-pass:${gateFile}`,
         result: 'completed',
@@ -1960,11 +1967,11 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'passed',
     note,
-    actorId: process.env.KYBERION_PERSONA || 'operator',
+    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
     action: 'gate.passed',
     operation: `gate-pass:${path.basename(gatePath)}`,
     result: 'completed',
@@ -1996,7 +2003,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
       const upperId = missionId.toUpperCase();
       const reworked = stored.phase ? markPhaseTasksForRework(upperId, stored.phase) : 0;
       auditChain.record({
-        agentId: process.env.KYBERION_PERSONA || 'operator',
+        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
         action: 'gate.rejected',
         operation: `gate-fail:${gateFile}`,
         result: 'completed',
@@ -2022,11 +2029,11 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'rejected',
     note,
-    actorId: process.env.KYBERION_PERSONA || 'operator',
+    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
     action: 'gate.rejected',
     operation: `gate-fail:${path.basename(gatePath)}`,
     result: 'completed',
@@ -2086,7 +2093,7 @@ export async function main() {
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   installReasoningBackends();
-  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
+  killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
   const positionalArgs = extractMissionControllerPositionalArgs(process.argv);
 
