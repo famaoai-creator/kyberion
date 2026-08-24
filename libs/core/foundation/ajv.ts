@@ -1,4 +1,5 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import Ajv2020Module from 'ajv/dist/2020.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from './json.js';
@@ -8,14 +9,21 @@ type AjvLike = {
   getSchema<T = unknown>(id: string): ValidateFunction<T> | undefined;
   compile<T>(schema: object): ValidateFunction<T>;
 };
-type AjvConstructor = new (options: Record<string, boolean>) => AjvLike;
+type AjvInstance = import('ajv').default;
+type AjvConstructor = new (options: Record<string, unknown>) => AjvInstance;
 
-const AjvConstructor =
-  (AjvModule as unknown as { default?: AjvConstructor }).default ||
-  (AjvModule as unknown as AjvConstructor);
+function resolveConstructor(moduleValue: unknown): AjvConstructor {
+  return (moduleValue as { default?: AjvConstructor }).default || (moduleValue as AjvConstructor);
+}
 
-export function createAjv(): AjvLike {
-  return new AjvConstructor({ allErrors: true, strict: false, allowUnionTypes: true });
+export function createAjv(options: Record<string, unknown> = {}): AjvInstance {
+  const AjvConstructor = resolveConstructor(AjvModule);
+  return new AjvConstructor({ allErrors: true, strict: false, allowUnionTypes: true, ...options });
+}
+
+export function createAjv2020(options: Record<string, unknown> = {}): AjvInstance {
+  const Ajv2020Constructor = resolveConstructor(Ajv2020Module);
+  return new Ajv2020Constructor({ allErrors: true, strict: false, ...options });
 }
 
 function collectExternalRefs(value: unknown, refs: Set<string>): void {

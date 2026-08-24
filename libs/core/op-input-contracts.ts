@@ -1,4 +1,5 @@
-import AjvModule, { type ErrorObject, type ValidateFunction } from 'ajv';
+import type { ErrorObject, ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { logger } from './core.js';
 import type { ResourceClaim } from './tool-call-scheduler.js';
 
@@ -41,8 +42,7 @@ export interface OpInputContract {
 
 type ContractCatalog = Record<OpInputDomain, Record<string, OpInputContract>>;
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 
 const INPUT_CONTRACTS: ContractCatalog = {
   browser: {

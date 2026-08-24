@@ -1,4 +1,3 @@
-import AjvModule from 'ajv';
 import * as path from 'node:path';
 import {
   buildMissionOrchestrationEvaluationReport,
@@ -6,10 +5,10 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { readJsonFile } from './refactor/cli-input.js';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 
 interface ScenarioRunRecord {
   scenario_id: string;

@@ -1,4 +1,3 @@
-import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import {
   compileSchemaFromPath,
@@ -26,8 +25,8 @@ import { createProductionEvidenceRegisterChecks } from './check_contract_schemas
 import { createPolicyAndManifestChecks } from './check_contract_schemas_policy_checks.js';
 import { createServiceChecks } from './check_contract_schemas_service_checks.js';
 import { readJsonFile } from './refactor/cli-input.js';
+import { createAjv, createAjv2020 } from '@agent/core/foundation';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function createChecks(): ContractCheck[] {
@@ -3977,9 +3976,9 @@ function createChecks(): ContractCheck[] {
 }
 
 function main() {
-  const ajv = new AjvCtor({ allErrors: true });
+  const ajv = createAjv();
   addFormats(ajv);
-  const ajv2020 = new AjvCtor({ allErrors: true, validateSchema: false });
+  const ajv2020 = createAjv2020({ validateSchema: false });
   addFormats(ajv2020);
   const violations: string[] = [];
   const unmanagedGoldenScenarioCatalogs = findUnmanagedGoldenScenarioCatalogs();

@@ -1,4 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import * as crypto from 'node:crypto';
 
 import { logger } from './core.js';
@@ -137,8 +138,7 @@ export interface CreatePeerConversationResponderOptions {
     | void;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 
 const SESSION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/peer-conversation-session.schema.json'
