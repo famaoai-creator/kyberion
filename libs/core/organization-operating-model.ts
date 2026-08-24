@@ -13,8 +13,8 @@ import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
 import {
   safeExistsSync,
+  loadJson,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
@@ -618,9 +618,7 @@ const validatorCache = new Map<string, ValidateFunction>();
 function validatorFor(schemaPath: string): ValidateFunction {
   const cached = validatorCache.get(schemaPath);
   if (cached) return cached;
-  const validator = ajv.compile(
-    JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string)
-  );
+  const validator = ajv.compile(loadJson<unknown>(schemaPath));
   validatorCache.set(schemaPath, validator);
   return validator;
 }
@@ -748,7 +746,7 @@ function recordQueryTenant(tenantSlug?: string): string {
 function readJsonRecord<T>(filePath: string, label: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8', label }) as string) as T;
+    return loadJson<T>(filePath);
   } catch (error) {
     throw new Error(`Unable to read ${label} at ${filePath}: ${String(error)}`);
   }
@@ -764,7 +762,7 @@ function saveValidated<T>(record: T, schemaPath: string, filePath: string, label
 }
 
 export function loadOrganizationOperatingModelCatalog(): OrganizationOperatingModelCatalog {
-  const catalog = JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string) as unknown;
+  const catalog = loadJson<unknown>(CATALOG_PATH);
   const validator = validatorFor(CATALOG_SCHEMA_PATH);
   if (!validator(catalog))
     throw new Error(`Invalid organization operating model: ${validationErrors(validator)}`);
