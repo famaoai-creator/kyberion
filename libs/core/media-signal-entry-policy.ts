@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface MediaSignalEntryPolicyItem {
   source_key: string;
@@ -23,15 +20,8 @@ interface MediaSignalEntryPolicyCatalog {
   entry_types: MediaSignalEntryPolicyItem[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-signal-entry-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-signal-entry-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MediaSignalEntryPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_ENTRY_TYPES: MediaSignalEntryPolicyItem[] = [
   {
@@ -76,54 +66,32 @@ const FALLBACK_CATALOG_META = {
   elevated_status_keywords: ['risk', 'blocked', 'late', 'issue'],
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MediaSignalEntryPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid media signal entry policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as MediaSignalEntryPolicyCatalog;
-}
+const catalog = defineCatalog<MediaSignalEntryPolicyCatalog>({
+  id: 'media-signal-entry-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: {
+    version: '1.0.0',
+    ...FALLBACK_CATALOG_META,
+    entry_types: FALLBACK_ENTRY_TYPES,
+  },
+});
 
 export function loadMediaSignalEntryPolicyCatalog(): MediaSignalEntryPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = {
-      version: '1.0.0',
-      ...FALLBACK_CATALOG_META,
-      entry_types: FALLBACK_ENTRY_TYPES,
-    };
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
-export function resolveMediaSignalEntryPolicy(sourceKey: string): MediaSignalEntryPolicyItem | null {
-  const normalized = String(sourceKey || '').trim().toLowerCase();
+export function resolveMediaSignalEntryPolicy(
+  sourceKey: string
+): MediaSignalEntryPolicyItem | null {
+  const normalized = String(sourceKey || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return null;
   const catalog = loadMediaSignalEntryPolicyCatalog();
   return catalog.entry_types.find((entry) => entry.source_key === normalized) || null;
 }
 
 export function resetMediaSignalEntryPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }
