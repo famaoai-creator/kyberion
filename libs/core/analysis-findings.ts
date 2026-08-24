@@ -1,7 +1,7 @@
 import type { AnalysisCorpusSnippet } from './analysis-corpus.js';
 import type { AnalysisImpactItem } from './analysis-impact-bands.js';
 import type { ReviewExecutionTargetBinding } from './analysis-intent-support.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 export interface AnalysisFindingCandidate {
   finding_id: string;

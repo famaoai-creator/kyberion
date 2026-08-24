@@ -1,0 +1,100 @@
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+
+export interface ScriptFlags {
+  json: boolean;
+  dryRun: boolean;
+  check: boolean;
+  quiet: boolean;
+  positional: string[];
+}
+
+export interface ScriptContext extends ScriptFlags {
+  name: string;
+  argv: string[];
+  print(value: unknown): void;
+}
+
+export function parseScriptFlags(argv: string[]): ScriptFlags {
+  const positional: string[] = [];
+  let json = false;
+  let dryRun = false;
+  let check = false;
+  let quiet = false;
+  for (const arg of argv) {
+    if (arg === '--json') json = true;
+    else if (arg === '--dry-run') dryRun = true;
+    else if (arg === '--check') check = true;
+    else if (arg === '--quiet') quiet = true;
+    else positional.push(arg);
+  }
+  return { json, dryRun, check, quiet, positional };
+}
+
+export function defineScript<T>(options: {
+  name: string;
+  run(context: ScriptContext): T | Promise<T>;
+}): (argv?: string[]) => Promise<T | undefined> {
+  return async (argv = process.argv.slice(2)): Promise<T | undefined> => {
+    const flags = parseScriptFlags(argv);
+    const output = (value: unknown): void => {
+      if (!flags.quiet) console.log(flags.json ? JSON.stringify(value, null, 2) : String(value));
+    };
+    try {
+      return await options.run({ ...flags, name: options.name, argv, print: output });
+    } catch (error) {
+      if (!flags.json) console.error(`[${options.name}] ${String(error)}`);
+      else console.error(JSON.stringify({ ok: false, error: String(error) }));
+      process.exitCode = 1;
+      return undefined;
+    }
+  };
+}
+
+export interface GeneratedFile {
+  path: string;
+  content: string;
+}
+
+export function defineGenerator(options: {
+  id: string;
+  outputs: string[];
+  render(context: ScriptContext): GeneratedFile[] | Promise<GeneratedFile[]>;
+}): (argv?: string[]) => Promise<{ changed: string[]; files: GeneratedFile[] } | undefined> {
+  return defineScript({
+    name: `generate:${options.id}`,
+    async run(context) {
+      const files = await options.render(context);
+      const changed = files
+        .filter(
+          (file) => !safeExistsSync(file.path) || String(safeReadFile(file.path)) !== file.content
+        )
+        .map((file) => file.path);
+      const unexpected = files
+        .map((file) => file.path)
+        .filter((file) => !options.outputs.includes(file));
+      if (unexpected.length > 0)
+        throw new Error(`generator emitted undeclared outputs: ${unexpected.join(', ')}`);
+      if (!context.check && !context.dryRun) {
+        withExecutionContext('ecosystem_architect', () => {
+          for (const file of files) safeWriteFile(file.path, file.content);
+        });
+      }
+      const result = { changed, files };
+      context.print({ ok: changed.length === 0 || !context.check, ...result });
+      if (context.check && changed.length > 0) {
+        process.exitCode = 1;
+      }
+      return result;
+    },
+  });
+}
+
+export function isDirectScript(importMetaUrl: string, expectedFile: string): boolean {
+  return (
+    path.resolve(process.argv[1] || '') === path.resolve(fileURLToPath(importMetaUrl)) &&
+    process.argv[1]?.endsWith(expectedFile) === true
+  );
+}

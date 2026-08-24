@@ -14,7 +14,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { logger } from './core.js';

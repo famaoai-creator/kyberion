@@ -113,6 +113,7 @@ type ConsoleSectionId =
   | 'diagnostics'
   | 'surface';
 type ConsoleContentSection = Exclude<ConsoleSectionId, 'surface'>;
+const SURFACE_TAGLINE_KEY = 'surface:chronos_surface_tagline';
 
 const CONSOLE_SECTIONS: Array<{
   id: ConsoleSectionId;

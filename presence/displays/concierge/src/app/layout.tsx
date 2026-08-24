@@ -4,7 +4,7 @@ import { ConciergeHeader } from './concierge-header';
 import { ConversationDock } from './conversation-dock';
 import { CommandPalette } from './command-palette';
 
-// Surface identity contract: CEO秘書 — 依頼・承認・成果・例外
+// Surface identity contract: surface:concierge_surface_tagline
 
 export const metadata = {
   title: 'Concierge — Kyberion',

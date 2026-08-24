@@ -8,7 +8,7 @@ import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { getRegisteredEnv } from './env-validator.js';
+import { getRegisteredEnv } from './foundation/env.js';
 
 /**
  * Provider Health Registry v1.0

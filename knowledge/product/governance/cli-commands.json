@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "entrypoints": [
+    {
+      "id": "operator-home",
+      "module": "scripts/kyberion_home.ts",
+      "commands": [
+        "",
+        "ask",
+        "procedure",
+        "feedback",
+        "improvements",
+        "record",
+        "recording",
+        "inbox",
+        "approvals",
+        "notify",
+        "deals"
+      ]
+    },
+    {
+      "id": "operator-cli",
+      "module": "scripts/cli.ts",
+      "commands": [
+        "help",
+        "list",
+        "search",
+        "info",
+        "examples",
+        "mobile-profiles",
+        "web-profiles",
+        "artifact",
+        "open-artifact",
+        "packet",
+        "accept-next-action",
+        "approve",
+        "reject",
+        "email",
+        "calendar",
+        "task",
+        "offboard",
+        "run",
+        "preview",
+        "intent",
+        "schedule"
+      ]
+    }
+  ]
+}

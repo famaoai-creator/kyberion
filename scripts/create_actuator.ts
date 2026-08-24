@@ -113,8 +113,8 @@ function buildPackage(description: string, name: string, fullName: string): stri
   );
 }
 
-function buildIndexTs(fullName: string, pascalName: string): string {
-  return `import { ensureDefaultOpPreflight, logger, classifyError, runOpPreflight } from '@agent/core';
+function buildIndexTs(fullName: string, pascalName: string, name: string): string {
+  return `import { defineActuator, ensureDefaultOpPreflight, logger, classifyError, runOpPreflight } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 // ── Op dispatch ─────────────────────────────────────────────────────────────
@@ -144,7 +144,11 @@ export async function dispatch${pascalName}Op(
     const admittedParams = preflight.input;
     switch (op) {
       case 'execute':
-        return { handled: true, ctx: await opExecute(admittedParams, ctx) };
+        {
+          const result = await actuator.dispatch(op, admittedParams, ctx);
+          if (!result.ok) throw new Error(result.error || 'Actuator operation failed.');
+          return { handled: true, ctx: asRecord(result.output ?? ctx) };
+        }
 
       default:
         logger.warn(\`[${fullName}] Unknown op: \${op}\`);
@@ -155,6 +159,13 @@ export async function dispatch${pascalName}Op(
     logger.error(\`[${fullName}] \${op} failed (\${classification.category}): \${err.message}\`);
     throw err;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Actuator output must be an object.');
+  }
+  return value as Record<string, unknown>;
 }
 
 // Re-export under the generic name expected by run_pipeline.ts
@@ -179,6 +190,18 @@ async function opExecute(
     },
   };
 }
+
+const actuator = defineActuator({
+  id: '${fullName}',
+  ops: {
+    execute: {
+      kind: 'apply',
+      input_schema: { '$ref': 'schemas/${name}-action.schema.json' },
+      validateInput: asRecord,
+      handler: opExecute,
+    },
+  },
+});
 
 // ── CLI entry point ─────────────────────────────────────────────────────────
 
@@ -277,7 +300,7 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
     path.join(outDir, 'package.json'),
     `${buildPackage(description, name, fullName)}\n`
   );
-  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName));
+  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName, name));
   safeWriteFile(
     path.join(outDir, 'schemas', `${name}-action.schema.json`),
     `${buildSchema(pascalName)}\n`

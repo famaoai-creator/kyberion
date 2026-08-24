@@ -1,4 +1,5 @@
 import { classifyTaskSessionIntent } from './task-session.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
   resolveSurfaceConversationReceiverForProvider,
@@ -137,7 +138,6 @@ export function shouldCompileSurfaceIntent(
   routingText: string,
   ruleBasedReceiver?: SurfaceDelegationReceiver
 ): boolean {
-  if (input.forcedReceiver || ruleBasedReceiver) return false;
   const originalText = (input.surfaceText || input.query || '').trim();
   const normalized = routingText.trim();
   if (!normalized || !originalText) return false;
@@ -147,6 +147,21 @@ export function shouldCompileSurfaceIntent(
   ) {
     return false;
   }
+  const resolution = resolveIntentResolutionPacket(originalText, {
+    tier: input.scope?.tier,
+    tenantId: input.scope?.tenant_slug,
+  });
+  // An explicit route is still compiled so the shared contract can explain
+  // what will happen; it must not become an escape hatch around intent work.
+  if (input.forcedReceiver || ruleBasedReceiver) return true;
   if (classifyTaskSessionIntent(originalText)) return true;
+  if (!resolution.selected_intent_id) return true;
+  if (
+    ['task_session', 'mission', 'pipeline', 'browser_session'].includes(
+      resolution.selected_resolution?.shape || ''
+    )
+  ) {
+    return true;
+  }
   return originalText.length > 80 || originalText.includes('\n');
 }

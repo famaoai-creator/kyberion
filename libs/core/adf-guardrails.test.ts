@@ -258,7 +258,7 @@ describe('TAKT judge_route guardrails', () => {
 });
 
 describe('logic-layering lint (LE-04/LE-05)', () => {
-  it('warns on an oversized core:transform script without flipping ok', () => {
+  it('blocks an oversized core:transform script', () => {
     const report = validatePipelineGuardrails({
       id: 'lint-transform',
       steps: [
@@ -268,9 +268,9 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
         },
       ],
     } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
-    expect(report.ok).toBe(true);
+    expect(report.ok).toBe(false);
     const finding = report.findings.find((f) => f.code === 'transform-script-oversized');
-    expect(finding?.severity).toBe('warn');
+    expect(finding?.severity).toBe('error');
   });
 
   it('accepts small core:transform glue scripts silently', () => {
@@ -279,6 +279,18 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
       steps: [{ op: 'core:transform', params: { script: 'return ctx.value;' } }],
     } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.findings).toHaveLength(0);
+  });
+
+  it('blocks shell wrappers around scripts and built actuators', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        { op: 'system:exec', params: { command: 'node dist/scripts/run_pipeline.js' } },
+        { op: 'system:shell', params: { cmd: 'npx tsx scripts/check.ts' } },
+        { op: 'system:shell', params: { cmd: 'node dist/libs/actuators/browser/index.js' } },
+      ],
+    });
+    expect(report.ok).toBe(false);
+    expect(report.findings.filter((f) => f.code === 'script-wrapper-forbidden')).toHaveLength(3);
   });
 
   it('walks media:pipeline embedded steps for budgets and lints', () => {

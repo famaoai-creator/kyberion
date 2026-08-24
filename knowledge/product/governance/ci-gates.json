@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "gates": [
+    {
+      "id": "type-ratchet",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["dist/scripts/check_type_ratchet.js"],
+      "owner": "quality",
+      "rationale": "Prevents type-safety debt from increasing."
+    },
+    {
+      "id": "module-boundaries",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_boundaries.ts"],
+      "owner": "architecture",
+      "rationale": "Prevents import cycles and layer direction debt from increasing."
+    },
+    {
+      "id": "first-win-docs",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_first_win_docs.ts"],
+      "owner": "experience",
+      "rationale": "Keeps the first-win command contract and documentation fences aligned."
+    },
+    {
+      "id": "cli-manifest",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_cli_manifest.ts"],
+      "owner": "operations",
+      "rationale": "Keeps the single CLI entrypoint and command ownership map valid."
+    },
+    {
+      "id": "ux-contract-docs",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_ux_contract_docs.ts"],
+      "owner": "experience",
+      "rationale": "Keeps the public entry documents understandable without internal runtime terms."
+    },
+    {
+      "id": "script-integrity",
+      "scope": "full",
+      "executable": "node",
+      "args": ["dist/scripts/check_script_integrity.js"],
+      "owner": "operations",
+      "rationale": "Ensures declared script and pipeline references resolve."
+    },
+    {
+      "id": "catalog-integrity",
+      "scope": "full",
+      "executable": "node",
+      "args": ["dist/scripts/check_catalog_integrity.js"],
+      "owner": "governance",
+      "rationale": "Ensures governed catalogs remain internally consistent."
+    }
+  ]
+}

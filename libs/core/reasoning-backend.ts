@@ -17,7 +17,7 @@ import { logger } from './core.js';
 import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
 import { assertOperationPolicy, currentDelegationDepth } from './operation-policy-gate.js';
 import type { A2ATaskContract, PlanningPacket, TaskResultBlock } from './channel-surface-types.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 import { frameUntrustedInput } from './untrusted-input-framing.js';
 import { createGapRecorder, type GapPhaseSample } from './gap-phase.js';
 import { parseStructuredJson } from './structured-reasoning.js';

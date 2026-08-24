@@ -1,5 +1,5 @@
 import type { KyberionMusicGenerationADF } from './src/types/music-generation-adf.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 export interface CompiledMusicWorkflow {
   workflow: Record<string, any>;
