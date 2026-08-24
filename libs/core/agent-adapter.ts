@@ -10,6 +10,13 @@ import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js'
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
+import { getRegisteredEnv } from './env-validator.js';
+
+function kyberionEnv(name: string): string | undefined {
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+}
 
 const ENV_WHITELIST = [
   'PATH',
@@ -205,7 +212,7 @@ function summarizePromptForLog(prompt: string, maxChars = 200): string {
 async function waitForBootSignal(
   child: ChildProcess,
   label: string,
-  timeoutMs = Number(process.env.KYBERION_AGENT_BOOT_READY_TIMEOUT_MS || 5000)
+  timeoutMs = Number(kyberionEnv('KYBERION_AGENT_BOOT_READY_TIMEOUT_MS') || 5000)
 ): Promise<void> {
   await new Promise<void>((resolve) => {
     let settled = false;
@@ -1075,8 +1082,8 @@ export class AgyAdapter implements AgentAdapter {
     try {
       const bin =
         this.options.bin ||
-        process.env.KYBERION_ANTIGRAVITY_CLI_BIN ||
-        process.env.KYBERION_AGY_CLI_BIN ||
+        kyberionEnv('KYBERION_ANTIGRAVITY_CLI_BIN') ||
+        kyberionEnv('KYBERION_AGY_CLI_BIN') ||
         'agy';
 
       const args: string[] = [];
@@ -1105,7 +1112,7 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       // 3. Sandboxed Execution
-      const useSandbox = options?.sandbox === true || process.env.KYBERION_AGY_SANDBOX === '1';
+      const useSandbox = options?.sandbox === true || kyberionEnv('KYBERION_AGY_SANDBOX') === '1';
       if (useSandbox) {
         args.push('--sandbox');
       }
@@ -2040,13 +2047,13 @@ export class AgentFactory {
 type AgentAdapterFactory = () => AgentAdapter;
 
 function createCodexAdapterFromEnv(): AgentAdapter {
-  const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+  const mode = (kyberionEnv('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
   if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
   return new CodexAppServerAdapter({
-    model: process.env.KYBERION_CODEX_MODEL,
-    modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+    model: kyberionEnv('KYBERION_CODEX_MODEL'),
+    modelProvider: kyberionEnv('KYBERION_CODEX_MODEL_PROVIDER'),
     approvalMode:
-      (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+      (kyberionEnv('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() === 'relaxed'
         ? 'relaxed'
         : 'strict',
   });
