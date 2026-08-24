@@ -1,5 +1,6 @@
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
 import { resolveConfiguredPosture } from './security-screen.js';
@@ -79,9 +80,7 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
       ? customerPolicyPath
       : pathResolver.knowledge('product/governance/approval-policy.json');
   try {
-    approvalPolicyCache = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ApprovalPolicyFile;
+    approvalPolicyCache = readJson<ApprovalPolicyFile>(filePath);
   } catch {
     approvalPolicyCache = { rules: [], defaults: { requires_approval: false } };
   }

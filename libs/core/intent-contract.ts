@@ -4,6 +4,7 @@ import { assessContextualClarification } from './contextual-intent-clarification
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
@@ -611,9 +612,7 @@ function isApprovalWorkflowRequest(text: string): boolean {
 }
 
 function loadIntentPolicy(): IntentPolicyFile {
-  const value = JSON.parse(
-    safeReadFile(INTENT_POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as IntentPolicyFile;
+  const value = readJson<IntentPolicyFile>(INTENT_POLICY_PATH);
   const validate = ensureIntentPolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])
@@ -625,9 +624,7 @@ function loadIntentPolicy(): IntentPolicyFile {
 }
 
 function loadWorkPolicy(): WorkPolicyFile {
-  const value = JSON.parse(
-    safeReadFile(WORK_POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as WorkPolicyFile;
+  const value = readJson<WorkPolicyFile>(WORK_POLICY_PATH);
   const validate = ensureWorkPolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])

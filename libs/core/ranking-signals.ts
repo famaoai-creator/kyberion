@@ -10,6 +10,11 @@
  * the next step.
  */
 
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import type { ScopeContext } from './scope-context.js';
+
 /** Cross-scope affinity: how relevant an entry of scope X is when ranking for scope Y. */
 export type ScopeAffinityMatrix = Record<string, Record<string, number>>;
 
@@ -105,9 +110,7 @@ export function loadKnowledgeRankingWeights(
   const defaults: KnowledgeRankingWeights = { proximity: 1, usage_yield: 4 };
   if (!safeExistsSync(rootPath)) return defaults;
   try {
-    const config = JSON.parse(
-      safeReadFile(rootPath, { encoding: 'utf8' }) as string
-    ) as KnowledgeRankingWeightConfig;
+    const config = readJson<KnowledgeRankingWeightConfig>(rootPath);
     return {
       ...defaults,
       ...(config.defaults || {}),
@@ -206,6 +209,3 @@ export function knowledgeMetadataScore(
   const usageYieldScore = Math.max(0, Math.min(1, metadata.usage_yield ?? 0)) * usageYieldWeight;
   return scopeScore + authorityScore + recencyScore + proximityScore + usageYieldScore;
 }
-import type { ScopeContext } from './scope-context.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';

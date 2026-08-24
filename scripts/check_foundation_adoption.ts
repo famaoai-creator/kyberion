@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
-const JSON_LOADER_RATCHET = 79;
+const JSON_LOADER_RATCHET = 181;
 const ENV_RATCHET = 421;
 
 function sourceFiles(): string[] {
@@ -30,7 +30,7 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
 
   for (const filePath of files) {
     const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-    if (/JSON\.parse\(\s*safeReadFile\(/u.test(source)) jsonLoaderViolations += 1;
+    jsonLoaderViolations += [...source.matchAll(/JSON\.parse\(\s*safeReadFile\(/gu)].length;
     if (
       !filePath.endsWith(`${path.sep}foundation${path.sep}ajv.ts`) &&
       /new\s+\w*Ajv\w*\s*\(/u.test(source)

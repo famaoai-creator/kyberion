@@ -16,6 +16,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -320,9 +321,7 @@ function readManagedRecord(managedDir: string): ManagedPluginRecord | null {
   const recordPath = path.join(managedDir, MANAGED_RECORD_FILENAME);
   if (!safeExistsSync(recordPath)) return null;
   try {
-    return JSON.parse(
-      safeReadFile(recordPath, { encoding: 'utf8' }) as string
-    ) as ManagedPluginRecord;
+    return readJson<ManagedPluginRecord>(recordPath);
   } catch {
     return null;
   }
