@@ -2,10 +2,9 @@ import {
   describeServiceHarness,
   loadServicePresetsCatalog,
   pathResolver,
-  safeReadFile,
-  safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 type ServiceHarnessRegistry = {
   version: '1.0.0';
@@ -61,27 +60,16 @@ function buildRegistry(): ServiceHarnessRegistry {
   };
 }
 
-function main(): void {
-  const expected = withExecutionContext(
-    'ecosystem_architect',
-    () => `${JSON.stringify(buildRegistry(), null, 2)}\n`
-  );
-  if (process.argv.includes('--check')) {
-    const actual = withExecutionContext('ecosystem_architect', () =>
-      String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' }) || '')
+export const main = defineGenerator({
+  id: 'service-harness-registry',
+  outputs: [OUTPUT_PATH],
+  render() {
+    const content = withExecutionContext(
+      'ecosystem_architect',
+      () => `${JSON.stringify(buildRegistry(), null, 2)}\n`
     );
-    if (actual !== expected) {
-      console.error('[service-harness-registry] registry is out of date');
-      process.exit(1);
-    }
-    console.log('[service-harness-registry] registry is up to date');
-    return;
-  }
+    return [{ path: OUTPUT_PATH, content }];
+  },
+});
 
-  withExecutionContext('ecosystem_architect', () => safeWriteFile(OUTPUT_PATH, expected));
-  console.log(`[service-harness-registry] wrote ${OUTPUT_PATH}`);
-}
-
-if (process.argv[1] && /generate_service_harness_registry\.(ts|js)$/.test(process.argv[1])) {
-  main();
-}
+if (isDirectScript(import.meta.url, 'generate_service_harness_registry.ts')) void main();
