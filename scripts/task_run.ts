@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeReadFile, safeLstat, safeReaddir } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
 
 type TaskScenario = {
   id: string;
   title: string;
   description: string;
-  trigger: { type: 'schedule' | 'event' | 'manual'; cron?: string; timezone?: string; event_name?: string; source?: string; prompt?: string };
+  trigger: {
+    type: 'schedule' | 'event' | 'manual';
+    cron?: string;
+    timezone?: string;
+    event_name?: string;
+    source?: string;
+    prompt?: string;
+  };
   input: { sources: string[]; required_params: string[]; optional_params?: string[] };
   first_run: { reasoning_required: boolean; questions: string[]; profile_output: string };
   repeat_run: { pipeline_template: string; params_from_profile: boolean; profile_input?: string };
   result: { artifacts: string[]; summary_format: 'markdown' | 'json' | 'text' };
-  approval_boundary: { required_for: string[]; default_action: 'draft-only' | 'notify-only' | 'requires-human-approval' };
+  approval_boundary: {
+    required_for: string[];
+    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
+  };
 };
 
 type TaskRunArgs = {
@@ -43,11 +53,13 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return loadJson<TaskScenario>(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
-  return loadScenarioFiles().map(loadScenario).find((scenario) => scenario.id === scenarioId);
+  return loadScenarioFiles()
+    .map(loadScenario)
+    .find((scenario) => scenario.id === scenarioId);
 }
 
 function parseArgs(argv: string[]): TaskRunArgs {
@@ -78,11 +90,17 @@ function printUsage(): void {
   console.log('Usage: pnpm task:run <scenario-id> [--profile <path>] [--dry-run]');
 }
 
-function resolveProfilePath(scenario: TaskScenario, override?: string, options: TaskRunOptions = {}): string {
+function resolveProfilePath(
+  scenario: TaskScenario,
+  override?: string,
+  options: TaskRunOptions = {}
+): string {
   const resolved = pathResolver.rootResolve(override || scenario.first_run.profile_output);
   const relative = path.relative(pathResolver.rootDir(), resolved);
   if (relative.startsWith('..')) {
-    throw new Error(`Profile path must stay within the workspace: ${override || scenario.first_run.profile_output}`);
+    throw new Error(
+      `Profile path must stay within the workspace: ${override || scenario.first_run.profile_output}`
+    );
   }
   if (options.allowExternalProfilePath) {
     return resolved;
@@ -97,7 +115,7 @@ function resolveProfilePath(scenario: TaskScenario, override?: string, options: 
 }
 
 function loadProfile(profilePath: string): Record<string, unknown> {
-  return JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+  return loadJson<Record<string, unknown>>(profilePath);
 }
 
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {
@@ -112,7 +130,11 @@ function formatArtifactHint(artifact: string): string {
   return `active/shared/tmp/${artifact}`;
 }
 
-export function describeTaskRun(scenarioId: string, profileOverride?: string, options: TaskRunOptions = {}): string {
+export function describeTaskRun(
+  scenarioId: string,
+  profileOverride?: string,
+  options: TaskRunOptions = {}
+): string {
   const scenario = loadScenarioById(scenarioId);
   if (!scenario) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
@@ -126,16 +148,17 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string, op
   const artifactList = scenario.result.artifacts
     .flatMap((artifact) => [`- ${artifact}`, `  Likely path: ${formatArtifactHint(artifact)}`])
     .join('\n');
-  const nextActions = requiresProfile && !profileLoaded
-    ? [
-        `1. Run pnpm task:init ${scenario.id} to create the profile.`,
-        `2. Review the generated profile.`,
-        `3. Re-run pnpm task:run ${scenario.id} --dry-run.`,
-      ]
-    : [
-        `1. Review the plan and expected artifacts.`,
-        `2. When you are ready to execute for real, run the task executor.`,
-      ];
+  const nextActions =
+    requiresProfile && !profileLoaded
+      ? [
+          `1. Run pnpm task:init ${scenario.id} to create the profile.`,
+          `2. Review the generated profile.`,
+          `3. Re-run pnpm task:run ${scenario.id} --dry-run.`,
+        ]
+      : [
+          `1. Review the plan and expected artifacts.`,
+          `2. When you are ready to execute for real, run the task executor.`,
+        ];
 
   return [
     `TaskScenario: ${scenario.id}`,
@@ -181,7 +204,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   main().catch((err) => {
     console.error(err?.message ?? String(err));
