@@ -3,11 +3,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getRegisteredEnv,
+  loadJson,
   pathResolver,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
@@ -98,7 +98,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return loadJson<TaskScenario>(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
@@ -109,9 +109,7 @@ function loadScenarioById(scenarioId: string): TaskScenario | undefined {
 
 function loadAnswers(args: TaskInitArgs): Record<string, unknown> {
   if (args.answersFile) {
-    return JSON.parse(
-      safeReadFile(pathResolver.rootResolve(args.answersFile), { encoding: 'utf8' }) as string
-    ) as Record<string, unknown>;
+    return loadJson<Record<string, unknown>>(pathResolver.rootResolve(args.answersFile));
   }
   if (args.answersJson) {
     return JSON.parse(args.answersJson) as Record<string, unknown>;

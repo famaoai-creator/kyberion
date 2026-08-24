@@ -5,12 +5,13 @@ import {
   applyKnowledgeRankingWeightProposal,
   isValidTenantSlug,
   knowledgeWritePathFor,
+  type KnowledgeRankingWeightProposal,
+  loadJson,
   proposeKnowledgeRankingWeightRecalculation,
   pathResolver,
   recordHumanKnowledgeFeedback,
   resolveTenant,
   safeExistsSync,
-  safeReadFile,
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
@@ -52,7 +53,7 @@ if (args[0] === 'weights' && args[1] === 'apply') {
   if (!safeExistsSync(proposalPath)) {
     throw new Error(`[KNOWLEDGE_WEIGHT_INVALID] proposal not found: ${proposalPathArg}`);
   }
-  const proposal = JSON.parse(safeReadFile(proposalPath, { encoding: 'utf8' }) as string);
+  const proposal = loadJson<KnowledgeRankingWeightProposal>(proposalPath);
   if (!proposal?.scope?.tenant_slug || !isValidTenantSlug(proposal.scope.tenant_slug)) {
     throw new Error('[SCOPE_CONTEXT_INVALID] proposal must contain a registered tenant slug');
   }
