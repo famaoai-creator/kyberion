@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { loadJson, pathResolver } from '@agent/core';
-import { main as operatorCliMain } from './cli.js';
-import { main as operatorHomeMain } from './kyberion_home.js';
 
 interface CliEntrypoint {
   id: string;
@@ -9,8 +7,18 @@ interface CliEntrypoint {
   commands: string[];
 }
 
+interface CliCommand {
+  id: string;
+  command: string;
+  noun: string;
+  verb: string;
+  entry: string;
+  audience: 'user' | 'operator' | 'dev';
+}
+
 interface CliManifest {
   version: number;
+  commands?: CliCommand[];
   entrypoints: CliEntrypoint[];
 }
 
@@ -25,13 +33,19 @@ export function selectEntrypoint(command: string, manifest = loadManifest()): Cl
   );
 }
 
+export function resolveCommand(command: string, manifest = loadManifest()): CliCommand | undefined {
+  return manifest.commands?.find((entry) => entry.command === command);
+}
+
 export async function main(args = process.argv.slice(2)): Promise<void> {
   const entrypoint = selectEntrypoint(args[0] ?? '');
   if (entrypoint.id === 'operator-cli') {
+    const { main: operatorCliMain } = await import('./cli.js');
     await operatorCliMain(args);
     return;
   }
 
+  const { main: operatorHomeMain } = await import('./kyberion_home.js');
   const originalArgv = process.argv;
   process.argv = [originalArgv[0] ?? 'node', 'kyberion', ...args];
   try {
