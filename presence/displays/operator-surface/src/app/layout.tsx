@@ -46,7 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               whiteSpace: 'nowrap',
             }}
           >
-            監査モニタ（読み取り専用）
+            <span data-tagline-key="surface:operator_surface_tagline">
+              監査モニタ（読み取り専用）
+            </span>
           </span>
           <nav style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
             <a href="/" style={{ color: 'var(--kb-accent)' }}>

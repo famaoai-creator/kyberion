@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "layers": ["foundation", "contracts", "domain", "orchestration"],
+  "patterns": [
+    { "layer": "foundation", "pattern": "libs/core/foundation/**" },
+    { "layer": "foundation", "pattern": "libs/core/secure-io.ts" },
+    { "layer": "foundation", "pattern": "libs/core/fs-primitives.ts" },
+    { "layer": "foundation", "pattern": "libs/core/path-resolver.ts" },
+    { "layer": "foundation", "pattern": "libs/core/schema-loader.ts" },
+    { "layer": "contracts", "pattern": "libs/core/*-contract.ts" },
+    { "layer": "contracts", "pattern": "libs/core/*-schema.ts" },
+    { "layer": "contracts", "pattern": "libs/core/entity-scope.ts" },
+    { "layer": "contracts", "pattern": "libs/core/vocabulary-keys.generated.ts" },
+    { "layer": "contracts", "pattern": "libs/core/channel-surface-types.ts" },
+    { "layer": "orchestration", "pattern": "libs/core/*orchestrat*.ts" },
+    { "layer": "orchestration", "pattern": "libs/core/*dispatcher*.ts" },
+    { "layer": "orchestration", "pattern": "libs/core/*worker*.ts" }
+  ],
+  "default_layer": "domain"
+}

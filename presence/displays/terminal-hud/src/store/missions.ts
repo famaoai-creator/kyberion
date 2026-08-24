@@ -3,7 +3,7 @@ import {
   buildMissionStatusView,
   type MissionSummary,
 } from '@agent/core/mission-read-model';
-import { pathResolver } from '@agent/core';
+import { currentScope, pathResolver, type ScopeContext } from '@agent/core';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { DetailLine, PanelViewModel } from './types.js';
@@ -12,8 +12,18 @@ export interface MissionsData {
   missions: MissionSummary[];
 }
 
+export function missionSummaryScope(scope: ScopeContext) {
+  return {
+    tier: scope.tier,
+    tenantSlug: scope.tenant_slug || (scope.tier === 'public' ? undefined : null),
+    organizationId: scope.organization_id,
+    projectId: scope.project_id,
+  } as const;
+}
+
 export function loadMissions(): MissionsData {
-  return { missions: listMissionSummaries() };
+  const scope = currentScope();
+  return { missions: listMissionSummaries(undefined, missionSummaryScope(scope)) };
 }
 
 export function missionsWatchPaths(): string[] {

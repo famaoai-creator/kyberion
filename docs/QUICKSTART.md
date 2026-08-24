@@ -1,10 +1,10 @@
 # Quick Start
 
-**Just want to run something?** → Jump to [§2 First Win Smoke](#2-first-win-smoke): `pnpm doctor` then `pnpm pipeline --input pipelines/verify-session.json`.
+**Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order.
 
 ---
 
-Kyberion should be approached as an intent-driven system.
+Kyberion should be approached as a request-driven system.
 
 Start with:
 
@@ -12,36 +12,39 @@ Start with:
 Intent -> Plan -> Result
 ```
 
-Not with:
+The system keeps internal runtime detail behind that conversation.
 
-```text
-Actuator -> ADF -> internal runtime detail
-```
+At every step it makes the request, plan, result, and next action visible.
 
 ## 1. Setup
 
-> **Canonical cold-start source: [docs/INITIALIZATION.md](./INITIALIZATION.md).** The block below is a summary; when in doubt (ordering, prerequisites, troubleshooting), follow INITIALIZATION.md. Tenant / organization / activation の業務順序は [オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md) を参照してください。
+> This document is the canonical first-win source. Day-2 tenant / organization / activation work is in [INITIALIZATION.md](./INITIALIZATION.md), and the operational lifecycle is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md).
 
 Prerequisites:
 
 - Node.js `24+` (matches `package.json` engines and `.nvmrc`)
 - `pnpm`
 
-If you want the shortest setup path first, you can use the same one-liner the initialization guide documents:
+The canonical first-win command sequence is deliberately short:
+
+# kyberion-first-win
 
 ```bash
-pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+pnpm install
+pnpm build
+pnpm prereq:check
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
-pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
-pnpm exec playwright install chromium   # recommended: needed for the browser first-win
 pnpm build
-pnpm surfaces:reconcile
-pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
+pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ### Start an AI company in one governed step

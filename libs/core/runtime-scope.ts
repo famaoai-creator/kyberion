@@ -7,7 +7,8 @@ import {
   type EventScopeInput,
 } from './event-scope.js';
 import { findMissionPath } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 import { loadProjectRecord } from './project-registry.js';
 import type { TierLevel } from './types.js';
 
@@ -43,7 +44,7 @@ function readMissionScope(missionId: string): EventScope | null {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
 
-  const state = loadJson<MissionScopeState>(statePath);
+  const state = readJson<MissionScopeState>(statePath);
   const stateMissionId = normalizeMissionId(
     typeof state.mission_id === 'string' ? state.mission_id : missionId
   );
