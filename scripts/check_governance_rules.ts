@@ -1,4 +1,3 @@
-import * as AjvModule from 'ajv';
 import * as path from 'node:path';
 import {
   loadActuatorManifestCatalog,
@@ -10,11 +9,8 @@ import {
   safeStat,
   assertProcessDefinitionRegistry,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
 import { fileURLToPath } from 'node:url';
-
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
 
 type GovernanceRuleCheck = {
   id: string;
@@ -226,7 +222,7 @@ export function findDeterministicCatalogViolations(): string[] {
 }
 
 function readJson<T>(relativePath: string): T {
-  return readJsonFile<T>(pathResolver.rootResolve(relativePath));
+  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
 }
 
 function validateAgentProfileDirectoryConsistency(violations: string[]) {
@@ -249,9 +245,7 @@ function validateAgentProfileDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/agent-profile-index.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{ agents?: Record<string, unknown> }>(
     'knowledge/product/orchestration/agent-profile-index.json'
   );
@@ -320,9 +314,7 @@ function validateVoiceProfileDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/voice-profile-registry.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{
     default_profile_id?: string;
     profiles?: Array<{ profile_id?: string }>;
@@ -399,9 +391,7 @@ function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/authority-role.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
     'knowledge/product/governance/authority-role-index.json'
   );
@@ -469,9 +459,7 @@ function validateTeamRoleDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/team-role.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{ team_roles?: Record<string, unknown> }>(
     'knowledge/product/orchestration/team-role-index.json'
   );
@@ -541,9 +529,7 @@ function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]
   }
 
   const schemaPath = 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{ entries?: Array<{ id?: string }> }>(
     'knowledge/product/governance/surface-provider-manifest-catalog.json'
   );
@@ -607,9 +593,7 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/service-endpoints.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{
     default_pattern?: string;
     services?: Record<string, { intent_aliases?: string[] }>;
@@ -684,9 +668,7 @@ function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/specialist-catalog.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>(
     'knowledge/product/orchestration/specialist-catalog.json'
   );
@@ -752,9 +734,7 @@ function validateVoiceEngineDirectoryConsistency(violations: string[]) {
   }
 
   const schemaPath = 'knowledge/product/schemas/voice-engine-registry.schema.json';
-  const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate =
-    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate = compileSchema(schemaPath);
   const snapshot = readJson<{
     default_engine_id?: string;
     engines?: Array<{ engine_id?: string }>;
@@ -881,9 +861,8 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const schema = readJson<Record<string, unknown>>(check.schemaPath);
   const data = readJson<Record<string, unknown>>(check.dataPath);
-  const validate = ajv.compile(schema);
+  const validate = compileSchema(check.schemaPath);
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {
