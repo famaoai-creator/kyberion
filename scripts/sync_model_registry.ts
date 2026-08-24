@@ -17,6 +17,7 @@ import {
   validateModelRegistrySnapshot,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const DIRECTORY = pathResolver.rootResolve('knowledge/product/governance/model-registry');
 const INDEX_PATH = path.join(DIRECTORY, 'index.json');
@@ -75,33 +76,29 @@ export async function syncModelRegistrySnapshot(checkOnly = false): Promise<bool
   });
 }
 
-async function main(): Promise<void> {
-  const args = new Set(process.argv.slice(2));
-  if (args.has('--bootstrap')) {
-    withExecutionContext('ecosystem_architect', () => {
-      bootstrapModelRegistryDirectory();
-      console.log(`[sync:model-registry] bootstrapped ${DIRECTORY}`);
-    });
-    return;
-  }
-  const checkOnly = args.has('--check');
-  const ok = await syncModelRegistrySnapshot(checkOnly);
-  if (!ok && checkOnly) {
-    console.error('[sync:model-registry] snapshot is out of date; run pnpm sync:model-registry');
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[sync:model-registry] ${checkOnly ? 'snapshot is aligned' : `wrote ${SNAPSHOT_PATH}`}`
-  );
-}
+export const runSyncModelRegistry = defineScript({
+  name: 'sync:model-registry',
+  async run(context) {
+    if (context.positional.includes('--bootstrap')) {
+      withExecutionContext('ecosystem_architect', () => {
+        bootstrapModelRegistryDirectory();
+        context.print(`[sync:model-registry] bootstrapped ${DIRECTORY}`);
+      });
+      return;
+    }
+    const checkOnly = context.check;
+    const ok = await syncModelRegistrySnapshot(checkOnly);
+    if (!ok && checkOnly) {
+      throw new Error('snapshot is out of date; run pnpm sync:model-registry');
+    }
+    context.print(
+      `[sync:model-registry] ${checkOnly ? 'snapshot is aligned' : `wrote ${SNAPSHOT_PATH}`}`
+    );
+  },
+});
 
-const isDirectExecution =
-  process.argv[1]?.endsWith('sync_model_registry.ts') ||
-  process.argv[1]?.endsWith('sync_model_registry.js');
-if (isDirectExecution) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'sync_model_registry.ts') ||
+  isDirectScript(import.meta.url, 'sync_model_registry.js')
+)
+  void runSyncModelRegistry();
