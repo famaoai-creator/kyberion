@@ -40,6 +40,7 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnv } from './env-validator.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
@@ -87,6 +88,10 @@ import {
   resolveReasoningBackendModeFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
+
+function kyberionEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 import {
   loadReasoningRoutePolicy,
   resolveReasoningRoute,
@@ -157,7 +162,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
 }
 
 function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallReasoningOptions {
-  if (options.mode || process.env.KYBERION_REASONING_BACKEND) return options;
+  if (options.mode || kyberionEnv('KYBERION_REASONING_BACKEND')) return options;
   const selection = loadLlmSelectionPreferences();
   if (!selection || !REASONING_BACKEND_MODES.has(selection.provider as ReasoningBackendMode)) {
     return options;
@@ -242,7 +247,7 @@ function buildReasoningRuntimeBundle(
 function filterChainByProviderCapability(
   chain: ReasoningRuntimeBundle[]
 ): ReasoningRuntimeBundle[] {
-  if (process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING === '0') return chain;
+  if (kyberionEnv('KYBERION_PROVIDER_CAPABILITY_ROUTING') === '0') return chain;
 
   let snapshot: ReturnType<typeof peekProviderCapabilityRegistry>;
   try {
@@ -298,13 +303,13 @@ function filterChainByProviderCapability(
 
 function shouldRefreshCapabilityRegistry(options: InstallReasoningOptions): boolean {
   return (
-    options.refreshProviders === true || process.env.KYBERION_PROVIDER_CAPABILITY_REFRESH === '1'
+    options.refreshProviders === true || kyberionEnv('KYBERION_PROVIDER_CAPABILITY_REFRESH') === '1'
   );
 }
 
 function refreshCapabilityRegistryIfRequested(options: InstallReasoningOptions): void {
   if (!shouldRefreshCapabilityRegistry(options)) return;
-  if (process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING === '0') return;
+  if (kyberionEnv('KYBERION_PROVIDER_CAPABILITY_ROUTING') === '0') return;
   try {
     const snapshot = loadProviderCapabilityRegistry({ forceRefresh: true });
     logger.info(
@@ -430,7 +435,8 @@ export function consultCapabilityBrokerForMode(
  */
 export function installReasoningBackends(options: InstallReasoningOptions = {}): boolean {
   const shouldReselect =
-    options.refreshProviders === true || process.env.KYBERION_PROVIDER_CAPABILITY_REFRESH === '1';
+    options.refreshProviders === true ||
+    kyberionEnv('KYBERION_PROVIDER_CAPABILITY_REFRESH') === '1';
   if (installed && !shouldReselect) return installedMode !== 'stub';
   if (shouldReselect) {
     installed = false;
@@ -462,7 +468,7 @@ export function reselectReasoningBackends(
  * quiet behavior for environments where stub residency is intentional.
  */
 function reportResidualStubDegradation(mode: string, reason: string): void {
-  if (process.env.KYBERION_ALLOW_STUB_FALLBACK === '1') return;
+  if (kyberionEnv('KYBERION_ALLOW_STUB_FALLBACK') === '1') return;
   markReasoningDegraded(mode, reason);
   void import('./operator-notifications.js')
     .then((m) =>
@@ -640,7 +646,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     if (provider === 'claude' && candidate.mode === 'claude-cli') return true;
     return healthyProviders.has(provider);
   });
-  if (!chainUsable && process.env.KYBERION_ALLOW_STUB_FALLBACK !== '1') {
+  if (!chainUsable && kyberionEnv('KYBERION_ALLOW_STUB_FALLBACK') !== '1') {
     markReasoningDegraded(
       mode,
       `hollow chain: candidates [${chain.map((candidate) => candidate.mode).join(', ')}] are CLI-backed but no healthy CLI provider was discovered`
@@ -667,7 +673,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
 
 function shouldRefreshProviders(options: InstallReasoningOptions): boolean {
   return (
-    options.refreshProviders === true || process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1'
+    options.refreshProviders === true || kyberionEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1'
   );
 }
 
