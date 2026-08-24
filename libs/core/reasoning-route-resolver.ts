@@ -1,7 +1,7 @@
 import { Ajv, type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
@@ -180,10 +180,7 @@ export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
   if (cachedPolicy) return cachedPolicy;
   if (!safeExistsSync(POLICY_PATH))
     throw new Error(`Missing reasoning route policy: ${POLICY_PATH}`);
-  cachedPolicy = validatePolicy(
-    JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string),
-    POLICY_PATH
-  );
+  cachedPolicy = validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
   return cachedPolicy;
 }
 
@@ -264,10 +261,10 @@ function loadOperatorLlmSelection(): { provider: string; model_id?: string } | n
   const filePath = path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
   if (!safeExistsSync(filePath)) return null;
   try {
-    const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    const value = loadJson<{
       provider?: unknown;
       model_id?: unknown;
-    };
+    }>(filePath);
     if (typeof value.provider !== 'string' || !value.provider.trim()) return null;
     return {
       provider: value.provider.trim(),

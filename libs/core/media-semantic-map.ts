@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface MediaSemanticRuleEntry {
@@ -103,7 +103,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): MediaSemanticMapCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid media semantic map catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid media semantic map catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MediaSemanticMapCatalog;
 }
@@ -120,10 +122,7 @@ export function loadMediaSemanticMapCatalog(): MediaSemanticMapCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
@@ -153,7 +152,9 @@ export function resolveProposalSectionKeywords(sectionId: string): string[] {
   const normalized = String(sectionId || '').trim();
   if (!normalized) return [];
   const catalog = loadMediaSemanticMapCatalog();
-  const matched = catalog.proposal_section_keywords.find((entry) => entry.section_id === normalized);
+  const matched = catalog.proposal_section_keywords.find(
+    (entry) => entry.section_id === normalized
+  );
   return matched?.keywords || [];
 }
 
