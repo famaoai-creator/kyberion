@@ -26,6 +26,7 @@ import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -243,7 +244,7 @@ interface WorkItemDispatchAdapters {
 const DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS = 10 * 60 * 1000;
 
 function resolveWorkItemResponseTimeoutMs(): number {
-  const raw = process.env.KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS?.trim();
+  const raw = getRegisteredEnvText('KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS')?.trim();
   const value = raw ? Number.parseInt(raw, 10) : Number.NaN;
   return Number.isInteger(value) && value > 0 ? value : DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS;
 }
@@ -2751,7 +2752,7 @@ export async function dispatchMissionWorkItems(
 ): Promise<MissionWorkItemDispatchManifest> {
   const maxRounds = Math.max(
     1,
-    Number(options.rounds ?? process.env.KYBERION_DISPATCH_MAX_ROUNDS ?? 1)
+    Number(options.rounds ?? getRegisteredEnvText('KYBERION_DISPATCH_MAX_ROUNDS') ?? 1)
   );
   let manifest = await dispatchMissionWorkItemsRound(state, options, adapters, 1);
   let previousRemaining = Number.POSITIVE_INFINITY;
