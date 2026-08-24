@@ -27,9 +27,18 @@ import { loadProviderConfig } from './provider-config.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { getRegisteredEnv } from './env-validator.js';
+
+function kyberionEnv(name: string): string | undefined {
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+}
 
 const PROJECT_ROOT = pathResolver.rootDir();
-const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
+const AGENT_IDLE_TIMEOUT_MS = Number(
+  kyberionEnv('KYBERION_AGENT_IDLE_TIMEOUT_MS') || 20 * 60 * 1000
+);
 
 /**
  * Agent Lifecycle Manager v1.0
@@ -474,17 +483,17 @@ class AgentLifecycleManagerImpl {
           permissionMode: 'auto',
         });
       } else {
-        const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+        const mode = (kyberionEnv('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
         if (mode === 'exec' || mode === 'legacy') {
           adapter = new CodexAdapter();
         } else {
           adapter = new CodexAppServerAdapter({
             model: resolvedOptions.modelId,
-            modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+            modelProvider: kyberionEnv('KYBERION_CODEX_MODEL_PROVIDER'),
             cwd: resolvedOptions.cwd || PROJECT_ROOT,
             systemPrompt: resolvedOptions.systemPrompt,
             approvalMode:
-              (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+              (kyberionEnv('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() === 'relaxed'
                 ? 'relaxed'
                 : 'strict',
           });
@@ -847,7 +856,9 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
   // supervisor binding may still be mid-evaluation here; defer the sweep
   // start one tick so module init order can never crash the process.
   queueMicrotask(() => {
-    runtimeSupervisor?.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+    runtimeSupervisor?.startSweep(
+      Number(kyberionEnv('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
+    );
   });
 }
 export const agentLifecycle: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];

@@ -23,6 +23,7 @@ let tmpDir: string;
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     shared: (sub = '') => path.join(tmpDir, sub),
+    knowledge: (sub = '') => path.join(tmpDir, 'knowledge', sub),
   },
   // Named exports (as opposed to the `pathResolver` object above) are what
   // `storage-janitor.ts` imports — provided here too so the shape-drift /
@@ -45,6 +46,10 @@ vi.mock('./secure-io.js', async () => {
     },
   };
 });
+
+vi.mock('./env-validator.js', () => ({
+  getRegisteredEnv: (name: string) => process.env[name],
+}));
 
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), success: vi.fn() },
