@@ -28,10 +28,11 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import {
   computeApprovalPayloadHash,
   findMissionPath,
+  loadJson,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core';
@@ -69,7 +70,7 @@ export interface AlignmentDecisionReport {
 function readBriefHash(briefPath: string): string | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
   try {
-    const parsed = JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(briefPath);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
     return computeApprovalPayloadHash(parsed as Record<string, unknown>);
   } catch {

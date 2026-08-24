@@ -20,6 +20,7 @@
 import * as path from 'node:path';
 import {
   createStandardYargs,
+  loadJson,
   customerResolver,
   listApprovalRequests,
   listCustomerChannelBindings,
@@ -159,7 +160,7 @@ interface OfficeSnapshot {
 function readJson<T>(filePath: string): T | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(filePath);
   } catch {
     return null;
   }

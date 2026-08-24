@@ -21,7 +21,8 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson } from '@agent/core';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
   computeApprovalPayloadHash,
@@ -90,7 +91,7 @@ export function openAlignmentApproval(
 
   let brief: MissionBriefShape & Record<string, unknown>;
   try {
-    brief = JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string);
+    brief = loadJson<MissionBriefShape & Record<string, unknown>>(briefPath);
   } catch (error) {
     return {
       missionId,

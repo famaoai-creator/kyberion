@@ -19,6 +19,7 @@ vi.mock('@agent/core', () => ({
   findMissionPath: mocks.findMissionPath,
   listApprovalRequests: mocks.listApprovalRequests,
   computeApprovalPayloadHash: mocks.computeApprovalPayloadHash,
+  loadJson: vi.fn((filePath: string) => JSON.parse(mocks.safeReadFile(filePath))),
 }));
 
 vi.mock('@agent/core/secure-io', () => ({
