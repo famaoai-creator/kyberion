@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import {
   ensureMissionTeamRuntime,
@@ -13,13 +14,7 @@ import {
   type AgentRuntimeSnapshot,
 } from './agent-lifecycle.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeAppendFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
@@ -190,9 +185,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  const request = JSON.parse(
-    safeReadFile(requestPath, { encoding: 'utf8' }) as string
-  ) as AgentRuntimeEnsureRequest;
+  const request = readJson<AgentRuntimeEnsureRequest>(requestPath);
   return {
     ...request,
     mission_id: request.mission_id.toUpperCase(),
@@ -277,9 +270,7 @@ export async function waitForMissionTeamPrewarmResult(
 
   while (Date.now() < deadline) {
     if (safeExistsSync(resultPath)) {
-      return JSON.parse(
-        safeReadFile(resultPath, { encoding: 'utf8' }) as string
-      ) as AgentRuntimeEnsureResult;
+      return readJson<AgentRuntimeEnsureResult>(resultPath);
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }

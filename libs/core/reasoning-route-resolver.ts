@@ -1,7 +1,8 @@
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
@@ -185,9 +186,7 @@ export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
   if (!safeExistsSync(USER_CONFIG_PATH)) return {};
-  const value = JSON.parse(
-    safeReadFile(USER_CONFIG_PATH, { encoding: 'utf8' }) as string
-  ) as ReasoningRouteUserConfig;
+  const value = readJson<ReasoningRouteUserConfig>(USER_CONFIG_PATH);
   validateReasoningRouteUserConfig(value, USER_CONFIG_PATH);
   return value;
 }

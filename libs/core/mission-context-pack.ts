@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   findRelevantDistilledKnowledge,
@@ -529,9 +530,7 @@ function buildTaskGuidance(input: {
     );
     if (safeExistsSync(dispatchManifestPath)) {
       try {
-        const parsed = JSON.parse(
-          safeReadFile(dispatchManifestPath, { encoding: 'utf8' }) as string
-        ) as { records?: Array<Record<string, unknown>> };
+        const parsed = readJson<{ records?: Array<Record<string, unknown>> }>(dispatchManifestPath);
         const currentItemId = input.workItem?.item_id;
         const currentTeamRole = String(
           input.workItem?.metadata && typeof input.workItem.metadata === 'object'
@@ -575,14 +574,12 @@ function buildTaskGuidance(input: {
             );
           if (responsePath && safeExistsSync(responsePath)) {
             try {
-              const responsePayload = JSON.parse(
-                safeReadFile(responsePath, { encoding: 'utf8' }) as string
-              ) as {
+              const responsePayload = readJson<{
                 task_result?: {
                   artifacts?: Array<{ path?: string; kind?: string }>;
                   summary?: string;
                 };
-              };
+              }>(responsePath);
               const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
                 ? responsePayload.task_result.artifacts
                 : [];
@@ -807,9 +804,7 @@ function loadMissionState(missionId: string, tier: MissionTier): MissionStateSum
   const filePath = missionStatePath(missionId, tier);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as MissionStateSummary;
+    const parsed = readJson<MissionStateSummary>(filePath);
     return ensureMissionStateValidator()(parsed) ? parsed : null;
   } catch {
     return null;
