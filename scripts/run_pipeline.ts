@@ -52,6 +52,7 @@ import {
   compactStepOutputContext,
   killSwitch,
   validateOpInput,
+  getRegisteredEnv,
   resolveIdentityContext,
   executeAdfSteps,
   runAdfLifecycle,
@@ -90,6 +91,10 @@ import {
   type GraphRunArtifact,
   assessPipelineDryRun,
 } from '@agent/core';
+
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { z } from 'zod';
@@ -200,7 +205,7 @@ function tryPermissionFallback(
   if (
     !fallbackPath ||
     failure.classification.category !== 'permission_denied' ||
-    process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
+    registeredEnv('KYBERION_PIPELINE_FALLBACK_ACTIVE')
   ) {
     return false;
   }
@@ -345,7 +350,7 @@ function resolvePipelineReasoningOptions(
   const persona =
     (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
     (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
-    process.env.KYBERION_PERSONA ||
+    registeredEnv('KYBERION_PERSONA') ||
     'default';
   const route = resolveStepReasoningRoute({
     stepId,
@@ -389,7 +394,10 @@ function resolvePipelineFacetNote(
     output_contract?: string;
   };
   const tierValue =
-    ctx.__knowledge_tier ?? ctx.knowledge_tier ?? process.env.KYBERION_KNOWLEDGE_TIER ?? 'public';
+    ctx.__knowledge_tier ??
+    ctx.knowledge_tier ??
+    registeredEnv('KYBERION_KNOWLEDGE_TIER') ??
+    'public';
   const tier = tierValue === 'personal' || tierValue === 'confidential' ? tierValue : 'public';
   const requestedTenantSlug =
     typeof ctx.tenant_slug === 'string'
@@ -579,7 +587,7 @@ interface RunStepsOptions {
 }
 
 function resolvePipelineHumanPresence(): boolean | undefined {
-  if (process.env.KYBERION_NON_INTERACTIVE === '1') return false;
+  if (registeredEnv('KYBERION_NON_INTERACTIVE') === '1') return false;
   if (process.stdin.isTTY && process.stdout.isTTY) return true;
   return undefined;
 }
@@ -725,7 +733,7 @@ async function loadActuatorDispatch(
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
     recordGovernanceAction(
-      process.env.KYBERION_PERSONA || 'unknown',
+      registeredEnv('KYBERION_PERSONA') || 'unknown',
       'actuator_dispatch',
       `${domain}:${op}`,
       false
@@ -2027,7 +2035,7 @@ async function runStepsInternal(
               },
               source: {
                 ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
-                agentId: process.env.KYBERION_AGENT_ID || 'pipeline-orchestrator',
+                agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
               },
               draft: {
                 title: `Escalated pipeline decision: ${stepId}`,
@@ -2052,7 +2060,7 @@ async function runStepsInternal(
         }
         throw new PipelineSuspendedError(suspended);
       }
-      if (process.env.KYBERION_NON_INTERACTIVE === '1' && params.non_interactive !== 'allow') {
+      if (registeredEnv('KYBERION_NON_INTERACTIVE') === '1' && params.non_interactive !== 'allow') {
         throw new Error('[AWAIT_DECISION_DENIED] non-interactive execution defaults to deny');
       }
       const timeoutMs = coercePositiveInt(params.timeout_ms ?? params.timeout, 86_400_000);
@@ -2074,7 +2082,7 @@ async function runStepsInternal(
         },
         source: {
           ...(process.env.MISSION_ID ? { missionId: process.env.MISSION_ID } : {}),
-          agentId: process.env.KYBERION_AGENT_ID || 'pipeline-orchestrator',
+          agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
         },
         draft: {
           title: String(approval.title || `Pipeline decision: ${stepId}`),
@@ -3062,7 +3070,7 @@ export async function executePipelineFile(
       : await withReasoningPayloadScope(
           {
             tier: payloadTier,
-            tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+            tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
             purpose: `pipeline ${pipelineId}`,
           },
           run
@@ -3161,7 +3169,7 @@ export async function main() {
   // Bootstrap reasoning + voice backends before any actuator dispatch.
   installReasoningBackends();
   installPythonVoiceBridgeIfAvailable();
-  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
+  killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
   // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
   // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.
@@ -3227,7 +3235,7 @@ export async function main() {
     const inferredScope: Record<string, unknown> = {
       tiers: ['public', autoContext.mission_tier],
     };
-    const customer = process.env.KYBERION_CUSTOMER?.trim();
+    const customer = registeredEnv('KYBERION_CUSTOMER')?.trim();
     if (customer) inferredScope.customerId = customer;
     autoContext._knowledge_scope = inferredScope;
   }
@@ -3352,7 +3360,7 @@ export async function main() {
         : await withReasoningPayloadScope(
             {
               tier: payloadTier,
-              tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+              tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
               purpose: `pipeline ${pipelineId}`,
             },
             runSteps
