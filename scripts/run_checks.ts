@@ -11,27 +11,87 @@ type Gate = {
 
 type GateManifest = { version: number; gates: Gate[] };
 
+const VALID_SCOPES = new Set<Gate['scope']>(['pr', 'full', 'release']);
+
+function isValidScope(value: string | undefined): value is Gate['scope'] {
+  return value !== undefined && VALID_SCOPES.has(value as Gate['scope']);
+}
+
+export function validateGateManifest(manifest: GateManifest): void {
+  if (!manifest || !Array.isArray(manifest.gates)) {
+    throw new Error('ci gate manifest must contain a gates array');
+  }
+  const ids = new Set<string>();
+  for (const gate of manifest.gates) {
+    if (!gate.id || ids.has(gate.id)) {
+      throw new Error(
+        `ci gate manifest contains a duplicate or empty gate id: ${gate.id || '(empty)'}`
+      );
+    }
+    if (!isValidScope(gate.scope)) {
+      throw new Error(`ci gate ${gate.id} has an invalid scope: ${String(gate.scope)}`);
+    }
+    if (!gate.executable || !Array.isArray(gate.args)) {
+      throw new Error(`ci gate ${gate.id} must declare executable and args`);
+    }
+    const command = [gate.executable, ...gate.args].join(' ');
+    if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
+      throw new Error(
+        `ci gate ${gate.id} may not recursively invoke a check or validate entrypoint`
+      );
+    }
+    ids.add(gate.id);
+  }
+}
+
 export function loadGateManifest(): GateManifest {
-  return JSON.parse(
+  const manifest = JSON.parse(
     String(
       safeReadFile(pathResolver.knowledge('product/governance/ci-gates.json'), { encoding: 'utf8' })
     )
   ) as GateManifest;
+  validateGateManifest(manifest);
+  return manifest;
 }
 
 export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?: string): Gate[] {
-  return manifest.gates.filter((gate) =>
-    only ? gate.id === only : gate.scope === scope || (scope === 'full' && gate.scope === 'pr')
+  validateGateManifest(manifest);
+  if (!isValidScope(scope)) throw new Error(`unknown check scope: ${String(scope)}`);
+  const scoped = manifest.gates.filter(
+    (gate) => gate.scope === scope || (scope === 'full' && gate.scope === 'pr')
   );
+  if (only) {
+    const selected = scoped.filter((gate) => gate.id === only);
+    if (selected.length === 0) {
+      throw new Error(`gate ${only} is not registered for scope ${scope}`);
+    }
+    return selected;
+  }
+  return scoped;
 }
 
 export function main(argv = process.argv.slice(2)): number {
   const scopeIndex = argv.indexOf('--scope');
-  const scope = (scopeIndex >= 0 ? argv[scopeIndex + 1] : 'pr') as Gate['scope'];
+  const scopeValue = scopeIndex >= 0 ? argv[scopeIndex + 1] : 'pr';
   const onlyIndex = argv.indexOf('--only');
   const only = onlyIndex >= 0 ? argv[onlyIndex + 1] : undefined;
   const json = argv.includes('--json');
-  const gates = selectGates(loadGateManifest(), scope, only);
+  const error = (message: string): number => {
+    if (json)
+      console.log(JSON.stringify({ scope: scopeValue, results: [], failed: 0, error }, null, 2));
+    else console.error(`[check] ERROR ${message}`);
+    return 1;
+  };
+  if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
+  if (scopeIndex >= 0 && !scopeValue) return error('--scope requires a value');
+  if (onlyIndex >= 0 && !only) return error('--only requires a gate id');
+  let gates: Gate[];
+  try {
+    gates = selectGates(loadGateManifest(), scopeValue, only);
+  } catch (cause) {
+    return error(cause instanceof Error ? cause.message : String(cause));
+  }
+  if (gates.length === 0) return error(`no gates registered for scope ${scopeValue}`);
   const results = gates.map((gate) => {
     const result = safeExecResult(gate.executable, gate.args, { cwd: pathResolver.rootDir() });
     return {
