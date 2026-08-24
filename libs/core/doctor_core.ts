@@ -1,7 +1,11 @@
-/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { execSync } from 'node:child_process';
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeReadlink } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeExecResult,
+  safeLstat,
+  safeReadFile,
+  safeReadlink,
+} from './secure-io.js';
 
 /**
  * Doctor Core Utility
@@ -10,9 +14,13 @@ export const doctor = {
   /** 指定されたコマンドがインストールされているかチェック */
   checkCommand: (cmd: string, name?: string) => {
     try {
-      execSync(`${cmd} --version`, { stdio: 'ignore' });
-      console.log(`✅ ${name || cmd}: Installed`);
-      return true;
+      const result = safeExecResult(cmd, ['--version'], { maxOutputMB: 1 });
+      if (result.status === 0) {
+        console.log(`✅ ${name || cmd}: Installed`);
+        return true;
+      }
+      console.log(`❌ ${name || cmd}: Not Found`);
+      return false;
     } catch (_e) {
       console.log(`❌ ${name || cmd}: Not Found`);
       return false;
@@ -34,9 +42,12 @@ export const doctor = {
   checkAccessibility: () => {
     if (process.platform !== 'darwin') return true;
     try {
-      execSync('osascript -e "tell application "System Events" to get name"', {
-        stdio: 'ignore',
-      });
+      const result = safeExecResult(
+        'osascript',
+        ['-e', 'tell application "System Events" to get name'],
+        { maxOutputMB: 1 }
+      );
+      if (result.status !== 0) throw new Error(result.stderr || 'osascript failed');
       console.log('✅ Accessibility: OK');
       return true;
     } catch (_e) {

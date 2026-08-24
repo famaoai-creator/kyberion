@@ -25,7 +25,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/in-room-meeting-driver.ts',
   'libs/core/in-room-minutes-recorder.ts',
   'libs/core/mic-capture.ts',
-  'libs/core/doctor_core.ts',
   'libs/core/email-bridge.ts',
   'libs/core/environment-capability.ts',
   'libs/core/gemini-cli-backend.ts',
