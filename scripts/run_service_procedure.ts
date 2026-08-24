@@ -17,7 +17,7 @@
 
 import {
   dispatchProcedure,
-  safeReadFile,
+  loadJson,
   validateServiceRecording,
   withExecutionContext,
   loadProcedures,
@@ -31,14 +31,17 @@ function parseArgs(argv: string[]): Record<string, string> {
     const key = argv[i].slice(2);
     const next = argv[i + 1];
     if (next === undefined || next.startsWith('--')) out[key] = 'true';
-    else { out[key] = next; i++; }
+    else {
+      out[key] = next;
+      i++;
+    }
   }
   return out;
 }
 
 function printUsage(): void {
   process.stdout.write(
-    '[run-service-procedure] Usage: node dist/scripts/run_service_procedure.js --procedure-id <id> --inputs <json> [--mission-id <id>]\n',
+    '[run-service-procedure] Usage: node dist/scripts/run_service_procedure.js --procedure-id <id> --inputs <json> [--mission-id <id>]\n'
   );
 }
 
@@ -58,14 +61,15 @@ async function main(): Promise<void> {
 
   const entry = loadProcedures().find((p) => p.procedure_id === procedureId);
   if (!entry) fail(`procedure "${procedureId}" not found in catalog`);
-  if (entry!.substrate !== 'service') fail(`procedure "${procedureId}" is not a service procedure (substrate=${entry!.substrate})`);
+  if (entry!.substrate !== 'service')
+    fail(`procedure "${procedureId}" is not a service procedure (substrate=${entry!.substrate})`);
 
   const recordingAbs = resolveAllowlistedRecordingRef(entry!.adapter.recording_ref);
   if (!recordingAbs) fail(`procedure "${procedureId}" has no allowlisted recording_ref`);
 
   let raw: unknown;
   try {
-    raw = JSON.parse(safeReadFile(recordingAbs!, { encoding: 'utf8' }) as string);
+    raw = loadJson<unknown>(recordingAbs!);
   } catch (err) {
     return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -92,17 +96,21 @@ async function main(): Promise<void> {
       agentId: 'run-service-procedure',
       missionId,
       channel: 'service',
-    }),
+    })
   );
 
   if (result.status === 'approval_required') {
-    process.stdout.write(`[run-service-procedure] approval required (request ${result.approvalRequestId ?? 'n/a'}). Approve in Kyberion and re-run.\n`);
+    process.stdout.write(
+      `[run-service-procedure] approval required (request ${result.approvalRequestId ?? 'n/a'}). Approve in Kyberion and re-run.\n`
+    );
     process.exit(2);
   }
   if (result.status !== 'executed') {
     fail(`${result.status}: ${result.errors.join('; ')}`);
   }
-  process.stdout.write(`[run-service-procedure] executed "${procedureId}"\n${JSON.stringify(result.serviceResults, null, 2)}\n`);
+  process.stdout.write(
+    `[run-service-procedure] executed "${procedureId}"\n${JSON.stringify(result.serviceResults, null, 2)}\n`
+  );
 }
 
 main().catch((err) => fail(err instanceof Error ? err.message : String(err)));

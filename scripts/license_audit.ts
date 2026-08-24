@@ -22,6 +22,7 @@
 import * as path from 'node:path';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -69,7 +70,7 @@ const REPORT_PATH = path.join(ROOT, 'docs', 'legal', 'third-party-licenses.json'
 
 function readPackageJson(p: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+    return loadJson<Record<string, unknown>>(p);
   } catch {
     return null;
   }
@@ -96,7 +97,10 @@ function detectLicenseFile(pkgDir: string): string | null {
   return null;
 }
 
-function extractLicense(pkg: Record<string, unknown>, pkgDir: string): {
+function extractLicense(
+  pkg: Record<string, unknown>,
+  pkgDir: string
+): {
   license: string;
   source: PackageLicenseInfo['licenseSource'];
 } {
@@ -108,7 +112,9 @@ function extractLicense(pkg: Record<string, unknown>, pkgDir: string): {
   }
   if (Array.isArray(pkg.licenses)) {
     const types = pkg.licenses
-      .map((l: unknown) => (typeof l === 'object' && l && 'type' in l ? String((l as any).type) : ''))
+      .map((l: unknown) =>
+        typeof l === 'object' && l && 'type' in l ? String((l as any).type) : ''
+      )
       .filter(Boolean);
     if (types.length > 0) return { license: types.join(' OR '), source: 'licenses_array' };
   }
@@ -194,12 +200,16 @@ function gatherPackages(): PackageLicenseInfo[] {
       repository:
         typeof pkgJson.repository === 'string'
           ? pkgJson.repository
-          : pkgJson.repository && typeof pkgJson.repository === 'object' && 'url' in pkgJson.repository
+          : pkgJson.repository &&
+              typeof pkgJson.repository === 'object' &&
+              'url' in pkgJson.repository
             ? String((pkgJson.repository as { url: unknown }).url)
             : undefined,
     });
   }
-  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+  return [...seen.values()].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version)
+  );
 }
 
 function buildReport(packages: PackageLicenseInfo[]): AuditReport {
@@ -211,10 +221,9 @@ function buildReport(packages: PackageLicenseInfo[]): AuditReport {
     byLicense[p.license] = (byLicense[p.license] || 0) + 1;
     if (p.license === 'UNKNOWN' || p.license === 'UNKNOWN_FILE') unknown.push(p);
     // Detect restrictive licenses (handle "MIT OR GPL-3.0" forms — restrictive only when *all* options are restrictive)
-    const parts = p.license.split(/\s+OR\s+|\s+\/\s+/i).map(s => s.trim());
+    const parts = p.license.split(/\s+OR\s+|\s+\/\s+/i).map((s) => s.trim());
     const allRestrictive =
-      parts.length > 0 &&
-      parts.every(part => RESTRICTIVE_LICENSES.has(part));
+      parts.length > 0 && parts.every((part) => RESTRICTIVE_LICENSES.has(part));
     if (allRestrictive) restrictive.push(p);
   }
 
