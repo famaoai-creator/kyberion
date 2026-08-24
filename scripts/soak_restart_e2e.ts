@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   logger,
+  loadJson,
   spawnManagedProcess,
   pathResolver,
   safeAppendFileSync,
@@ -60,7 +61,7 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
   const journalPath = path.join(root, 'mission-journal.json');
   const statePath = path.join(root, 'provider-health.json');
   const existing = safeExistsSync(statePath)
-    ? JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string)
+    ? loadJson<{ phase?: string; resumed?: boolean; restored_from?: string }>(statePath)
     : {};
   safeWriteFile(
     heartbeatPath,
@@ -218,7 +219,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   });
   await resumeExit;
 
-  const restored = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+  const restored = loadJson<{ resumed?: boolean; restored_from?: string }>(statePath);
   return {
     timestamp: new Date().toISOString(),
     root,

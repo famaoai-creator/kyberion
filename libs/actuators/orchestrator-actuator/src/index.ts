@@ -1,4 +1,4 @@
-import { logger, safeExistsSync, safeReadFile } from '@agent/core';
+import { loadJson, logger, safeExistsSync, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
@@ -38,7 +38,7 @@ async function performReconcile(input: OrchestratorAction) {
     input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = loadJson<unknown>(strategyPath);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
