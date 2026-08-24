@@ -74,12 +74,270 @@
       "rationale": "Ensures declared script and pipeline references resolve."
     },
     {
-      "id": "catalog-integrity",
+      "id": "esm",
       "scope": "full",
-      "executable": "node",
-      "args": ["dist/scripts/check_catalog_integrity.js"],
+      "script": "check:esm",
+      "owner": "quality",
+      "rationale": "Checks runtime ESM integrity."
+    },
+    {
+      "id": "catalogs",
+      "scope": "full",
+      "script": "check:catalogs",
       "owner": "governance",
-      "rationale": "Ensures governed catalogs remain internally consistent."
+      "rationale": "Checks catalog and knowledge index integrity."
+    },
+    {
+      "id": "facet-purity",
+      "scope": "full",
+      "script": "check:facet-purity",
+      "owner": "quality",
+      "rationale": "Checks facet purity boundaries."
+    },
+    {
+      "id": "op-registry",
+      "scope": "full",
+      "script": "check:op-registry",
+      "owner": "operations",
+      "rationale": "Checks actuator operation registry freshness."
+    },
+    {
+      "id": "vocabulary-types",
+      "scope": "full",
+      "script": "check:vocabulary-types",
+      "owner": "experience",
+      "rationale": "Checks generated vocabulary types."
+    },
+    {
+      "id": "pseudo-locale",
+      "scope": "full",
+      "script": "check:pseudo-locale",
+      "owner": "experience",
+      "rationale": "Checks generated pseudo-locale output."
+    },
+    {
+      "id": "deprecated-wisdom-ops",
+      "scope": "full",
+      "script": "check:deprecated-wisdom-ops",
+      "owner": "governance",
+      "rationale": "Prevents retired Wisdom aliases in pipeline catalogs."
+    },
+    {
+      "id": "wisdom-forwarders",
+      "scope": "full",
+      "script": "check:wisdom-forwarders",
+      "owner": "operations",
+      "rationale": "Checks Wisdom forwarder targets."
+    },
+    {
+      "id": "env-registry",
+      "scope": "full",
+      "script": "check:env-registry",
+      "owner": "operations",
+      "rationale": "Checks environment registry freshness."
+    },
+    {
+      "id": "knowledge-scope",
+      "scope": "full",
+      "script": "check:knowledge-scope",
+      "owner": "security",
+      "rationale": "Checks tenant and knowledge scope boundaries."
+    },
+    {
+      "id": "governance-rules",
+      "scope": "full",
+      "script": "check:governance-rules",
+      "owner": "governance",
+      "rationale": "Checks governed catalog rules."
+    },
+    {
+      "id": "work-scope-policy",
+      "scope": "full",
+      "script": "check:work-scope-policy",
+      "owner": "governance",
+      "rationale": "Checks mandatory work-scope policy emitters."
+    },
+    {
+      "id": "mission-gate-docs",
+      "scope": "full",
+      "script": "check:mission-gate-docs",
+      "owner": "governance",
+      "rationale": "Checks canonical mission-gate documentation."
+    },
+    {
+      "id": "design-contrast",
+      "scope": "full",
+      "script": "check:design-contrast",
+      "owner": "experience",
+      "rationale": "Checks design contrast contracts."
+    },
+    {
+      "id": "design-ledger",
+      "scope": "full",
+      "script": "check:design-ledger",
+      "owner": "experience",
+      "rationale": "Checks design decision ledger integrity."
+    },
+    {
+      "id": "chronos-dom-contrast",
+      "scope": "full",
+      "script": "check:chronos-dom-contrast",
+      "owner": "experience",
+      "rationale": "Checks Chronos light, dark, and reduced-motion DOM contrast."
+    },
+    {
+      "id": "ui-ux",
+      "scope": "full",
+      "script": "check:ui-ux",
+      "owner": "experience",
+      "rationale": "Checks shared UI and UX governance."
+    },
+    {
+      "id": "i18n",
+      "scope": "full",
+      "script": "check:i18n",
+      "owner": "experience",
+      "rationale": "Checks internationalization hardcoding ratchets."
+    },
+    {
+      "id": "intent-domain-coverage",
+      "scope": "full",
+      "script": "check:intent-domain-coverage",
+      "owner": "intent",
+      "rationale": "Checks intent domain coverage."
+    },
+    {
+      "id": "contract-schemas",
+      "scope": "full",
+      "script": "check:contract-schemas",
+      "owner": "quality",
+      "rationale": "Checks contract schema coverage and validity."
+    },
+    {
+      "id": "pii-rules",
+      "scope": "full",
+      "script": "check:pii-rules",
+      "owner": "security",
+      "rationale": "Checks generated PII rules."
+    },
+    {
+      "id": "eval-distill",
+      "scope": "full",
+      "script": "eval:distill",
+      "owner": "quality",
+      "rationale": "Runs the deterministic distill evaluation."
+    },
+    {
+      "id": "contract-semver",
+      "scope": "full",
+      "script": "check:contract-semver",
+      "owner": "quality",
+      "rationale": "Checks actuator contract semver compatibility."
+    },
+    {
+      "id": "pipeline-shell-independence",
+      "scope": "full",
+      "script": "check:pipeline-shell-independence",
+      "owner": "operations",
+      "rationale": "Checks portable pipeline shell usage."
+    },
+    {
+      "id": "workflow-catalog-refs",
+      "scope": "full",
+      "script": "check:workflow-catalog-refs",
+      "owner": "governance",
+      "rationale": "Checks workflow catalog references."
+    },
+    {
+      "id": "process-registry",
+      "scope": "full",
+      "script": "check:process-registry",
+      "owner": "governance",
+      "rationale": "Checks process definition registry bindings."
+    },
+    {
+      "id": "mission-process-bindings",
+      "scope": "full",
+      "script": "check:mission-process-bindings",
+      "owner": "governance",
+      "rationale": "Checks mission process bindings."
+    },
+    {
+      "id": "reference-drift",
+      "scope": "full",
+      "script": "check:reference-drift",
+      "owner": "quality",
+      "rationale": "Checks reference drift contracts."
+    },
+    {
+      "id": "production-evidence-status",
+      "scope": "full",
+      "script": "check:production-evidence-status",
+      "owner": "release",
+      "rationale": "Surfaces production evidence readiness without blocking local validation."
+    },
+    {
+      "id": "production-evidence",
+      "scope": "full",
+      "script": "check:production-evidence",
+      "owner": "release",
+      "rationale": "Checks the production evidence register contract."
+    },
+    {
+      "id": "first-win-smoke",
+      "scope": "full",
+      "script": "check:first-win-smoke",
+      "owner": "experience",
+      "rationale": "Checks first-win smoke contract."
+    },
+    {
+      "id": "first-win-lifecycle",
+      "scope": "full",
+      "script": "check:first-win-lifecycle",
+      "owner": "experience",
+      "rationale": "Checks first-win lifecycle dry-run."
+    },
+    {
+      "id": "doc-examples",
+      "scope": "full",
+      "script": "check:doc-examples",
+      "owner": "documentation",
+      "rationale": "Checks tagged documentation examples."
+    },
+    {
+      "id": "tier-hygiene",
+      "scope": "full",
+      "script": "check:tier-hygiene",
+      "owner": "security",
+      "rationale": "Checks tier hygiene boundaries."
+    },
+    {
+      "id": "mos-no-write-api",
+      "scope": "full",
+      "script": "check:mos-no-write-api",
+      "owner": "security",
+      "rationale": "Checks read-only operator-surface API boundaries."
+    },
+    {
+      "id": "audit-continuity",
+      "scope": "full",
+      "script": "check:audit-continuity",
+      "owner": "security",
+      "rationale": "Checks audit continuity in warn-only observation mode."
+    },
+    {
+      "id": "entity-governance",
+      "scope": "full",
+      "script": "check:entity-governance",
+      "owner": "governance",
+      "rationale": "Checks entity and mission governance boundaries."
+    },
+    {
+      "id": "event-wiring",
+      "scope": "full",
+      "script": "check:event-wiring",
+      "owner": "operations",
+      "rationale": "Checks event wiring contracts."
     },
     {
       "id": "production-evidence-complete",

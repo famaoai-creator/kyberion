@@ -3,8 +3,9 @@ import { pathResolver, safeExecResult, safeReadFile } from '@agent/core';
 type Gate = {
   id: string;
   scope: 'pr' | 'full' | 'release';
-  executable: string;
-  args: string[];
+  executable?: string;
+  args?: string[];
+  script?: string;
   owner: string;
   rationale: string;
 };
@@ -31,14 +32,23 @@ export function validateGateManifest(manifest: GateManifest): void {
     if (!isValidScope(gate.scope)) {
       throw new Error(`ci gate ${gate.id} has an invalid scope: ${String(gate.scope)}`);
     }
-    if (!gate.executable || !Array.isArray(gate.args)) {
-      throw new Error(`ci gate ${gate.id} must declare executable and args`);
+    const hasExecutable = Boolean(gate.executable);
+    const hasScript = Boolean(gate.script);
+    if (hasExecutable === hasScript) {
+      throw new Error(`ci gate ${gate.id} must declare exactly one of executable or script`);
     }
-    const command = [gate.executable, ...gate.args].join(' ');
-    if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
-      throw new Error(
-        `ci gate ${gate.id} may not recursively invoke a check or validate entrypoint`
-      );
+    if (hasExecutable) {
+      if (!Array.isArray(gate.args)) {
+        throw new Error(`ci gate ${gate.id} executable gates must declare args`);
+      }
+      const command = [gate.executable, ...gate.args].join(' ');
+      if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
+        throw new Error(
+          `ci gate ${gate.id} may not recursively invoke a check or validate entrypoint`
+        );
+      }
+    } else if (gate.script === 'check' || gate.script === 'validate') {
+      throw new Error(`ci gate ${gate.id} may not invoke the check or validate script itself`);
     }
     ids.add(gate.id);
   }
@@ -94,7 +104,9 @@ export function main(argv = process.argv.slice(2)): number {
   }
   if (gates.length === 0) return error(`no gates registered for scope ${scopeValue}`);
   const results = gates.map((gate) => {
-    const result = safeExecResult(gate.executable, gate.args, { cwd: pathResolver.rootDir() });
+    const result = gate.script
+      ? safeExecResult('pnpm', ['run', gate.script], { cwd: pathResolver.rootDir() })
+      : safeExecResult(gate.executable!, gate.args || [], { cwd: pathResolver.rootDir() });
     return {
       id: gate.id,
       owner: gate.owner,

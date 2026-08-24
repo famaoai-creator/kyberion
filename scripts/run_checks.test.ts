@@ -4,8 +4,7 @@ import { loadGateManifest, main, selectGates, validateGateManifest } from './run
 const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
   id,
   scope,
-  executable: 'node',
-  args: ['-e', 'process.exit(0)'],
+  script: `check:${id}`,
   owner: 'test',
   rationale: 'test gate',
 });
@@ -29,9 +28,9 @@ describe('manifest-driven check runner', () => {
     expect(() =>
       validateGateManifest({
         version: 1,
-        gates: [{ ...gate('recursive', 'pr'), args: ['scripts/run_checks.ts'] }],
+        gates: [{ ...gate('recursive', 'pr'), script: 'validate' }],
       })
-    ).toThrow('recursively');
+    ).toThrow('itself');
   });
 
   it('fails closed for unknown and empty scopes', () => {

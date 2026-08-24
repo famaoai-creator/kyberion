@@ -96,6 +96,7 @@ function startChronos(port: number): { child: ChildProcess; getStartupOutput: ()
     cwd: chronosRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1' },
+    detached: process.platform !== 'win32',
   });
   const capture = (chunk: Buffer) => {
     startupOutput = `${startupOutput}${chunk.toString()}`.slice(-4000);
@@ -103,6 +104,34 @@ function startChronos(port: number): { child: ChildProcess; getStartupOutput: ()
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
   return { child, getStartupOutput: () => startupOutput };
+}
+
+async function stopChronos(server: ChildProcess): Promise<void> {
+  if (server.exitCode !== null) return;
+  await new Promise<void>((resolve) => {
+    const kill = (signal: NodeJS.Signals) => {
+      if (process.platform !== 'win32' && server.pid) {
+        try {
+          process.kill(-server.pid, signal);
+        } catch {
+          // The process group may already have exited.
+        }
+      }
+      if (server.exitCode === null) server.kill(signal);
+    };
+    const timeout = setTimeout(() => {
+      kill('SIGKILL');
+      server.stdout?.destroy();
+      server.stderr?.destroy();
+      server.unref();
+      resolve();
+    }, 5_000);
+    server.once('close', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    kill('SIGTERM');
+  });
 }
 
 async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> {
@@ -224,7 +253,7 @@ async function main(): Promise<void> {
     }
     console.log(`[check:chronos-dom-contrast] OK (${modes.join(' + ')}, reduced-motion)`);
   } finally {
-    if (server && !server.killed) server.kill('SIGTERM');
+    if (server) await stopChronos(server);
   }
 }
 

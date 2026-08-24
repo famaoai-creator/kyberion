@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 3299,
+      "size": 10583,
       "type": "json"
     },
     {
