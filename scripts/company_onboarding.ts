@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
+  loadJson,
   readTenantProfile,
   safeExistsSync,
   safeReadFile,
@@ -146,10 +147,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       rootDir,
       force: normalized.force,
     });
-    const profile = JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      unknown
-    >;
+    const profile = loadJson<Record<string, unknown>>(profilePath);
     profile.accountable_human_resource_id = normalized.accountableHumanId;
     profile.workforce = {
       mode: 'solo_founder_ai_workforce',

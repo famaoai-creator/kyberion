@@ -6,6 +6,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import {
   compileSchemaFromPath,
+  loadJson,
   pathResolver,
   resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
@@ -120,7 +121,7 @@ export async function readInput(file?: string): Promise<ApplyInput> {
         `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
       );
     }
-    return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as ApplyInput;
+    return loadJson<ApplyInput>(file);
   }
   // stdin fallback
   if (process.stdin.isTTY) {
