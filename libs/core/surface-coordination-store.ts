@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import {
@@ -9,7 +10,6 @@ import {
   loadJson,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
@@ -506,9 +506,7 @@ export function getSurfaceAsyncRequest(
 ): SurfaceAsyncRequestRecord | null {
   const resolved = findRecordPath(asyncRequestBase(surface), requestId, { scope }, 'requests');
   if (!resolved) return null;
-  const request = JSON.parse(
-    safeReadFile(resolved, { encoding: 'utf8' }) as string
-  ) as SurfaceAsyncRequestRecord;
+  const request = readJson<SurfaceAsyncRequestRecord>(resolved);
   return recordMatchesScope(request, scopeFilter(scope)) ? request : null;
 }
 

@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
+import { safeExistsSync, validateUrl } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import {
   evaluateShellCommandPolicy,
   loadShellCommandPolicy,
@@ -65,9 +66,7 @@ function loadAdfExecutionPolicy(): AdfExecutionPolicy {
   }
 
   try {
-    const parsed = JSON.parse(
-      safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-    ) as Partial<AdfExecutionPolicy>;
+    const parsed = readJson<Partial<AdfExecutionPolicy>>(POLICY_PATH);
     cachedPolicy = {
       limits: {
         max_steps: coercePositiveInt(parsed?.limits?.max_steps, DEFAULT_POLICY.limits.max_steps),

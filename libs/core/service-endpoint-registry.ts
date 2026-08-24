@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('service-endpoint-registry');
@@ -57,9 +58,7 @@ function getServiceEndpointsDir(): string {
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
   try {
-    return JSON.parse(
-      safeReadFile(pathResolver.rootResolve(catalogPath), { encoding: 'utf8' }) as string
-    ) as ServiceEndpointsCatalog;
+    return readJson<ServiceEndpointsCatalog>(pathResolver.rootResolve(catalogPath));
   } catch (error: any) {
     throw new Error(
       `Failed to load service endpoints catalog at ${catalogPath}: ${error?.message || error}`

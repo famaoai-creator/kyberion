@@ -9,6 +9,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import * as customerResolver from './customer-resolver.js';
 import { grantAccess, grantAccessGuarded } from './secret-guard.js';
 import { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
@@ -349,9 +350,7 @@ export function readMissionNextTasks(missionDir: string): Array<Record<string, u
   const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
   if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    const parsed = JSON.parse(
-      safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string
-    ) as unknown;
+    const parsed = readJson<unknown>(nextTasksPath);
     return Array.isArray(parsed)
       ? (parsed.filter((entry) => entry && typeof entry === 'object') as Array<
           Record<string, unknown>

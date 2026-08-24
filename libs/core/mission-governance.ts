@@ -14,6 +14,7 @@ import {
 import { evaluateDeliverableQuality, inferDeliverableKind } from './deliverable-quality.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { logger } from './core.js';
 import {
   safeAppendFileSync,
@@ -330,9 +331,7 @@ export function validateMarketingMissionCompletionGate(input: {
   }
   candidates.sort((left, right) => safeStat(right).mtimeMs - safeStat(left).mtimeMs);
   try {
-    const evidence = JSON.parse(
-      safeReadFile(candidates[0], { encoding: 'utf8' }) as string
-    ) as MarketingCompletionEvidence;
+    const evidence = readJson<MarketingCompletionEvidence>(candidates[0]);
     const currentArtifacts = Object.fromEntries(
       Object.entries(evidence.artifact_bindings || {}).map(([name, binding]) => {
         const artifactPath = path.isAbsolute(binding.path)

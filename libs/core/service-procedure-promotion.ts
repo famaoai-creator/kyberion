@@ -2,7 +2,8 @@ import path from 'node:path';
 import { compileServiceRecording } from './service-recording-compiler.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { validatePipelineAdf, type PipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validateServiceRecording } from './service-recording.js';
@@ -80,9 +81,7 @@ export function promoteServiceProcedure(
   const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
   let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
   if (safeExistsSync(catalogPath)) {
-    catalog = JSON.parse(
-      safeReadFile(catalogPath, { encoding: 'utf8' }) as string
-    ) as ProcedureCatalog;
+    catalog = readJson<ProcedureCatalog>(catalogPath);
   }
   if (!Array.isArray(catalog.procedures)) catalog.procedures = [];
   if (catalog.procedures.some((entry) => entry.procedure_id === procedureId)) {

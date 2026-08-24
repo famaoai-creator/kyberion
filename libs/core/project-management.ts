@@ -39,6 +39,7 @@ import { listMissionsInSearchDirs, loadState, saveState } from './mission-state.
 import type { MissionState } from './mission-types.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { validateWritePermission } from './tier-guard.js';
 import {
   removeMissionFromProjectLedger,
@@ -518,12 +519,9 @@ export function ensureProjectOsScaffold(
   rootDir = pathResolver.rootDir()
 ): string {
   const targetDir = pathResolver.projectOsDir(projectId, tier, tenantSlug, rootDir);
-  const artifactMap = JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'),
-      { encoding: 'utf8' }
-    ) as string
-  ) as { lifecycle?: Array<{ phase: string; required?: string[] }> };
+  const artifactMap = readJson<{
+    lifecycle?: Array<{ phase: string; required?: string[] }>;
+  }>(pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'));
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
   for (const phase of artifactMap.lifecycle || []) {
     const phaseDir = path.join(targetDir, PROJECT_OS_PHASE_DIRS[phase.phase] || phase.phase);
