@@ -376,7 +376,15 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);
     }
-    const catalog = loadJson<unknown>(catalogPath);
+    const catalog = loadJson<{
+      documents: Record<
+        string,
+        {
+          default_template?: string;
+          templates?: Record<string, unknown>;
+        }
+      >;
+    }>(catalogPath);
     const documentType = brief.document_type || 'invoice';
     const documentCatalog = catalog.documents?.[documentType];
     if (!documentCatalog) {

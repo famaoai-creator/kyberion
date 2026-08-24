@@ -601,7 +601,7 @@ function completeOperatorApproval(
   let current: Record<string, unknown> = {};
   if (safeExistsSync(filePath)) {
     try {
-      current = loadJson<unknown>(filePath);
+      current = loadJson<Record<string, unknown>>(filePath);
     } catch {
       // A corrupt approval artifact is replaced with a fresh terminal state.
     }
