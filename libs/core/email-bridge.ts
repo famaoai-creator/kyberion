@@ -8,7 +8,9 @@ import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
 import { getRegisteredEnv } from './env-validator.js';
 
 function kyberionEnv(name: string): string | undefined {
-  return getRegisteredEnv<string>(name) as string | undefined;
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
 }
 
 export type EmailBackendOperation = 'create_draft' | 'send';
