@@ -283,13 +283,13 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
-> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` が **0 occurrences**、空白を許容する同パターンが **71 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **390 occurrences / 202 files**、`defineCatalog` が **31 core implementations**、import boundary は **183 cycles / 114 direction violations** となった。JSON 読込と env 読み取りの移行は進行中で Ajv生成器の集約は完了したが、旧 JSON 読込・env codemod・catalog統合・cycle削減は未完のため、SX-03/04は引き続き PARTIAL とする。
+> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` が **0 occurrences**、空白を許容する同パターンが **71 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **368 occurrences / 202 files**、`defineCatalog` が **31 core implementations**、import boundary は **183 cycles / 114 direction violations** となった。JSON 読込と env 読み取りの移行は進行中で Ajv生成器の集約は完了したが、旧 JSON 読込・env codemod・catalog統合・cycle削減は未完のため、SX-03/04は引き続き PARTIAL とする。
 
 | 指標                                      | 現状  | 目標   | 担当     |
 | ----------------------------------------- | ----- | ------ | -------- |
 | `JSON.parse(\s*safeReadFile(`（空白許容） | 71    | 0      | SX-03    |
 | 自前 `new Ajv(` (foundation 外)           | 0     | 0      | SX-03/04 |
-| `process.env.KYBERION_*` 直読             | 390   | 0      | SX-03    |
+| `process.env.KYBERION_*` 直読             | 368   | 0      | SX-03    |
 | 手書き catalog loader                     | ~151  | 0      | SX-04    |
 | schema 無し governance catalog            | 70    | 0      | SX-04    |
 | npm scripts                               | 324   | ≤120   | SX-05    |
@@ -328,7 +328,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | ----- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SX-01 | IMPLEMENTED | `check:first-win-docs` と 3 文書の機械検証を追加。clean-clone の実行証跡は未完。                                                                                                                                                                                                      |
 | SX-02 | BASELINED   | 4 層宣言、cycle/方向チェッカー、baseline ratchet を追加。既存違反は baseline 内。                                                                                                                                                                                                     |
-| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し、旧 JSON 読み込みと env 読み取りの一部を foundation 経由へ移行。`new Ajv` は foundation 外 0 まで減少したが、空白を含む旧 JSON 読み込み 71 件、env 直読 390 件、JSONL append、私的 text helper の全 codemod は未完。                   |
+| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し、旧 JSON 読み込みと env 読み取りの一部を foundation 経由へ移行。`new Ajv` は foundation 外 0 まで減少したが、空白を含む旧 JSON 読み込み 71 件、env 直読 368 件、JSONL append、私的 text helper の全 codemod は未完。                   |
 | SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio 系・media-style・media-theme-role・schema 付き5 policy loader を移行。mtime cache と schema 検証を共通化した。全 catalog/schema 統合と未参照 catalog 処分は未完。                                                                                |
 | SX-05 | PARTIAL     | command registry を `id/noun/verb/entry/audience` 単位へ拡張し、entrypoint route 整合性 checker・router の dynamic import・未知 command の fail-closed を追加。doctor/alias/script 削減は未完。                                                                                       |
 | SX-06 | PARTIAL     | `defineScript`/`defineGenerator` と harness test を追加し、script ごとの `flags` 宣言を可能にした。pseudo-locale / vocabulary-types / env-registry / op-registry / model-registry / intent-contract-memory / deterministic checkers を共通 harness へ移行。既存 script 全移行は未完。 |

@@ -5,7 +5,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 71;
-const ENV_RATCHET = 390;
+const ENV_RATCHET = 368;
 
 function sourceFiles(): string[] {
   return SOURCE_ROOTS.flatMap((relativeRoot) => {

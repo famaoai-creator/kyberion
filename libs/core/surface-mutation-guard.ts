@@ -8,6 +8,7 @@
  */
 
 import { timingSafeEqual } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { isValidChronosScopeId, type ChronosAccessRole } from './chronos-access-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
@@ -40,8 +41,8 @@ function matchesConfiguredToken(candidate: string, configured: string | undefine
 
 export function authorizeSurfaceMutation(request: SurfaceMutationRequest): SurfaceMutationDecision {
   const url = new URL(request.url);
-  const apiToken = process.env.KYBERION_API_TOKEN;
-  const localadminToken = process.env.KYBERION_LOCALADMIN_TOKEN;
+  const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
+  const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
   const token = resolveBearerToken(request);
   if (matchesConfiguredToken(token, apiToken) || matchesConfiguredToken(token, localadminToken)) {
     return { ok: true, status: 200, reason: 'token' };
