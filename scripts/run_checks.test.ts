@@ -33,6 +33,15 @@ describe('manifest-driven check runner', () => {
     ).toThrow('itself');
   });
 
+  it('rejects script gates that are absent from the package script registry', () => {
+    expect(() =>
+      validateGateManifest(
+        { version: 1, gates: [{ ...gate('missing', 'full'), script: 'check:missing' }] },
+        new Set(['check:present'])
+      )
+    ).toThrow('unknown package script');
+  });
+
   it('fails closed for unknown and empty scopes', () => {
     expect(main(['--scope', 'typo', '--json'])).toBe(1);
     expect(selectGates(loadGateManifest(), 'release')).toHaveLength(1);
