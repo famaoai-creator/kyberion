@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import {
   buildExecutionEnv,
+  loadJson,
   listTenantProfileSlugs,
   pathResolver,
   safeExecResult,
@@ -120,10 +121,7 @@ function readBrief(tenant: string, instanceId: string): Record<string, unknown> 
   );
   if (!safeExistsSync(briefPath)) return null;
   try {
-    return JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string) as Record<
-      string,
-      unknown
-    >;
+    return loadJson<Record<string, unknown>>(briefPath);
   } catch {
     return null;
   }

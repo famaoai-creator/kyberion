@@ -38,6 +38,7 @@ import {
   resolveProcedure,
   saveProcedureDelta,
   pathResolver,
+  loadJson,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -79,7 +80,7 @@ function loadBrowserProcedure(procedureId: string): {
         };
       let raw: unknown;
       try {
-        raw = JSON.parse(safeReadFile(recordingPath) as string);
+        raw = loadJson<unknown>(recordingPath);
       } catch (err) {
         return {
           error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
@@ -543,9 +544,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
     return { ok: false, error: 'delta_recording_ref is not in the allowlisted recordings store' };
   let deltaRecording;
   try {
-    const parsed = validateBrowserExtensionRecording(
-      JSON.parse(safeReadFile(deltaRecAbs) as string)
-    );
+    const parsed = validateBrowserExtensionRecording(loadJson<unknown>(deltaRecAbs));
     if (!parsed.value)
       return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
     deltaRecording = parsed.value;

@@ -11,6 +11,7 @@ import {
   skipAdfStep,
   safeExistsSync,
   safeExec,
+  loadJson,
   safeReadFile,
   suggestClosestStrings,
   ensureDefaultOpPreflight,
@@ -206,7 +207,7 @@ async function handleCoreAction(
     case 'include': {
       const ref = String(resolveVars(params.path ?? params.fragment ?? '', ctx));
       const macroPath = pathResolver.rootResolve(ref);
-      const macroDef = JSON.parse(safeReadFile(macroPath, { encoding: 'utf8' }) as string);
+      const macroDef = loadJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
       const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
       if (nested.status === 'failed') {
         throw new Error(

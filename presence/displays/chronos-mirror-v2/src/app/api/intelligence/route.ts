@@ -95,6 +95,7 @@ import {
   safeExec,
   safeExistsSync,
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeStat,
   saveDistillCandidateRecord,
@@ -794,7 +795,7 @@ function resolveProjectRootPath(project: ReturnType<typeof loadProjectRecord>): 
 
 function readJson<T = any>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(filePath);
 }
 
 function collectActiveMissions(): MissionSummary[] {

@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -547,7 +548,7 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    const value = loadJson<unknown>(filePath);
     return Array.isArray(value) ? value.slice(-200) : [];
   } catch {
     return [];
@@ -600,7 +601,7 @@ function completeOperatorApproval(
   let current: Record<string, unknown> = {};
   if (safeExistsSync(filePath)) {
     try {
-      current = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      current = loadJson<unknown>(filePath);
     } catch {
       // A corrupt approval artifact is replaced with a fresh terminal state.
     }

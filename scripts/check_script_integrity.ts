@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 
 const ROOT = pathResolver.rootDir();
@@ -147,9 +147,9 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
     options.pathExists ||
     ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
   const packageJsonPath = options.packageJsonPath || pathResolver.rootResolve('package.json');
-  const packageJson = JSON.parse(safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string) as {
+  const packageJson = loadJson<{
     scripts?: Record<string, string>;
-  };
+  }>(packageJsonPath);
 
   for (const [scriptName, command] of Object.entries(packageJson.scripts || {})) {
     const owner = `package.json scripts.${scriptName}`;
@@ -162,7 +162,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   const pipelineRoots = options.pipelineRoots || DEFAULT_PIPELINE_ROOTS;
   for (const file of listPipelineFiles(pipelineRoots)) {
     const owner = toRepoRelative(file);
-    const payload = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as unknown;
+    const payload = loadJson<unknown>(file);
     scanValue(owner, payload, violations, pathExists);
   }
 

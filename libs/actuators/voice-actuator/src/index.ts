@@ -13,6 +13,7 @@ import {
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
   logger,
+  loadJson,
   pathResolver,
   recordInteraction,
   resolveVars,
@@ -383,7 +384,7 @@ async function recordVerifyRepairVoiceSample(input: {
   if (input.resume_session_path) {
     let session: any;
     try {
-      session = JSON.parse(safeReadFile(sessionPath, { encoding: 'utf8' }) as string);
+      session = loadJson<unknown>(sessionPath);
     } catch (error: any) {
       throw new Error(
         `voice repair session could not be resumed: ${error?.message || String(error)}`

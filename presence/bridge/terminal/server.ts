@@ -12,6 +12,7 @@ import {
   pathResolver,
   runtimeSupervisor,
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeMkdir,
   safeRmSync,
@@ -306,7 +307,10 @@ async function setupSessionWatcher(session: Session) {
         try {
           const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
           if (safeExistsSync(registryPath)) {
-            const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+            const registry = loadJson<{
+              default_profile: string;
+              profiles: Record<string, { cmd: string; args: string[] }>;
+            }>(registryPath);
             const profileKey =
               requestedBrain === 'default' ? registry.default_profile : requestedBrain;
             const profile =

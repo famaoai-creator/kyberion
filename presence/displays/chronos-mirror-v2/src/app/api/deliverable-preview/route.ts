@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -21,10 +21,10 @@ function artifactTenant(artifact: {
   const statePath = `${missionPath}/mission-state.json`;
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       tenant_slug?: string;
       tenant_id?: string;
-    };
+    }>(statePath);
     return state.tenant_slug || state.tenant_id;
   } catch {
     return undefined;
