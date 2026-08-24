@@ -41,6 +41,9 @@ jobs:
       - name: Build project
         run: pnpm run build
 
+      - name: Run manifest-driven full checks
+        run: pnpm run check -- --scope full
+
       # These checkers import @agent/core through its package entrypoint.
       # Run them after the build so fresh runners have dist/index.js.
       - name: Check operation preflight and seam bindings
