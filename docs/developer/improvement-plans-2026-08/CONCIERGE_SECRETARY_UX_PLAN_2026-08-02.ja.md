@@ -1,3 +1,10 @@
+---
+title: CONCIERGE SECRETARY UX PLAN 2026 08 02
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # Concierge 秘書室 全面改善計画(CS-00〜CS-05)
 
 > **作成日**: 2026-08-02

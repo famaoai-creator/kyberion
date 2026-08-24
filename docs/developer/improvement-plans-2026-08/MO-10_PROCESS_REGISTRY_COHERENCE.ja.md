@@ -1,3 +1,10 @@
+---
+title: MO 10 PROCESS REGISTRY COHERENCE
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # MO-10: ミッションプロセス定義の整合統一 — 3層レジストリモデル
 
 > 優先度: **P1** / 規模: M / 依存: MO-01(ミッションタイプ実効化・完了)、MO-02(フェーズゲート) / 後続: なし

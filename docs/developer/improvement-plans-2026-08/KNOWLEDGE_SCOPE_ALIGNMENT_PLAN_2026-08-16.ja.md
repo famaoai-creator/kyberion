@@ -14,7 +14,7 @@ tags:
     governance,
   ]
 last_updated: 2026-08-16
-status: implemented-and-verified
+status: completed
 ---
 
 # ナレッジ機構・学習ループ・UX 経路のスコープ整合計画(KS-01〜16)

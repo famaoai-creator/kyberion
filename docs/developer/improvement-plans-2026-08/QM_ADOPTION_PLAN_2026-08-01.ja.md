@@ -1,3 +1,10 @@
+---
+title: QM ADOPTION PLAN 2026 08 01
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # qm 分析・採択計画(QM-01〜11)
 
 > **作成日**: 2026-08-01

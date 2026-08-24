@@ -1,3 +1,10 @@
+---
+title: README
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # コードベース改善計画 2026-08(索引)
 
 > **位置づけ**: [improvement-plans-2026-07](../improvement-plans-2026-07/README.ja.md) の後続月次バックログ。命名・ステータス規約は 07 と同一(実装状況の記録は各計画文書内の「実装状況」節)。

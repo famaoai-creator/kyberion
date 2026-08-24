@@ -16,6 +16,8 @@ import {
   safeExistsSync,
   safeMkdir,
   runSurfaceMessageConversation,
+  runChannelTurn,
+  type ChannelAdapter,
   safeReadFile,
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
@@ -523,7 +525,6 @@ export async function handleTelegramUpdate(
     return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
   }
 
-  const threadContext = buildTelegramThreadContext(threadTs);
   appendTelegramThreadHistory({
     role: 'user',
     authorLabel,
@@ -535,30 +536,39 @@ export async function handleTelegramUpdate(
   });
 
   let conversation: Awaited<ReturnType<typeof runSurfaceMessageConversation>>;
-  // UX-02: keep Telegram's typing state alive while we think.
-  const typing = startBridgeTypingLoop(
-    'telegram-bridge',
-    () => sendTelegramTypingAction(chatId, options),
-    4000
-  );
+  const channelAdapter: ChannelAdapter = {
+    channel: 'telegram',
+    actorId: String(message.from?.id || chatId),
+    threadContext: () => buildTelegramThreadContext(threadTs) || undefined,
+    typing: () =>
+      startBridgeTypingLoop(
+        'telegram-bridge',
+        () => sendTelegramTypingAction(chatId, options),
+        4000
+      ),
+    send: async () => undefined,
+  };
   try {
-    conversation = await runSurfaceMessageConversation({
-      surface: 'telegram',
-      text,
-      channel: chatId,
-      threadTs,
-      correlationId: `telegram-${message.message_id}`,
-      receivedAt,
-      actorId: String(message.from?.id || chatId),
-      senderAgentId: 'kyberion:telegram-bridge',
-      agentId: TELEGRAM_SURFACE_AGENT_ID,
-      threadContext: threadContext || undefined,
-      delegationSummaryInstruction:
-        'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-    } as any);
-    typing.stop();
+    conversation = await runChannelTurn(
+      channelAdapter,
+      { text, channel: chatId, threadTs },
+      ({ threadContext }) =>
+        runSurfaceMessageConversation({
+          surface: 'telegram',
+          text,
+          channel: chatId,
+          threadTs,
+          correlationId: `telegram-${message.message_id}`,
+          receivedAt,
+          actorId: String(message.from?.id || chatId),
+          senderAgentId: 'kyberion:telegram-bridge',
+          agentId: TELEGRAM_SURFACE_AGENT_ID,
+          threadContext,
+          delegationSummaryInstruction:
+            'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
+        } as any)
+    );
   } catch (err) {
-    typing.stop();
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(`❌ [TelegramBridge] Conversation failed for ${chatId}: ${detail}`);
     // UX-01: the user must not be left in silence (rate-limited per thread).

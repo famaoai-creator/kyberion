@@ -1,3 +1,10 @@
+---
+title: IMPLEMENTATION LEDGER 2026 08 10
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # 実装台帳 — improvement-plans-2026-07 の実装記録
 
 > **開始**: 2026-07-03 / 実装者: Fable 5

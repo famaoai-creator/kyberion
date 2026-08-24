@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { defineSeam, SeamError } from './seam.js';
+import { createSeam, defineSeam, SeamError } from './seam.js';
 
 describe('defineSeam', () => {
+  it('supports the canonical createSeam constructor', () => {
+    const seam = createSeam<{ value: string }>({ key: 'test.create', multiplicity: 'sole' });
+    const dispose = seam.register('builtin', { value: 'ok' }, { provenance: 'builtin' });
+    expect(seam.get().value).toBe('ok');
+    dispose();
+  });
   it('rejects a second provider for a sole seam', () => {
     const seam = defineSeam<{ value: string }>({ key: 'test.sole', multiplicity: 'sole' });
     seam.register('first', { value: 'first' }, { provenance: 'builtin' });

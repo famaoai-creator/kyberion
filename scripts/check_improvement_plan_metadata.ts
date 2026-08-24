@@ -1,0 +1,160 @@
+import * as path from 'node:path';
+import { pathResolver, safeReadFile, safeWriteFile, withExecutionContext } from '@agent/core';
+import { getAllFiles } from '@agent/core/fs-utils';
+
+export const IMPROVEMENT_PLAN_ROOT = 'docs/developer/improvement-plans-2026-08';
+const REQUIRED_KEYS = ['title', 'tags', 'last_updated', 'status'] as const;
+
+export interface PlanMetadata {
+  title: string;
+  tags: string[];
+  last_updated: string;
+  status: 'planned' | 'active' | 'partial' | 'completed' | 'archived';
+}
+
+function read(filePath: string): string {
+  return String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+}
+
+export function parseFrontmatter(markdown: string): Record<string, string> | null {
+  if (!markdown.startsWith('---\n')) return null;
+  const end = markdown.indexOf('\n---\n', 4);
+  if (end < 0) return null;
+  const fields: Record<string, string> = {};
+  let inMultilineTags = false;
+  for (const line of markdown.slice(4, end).split('\n')) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(line);
+    if (match) {
+      fields[match[1]] = match[2].trim();
+      inMultilineTags = match[1] === 'tags' && match[2].trim() === '';
+      if (inMultilineTags) fields.tags = '[multiline]';
+      continue;
+    }
+    if (inMultilineTags && line.includes(']')) inMultilineTags = false;
+  }
+  return fields;
+}
+
+export function addPlanFrontmatter(
+  markdown: string,
+  title: string,
+  lastUpdated = '2026-08-25'
+): string {
+  if (parseFrontmatter(markdown)) return markdown;
+  const cleanTitle = title
+    .replace(/\.ja\.md$/u, '')
+    .replace(/[_-]+/gu, ' ')
+    .trim();
+  const header = [
+    '---',
+    `title: ${cleanTitle}`,
+    'tags: [improvement-plan, 2026-08]',
+    `last_updated: ${lastUpdated}`,
+    'status: active',
+    '---',
+    '',
+  ].join('\n');
+  return `${header}${markdown}`;
+}
+
+function normalizeStatus(value: string | undefined): PlanMetadata['status'] {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === 'completed' ||
+    normalized === 'implemented' ||
+    normalized === 'implemented-reviewed' ||
+    normalized === 'implemented-and-verified'
+  )
+    return 'completed';
+  if (normalized === 'archived') return 'archived';
+  if (normalized === 'partial' || normalized === 'accepted-with-follow-ups') return 'partial';
+  if (normalized === 'planned') return 'planned';
+  return 'active';
+}
+
+export function normalizePlanFrontmatter(
+  markdown: string,
+  title: string,
+  lastUpdated = '2026-08-25'
+): string {
+  if (!parseFrontmatter(markdown)) return addPlanFrontmatter(markdown, title, lastUpdated);
+  const end = markdown.indexOf('\n---\n', 4);
+  const header = markdown.slice(0, end);
+  const fields = parseFrontmatter(markdown) || {};
+  const additions: string[] = [];
+  if (!fields.title)
+    additions.push(
+      `title: ${title
+        .replace(/\.ja\.md$/u, '')
+        .replace(/[_-]+/gu, ' ')
+        .trim()}`
+    );
+  if (!fields.tags) additions.push('tags: [improvement-plan, 2026-08]');
+  if (!fields.last_updated) additions.push(`last_updated: ${lastUpdated}`);
+  const normalizedStatus = normalizeStatus(fields.status);
+  let normalizedHeader = header.replace(/^status:\s*.*$/mu, `status: ${normalizedStatus}`);
+  if (!fields.status) additions.push(`status: ${normalizedStatus}`);
+  if (additions.length) normalizedHeader = `${normalizedHeader}\n${additions.join('\n')}`;
+  return `${normalizedHeader}\n---${markdown.slice(end + '\n---'.length)}`;
+}
+
+export function listImprovementPlans(
+  rootDir = pathResolver.rootResolve(IMPROVEMENT_PLAN_ROOT)
+): string[] {
+  return getAllFiles(rootDir)
+    .filter((filePath) => filePath.endsWith('.md'))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export function checkImprovementPlanMetadata(): string[] {
+  const failures: string[] = [];
+  for (const filePath of listImprovementPlans()) {
+    const metadata = parseFrontmatter(read(filePath));
+    const relative = path.relative(pathResolver.rootDir(), filePath);
+    if (!metadata) {
+      failures.push(`${relative}: missing YAML frontmatter`);
+      continue;
+    }
+    for (const key of REQUIRED_KEYS) {
+      if (!metadata[key]) failures.push(`${relative}: missing frontmatter key ${key}`);
+    }
+    if (
+      metadata.status &&
+      !/^(planned|active|partial|completed|archived)$/u.test(metadata.status)
+    ) {
+      failures.push(`${relative}: invalid status ${metadata.status}`);
+    }
+  }
+  return failures;
+}
+
+export function main(argv = process.argv.slice(2)): number {
+  const files = listImprovementPlans();
+  if (argv.includes('--fix')) {
+    for (const filePath of files) {
+      const current = read(filePath);
+      const next = normalizePlanFrontmatter(current, path.basename(filePath));
+      if (next !== current) {
+        withExecutionContext(
+          'ecosystem_architect',
+          () => safeWriteFile(filePath, next),
+          'ecosystem_architect'
+        );
+      }
+    }
+  }
+  const failures = checkImprovementPlanMetadata();
+  if (failures.length) {
+    console.error('[check:improvement-plan-metadata] FAILED');
+    for (const failure of failures) console.error(`- ${failure}`);
+    return 1;
+  }
+  console.log(`[check:improvement-plan-metadata] OK (${files.length} documents)`);
+  return 0;
+}
+
+if (process.argv[1]?.endsWith('check_improvement_plan_metadata.ts')) {
+  process.exitCode = main();
+}
