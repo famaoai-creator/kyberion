@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
 const GRAPH_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
@@ -134,11 +135,20 @@ function check(): string[] {
   return findings;
 }
 
-const findings = check();
-if (findings.length > 0) {
-  console.error('[check:capability-seams-ast] FAILED');
-  for (const finding of findings) console.error(`- ${finding}`);
-  process.exitCode = 1;
-} else {
-  console.log(`[check:capability-seams-ast] OK (${scanDeclarations().length} declarations)`);
-}
+export const runCheckCapabilitySeamsAst = defineScript({
+  name: 'check:capability-seams-ast',
+  flags: [],
+  run(context): void {
+    const findings = check();
+    if (findings.length > 0) {
+      throw new Error(findings.join('; '));
+    }
+    context.print(`[check:capability-seams-ast] OK (${scanDeclarations().length} declarations)`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_capability_seams_ast.ts') ||
+  isDirectScript(import.meta.url, 'check_capability_seams_ast.js')
+)
+  void runCheckCapabilitySeamsAst();
