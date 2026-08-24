@@ -1,5 +1,5 @@
 import { logger } from './core.js';
-import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { loadJson, safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
@@ -284,7 +284,7 @@ class TrustEngineImpl {
     );
     if (!safeExistsSync(filePath)) return;
     try {
-      const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      const data = loadJson<unknown>(filePath);
       for (const [agentId, entry] of Object.entries(data as Record<string, any>)) {
         this.records.set(agentId, {
           agentId,

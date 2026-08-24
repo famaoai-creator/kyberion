@@ -10,6 +10,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
@@ -231,7 +232,7 @@ export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntime
   if (!safeExistsSync(statePath)) {
     return { version: 1, surfaces: {} };
   }
-  return JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as SurfaceRuntimeState;
+  return loadJson<SurfaceRuntimeState>(statePath);
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {

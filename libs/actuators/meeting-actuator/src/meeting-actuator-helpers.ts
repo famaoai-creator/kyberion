@@ -24,6 +24,7 @@ import {
   logger,
   safeExec,
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeExistsSync,
   pathResolver,
@@ -200,7 +201,7 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
     };
   }
   try {
-    const consent = JSON.parse(safeReadFile(consentPath, { encoding: 'utf8' }) as string);
+    const consent = loadJson<unknown>(consentPath);
     if (!isPlainObject(consent)) {
       return {
         allowed: false,

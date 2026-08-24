@@ -41,6 +41,7 @@ import {
   safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 
 type AjvConstructor = typeof import('ajv').default;
@@ -292,9 +293,7 @@ export function loadOnboardingFirstWorkRecord(
 ): OnboardingFirstWorkRecord | null {
   const filePath = firstWorkPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateFirstWorkRecord(
-    JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string)
-  );
+  return validateFirstWorkRecord(loadJson<unknown>(filePath));
 }
 
 function saveOnboardingFirstWorkRecord(record: OnboardingFirstWorkRecord, rootDir: string): string {
@@ -542,7 +541,7 @@ export function loadOnboardingContextBinding(
 ): OnboardingContextBinding | null {
   const filePath = contextPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateBinding(JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string));
+  return validateBinding(loadJson<unknown>(filePath));
 }
 
 export function resolveOnboardingContext(

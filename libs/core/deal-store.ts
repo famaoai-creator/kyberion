@@ -6,6 +6,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -105,7 +106,7 @@ export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
   const filePath = dealPath(tenantSlug, dealId);
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as DealRecord;
+    return loadJson<DealRecord>(filePath);
   } catch {
     return null;
   }
@@ -393,7 +394,7 @@ export function loadPriceBook(tenantSlug?: string): PriceBook | null {
   for (const candidate of candidates) {
     try {
       if (!safeExistsSync(candidate)) continue;
-      return JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string) as PriceBook;
+      return loadJson<PriceBook>(candidate);
     } catch {
       continue;
     }

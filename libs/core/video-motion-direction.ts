@@ -1,6 +1,6 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -145,7 +145,7 @@ export function loadVideoMotionCatalog(): VideoMotionCatalog {
       'public/design-patterns/media-templates/video-motion-patterns.json'
     );
     if (safeExistsSync(catalogPath)) {
-      const parsed = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
       const catalog = coerceCatalog(parsed);
       if (catalog) {
         cachedCatalog = catalog;

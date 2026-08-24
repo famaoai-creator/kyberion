@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 
 export type ProviderConfigRuntimeRole =
@@ -96,7 +96,7 @@ export function loadProviderConfig(): ProviderConfigFile {
       cachedProviderConfig = FALLBACK;
       return cachedProviderConfig;
     }
-    const parsed = JSON.parse(safeReadFile(PROVIDER_CONFIG_PATH, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(PROVIDER_CONFIG_PATH);
     const validated = validateProviderConfig(parsed, PROVIDER_CONFIG_PATH);
     cachedProviderConfig = {
       default_priority: validated.default_priority,

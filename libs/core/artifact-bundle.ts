@@ -3,9 +3,17 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  loadJson,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 
-export type ArtifactBundleStatus = 'assembling' | 'pending_review' | 'approved' | 'rejected' | 'superseded';
+export type ArtifactBundleStatus =
+  'assembling' | 'pending_review' | 'approved' | 'rejected' | 'superseded';
 
 export interface ArtifactBundleItem {
   artifact_id: string;
@@ -59,7 +67,7 @@ function ensureValidator() {
 function normalizeMissionDir(
   missionId: string,
   missionPath?: string,
-  options: { createIfMissing?: boolean } = {},
+  options: { createIfMissing?: boolean } = {}
 ): string | null {
   if (missionPath) {
     if (options.createIfMissing || safeExistsSync(missionPath)) return missionPath;
@@ -71,7 +79,11 @@ function normalizeMissionDir(
   return null;
 }
 
-function bundleDir(missionId: string, missionPath?: string, options: { createIfMissing?: boolean } = {}): string | null {
+function bundleDir(
+  missionId: string,
+  missionPath?: string,
+  options: { createIfMissing?: boolean } = {}
+): string | null {
   const missionDir = normalizeMissionDir(missionId, missionPath, options);
   if (!missionDir) return null;
   return path.join(missionDir, 'coordination', 'artifact-bundles');
@@ -82,8 +94,12 @@ function validateConsistency(bundle: ArtifactBundle): string[] {
   if (bundle.status === 'approved' && bundle.approval.status !== 'approved') {
     errors.push('bundle.status=approved requires approval.status=approved');
   }
-  if ((bundle.status === 'assembling' || bundle.status === 'pending_review' || bundle.status === 'superseded')
-    && bundle.approval.status !== 'pending') {
+  if (
+    (bundle.status === 'assembling' ||
+      bundle.status === 'pending_review' ||
+      bundle.status === 'superseded') &&
+    bundle.approval.status !== 'pending'
+  ) {
     errors.push(`bundle.status=${bundle.status} requires approval.status=pending`);
   }
   if (bundle.status === 'rejected' && bundle.approval.status !== 'rejected') {
@@ -128,10 +144,12 @@ export function validateArtifactBundle(value: unknown): value is ArtifactBundle 
 export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string): string {
   if (!validateArtifactBundle(bundle)) {
     const schemaErrors = (ensureValidator().errors ?? []).map(
-      (e) => `${e.instancePath || '/'} ${e.message ?? 'schema violation'}`,
+      (e) => `${e.instancePath || '/'} ${e.message ?? 'schema violation'}`
     );
     const consistencyErrors = validateConsistency(bundle);
-    throw new Error(`Invalid artifact bundle: ${[...schemaErrors, ...consistencyErrors].join('; ')}`);
+    throw new Error(
+      `Invalid artifact bundle: ${[...schemaErrors, ...consistencyErrors].join('; ')}`
+    );
   }
   const dir = bundleDir(bundle.mission_id, missionPath, { createIfMissing: true });
   if (!dir) {
@@ -139,24 +157,34 @@ export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string)
   }
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const filePath = path.join(dir, `${bundle.bundle_id}.json`);
-  safeWriteFile(filePath, JSON.stringify({ ...bundle, updated_at: new Date().toISOString() }, null, 2));
+  safeWriteFile(
+    filePath,
+    JSON.stringify({ ...bundle, updated_at: new Date().toISOString() }, null, 2)
+  );
   return filePath;
 }
 
-export function loadArtifactBundle(missionId: string, bundleId: string, missionPath?: string): ArtifactBundle | null {
+export function loadArtifactBundle(
+  missionId: string,
+  bundleId: string,
+  missionPath?: string
+): ArtifactBundle | null {
   const dir = bundleDir(missionId, missionPath);
   if (!dir) return null;
   const filePath = path.join(dir, `${bundleId}.json`);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ArtifactBundle;
+    const parsed = loadJson<ArtifactBundle>(filePath);
     return validateArtifactBundle(parsed) ? parsed : null;
   } catch {
     return null;
   }
 }
 
-export function listArtifactBundlesForMission(missionId: string, missionPath?: string): ArtifactBundle[] {
+export function listArtifactBundlesForMission(
+  missionId: string,
+  missionPath?: string
+): ArtifactBundle[] {
   const dir = bundleDir(missionId, missionPath);
   if (!dir || !safeExistsSync(dir)) return [];
   const bundles = safeReaddir(dir)
@@ -168,12 +196,18 @@ export function listArtifactBundlesForMission(missionId: string, missionPath?: s
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-export function loadLatestArtifactBundleForMission(missionId: string, missionPath?: string): ArtifactBundle | null {
+export function loadLatestArtifactBundleForMission(
+  missionId: string,
+  missionPath?: string
+): ArtifactBundle | null {
   const bundles = listArtifactBundlesForMission(missionId, missionPath);
   return bundles.length ? bundles[bundles.length - 1] : null;
 }
 
-export function addItemToArtifactBundle(bundle: ArtifactBundle, item: ArtifactBundleItem): ArtifactBundle {
+export function addItemToArtifactBundle(
+  bundle: ArtifactBundle,
+  item: ArtifactBundleItem
+): ArtifactBundle {
   return {
     ...bundle,
     items: [...bundle.items.filter((i) => i.artifact_id !== item.artifact_id), item],
@@ -187,7 +221,7 @@ export function transitionBundleToReview(bundle: ArtifactBundle): ArtifactBundle
 
 export function applyBundleApproval(
   bundle: ArtifactBundle,
-  decision: { verdict: 'approved' | 'rejected'; reviewer?: string; note?: string },
+  decision: { verdict: 'approved' | 'rejected'; reviewer?: string; note?: string }
 ): ArtifactBundle {
   const now = new Date().toISOString();
   return {
@@ -203,7 +237,9 @@ export function applyBundleApproval(
   };
 }
 
-export function checkArtifactBundleFulfillment(bundle: ArtifactBundle): ArtifactBundleFulfillmentReport {
+export function checkArtifactBundleFulfillment(
+  bundle: ArtifactBundle
+): ArtifactBundleFulfillmentReport {
   const covered = new Set(bundle.items.map((item) => item.kind));
   const satisfied = bundle.required_artifact_kinds.filter((kind) => covered.has(kind));
   const missing = bundle.required_artifact_kinds.filter((kind) => !covered.has(kind));
@@ -215,7 +251,10 @@ export function buildBundleFromOutcomeContract(input: {
   projectId?: string;
   trackId?: string;
   trackName?: string;
-  outcomeContract: { outcome_id: string; expected_artifacts: Array<{ kind: string; storage_class: ArtifactBundleItem['storage_class'] }> };
+  outcomeContract: {
+    outcome_id: string;
+    expected_artifacts: Array<{ kind: string; storage_class: ArtifactBundleItem['storage_class'] }>;
+  };
   trackRequiredArtifactKinds?: string[];
 }): ArtifactBundle {
   const fromOutcome = input.outcomeContract.expected_artifacts.map((artifact) => artifact.kind);

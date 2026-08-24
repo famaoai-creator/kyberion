@@ -17,6 +17,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  loadJson,
   safeWriteFile,
 } from '@agent/core';
 
@@ -30,7 +31,7 @@ export function readCookies(accountSlug: string): unknown[] {
   const file = cookiePathFor(accountSlug);
   if (!safeExistsSync(file)) return [];
   try {
-    const data = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+    const data = loadJson<unknown>(file);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];

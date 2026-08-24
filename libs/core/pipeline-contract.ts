@@ -1,5 +1,5 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 export interface PipelineStepResult {
@@ -181,7 +181,7 @@ function getPipelineValidator() {
   if (validatePipelineFn) return validatePipelineFn;
 
   const schemaPath = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');
-  const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string);
+  const schema = loadJson<Record<string, unknown>>(schemaPath);
   const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
   validatePipelineFn = ajv.compile(schema);
   return validatePipelineFn;

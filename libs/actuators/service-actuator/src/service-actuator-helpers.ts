@@ -1,5 +1,6 @@
 import {
   logger,
+  loadJson,
   safeExec,
   safeReadFile,
   safeWriteFile,
@@ -598,7 +599,7 @@ function recordServiceObservation(observation: PreparedObservation | null, _resu
 
 async function reconcileServices(input: ServiceAction) {
   const manifestPath = pathResolver.rootResolve(input.params.manifest_path);
-  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+  const manifest = loadJson<unknown>(manifestPath);
   const pids = loadPids();
   let changed = false;
 

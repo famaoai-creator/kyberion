@@ -2,7 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { safeMkdir } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
@@ -124,7 +124,7 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 function parseJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(filePath);
 }
 
 function loadMemoryFile(filePath: string): IntentContractMemoryFile | null {

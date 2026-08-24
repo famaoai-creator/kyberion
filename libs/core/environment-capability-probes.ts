@@ -22,7 +22,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
+import {
+  loadJson,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+  safeExec,
+} from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 function kyberionEnv(name: string): string | undefined {
@@ -383,8 +390,8 @@ function readRootEnginesNodeRange(): string | null {
   try {
     const pkgPath = pathResolver.rootResolve('package.json');
     if (!safeExistsSync(pkgPath)) return null;
-    const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
-    const range = pkg?.engines?.node;
+    const pkg = loadJson<{ engines?: { node?: unknown } }>(pkgPath);
+    const range = pkg.engines?.node;
     return typeof range === 'string' && range.trim() !== '' ? range : null;
   } catch {
     return null;

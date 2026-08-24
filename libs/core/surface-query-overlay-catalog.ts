@@ -1,6 +1,6 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface SurfaceQueryOverlayCatalogEntry {
@@ -60,10 +60,7 @@ export function loadSurfaceQueryOverlayCatalog(): SurfaceQueryOverlayCatalog | n
   if (!safeExistsSync(CATALOG_PATH)) return null;
   if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
 
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return cachedCatalog;

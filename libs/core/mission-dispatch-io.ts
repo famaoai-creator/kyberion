@@ -4,6 +4,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  loadJson,
   safeWriteFile,
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
@@ -28,7 +29,7 @@ export function ensureDirectory(dirPath: string): void {
 export function readJsonFile<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(filePath);
   } catch (_) {
     return null;
   }

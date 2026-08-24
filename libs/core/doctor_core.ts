@@ -4,6 +4,7 @@ import {
   safeExecResult,
   safeLstat,
   safeReadFile,
+  loadJson,
   safeReadlink,
 } from './secure-io.js';
 
@@ -117,7 +118,7 @@ export const doctor = {
     );
     if (safeExistsSync(inventoryPath)) {
       try {
-        const inventory = JSON.parse(safeReadFile(inventoryPath, { encoding: 'utf8' }) as string);
+        const inventory = loadJson<{ systems?: Record<string, unknown> }>(inventoryPath);
         const systems = Object.keys(inventory.systems || {});
         if (systems.length > 0) {
           console.log(`✅ Known Systems: ${systems.join(', ')}`);

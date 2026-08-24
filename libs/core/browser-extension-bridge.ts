@@ -4,7 +4,14 @@ import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFile, safeMkdir, safeReadFile, safeStat, safeWriteFile } from './secure-io.js';
+import {
+  loadJson,
+  safeAppendFile,
+  safeMkdir,
+  safeReadFile,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 
@@ -195,7 +202,7 @@ let receiptValidator: ValidateFunction | null = null;
 
 function schemaValidator(schemaPath: string, cached: ValidateFunction | null): ValidateFunction {
   if (cached) return cached;
-  return ajv.compile(JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string));
+  return ajv.compile(loadJson<Record<string, unknown>>(schemaPath));
 }
 
 function formatErrors(validate: ValidateFunction): string[] {

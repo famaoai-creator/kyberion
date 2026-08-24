@@ -1,5 +1,5 @@
 import { classifyError } from './error-classifier.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import type { RetryOptions } from './src/retry-utils.js';
 
 export type RecoveryPolicy = Record<string, any>;
@@ -28,7 +28,7 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 /** Load only the recovery_policy envelope from an actuator manifest. */
 export function loadRecoveryPolicy(manifestPath: string): RecoveryPolicy {
   try {
-    const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+    const manifest = loadJson<{ recovery_policy?: unknown }>(manifestPath);
     return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
   } catch {
     return {};

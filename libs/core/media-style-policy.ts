@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface MediaBorderKeySideEntry {
@@ -58,7 +58,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): MediaStylePolicyCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid media style policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid media style policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MediaStylePolicyCatalog;
 }
@@ -74,24 +76,25 @@ export function loadMediaStylePolicyCatalog(): MediaStylePolicyCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
 }
 
 export function resolveSignalToneRank(tone?: string): number {
-  const normalized = String(tone || '').trim().toLowerCase();
+  const normalized = String(tone || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return 2;
   const catalog = loadMediaStylePolicyCatalog();
   return catalog.signal_tone_ranks[normalized] ?? FALLBACK_SIGNAL_TONE_RANKS[normalized] ?? 2;
 }
 
 export function resolveBorderKeySides(key: string): Array<'top' | 'bottom' | 'left' | 'right'> {
-  const normalized = String(key || '').trim().toUpperCase();
+  const normalized = String(key || '')
+    .trim()
+    .toUpperCase();
   if (!normalized) return [];
   const catalog = loadMediaStylePolicyCatalog();
   const sides = new Set<'top' | 'bottom' | 'left' | 'right'>();

@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { type StandardIntentDefinition, type IntentResolutionPacket } from './intent-resolution.js';
 
@@ -12,10 +12,7 @@ const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-level-p
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-level-policy.schema.json');
 
 export type ReasoningLevel =
-  | 'COGNITIVE_EXPLORATORY'
-  | 'COGNITIVE_STANDARD'
-  | 'REACTION_FAST'
-  | 'REFLEX_DETERMINISTIC';
+  'COGNITIVE_EXPLORATORY' | 'COGNITIVE_STANDARD' | 'REACTION_FAST' | 'REFLEX_DETERMINISTIC';
 
 export type TaskModelPhaseKind = 'plan' | 'implement' | 'review' | 'mechanical';
 export type TaskModelTier = 'small' | 'standard' | 'large';
@@ -118,7 +115,7 @@ export function validateReasoningLevelPolicy(
 
 function loadPolicyFile(): ReasoningLevelPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  const parsed = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string);
+  const parsed = loadJson<unknown>(POLICY_PATH);
   return validateReasoningLevelPolicy(parsed, POLICY_PATH);
 }
 

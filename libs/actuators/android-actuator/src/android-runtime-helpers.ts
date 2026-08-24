@@ -1,5 +1,6 @@
 import {
   executeLlmDecideOp,
+  loadJson,
   logger,
   safeExec,
   safeReadFile,
@@ -1088,7 +1089,7 @@ function serializeTapTarget(target: AndroidTapTarget) {
 function loadAndroidUiDefaults(): any {
   if (safeExistsSync(ANDROID_UI_DEFAULTS_PATH)) {
     try {
-      return JSON.parse(safeReadFile(ANDROID_UI_DEFAULTS_PATH, { encoding: 'utf8' }) as string);
+      return loadJson<unknown>(ANDROID_UI_DEFAULTS_PATH);
     } catch (err) {
       logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
     }

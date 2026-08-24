@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type {
   MeetingBriefInput,
@@ -20,11 +20,7 @@ const SCHEMA_PATH = pathResolver.knowledge(
 );
 
 export type MeetingEnvironmentState =
-  | 'required'
-  | 'recommended'
-  | 'optional'
-  | 'blocked_by_authority'
-  | 'not_needed';
+  'required' | 'recommended' | 'optional' | 'blocked_by_authority' | 'not_needed';
 
 export type MeetingEnvironmentItemKind =
   | 'browser'
@@ -113,7 +109,7 @@ export function validateMeetingEnvironmentPolicy(
 
 function loadPolicyFile(): MeetingEnvironmentPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  const parsed = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string);
+  const parsed = loadJson<unknown>(POLICY_PATH);
   return validateMeetingEnvironmentPolicy(parsed, POLICY_PATH);
 }
 

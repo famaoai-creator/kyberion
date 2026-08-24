@@ -23,7 +23,7 @@ import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -150,7 +150,7 @@ function loadShellDeploymentAdapterConfig(
   return withExecutionContext('ecosystem_architect', () => {
     const configPath = resolveDeploymentConfigPath(env);
     if (!configPath || !safeExistsSync(configPath)) return null;
-    const parsed = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(configPath);
     const validate = ensureDeploymentConfigValidator();
     if (!validate(parsed)) {
       const errors = (validate.errors || [])

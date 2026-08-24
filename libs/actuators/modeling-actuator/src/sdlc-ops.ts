@@ -4,6 +4,7 @@ import {
   evaluateQaReadyGate,
   evaluateRequirementsCompletenessGate,
   getReasoningBackend,
+  loadJson,
   pathResolver,
   readDesignSpec,
   readRequirementsDraft,
@@ -20,12 +21,7 @@ export interface ExtractRequirementsInput {
   project_name: string;
   source_path: string;
   source_type?:
-    | 'call_recording'
-    | 'call_transcript'
-    | 'meeting_notes'
-    | 'document_pack'
-    | 'chat_log'
-    | 'mixed';
+    'call_recording' | 'call_transcript' | 'meeting_notes' | 'document_pack' | 'chat_log' | 'mixed';
   language?: string;
   customer_name?: string;
   customer_person_slug?: string;
@@ -48,7 +44,7 @@ export async function extractRequirements(input: ExtractRequirementsInput) {
   if (input.prior_draft_ref) {
     const priorAbs = pathResolver.rootResolve(input.prior_draft_ref);
     if (safeExistsSync(priorAbs)) {
-      priorDraft = JSON.parse(safeReadFile(priorAbs, { encoding: 'utf8' }) as string);
+      priorDraft = loadJson<unknown>(priorAbs);
     }
   }
 
@@ -104,7 +100,7 @@ export async function extractDesignSpec(input: {
     `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
   const abs = pathResolver.rootResolve(requirementsPath);
   const requirementsDraft = safeExistsSync(abs)
-    ? JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string)
+    ? loadJson<unknown>(abs)
     : readRequirementsDraft(input.mission_id);
   if (!requirementsDraft) {
     throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);

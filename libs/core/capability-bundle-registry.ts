@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -43,7 +43,7 @@ function ensureCapabilityBundleRegistryValidator(): ValidateFunction {
 export function loadCapabilityBundleRegistry(): CapabilityBundleRegistryFile {
   if (capabilityBundleRegistryCache) return capabilityBundleRegistryCache;
   const filePath = pathResolver.knowledge('product/governance/capability-bundle-registry.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as CapabilityBundleRegistryFile;
+  const parsed = loadJson<CapabilityBundleRegistryFile>(filePath);
   const validate = ensureCapabilityBundleRegistryValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -68,12 +68,10 @@ function statusRank(status: CapabilityBundleStatus): number {
   }
 }
 
-export function resolveCapabilityBundleForIntent(
-  intentId?: string
-): CapabilityBundleEntry | null {
+export function resolveCapabilityBundleForIntent(intentId?: string): CapabilityBundleEntry | null {
   if (!intentId) return null;
-  const matched = loadCapabilityBundleRegistry().bundles
-    .filter((bundle) => (bundle.intents || []).includes(intentId))
+  const matched = loadCapabilityBundleRegistry()
+    .bundles.filter((bundle) => (bundle.intents || []).includes(intentId))
     .sort((left, right) => statusRank(left.status) - statusRank(right.status));
   return matched[0] || null;
 }
@@ -148,9 +146,7 @@ export function resolveCapabilityBundlesForUtterance(utterance: string): Capabil
   return bundles;
 }
 
-export function summarizeRelevantCapabilityBundlesForIntentIds(
-  intentIds: string[]
-): string {
+export function summarizeRelevantCapabilityBundlesForIntentIds(intentIds: string[]): string {
   const bundleById = new Map<string, CapabilityBundleEntry>();
   for (const intentId of intentIds) {
     const bundle = resolveCapabilityBundleForIntent(intentId);
@@ -172,9 +168,7 @@ export function summarizeRelevantCapabilityBundlesForIntentIds(
   return JSON.stringify(bundles, null, 2);
 }
 
-export function summarizeRelevantCapabilityBundlesForIntentIdsCompact(
-  intentIds: string[]
-): string {
+export function summarizeRelevantCapabilityBundlesForIntentIdsCompact(intentIds: string[]): string {
   const bundleById = new Map<string, CapabilityBundleEntry>();
   for (const intentId of intentIds) {
     const bundle = resolveCapabilityBundleForIntent(intentId);

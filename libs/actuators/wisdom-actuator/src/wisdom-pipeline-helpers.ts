@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -862,7 +863,7 @@ export async function performReconcile(input: WisdomAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = (await retry(
-    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    async () => loadJson<unknown>(strategyPath),
     buildRetryOptions()
   )) as {
     strategies: Array<{

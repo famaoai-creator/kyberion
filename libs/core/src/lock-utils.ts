@@ -8,6 +8,7 @@ import {
   safeReadFile,
   safeUnlinkSync,
 } from '../secure-io.js';
+import { loadJson } from '../secure-io.js';
 
 /**
  * Lock Utilities for Autonomous Resource Arbitration.
@@ -76,7 +77,7 @@ export function releaseLock(resourceId: string): void {
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
   if (safeExistsSync(lockFile)) {
     try {
-      const content = JSON.parse(safeReadFile(lockFile, { encoding: 'utf8' }) as string);
+      const content = loadJson<{ pid?: number }>(lockFile);
       if (content.pid === process.pid) {
         safeUnlinkSync(lockFile);
       }
@@ -92,7 +93,7 @@ export function releaseLock(resourceId: string): void {
  */
 function _isLockStale(lockFile: string): boolean {
   try {
-    const content = JSON.parse(safeReadFile(lockFile, { encoding: 'utf8' }) as string);
+    const content = loadJson<{ pid?: number }>(lockFile);
     const pid = Number(content?.pid);
     // A partially-written or hand-edited lock must never become a permanent
     // delivery fence. Only a positive integer PID is meaningful ownership

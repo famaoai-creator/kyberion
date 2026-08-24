@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
 
@@ -569,7 +569,7 @@ export function validateMarketingCompletionEvidence(input: {
 export function loadMarketingRiskPolicy(env: NodeJS.ProcessEnv = process.env): MarketingRiskPolicy {
   const overlay = customerResolver.customerRoot('policy/marketing-risk-policy.json', env);
   const source = overlay && safeExistsSync(overlay) ? overlay : DEFAULT_POLICY_PATH;
-  return JSON.parse(safeReadFile(source, { encoding: 'utf8' }) as string) as MarketingRiskPolicy;
+  return loadJson<MarketingRiskPolicy>(source);
 }
 
 export function requiredMarketingControls(

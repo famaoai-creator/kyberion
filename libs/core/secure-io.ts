@@ -185,7 +185,8 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
  * Read and parse a JSON file safely.
  */
 export function loadJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  return JSON.parse(raw) as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */
