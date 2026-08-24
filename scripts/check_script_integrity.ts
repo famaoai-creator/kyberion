@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadJson, pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -169,20 +169,19 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   return violations;
 }
 
-export function main(): void {
-  const violations = checkScriptIntegrity();
-  if (violations.length > 0) {
-    console.error('[check:script-integrity] violations detected:');
-    for (const violation of violations) {
-      console.error(`- ${violation}`);
+export const runCheckScriptIntegrity = defineScript({
+  name: 'check:script-integrity',
+  run(context) {
+    const violations = checkScriptIntegrity();
+    if (violations.length > 0) {
+      throw new Error(violations.join('; '));
     }
-    process.exit(1);
-  }
-  console.log('[check:script-integrity] OK');
-}
+    context.print('[check:script-integrity] OK');
+  },
+});
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_script_integrity.ts') ||
+  isDirectScript(import.meta.url, 'check_script_integrity.js')
+)
+  void runCheckScriptIntegrity();

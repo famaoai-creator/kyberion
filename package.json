@@ -113,7 +113,7 @@
     "check:design-ledger": "node --import ./scripts/ts-loader.mjs scripts/check_design_ledger.ts",
     "check:module-invariants": "node --import ./scripts/ts-loader.mjs scripts/check_module_invariants.ts",
     "check:module-boundaries": "node --import ./scripts/ts-loader.mjs scripts/check_module_boundaries.ts",
-    "check:foundation-adoption": "node --import ./scripts/ts-loader.mjs scripts/check_foundation_adoption.ts",
+    "check:foundation-adoption": "node dist/scripts/check_foundation_adoption.js",
     "check": "node --import ./scripts/ts-loader.mjs scripts/run_checks.ts",
     "check:install-script-allowlist": "node --import ./scripts/ts-loader.mjs scripts/check_install_script_allowlist.ts",
     "check:pinned-deps": "node --import ./scripts/ts-loader.mjs scripts/check_pinned_deps.ts",
