@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { authorizeSurfaceMutation } from './surface-mutation-guard.js';
+import {
+  authorizeSurfaceMutation,
+  defaultSurfaceViewerTierAccess,
+  narrowSurfaceViewerScope,
+  narrowSurfaceViewerTenant,
+  narrowSurfaceViewerTier,
+  resolveSurfaceViewerTierAccess,
+} from './surface-mutation-guard.js';
 
 function makeRequest(url: string, headers: Record<string, string> = {}) {
   const normalized = Object.fromEntries(
@@ -83,5 +90,48 @@ describe('surface-mutation-guard', () => {
     );
     expect(decision.ok).toBe(false);
     expect(decision.status).toBe(403);
+  });
+});
+
+describe('surface viewer scope', () => {
+  it('keeps role tier policy and permits only narrower registrations', () => {
+    expect(defaultSurfaceViewerTierAccess('readonly')).toEqual(['public', 'confidential']);
+    expect(defaultSurfaceViewerTierAccess('localadmin')).toEqual([
+      'personal',
+      'confidential',
+      'public',
+    ]);
+    expect(resolveSurfaceViewerTierAccess('localadmin', ['public'])).toEqual(['public']);
+    expect(() => resolveSurfaceViewerTierAccess('readonly', ['personal'])).toThrow(
+      'exceeds the readonly role policy'
+    );
+  });
+
+  it('rejects invalid or widening tenant and entity selections', () => {
+    const viewer = {
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+    };
+    expect(narrowSurfaceViewerScope(viewer, { tenant: 'tenant-a' })).toEqual({
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+    });
+    expect(() => narrowSurfaceViewerTenant(viewer, 'tenant-b')).toThrow(
+      'viewer tenant scope denied'
+    );
+    expect(() => narrowSurfaceViewerScope(viewer, { organizationId: 'org-b' })).toThrow(
+      'viewer organization scope denied'
+    );
+  });
+
+  it('enforces the resolved tier at the data-bearing boundary', () => {
+    expect(narrowSurfaceViewerTier({ role: 'readonly', tierAccess: ['public'] }, 'public')).toBe(
+      'public'
+    );
+    expect(() =>
+      narrowSurfaceViewerTier({ role: 'readonly', tierAccess: ['public'] }, 'confidential')
+    ).toThrow('viewer tier scope denied');
   });
 });

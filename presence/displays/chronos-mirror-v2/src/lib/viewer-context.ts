@@ -6,6 +6,12 @@ import {
   isValidTenantSlug,
   readChronosTokenRegistrations,
   toWireError,
+  defaultSurfaceViewerTierAccess,
+  narrowSurfaceViewerTier,
+  narrowSurfaceViewerScope,
+  narrowSurfaceViewerTenant,
+  resolveSurfaceViewerTierAccess,
+  type SurfaceViewerScope,
 } from '@agent/core';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
@@ -17,21 +23,15 @@ import {
 } from './api-guard';
 import type { ChronosTokenRegistration, OsKnowledgeTier } from '@agent/core';
 
-export interface ViewerContext {
-  role: ChronosAccessRole;
-  tenantSlugs: string[] | 'all';
+export interface ViewerContext extends Omit<
+  SurfaceViewerScope,
+  'organizationIds' | 'projectIds' | 'tierAccess'
+> {
   /** Optional for compatibility with pre-organization token fixtures. */
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
   tierAccess?: OsKnowledgeTier[];
-  source: 'token' | 'loopback' | 'anonymous';
-  principalId?: string;
 }
-
-const CHRONOS_ROLE_TIER_ACCESS: Record<ChronosAccessRole, readonly OsKnowledgeTier[]> = {
-  readonly: ['public', 'confidential'],
-  localadmin: ['public', 'confidential'],
-};
 
 export class ViewerContextError extends Error {
   constructor(
@@ -102,23 +102,25 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
 
 /** Chronos roles currently expose public/confidential; personal remains masked. */
 export function defaultTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {
-  return [...CHRONOS_ROLE_TIER_ACCESS[role]];
+  return defaultSurfaceViewerTierAccess(role).filter((tier) => tier !== 'personal');
 }
 
 export function resolveViewerTierAccess(
   role: ChronosAccessRole,
   requested?: readonly OsKnowledgeTier[]
 ): OsKnowledgeTier[] {
-  const roleAccess = CHRONOS_ROLE_TIER_ACCESS[role];
-  if (!requested) return [...roleAccess];
-  const normalized = [...new Set(requested)];
-  if (normalized.length === 0 || normalized.some((tier) => !roleAccess.includes(tier))) {
+  try {
+    const resolved = resolveSurfaceViewerTierAccess(role, requested);
+    if (resolved.includes('personal')) {
+      throw new Error(`Chronos viewer tier access exceeds the ${role} role policy.`);
+    }
+    return resolved;
+  } catch (error) {
     throw new ViewerContextError(
-      403,
+      error instanceof Error && 'status' in error && error.status === 401 ? 401 : 403,
       `Chronos viewer tier access exceeds the ${role} role policy.`
     );
   }
-  return normalized;
 }
 
 /** Enforce the resolved viewer tier set for data-bearing routes. */
@@ -126,11 +128,20 @@ export function strictViewerTier(
   viewer: ViewerContext,
   requested: OsKnowledgeTier
 ): OsKnowledgeTier {
-  const allowed = viewer.tierAccess ?? defaultTierAccess(viewer.role);
-  if (!allowed.includes(requested)) {
-    throw new ViewerContextError(403, `viewer tier scope denied: ${requested}`);
+  try {
+    return narrowSurfaceViewerTier(
+      {
+        role: viewer.role,
+        tierAccess: viewer.tierAccess ?? defaultTierAccess(viewer.role),
+      },
+      requested
+    );
+  } catch (error) {
+    throw new ViewerContextError(
+      403,
+      error instanceof Error ? error.message : 'viewer tier scope denied'
+    );
   }
-  return requested;
 }
 
 export function resolveViewerContextForRequest(
@@ -197,15 +208,14 @@ export function strictViewerScopeTenantSlugs(
   viewer: ViewerContext,
   requested?: string
 ): string[] | 'all' {
-  const normalized = requested?.trim() || undefined;
-  if (normalized && !isValidTenantSlug(normalized)) {
-    throw new ViewerContextError(403, `invalid viewer tenant scope: ${normalized}`);
+  try {
+    return narrowSurfaceViewerTenant(viewer, requested);
+  } catch (error) {
+    throw new ViewerContextError(
+      403,
+      error instanceof Error ? error.message : 'viewer tenant scope denied'
+    );
   }
-  if (normalized && viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(normalized)) {
-    throw new ViewerContextError(403, `viewer tenant scope denied: ${normalized}`);
-  }
-  if (normalized) return [normalized];
-  return viewer.tenantSlugs;
 }
 
 function strictViewerScopeIds(
@@ -213,15 +223,21 @@ function strictViewerScopeIds(
   allowed: string[] | 'all',
   requested?: string
 ): string[] | 'all' {
-  const normalized = requested?.trim() || undefined;
-  if (normalized && !isValidChronosScopeId(normalized)) {
-    throw new ViewerContextError(403, `invalid viewer ${kind} scope: ${normalized}`);
+  try {
+    return narrowSurfaceViewerScope(
+      {
+        tenantSlugs: 'all',
+        organizationIds: kind === 'organization' ? allowed : 'all',
+        projectIds: kind === 'project' ? allowed : 'all',
+      },
+      kind === 'organization' ? { organizationId: requested } : { projectId: requested }
+    )[kind === 'organization' ? 'organizationIds' : 'projectIds'];
+  } catch (error) {
+    throw new ViewerContextError(
+      403,
+      error instanceof Error ? error.message : `viewer ${kind} scope denied`
+    );
   }
-  if (normalized && allowed !== 'all' && !allowed.includes(normalized)) {
-    throw new ViewerContextError(403, `viewer ${kind} scope denied: ${normalized}`);
-  }
-  if (normalized) return [normalized];
-  return allowed;
 }
 
 export function strictViewerScopeOrganizationIds(
