@@ -9128,27 +9128,27 @@
       "concierge_surface_tagline": {
         "en": "Your requests, approvals, outcomes, and exceptions in one place.",
         "ja": "依頼・承認・成果・例外をひとつの場所で確認できます。",
-        "qps-ploc": "⟦Ŷőůř řėɋůėşŧş, ȧṗṗřőṽȧŀş, őůŧƈőɱėş, ȧñḓ ėẋƈėṗŧïőñş ïñ őñė ṗŀȧƈė.⟧"
+        "qps-ploc": "⟦Ẏőůř řėɋůėşŧş, ȧṗṗřőṽȧŀş, őůŧƈőɱėş, ȧñḓ ėẋƈėṗŧïőñş ïñ őñė ṗŀȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "presence_studio_surface_tagline": {
         "en": "A shared workbench for working alongside Kyberion.",
         "ja": "Kyberion と一緒に作業するワークベンチです。",
-        "qps-ploc": "⟦Ȧ şħȧřėḓ ẇőřķƀėñƈħ ƒőř ẇőřķïñɠ ȧŀőñɠşïḓė Kẏƀėřïőñ.⟧"
+        "qps-ploc": "⟦Ȧ şħȧřėḓ ẇőřķƀėñƈħ ƒőř ẇőřķïñɠ ȧŀőñɠşïḓė Ķẏƀėřïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "chronos_surface_tagline": {
         "en": "Check progress and step in only when needed.",
         "ja": "進み具合を確認し、必要なときだけ対応します。",
-        "qps-ploc": "⟦Ƈħėƈķ ṗřőɠřėşş ȧñḓ şŧėṗ ïñ őñŀẏ ẇħėñ ñėėḓėḓ.⟧"
+        "qps-ploc": "⟦Ƈħėƈķ ṗřőɠřėşş ȧñḓ şŧėṗ ïñ őñŀẏ ẇħėñ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "operator_surface_tagline": {
         "en": "A read-only view of current work and evidence.",
         "ja": "現在の作業と証拠を読み取り専用で確認します。",
-        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ṽïėẇ őƒ ƈůřřėñŧ ẇőřķ ȧñḓ ėṽïḓėñƈė.⟧"
+        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ṽïėẇ őƒ ƈůřřėñŧ ẇőřķ ȧñḓ ėṽïḓėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "computer_surface_tagline": {
         "en": "A read-only mirror of the current browser and terminal.",
         "ja": "現在のブラウザとターミナルを読み取り専用で映します。",
-        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ɱïřřőř őƒ ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ.⟧"
+        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ɱïřřőř őƒ ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       }
     }
   }
