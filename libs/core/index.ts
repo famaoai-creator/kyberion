@@ -1000,6 +1000,7 @@ export {
 // A2UI Protocol
 export * from './a2ui.js';
 export * from './headless-surface-contract.js';
+export * from './surface-authorization.js';
 
 // PTY Engine (Logical Kernel)
 export * from './pty-engine.js';

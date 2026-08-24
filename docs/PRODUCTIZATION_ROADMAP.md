@@ -19,13 +19,15 @@ last_updated: 2026-06-05
 
 - **SaaS 化** — マネージド配布、テナント自動受け入れ、課金、利用計測。
   _理由_: 今 SaaS 化しても土台のユースケースが固まる前に陳腐化する。SaaS は利用者数の関数として後で立てる。
-- **マルチテナント GUI** — テナント切替 UI、組織管理、ロールベース ACL。
-  _理由_: OSS の主戦場はシングルユーザ／シングル組織で動くこと。
+- **プロダクト化されたマルチテナント GUI** — テナント切替 UI、組織管理、hosted user management、課金と一体化したロールベース ACL。
+  _理由_: OSS の主戦場はシングルユーザ／シングル組織で動くこと。なお、self-hosted / FDE の内部データ境界を守る server-side scope と operation 認可はこの非目標とは別であり、既存 surface の安全な運用基盤として実装する。
 - **公開 REST API / SDK** — 外部開発者が "Kyberion を組み込む" ためのもの。
   _理由_: そもそも内部のユーザー層がまだ薄い段階で、外向きの安定 API を背負うと内部進化が止まる。
 - **OAuth / SSO 連携 / Stripe 連携** — 上記の派生。
 
 ### やること
+
+> **境界の明記**: Chronos / Concierge / Presence の `ViewerContext`、tenant scope、operation permission、A2UI manifest filtering は、複数の surface とデータ境界を持つ OSS / self-hosted 環境の内部認可である。SaaS の tenant provisioning、IdP/SSO、billing、hosted user management、公開 API/SDK を意味しない。
 
 1. **OSS として導入の摩擦をゼロに近づける** — clone から first win までのコストを最小化。
 2. **手元で 30 日壊れず動く** — 使い捨てではないツールである、という信頼を作る。
