@@ -1,4 +1,4 @@
-import { pathResolver, safeExecResult, safeReadFile } from '@agent/core';
+import { loadJson, pathResolver, safeExecResult } from '@agent/core';
 
 type Gate = {
   id: string;
@@ -18,7 +18,7 @@ function isValidScope(value: string | undefined): value is Gate['scope'] {
   return value !== undefined && VALID_SCOPES.has(value as Gate['scope']);
 }
 
-export function validateGateManifest(manifest: GateManifest): void {
+export function validateGateManifest(manifest: GateManifest, availableScripts?: Set<string>): void {
   if (!manifest || !Array.isArray(manifest.gates)) {
     throw new Error('ci gate manifest must contain a gates array');
   }
@@ -49,18 +49,21 @@ export function validateGateManifest(manifest: GateManifest): void {
       }
     } else if (gate.script === 'check' || gate.script === 'validate') {
       throw new Error(`ci gate ${gate.id} may not invoke the check or validate script itself`);
+    } else if (availableScripts && !availableScripts.has(gate.script!)) {
+      throw new Error(`ci gate ${gate.id} references an unknown package script: ${gate.script}`);
     }
     ids.add(gate.id);
   }
 }
 
 export function loadGateManifest(): GateManifest {
-  const manifest = JSON.parse(
-    String(
-      safeReadFile(pathResolver.knowledge('product/governance/ci-gates.json'), { encoding: 'utf8' })
-    )
-  ) as GateManifest;
-  validateGateManifest(manifest);
+  const manifest = loadJson<GateManifest>(
+    pathResolver.knowledge('product/governance/ci-gates.json')
+  );
+  const packageJson = loadJson<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json')
+  );
+  validateGateManifest(manifest, new Set(Object.keys(packageJson.scripts || {})));
   return manifest;
 }
 
