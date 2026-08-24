@@ -14,7 +14,7 @@ import {
 
 export const HEADLESS_API_VERSION = '1' as const;
 
-export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio';
+export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio' | 'computer-surface';
 export type HeadlessViewerRole = SurfaceAuthorizationRole;
 export type HeadlessOperationPermission = SurfacePermission;
 export type HeadlessOperationEffect = 'read' | 'write';
@@ -182,6 +182,91 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
   },
 ];
 
+export const COMPUTER_SURFACE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
+  {
+    operation_id: 'computer_surface.manifest.read',
+    resource: 'headless-manifest',
+    method: 'GET',
+    path: '/api/headless/manifest',
+    description: 'Read the Computer Surface operation manifest filtered by viewer role.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: EMPTY_OBJECT_SCHEMA,
+    output_schema: { type: 'object', description: 'Computer Surface headless manifest.' },
+    a2ui_projection: false,
+  },
+  {
+    operation_id: 'computer_surface.identity.read',
+    resource: 'identity',
+    method: 'GET',
+    path: '/api/identity',
+    description: 'Read the local identity projection available to the resolved viewer.',
+    effect: 'read',
+    required_role: 'localadmin',
+    required_permissions: ['surface.headless.read'],
+    input_schema: EMPTY_OBJECT_SCHEMA,
+    output_schema: { type: 'object', description: 'Identity and onboarding projection.' },
+    a2ui_projection: false,
+  },
+  {
+    operation_id: 'computer_surface.state.read',
+    resource: 'surface-state',
+    method: 'GET',
+    path: '/api/state',
+    description: 'Read the latest A2UI state mirrored by Computer Surface.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: EMPTY_OBJECT_SCHEMA,
+    output_schema: { type: 'object', description: 'Latest Computer Surface state.' },
+    a2ui_projection: true,
+  },
+  {
+    operation_id: 'computer_surface.stream.read',
+    resource: 'surface-stream',
+    method: 'GET',
+    path: '/api/stream',
+    description: 'Subscribe to the scoped Computer Surface state stream.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: EMPTY_OBJECT_SCHEMA,
+    output_schema: { type: 'string', description: 'Server-sent Computer Surface state events.' },
+    a2ui_projection: true,
+  },
+  {
+    operation_id: 'computer_surface.os_control_plane.read',
+    resource: 'os-control-plane',
+    method: 'GET',
+    path: '/api/os/control-plane',
+    description: 'Read the tenant-scoped, read-only OS control-plane projection.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: {
+      type: 'object',
+      properties: { mission_id: { type: 'string' } },
+      additionalProperties: false,
+    },
+    output_schema: { type: 'object', description: 'Held actions and observations projection.' },
+    a2ui_projection: true,
+  },
+  {
+    operation_id: 'computer_surface.a2ui.dispatch',
+    resource: 'a2ui-dispatch',
+    method: 'POST',
+    path: '/a2ui/dispatch',
+    description: 'Apply an A2UI state update to the local Computer Surface mirror.',
+    effect: 'write',
+    required_role: 'localadmin',
+    required_permissions: ['surface.headless.write'],
+    input_schema: { type: 'array', description: 'A2UI messages.' },
+    output_schema: { type: 'object', description: 'Applied message count.' },
+    a2ui_projection: false,
+  },
+];
+
 export function buildChronosHeadlessManifest(): HeadlessApiManifest {
   return {
     api_version: HEADLESS_API_VERSION,
@@ -205,6 +290,50 @@ export function buildChronosHeadlessManifest(): HeadlessApiManifest {
       },
     ],
     operations: CHRONOS_HEADLESS_OPERATIONS.map((operation) => ({
+      ...operation,
+      input_schema: { ...operation.input_schema },
+      output_schema: { ...operation.output_schema },
+    })),
+  };
+}
+
+export function buildComputerSurfaceManifest(): HeadlessApiManifest {
+  return {
+    api_version: HEADLESS_API_VERSION,
+    surface: 'computer-surface',
+    resources: [
+      {
+        resource: 'headless-manifest',
+        description: 'Viewer-filtered operation and resource manifest.',
+        query_path: '/api/headless/manifest',
+      },
+      {
+        resource: 'identity',
+        description: 'Viewer-scoped local identity and onboarding projection.',
+        query_path: '/api/identity',
+      },
+      {
+        resource: 'surface-state',
+        description: 'Latest A2UI state mirrored by Computer Surface.',
+        query_path: '/api/state',
+      },
+      {
+        resource: 'surface-stream',
+        description: 'Scoped live state stream.',
+        query_path: '/api/stream',
+      },
+      {
+        resource: 'os-control-plane',
+        description: 'Read-only held-action and observation projection.',
+        query_path: '/api/os/control-plane',
+      },
+      {
+        resource: 'a2ui-dispatch',
+        description: 'Governed A2UI state update transport.',
+        query_path: '/a2ui/dispatch',
+      },
+    ],
+    operations: COMPUTER_SURFACE_OPERATIONS.map((operation) => ({
       ...operation,
       input_schema: { ...operation.input_schema },
       output_schema: { ...operation.output_schema },
