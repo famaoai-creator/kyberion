@@ -20,6 +20,7 @@ const {
   normalizePipelineOp,
   runSteps,
   runValidatedSteps,
+  executePipelineFile,
   recordFallbackOutcome,
   finalizePipelineTrace,
   formatPipelineFailure,
@@ -89,6 +90,21 @@ describe('run_pipeline compatibility', () => {
     timeout_at?: string;
     reason?: string;
   };
+
+  it('executes a validated pipeline file in-process through the shared lifecycle', async () => {
+    const result = await executePipelineFile(
+      'pipelines/fragments/_test-run-pipeline-include.json',
+      {
+        context: { greeting: 'hello' },
+        quiet: true,
+        trace: new TraceContext('pipeline:library-entry', { pipelineId: 'library-entry' }),
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.fragment_result).toBe('hello from fragment');
+    expect(result.context.trace_persisted_path).toContain('active/shared/logs/traces/');
+  });
 
   it('persists a recovered fallback as one successful causal trace', () => {
     const trace = new TraceContext('pipeline:fallback-recovery', {

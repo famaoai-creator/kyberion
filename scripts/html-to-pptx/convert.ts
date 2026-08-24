@@ -13,16 +13,10 @@
  *   { "op": "media:deck_from_html", "params": { "path": "report.html" } }   // -> last_pptx_design
  *   { "op": "media:pptx_render", "consumes": "last_pptx_design", "params": { "path": "out.pptx" } }
  */
-import { safeWriteFile, safeMkdir, safeExec } from '@agent/core/secure-io';
-import { pathResolver } from '@agent/core';
+import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { executePipelineFile } from '../run_pipeline.js';
 
-/**
- * Rendering a deck is far slower than the 30s safeExec default — a large HTML
- * report can take minutes through deck_from_html + pptx_render.
- */
-const RENDER_TIMEOUT_MS = 10 * 60 * 1000;
-
-function main(): void {
+async function main(): Promise<void> {
   const [input, outArg] = process.argv.slice(2);
   if (!input) {
     console.error('usage: convert.ts <input.html> [output.pptx]');
@@ -61,30 +55,18 @@ function main(): void {
     ),
     { mkdir: true, encoding: 'utf8' }
   );
-  // AGENTS.md §1: process execution goes through secure-io, never
-  // node:child_process directly. safeExec captures output rather than
-  // inheriting the terminal, so relay it to keep the CLI as legible as before —
-  // especially on failure, where the pipeline's own diagnostics are the whole
-  // reason to look at this command.
-  try {
-    const output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', pipePath], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: RENDER_TIMEOUT_MS,
-    });
-    if (output.trim()) console.error(output.trimEnd());
-  } catch (error: unknown) {
-    const detail = error as { stdout?: string | Buffer; stderr?: string | Buffer };
-    const stdout = detail?.stdout?.toString().trimEnd();
-    const stderr = detail?.stderr?.toString().trimEnd();
-    if (stdout) console.error(stdout);
-    if (stderr) console.error(stderr);
-    console.error(
-      `[html-to-pptx] pipeline failed: ${error instanceof Error ? error.message : String(error)}`
+  const result = await executePipelineFile(pipePath, { quiet: true });
+  if (result.status === 'failed') {
+    throw new Error(
+      `pipeline failed: ${result.results.find((entry) => entry.status === 'failed')?.error || 'unknown error'}`
     );
-    process.exitCode = 1;
-    return;
   }
   console.error(`[html-to-pptx] wrote ${out}`);
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error(
+    `[html-to-pptx] pipeline failed: ${error instanceof Error ? error.message : String(error)}`
+  );
+  process.exitCode = 1;
+});

@@ -2967,6 +2967,97 @@ export async function runValidatedSteps(
   };
 }
 
+export interface ExecutePipelineFileOptions {
+  context?: Record<string, unknown>;
+  trace?: TraceContext;
+  quiet?: boolean;
+  hasHuman?: boolean;
+}
+
+/**
+ * Library entry for callers that already run inside the Kyberion process.
+ *
+ * The CLI remains responsible for durable resume journals and terminal exit
+ * codes. This entry deliberately shares the same validated input, ADF
+ * lifecycle, actuator dispatch, trace finalization, and feedback loop rather
+ * than spawning a second `run_pipeline` process.
+ */
+export async function executePipelineFile(
+  inputPath: string,
+  options: ExecutePipelineFileOptions = {}
+) {
+  const pipeline = await readValidatedWorkflowAdf(inputPath);
+  const pipelineId = String(
+    pipeline.pipeline_id || pipeline.id || nodePath.basename(inputPath, nodePath.extname(inputPath))
+  );
+  const baseContext = (pipeline.context || {}) as Record<string, unknown>;
+  const missionId =
+    String(options.context?.mission_id || baseContext.mission_id || process.env.MISSION_ID || '') ||
+    undefined;
+  const autoContext: Record<string, unknown> = {
+    repo_root: pathResolver.rootDir(),
+    platform_name: process.platform,
+    node_options: process.env.NODE_OPTIONS || '',
+    run_utc_now: new Date().toISOString(),
+    __pipeline_options: pipeline.options || {},
+  };
+  if (missionId) {
+    const missionPath = findMissionPath(missionId);
+    const evidenceDir = missionEvidenceDir(missionId);
+    if (missionPath) {
+      autoContext.mission_dir =
+        nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
+      autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
+    }
+    if (evidenceDir) {
+      autoContext.mission_evidence_dir =
+        nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
+    }
+  }
+  if (pipeline.knowledge_scope) autoContext._knowledge_scope = pipeline.knowledge_scope;
+  const mergedContext = { ...baseContext, ...autoContext, ...(options.context || {}) };
+  const trace =
+    options.trace ||
+    new TraceContext(`pipeline:${pipelineId}`, {
+      ...(missionId ? { missionId } : {}),
+      pipelineId,
+    });
+  trace.addArtifact('file', inputPath, 'Pipeline ADF input');
+  const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+  const run = () =>
+    runValidatedSteps(steps, mergedContext, {
+      trace,
+      pipelinePath: inputPath,
+      quiet: options.quiet,
+      hasHuman: options.hasHuman,
+    });
+  const missionTier = String(autoContext.mission_tier || '');
+  const payloadTier: 'public' | 'confidential' | 'personal' =
+    missionTier === 'personal'
+      ? 'personal'
+      : missionTier === 'confidential'
+        ? 'confidential'
+        : 'public';
+  const result =
+    payloadTier === 'public'
+      ? await run()
+      : await withReasoningPayloadScope(
+          {
+            tier: payloadTier,
+            tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+            purpose: `pipeline ${pipelineId}`,
+          },
+          run
+        );
+  const failed = result.results.some((entry) => entry.status === 'failed');
+  const persisted = finalizePipelineTrace(trace, !failed);
+  result.context.trace_summary = persisted.trace.rootSpan.status;
+  result.context.trace_persisted_path =
+    nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
+  runFeedbackLoop(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
+  return { ...result, trace, persistedPath: persisted.path };
+}
+
 export async function main() {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
   const identity = resolveIdentityContext();
