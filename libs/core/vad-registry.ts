@@ -11,6 +11,7 @@
  */
 
 import { EnergyVad, type VoiceActivityDetector } from './voice-activity-detector.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -82,7 +83,7 @@ export interface ResolvedVadBackend {
  * callers must surface it (fail-soft, never silent).
  */
 export function resolveVadBackend(id?: string): ResolvedVadBackend {
-  const explicit = id?.trim() || process.env.KYBERION_VAD?.trim();
+  const explicit = id?.trim() || getRegisteredEnvText('KYBERION_VAD')?.trim();
   const requested = explicit || getAdapterDefault('voice.vad') || 'energy';
   const backend = vadBackendSeam
     .list()
