@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import {
+  getRegisteredEnv,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeReaddir,
+} from '@agent/core';
 
 type TaskTrigger =
   | { type: 'schedule'; cron: string; timezone?: string }
@@ -41,7 +48,9 @@ type TaskScenario = {
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
 function resolveScenarioDir(): string {
-  const override = process.env.KYBERION_TASK_SCENARIO_DIR?.trim();
+  const override = (
+    getRegisteredEnv<string>('KYBERION_TASK_SCENARIO_DIR') as string | undefined
+  )?.trim();
   return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
 }
 
@@ -118,7 +127,9 @@ export function printTaskScenarios(scenarios: TaskScenario[]): void {
     console.error(
       `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
     );
-    console.error('Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.');
+    console.error(
+      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
+    );
     process.exitCode = 1;
     return;
   }
@@ -143,7 +154,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   printTaskScenarios(scenarios);
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   main().catch((err) => {
     console.error(err?.message ?? String(err));

@@ -29,6 +29,7 @@ import {
   probeNativeTts,
   classifyError,
   formatClassification,
+  getRegisteredEnv,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -67,8 +68,8 @@ function parseArgs(): Tier {
     throw new Error(`--tier must be 0, 1, or 2 (got ${args[tierIdx + 1]})`);
   }
   // Inferred from script alias (set by package.json scripts).
-  if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'cloud') return 1;
-  if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'local') return 2;
+  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'cloud') return 1;
+  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'local') return 2;
   printUsage();
   throw new Error('Missing --tier');
 }
@@ -83,7 +84,9 @@ async function checkTier0(): Promise<{ name: string; ok: boolean; detail?: strin
     },
     {
       name: 'presence-studio',
-      ok: safeExistsSync(path.join(pathResolver.rootDir(), 'presence', 'displays', 'presence-studio')),
+      ok: safeExistsSync(
+        path.join(pathResolver.rootDir(), 'presence', 'displays', 'presence-studio')
+      ),
       detail: 'Browser surface for Web Speech API input',
     },
   ];
@@ -114,7 +117,9 @@ function checkTier1(): { name: string; ok: boolean; detail?: string }[] {
 function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
   const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
   function whichOk(cmd: string): boolean {
-    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' });
+    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], {
+      stdio: 'ignore',
+    });
     return r.status === 0;
   }
   return [
@@ -123,7 +128,8 @@ function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
     {
       name: 'Style-Bert-VITS2 server',
       ok: false,
-      detail: 'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (Tier 1 → Tier 2 section)',
+      detail:
+        'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (Tier 1 → Tier 2 section)',
     },
   ];
 }
@@ -212,9 +218,10 @@ async function main(): Promise<void> {
   }
 
   // For tier 1, "ok" means at least one provider is set.
-  const required = tier === 1
-    ? prereqs.find(p => p.name === 'At least one cloud voice provider')!.ok
-    : prereqs.every(p => p.ok || p.name === 'Style-Bert-VITS2 server'); // tier-2 server is informational
+  const required =
+    tier === 1
+      ? prereqs.find((p) => p.name === 'At least one cloud voice provider')!.ok
+      : prereqs.every((p) => p.ok || p.name === 'Style-Bert-VITS2 server'); // tier-2 server is informational
   const configPath = writeTier(tier);
   const report: UpgradeReport = {
     requested_tier: tier,
@@ -229,13 +236,15 @@ async function main(): Promise<void> {
   console.log(`\n📝 Profile written: ${path.relative(pathResolver.rootDir(), configPath)}`);
 
   if (!required) {
-    console.error(`\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`);
+    console.error(
+      `\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`
+    );
     process.exit(1);
   }
   console.log(`\n✅ Voice tier ${tier} configured.`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal:', formatClassification(classifyError(err)));
   process.exit(1);
 });
