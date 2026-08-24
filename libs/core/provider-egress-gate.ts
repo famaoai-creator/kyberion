@@ -38,17 +38,16 @@
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03.
  */
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { detectTier, TIERS } from './tier-guard.js';
 import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
 import { resolveTenant } from './tenant-registry.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
 
 const logger = createLogger('provider-egress-gate');
 
@@ -83,8 +82,8 @@ function policyPath(): string {
 
 function ensureValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
-  const ajv = new Ajv({ allErrors: true });
-  cachedValidator = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  const ajv = createAjv();
+  cachedValidator = compileSchema(SCHEMA_PATH);
   return cachedValidator;
 }
 

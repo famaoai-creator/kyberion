@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface ServiceOnboardingCatalogEntry {
   service_id: string;
@@ -16,9 +16,6 @@ interface ServiceOnboardingCatalog {
   services: ServiceOnboardingCatalogEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/service-onboarding-catalog.json');
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-onboarding-catalog.schema.json'
@@ -30,7 +27,7 @@ let cachedCatalogPath: string | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

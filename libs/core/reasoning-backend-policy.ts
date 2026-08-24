@@ -1,8 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
@@ -79,8 +80,7 @@ export interface ReasoningBackendProviderSnapshot {
   healthy: boolean;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-policy.schema.json');
@@ -167,7 +167,7 @@ let cachedPolicyPath: string | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

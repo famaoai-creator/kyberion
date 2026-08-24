@@ -1,9 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -57,8 +57,6 @@ export interface MemoryCandidate {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const SCHEMA_PATH = pathResolver.rootResolve('schemas/memory-candidate.schema.json');
 const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
@@ -114,7 +112,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

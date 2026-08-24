@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface SurfaceProviderManifestCatalogEntry {
   id: string;
@@ -17,8 +17,6 @@ export interface SurfaceProviderManifestCatalog {
   entries: SurfaceProviderManifestCatalogEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const CATALOG_PATH = pathResolver.knowledge(
   'product/governance/surface-provider-manifest-catalog.json'
 );
@@ -35,7 +33,7 @@ let cachedCatalogSnapshotMtime: number | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, CATALOG_SCHEMA_PATH);
+  validateFn = compileSchema(CATALOG_SCHEMA_PATH);
   return validateFn;
 }
 

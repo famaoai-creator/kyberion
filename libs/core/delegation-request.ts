@@ -1,18 +1,18 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { safeWriteFile } from './secure-io.js';
 import type { IntentCompilerProvider, IntentContract } from './intent-contract.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
-const DELEGATION_REQUEST_SCHEMA_PATH = pathResolver.knowledge('product/schemas/assistant-delegation-request.schema.json');
+const DELEGATION_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/assistant-delegation-request.schema.json'
+);
 
 export type AssistantDelegationMode = 'plan_only' | 'investigate' | 'implement';
-export type AssistantDelegationOutputContract = 'planning_packet' | 'organization-work-loop' | 'pipeline-adf' | 'report';
+export type AssistantDelegationOutputContract =
+  'planning_packet' | 'organization-work-loop' | 'pipeline-adf' | 'report';
 
 export interface AssistantDelegationRequest {
   kind: 'assistant-delegation-request';
@@ -76,16 +76,22 @@ let delegationRequestValidateFn: ValidateFunction | null = null;
 
 function ensureDelegationRequestValidator(): ValidateFunction {
   if (delegationRequestValidateFn) return delegationRequestValidateFn;
-  delegationRequestValidateFn = compileSchemaFromPath(ajv, DELEGATION_REQUEST_SCHEMA_PATH);
+  delegationRequestValidateFn = compileSchema(DELEGATION_REQUEST_SCHEMA_PATH);
   return delegationRequestValidateFn;
 }
 
-export function validateAssistantDelegationRequest(value: unknown): { valid: boolean; errors: string[]; value?: AssistantDelegationRequest } {
+export function validateAssistantDelegationRequest(value: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: AssistantDelegationRequest;
+} {
   const validate = ensureDelegationRequestValidator();
   const valid = validate(value);
   return {
     valid: Boolean(valid),
-    errors: (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()),
+    errors: (validate.errors || []).map((error) =>
+      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+    ),
     value: valid ? (value as AssistantDelegationRequest) : undefined,
   };
 }
@@ -102,7 +108,9 @@ export function getAssistantDelegationResultPath(requestId: string) {
   return pathResolver.sharedTmp(`delegation-results/${requestId}.json`);
 }
 
-export function buildAssistantDelegationRequest(input: CreateAssistantDelegationRequestInput): AssistantDelegationRequest {
+export function buildAssistantDelegationRequest(
+  input: CreateAssistantDelegationRequestInput
+): AssistantDelegationRequest {
   const requestId = createRequestId();
   const request: AssistantDelegationRequest = {
     kind: 'assistant-delegation-request',
@@ -128,7 +136,10 @@ export function buildAssistantDelegationRequest(input: CreateAssistantDelegation
       preferred_provider: input.preferredProvider,
       preferred_model: input.preferredModel,
       preferred_model_provider: input.preferredModelProvider,
-      allowed_providers: input.allowedProviders && input.allowedProviders.length > 0 ? input.allowedProviders : ['codex', 'gemini', 'claude'],
+      allowed_providers:
+        input.allowedProviders && input.allowedProviders.length > 0
+          ? input.allowedProviders
+          : ['codex', 'gemini', 'claude'],
     },
     expected_output: {
       contract: input.expectedOutputContract || 'planning_packet',
@@ -153,7 +164,10 @@ export function writeAssistantDelegationRequest(request: AssistantDelegationRequ
   return requestPath;
 }
 
-export function createAssistantDelegationRequest(input: CreateAssistantDelegationRequestInput): { request: AssistantDelegationRequest; requestPath: string } {
+export function createAssistantDelegationRequest(input: CreateAssistantDelegationRequestInput): {
+  request: AssistantDelegationRequest;
+  requestPath: string;
+} {
   const request = buildAssistantDelegationRequest(input);
   const requestPath = writeAssistantDelegationRequest(request);
   return { request, requestPath };

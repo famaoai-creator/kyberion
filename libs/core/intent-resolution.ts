@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { loadJson, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
@@ -10,8 +10,6 @@ import {
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/standard-intents.schema.json'
 );
@@ -148,16 +146,13 @@ const resolvedIntentCatalogCache = new Map<string, StandardIntentDefinition[]>()
 
 function ensureStandardIntentValidator(): ValidateFunction {
   if (standardIntentValidateFn) return standardIntentValidateFn;
-  standardIntentValidateFn = compileSchemaFromPath(ajv, STANDARD_INTENTS_SCHEMA_PATH);
+  standardIntentValidateFn = compileSchema(STANDARD_INTENTS_SCHEMA_PATH);
   return standardIntentValidateFn;
 }
 
 function ensureIntentResolutionPolicyValidator(): ValidateFunction {
   if (intentResolutionPolicyValidateFn) return intentResolutionPolicyValidateFn;
-  intentResolutionPolicyValidateFn = compileSchemaFromPath(
-    ajv,
-    INTENT_RESOLUTION_POLICY_SCHEMA_PATH
-  );
+  intentResolutionPolicyValidateFn = compileSchema(INTENT_RESOLUTION_POLICY_SCHEMA_PATH);
   return intentResolutionPolicyValidateFn;
 }
 

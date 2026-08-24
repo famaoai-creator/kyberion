@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface MediaAwsIconRuleEntry {
   match_type: 'starts_with' | 'contains';
@@ -15,9 +15,6 @@ interface MediaAwsIconRuleCatalog {
   exact_resources: Record<string, string[]>;
   rules: MediaAwsIconRuleEntry[];
 }
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-aws-icon-rules.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-aws-icon-rules.schema.json');
@@ -155,7 +152,7 @@ const FALLBACK_EXACT_RESOURCES: Record<string, string[]> = {
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 
