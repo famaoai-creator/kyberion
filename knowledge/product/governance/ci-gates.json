@@ -58,6 +58,14 @@
       "rationale": "Keeps all text bridges on the shared turn/thread/typing lifecycle."
     },
     {
+      "id": "ci-gate-parity",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_ci_gate_parity.ts"],
+      "owner": "operations",
+      "rationale": "Keeps manifest scopes connected to the PR, full, and release workflow entrypoints."
+    },
+    {
       "id": "script-integrity",
       "scope": "full",
       "executable": "node",
