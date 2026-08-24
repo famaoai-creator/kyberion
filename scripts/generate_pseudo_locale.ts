@@ -37,6 +37,7 @@
 
 import { pathResolver } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
+import { format as prettierFormat } from 'prettier';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
@@ -200,8 +201,10 @@ export function buildPseudoLocalizedCatalog(catalog: VocabularyCatalogFile): Voc
   return { ...catalog, domains: buildPseudoLocalizedDomains(catalog) };
 }
 
-function serializeCatalog(catalog: VocabularyCatalogFile): string {
-  return `${JSON.stringify(catalog, null, 2)}\n`;
+async function serializeCatalog(catalog: VocabularyCatalogFile): Promise<string> {
+  return prettierFormat(`${JSON.stringify(catalog, null, 2)}\n`, {
+    filepath: CATALOG_PATH,
+  });
 }
 
 interface DriftEntry {
@@ -228,10 +231,13 @@ export function findDrift(catalog: VocabularyCatalogFile): DriftEntry[] {
 export const main = defineGenerator({
   id: 'pseudo-locale',
   outputs: [CATALOG_PATH],
-  render() {
+  async render() {
     const catalog = loadCatalog();
     return [
-      { path: CATALOG_PATH, content: serializeCatalog(buildPseudoLocalizedCatalog(catalog)) },
+      {
+        path: CATALOG_PATH,
+        content: await serializeCatalog(buildPseudoLocalizedCatalog(catalog)),
+      },
     ];
   },
 });
