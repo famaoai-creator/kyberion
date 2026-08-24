@@ -35,9 +35,9 @@
  *                                   have drifted from what `en` would derive
  */
 
-import * as path from 'node:path';
-import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
+import { pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
 const PSEUDO_LOCALE = 'qps-ploc';
@@ -170,9 +170,7 @@ export function pseudoLocalize(enTemplate: string): string {
 }
 
 function loadCatalog(): VocabularyCatalogFile {
-  return JSON.parse(
-    String(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) || '{}')
-  ) as VocabularyCatalogFile;
+  return readJson<VocabularyCatalogFile>(CATALOG_PATH);
 }
 
 /**
@@ -227,40 +225,15 @@ export function findDrift(catalog: VocabularyCatalogFile): DriftEntry[] {
   return drift;
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const catalog = loadCatalog();
-  const rootDir = pathResolver.rootDir();
+export const main = defineGenerator({
+  id: 'pseudo-locale',
+  outputs: [CATALOG_PATH],
+  render() {
+    const catalog = loadCatalog();
+    return [
+      { path: CATALOG_PATH, content: serializeCatalog(buildPseudoLocalizedCatalog(catalog)) },
+    ];
+  },
+});
 
-  return withExecutionContext('ecosystem_architect', () => {
-    if (shouldCheck) {
-      const drift = findDrift(catalog);
-      if (drift.length === 0) {
-        console.log('pseudo-locale (qps-ploc) is up to date');
-        return;
-      }
-      console.error('pseudo-locale drift detected — run pnpm generate:pseudo-locale');
-      for (const entry of drift.slice(0, 20)) {
-        console.error(`- ${entry.namespace}.${entry.key} differs`);
-      }
-      if (drift.length > 20) {
-        console.error(`  ...and ${drift.length - 20} more`);
-      }
-      process.exitCode = 1;
-      return;
-    }
-
-    const nextCatalog = buildPseudoLocalizedCatalog(catalog);
-    safeWriteFile(CATALOG_PATH, serializeCatalog(nextCatalog));
-    console.log(
-      `wrote ${path.relative(rootDir, CATALOG_PATH)} (${PSEUDO_LOCALE} entries derived from ${catalog.default_locale || 'en'})`
-    );
-  });
-}
-
-if (process.argv[1] && /generate_pseudo_locale\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (isDirectScript(import.meta.url, 'generate_pseudo_locale.ts')) void main();
