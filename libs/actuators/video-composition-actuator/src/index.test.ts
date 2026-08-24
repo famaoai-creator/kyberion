@@ -162,6 +162,10 @@ vi.mock('@agent/core', async () => {
   };
 });
 
+vi.mock('@agent/core/foundation', () => ({
+  compileSchema: mocks.compileSchemaFromPath,
+}));
+
 describe('video-composition-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

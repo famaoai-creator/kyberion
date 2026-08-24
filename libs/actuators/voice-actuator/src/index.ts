@@ -1,7 +1,5 @@
-import AjvModule from 'ajv';
 import {
   collectVoiceSamples,
-  compileSchemaFromPath,
   getVoiceSampleIngestionPolicy,
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
@@ -53,6 +51,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { compileSchema } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -67,10 +66,7 @@ import {
 import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
 import { runActuatorCli } from '@agent/core';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const voiceActionValidate = compileSchemaFromPath(
-  ajv,
+const voiceActionValidate = compileSchema(
   pathResolver.rootResolve('schemas/voice-action.schema.json')
 );
 
