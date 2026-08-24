@@ -4,6 +4,7 @@ import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import {
   firstJsonObject,
@@ -160,8 +161,9 @@ function getSignalPath(): string {
  * Checks if the injection suspected status is active in the current session/mission context.
  */
 export function isInjectionSuspected(scope?: string): boolean {
-  if (process.env.KYBERION_INJECTION_SUSPECTED === 'true') {
-    const envScope = process.env.KYBERION_INJECTION_SCOPE || 'global';
+  const injectionSuspected = getRegisteredEnvText('KYBERION_INJECTION_SUSPECTED');
+  if (injectionSuspected === '1' || injectionSuspected === 'true') {
+    const envScope = getRegisteredEnvText('KYBERION_INJECTION_SCOPE') || 'global';
     if (!scope || envScope === 'global' || envScope === scope) {
       return true;
     }
