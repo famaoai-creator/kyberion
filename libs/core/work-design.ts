@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
@@ -16,8 +16,6 @@ import {
 } from './execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/specialist-catalog.json'
@@ -158,7 +156,7 @@ let workPolicyValidateFn: ValidateFunction | null = null;
 
 function ensureWorkPolicyValidator(): ValidateFunction {
   if (workPolicyValidateFn) return workPolicyValidateFn;
-  workPolicyValidateFn = compileSchemaFromPath(ajv, WORK_POLICY_SCHEMA_PATH);
+  workPolicyValidateFn = compileSchema(WORK_POLICY_SCHEMA_PATH);
   return workPolicyValidateFn;
 }
 

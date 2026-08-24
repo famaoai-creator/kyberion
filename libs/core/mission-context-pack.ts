@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   findRelevantDistilledKnowledge,
@@ -48,9 +48,6 @@ import {
 } from './skill-resource-loader.js';
 import { isSkillAllowed } from './skill-plugin-loader.js';
 import type { ScopeContext } from './scope-context.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve('schemas/mission-state.schema.json');
 const MISSION_CONTEXT_PACK_SCHEMA_PATH = pathResolver.knowledge(
@@ -414,13 +411,13 @@ let missionContextPackValidateFn: ValidateFunction | null = null;
 
 function ensureMissionStateValidator(): ValidateFunction {
   if (missionStateValidateFn) return missionStateValidateFn;
-  missionStateValidateFn = compileSchemaFromPath(ajv, MISSION_STATE_SCHEMA_PATH);
+  missionStateValidateFn = compileSchema(MISSION_STATE_SCHEMA_PATH);
   return missionStateValidateFn;
 }
 
 function ensureMissionContextPackValidator(): ValidateFunction {
   if (missionContextPackValidateFn) return missionContextPackValidateFn;
-  missionContextPackValidateFn = compileSchemaFromPath(ajv, MISSION_CONTEXT_PACK_SCHEMA_PATH);
+  missionContextPackValidateFn = compileSchema(MISSION_CONTEXT_PACK_SCHEMA_PATH);
   return missionContextPackValidateFn;
 }
 

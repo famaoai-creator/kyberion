@@ -1,16 +1,16 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
 import type { TierLevel } from './types.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-provider-manifests.schema.json'
 );
@@ -94,7 +94,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH);
+  validateFn = compileSchema(SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH);
   return validateFn;
 }
 

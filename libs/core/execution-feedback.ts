@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
@@ -12,8 +12,6 @@ import {
 } from './distill-candidate-registry.js';
 import { t } from './t.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/execution-feedback.schema.json'
 );
@@ -205,7 +203,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, FEEDBACK_SCHEMA_PATH);
+  validateFn = compileSchema(FEEDBACK_SCHEMA_PATH);
   return validateFn;
 }
 

@@ -1,8 +1,8 @@
-import { Ajv, type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -20,7 +20,6 @@ import {
   type ThinkingLevel,
 } from './backend-capability-profile.js';
 
-const ajv = new Ajv({ allErrors: true });
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-route-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-route-policy.schema.json');
 const USER_SCHEMA_PATH = pathResolver.knowledge(
@@ -162,7 +161,7 @@ let validateUserConfigFn: ValidateFunction | null = null;
 let cachedPolicy: ReasoningRoutePolicy | null = null;
 
 function validator(): ValidateFunction {
-  if (!validatePolicyFn) validatePolicyFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  if (!validatePolicyFn) validatePolicyFn = compileSchema(SCHEMA_PATH);
   return validatePolicyFn;
 }
 
@@ -197,7 +196,7 @@ export function validateReasoningRouteUserConfig(
   value: unknown,
   label = USER_CONFIG_PATH
 ): ReasoningRouteUserConfig {
-  if (!validateUserConfigFn) validateUserConfigFn = compileSchemaFromPath(ajv, USER_SCHEMA_PATH);
+  if (!validateUserConfigFn) validateUserConfigFn = compileSchema(USER_SCHEMA_PATH);
   if (!validateUserConfigFn(value)) {
     const errors = (validateUserConfigFn.errors || []).map(
       (error) => `${error.instancePath || '/'} ${error.message || 'invalid'}`

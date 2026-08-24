@@ -1,8 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface MediaThemeRolePolicyCatalog {
   version: string;
@@ -10,8 +11,7 @@ export interface MediaThemeRolePolicyCatalog {
   theme_hex_roles: Record<string, string>;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-theme-role-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-theme-role-policy.schema.json');
@@ -41,7 +41,7 @@ const FALLBACK_POLICY: MediaThemeRolePolicyCatalog = {
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

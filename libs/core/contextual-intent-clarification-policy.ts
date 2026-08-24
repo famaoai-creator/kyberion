@@ -1,12 +1,12 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-clarification-policy.schema.json'
 );
@@ -59,7 +59,7 @@ let policyValidateFn: ValidateFunction | null = null;
 
 function ensurePolicyValidator(): ValidateFunction {
   if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
+  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
   return policyValidateFn;
 }
 

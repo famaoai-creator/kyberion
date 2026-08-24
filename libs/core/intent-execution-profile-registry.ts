@@ -1,10 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-execution-profile-registry.schema.json'
 );
@@ -71,7 +69,7 @@ let registryValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchemaFromPath(ajv, INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH);
+  registryValidateFn = compileSchema(INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH);
   return registryValidateFn;
 }
 

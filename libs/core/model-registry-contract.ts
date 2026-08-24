@@ -1,10 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/model-registry.schema.json'
 );
@@ -23,7 +21,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, MODEL_REGISTRY_SCHEMA_PATH);
+  validateFn = compileSchema(MODEL_REGISTRY_SCHEMA_PATH);
   return validateFn;
 }
 

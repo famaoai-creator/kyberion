@@ -1,5 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import type {
@@ -95,8 +95,6 @@ export interface ArtifactReviewerProfile {
   rationale: string;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-review-gate-registry.schema.json'
 );
@@ -110,13 +108,13 @@ let resultValidateFn: ValidateFunction | null = null;
 
 function ensureRegistryValidator(): ValidateFunction {
   if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchemaFromPath(ajv, REGISTRY_SCHEMA_PATH);
+  registryValidateFn = compileSchema(REGISTRY_SCHEMA_PATH);
   return registryValidateFn;
 }
 
 function ensureResultValidator(): ValidateFunction {
   if (resultValidateFn) return resultValidateFn;
-  resultValidateFn = compileSchemaFromPath(ajv, RESULT_SCHEMA_PATH);
+  resultValidateFn = compileSchema(RESULT_SCHEMA_PATH);
   return resultValidateFn;
 }
 

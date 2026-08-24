@@ -2,7 +2,7 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
-import { Ajv, type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as nodePath from 'node:path';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
@@ -13,7 +13,7 @@ import {
   type ArtifactReviewReceipt,
 } from './artifact-review.js';
 import { auditChain } from './audit-chain.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
@@ -146,9 +146,7 @@ let validateManifest: ValidateFunction | null = null;
 
 function getManifestValidator(): ValidateFunction {
   if (validateManifest) return validateManifest;
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  validateManifest = compileSchemaFromPath(
-    ajv,
+  validateManifest = compileSchema(
     pathResolver.knowledge('product/schemas/mission-work-reconciliation.schema.json')
   );
   return validateManifest;

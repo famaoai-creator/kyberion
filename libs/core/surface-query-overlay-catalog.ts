@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface SurfaceQueryOverlayCatalogEntry {
   id: string;
@@ -21,8 +21,6 @@ export interface SurfaceQueryOverlayCatalog {
   overlays: SurfaceQueryOverlayCatalogEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const CATALOG_PATH = pathResolver.knowledge(
   'product/governance/surface-query-overlay-catalog.json'
 );
@@ -36,7 +34,7 @@ let cachedCatalogPath: string | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, CATALOG_SCHEMA_PATH);
+  validateFn = compileSchema(CATALOG_SCHEMA_PATH);
   return validateFn;
 }
 

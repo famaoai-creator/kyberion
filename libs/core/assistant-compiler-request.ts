@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { safeWriteFile } from './secure-io.js';
 import {
   inferGovernedDeliveryMode,
@@ -20,9 +20,6 @@ import {
 } from './execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const REQUEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/assistant-compiler-request.schema.json'
@@ -114,31 +111,31 @@ let executionBriefValidateFn: ValidateFunction | null = null;
 
 function ensureRequestValidator(): ValidateFunction {
   if (requestValidateFn) return requestValidateFn;
-  requestValidateFn = compileSchemaFromPath(ajv, REQUEST_SCHEMA_PATH);
+  requestValidateFn = compileSchema(REQUEST_SCHEMA_PATH);
   return requestValidateFn;
 }
 
 function ensureResultValidator(): ValidateFunction {
   if (resultValidateFn) return resultValidateFn;
-  resultValidateFn = compileSchemaFromPath(ajv, RESULT_SCHEMA_PATH);
+  resultValidateFn = compileSchema(RESULT_SCHEMA_PATH);
   return resultValidateFn;
 }
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
-  intentContractValidateFn = compileSchemaFromPath(ajv, INTENT_CONTRACT_SCHEMA_PATH);
+  intentContractValidateFn = compileSchema(INTENT_CONTRACT_SCHEMA_PATH);
   return intentContractValidateFn;
 }
 
 function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
-  workLoopValidateFn = compileSchemaFromPath(ajv, WORK_LOOP_SCHEMA_PATH);
+  workLoopValidateFn = compileSchema(WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
 }
 
 function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
-  executionBriefValidateFn = compileSchemaFromPath(ajv, EXECUTION_BRIEF_SCHEMA_PATH);
+  executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
 }
 

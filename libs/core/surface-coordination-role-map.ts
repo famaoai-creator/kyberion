@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 
 interface SurfaceCoordinationRoleMap {
@@ -13,9 +13,6 @@ interface SurfaceCoordinationRoleMap {
     summary?: string;
   }>;
 }
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const PUBLIC_MAP_PATH = pathResolver.knowledge(
   'product/governance/surface-coordination-role-map.json'
@@ -33,7 +30,7 @@ let cachedMapKey: string | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

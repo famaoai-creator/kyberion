@@ -1,6 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { slugify } from './foundation/text.js';
 
 import { withExecutionContext } from './authority.js';
@@ -16,7 +16,7 @@ import {
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { resolveTenant } from './tenant-registry.js';
 
 export type WorkItemStatus =
@@ -41,13 +41,11 @@ export interface WorkItemContext {
     | 'improvement_experiment';
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const workItemAjv = new Ajv({ allErrors: true });
 const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve('schemas/work-item.schema.json');
 let workItemValidator: ValidateFunction | null = null;
 
 function validateWorkItem(value: unknown): void {
-  workItemValidator ??= compileSchemaFromPath(workItemAjv, WORK_ITEM_SCHEMA_PATH);
+  workItemValidator ??= compileSchema(WORK_ITEM_SCHEMA_PATH);
   if (workItemValidator(value)) return;
   const errors = (workItemValidator.errors || [])
     .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)

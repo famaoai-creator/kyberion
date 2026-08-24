@@ -1,10 +1,10 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'
@@ -48,7 +48,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, GUIDED_COORDINATION_BRIEF_SCHEMA_PATH);
+  validateFn = compileSchema(GUIDED_COORDINATION_BRIEF_SCHEMA_PATH);
   return validateFn;
 }
 

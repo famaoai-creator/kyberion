@@ -1,8 +1,8 @@
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import {
   listSurfaceQueryOverlayCatalogEntries,
   loadSurfaceQueryOverlayCatalog,
@@ -58,16 +58,13 @@ const CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-query-providers.schema.json'
 );
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 let cachedConfig: SurfaceQueryProviderConfig | null = null;
 let cachedConfigPath: string | null = null;
 let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, CONFIG_SCHEMA_PATH);
+  validateFn = compileSchema(CONFIG_SCHEMA_PATH);
   return validateFn;
 }
 

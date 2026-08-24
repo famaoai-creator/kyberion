@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 
@@ -31,9 +31,6 @@ const PROVIDER_CONFIG_PATH = pathResolver.knowledge('product/governance/provider
 const PROVIDER_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/provider-config.schema.json'
 );
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const FALLBACK: ProviderConfigFile = {
   default_priority: ['agy', 'claude', 'codex', 'grok', 'copilot'],
@@ -74,7 +71,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, PROVIDER_CONFIG_SCHEMA_PATH);
+  validateFn = compileSchema(PROVIDER_CONFIG_SCHEMA_PATH);
   return validateFn;
 }
 

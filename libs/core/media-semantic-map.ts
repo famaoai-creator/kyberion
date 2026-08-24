@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface MediaSemanticRuleEntry {
   layout?: string;
@@ -26,9 +26,6 @@ interface MediaSemanticMapCatalog {
   proposal_evidence_rules: ProposalEvidenceRuleEntry[];
   proposal_section_keywords: ProposalSectionKeywordRuleEntry[];
 }
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-semantic-map.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-semantic-map.schema.json');
@@ -90,7 +87,7 @@ const FALLBACK_PROPOSAL_SECTION_KEYWORDS: ProposalSectionKeywordRuleEntry[] = [
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

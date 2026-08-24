@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
 import {
   buildContextualIntentFrame,
@@ -15,9 +15,6 @@ import type { GuidedCoordinationBrief } from './src/types/guided-coordination-br
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -58,12 +55,7 @@ export interface ApprovalWorkflowStep {
   description: string;
   actuator: string;
   phase:
-    | 'resolve_system'
-    | 'authenticate'
-    | 'list_pending'
-    | 'review_item'
-    | 'decide'
-    | 'summarize';
+    'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
   requires_confirmation?: boolean;
   input_refs?: string[];
   output_refs?: string[];
@@ -74,7 +66,7 @@ let executionBriefValidateFn: ValidateFunction | null = null;
 
 function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
-  executionBriefValidateFn = compileSchemaFromPath(ajv, EXECUTION_BRIEF_SCHEMA_PATH);
+  executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
 }
 

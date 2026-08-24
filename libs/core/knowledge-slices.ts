@@ -34,11 +34,10 @@
  * distinct manifest path on invalid/unreadable input.
  */
 
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
 
 const SCHEMA_PATH = 'knowledge/product/schemas/knowledge-slices.schema.json';
 const DEFAULT_DATA_PATH = 'knowledge/product/governance/knowledge-slices.json';
@@ -120,10 +119,7 @@ let cachedValidator: ValidateFunction | null | undefined;
 function getValidator(): ValidateFunction | null {
   if (cachedValidator !== undefined) return cachedValidator;
   try {
-    const raw = safeReadFile(pathResolver.rootResolve(SCHEMA_PATH), { encoding: 'utf8' }) as string;
-    const schema = JSON.parse(raw);
-    const ajv = new Ajv({ allErrors: true });
-    cachedValidator = ajv.compile(schema);
+    cachedValidator = compileSchema(pathResolver.rootResolve(SCHEMA_PATH));
   } catch {
     cachedValidator = null;
   }
