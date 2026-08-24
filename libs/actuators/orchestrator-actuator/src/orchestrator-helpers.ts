@@ -2004,7 +2004,7 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
       const titleLine =
         readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
       const ledger = safeExistsSync(ledgerPath)
-        ? loadJson<{ entries?: unknown }>(ledgerPath)
+        ? loadJson<{ project_id?: unknown; entries?: unknown }>(ledgerPath)
         : { entries: [] };
       const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
       projectEntries.push({
