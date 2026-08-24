@@ -3,10 +3,10 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getRegisteredEnv,
+  loadJson,
   pathResolver,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core';
 
@@ -66,7 +66,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return loadJson<TaskScenario>(filePath);
 }
 
 function resolveProfilePath(scenario: TaskScenario): string {

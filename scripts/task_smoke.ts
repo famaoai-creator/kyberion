@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
 import { describeTaskRun } from './task_run.js';
 
 type TaskScenario = {
@@ -45,7 +45,7 @@ function loadScenario(scenarioId: string): TaskScenario {
   if (!safeExistsSync(filePath)) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
   }
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return loadJson<TaskScenario>(filePath);
 }
 
 function buildSmokeProfile(
