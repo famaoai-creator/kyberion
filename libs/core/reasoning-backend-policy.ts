@@ -1,9 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
@@ -79,8 +76,6 @@ export interface ReasoningBackendProviderSnapshot {
   installed: boolean;
   healthy: boolean;
 }
-
-const ajv = createAjv();
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-policy.schema.json');
@@ -161,35 +156,26 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   },
 };
 
-let validateFn: ValidateFunction | null = null;
 let cachedPolicy: ReasoningBackendPolicy | null = null;
 let cachedPolicyPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
+  id: 'reasoning-backend-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_POLICY,
+});
 
 function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid reasoning backend policy at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
+  try {
+    return policyCatalog.validate(value, label);
+  } catch (error) {
+    throw new Error(`Invalid reasoning backend policy at ${label}: ${String(error)}`);
   }
-  return value as ReasoningBackendPolicy;
 }
 
 function loadPolicyFile(): ReasoningBackendPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  return validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
+  return policyCatalog.load();
 }
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
@@ -322,4 +308,5 @@ export function resolveScopedBackendPolicy(
 export function resetReasoningBackendPolicyCache(): void {
   cachedPolicy = null;
   cachedPolicyPath = null;
+  policyCatalog.reset();
 }

@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { type StandardIntentDefinition, type IntentResolutionPacket } from './intent-resolution.js';
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-level-policy.json');
@@ -81,39 +79,28 @@ export interface ReasoningLevelPolicy {
   };
 }
 
-let validateFn: ValidateFunction | null = null;
 let cachedPolicy: ReasoningLevelPolicy | null = null;
 let cachedPolicyPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const policyCatalog = defineCatalog<ReasoningLevelPolicy>({
+  id: 'reasoning-level-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+});
 
 export function validateReasoningLevelPolicy(
   value: unknown,
   label = POLICY_PATH
 ): ReasoningLevelPolicy {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid reasoning level policy at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
+  try {
+    return policyCatalog.validate(value, label);
+  } catch (error) {
+    throw new Error(`Invalid reasoning level policy at ${label}: ${String(error)}`);
   }
-  return value as ReasoningLevelPolicy;
 }
 
 function loadPolicyFile(): ReasoningLevelPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  const parsed = loadJson<unknown>(POLICY_PATH);
-  return validateReasoningLevelPolicy(parsed, POLICY_PATH);
+  return policyCatalog.load();
 }
 
 export function loadReasoningLevelPolicy(): ReasoningLevelPolicy {
