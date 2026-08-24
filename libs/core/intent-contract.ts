@@ -14,6 +14,7 @@ import {
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
 import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -733,8 +734,8 @@ function resolveTenantId(input: CompileUserIntentFlowInput): string | undefined 
     typeof runtime.tenantId === 'string' ? runtime.tenantId : undefined,
     typeof runtime.tenant_slug === 'string' ? runtime.tenant_slug : undefined,
     typeof runtime.tenantSlug === 'string' ? runtime.tenantSlug : undefined,
-    process.env.KYBERION_TENANT,
-    process.env.KYBERION_CUSTOMER,
+    getRegisteredEnvText('KYBERION_TENANT'),
+    getRegisteredEnvText('KYBERION_CUSTOMER'),
   ];
   return candidates
     .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
@@ -1205,19 +1206,19 @@ export function resolveIntentCompilerTarget(
 
   const rawProvider = (
     options.provider ||
-    process.env.KYBERION_INTENT_COMPILER_PROVIDER ||
+    getRegisteredEnvText('KYBERION_INTENT_COMPILER_PROVIDER') ||
     'codex'
   ).toLowerCase();
   const provider: IntentCompilerProvider =
     rawProvider === 'claude' || rawProvider === 'gemini' ? rawProvider : 'codex';
-  const explicitModel = options.model || process.env.KYBERION_INTENT_COMPILER_MODEL;
+  const explicitModel = options.model || getRegisteredEnvText('KYBERION_INTENT_COMPILER_MODEL');
   const explicitModelProvider =
-    options.modelProvider || process.env.KYBERION_INTENT_COMPILER_MODEL_PROVIDER;
+    options.modelProvider || getRegisteredEnvText('KYBERION_INTENT_COMPILER_MODEL_PROVIDER');
 
   if (provider === 'claude') {
     return {
       provider,
-      model: explicitModel || process.env.KYBERION_CLAUDE_MODEL,
+      model: explicitModel || getRegisteredEnvText('KYBERION_CLAUDE_MODEL'),
     };
   }
 
@@ -1230,8 +1231,8 @@ export function resolveIntentCompilerTarget(
 
   return {
     provider: 'codex',
-    model: explicitModel || process.env.KYBERION_CODEX_MODEL,
-    modelProvider: explicitModelProvider || process.env.KYBERION_CODEX_MODEL_PROVIDER,
+    model: explicitModel || getRegisteredEnvText('KYBERION_CODEX_MODEL'),
+    modelProvider: explicitModelProvider || getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
   };
 }
 
