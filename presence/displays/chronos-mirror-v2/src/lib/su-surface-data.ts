@@ -12,7 +12,7 @@ import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { type MissionState } from '../../../../../scripts/refactor/mission-types.js';
 
 export interface MissionHistoryEntry {
@@ -118,10 +118,7 @@ export function resolveApprovalTenant(record: ApprovalRequestRecord): string | u
   const statePath = `${missionPath}/mission-state.json`;
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
-      tenant_slug?: string;
-      tenant_id?: string;
-    };
+    const state = loadJson<{ tenant_slug?: string; tenant_id?: string }>(statePath);
     return state.tenant_slug || state.tenant_id;
   } catch {
     return undefined;
@@ -143,9 +140,7 @@ function readMissionManagementDirs(): string[] {
   const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
   if (safeExistsSync(configPath)) {
     try {
-      const raw = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string) as {
-        directories?: Record<string, string>;
-      };
+      const raw = loadJson<{ directories?: Record<string, string> }>(configPath);
       const dirs = raw.directories || {};
       return ['personal', 'confidential', 'public']
         .map((tier) => dirs[tier])
@@ -173,9 +168,7 @@ function collectMissionStates(): MissionState[] {
         const statePath = `${root}/${entry}/mission-state.json`;
         if (!safeExistsSync(statePath)) continue;
         try {
-          const state = JSON.parse(
-            safeReadFile(statePath, { encoding: 'utf8' }) as string
-          ) as MissionState;
+          const state = loadJson<MissionState>(statePath);
           if (state?.mission_id) states.push(state);
         } catch {
           // Ignore malformed mission state files.

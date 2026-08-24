@@ -1,7 +1,7 @@
 import { findMissionPath } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
 import type { MemoryCandidate } from '@agent/core/memory-promotion-queue';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync } from '@agent/core/secure-io';
 import type { ViewerContext } from './viewer-context';
 
 type TenantState = { tenant_slug?: string; tenant_id?: string };
@@ -9,7 +9,7 @@ type TenantState = { tenant_slug?: string; tenant_id?: string };
 function readTenantState(path: string): string | undefined {
   if (!safeExistsSync(path)) return undefined;
   try {
-    const state = JSON.parse(safeReadFile(path, { encoding: 'utf8' }) as string) as TenantState;
+    const state = loadJson<TenantState>(path);
     return state.tenant_slug || state.tenant_id;
   } catch {
     return undefined;

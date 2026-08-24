@@ -2,7 +2,7 @@ import path from 'node:path';
 import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
 import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync, safeStat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
@@ -58,9 +58,7 @@ function readMissionStatus(missionId?: string): string | undefined {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const parsed = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
-      status?: string;
-    };
+    const parsed = loadJson<{ status?: string }>(statePath);
     return typeof parsed.status === 'string' ? parsed.status : undefined;
   } catch {
     return undefined;
@@ -79,14 +77,14 @@ function readMissionContext(missionId?: string): {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return {};
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       tenant_slug?: string;
       tenant_id?: string;
       relationships?: {
         project?: { project_id?: string };
         track?: { track_id?: string; track_name?: string };
       };
-    };
+    }>(statePath);
     return {
       tenantSlug: state.tenant_slug || state.tenant_id,
       projectId: state.relationships?.project?.project_id,
