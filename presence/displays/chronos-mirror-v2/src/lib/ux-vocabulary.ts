@@ -1,4 +1,8 @@
-import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
+import {
+  browserVocabularyDefaultLocale,
+  resolveBrowserVocabularyEntry,
+  type BrowserVocabularyEntry,
+} from '@agent/core/locale-normalize';
 import {
   normalizeLocale,
   nextSupportedLocale,
@@ -16,13 +20,6 @@ import { renderMessage } from '@agent/core/message-format';
  */
 export type { SupportedLocale };
 
-type VocabularyEntry = Record<string, string>;
-type VocabularyCatalog = {
-  default_locale: SupportedLocale;
-  domains?: Record<string, Record<string, VocabularyEntry>>;
-};
-
-const catalog = vocabularyCatalog as VocabularyCatalog;
 // I18N-07 finding: this was `Record<SupportedLocale, string>` (every locale
 // required), which broke `tsc` the moment `SupportedLocale` grew a third
 // member (`qps-ploc`) that has no real speech-synthesis tag. Widened to
@@ -44,30 +41,8 @@ const speechLocales: Partial<Record<SupportedLocale, string>> = {
 // stay import-free of secure-io. An ambiguous bare key (present in more than
 // one namespace) throws rather than silently picking one, matching the core
 // resolver's contract.
-let bareKeyIndex: Map<string, VocabularyEntry[]> | null = null;
-
-function buildBareKeyIndex(): Map<string, VocabularyEntry[]> {
-  const index = new Map<string, VocabularyEntry[]>();
-  for (const entries of Object.values(catalog.domains || {})) {
-    for (const [key, entry] of Object.entries(entries || {})) {
-      const list = index.get(key) ?? [];
-      list.push(entry);
-      index.set(key, list);
-    }
-  }
-  return index;
-}
-
-function lookupVocabularyEntry(key: string): VocabularyEntry | null {
-  if (!bareKeyIndex) bareKeyIndex = buildBareKeyIndex();
-  const matches = bareKeyIndex.get(key) ?? [];
-  if (matches.length === 0) return null;
-  if (matches.length > 1) {
-    throw new Error(
-      `[ux-vocabulary] ambiguous bare key "${key}" matches multiple namespaces; qualify the lookup or rename the key.`
-    );
-  }
-  return matches[0];
+function lookupVocabularyEntry(key: string): BrowserVocabularyEntry | null {
+  return resolveBrowserVocabularyEntry(key)?.entry ?? null;
 }
 
 /**
@@ -77,7 +52,7 @@ function lookupVocabularyEntry(key: string): VocabularyEntry | null {
  * browser. The normalization rule itself is the shared one — not a copy.
  */
 export function normalizeChronosLocale(value: unknown): SupportedLocale {
-  return normalizeLocale(value) ?? normalizeLocale(catalog.default_locale) ?? 'en';
+  return normalizeLocale(value) ?? normalizeLocale(browserVocabularyDefaultLocale()) ?? 'en';
 }
 
 // UX-03 Task 5: an explicit operator choice (header toggle) persists in
@@ -130,7 +105,7 @@ export function resolveChronosLocale(): SupportedLocale {
     if (stored) return stored;
     return normalizeChronosLocale(window.navigator.language);
   }
-  return catalog.default_locale || 'en';
+  return browserVocabularyDefaultLocale() || 'en';
 }
 
 export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
@@ -162,13 +137,13 @@ export function selectChronosLocaleText(
   locale: SupportedLocale,
   variants: Partial<Record<SupportedLocale, string>> & { en: string }
 ): string {
-  return variants[locale] || variants[catalog.default_locale] || variants.en;
+  return variants[locale] || variants[browserVocabularyDefaultLocale()] || variants.en;
 }
 
 export function uxLabel(key: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
-  return entry[locale] || entry[catalog.default_locale] || key;
+  return entry[locale] || entry[browserVocabularyDefaultLocale()] || key;
 }
 
 // UX-03 Task 5.3: no per-call fallback — the catalog is the single source
@@ -177,7 +152,7 @@ export function uxLabel(key: string, locale = resolveChronosLocale()): string {
 export function uxText(key: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
-  return entry[locale] || entry[catalog.default_locale] || key;
+  return entry[locale] || entry[browserVocabularyDefaultLocale()] || key;
 }
 
 /**
@@ -187,7 +162,7 @@ export function uxText(key: string, locale = resolveChronosLocale()): string {
 export function uxTextOr(key: string, fallback: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return fallback;
-  return entry[locale] || entry[catalog.default_locale] || fallback;
+  return entry[locale] || entry[browserVocabularyDefaultLocale()] || fallback;
 }
 
 /**
@@ -211,6 +186,6 @@ export function uxMessage(
   locale = resolveChronosLocale()
 ): string {
   const entry = lookupVocabularyEntry(key);
-  const template = entry ? entry[locale] || entry[catalog.default_locale] : undefined;
+  const template = entry ? entry[locale] || entry[browserVocabularyDefaultLocale()] : undefined;
   return renderMessage(template ?? fallback, params);
 }

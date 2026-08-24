@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { isValidTenantSlug, logger } from '@agent/core';
+import { logger, narrowSurfaceViewerTenant } from '@agent/core';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -213,14 +213,14 @@ export function narrowPresenceStudioTenant(
   viewer: PresenceStudioViewerContext,
   requested?: string
 ): string[] | 'all' {
-  const tenant = requested?.trim() || undefined;
-  if (tenant && !isValidTenantSlug(tenant)) {
-    throw new PresenceStudioViewerError(403, `invalid viewer tenant scope: ${tenant}`);
+  try {
+    return narrowSurfaceViewerTenant(viewer, requested);
+  } catch (error) {
+    throw new PresenceStudioViewerError(
+      403,
+      error instanceof Error ? error.message : 'viewer tenant scope denied'
+    );
   }
-  if (tenant && viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(tenant)) {
-    throw new PresenceStudioViewerError(403, `viewer tenant scope denied: ${tenant}`);
-  }
-  return tenant ? [tenant] : viewer.tenantSlugs;
 }
 
 export class PresenceStudioViewerError extends Error {
