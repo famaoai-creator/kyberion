@@ -26,7 +26,7 @@ export function loadProfile(): ProfileData {
   try {
     const statePath = path.join(profileRoot, 'onboarding', 'onboarding-state.json');
     if (safeExistsSync(statePath)) {
-      const state = loadJson<unknown>(statePath);
+      const state = loadJson<Record<string, unknown>>(statePath);
       onboardingLines = Object.entries(state)
         .filter(([, value]) => typeof value !== 'object' || value === null)
         .slice(0, 10)

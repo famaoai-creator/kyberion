@@ -74,6 +74,10 @@ export interface PipelineStep {
   params: any;
 }
 
+interface StrategyConfig {
+  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
+}
+
 export interface ModelingAction {
   action: 'pipeline' | 'reconcile';
   steps?: PipelineStep[];
@@ -732,10 +736,16 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
   if (safeExistsSync(BROWSER_EXECUTION_PRESETS_PATH)) {
     try {
       const parsed = await retry(
-        async () => loadJson<unknown>(BROWSER_EXECUTION_PRESETS_PATH),
+        async () =>
+          loadJson<{
+            default_preset?: string;
+            presets?: Record<string, unknown>;
+          }>(BROWSER_EXECUTION_PRESETS_PATH),
         buildRetryOptions()
       );
-      if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
+      if (parsed.presets) {
+        return { default_preset: parsed.default_preset, presets: parsed.presets };
+      }
     } catch (err) {
       logger.warn(
         `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
@@ -1006,7 +1016,10 @@ export async function performReconcile(input: ModelingAction) {
     input.strategy_path || 'knowledge/product/governance/modeling-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await retry(async () => loadJson<unknown>(strategyPath), buildRetryOptions());
+  const config = await retry(
+    async () => loadJson<StrategyConfig>(strategyPath),
+    buildRetryOptions()
+  );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

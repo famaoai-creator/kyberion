@@ -23,6 +23,10 @@ interface OrchestratorAction {
   };
 }
 
+interface StrategyConfig {
+  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
+}
+
 async function handleAction(input: OrchestratorAction) {
   if (input.action === 'reconcile') {
     return await performReconcile(input);
@@ -38,7 +42,7 @@ async function performReconcile(input: OrchestratorAction) {
     input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = loadJson<unknown>(strategyPath);
+  const config = loadJson<StrategyConfig>(strategyPath);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
