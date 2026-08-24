@@ -19,7 +19,7 @@ import type {
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 import type { AudioBus } from './audio-bus.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface MeetingJoinDriver {
   readonly driver_id: string;
@@ -117,7 +117,7 @@ export function validateMeetingTarget(
  * Registry
  * ------------------------------------------------------------------ */
 
-const meetingJoinDriverSeam = defineSeam<MeetingJoinDriver>({
+const meetingJoinDriverSeam = createSeam<MeetingJoinDriver>({
   key: 'meeting-join-driver',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

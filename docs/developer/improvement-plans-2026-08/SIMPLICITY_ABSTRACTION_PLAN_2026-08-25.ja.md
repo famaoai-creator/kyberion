@@ -335,7 +335,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | SX-09 | PARTIAL     | `ChannelAdapter`/`runChannelTurn` を追加し、4 bridge の共通 turn lifecycle を移行。viewer/read-model/配送統合は未完。                  |
 | SX-10 | PARTIAL     | `runActuatorCli` を `defineActuator()` SDK dispatch へ移行。全 actuator ABI と op schema 統合は未完。                                  |
 | SX-11 | PARTIAL     | `runAdfLifecycle` と canonical repair を実行入口へ接続。重複 repair・script wrapper・語彙移行は未完。                                  |
-| SX-12 | PENDING     | god module 分割・重複 façade 統合は未着手。                                                                                            |
+| SX-12 | PARTIAL     | 21 seam の生成入口を `createSeam<T>()` に統一。god module/store/façade の分割は未着手。                                                |
 | SX-13 | PARTIAL     | 2026-08 計画群36文書へ metadata checker/gate を追加し frontmatter を補正。状態正本・知識コーパス整理は未完。                           |
 | SX-14 | PARTIAL     | front-door UX contract lint と env registry 品質修正を追加。tagline の全件完備は未完。                                                 |
 

@@ -11,7 +11,7 @@ import { pathResolver } from '../path-resolver.js';
 import * as path from 'path';
 import { safeExec, safeExistsSync, safeReadFile } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ActuatorCapability {
   op: string;
@@ -49,7 +49,7 @@ interface ManifestCapability {
 
 export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
 
-const capabilityProbeSeam = defineSeam<ActuatorCapabilityProbe>({
+const capabilityProbeSeam = createSeam<ActuatorCapabilityProbe>({
   key: 'actuator.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

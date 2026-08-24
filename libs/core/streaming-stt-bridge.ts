@@ -14,7 +14,7 @@
  */
 
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface StreamingSpeechToTextBridge {
   readonly bridge_id: string;
@@ -59,7 +59,7 @@ export class StubStreamingSpeechToTextBridge implements StreamingSpeechToTextBri
  * Registry — lets the coordinator pick a backend by id at runtime.
  * ------------------------------------------------------------------ */
 
-const streamingSttSeam = defineSeam<() => StreamingSpeechToTextBridge>({
+const streamingSttSeam = createSeam<() => StreamingSpeechToTextBridge>({
   key: 'streaming-stt-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
