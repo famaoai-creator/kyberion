@@ -980,6 +980,33 @@ describe('run_pipeline compatibility', () => {
     ]);
   });
 
+  it('exports an include envelope and applies fragment context defaults', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:include',
+          params: {
+            fragment: 'fragments/_test-run-pipeline-include.json',
+            context: { greeting: '{{name}}' },
+            export_as: 'fragment_run',
+          },
+        },
+      ],
+      { name: 'world' }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.fragment_default).toBe('fragment default');
+    expect(result.context.fragment_run).toMatchObject({
+      status: 'succeeded',
+      results: [{ op: 'core:transform', status: 'success' }],
+      context: {
+        fragment_default: 'fragment default',
+        fragment_result: 'world from fragment',
+      },
+    });
+  });
+
   it('detects circular core:include references', async () => {
     const result = await runSteps([
       {

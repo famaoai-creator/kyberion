@@ -1,5 +1,4 @@
 import {
-  attemptAutonomousRepair,
   validateAndRepairAdf,
   recordGovernanceAction,
   TraceContext,
@@ -1722,15 +1721,15 @@ async function runWithRepair(
             `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
           );
         }
-        const repaired = await attemptAutonomousRepair({
+        const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf', {
           step: { op: step.op, id: step.id, params: step.params },
           failure,
-          pipelinePath: opts.pipelinePath!,
-          policy: stepPolicy,
-          validate: () => readValidatedWorkflowAdf(opts.pipelinePath!),
-          logPrefix: '[SYS_PIPELINE:REPAIR]',
+          delegationOptions: {
+            ...(stepPolicy.effort ? { effort: stepPolicy.effort } : {}),
+            ...(stepPolicy.budget ? { budget: stepPolicy.budget } : {}),
+          },
         });
-        if (repaired) {
+        if (repair.repaired) {
           if (!opts.quiet) {
             logger.success(
               `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
@@ -2540,6 +2539,15 @@ async function runStepsInternal(
         ...s,
         params: s.params || {},
       }));
+      const fragmentContext: Record<string, unknown> =
+        fragmentJson.context && typeof fragmentJson.context === 'object'
+          ? Object.fromEntries(
+              Object.entries(fragmentJson.context as Record<string, unknown>).map(([k, v]) => [
+                k,
+                typeof v === 'string' ? resolveVars(v, ctx) : v,
+              ])
+            )
+          : {};
       const inlineCtx: Record<string, unknown> =
         params.context && typeof params.context === 'object'
           ? Object.fromEntries(
@@ -2554,10 +2562,20 @@ async function runStepsInternal(
       try {
         const nested = await runBody(
           fragmentSteps,
-          { ...ctx, ...inlineCtx },
+          { ...fragmentContext, ...ctx, ...inlineCtx },
           `core:include fragment failed: ${fragmentRef}`
         );
-        return nested.context;
+        const exportKey =
+          typeof params.export_as === 'string' && params.export_as ? params.export_as : undefined;
+        if (!exportKey) return nested.context;
+        return {
+          ...nested.context,
+          [exportKey]: {
+            status: nested.status,
+            results: nested.results,
+            context: nested.context,
+          },
+        };
       } finally {
         includeStack = previousStack;
       }
