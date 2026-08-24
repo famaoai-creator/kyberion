@@ -1,6 +1,6 @@
+import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import {
-  browserVocabularyDefaultLocale,
-  resolveBrowserVocabularyEntry,
+  createBrowserVocabularyResolver,
   type BrowserVocabularyEntry,
 } from '@agent/core/locale-normalize';
 import {
@@ -19,6 +19,8 @@ import { renderMessage } from '@agent/core/message-format';
  * regardless of which exports are used.)
  */
 export type { SupportedLocale };
+
+const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
 
 // I18N-07 finding: this was `Record<SupportedLocale, string>` (every locale
 // required), which broke `tsc` the moment `SupportedLocale` grew a third
@@ -42,7 +44,7 @@ const speechLocales: Partial<Record<SupportedLocale, string>> = {
 // one namespace) throws rather than silently picking one, matching the core
 // resolver's contract.
 function lookupVocabularyEntry(key: string): BrowserVocabularyEntry | null {
-  return resolveBrowserVocabularyEntry(key)?.entry ?? null;
+  return browserVocabulary.resolveEntry(key)?.entry ?? null;
 }
 
 /**
@@ -52,7 +54,7 @@ function lookupVocabularyEntry(key: string): BrowserVocabularyEntry | null {
  * browser. The normalization rule itself is the shared one — not a copy.
  */
 export function normalizeChronosLocale(value: unknown): SupportedLocale {
-  return normalizeLocale(value) ?? normalizeLocale(browserVocabularyDefaultLocale()) ?? 'en';
+  return normalizeLocale(value) ?? normalizeLocale(browserVocabulary.defaultLocale()) ?? 'en';
 }
 
 // UX-03 Task 5: an explicit operator choice (header toggle) persists in
@@ -105,7 +107,7 @@ export function resolveChronosLocale(): SupportedLocale {
     if (stored) return stored;
     return normalizeChronosLocale(window.navigator.language);
   }
-  return browserVocabularyDefaultLocale() || 'en';
+  return browserVocabulary.defaultLocale() || 'en';
 }
 
 export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
@@ -137,13 +139,13 @@ export function selectChronosLocaleText(
   locale: SupportedLocale,
   variants: Partial<Record<SupportedLocale, string>> & { en: string }
 ): string {
-  return variants[locale] || variants[browserVocabularyDefaultLocale()] || variants.en;
+  return variants[locale] || variants[browserVocabulary.defaultLocale()] || variants.en;
 }
 
 export function uxLabel(key: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
-  return entry[locale] || entry[browserVocabularyDefaultLocale()] || key;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || key;
 }
 
 // UX-03 Task 5.3: no per-call fallback — the catalog is the single source
@@ -152,7 +154,7 @@ export function uxLabel(key: string, locale = resolveChronosLocale()): string {
 export function uxText(key: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
-  return entry[locale] || entry[browserVocabularyDefaultLocale()] || key;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || key;
 }
 
 /**
@@ -162,7 +164,7 @@ export function uxText(key: string, locale = resolveChronosLocale()): string {
 export function uxTextOr(key: string, fallback: string, locale = resolveChronosLocale()): string {
   const entry = lookupVocabularyEntry(key);
   if (!entry) return fallback;
-  return entry[locale] || entry[browserVocabularyDefaultLocale()] || fallback;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || fallback;
 }
 
 /**
@@ -186,6 +188,6 @@ export function uxMessage(
   locale = resolveChronosLocale()
 ): string {
   const entry = lookupVocabularyEntry(key);
-  const template = entry ? entry[locale] || entry[browserVocabularyDefaultLocale()] : undefined;
+  const template = entry ? entry[locale] || entry[browserVocabulary.defaultLocale()] : undefined;
   return renderMessage(template ?? fallback, params);
 }

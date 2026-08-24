@@ -16,8 +16,8 @@
  * duplicated browser-side copy would keep accepting only `ja`/`en` and the
  * I18N-07 third-locale proof would fail on chronos alone.
  *
- * Keep this file browser-safe: its only runtime data dependency is the static
- * user-facing vocabulary JSON, which bundlers can include without Node APIs.
+ * Keep this file browser-safe and import-free. Browser surfaces pass their
+ * statically imported catalog to the shared resolver below.
  *
  * I18N-02: `SUPPORTED_LOCALES` below is generated from the vocabulary
  * catalog's `required_locales` field by `scripts/generate_vocabulary_types.ts`
@@ -27,8 +27,6 @@
  * to read the catalog at runtime here; that would break the browser-bundle
  * safety this file exists for.
  */
-
-import vocabulary from '../../knowledge/product/orchestration/user-facing-vocabulary.json';
 
 // GENERATED-LOCALES:BEGIN
 export const SUPPORTED_LOCALES = ['en', 'ja', 'qps-ploc'] as const;
@@ -75,75 +73,66 @@ export function normalizeLocale(value: unknown): SupportedLocale | null {
 
 export type BrowserVocabularyEntry = Record<string, string>;
 
-interface BrowserVocabularyCatalog {
+export interface BrowserVocabularyCatalog {
   default_locale: string;
   domains?: Record<string, Record<string, BrowserVocabularyEntry>>;
 }
 
-const browserVocabulary = vocabulary as BrowserVocabularyCatalog;
-let browserVocabularyIndex: Map<
-  string,
-  Array<{ namespace: string; entry: BrowserVocabularyEntry }>
-> | null = null;
-
-function buildBrowserVocabularyIndex() {
-  const index = new Map<string, Array<{ namespace: string; entry: BrowserVocabularyEntry }>>();
-  for (const [namespace, entries] of Object.entries(browserVocabulary.domains || {})) {
-    for (const [key, entry] of Object.entries(entries || {})) {
-      const matches = index.get(key) || [];
-      matches.push({ namespace, entry });
-      index.set(key, matches);
+export function createBrowserVocabularyResolver(catalog: BrowserVocabularyCatalog) {
+  let index: Map<string, Array<{ namespace: string; entry: BrowserVocabularyEntry }>> | null = null;
+  const buildIndex = () => {
+    const next = new Map<string, Array<{ namespace: string; entry: BrowserVocabularyEntry }>>();
+    for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+      for (const [key, entry] of Object.entries(entries || {})) {
+        const matches = next.get(key) || [];
+        matches.push({ namespace, entry });
+        next.set(key, matches);
+      }
     }
-  }
-  return index;
-}
-
-/** Resolve a qualified or unqualified key without importing Node-only core modules. */
-export function resolveBrowserVocabularyEntry(
-  key: string
-): { namespace: string; key: string; entry: BrowserVocabularyEntry } | null {
-  const separator = key.indexOf(':');
-  const namespace = separator < 0 ? undefined : key.slice(0, separator);
-  const bareKey = separator < 0 ? key : key.slice(separator + 1);
-  if (namespace) {
-    const entry = browserVocabulary.domains?.[namespace]?.[bareKey];
-    return entry ? { namespace, key: bareKey, entry } : null;
-  }
-  browserVocabularyIndex ||= buildBrowserVocabularyIndex();
-  const matches = browserVocabularyIndex.get(bareKey) || [];
-  if (matches.length > 1) {
-    throw new Error(
-      `[vocabulary] ambiguous bare key "${bareKey}" matches multiple namespaces; qualify the lookup.`
+    return next;
+  };
+  const resolveEntry = (
+    key: string
+  ): { namespace: string; key: string; entry: BrowserVocabularyEntry } | null => {
+    const separator = key.indexOf(':');
+    const namespace = separator < 0 ? undefined : key.slice(0, separator);
+    const bareKey = separator < 0 ? key : key.slice(separator + 1);
+    if (namespace) {
+      const entry = catalog.domains?.[namespace]?.[bareKey];
+      return entry ? { namespace, key: bareKey, entry } : null;
+    }
+    index ||= buildIndex();
+    const matches = index.get(bareKey) || [];
+    if (matches.length > 1) {
+      throw new Error(
+        `[vocabulary] ambiguous bare key "${bareKey}" matches multiple namespaces; qualify the lookup.`
+      );
+    }
+    const match = matches[0];
+    return match ? { namespace: match.namespace, key: bareKey, entry: match.entry } : null;
+  };
+  const defaultLocale = () => catalog.default_locale || 'en';
+  const renderText = (key: string, locale = 'en') => {
+    const resolved = resolveEntry(key);
+    if (!resolved) return key;
+    return (
+      resolved.entry[locale] ||
+      resolved.entry[defaultLocale()] ||
+      resolved.entry.en ||
+      resolved.entry.ja ||
+      key
     );
-  }
-  const match = matches[0];
-  return match ? { namespace: match.namespace, key: bareKey, entry: match.entry } : null;
-}
-
-export function browserVocabularyDefaultLocale(): string {
-  return browserVocabulary.default_locale || 'en';
-}
-
-export function renderBrowserVocabularyText(key: string, locale = 'en'): string {
-  const resolved = resolveBrowserVocabularyEntry(key);
-  if (!resolved) return key;
-  return (
-    resolved.entry[locale] ||
-    resolved.entry[browserVocabularyDefaultLocale()] ||
-    resolved.entry.en ||
-    resolved.entry.ja ||
-    key
-  );
-}
-
-export function renderBrowserVocabularyMessage(
-  key: string,
-  params: Record<string, string | number>,
-  locale = 'en'
-): string {
-  let value = renderBrowserVocabularyText(key, locale);
-  for (const [name, replacement] of Object.entries(params)) {
-    value = value.replaceAll(`{${name}}`, String(replacement));
-  }
-  return value;
+  };
+  return {
+    defaultLocale,
+    resolveEntry,
+    renderText,
+    renderMessage: (key: string, params: Record<string, string | number>, locale = 'en') => {
+      let value = renderText(key, locale);
+      for (const [name, replacement] of Object.entries(params)) {
+        value = value.replaceAll(`{${name}}`, String(replacement));
+      }
+      return value;
+    },
+  };
 }
