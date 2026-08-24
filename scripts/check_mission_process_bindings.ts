@@ -1,5 +1,12 @@
 import * as yaml from 'js-yaml';
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import {
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeReaddir,
+} from '@agent/core';
 
 type JsonRecord = Record<string, any>;
 
@@ -7,7 +14,7 @@ const ROOT = pathResolver.rootDir();
 const rel = (value: string) => pathResolver.rootResolve(value);
 
 function readJson(path: string): JsonRecord {
-  return JSON.parse(safeReadFile(rel(path), { encoding: 'utf8' }) as string) as JsonRecord;
+  return loadJson<JsonRecord>(rel(path));
 }
 
 function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
