@@ -1,4 +1,5 @@
 import { pathResolver, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const FIRST_WIN_DOCS = [
   'README.md',
@@ -67,15 +68,19 @@ export function checkFirstWinDocs(): string[] {
   return failures;
 }
 
-export function main(): void {
-  const failures = checkFirstWinDocs();
-  if (failures.length > 0) {
-    console.error('[check:first-win-docs] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(`[check:first-win-docs] OK (${FIRST_WIN_DOCS.length} documents)`);
-}
+export const runCheckFirstWinDocs = defineScript({
+  name: 'check:first-win-docs',
+  run(context) {
+    const failures = checkFirstWinDocs();
+    if (failures.length > 0) {
+      throw new Error(failures.join('; '));
+    }
+    context.print(`[check:first-win-docs] OK (${FIRST_WIN_DOCS.length} documents)`);
+  },
+});
 
-if (process.argv[1]?.endsWith('check_first_win_docs.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_first_win_docs.ts') ||
+  isDirectScript(import.meta.url, 'check_first_win_docs.js')
+)
+  void runCheckFirstWinDocs();
