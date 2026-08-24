@@ -8,6 +8,7 @@ import {
   safeReadFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type ChainAlg = 'sha256' | 'hmac-sha256';
 
@@ -40,7 +41,7 @@ function auditKeyPath(): string {
 }
 
 export function resolveAuditChainKey(options: { createIfMissing?: boolean } = {}): string | null {
-  const fromEnv = process.env.KYBERION_AUDIT_CHAIN_KEY?.trim();
+  const fromEnv = getRegisteredEnvText('KYBERION_AUDIT_CHAIN_KEY')?.trim();
   if (fromEnv) return fromEnv;
 
   const keyPath = auditKeyPath();

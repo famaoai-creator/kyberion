@@ -1,4 +1,5 @@
 import { classifyError } from './error-classifier.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
@@ -369,7 +370,7 @@ export function isCliAllowedForOperation(
   preset: Record<string, any>,
   operation: Record<string, any>
 ): boolean {
-  if (process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true') return true;
+  if (getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') === 'true') return true;
   return (
     Boolean(operation.allow_unsafe_cli) ||
     Boolean(preset.allow_unsafe_cli) ||

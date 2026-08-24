@@ -4,6 +4,7 @@
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
@@ -57,7 +58,8 @@ import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 
 function resolveApprovalActor(requestedBy?: string): string {
-  const resolvedActor = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
+  const resolvedActor =
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
   const requested = String(requestedBy || '').trim();
   if (requested && requested !== resolvedActor) {
     throw new Error(

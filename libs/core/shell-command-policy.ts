@@ -12,6 +12,7 @@ import {
   type SimpleCommand,
 } from './shell-command-normalize.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { ApprovalActionDescriptor } from './approval-store.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
@@ -69,7 +70,7 @@ export function resetShellCommandPolicyCache(): void {
 }
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_SHELL_COMMAND_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return getRegisteredEnvText('KYBERION_SHELL_COMMAND_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
 }
 
 export function loadShellCommandPolicy(): ShellCommandPolicyFile {
