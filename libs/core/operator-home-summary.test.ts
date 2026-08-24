@@ -14,6 +14,7 @@ const secureIo = vi.hoisted(() => ({
     fs.writeFileSync(filePath, data);
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),

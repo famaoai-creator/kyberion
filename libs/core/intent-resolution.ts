@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -164,9 +164,9 @@ function ensureIntentResolutionPolicyValidator(): ValidateFunction {
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
   const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: StandardIntentDefinition[];
-  };
+  }>(filePath);
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -180,9 +180,9 @@ export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
 
 function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[] {
   if (!safeExistsSync(filePath)) return [];
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: StandardIntentDefinition[];
-  };
+  }>(filePath);
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -307,9 +307,7 @@ export function loadResolvedStandardIntentCatalog(
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
   const filePath = pathResolver.knowledge('product/governance/intent-resolution-policy.json');
-  const parsed = JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as IntentResolutionPolicyFile;
+  const parsed = loadJson<IntentResolutionPolicyFile>(filePath);
   const validate = ensureIntentResolutionPolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -324,9 +322,9 @@ function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
 function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
   if (intentDomainOntologyCache) return intentDomainOntologyCache;
   const filePath = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: IntentDomainOntologyEntry[];
-  };
+  }>(filePath);
   const mapped = new Map<string, IntentDomainOntologyEntry>();
   for (const entry of parsed.intents || []) {
     if (!entry.intent_id) continue;
