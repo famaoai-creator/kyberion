@@ -22,8 +22,9 @@ import http from 'node:http';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 import {
+  loadJson,
   applySurfaceApprovalDecision,
   findMissionPath,
   listApprovalRequests,
@@ -63,7 +64,7 @@ if (!safeExistsSync(briefPath)) {
 const TOKEN = randomBytes(16).toString('hex');
 
 function readBrief(): MissionBrief {
-  return JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string) as MissionBrief;
+  return loadJson<MissionBrief>(briefPath);
 }
 
 /**

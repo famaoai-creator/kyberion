@@ -15,6 +15,7 @@
  * スキーマは README.md 参照。
  */
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { loadJson } from '@agent/core';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { reviewLayerMarkup } from '../report-review/review-layer.js';
@@ -356,7 +357,7 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
-  const brief = JSON.parse(safeReadFile(src, { encoding: 'utf8' }) as string) as MissionBrief;
+  const brief = loadJson<MissionBrief>(src);
   const rendered = renderMissionBriefHtml(brief);
   safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
   console.log(`rendered mission brief → ${out}`);
