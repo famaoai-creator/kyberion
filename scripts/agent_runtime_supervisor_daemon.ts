@@ -10,6 +10,7 @@ import {
   hasPendingDelegatedTaskInbox,
   getAgentRuntimeLog,
   getAgentRuntimeSnapshot,
+  getRegisteredEnv,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   loadDelegatedTaskRecord,
@@ -39,6 +40,10 @@ import { installProcessGuards, recordRuntimeHealthSample } from '@agent/core';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('agent-runtime-supervisor');
+
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 
 // OP-04: hourly RSS/heap samples feed the degradation watch's trend
 // evaluation (leak / restart-storm detection over a 24h window).
@@ -84,8 +89,8 @@ const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
-const GLOBAL_LIMIT = Number(process.env.KYBERION_GLOBAL_INFLIGHT_LIMIT || 8);
-const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
+const GLOBAL_LIMIT = Number(registeredEnv('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
+const AGENT_LIMIT = Number(registeredEnv('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
 
 let daemonGlobalInflight = 0;
 const daemonAgentInflightMap = new Map<string, number>();
@@ -110,7 +115,7 @@ setInterval(
       logger.warn(`[agent_runtime_supervisor_daemon] suppressed error in best-effort step: ${err}`);
     }
   },
-  Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000)
+  Number(registeredEnv('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
 ).unref?.();
 
 export interface AgentRuntimeSupervisorDaemonOptions {
@@ -160,20 +165,24 @@ function readTaskModelHint(value: unknown): TaskModelHint | undefined {
 function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'unix' | 'tcp' {
   return (
     options.transport ||
-    (process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT as 'unix' | 'tcp' | undefined) ||
+    (registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT') as 'unix' | 'tcp' | undefined) ||
     'unix'
   );
 }
 
 function resolveSocketPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
   return (
-    options.socketPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH || SOCKET_PATH
+    options.socketPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH') ||
+    SOCKET_PATH
   );
 }
 
 function resolveLockPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
   return (
-    options.lockPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH || DAEMON_LOCK_PATH
+    options.lockPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH') ||
+    DAEMON_LOCK_PATH
   );
 }
 
@@ -183,8 +192,8 @@ function resolveListenTarget(
 ): ListenTarget {
   if (resolveTransport(options) === 'tcp') {
     return {
-      host: options.host || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST || '127.0.0.1',
-      port: options.port ?? Number(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT || 0),
+      host: options.host || registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST') || '127.0.0.1',
+      port: options.port ?? Number(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT') || 0),
     };
   }
   return socketPath;
@@ -229,7 +238,7 @@ function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
 }
 
 function supervisorTokenValid(candidate: string | undefined): boolean {
-  const configured = process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN;
+  const configured = registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN');
   if (!configured) return true;
   if (!candidate) return false;
   const left = Buffer.from(candidate);
@@ -676,8 +685,8 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
         `${JSON.stringify({
           id: 'health-probe',
           method: 'health',
-          ...(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN
-            ? { auth_token: process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN }
+          ...(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')
+            ? { auth_token: registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN') }
             : {}),
         })}\n`
       );
