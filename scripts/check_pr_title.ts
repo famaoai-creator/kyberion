@@ -9,6 +9,7 @@
 
 import * as path from 'node:path';
 import { safeExec, safeReadFile, pathResolver } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CheckResult {
   ok: boolean;
@@ -17,7 +18,8 @@ interface CheckResult {
   reason?: string;
 }
 
-const CONVENTIONAL_RE = /^(?<type>feat|fix|docs|refactor|test|build|ci|chore|perf|revert)(\((?<scope>[^)]+)\))?(?<breaking>!)?:\s+.+$/;
+const CONVENTIONAL_RE =
+  /^(?<type>feat|fix|docs|refactor|test|build|ci|chore|perf|revert)(\((?<scope>[^)]+)\))?(?<breaking>!)?:\s+.+$/;
 
 function normalizeTitle(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
@@ -70,52 +72,42 @@ export function checkPullRequestTitle(input: { title?: string; eventPath?: strin
   }
   if (input.eventPath && input.eventPath.trim()) {
     const fromEvent = readEventTitle(input.eventPath);
-    if (fromEvent) return checkTitle(fromEvent, `event file ${path.relative(pathResolver.rootDir(), input.eventPath)}`);
+    if (fromEvent)
+      return checkTitle(
+        fromEvent,
+        `event file ${path.relative(pathResolver.rootDir(), input.eventPath)}`
+      );
   }
   return checkTitle(readCurrentCommitSubject(), 'HEAD commit subject');
 }
 
-function printUsage(): void {
-  console.log('Usage: pnpm check:pr-title [--title <title>] [--event-path <path>] [--json]');
+function optionValue(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  return index >= 0 ? argv[index + 1] : undefined;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-    printUsage();
-    return;
-  }
-  let title: string | undefined;
-  let eventPath: string | undefined;
-  let json = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--title') title = args[++i];
-    else if (arg === '--event-path') eventPath = args[++i];
-    else if (arg === '--json') json = true;
-  }
+export const runCheckPullRequestTitle = defineScript({
+  name: 'check:pr-title',
+  run(context) {
+    if (
+      context.positional.includes('--help') ||
+      context.positional.includes('-h') ||
+      context.positional.includes('help')
+    ) {
+      context.print('Usage: pnpm check:pr-title [--title <title>] [--event-path <path>] [--json]');
+      return;
+    }
+    const result = checkPullRequestTitle({
+      title: optionValue(context.argv, '--title'),
+      eventPath: optionValue(context.argv, '--event-path') || process.env.GITHUB_EVENT_PATH,
+    });
+    if (!result.ok) throw new Error(`${result.source}: ${result.value} (${result.reason})`);
+    context.print(context.json ? result : `✅ ${result.source}: ${result.value}`);
+  },
+});
 
-  if (!eventPath && process.env.GITHUB_EVENT_PATH) {
-    eventPath = process.env.GITHUB_EVENT_PATH;
-  }
-
-  const result = checkPullRequestTitle({ title, eventPath });
-  if (json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  } else if (result.ok) {
-    console.log(`✅ ${result.source}: ${result.value}`);
-  } else {
-    console.error(`❌ ${result.source}: ${result.value}`);
-    console.error(`   ${result.reason}`);
-  }
-
-  process.exit(result.ok ? 0 : 1);
-}
-
-const isDirect = process.argv[1] && /check_pr_title\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'check_pr_title.ts') ||
+  isDirectScript(import.meta.url, 'check_pr_title.js')
+)
+  void runCheckPullRequestTitle();
