@@ -41,6 +41,9 @@ jobs:
       - name: Validate release surface
         run: pnpm run validate
 
+      - name: Run manifest-driven release checks
+        run: pnpm run check -- --scope release
+
       - name: Run full test suite
         run: pnpm run test:all
 
