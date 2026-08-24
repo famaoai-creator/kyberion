@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
 
 export interface TraceFeedSummary {
@@ -276,14 +276,14 @@ function resolveMissionScope(missionId?: string): {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return {};
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       tenant_slug?: string;
       organization_id?: string;
       relationships?: {
         organization?: { organization_id?: string };
         project?: { project_id?: string };
       };
-    };
+    }>(statePath);
     return {
       tenantSlug: state.tenant_slug,
       organizationId: state.organization_id || state.relationships?.organization?.organization_id,
