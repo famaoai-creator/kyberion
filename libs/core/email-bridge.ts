@@ -5,6 +5,11 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
+import { getRegisteredEnv } from './env-validator.js';
+
+function kyberionEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 
 export type EmailBackendOperation = 'create_draft' | 'send';
 
@@ -33,7 +38,7 @@ function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): strin
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n');
-  const fromAddr = (params.from ?? process.env.KYBERION_EMAIL_FROM ?? '').replace(/"/g, '\\"');
+  const fromAddr = (params.from ?? kyberionEnv('KYBERION_EMAIL_FROM') ?? '').replace(/"/g, '\\"');
 
   const sendLine = op === 'send' ? 'msg.send()' : '// draft only';
 
@@ -126,9 +131,9 @@ export class SmtpEmailProvider implements EmailProvider {
 
   isAvailable(): boolean {
     return Boolean(
-      process.env.KYBERION_SMTP_HOST &&
-      process.env.KYBERION_SMTP_USER &&
-      process.env.KYBERION_SMTP_PASS
+      kyberionEnv('KYBERION_SMTP_HOST') &&
+      kyberionEnv('KYBERION_SMTP_USER') &&
+      kyberionEnv('KYBERION_SMTP_PASS')
     );
   }
 
@@ -144,11 +149,11 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   async send(params: EmailParams): Promise<EmailResult> {
-    const host = process.env.KYBERION_SMTP_HOST;
-    const user = process.env.KYBERION_SMTP_USER;
-    const pass = process.env.KYBERION_SMTP_PASS;
-    const port = parseInt(process.env.KYBERION_SMTP_PORT ?? '587', 10);
-    const from = params.from ?? process.env.KYBERION_EMAIL_FROM ?? user ?? '';
+    const host = kyberionEnv('KYBERION_SMTP_HOST');
+    const user = kyberionEnv('KYBERION_SMTP_USER');
+    const pass = kyberionEnv('KYBERION_SMTP_PASS');
+    const port = parseInt(kyberionEnv('KYBERION_SMTP_PORT') ?? '587', 10);
+    const from = params.from ?? kyberionEnv('KYBERION_EMAIL_FROM') ?? user ?? '';
     const to = params.to ?? '';
     const subject = params.subject ?? '(no subject)';
     const body = params.body ?? '';
