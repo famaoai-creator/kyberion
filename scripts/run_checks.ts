@@ -85,6 +85,7 @@ export function main(argv = process.argv.slice(2)): number {
   if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
   if (scopeIndex >= 0 && !scopeValue) return error('--scope requires a value');
   if (onlyIndex >= 0 && !only) return error('--only requires a gate id');
+  const scope = scopeValue;
   let gates: Gate[];
   try {
     gates = selectGates(loadGateManifest(), scopeValue, only);
