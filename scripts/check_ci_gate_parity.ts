@@ -1,5 +1,6 @@
 import { pathResolver, safeReadFile } from '@agent/core';
 import { loadGateManifest } from './run_checks.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const WORKFLOW_SCOPE_REFS = {
   pr: '.github/workflows/pr-validation.yml',
@@ -31,15 +32,19 @@ export function checkCiGateParity(): string[] {
   return failures;
 }
 
-export function main(): void {
-  const failures = checkCiGateParity();
-  if (failures.length > 0) {
-    console.error('[check:ci-gate-parity] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log('[check:ci-gate-parity] OK');
-}
+export const runCheckCiGateParity = defineScript({
+  name: 'check:ci-gate-parity',
+  run(context) {
+    const failures = checkCiGateParity();
+    if (failures.length > 0) {
+      throw new Error(failures.join('; '));
+    }
+    context.print('[check:ci-gate-parity] OK');
+  },
+});
 
-if (process.argv[1]?.endsWith('check_ci_gate_parity.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_ci_gate_parity.ts') ||
+  isDirectScript(import.meta.url, 'check_ci_gate_parity.js')
+)
+  void runCheckCiGateParity();
