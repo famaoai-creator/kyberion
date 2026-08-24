@@ -1,5 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import type {
@@ -155,9 +156,7 @@ function matchRule(
 }
 
 function loadRegistry(): ReviewGateRegistry {
-  const parsed = JSON.parse(
-    safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string
-  ) as ReviewGateRegistry;
+  const parsed = readJson<ReviewGateRegistry>(REGISTRY_PATH);
   const validate = ensureRegistryValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])

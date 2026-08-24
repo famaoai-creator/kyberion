@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { suggestClosestStrings } from './op-suggestions.js';
@@ -149,9 +150,7 @@ function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
   if (_cachedOpRegistry) return _cachedOpRegistry;
   try {
     const filePath = pathResolver.knowledge('product/governance/actuator-op-registry.json');
-    _cachedOpRegistry = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ActuatorOpRegistryFile;
+    _cachedOpRegistry = readJson<ActuatorOpRegistryFile>(filePath);
   } catch (err) {
     const defaults: ActuatorOpRegistryFile = {
       shared_capture_ops: [],

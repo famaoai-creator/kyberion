@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { readJson } from './foundation/json.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -238,9 +239,7 @@ export function promoteDesktopProcedure(options: {
     assertNoPendingDesktopPromotion(options.procedureId, { lockHeld: true });
     let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
     try {
-      catalog = JSON.parse(
-        safeReadFile(catalogPath, { encoding: 'utf8' }) as string
-      ) as ProcedureCatalog;
+      catalog = readJson<ProcedureCatalog>(catalogPath);
     } catch (error) {
       if (safeExistsSync(catalogPath)) {
         throw new Error(

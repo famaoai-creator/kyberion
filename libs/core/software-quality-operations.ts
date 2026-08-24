@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
@@ -35,11 +36,9 @@ export interface DeriveTestInventoryInput {
 }
 
 function loadViewpointCatalog(): TestViewpointCatalog {
-  return JSON.parse(
-    safeReadFile(pathResolver.knowledge('product/governance/software-test-viewpoints.json'), {
-      encoding: 'utf8',
-    }) as string
-  ) as TestViewpointCatalog;
+  return readJson<TestViewpointCatalog>(
+    pathResolver.knowledge('product/governance/software-test-viewpoints.json')
+  );
 }
 
 function deterministicInventory(input: DeriveTestInventoryInput): TestInventoryItem[] {
@@ -110,12 +109,7 @@ export async function deriveTestInventory(input: DeriveTestInventoryInput): Prom
 }
 
 export type TestDispatchStatus =
-  | 'passed'
-  | 'failed'
-  | 'error'
-  | 'awaiting_approval'
-  | 'manual_required'
-  | 'prohibited';
+  'passed' | 'failed' | 'error' | 'awaiting_approval' | 'manual_required' | 'prohibited';
 
 export interface TestDispatchResult {
   item_id: string;

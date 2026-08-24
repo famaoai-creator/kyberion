@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
@@ -65,9 +66,7 @@ export function promoteBrowserProcedure(
   const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
   let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
   try {
-    catalog = JSON.parse(
-      safeReadFile(catalogPath, { encoding: 'utf8' }) as string
-    ) as ProcedureCatalog;
+    catalog = readJson<ProcedureCatalog>(catalogPath);
   } catch (error) {
     if (safeExistsSync(catalogPath)) {
       throw new Error(
