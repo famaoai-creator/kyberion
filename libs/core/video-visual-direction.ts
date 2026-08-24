@@ -1,6 +1,6 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 
@@ -162,7 +162,7 @@ export function loadVideoVisualPatternCatalog(): Record<string, VideoVisualPatte
       'public/design-patterns/media-templates/video-visual-patterns.json'
     );
     if (safeExistsSync(catalogPath)) {
-      const parsed = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
       if (parsed?.patterns && typeof parsed.patterns === 'object') {
         cachedPatternCatalog = parsed.patterns as Record<string, VideoVisualPattern>;
         return cachedPatternCatalog;

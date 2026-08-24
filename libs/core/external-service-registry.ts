@@ -11,7 +11,7 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,14 +33,18 @@ interface ExternalServiceRegistry {
 // ─── Paths ──────────────────────────────────────────────────────────────────
 
 /** Org-wide defaults (Kyberion-managed, read-only). */
-const PUBLIC_SEED_PATH = pathResolver.knowledge('product/orchestration/external-service-registry.json');
+const PUBLIC_SEED_PATH = pathResolver.knowledge(
+  'product/orchestration/external-service-registry.json'
+);
 
 /**
  * Personal overrides (user-managed, read-only at runtime).
  * Place entries here to persist preferred sources across sessions without
  * touching public knowledge. File need not exist.
  */
-const PERSONAL_SEED_PATH = pathResolver.knowledge('personal/orchestration/external-service-registry.json');
+const PERSONAL_SEED_PATH = pathResolver.knowledge(
+  'personal/orchestration/external-service-registry.json'
+);
 
 /**
  * Runtime store (auto-accumulated as new services are registered via chat).
@@ -53,7 +57,7 @@ const RUNTIME_PATH = pathResolver.shared('runtime/external-service-registry.json
 function parseRegistry(filePath: string): ExternalServiceRegistry | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ExternalServiceRegistry;
+    return loadJson<ExternalServiceRegistry>(filePath);
   } catch {
     return null;
   }
@@ -65,15 +69,15 @@ function parseRegistry(filePath: string): ExternalServiceRegistry | null {
  */
 function loadMerged(): ExternalServiceRegistry {
   const fallback: ExternalServiceRegistry = { version: '1.0.0', services: [] };
-  const publicSeed  = parseRegistry(PUBLIC_SEED_PATH)  ?? fallback;
+  const publicSeed = parseRegistry(PUBLIC_SEED_PATH) ?? fallback;
   const personalSeed = parseRegistry(PERSONAL_SEED_PATH) ?? fallback;
-  const runtime     = parseRegistry(RUNTIME_PATH)      ?? fallback;
+  const runtime = parseRegistry(RUNTIME_PATH) ?? fallback;
 
   const byId = new Map<string, ExternalServiceEntry>();
   // Apply in ascending priority order (later writes win)
-  for (const entry of publicSeed.services)  byId.set(entry.service_id, entry);
+  for (const entry of publicSeed.services) byId.set(entry.service_id, entry);
   for (const entry of personalSeed.services) byId.set(entry.service_id, entry);
-  for (const entry of runtime.services)     byId.set(entry.service_id, entry);
+  for (const entry of runtime.services) byId.set(entry.service_id, entry);
 
   return {
     version: runtime.version || personalSeed.version || publicSeed.version || '1.0.0',
@@ -97,9 +101,11 @@ export function findServiceByTopic(topic: string): ExternalServiceEntry | undefi
   return registry.services.find((entry) => {
     const entryTopic = entry.topic.trim().toLowerCase();
     // Exact match or one contains the other
-    return entryTopic === normalized ||
+    return (
+      entryTopic === normalized ||
       entryTopic.includes(normalized) ||
-      normalized.includes(entryTopic);
+      normalized.includes(entryTopic)
+    );
   });
 }
 
@@ -198,14 +204,16 @@ export function listServices(): ExternalServiceEntry[] {
  * Convert an arbitrary topic string to a slug suitable for use as service_id.
  */
 export function topicToServiceId(topic: string): string {
-  return topic
-    .trim()
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 64) || 'external-service';
+  return (
+    topic
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 64) || 'external-service'
+  );
 }
 
 // ─── Provider Catalog ────────────────────────────────────────────────────────
@@ -223,14 +231,18 @@ interface ServiceProviderCatalog {
   providers: ServiceProvider[];
 }
 
-const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge('product/orchestration/service-provider-catalog.json');
-const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge('personal/orchestration/service-provider-catalog.json');
+const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/service-provider-catalog.json'
+);
+const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
+  'personal/orchestration/service-provider-catalog.json'
+);
 
 function loadProviderCatalog(): ServiceProvider[] {
   const load = (p: string): ServiceProvider[] => {
     if (!safeExistsSync(p)) return [];
     try {
-      const parsed = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string) as ServiceProviderCatalog;
+      const parsed = loadJson<ServiceProviderCatalog>(p);
       return parsed.providers || [];
     } catch {
       return [];
@@ -274,7 +286,7 @@ function fillUrlTemplate(template: string, topic: string, location: string): str
 export function resolveProviderUrl(
   providerName: string,
   topic: string,
-  location: string,
+  location: string
 ): { url: string; providerId: string } | undefined {
   const normalizedName = providerName.trim().toLowerCase();
   const normalizedTopic = topic.trim().toLowerCase();
@@ -282,13 +294,16 @@ export function resolveProviderUrl(
 
   const matched = providers.find((provider) => {
     const aliasMatch = provider.aliases.some(
-      (alias) => alias.toLowerCase() === normalizedName || normalizedName.includes(alias.toLowerCase())
+      (alias) =>
+        alias.toLowerCase() === normalizedName || normalizedName.includes(alias.toLowerCase())
     );
     if (!aliasMatch) return false;
 
     // Check topic compatibility
     if (provider.topics.includes('*')) return true;
-    return provider.topics.some((t) => t.toLowerCase() === normalizedTopic || normalizedTopic.includes(t.toLowerCase()));
+    return provider.topics.some(
+      (t) => t.toLowerCase() === normalizedTopic || normalizedTopic.includes(t.toLowerCase())
+    );
   });
 
   if (!matched) return undefined;
@@ -304,9 +319,7 @@ export function resolveProviderUrl(
  * Looks for patterns like "XxxJapanで", "Xxxを使って", "Xxxから" before the topic.
  * Returns undefined if no known provider is found.
  */
-export function extractProviderFromUtterance(
-  utterance: string,
-): string | undefined {
+export function extractProviderFromUtterance(utterance: string): string | undefined {
   const providers = loadProviderCatalog();
 
   // Try to match each provider alias against the utterance
@@ -320,4 +333,3 @@ export function extractProviderFromUtterance(
   }
   return undefined;
 }
-

@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeAppendFileSync,
   safeExistsSync,
@@ -572,7 +573,7 @@ function resolveCurrentTenantSlug(): string | undefined {
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) continue;
     try {
-      const state = JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string);
+      const state = loadJson<{ tenant_slug?: string }>(candidate);
       const slug = (state.tenant_slug || '').trim();
       if (slug && isValidTenantSlug(slug)) return slug;
     } catch {

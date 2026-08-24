@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -83,11 +83,15 @@ function errorsFrom(validate: ValidateFunction): string[] {
 
 export function loadIntentExecutionProfileRegistry(): IntentExecutionProfileRegistryFile {
   if (registryCache) return registryCache;
-  const filePath = pathResolver.knowledge('product/governance/intent-execution-profile-registry.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentExecutionProfileRegistryFile;
+  const filePath = pathResolver.knowledge(
+    'product/governance/intent-execution-profile-registry.json'
+  );
+  const parsed = loadJson<IntentExecutionProfileRegistryFile>(filePath);
   const validate = ensureValidator();
   if (!validate(parsed)) {
-    throw new Error(`Invalid intent-execution-profile-registry: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid intent-execution-profile-registry: ${errorsFrom(validate).join('; ')}`
+    );
   }
   registryCache = parsed;
   return registryCache;
@@ -157,13 +161,14 @@ function mergeSurfaceOverride(
     ...profile,
     capability_bundle_id: override.capability_bundle_id || profile.capability_bundle_id,
     enabled_toolsets: override.enabled_toolsets || profile.enabled_toolsets,
-    provider_selection: mergeProviderSelection(profile.provider_selection, override.provider_selection),
+    provider_selection: mergeProviderSelection(
+      profile.provider_selection,
+      override.provider_selection
+    ),
   };
 }
 
-function extractExecutionHints(
-  hints?: IntentExecutionProfileResolutionHints
-): {
+function extractExecutionHints(hints?: IntentExecutionProfileResolutionHints): {
   surface?: string;
   meetingProvider?: string;
   meetingMode?: string;
@@ -173,7 +178,11 @@ function extractExecutionHints(
 } {
   const runtimeContext = hints?.runtime_context || {};
   return {
-    surface: normalizeSurface(hints?.surface || getNestedString(runtimeContext, ['surface']) || getNestedString(runtimeContext, ['channel'])),
+    surface: normalizeSurface(
+      hints?.surface ||
+        getNestedString(runtimeContext, ['surface']) ||
+        getNestedString(runtimeContext, ['channel'])
+    ),
     meetingProvider:
       getNestedString(runtimeContext, ['meeting', 'provider']) ||
       getNestedString(runtimeContext, ['meeting_provider']) ||
@@ -200,19 +209,39 @@ function scoreProfile(
 ): number {
   let score = profile.default_for_intent ? 10 : 0;
   const selection = profile.provider_selection || {};
-  if (selection.meeting?.provider && hints.meetingProvider && selection.meeting.provider === hints.meetingProvider) {
+  if (
+    selection.meeting?.provider &&
+    hints.meetingProvider &&
+    selection.meeting.provider === hints.meetingProvider
+  ) {
     score += 50;
   }
-  if (selection.meeting?.mode && hints.meetingMode && selection.meeting.mode === hints.meetingMode) {
+  if (
+    selection.meeting?.mode &&
+    hints.meetingMode &&
+    selection.meeting.mode === hints.meetingMode
+  ) {
     score += 20;
   }
-  if (selection.voice?.engine_id && hints.voiceEngineId && selection.voice.engine_id === hints.voiceEngineId) {
+  if (
+    selection.voice?.engine_id &&
+    hints.voiceEngineId &&
+    selection.voice.engine_id === hints.voiceEngineId
+  ) {
     score += 40;
   }
-  if (selection.stt?.engine_id && hints.sttEngineId && selection.stt.engine_id === hints.sttEngineId) {
+  if (
+    selection.stt?.engine_id &&
+    hints.sttEngineId &&
+    selection.stt.engine_id === hints.sttEngineId
+  ) {
     score += 35;
   }
-  if (selection.video?.backend_id && hints.videoBackendId && selection.video.backend_id === hints.videoBackendId) {
+  if (
+    selection.video?.backend_id &&
+    hints.videoBackendId &&
+    selection.video.backend_id === hints.videoBackendId
+  ) {
     score += 40;
   }
   if (hints.surface && profile.surface_overrides?.[hints.surface]) {
@@ -221,7 +250,10 @@ function scoreProfile(
   return score;
 }
 
-function sortProfiles(left: IntentExecutionProfileEntry, right: IntentExecutionProfileEntry): number {
+function sortProfiles(
+  left: IntentExecutionProfileEntry,
+  right: IntentExecutionProfileEntry
+): number {
   const statusCompare = statusRank(left.status) - statusRank(right.status);
   if (statusCompare !== 0) return statusCompare;
   if (left.default_for_intent !== right.default_for_intent) {
@@ -237,8 +269,7 @@ export function resolveExecutionProfileForIntent(
   if (!intentId) return null;
   const extractedHints = extractExecutionHints(hints);
   const matched = loadIntentExecutionProfileRegistry()
-    .profiles
-    .filter((profile) => (profile.intents || []).includes(intentId))
+    .profiles.filter((profile) => (profile.intents || []).includes(intentId))
     .map((profile) => mergeSurfaceOverride(profile, extractedHints.surface))
     .sort((left, right) => {
       const scoreDiff = scoreProfile(right, extractedHints) - scoreProfile(left, extractedHints);
@@ -300,7 +331,9 @@ export function summarizeRelevantExecutionProfilesForIntentIdsCompact(
         selection.meeting?.provider
           ? `meeting=${selection.meeting.provider}/${selection.meeting.mode || 'n/a'}`
           : '',
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
       return `- ${profile.profile_id} [${profile.status}] default=${profile.default_for_intent ? 'yes' : 'no'} bundle=${bundle} toolsets=${toolsets}${providerBits ? ` provider=${providerBits}` : ''}`;
     })
     .join('\n');

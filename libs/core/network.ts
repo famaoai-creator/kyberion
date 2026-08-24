@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
 import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,
@@ -22,7 +22,9 @@ function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
   try {
     const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
     if (safeExistsSync(policyPath)) {
-      const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
+      const policy = loadJson<{ network_guardrails?: { max_request_size_kb?: unknown } }>(
+        policyPath
+      );
       const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);
       if (!Number.isNaN(maxRequestSizeKb) && maxRequestSizeKb > 0) {
         return { maxRequestSizeKb };

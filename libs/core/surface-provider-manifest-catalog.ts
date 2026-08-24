@@ -1,6 +1,6 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface SurfaceProviderManifestCatalogEntry {
@@ -19,9 +19,13 @@ export interface SurfaceProviderManifestCatalog {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const CATALOG_PATH = pathResolver.knowledge('product/governance/surface-provider-manifest-catalog.json');
+const CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/surface-provider-manifest-catalog.json'
+);
 const CATALOG_DIR = pathResolver.knowledge('product/governance/surface-provider-manifest-catalogs');
-const CATALOG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-provider-manifest-catalog.schema.json');
+const CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-provider-manifest-catalog.schema.json'
+);
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: SurfaceProviderManifestCatalog | null = null;
@@ -36,13 +40,17 @@ function ensureValidator(): ValidateFunction {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function validateCatalog(value: unknown, label: string): SurfaceProviderManifestCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid surface provider manifest catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid surface provider manifest catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as SurfaceProviderManifestCatalog;
 }
@@ -57,21 +65,27 @@ function readMtime(filePath: string): number {
 
 function loadCatalogDirectory(): SurfaceProviderManifestCatalog | null {
   if (!safeExistsSync(CATALOG_DIR)) return null;
-  const files = safeReaddir(CATALOG_DIR).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(CATALOG_DIR)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) return null;
 
   const entries: SurfaceProviderManifestCatalogEntry[] = [];
   for (const file of files) {
     const value = validateCatalog(
-      JSON.parse(safeReadFile(pathResolver.knowledge(`product/governance/surface-provider-manifest-catalogs/${file}`), { encoding: 'utf8' }) as string),
-      `${CATALOG_DIR}/${file}`,
+      loadJson(
+        pathResolver.knowledge(`product/governance/surface-provider-manifest-catalogs/${file}`)
+      ),
+      `${CATALOG_DIR}/${file}`
     );
     if ((value.entries || []).length !== 1) {
       throw new Error(`Invalid surface provider catalog file ${file}: expected exactly one entry`);
     }
     const entry = value.entries[0];
     if (entry.id !== file.replace(/\.json$/i, '')) {
-      throw new Error(`Invalid surface provider catalog file ${file}: file name must match entry id (${entry.id})`);
+      throw new Error(
+        `Invalid surface provider catalog file ${file}: file name must match entry id (${entry.id})`
+      );
     }
     entries.push(entry);
   }
@@ -87,7 +101,8 @@ export function loadSurfaceProviderManifestCatalog(): SurfaceProviderManifestCat
     cachedCatalogPath === CATALOG_PATH &&
     cachedCatalogDirMtime === dirMtime &&
     cachedCatalogSnapshotMtime === snapshotMtime
-  ) return cachedCatalog;
+  )
+    return cachedCatalog;
 
   const directoryCatalog = loadCatalogDirectory();
   if (directoryCatalog) {
@@ -100,10 +115,7 @@ export function loadSurfaceProviderManifestCatalog(): SurfaceProviderManifestCat
 
   if (!safeExistsSync(CATALOG_PATH)) return null;
 
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   cachedCatalogDirMtime = dirMtime;
@@ -115,10 +127,14 @@ export function listSurfaceProviderManifestCatalogEntries(): SurfaceProviderMani
   return loadSurfaceProviderManifestCatalog()?.entries || [];
 }
 
-export function getSurfaceProviderManifestCatalogEntry(id: string): SurfaceProviderManifestCatalogEntry | null {
+export function getSurfaceProviderManifestCatalogEntry(
+  id: string
+): SurfaceProviderManifestCatalogEntry | null {
   const normalized = id.trim();
   if (!normalized) return null;
-  return listSurfaceProviderManifestCatalogEntries().find((entry) => entry.id === normalized) || null;
+  return (
+    listSurfaceProviderManifestCatalogEntries().find((entry) => entry.id === normalized) || null
+  );
 }
 
 export function resetSurfaceProviderManifestCatalogCache(): void {

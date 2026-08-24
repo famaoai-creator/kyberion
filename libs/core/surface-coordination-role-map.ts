@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 
@@ -17,9 +17,15 @@ interface SurfaceCoordinationRoleMap {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_MAP_PATH = pathResolver.knowledge('product/governance/surface-coordination-role-map.json');
-const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/surface-coordination-role-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-coordination-role-map.schema.json');
+const PUBLIC_MAP_PATH = pathResolver.knowledge(
+  'product/governance/surface-coordination-role-map.json'
+);
+const PERSONAL_MAP_PATH = pathResolver.knowledge(
+  'personal/governance/surface-coordination-role-map.json'
+);
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-coordination-role-map.schema.json'
+);
 
 let validateFn: ValidateFunction | null = null;
 let cachedMap: SurfaceCoordinationRoleMap | null = null;
@@ -34,7 +40,9 @@ function ensureValidator(): ValidateFunction {
 function validateMap(value: unknown, label: string): SurfaceCoordinationRoleMap {
   const validate = ensureValidator();
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+    const errors = (validate.errors || []).map((error) =>
+      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+    );
     throw new Error(`Invalid surface coordination role map at ${label}: ${errors.join('; ')}`);
   }
   return value as SurfaceCoordinationRoleMap;
@@ -42,11 +50,17 @@ function validateMap(value: unknown, label: string): SurfaceCoordinationRoleMap 
 
 function loadMapFile(mapPath: string): SurfaceCoordinationRoleMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(JSON.parse(safeReadFile(mapPath, { encoding: 'utf8' }) as string), mapPath);
+  return validateMap(loadJson(mapPath), mapPath);
 }
 
-function mergeMaps(base: SurfaceCoordinationRoleMap, overlay: SurfaceCoordinationRoleMap): SurfaceCoordinationRoleMap {
-  const bySurface = new Map<string, { surface: string; role: GovernedArtifactRole; summary?: string }>();
+function mergeMaps(
+  base: SurfaceCoordinationRoleMap,
+  overlay: SurfaceCoordinationRoleMap
+): SurfaceCoordinationRoleMap {
+  const bySurface = new Map<
+    string,
+    { surface: string; role: GovernedArtifactRole; summary?: string }
+  >();
   for (const entry of base.entries) bySurface.set(entry.surface, entry);
   for (const entry of overlay.entries) bySurface.set(entry.surface, entry);
   return {

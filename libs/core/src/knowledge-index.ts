@@ -9,6 +9,7 @@ import {
   safeMkdir,
   safeStat,
   safeUnlinkSync,
+  loadJson,
 } from '../secure-io.js';
 import {
   getEmbeddingBackend,
@@ -356,7 +357,7 @@ function usageFilePath(): string {
 function loadUsageMap(): Record<string, string> {
   try {
     if (!safeExistsSync(usageFilePath())) return {};
-    const parsed = JSON.parse(safeReadFile(usageFilePath(), { encoding: 'utf8' }) as string);
+    const parsed = loadJson<Record<string, string>>(usageFilePath());
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     /* corrupt usage map: rebuild from scratch */

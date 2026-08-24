@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -732,8 +733,7 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
   if (safeExistsSync(BROWSER_EXECUTION_PRESETS_PATH)) {
     try {
       const parsed = await retry(
-        async () =>
-          JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string),
+        async () => loadJson<unknown>(BROWSER_EXECUTION_PRESETS_PATH),
         buildRetryOptions()
       );
       if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
@@ -1007,10 +1007,7 @@ export async function performReconcile(input: ModelingAction) {
     input.strategy_path || 'knowledge/product/governance/modeling-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await retry(
-    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
-    buildRetryOptions()
-  );
+  const config = await retry(async () => loadJson<unknown>(strategyPath), buildRetryOptions());
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

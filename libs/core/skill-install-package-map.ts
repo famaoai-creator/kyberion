@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface SkillInstallPackageMapEntry {
@@ -21,7 +21,9 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const MAP_PATH = pathResolver.knowledge('product/governance/skill-install-package-map.json');
-const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/skill-install-package-map.json');
+const PERSONAL_MAP_PATH = pathResolver.knowledge(
+  'personal/governance/skill-install-package-map.json'
+);
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/skill-install-package-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
@@ -37,7 +39,9 @@ function ensureValidator(): ValidateFunction {
 function validateMap(value: unknown, label: string): SkillInstallPackageMap {
   const validate = ensureValidator();
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+    const errors = (validate.errors || []).map((error) =>
+      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+    );
     throw new Error(`Invalid skill install package map at ${label}: ${errors.join('; ')}`);
   }
   return value as SkillInstallPackageMap;
@@ -45,14 +49,20 @@ function validateMap(value: unknown, label: string): SkillInstallPackageMap {
 
 function loadMapFile(mapPath: string): SkillInstallPackageMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(JSON.parse(safeReadFile(mapPath, { encoding: 'utf8' }) as string), mapPath);
+  return validateMap(loadJson(mapPath), mapPath);
 }
 
-function mergeMaps(base: SkillInstallPackageMap, overlay: SkillInstallPackageMap): SkillInstallPackageMap {
+function mergeMaps(
+  base: SkillInstallPackageMap,
+  overlay: SkillInstallPackageMap
+): SkillInstallPackageMap {
   const byId = new Map<string, SkillInstallPackageMapEntry>();
   for (const entry of base.entries) byId.set(entry.id, entry);
   for (const entry of overlay.entries) byId.set(entry.id, entry);
-  return { version: overlay.version || base.version || '1.0.0', entries: Array.from(byId.values()) };
+  return {
+    version: overlay.version || base.version || '1.0.0',
+    entries: Array.from(byId.values()),
+  };
 }
 
 export function loadSkillInstallPackageMap(): SkillInstallPackageMap {
@@ -68,10 +78,16 @@ export function loadSkillInstallPackageMap(): SkillInstallPackageMap {
   return merged;
 }
 
-export function findSkillInstallPackageMapEntry(capabilityId: string): SkillInstallPackageMapEntry | null {
+export function findSkillInstallPackageMapEntry(
+  capabilityId: string
+): SkillInstallPackageMapEntry | null {
   const normalized = capabilityId.trim().toLowerCase();
   if (!normalized) return null;
-  return loadSkillInstallPackageMap().entries.find((entry) => entry.patterns.some((pattern) => normalized.includes(pattern.toLowerCase()))) || null;
+  return (
+    loadSkillInstallPackageMap().entries.find((entry) =>
+      entry.patterns.some((pattern) => normalized.includes(pattern.toLowerCase()))
+    ) || null
+  );
 }
 
 export function resetSkillInstallPackageMapCache(): void {

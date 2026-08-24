@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   getPersonalVoiceProfileRegistryPath,
   getVoiceProfileRegistry,
@@ -52,12 +52,16 @@ function loadRegistrationReceipt(receiptPath: string): VoiceProfileRegistrationR
   if (!safeExistsSync(receiptPath)) {
     throw new Error(`Voice profile registration receipt not found: ${receiptPath}`);
   }
-  const parsed = JSON.parse(safeReadFile(receiptPath, { encoding: 'utf8' }) as string) as VoiceProfileRegistrationReceipt;
+  const parsed = loadJson<VoiceProfileRegistrationReceipt>(receiptPath);
   if (parsed.kind !== 'voice_profile_registration_receipt') {
-    throw new Error(`Unsupported voice profile receipt kind: ${String((parsed as { kind?: string }).kind || 'unknown')}`);
+    throw new Error(
+      `Unsupported voice profile receipt kind: ${String((parsed as { kind?: string }).kind || 'unknown')}`
+    );
   }
   if (parsed.status !== 'validated_pending_promotion') {
-    throw new Error(`Voice profile receipt ${parsed.request_id} is not pending promotion (status=${parsed.status})`);
+    throw new Error(
+      `Voice profile receipt ${parsed.request_id} is not pending promotion (status=${parsed.status})`
+    );
   }
   return parsed;
 }
@@ -65,7 +69,7 @@ function loadRegistrationReceipt(receiptPath: string): VoiceProfileRegistrationR
 function buildPromotedProfile(
   receipt: VoiceProfileRegistrationReceipt,
   promotedStatus: 'active' | 'shadow',
-  sampleRefs: string[],
+  sampleRefs: string[]
 ): VoiceProfileRecord {
   return {
     profile_id: receipt.profile.profile_id,
@@ -89,7 +93,9 @@ function appendProfileToRegistry(input: {
   }
   return {
     ...input.registry,
-    default_profile_id: input.setAsDefault ? input.profile.profile_id : input.registry.default_profile_id,
+    default_profile_id: input.setAsDefault
+      ? input.profile.profile_id
+      : input.registry.default_profile_id,
     profiles: [...input.registry.profiles, input.profile],
   };
 }
@@ -102,14 +108,16 @@ function loadRegistryForPromotion(targetPath: string): VoiceProfileRegistry {
       profiles: [],
     };
   }
-  return JSON.parse(safeReadFile(targetPath, { encoding: 'utf8' }) as string) as VoiceProfileRegistry;
+  return loadJson<VoiceProfileRegistry>(targetPath);
 }
 
 function resolvePromotionRegistryPath(tier: VoiceProfileRecord['tier']): string {
   if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) {
     return getVoiceProfileRegistryPath();
   }
-  return tier === 'personal' ? getPersonalVoiceProfileRegistryPath() : getVoiceProfileRegistryPath();
+  return tier === 'personal'
+    ? getPersonalVoiceProfileRegistryPath()
+    : getVoiceProfileRegistryPath();
 }
 
 function writePromotionReceipt(input: {
@@ -135,13 +143,15 @@ function writePromotionReceipt(input: {
         registry_path: input.registryPath,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
   return targetPath;
 }
 
-export function promoteVoiceProfileFromReceipt(input: PromoteVoiceProfileInput): PromoteVoiceProfileResult {
+export function promoteVoiceProfileFromReceipt(
+  input: PromoteVoiceProfileInput
+): PromoteVoiceProfileResult {
   const approvedBy = String(input.approvedBy || '').trim();
   if (!approvedBy) {
     throw new Error('Voice profile promotion requires approvedBy');

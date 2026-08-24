@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { validateReasoningEgress, type ContextSecurityScope } from './context-security-scope.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import {
@@ -103,7 +103,7 @@ export function loadVisualReviewRubric(options: { tenantSlug?: string } = {}): V
         ];
     const rubricPath = candidatePaths.find((candidate) => safeExistsSync(candidate));
     if (rubricPath) {
-      const parsed = JSON.parse(safeReadFile(rubricPath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<Partial<VisualReviewRubric>>(rubricPath);
       const criteria = Array.isArray(parsed?.criteria)
         ? parsed.criteria.filter((entry: any) => entry?.id && entry?.prompt)
         : [];

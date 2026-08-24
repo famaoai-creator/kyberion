@@ -5,16 +5,12 @@ import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client
 import { trustEngine } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 
 export interface AnomalyIndicator {
   type:
-    | 'rapid-fire'
-    | 'frequency-spike'
-    | 'trust-degradation'
-    | 'action-drift'
-    | 'policy-violations';
+    'rapid-fire' | 'frequency-spike' | 'trust-degradation' | 'action-drift' | 'policy-violations';
   threshold: string;
 }
 
@@ -30,9 +26,9 @@ function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
   if (_cachedAnomalyConfig) return _cachedAnomalyConfig;
   try {
     const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
-    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    const data = loadJson<{
       anomaly_detection?: TrustPolicyAnomalyDetection;
-    };
+    }>(filePath);
     _cachedAnomalyConfig = data.anomaly_detection ?? null;
   } catch (err) {
     const defaults: TrustPolicyAnomalyDetection = {

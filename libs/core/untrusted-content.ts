@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
@@ -224,7 +224,7 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
   try {
     let currentSignal: any = { scopes: [] };
     if (safeExistsSync(signalPath)) {
-      currentSignal = JSON.parse(safeReadFile(signalPath, { encoding: 'utf8' }) as string);
+      currentSignal = loadJson<typeof currentSignal>(signalPath);
       if (!Array.isArray(currentSignal.scopes)) currentSignal.scopes = [];
     }
 
