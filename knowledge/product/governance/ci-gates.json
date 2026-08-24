@@ -2,6 +2,14 @@
   "version": 1,
   "gates": [
     {
+      "id": "foundation-adoption",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_foundation_adoption.ts"],
+      "owner": "architecture",
+      "rationale": "Prevents shared JSON and schema construction helpers from regressing into local implementations."
+    },
+    {
       "id": "type-ratchet",
       "scope": "pr",
       "executable": "node",
