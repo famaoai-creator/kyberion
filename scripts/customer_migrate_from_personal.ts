@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
+  loadJson,
   pathResolver,
   safeCopyFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
@@ -26,7 +26,9 @@ function copyTree(srcDir: string, dstDir: string): void {
       continue;
     }
     if (stat.isSymbolicLink()) {
-      throw new Error(`Refusing to copy symlink from personal tree: ${path.relative(pathResolver.rootDir(), src)}`);
+      throw new Error(
+        `Refusing to copy symlink from personal tree: ${path.relative(pathResolver.rootDir(), src)}`
+      );
     }
     safeCopyFileSync(src, dst);
   }
@@ -38,7 +40,7 @@ export function migratePersonalCustomer(slug: string): string {
   const customerRoot = created.root;
 
   const customerJsonPath = path.join(customerRoot, 'customer.json');
-  const customerJson = JSON.parse(safeReadFile(customerJsonPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+  const customerJson = loadJson<Record<string, unknown>>(customerJsonPath);
   safeWriteFile(
     customerJsonPath,
     JSON.stringify(
@@ -48,8 +50,8 @@ export function migratePersonalCustomer(slug: string): string {
         display_name: customerJson.display_name || slug,
       },
       null,
-      2,
-    ) + '\n',
+      2
+    ) + '\n'
   );
 
   const mappings: Array<[string, string]> = [
@@ -83,14 +85,17 @@ function main(): void {
 
   try {
     const customerRoot = migratePersonalCustomer(slug);
-    console.log(`Migrated personal setup to ${path.relative(pathResolver.rootDir(), customerRoot)}`);
+    console.log(
+      `Migrated personal setup to ${path.relative(pathResolver.rootDir(), customerRoot)}`
+    );
   } catch (err) {
     console.error(formatClassification(classifyError(err)));
     process.exit(1);
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirect) {
   main();
 }
