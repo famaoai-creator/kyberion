@@ -13,7 +13,7 @@ import {
 } from './surface-coordination-store.js';
 import { resolveCustomerBinding } from './customer-channel-binding.js';
 import { renderStatus } from './ux-vocabulary.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 import type {
   SlackSurfaceMetadata,
@@ -181,7 +181,7 @@ export class SurfaceUnsupportedActionError extends Error {
 // Surface providers are a named seam: adding a provider is reversible, while
 // silently replacing a provider would make boot/load order part of product
 // semantics and could route replies through an unintended implementation.
-const surfaceProviderSeam = defineSeam<SurfaceProviderDefinition>({
+const surfaceProviderSeam = createSeam<SurfaceProviderDefinition>({
   key: 'surface-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

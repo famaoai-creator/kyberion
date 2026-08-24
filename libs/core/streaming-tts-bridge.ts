@@ -15,7 +15,7 @@
 
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import { executeServicePreset } from './service-engine.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface StreamingTextToSpeechBridge {
   readonly bridge_id: string;
@@ -104,7 +104,7 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
   }
 }
 
-const streamingTtsSeam = defineSeam<() => StreamingTextToSpeechBridge>({
+const streamingTtsSeam = createSeam<() => StreamingTextToSpeechBridge>({
   key: 'streaming-tts-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

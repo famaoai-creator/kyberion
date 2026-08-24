@@ -14,7 +14,7 @@
  */
 
 import { logger } from './core.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import { assertOperationPolicy, currentDelegationDepth } from './operation-policy-gate.js';
 import type { A2ATaskContract, PlanningPacket, TaskResultBlock } from './channel-surface-types.js';
 import { slugify } from './foundation/text.js';
@@ -1802,7 +1802,7 @@ export async function requestPeerAdvice(
   };
 }
 
-const reasoningBackendSeam = defineSeam<ReasoningBackend>({
+const reasoningBackendSeam = createSeam<ReasoningBackend>({
   key: 'reasoning-backend',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

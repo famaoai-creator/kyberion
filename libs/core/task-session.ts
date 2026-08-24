@@ -37,7 +37,7 @@ import {
   resolveProviderUrl,
 } from './external-service-registry.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
 
@@ -685,7 +685,7 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
 export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
 
-const taskIntentBuilderSeam = defineSeam<TaskSessionIntentBuilder>({
+const taskIntentBuilderSeam = createSeam<TaskSessionIntentBuilder>({
   key: 'task-intent-builder',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

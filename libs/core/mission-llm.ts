@@ -12,7 +12,7 @@ import { runCodexCliQuery } from './codex-cli-query.js';
 import { runGeminiCliQuery } from './gemini-cli-backend.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { readJsonFile } from './cli-input.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export interface LlmProfile {
   description?: string;
@@ -74,7 +74,7 @@ export interface StructuredRunner<T = unknown> {
   }): Promise<T>;
 }
 
-const structuredRunnerSeam = defineSeam<StructuredRunner>({
+const structuredRunnerSeam = createSeam<StructuredRunner>({
   key: 'structured-runner',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

@@ -21,7 +21,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface ResolveSecretInput {
   key: string;
@@ -49,7 +49,7 @@ export interface SecretResolver {
   describe?: () => SecretResolverDescription;
 }
 
-const secretResolverSeam = defineSeam<SecretResolver>({
+const secretResolverSeam = createSeam<SecretResolver>({
   key: 'secret-resolver',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

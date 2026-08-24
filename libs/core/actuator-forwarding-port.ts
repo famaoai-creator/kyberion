@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ContextSecurityScope } from './context-security-scope.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export type ActuatorForwardStatus = 'succeeded' | 'failed' | 'blocked';
 
@@ -35,7 +35,7 @@ class MissingActuatorForwardingPort implements ActuatorForwardingPort {
   }
 }
 
-const actuatorForwardingPortSeam = defineSeam<ActuatorForwardingPort>({
+const actuatorForwardingPortSeam = createSeam<ActuatorForwardingPort>({
   key: 'actuator-forwarding-port',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

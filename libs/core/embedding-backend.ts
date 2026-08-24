@@ -1,4 +1,4 @@
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface EmbeddingBackend {
   name: string;
@@ -8,7 +8,7 @@ export interface EmbeddingBackend {
 }
 
 const VECTOR_SIZE = 64;
-const embeddingBackendSeam = defineSeam<EmbeddingBackend>({
+const embeddingBackendSeam = createSeam<EmbeddingBackend>({
   key: 'embedding-backend',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
