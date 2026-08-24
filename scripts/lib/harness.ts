@@ -17,17 +17,25 @@ export interface ScriptContext extends ScriptFlags {
   print(value: unknown): void;
 }
 
-export function parseScriptFlags(argv: string[]): ScriptFlags {
+export type ScriptFlag = 'json' | 'dry-run' | 'check' | 'quiet';
+
+const DEFAULT_SCRIPT_FLAGS: readonly ScriptFlag[] = ['json', 'dry-run', 'check', 'quiet'];
+
+export function parseScriptFlags(
+  argv: string[],
+  enabledFlags: readonly ScriptFlag[] = DEFAULT_SCRIPT_FLAGS
+): ScriptFlags {
+  const enabled = new Set(enabledFlags);
   const positional: string[] = [];
   let json = false;
   let dryRun = false;
   let check = false;
   let quiet = false;
   for (const arg of argv) {
-    if (arg === '--json') json = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--check') check = true;
-    else if (arg === '--quiet') quiet = true;
+    if (arg === '--json' && enabled.has('json')) json = true;
+    else if (arg === '--dry-run' && enabled.has('dry-run')) dryRun = true;
+    else if (arg === '--check' && enabled.has('check')) check = true;
+    else if (arg === '--quiet' && enabled.has('quiet')) quiet = true;
     else positional.push(arg);
   }
   return { json, dryRun, check, quiet, positional };
@@ -35,10 +43,11 @@ export function parseScriptFlags(argv: string[]): ScriptFlags {
 
 export function defineScript<T>(options: {
   name: string;
+  flags?: readonly ScriptFlag[];
   run(context: ScriptContext): T | Promise<T>;
 }): (argv?: string[]) => Promise<T | undefined> {
   return async (argv = process.argv.slice(2)): Promise<T | undefined> => {
-    const flags = parseScriptFlags(argv);
+    const flags = parseScriptFlags(argv, options.flags);
     const output = (value: unknown): void => {
       if (!flags.quiet) {
         const rendered =

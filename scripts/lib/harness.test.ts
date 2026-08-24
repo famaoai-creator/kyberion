@@ -11,4 +11,14 @@ describe('script harness', () => {
       positional: ['catalog.json'],
     });
   });
+
+  it('honors a script-declared flag surface', () => {
+    expect(parseScriptFlags(['--json', '--check'], ['check'])).toEqual({
+      json: false,
+      dryRun: false,
+      check: true,
+      quiet: false,
+      positional: ['--json'],
+    });
+  });
 });
