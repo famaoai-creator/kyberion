@@ -21,7 +21,7 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
 
 interface GoldenRegistryEntry {
   /** Stable pipeline identifier (matches `id` field in the ADF JSON). */
@@ -63,13 +63,13 @@ const DEFAULT_IGNORE_PATHS = [
 
 function loadRegistry(): GoldenRegistryEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
-  return JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
+  return loadJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
 }
 
 function loadSnapshot(id: string): GoldenSnapshot | null {
   const p = path.join(SNAPSHOTS_DIR, `${id}.json`);
   if (!safeExistsSync(p)) return null;
-  return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  return loadJson<GoldenSnapshot>(p);
 }
 
 function writeSnapshot(snapshot: GoldenSnapshot): void {
@@ -102,7 +102,9 @@ function normalizeResult(result: unknown, ignorePaths: string[]): unknown {
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return '[' + value.map(canonicalize).join(',') + ']';
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   return '{' + entries.map(([k, v]) => JSON.stringify(k) + ':' + canonicalize(v)).join(',') + '}';
 }
 
@@ -110,17 +112,23 @@ function hashResult(result: unknown): string {
   return createHash('sha256').update(canonicalize(result)).digest('hex');
 }
 
-async function runPipeline(pipelinePath: string, input: Record<string, unknown> = {}): Promise<unknown> {
+async function runPipeline(
+  pipelinePath: string,
+  input: Record<string, unknown> = {}
+): Promise<unknown> {
   // Lazy-import to keep CLI startup fast and to allow the script to load without a
   // built dist/ when only the registry is being inspected.
   const mod = await import('./run_pipeline.js' as string);
-  const adf = JSON.parse(safeReadFile(path.join(ROOT, pipelinePath), { encoding: 'utf8' }) as string);
+  const adf = loadJson<unknown>(path.join(ROOT, pipelinePath));
   const steps = (adf as { steps?: unknown[] }).steps ?? [];
   const runStepsFn = (mod as Record<string, unknown>).runSteps;
   if (typeof runStepsFn !== 'function') {
     throw new Error('run_pipeline.js does not export runSteps');
   }
-  return await (runStepsFn as (s: unknown[], i?: Record<string, unknown>) => Promise<unknown>)(steps, input);
+  return await (runStepsFn as (s: unknown[], i?: Record<string, unknown>) => Promise<unknown>)(
+    steps,
+    input
+  );
 }
 
 interface Diagnostic {
@@ -129,10 +137,7 @@ interface Diagnostic {
   message: string;
 }
 
-async function checkOne(
-  entry: GoldenRegistryEntry,
-  rebaseline: boolean,
-): Promise<Diagnostic[]> {
+async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promise<Diagnostic[]> {
   const diags: Diagnostic[] = [];
   let result: unknown;
   try {
@@ -192,7 +197,7 @@ async function main(): Promise<void> {
   if (registry.length === 0) {
     console.log(
       `📝 No golden registry yet. Create ${path.relative(ROOT, REGISTRY_PATH)} ` +
-        `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`,
+        `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`
     );
     return;
   }
@@ -201,12 +206,16 @@ async function main(): Promise<void> {
   for (const entry of registry) {
     const diags = await checkOne(entry, rebaseline);
     allDiags.push(...diags);
-    const status = diags.find(d => d.severity === 'error') ? '❌' : diags.length > 0 ? '⚠️ ' : '✅';
+    const status = diags.find((d) => d.severity === 'error')
+      ? '❌'
+      : diags.length > 0
+        ? '⚠️ '
+        : '✅';
     console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
   }
 
-  const errors = allDiags.filter(d => d.severity === 'error');
-  const warnings = allDiags.filter(d => d.severity === 'warning');
+  const errors = allDiags.filter((d) => d.severity === 'error');
+  const warnings = allDiags.filter((d) => d.severity === 'warning');
 
   if (warnings.length > 0) {
     console.log('\nWarnings:');
@@ -225,7 +234,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal:', err);
   process.exit(1);
 });

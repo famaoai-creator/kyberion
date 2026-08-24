@@ -24,7 +24,7 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { loadJson, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import * as AjvModule from 'ajv';
 import * as path from 'node:path';
 
@@ -99,7 +99,7 @@ function abs(rel: string): string {
 }
 
 function readJson(rel: string): Json {
-  return JSON.parse(safeReadFile(abs(rel)) as string) as Json;
+  return loadJson<Json>(abs(rel));
 }
 
 function writeJson(rel: string, obj: unknown): void {
@@ -118,7 +118,7 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
 }
 
 function validateRequest(req: unknown): void {
-  const schema = JSON.parse(safeReadFile(abs(SCHEMA_REL)) as string);
+  const schema = loadJson<unknown>(abs(SCHEMA_REL));
   const ajv = new AjvCtor({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
   const ok = validate(req);
@@ -403,7 +403,7 @@ function main(): void {
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
-  const req = JSON.parse(safeReadFile(requestPath) as string) as RegistrationRequest;
+  const req = loadJson<RegistrationRequest>(requestPath);
   validateRequest(req);
 
   if (args.mode === 'apply') {
