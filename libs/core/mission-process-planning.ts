@@ -9,6 +9,7 @@
  */
 
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 
 import {
   evaluateMissionGate,
@@ -353,9 +354,7 @@ export async function evaluatePhaseEntryGate(args: {
     if (!entry.endsWith('.json')) continue;
     let definition: { phase?: string; position?: string; gate?: { id?: string } };
     try {
-      definition = JSON.parse(
-        safeReadFile(path.join(definitionsDir, entry), { encoding: 'utf8' }) as string
-      );
+      definition = readJson(path.join(definitionsDir, entry));
     } catch {
       continue;
     }
