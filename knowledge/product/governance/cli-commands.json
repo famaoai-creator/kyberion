@@ -1,5 +1,263 @@
 {
   "version": 1,
+  "commands": [
+    {
+      "id": "operator-home.default",
+      "command": "",
+      "noun": "home",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.ask",
+      "command": "ask",
+      "noun": "ask",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.procedure",
+      "command": "procedure",
+      "noun": "procedure",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.feedback",
+      "command": "feedback",
+      "noun": "feedback",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.improvements",
+      "command": "improvements",
+      "noun": "improvements",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.record",
+      "command": "record",
+      "noun": "record",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.recording",
+      "command": "recording",
+      "noun": "recording",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.inbox",
+      "command": "inbox",
+      "noun": "inbox",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.approvals",
+      "command": "approvals",
+      "noun": "approvals",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.notify",
+      "command": "notify",
+      "noun": "notify",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.deals",
+      "command": "deals",
+      "noun": "deals",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.help",
+      "command": "help",
+      "noun": "help",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.list",
+      "command": "list",
+      "noun": "list",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.search",
+      "command": "search",
+      "noun": "search",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.info",
+      "command": "info",
+      "noun": "info",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.examples",
+      "command": "examples",
+      "noun": "examples",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.mobile-profiles",
+      "command": "mobile-profiles",
+      "noun": "mobile-profiles",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.web-profiles",
+      "command": "web-profiles",
+      "noun": "web-profiles",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.artifact",
+      "command": "artifact",
+      "noun": "artifact",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.open-artifact",
+      "command": "open-artifact",
+      "noun": "open-artifact",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.packet",
+      "command": "packet",
+      "noun": "packet",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.accept-next-action",
+      "command": "accept-next-action",
+      "noun": "accept-next-action",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.approve",
+      "command": "approve",
+      "noun": "approve",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.reject",
+      "command": "reject",
+      "noun": "reject",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.email",
+      "command": "email",
+      "noun": "email",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.calendar",
+      "command": "calendar",
+      "noun": "calendar",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.task",
+      "command": "task",
+      "noun": "task",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.offboard",
+      "command": "offboard",
+      "noun": "offboard",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.run",
+      "command": "run",
+      "noun": "run",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.preview",
+      "command": "preview",
+      "noun": "preview",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.intent",
+      "command": "intent",
+      "noun": "intent",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.schedule",
+      "command": "schedule",
+      "noun": "schedule",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    }
+  ],
   "entrypoints": [
     {
       "id": "operator-home",
