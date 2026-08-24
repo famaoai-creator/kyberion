@@ -1,3 +1,10 @@
+---
+title: CLAUDE NATIVE SUBAGENT PLAN 2026 08 12
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # Claude ネイティブ・サブエージェント委譲(CN-01〜06)
 
 > **作成日**: 2026-08-12

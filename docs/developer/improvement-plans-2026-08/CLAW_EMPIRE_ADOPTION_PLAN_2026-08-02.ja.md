@@ -1,3 +1,10 @@
+---
+title: CLAW EMPIRE ADOPTION PLAN 2026 08 02
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # claw-empire 分析・採択計画(CE-01〜12)
 
 > **作成日**: 2026-08-02

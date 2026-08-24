@@ -1,3 +1,10 @@
+---
+title: EG 14 TIER NAME AS TENANT SLUG
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # EG-14: ティア名がテナントスラッグとして使われている
 
 > **記録日**: 2026-08-12

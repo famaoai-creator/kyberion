@@ -2,7 +2,7 @@
 title: オンボーディング後の Organization / Project Context Binding 改善計画
 tags: [improvement-plan, onboarding, organization, project, tenant, work-shape]
 last_updated: 2026-08-12
-status: implemented
+status: completed
 ---
 
 # オンボーディング後の Organization / Project Context Binding 改善計画

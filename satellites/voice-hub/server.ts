@@ -4344,7 +4344,37 @@ function processAsyncDelegation(params: {
   })();
 }
 
+/**
+ * SX-08: voice is an I/O surface, not a second intent router. All normal
+ * turns enter the shared surface runtime so the same intent contract,
+ * approval path, delegation policy, and user-facing result shape apply to
+ * voice, text, and headless surfaces alike.
+ */
 async function generateReply(userText: string, context: { sessionKey: string }): Promise<string> {
+  try {
+    const result = await runSurfaceMessageConversation(
+      buildPresenceSurfaceConversationMessageInput(
+        buildPresenceConversationPrompt(userText, context.sessionKey),
+        {
+          surfaceText: userText,
+          delegationSummaryInstruction:
+            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+        }
+      )
+    );
+    const text = (result.text || '').trim();
+    return text || buildVoiceFallbackReply(userText);
+  } catch (error: any) {
+    logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
+    return buildVoiceFallbackReply(userText);
+  }
+}
+
+/** @deprecated Kept only as a migration reference; production turns do not call this ladder. */
+async function legacyVoiceReplyLadder(
+  userText: string,
+  context: { sessionKey: string }
+): Promise<string> {
   try {
     // 1. 共通のインテントフローのコンパイルを試みる
     const compiledFlow = await compileUserIntentFlow({

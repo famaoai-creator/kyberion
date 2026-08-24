@@ -33,6 +33,8 @@ import {
   shouldProcessIMessage,
   stripLeadingIMessageWakeWord,
   runSurfaceMessageConversation,
+  runChannelTurn,
+  type ChannelAdapter,
   buildBridgeEmptyReplyText,
   postBridgeError,
   resolveMissionProposalReply,
@@ -312,32 +314,49 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
     return (await sendReply(proposalReply.reply)) ? 'processed' : 'failed';
   }
 
-  const threadContext = buildThreadContext({
-    ...msg,
-    text: stripLeadingIMessageWakeWord(msg.text),
-  });
-
   // UX-02: iMessage has no typing API — send a one-time working note
   // only if processing outlives 5s (quick replies stay clean).
   const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
     sendIMessageText(buildIMessageReplyRequest(msg, '処理中です。少々お待ちください…'))
   );
+  const channelAdapter: ChannelAdapter = {
+    channel: 'imessage',
+    actorId: msg.sender,
+    threadContext: () =>
+      buildThreadContext({
+        ...msg,
+        text: stripLeadingIMessageWakeWord(msg.text),
+      }) || undefined,
+    typing: () => ({ stop: () => processingNote.cancel() }),
+    // Proposal/approval replies have channel-specific envelopes and are
+    // delivered below; the adapter still owns the common turn lifecycle.
+    send: async () => undefined,
+  };
   try {
-    const conversation = await runSurfaceMessageConversation({
-      surface: 'imessage',
-      text: incomingText,
-      channel: msg.chatId,
-      threadTs: msg.id,
-      correlationId: `imsg-${msg.id}`,
-      receivedAt: msg.date,
-      actorId: msg.sender,
-      senderAgentId: 'kyberion:imessage-bridge',
-      agentId: IMESSAGE_SURFACE_AGENT_ID,
-      threadContext: threadContext || undefined,
-      attachments: msg.attachments,
-      delegationSummaryInstruction:
-        'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
-    } as any);
+    const conversation = await runChannelTurn(
+      channelAdapter,
+      {
+        text: incomingText,
+        channel: msg.chatId,
+        threadTs: msg.id,
+      },
+      ({ threadContext }) =>
+        runSurfaceMessageConversation({
+          surface: 'imessage',
+          text: incomingText,
+          channel: msg.chatId,
+          threadTs: msg.id,
+          correlationId: `imsg-${msg.id}`,
+          receivedAt: msg.date,
+          actorId: msg.sender,
+          senderAgentId: 'kyberion:imessage-bridge',
+          agentId: IMESSAGE_SURFACE_AGENT_ID,
+          threadContext,
+          attachments: msg.attachments,
+          delegationSummaryInstruction:
+            'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
+        } as any)
+    );
 
     // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
     // confirmation instead of a plain reply.
@@ -409,8 +428,6 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       releaseDedupKey();
     }
     return 'failed';
-  } finally {
-    processingNote.cancel();
   }
   return 'processed';
 }

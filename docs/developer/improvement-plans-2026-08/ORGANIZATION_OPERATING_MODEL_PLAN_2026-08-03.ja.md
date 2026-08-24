@@ -2,7 +2,7 @@
 title: Organization Operating Model Improvement Plan 2026-08-03
 tags: [organization, purpose, operating-model, service, operation, project, governance]
 last_updated: 2026-08-04
-status: implemented-reviewed
+status: completed
 ---
 
 # 組織オペレーティングモデル改善計画

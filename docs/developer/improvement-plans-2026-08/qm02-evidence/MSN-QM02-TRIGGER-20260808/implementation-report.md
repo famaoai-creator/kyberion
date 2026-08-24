@@ -1,3 +1,10 @@
+---
+title: implementation report.md
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # QM-02 implementation report
 
 実装は commit `02f94680` (`feat(qm02): harden trigger execution lifecycle`) に確定した。

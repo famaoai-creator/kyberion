@@ -1,3 +1,10 @@
+---
+title: EG 15 TEST ENVIRONMENT DEFECTS
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # EG-15: テストが落ちていた 2 つの環境要因
 
 > **記録日**: 2026-08-12

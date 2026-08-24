@@ -42,6 +42,22 @@
       "rationale": "Keeps the public entry documents understandable without internal runtime terms."
     },
     {
+      "id": "improvement-plan-metadata",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_improvement_plan_metadata.ts"],
+      "owner": "governance",
+      "rationale": "Keeps improvement plans searchable and prevents a second undocumented status source."
+    },
+    {
+      "id": "channel-adapter-adoption",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_channel_adapter_adoption.ts"],
+      "owner": "experience",
+      "rationale": "Keeps all text bridges on the shared turn/thread/typing lifecycle."
+    },
+    {
       "id": "script-integrity",
       "scope": "full",
       "executable": "node",

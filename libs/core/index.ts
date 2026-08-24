@@ -191,6 +191,7 @@ export * from './channel-adapter.js';
 export * from './actuator-sdk.js';
 export * from './tool-call-scheduler.js';
 export * from './autonomous-repair.js';
+export * from './adf-repair-agent.js';
 export * from './operation-policy-gate.js';
 export * from './video-visual-direction.js';
 export * from './video-motion-direction.js';
@@ -1274,9 +1275,9 @@ export {
 } from './env-validator.js';
 export type {
   EnvRegistryValidationEntry,
-  RegisteredEnvReadOptions,
   EnvValidationIssue,
   EnvValidationReport,
+  RegisteredEnvReadOptions,
 } from './env-validator.js';
 export type {
   BootstrapOptions,

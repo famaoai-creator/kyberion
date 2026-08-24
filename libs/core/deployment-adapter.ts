@@ -25,7 +25,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -54,7 +54,7 @@ export interface DeploymentAdapter {
   deploy(input: DeployInput): Promise<DeployResult>;
 }
 
-const deploymentAdapterSeam = defineSeam<DeploymentAdapter>({
+const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
   key: 'deployment-adapter',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

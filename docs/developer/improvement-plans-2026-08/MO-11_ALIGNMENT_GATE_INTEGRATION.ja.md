@@ -1,3 +1,10 @@
+---
+title: MO 11 ALIGNMENT GATE INTEGRATION
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # MO-11: アラインメント承認のゲート機構統合 — Sovereign 承認を第一級ゲートにする
 
 > 優先度: **P2** / 規模: S〜M / 依存: MO-01(ミッションタイプ実効化)、MO-02(フェーズゲート)、MO-10(3層レジストリ・完了) / 後続: なし

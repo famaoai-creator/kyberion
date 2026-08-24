@@ -1,3 +1,10 @@
+---
+title: MISSION GATE COHERENCE PLAN 2026 08 10
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # MG: ミッションゲート整合計画 — 切り分け基準の一本化とゲート実効化
 
 > 優先度: **P1** / 規模: M / 依存: EG-06(WorkItem context スキーマ執行)、IL-05(shape 正準化) / 後続: 個人タスク実行形の定義(**保留中** — 下記スコープ外)

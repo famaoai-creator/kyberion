@@ -2,7 +2,7 @@
 title: CLI-Anything Service Harness 統合改善計画
 tags: [service-actuator, service-harness, cli-anything, adapter, verification]
 last_updated: 2026-08-16
-status: implemented
+status: completed
 ---
 
 # CLI-Anything Service Harness 統合改善計画

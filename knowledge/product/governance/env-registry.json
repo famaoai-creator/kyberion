@@ -3,14 +3,6 @@
   "description": "Canonical registry of KYBERION_* environment variables (OP-05). Regenerate with pnpm generate:env-registry; curated fields are preserved.",
   "entries": [
     {
-      "name": "KYBERION_A",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_A2A_SECRET",
       "category": "secret",
       "type": "string",
@@ -386,14 +378,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_AUDIT_FORWARDER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_AUDIT_FORWARDER_COMMAND",
       "category": "provider",
       "type": "string",
@@ -717,8 +701,8 @@
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -733,16 +717,16 @@
     },
     {
       "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
     },
     {
       "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -989,14 +973,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_DOCUMENTED",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_DRAFT_REFINE",
       "category": "runtime",
       "type": "string",
@@ -1062,14 +1038,6 @@
     },
     {
       "name": "KYBERION_FIRST_WIN_LIVE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_FLAG",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1407,14 +1375,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_KEPT",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_KI_CACHE_DIR",
       "category": "path",
       "type": "path",
@@ -1466,14 +1426,6 @@
       "name": "KYBERION_KNOWLEDGE_REFS",
       "category": "runtime",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_KNOWLEDGE_ROOT",
-      "category": "path",
-      "type": "path",
       "required": false,
       "description": "",
       "documented": false
@@ -1907,31 +1859,7 @@
       "documented": false
     },
     {
-      "name": "KYBERION_MOBILE_TOOLCHAIN",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_MODE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_MOS_PRINCIPAL",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_MYSTERY",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1958,14 +1886,6 @@
       "name": "KYBERION_NEMOTRON_URL",
       "category": "provider",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_NEW_TIMEOUT_MS",
-      "category": "tuning",
-      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -2479,48 +2399,8 @@
       "documented": false
     },
     {
-      "name": "KYBERION_REASONING_ROLE_",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REASONING_ROLE_SUBAGENT",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REHYDRATE_ITEM",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_REMINDER_CC_AFTER_N",
       "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REMOVED",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REQUIRED_TOKEN",
-      "category": "secret",
       "type": "string",
       "required": false,
       "description": "",
@@ -2716,14 +2596,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_SKILL_PLUGIN_TEST_MARKER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",
@@ -2757,14 +2629,6 @@
     },
     {
       "name": "KYBERION_SMTP_USER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_SOMETHING_ELSE",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -3073,22 +2937,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_TEST_MARKER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_TEST_MISSING_ENV",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_TEST_OBSERVABILITY_DIR",
       "category": "path",
       "type": "path",
@@ -3100,14 +2948,6 @@
       "name": "KYBERION_TIER",
       "category": "runtime",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_TIMEOUT_MS",
-      "category": "tuning",
-      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -3185,14 +3025,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_UNDOCUMENTED",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_VAD",
       "category": "runtime",
       "type": "string",
@@ -3240,14 +3072,6 @@
       "description": "Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.",
       "documented": true,
       "subsystem": "surfaces"
-    },
-    {
-      "name": "KYBERION_VITEST_NETWORK_ALLOWLIST",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
     },
     {
       "name": "KYBERION_VLLM_KEY",

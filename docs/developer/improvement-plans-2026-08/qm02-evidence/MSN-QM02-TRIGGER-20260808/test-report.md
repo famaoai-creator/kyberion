@@ -1,3 +1,10 @@
+---
+title: test report.md
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # QM-02 test report
 
 - QM-02対象テスト: **22/22 passed**

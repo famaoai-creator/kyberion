@@ -54,7 +54,14 @@ const CONFIGURATION_DOC_PATH = pathResolver.rootResolve('docs/developer/CONFIGUR
 
 const SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'pipelines', 'tests'];
 const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs']);
-const EXCLUDED_PATH_SEGMENTS = ['/node_modules/', '/dist/', '/.next/', '/coverage/', '/vault/'];
+const EXCLUDED_PATH_SEGMENTS = [
+  '/node_modules/',
+  '/dist/',
+  '/.next/',
+  '/coverage/',
+  '/vault/',
+  '/tests/',
+];
 const ENV_NAME_RE = /KYBERION_[A-Z0-9_]+/g;
 
 export function classifyEnvName(name: string): { category: EnvCategory; type: EnvType } {
@@ -65,6 +72,12 @@ export function classifyEnvName(name: string): { category: EnvCategory; type: En
     /_(ENABLED|DISABLED)$/.test(name)
   ) {
     return { category: 'flag', type: 'boolean' };
+  }
+  // Token counts are tuning values, not credentials. Keep this before the
+  // generic TOKEN secret rule so context-window settings cannot be mislabeled
+  // as secrets in generated configuration docs.
+  if (/(?:_TOKENS|_COUNT|_LIMIT|_MAX|_MIN|_SIZE|_TTL|_RETRIES|_FACTOR)$/.test(name)) {
+    return { category: 'tuning', type: 'number' };
   }
   if (/SECRET|TOKEN|_KEY$|_KEY_|PASSWORD|CREDENTIAL/.test(name)) {
     return { category: 'secret', type: 'string' };
@@ -90,10 +103,18 @@ export function discoverEnvNames(rootDir: string): string[] {
       const normalized = `/${filePath.split(path.sep).join('/')}/`;
       if (EXCLUDED_PATH_SEGMENTS.some((segment) => normalized.includes(segment))) continue;
       if (!SCAN_EXTENSIONS.has(path.extname(filePath))) continue;
-      if (filePath.endsWith('.d.ts')) continue;
+      if (
+        filePath.endsWith('.d.ts') ||
+        /(?:\.test|\.spec)\.[cm]?[jt]sx?$/.test(filePath) ||
+        filePath.includes(`${path.sep}__tests__${path.sep}`)
+      ) {
+        continue;
+      }
       const content = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
       for (const match of content.matchAll(ENV_NAME_RE)) {
-        names.add(match[0]);
+        // A trailing underscore is a dynamic prefix (for example
+        // KYBERION_REASONING_ROLE_${role}), not a concrete registry key.
+        if (!match[0].endsWith('_')) names.add(match[0]);
       }
     }
   }

@@ -2,6 +2,7 @@
 title: QM残作業レビュー 2026-08-08
 tags: [improvement-plan, qm, review, residuals]
 last_updated: 2026-08-08
+status: active
 ---
 
 # QM残作業レビュー
