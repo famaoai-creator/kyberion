@@ -1,4 +1,4 @@
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
 
 export const UX_CONTRACT_DOCS = [
   'README.md',
@@ -8,6 +8,12 @@ export const UX_CONTRACT_DOCS = [
 
 const INTERNAL_TERMS = /\b(?:mission|actuator|ADF|packet|ledger|capability bundle)\b/giu;
 const EXTERNAL_TERMS = [/\brequest\b/iu, /\bplan\b/iu, /\bresult\b/iu, /\bnext action\b/iu];
+
+interface SurfaceRole {
+  id: string;
+  enabled: boolean;
+  tagline_key?: string;
+}
 
 function read(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
@@ -33,6 +39,25 @@ export function checkUxContractDocs(): string[] {
       if (!term.test(door)) failures.push(`${relativePath}: missing plain-language term ${term}`);
     }
   }
+  const roles = JSON.parse(
+    String(
+      safeReadFile(pathResolver.knowledge('product/governance/surface-roles.json'), {
+        encoding: 'utf8',
+      })
+    )
+  ) as { roles?: SurfaceRole[] };
+  for (const role of roles.roles || []) {
+    if (!role.enabled) continue;
+    if (!role.tagline_key) {
+      failures.push(`${role.id}: enabled surface is missing tagline_key`);
+      continue;
+    }
+    if (!resolveVocabularyEntry(role.tagline_key)) {
+      failures.push(
+        `${role.id}: tagline_key is missing from the vocabulary catalog: ${role.tagline_key}`
+      );
+    }
+  }
   return failures;
 }
 
@@ -44,7 +69,9 @@ export function main(): void {
     process.exitCode = 1;
     return;
   }
-  console.log(`[check:ux-contract-docs] OK (${UX_CONTRACT_DOCS.length} documents)`);
+  console.log(
+    `[check:ux-contract-docs] OK (${UX_CONTRACT_DOCS.length} documents and surface taglines)`
+  );
 }
 
 if (process.argv[1]?.endsWith('check_ux_contract_docs.ts')) main();
