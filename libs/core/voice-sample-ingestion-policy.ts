@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
@@ -55,7 +56,9 @@ export interface VoiceProfileRegistrationValidationResult {
   };
 }
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/voice-sample-ingestion-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge(
+  'product/governance/voice-sample-ingestion-policy.json'
+);
 
 const FALLBACK_POLICY: VoiceSampleIngestionPolicy = {
   version: 'fallback',
@@ -78,7 +81,10 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: VoiceSampleIngestionPolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH')?.trim() ||
+    DEFAULT_POLICY_PATH
+  );
 }
 
 export function resetVoiceSampleIngestionPolicyCache(): void {
@@ -101,7 +107,9 @@ export function getVoiceSampleIngestionPolicy(): VoiceSampleIngestionPolicy {
     cachedPolicy = parsed;
     return parsed;
   } catch (error: any) {
-    logger.warn(`[VOICE_SAMPLE_INGESTION_POLICY] Failed to load policy at ${policyPath}: ${error.message}`);
+    logger.warn(
+      `[VOICE_SAMPLE_INGESTION_POLICY] Failed to load policy at ${policyPath}: ${error.message}`
+    );
     cachedPolicyPath = policyPath;
     cachedPolicy = FALLBACK_POLICY;
     return cachedPolicy;
@@ -110,10 +118,12 @@ export function getVoiceSampleIngestionPolicy(): VoiceSampleIngestionPolicy {
 
 export function validateVoiceProfileRegistration(
   request: VoiceProfileRegistrationRequest,
-  policy: VoiceSampleIngestionPolicy = getVoiceSampleIngestionPolicy(),
+  policy: VoiceSampleIngestionPolicy = getVoiceSampleIngestionPolicy()
 ): VoiceProfileRegistrationValidationResult {
   const violations: string[] = [];
-  const strictPersonalVoice = request.policy?.strict_personal_voice ?? policy.profile_rules.strict_personal_voice_registration;
+  const strictPersonalVoice =
+    request.policy?.strict_personal_voice ??
+    policy.profile_rules.strict_personal_voice_registration;
   const sampleCount = request.samples.length;
 
   if (!request.profile.profile_id.trim()) {
@@ -130,7 +140,9 @@ export function validateVoiceProfileRegistration(
   }
 
   if (!request.policy?.allow_update) {
-    const existingProfiles = new Set((getVoiceProfileRegistry().profiles || []).map((profile) => String(profile.profile_id || '')));
+    const existingProfiles = new Set(
+      (getVoiceProfileRegistry().profiles || []).map((profile) => String(profile.profile_id || ''))
+    );
     if (existingProfiles.has(request.profile.profile_id)) {
       violations.push(`profile.profile_id already exists (${request.profile.profile_id})`);
     }
@@ -141,8 +153,14 @@ export function validateVoiceProfileRegistration(
     violations.push(`profile.default_engine_id is unknown (${request.profile.default_engine_id})`);
   } else {
     const engine = getVoiceEngineRecord(request.profile.default_engine_id);
-    if (strictPersonalVoice && request.profile.tier === 'personal' && engine.kind !== 'voice_clone_service') {
-      violations.push(`strict personal voice requires clone-capable engine, received ${engine.engine_id}`);
+    if (
+      strictPersonalVoice &&
+      request.profile.tier === 'personal' &&
+      engine.kind !== 'voice_clone_service'
+    ) {
+      violations.push(
+        `strict personal voice requires clone-capable engine, received ${engine.engine_id}`
+      );
     }
   }
 
@@ -156,7 +174,9 @@ export function validateVoiceProfileRegistration(
   const seenPaths = new Set<string>();
   const sampleLanguages = new Set<string>();
   let totalSampleBytes = 0;
-  const allowedExtensions = new Set((policy.sample_limits.allowed_extensions || []).map((ext) => ext.toLowerCase()));
+  const allowedExtensions = new Set(
+    (policy.sample_limits.allowed_extensions || []).map((ext) => ext.toLowerCase())
+  );
   for (const sample of request.samples) {
     const samplePath = String(sample.path || '').trim();
     if (!sample.sample_id?.trim()) {

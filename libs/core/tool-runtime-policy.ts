@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { withExecutionContext } from './authority.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
@@ -44,7 +45,7 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
-  const explicit = process.env.KYBERION_TOOL_RUNTIME_POLICY_PATH?.trim();
+  const explicit = getRegisteredEnvText('KYBERION_TOOL_RUNTIME_POLICY_PATH')?.trim();
   if (explicit) return explicit;
   const operatorOverlay = `${resolveActiveProfileRoot()}/onboarding/tool-runtime-policy.json`;
   return safeExistsSync(operatorOverlay) ? operatorOverlay : DEFAULT_POLICY_PATH;

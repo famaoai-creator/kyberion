@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
@@ -21,7 +22,9 @@ export interface ServiceRuntimePolicy {
   };
 }
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/service-runtime-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge(
+  'product/governance/service-runtime-policy.json'
+);
 
 const FALLBACK_POLICY: ServiceRuntimePolicy = {
   version: 'fallback',
@@ -43,7 +46,9 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: ServiceRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_SERVICE_RUNTIME_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
+  );
 }
 
 function loadPolicyFromPath(policyPath: string): ServiceRuntimePolicy {
@@ -78,10 +83,14 @@ export function getServiceRuntimePolicy(): ServiceRuntimePolicy {
   }
 }
 
-export function resolveServiceRuntimeRoot(policy: ServiceRuntimePolicy = getServiceRuntimePolicy()): string {
+export function resolveServiceRuntimeRoot(
+  policy: ServiceRuntimePolicy = getServiceRuntimePolicy()
+): string {
   return pathResolver.rootResolve(policy.managed_roots.service_runtime_root);
 }
 
-export function resolveServiceRuntimeCacheRoot(policy: ServiceRuntimePolicy = getServiceRuntimePolicy()): string {
+export function resolveServiceRuntimeCacheRoot(
+  policy: ServiceRuntimePolicy = getServiceRuntimePolicy()
+): string {
   return pathResolver.rootResolve(policy.managed_roots.cache_root);
 }

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
@@ -99,7 +100,7 @@ let warnedUiLocaleAliasOnce = false;
  * one-time warning naming the replacement.
  */
 function readDeprecatedUiLocaleAlias(): SupportedLocale | null {
-  const raw = process.env.KYBERION_UI_LOCALE;
+  const raw = getRegisteredEnvText('KYBERION_UI_LOCALE');
   if (raw === undefined || raw.trim() === '') return null;
   if (!warnedUiLocaleAliasOnce) {
     warnedUiLocaleAliasOnce = true;
@@ -192,7 +193,7 @@ function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const identityLocale = resolveIdentityLocale(ctx.identityPath);
   if (identityLocale) return identityLocale;
 
-  const canonicalEnv = normalizeLocale(process.env.KYBERION_LOCALE);
+  const canonicalEnv = normalizeLocale(getRegisteredEnvText('KYBERION_LOCALE'));
   if (canonicalEnv) return canonicalEnv;
 
   const aliasEnv = readDeprecatedUiLocaleAlias();

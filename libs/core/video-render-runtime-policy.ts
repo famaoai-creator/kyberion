@@ -1,10 +1,13 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import type { VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/video-render-runtime-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge(
+  'product/governance/video-render-runtime-policy.json'
+);
 
 const FALLBACK_POLICY: VideoRenderRuntimePolicy = {
   version: 'fallback',
@@ -34,7 +37,9 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: VideoRenderRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
+  );
 }
 
 export function resetVideoRenderRuntimePolicyCache(): void {
@@ -59,7 +64,9 @@ export function getVideoRenderRuntimePolicy(): VideoRenderRuntimePolicy {
     cachedPolicy = parsed;
     return parsed;
   } catch (error: any) {
-    logger.warn(`[VIDEO_RENDER_RUNTIME_POLICY] Failed to load policy at ${policyPath}: ${error.message}`);
+    logger.warn(
+      `[VIDEO_RENDER_RUNTIME_POLICY] Failed to load policy at ${policyPath}: ${error.message}`
+    );
     cachedPolicyPath = policyPath;
     cachedPolicy = FALLBACK_POLICY;
     return cachedPolicy;
