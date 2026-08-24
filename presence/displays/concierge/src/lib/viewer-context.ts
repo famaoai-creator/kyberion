@@ -2,10 +2,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   findChronosTokenRegistration,
   currentScope,
-  isValidChronosScopeId,
-  isValidTenantSlug,
   matchesChronosToken,
   readChronosTokenRegistrations,
+  defaultSurfaceViewerTierAccess,
+  narrowSurfaceViewerScope,
+  resolveSurfaceViewerTierAccess,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
@@ -64,9 +65,7 @@ function registeredViewer(token: string): ChronosTokenRegistration | null {
 }
 
 function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
-  return role === 'localadmin'
-    ? ['personal', 'confidential', 'public']
-    : ['confidential', 'public'];
+  return defaultSurfaceViewerTierAccess(role);
 }
 
 function serverTenant(): string {
@@ -81,16 +80,16 @@ function resolveTierAccess(
   role: ChronosAccessRole,
   requested?: readonly ConciergeViewerContext['tierAccess'][number][]
 ): ConciergeViewerContext['tierAccess'] {
-  const allowed = defaultTierAccess(role);
-  if (!requested) return allowed;
-  const normalized = [...new Set(requested)];
-  if (!normalized.length || normalized.some((tier) => !allowed.includes(tier))) {
+  try {
+    return resolveSurfaceViewerTierAccess(role, requested);
+  } catch (error) {
     throw new ConciergeViewerError(
       403,
-      `Concierge viewer tier scope exceeds the ${role} role policy.`
+      error instanceof Error
+        ? `Concierge ${error.message}`
+        : `Concierge viewer tier scope exceeds the ${role} role policy.`
     );
   }
-  return normalized;
 }
 
 export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewerContext {
@@ -169,30 +168,18 @@ export function resolveConciergeViewer(
   }
 }
 
-function strictScope(
-  kind: 'tenant' | 'organization' | 'project',
-  allowed: string[] | 'all',
-  requested?: string | null
-): string[] | 'all' {
-  const value = requested?.trim() || undefined;
-  if (value && (kind === 'tenant' ? !isValidTenantSlug(value) : !isValidChronosScopeId(value))) {
-    throw new ConciergeViewerError(403, `invalid viewer ${kind} scope: ${value}`);
-  }
-  if (value && allowed !== 'all' && !allowed.includes(value)) {
-    throw new ConciergeViewerError(403, `viewer ${kind} scope denied: ${value}`);
-  }
-  return value ? [value] : allowed;
-}
-
 export function narrowConciergeScope(
   viewer: ConciergeViewerContext,
   query: { tenant?: string | null; organizationId?: string | null; projectId?: string | null }
 ) {
-  return {
-    tenantSlugs: strictScope('tenant', viewer.tenantSlugs, query.tenant),
-    organizationIds: strictScope('organization', viewer.organizationIds, query.organizationId),
-    projectIds: strictScope('project', viewer.projectIds, query.projectId),
-  };
+  try {
+    return narrowSurfaceViewerScope(viewer, query);
+  } catch (error) {
+    throw new ConciergeViewerError(
+      403,
+      error instanceof Error ? `Concierge ${error.message}` : 'Concierge viewer scope denied'
+    );
+  }
 }
 
 export function conciergeHeadlessScope(viewer: ConciergeViewerContext): HeadlessViewerScope {

@@ -4,6 +4,11 @@ import {
   loadVocabularyCatalog,
   resolveVocabularyEntry,
 } from './vocabulary-catalog.js';
+import {
+  renderBrowserVocabularyMessage,
+  renderBrowserVocabularyText,
+  resolveBrowserVocabularyEntry,
+} from './locale-normalize.js';
 
 afterEach(() => {
   _resetVocabularyCatalogCacheForTests();
@@ -43,5 +48,19 @@ describe('vocabulary-catalog (I18N-02)', () => {
 
   it('returns null for a qualified lookup naming a namespace the key is not in', () => {
     expect(resolveVocabularyEntry('cli:chronos_jump_to_section')).toBeNull();
+  });
+});
+
+describe('browser vocabulary resolver', () => {
+  it('resolves qualified shared entries and interpolates values', () => {
+    const entry = resolveBrowserVocabularyEntry('concierge:setup.briefing');
+    expect(entry?.namespace).toBe('concierge');
+    expect(
+      renderBrowserVocabularyMessage('concierge:setup.briefing', { name: 'Aki' }, 'ja')
+    ).toContain('Aki');
+  });
+
+  it('keeps missing keys visible instead of inventing user-facing copy', () => {
+    expect(renderBrowserVocabularyText('missing:surface_key', 'ja')).toBe('missing:surface_key');
   });
 });
