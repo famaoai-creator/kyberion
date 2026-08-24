@@ -3,7 +3,7 @@
  *
  * The generated seam graph intentionally has its own hand-maintained role
  * map. This checker does not import that map: it scans production TypeScript
- * declarations directly and verifies that every defineSeam declaration is
+ * declarations directly and verifies that every createSeam declaration is
  * catalog-backed and represented in the generated graph.
  */
 import * as path from 'node:path';
@@ -20,6 +20,8 @@ interface SeamDeclaration {
   line: number;
   catalogBacked: boolean;
 }
+
+const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam']);
 
 function collectSourceFiles(directory: string): string[] {
   const files: string[] = [];
@@ -68,7 +70,7 @@ function scanDeclarations(): SeamDeclaration[] {
       if (
         ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        node.expression.text === 'defineSeam'
+        SEAM_CONSTRUCTORS.has(node.expression.text)
       ) {
         const argument = node.arguments[0];
         if (!argument || !ts.isObjectLiteralExpression(argument)) return;
@@ -105,7 +107,7 @@ function check(): string[] {
     }
   }
 
-  if (declarations.length === 0) findings.push('no production defineSeam declaration was found');
+  if (declarations.length === 0) findings.push('no production createSeam declaration was found');
   for (const declaration of declarations) {
     const previous = byKey.get(declaration.key);
     if (previous) {
@@ -116,7 +118,7 @@ function check(): string[] {
     byKey.set(declaration.key, declaration);
     if (!declaration.catalogBacked) {
       findings.push(
-        `${declaration.key}: defineSeam declaration is not registered in a catalog (${declaration.file}:${declaration.line})`
+        `${declaration.key}: createSeam declaration is not registered in a catalog (${declaration.file}:${declaration.line})`
       );
     }
     if (!documentedKeys.has(declaration.key)) {
