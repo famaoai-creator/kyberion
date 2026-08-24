@@ -58,6 +58,13 @@ import {
   appendDeferredToolAnnouncement,
   planDeferredToolLoading,
 } from './prompt-cache-discipline.js';
+import { getRegisteredEnv } from './env-validator.js';
+
+function kyberionEnv(name: string): string | undefined {
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+}
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -97,7 +104,7 @@ function readRetryAfterMs(error: unknown): number | undefined {
 }
 
 function resolveInPlaceRetryCount(policyDefault?: number): number {
-  const raw = process.env.KYBERION_REASONING_IN_PLACE_RETRIES;
+  const raw = kyberionEnv('KYBERION_REASONING_IN_PLACE_RETRIES');
   if (!raw?.trim()) return policyDefault ?? DEFAULT_IN_PLACE_RETRIES;
   const configured = Number(raw);
   return Number.isFinite(configured) && configured >= 0
@@ -106,7 +113,7 @@ function resolveInPlaceRetryCount(policyDefault?: number): number {
 }
 
 function resolveRetryBaseMs(): number {
-  const raw = process.env.KYBERION_REASONING_RETRY_BASE_MS;
+  const raw = kyberionEnv('KYBERION_REASONING_RETRY_BASE_MS');
   if (!raw?.trim()) return DEFAULT_RETRY_BASE_MS;
   const configured = Number(raw);
   return Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_RETRY_BASE_MS;
@@ -710,7 +717,7 @@ export const STRUCTURED_DELEGATION_PROMPT_HEADER =
   'Return a single JSON object that satisfies the schema below.';
 
 export function delegationSummaryRetryEnabled(): boolean {
-  const raw = (process.env.KYBERION_DELEGATION_SUMMARY_RETRY || '').trim().toLowerCase();
+  const raw = (kyberionEnv('KYBERION_DELEGATION_SUMMARY_RETRY') || '').trim().toLowerCase();
   return !(raw === '0' || raw === 'false' || raw === 'off');
 }
 
@@ -787,12 +794,12 @@ function inferAmbientPromptVisibility(): ReasoningPromptVisibilityContext | unde
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
-  const knowledgeRefs = String(process.env.KYBERION_KNOWLEDGE_REFS || '')
+  const knowledgeRefs = String(kyberionEnv('KYBERION_KNOWLEDGE_REFS') || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  const taskId = String(process.env.KYBERION_TASK_ID || '').trim();
-  const contextPackId = String(process.env.KYBERION_CONTEXT_PACK_ID || '').trim();
+  const taskId = String(kyberionEnv('KYBERION_TASK_ID') || '').trim();
+  const contextPackId = String(kyberionEnv('KYBERION_CONTEXT_PACK_ID') || '').trim();
   return {
     missionPath,
     missionId,
@@ -1859,7 +1866,7 @@ const stubServedOps: StubServedRecord[] = [];
 const STUB_SERVED_CAP = 500;
 
 export function stubExplicitlyRequested(): boolean {
-  return process.env.KYBERION_REASONING_BACKEND === 'stub';
+  return kyberionEnv('KYBERION_REASONING_BACKEND') === 'stub';
 }
 
 function recordStubServed(op: string, detail?: string): void {
