@@ -40,7 +40,7 @@
  */
 
 import { logger } from './core.js';
-import { getRegisteredEnv } from './env-validator.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
@@ -90,9 +90,7 @@ import {
 } from './reasoning-backend-policy.js';
 
 function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+  return getRegisteredEnvText(name);
 }
 import {
   loadReasoningRoutePolicy,

@@ -89,6 +89,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 const DEFAULT_GLOBAL_MAX_CONCURRENCY = 4;
 const DEFAULT_PROVIDER_MAX_CONCURRENCY = 2;
@@ -109,20 +110,20 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 
 function resolveGlobalCap(): number {
   return parsePositiveInt(
-    process.env.KYBERION_DELEGATION_MAX_CONCURRENCY,
+    getRegisteredEnvText('KYBERION_DELEGATION_MAX_CONCURRENCY'),
     DEFAULT_GLOBAL_MAX_CONCURRENCY
   );
 }
 
 function resolveUniformProviderCap(): number {
   return parsePositiveInt(
-    process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY,
+    getRegisteredEnvText('KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY'),
     DEFAULT_PROVIDER_MAX_CONCURRENCY
   );
 }
 
 function resolveProviderCapOverrides(): Record<string, number> {
-  const raw = process.env.KYBERION_DELEGATION_PROVIDER_CAPS;
+  const raw = getRegisteredEnvText('KYBERION_DELEGATION_PROVIDER_CAPS');
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
@@ -143,11 +144,17 @@ function resolveProviderCap(provider: string): number {
 }
 
 function resolveWallClockBudgetMs(): number {
-  return parsePositiveInt(process.env.KYBERION_DELEGATION_WALL_CLOCK_MS, DEFAULT_WALL_CLOCK_MS);
+  return parsePositiveInt(
+    getRegisteredEnvText('KYBERION_DELEGATION_WALL_CLOCK_MS'),
+    DEFAULT_WALL_CLOCK_MS
+  );
 }
 
 function resolveKillGraceMs(): number {
-  return parsePositiveInt(process.env.KYBERION_DELEGATION_KILL_GRACE_MS, DEFAULT_KILL_GRACE_MS);
+  return parsePositiveInt(
+    getRegisteredEnvText('KYBERION_DELEGATION_KILL_GRACE_MS'),
+    DEFAULT_KILL_GRACE_MS
+  );
 }
 
 // --- concurrency semaphore -------------------------------------------------
