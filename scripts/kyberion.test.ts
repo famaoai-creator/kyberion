@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectEntrypoint } from './kyberion.js';
+import { resolveCommand, selectEntrypoint } from './kyberion.js';
 
 describe('kyberion command router', () => {
   it('routes operator-home commands through the home entrypoint', () => {
@@ -14,5 +14,14 @@ describe('kyberion command router', () => {
 
   it('keeps unknown commands on the operator-home surface', () => {
     expect(selectEntrypoint('unknown-command').id).toBe('operator-home');
+  });
+
+  it('exposes command metadata from the governed registry', () => {
+    expect(resolveCommand('ask')).toMatchObject({
+      noun: 'ask',
+      verb: 'default',
+      entry: 'operator-home',
+      audience: 'user',
+    });
   });
 });

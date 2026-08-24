@@ -6,8 +6,18 @@ export interface CliEntrypoint {
   commands: string[];
 }
 
+export interface CliCommand {
+  id: string;
+  command: string;
+  noun: string;
+  verb: string;
+  entry: string;
+  audience: 'user' | 'operator' | 'dev';
+}
+
 export interface CliManifest {
   version: number;
+  commands?: CliCommand[];
   entrypoints: CliEntrypoint[];
 }
 
@@ -26,6 +36,23 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
 
   const ids = new Set<string>();
   const commands = new Map<string, string>();
+  const commandIds = new Set<string>();
+  if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
+    failures.push('commands must be a non-empty command registry');
+  } else {
+    for (const command of manifest.commands) {
+      if (!command.id || commandIds.has(command.id)) {
+        failures.push(`command id must be unique: ${command.id || '<missing>'}`);
+      }
+      commandIds.add(command.id);
+      if (!command.noun || !command.verb || !command.entry) {
+        failures.push(`command ${command.id || '<missing>'} must declare noun, verb, and entry`);
+      }
+      if (!['user', 'operator', 'dev'].includes(command.audience)) {
+        failures.push(`command ${command.id || '<missing>'} has invalid audience`);
+      }
+    }
+  }
   for (const entrypoint of manifest.entrypoints) {
     if (!entrypoint.id || ids.has(entrypoint.id)) {
       failures.push(`entrypoint id must be unique: ${entrypoint.id || '<missing>'}`);
@@ -43,6 +70,14 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
       const owner = commands.get(command);
       if (owner) failures.push(`command is claimed by multiple entrypoints: ${command}`);
       commands.set(command, entrypoint.id);
+    }
+  }
+  for (const command of manifest.commands || []) {
+    if (!ids.has(command.entry)) {
+      failures.push(`command ${command.id} references missing entrypoint: ${command.entry}`);
+    }
+    if (commands.get(command.command) !== command.entry) {
+      failures.push(`command registry route mismatch: ${command.command} -> ${command.entry}`);
     }
   }
   for (const required of ['operator-home', 'operator-cli']) {
