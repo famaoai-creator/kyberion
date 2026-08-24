@@ -8,6 +8,26 @@ vi.mock('@agent/core', async (importOriginal) => {
   const personalThemeDir = actual.pathResolver.rootResolve(
     'knowledge/personal/design-patterns/media-templates/themes'
   );
+  const personalTheme = {
+    version: '1.1.0',
+    default_theme: 'test-roundtrip-theme',
+    themes: {
+      'test-roundtrip-theme': {
+        name: 'Test Roundtrip Theme',
+        colors: {
+          primary: '#123456',
+          secondary: '#234567',
+          accent: '#345678',
+          background: '#abcdef',
+          text: '#112233',
+        },
+        fonts: {
+          heading: 'Aptos, sans-serif',
+          body: 'Aptos, sans-serif',
+        },
+      },
+    },
+  };
   return {
     ...actual,
     safeExistsSync: (targetPath: string) => {
@@ -17,29 +37,12 @@ vi.mock('@agent/core', async (importOriginal) => {
     },
     safeReadFile: (targetPath: string, options?: { encoding?: string }) => {
       if (targetPath === personalThemePath) {
-        return JSON.stringify({
-          version: '1.1.0',
-          default_theme: 'test-roundtrip-theme',
-          themes: {
-            'test-roundtrip-theme': {
-              name: 'Test Roundtrip Theme',
-              colors: {
-                primary: '#123456',
-                secondary: '#234567',
-                accent: '#345678',
-                background: '#abcdef',
-                text: '#112233',
-              },
-              fonts: {
-                heading: 'Aptos, sans-serif',
-                body: 'Aptos, sans-serif',
-              },
-            },
-          },
-        });
+        return JSON.stringify(personalTheme);
       }
       return actual.safeReadFile(targetPath, options as any);
     },
+    loadJson: <T>(targetPath: string) =>
+      targetPath === personalThemePath ? (personalTheme as T) : actual.loadJson<T>(targetPath),
   };
 });
 
@@ -67,7 +70,7 @@ describe('media-actuator personal theme overlay', () => {
       expect.objectContaining({
         primary: '#123456',
         accent: '#345678',
-      }),
+      })
     );
   });
 });
