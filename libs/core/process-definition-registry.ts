@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 
 export type ProcessDefinitionKind =
   'mission_workflow_catalog' | 'scenario_pack' | 'playbook_directory' | 'phase_directory';
@@ -45,7 +45,7 @@ export interface ProcessDefinitionRegistryAudit {
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/process-definition-registry.json');
 
 function readJson(path: string): Record<string, unknown> {
-  return JSON.parse(safeReadFile(path, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+  return loadJson<Record<string, unknown>>(path);
 }
 
 export function loadProcessDefinitionRegistry(): ProcessDefinitionRegistry {

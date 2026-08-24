@@ -1,4 +1,4 @@
-import { safeExec, safeReadFile } from './secure-io.js';
+import { loadJson, safeExec, safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 type CapabilitySource = {
@@ -77,17 +77,17 @@ export type DiscoveredCapability = CapabilityRegistryEntry & {
 };
 
 function readJson<T>(relativePath: string): T {
-  return JSON.parse(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(pathResolver.rootResolve(relativePath));
 }
 
 export function loadCapabilityRegistry(
-  relativePath = 'knowledge/product/governance/harness-capability-registry.json',
+  relativePath = 'knowledge/product/governance/harness-capability-registry.json'
 ): CapabilityRegistry {
   return readJson<CapabilityRegistry>(relativePath);
 }
 
 export function loadProviderCapabilityScanPolicy(
-  relativePath = 'knowledge/product/governance/provider-capability-scan-policy.json',
+  relativePath = 'knowledge/product/governance/provider-capability-scan-policy.json'
 ): ProviderScanPolicy {
   return readJson<ProviderScanPolicy>(relativePath);
 }
@@ -124,11 +124,14 @@ function matchesCapabilityIds(targetCapabilityId: string, candidateIds: string[]
 }
 
 export function probeProviderAvailability(
-  policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy(),
+  policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy()
 ): Map<string, ProbeResult> {
   const results = new Map<string, ProbeResult>();
   for (const providerPolicy of policy.providers) {
-    results.set(providerPolicy.provider, runProbe(providerPolicy.provider, providerPolicy.primary_probe));
+    results.set(
+      providerPolicy.provider,
+      runProbe(providerPolicy.provider, providerPolicy.primary_probe)
+    );
   }
   return results;
 }
@@ -136,10 +139,12 @@ export function probeProviderAvailability(
 export function scanProviderCapabilities(
   registry: CapabilityRegistry = loadCapabilityRegistry(),
   policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy(),
-  options: { includeUnavailable?: boolean } = {},
+  options: { includeUnavailable?: boolean } = {}
 ): DiscoveredCapability[] {
   const includeUnavailable = options.includeUnavailable ?? false;
-  const providerPolicies = new Map(policy.providers.map((providerPolicy) => [providerPolicy.provider, providerPolicy]));
+  const providerPolicies = new Map(
+    policy.providers.map((providerPolicy) => [providerPolicy.provider, providerPolicy])
+  );
   const providerProbes = probeProviderAvailability(policy);
   const discovered: DiscoveredCapability[] = [];
 

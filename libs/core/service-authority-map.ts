@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface ServiceAuthorityMapEntry {
@@ -34,20 +34,24 @@ function ensureValidator(): ValidateFunction {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function validateMap(value: unknown, label: string): ServiceAuthorityMap {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid service authority map at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid service authority map at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as ServiceAuthorityMap;
 }
 
 function loadMapFile(mapPath: string): ServiceAuthorityMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(JSON.parse(safeReadFile(mapPath, { encoding: 'utf8' }) as string), mapPath);
+  return validateMap(loadJson(mapPath), mapPath);
 }
 
 function mergeMaps(base: ServiceAuthorityMap, overlay: ServiceAuthorityMap): ServiceAuthorityMap {
@@ -80,7 +84,10 @@ export function listServiceAuthorityMapEntries(): ServiceAuthorityMapEntry[] {
 export function getServiceAuthorities(serviceId: string): string[] {
   const normalized = serviceId.trim();
   if (!normalized) return [];
-  return listServiceAuthorityMapEntries().find((entry) => entry.service_id === normalized)?.authorities || [];
+  return (
+    listServiceAuthorityMapEntries().find((entry) => entry.service_id === normalized)
+      ?.authorities || []
+  );
 }
 
 export function resetServiceAuthorityMapCache(): void {

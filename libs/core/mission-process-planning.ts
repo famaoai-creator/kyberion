@@ -33,6 +33,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 import {
   type MissionClass,
@@ -138,7 +139,7 @@ export function applyProcessTemplatePlan(input: {
 
 function readTasksSafe(nextTasksPath: string): Array<Record<string, unknown>> {
   try {
-    const parsed = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(nextTasksPath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -308,11 +309,11 @@ export async function evaluateStoredMissionGate(args: {
   const definitionPath = gateDefinitionPath(missionDir, args.gateId);
   if (!safeExistsSync(definitionPath)) return { found: false };
 
-  const definition = JSON.parse(safeReadFile(definitionPath, { encoding: 'utf8' }) as string) as {
+  const definition = loadJson<{
     phase?: string;
     position?: 'entry' | 'exit';
     gate: MissionGateDefinition;
-  };
+  }>(definitionPath);
 
   const gate = resolveGateCheckPaths(definition.gate, missionDir, args.humanConfirmed ?? false);
   const evaluation = await evaluateMissionGate({

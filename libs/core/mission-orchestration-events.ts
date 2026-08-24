@@ -7,6 +7,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -247,9 +248,7 @@ function resolveMissionOrchestrationScope(
 export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
   eventPath: string
 ): MissionOrchestrationEvent<TPayload> {
-  const parsed = JSON.parse(safeReadFile(eventPath, { encoding: 'utf8' }) as string) as Partial<
-    MissionOrchestrationEvent<TPayload>
-  >;
+  const parsed = loadJson<Partial<MissionOrchestrationEvent<TPayload>>>(eventPath);
   if (
     typeof parsed.event_id !== 'string' ||
     typeof parsed.event_type !== 'string' ||
