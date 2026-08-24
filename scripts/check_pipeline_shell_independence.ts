@@ -13,7 +13,7 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync, safeReaddir, safeStat } from '@agent/core';
 
 interface ShellViolation {
   file: string;
@@ -95,7 +95,7 @@ export function scanPipelineShellIndependence(
   const violations: ShellViolation[] = [];
   for (const file of files) {
     if (!safeExistsSync(file)) continue;
-    const data = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as unknown;
+    const data = loadJson<unknown>(file);
     scanValue(file, data, violations);
   }
   return violations;
