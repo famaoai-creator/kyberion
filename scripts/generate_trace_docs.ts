@@ -1,7 +1,6 @@
-import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { TRACE_SPAN_DEFINITIONS } from '@agent/core/trace-schema';
-import { withExecutionContext } from '@agent/core/authority';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const outputPath = pathResolver.rootResolve('docs/developer/TRACE_SCHEMA.md');
 
@@ -44,21 +43,17 @@ function render(): string {
     }
     lines.push('');
   }
-  return `${lines.join('\n')}\n`;
+  return `${lines.join('\n').replace(/\n+$/u, '')}\n`;
 }
 
-const rendered = render();
-if (process.argv.includes('--check')) {
-  const current = String(safeReadFile(outputPath, { encoding: 'utf8' }) || '');
-  if (current !== rendered) {
-    console.error(`[generate:trace-docs] stale: ${outputPath}`);
-    process.exitCode = 1;
-  } else {
-    console.log('[generate:trace-docs] OK');
-  }
-} else {
-  withExecutionContext('ecosystem_architect', () =>
-    safeWriteFile(outputPath, rendered, { mkdir: true, encoding: 'utf8' })
-  );
-  console.log(`[generate:trace-docs] wrote ${outputPath}`);
-}
+export const runGenerateTraceDocs = defineGenerator({
+  id: 'trace-docs',
+  outputs: [outputPath],
+  render: () => [{ path: outputPath, content: render() }],
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_trace_docs.ts') ||
+  isDirectScript(import.meta.url, 'generate_trace_docs.js')
+)
+  void runGenerateTraceDocs();
