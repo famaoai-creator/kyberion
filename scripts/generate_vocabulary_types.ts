@@ -26,10 +26,10 @@
  *   pnpm check:vocabulary-types      — fail if either file has drifted
  */
 
-import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface VocabularyCatalogFile {
   version: string;
@@ -46,9 +46,7 @@ const LOCALES_BEGIN_MARKER = '// GENERATED-LOCALES:BEGIN';
 const LOCALES_END_MARKER = '// GENERATED-LOCALES:END';
 
 function loadCatalog(): VocabularyCatalogFile {
-  return JSON.parse(
-    String(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) || '{}')
-  ) as VocabularyCatalogFile;
+  return readJson<VocabularyCatalogFile>(CATALOG_PATH);
 }
 
 /** Builds the replacement block for locale-normalize.ts's generated locales array. */
@@ -156,40 +154,16 @@ function readIfExists(filePath: string): string | null {
     : null;
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const built = await buildArtifacts();
-  const rootDir = pathResolver.rootDir();
+export const main = defineGenerator({
+  id: 'vocabulary-types',
+  outputs: [LOCALE_NORMALIZE_PATH, VOCABULARY_KEYS_PATH],
+  async render() {
+    const built = await buildArtifacts();
+    return [
+      { path: LOCALE_NORMALIZE_PATH, content: built.localeNormalizeSource },
+      { path: VOCABULARY_KEYS_PATH, content: built.vocabularyKeysSource },
+    ];
+  },
+});
 
-  return withExecutionContext('ecosystem_architect', () => {
-    if (shouldCheck) {
-      const drifted: string[] = [];
-      if (readIfExists(LOCALE_NORMALIZE_PATH) !== built.localeNormalizeSource) {
-        drifted.push(path.relative(rootDir, LOCALE_NORMALIZE_PATH));
-      }
-      if (readIfExists(VOCABULARY_KEYS_PATH) !== built.vocabularyKeysSource) {
-        drifted.push(path.relative(rootDir, VOCABULARY_KEYS_PATH));
-      }
-      if (drifted.length === 0) {
-        console.log('vocabulary types are up to date');
-        return;
-      }
-      console.error('vocabulary type drift detected — run pnpm generate:vocabulary-types');
-      for (const rel of drifted) console.error(`- ${rel} differs`);
-      process.exitCode = 1;
-      return;
-    }
-
-    safeWriteFile(LOCALE_NORMALIZE_PATH, built.localeNormalizeSource);
-    safeWriteFile(VOCABULARY_KEYS_PATH, built.vocabularyKeysSource);
-    console.log(`wrote ${path.relative(rootDir, LOCALE_NORMALIZE_PATH)}`);
-    console.log(`wrote ${path.relative(rootDir, VOCABULARY_KEYS_PATH)}`);
-  });
-}
-
-if (process.argv[1] && /generate_vocabulary_types\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (isDirectScript(import.meta.url, 'generate_vocabulary_types.ts')) void main();
