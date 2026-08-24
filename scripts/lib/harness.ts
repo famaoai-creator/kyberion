@@ -76,16 +76,20 @@ export interface GeneratedFile {
 export function defineGenerator(options: {
   id: string;
   outputs: string[];
+  executionContext?: string;
+  normalize?: (content: string) => string;
   render(context: ScriptContext): GeneratedFile[] | Promise<GeneratedFile[]>;
 }): (argv?: string[]) => Promise<{ changed: string[]; files: GeneratedFile[] } | undefined> {
   return defineScript({
     name: `generate:${options.id}`,
     async run(context) {
       const files = await options.render(context);
+      const normalize = options.normalize ?? ((content: string) => content);
       const changed = files
-        .filter(
-          (file) => !safeExistsSync(file.path) || String(safeReadFile(file.path)) !== file.content
-        )
+        .filter((file) => {
+          if (!safeExistsSync(file.path)) return true;
+          return normalize(String(safeReadFile(file.path))) !== normalize(file.content);
+        })
         .map((file) => file.path);
       const unexpected = files
         .map((file) => file.path)
@@ -93,7 +97,7 @@ export function defineGenerator(options: {
       if (unexpected.length > 0)
         throw new Error(`generator emitted undeclared outputs: ${unexpected.join(', ')}`);
       if (!context.check && !context.dryRun) {
-        withExecutionContext('ecosystem_architect', () => {
+        withExecutionContext(options.executionContext ?? 'ecosystem_architect', () => {
           for (const file of files) safeWriteFile(file.path, file.content);
         });
       }

@@ -1,7 +1,8 @@
 /** DH-07: generate the declaration/provider/consumer seam graph. */
 import { loadCoreSeamBindings } from './bindings.js';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface SeamRoleEntry {
   declaration: string;
@@ -110,8 +111,9 @@ function validateRoles(bindings: ReturnType<typeof loadCoreSeamBindings>): strin
       findings.push(`${binding.key}: no declaration/consumer role entry`);
       continue;
     }
-    if (!source(role.declaration).includes('defineSeam')) {
-      findings.push(`${binding.key}: declaration has no defineSeam call (${role.declaration})`);
+    const declarationSource = source(role.declaration);
+    if (!declarationSource.includes('createSeam') && !declarationSource.includes('defineSeam')) {
+      findings.push(`${binding.key}: declaration has no createSeam call (${role.declaration})`);
     }
     if (role.consumers.length === 0) findings.push(`${binding.key}: consumer list is empty`);
     for (const consumer of role.consumers) {
@@ -215,26 +217,22 @@ function normalizeGeneratedDocument(document: string): string {
     .join('\n');
 }
 
-const bindings = loadCoreSeamBindings();
-const findings = validateRoles(bindings);
-if (findings.length > 0) {
-  console.error('[generate:capability-seams] FAILED');
-  for (const finding of findings) console.error(`- ${finding}`);
-  process.exitCode = 1;
-} else {
-  const generated = render(bindings);
-  if (process.argv.includes('--check')) {
-    const existing = safeExistsSync(OUTPUT_PATH)
-      ? normalizeGeneratedDocument(String(safeReadFile(OUTPUT_PATH, { encoding: 'utf8' })))
-      : '';
-    if (!safeExistsSync(OUTPUT_PATH) || existing !== normalizeGeneratedDocument(generated)) {
-      console.error('[generate:capability-seams] FAILED: generated document is stale');
-      process.exitCode = 1;
-    } else {
-      console.log('[generate:capability-seams] OK');
+export const main = defineGenerator({
+  id: 'capability-seams',
+  outputs: [OUTPUT_PATH],
+  normalize: normalizeGeneratedDocument,
+  render() {
+    const bindings = loadCoreSeamBindings();
+    const findings = validateRoles(bindings);
+    if (findings.length > 0) {
+      throw new Error(`FAILED\n${findings.map((finding) => `- ${finding}`).join('\n')}`);
     }
-  } else {
-    safeWriteFile(OUTPUT_PATH, generated);
-    console.log(`[generate:capability-seams] wrote ${bindings.length} seams`);
-  }
-}
+    return [{ path: OUTPUT_PATH, content: render(bindings) }];
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_capability_seams.ts') ||
+  isDirectScript(import.meta.url, 'generate_capability_seams.js')
+)
+  void main();

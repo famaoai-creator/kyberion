@@ -1,4 +1,5 @@
 import { loadJson, pathResolver, safeExistsSync } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface CliEntrypoint {
   id: string;
@@ -89,15 +90,20 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
   return failures;
 }
 
-export function main(): void {
-  const failures = checkCliManifest();
-  if (failures.length > 0) {
-    console.error('[check:cli-manifest] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log('[check:cli-manifest] OK');
-}
+export const runCheckCliManifest = defineScript({
+  name: 'check:cli-manifest',
+  flags: [],
+  run(context): void {
+    const failures = checkCliManifest();
+    if (failures.length > 0) {
+      throw new Error(failures.join('; '));
+    }
+    context.print('[check:cli-manifest] OK');
+  },
+});
 
-if (process.argv[1]?.endsWith('check_cli_manifest.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_cli_manifest.ts') ||
+  isDirectScript(import.meta.url, 'check_cli_manifest.js')
+)
+  void runCheckCliManifest();

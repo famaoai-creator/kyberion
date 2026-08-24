@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { parseScriptFlags } from './harness.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver, safeRmSync, safeWriteFile } from '@agent/core';
+import { defineGenerator, parseScriptFlags } from './harness.js';
+
+const NORMALIZED_OUTPUT = pathResolver.sharedTmp('harness-test/generator-output.txt');
 
 describe('script harness', () => {
   it('normalizes shared flags without consuming positional arguments', () => {
@@ -20,5 +23,25 @@ describe('script harness', () => {
       quiet: false,
       positional: ['--json'],
     });
+  });
+
+  afterEach(() => {
+    safeRmSync(NORMALIZED_OUTPUT, { force: true });
+  });
+
+  it('supports generator-specific comparison normalization', async () => {
+    safeWriteFile(NORMALIZED_OUTPUT, 'generated value');
+    const main = defineGenerator({
+      id: 'harness-test',
+      outputs: [NORMALIZED_OUTPUT],
+      normalize: (content) => content.replaceAll(' ', ''),
+      render: () => [{ path: NORMALIZED_OUTPUT, content: 'generatedvalue' }],
+    });
+
+    process.exitCode = undefined;
+    const result = await main(['--check']);
+
+    expect(result?.changed).toEqual([]);
+    expect(process.exitCode).toBeUndefined();
   });
 });

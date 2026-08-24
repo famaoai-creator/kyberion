@@ -283,7 +283,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
-> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` が **0 occurrences**、空白を許容する同パターンが **71 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **368 occurrences / 202 files**、`defineCatalog` が **31 core implementations**、import boundary は **183 cycles / 114 direction violations** となった。JSON 読込と env 読み取りの移行は進行中で Ajv生成器の集約は完了したが、旧 JSON 読込・env codemod・catalog統合・cycle削減は未完のため、SX-03/04は引き続き PARTIAL とする。
+> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` が **0 occurrences**、空白を許容する同パターンが **71 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **368 occurrences / 202 files**、`defineCatalog` が **31 core implementations**、import boundary は **182 cycles / 114 direction violations** となった。JSON 読込と env 読み取りの移行は進行中で Ajv生成器の集約は完了したが、旧 JSON 読込・env codemod・catalog統合・cycle削減は未完のため、SX-03/04は引き続き PARTIAL とする。
 
 | 指標                                      | 現状  | 目標   | 担当     |
 | ----------------------------------------- | ----- | ------ | -------- |
