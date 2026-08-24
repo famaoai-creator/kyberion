@@ -327,7 +327,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | SX-01 | IMPLEMENTED | `check:first-win-docs` と 3 文書の機械検証を追加。clean-clone の実行証跡は未完。                                                       |
 | SX-02 | BASELINED   | 4 層宣言、cycle/方向チェッカー、baseline ratchet を追加。既存違反は baseline 内。                                                      |
 | SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し主要 helper の一部を移行。全 codemod は未完。                                            |
-| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio policy を移行。全 catalog/schema 統合は未完。                                                     |
+| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio policy 5系統中4系統を移行。全 catalog/schema 統合と boundary policy 移行は未完。                  |
 | SX-05 | PARTIAL     | command registry と `bin`/`pnpm kyberion` の単一入口を追加。doctor/alias/script 削減は未完。                                           |
 | SX-06 | PARTIAL     | `defineScript`/`defineGenerator` と harness test を追加。既存 script 全移行は未完。                                                    |
 | SX-07 | PARTIAL     | manifest-driven `pnpm check` と PR workflow gate を追加。全 validate 集合統合は未完。                                                  |
