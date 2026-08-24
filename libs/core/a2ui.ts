@@ -199,9 +199,13 @@ function createBridgeTransport(
   return (message: A2UIMessage) => {
     for (const target of targets) {
       const payload = redactSensitiveObject(message);
+      const localadminToken = String(process.env.KYBERION_LOCALADMIN_TOKEN || '').trim();
       fetch(`${target}/a2ui/dispatch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localadminToken ? { Authorization: `Bearer ${localadminToken}` } : {}),
+        },
         body: JSON.stringify(payload),
       }).catch((err) => {
         logger.warn(`[A2UI_BRIDGE] Failed to relay to bridge ${target}: ${err.message}`);
