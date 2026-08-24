@@ -69,6 +69,7 @@ import {
   listSurfaceNotificationsAcrossChannels,
   listSurfaceAgentCatalog,
   logger,
+  loadJson,
   pathResolver,
   resolveWorkDesign,
   safeAppendFileSync,
@@ -1195,12 +1196,8 @@ app.get('/api/identity', (_req, res) => {
     const agentPath = path.join(personalDir, 'agent-identity.json');
     const visionPath = path.join(personalDir, 'my-vision.md');
     const result = withExecutionContext('ecosystem_architect', () => {
-      const sovereign = safeExistsSync(idPath)
-        ? JSON.parse(safeReadFile(idPath, { encoding: 'utf8' }) as string)
-        : null;
-      const agent = safeExistsSync(agentPath)
-        ? JSON.parse(safeReadFile(agentPath, { encoding: 'utf8' }) as string)
-        : null;
+      const sovereign = safeExistsSync(idPath) ? loadJson<unknown>(idPath) : null;
+      const agent = safeExistsSync(agentPath) ? loadJson<unknown>(agentPath) : null;
       const visionRaw = safeExistsSync(visionPath)
         ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
         : null;
