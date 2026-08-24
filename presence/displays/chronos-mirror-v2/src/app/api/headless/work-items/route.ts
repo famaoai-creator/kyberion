@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
-import { headlessEnvelope, headlessErrorResponse } from '../../../../lib/headless-response';
+import {
+  authorizeHeadlessOperation,
+  headlessEnvelope,
+  headlessErrorResponse,
+} from '../../../../lib/headless-response';
 import { readHeadlessWorkItems } from '../../../../lib/headless-projections';
 import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
 
@@ -15,6 +19,11 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
+    authorizeHeadlessOperation(resolvedViewer.context, 'chronos.work_items.read', {
+      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
+      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
+      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+    });
     const projection = readHeadlessWorkItems(resolvedViewer.context, {
       tenant: req.nextUrl.searchParams.get('tenant') || undefined,
       organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,

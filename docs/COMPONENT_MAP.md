@@ -197,7 +197,7 @@ Chronos access modes:
 - `localadmin`
   - operator mode for deterministic mission/runtime/surface control actions
 
-Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Client-supplied `tenant` parameters can only narrow the viewer's allowed set. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`; see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback.
+Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`; see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
 
 Local Chronos boot:
 
