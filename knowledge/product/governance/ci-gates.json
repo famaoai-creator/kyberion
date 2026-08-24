@@ -72,6 +72,14 @@
       "args": ["dist/scripts/check_catalog_integrity.js"],
       "owner": "governance",
       "rationale": "Ensures governed catalogs remain internally consistent."
+    },
+    {
+      "id": "production-evidence-complete",
+      "scope": "release",
+      "executable": "node",
+      "args": ["dist/scripts/check_production_evidence.js", "--require-complete"],
+      "owner": "release",
+      "rationale": "Prevents release promotion until external production evidence is complete."
     }
   ]
 }
