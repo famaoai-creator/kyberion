@@ -107,6 +107,7 @@ import * as path from 'node:path';
 import {
   safeExec,
   safeExistsSync,
+  loadJson,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -4432,7 +4433,7 @@ function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | 
   const statePath = `${missionPath}/mission-state.json`;
   if (!safeExistsSync(statePath)) return null;
   try {
-    const parsed = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(statePath);
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
@@ -4447,9 +4448,7 @@ function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = JSON.parse(
-          safeReadFile(`${gateDir}/${entry}`, { encoding: 'utf8' }) as string
-        );
+        const parsed = loadJson<unknown>(`${gateDir}/${entry}`);
         return parsed && typeof parsed === 'object' ? (parsed as MissionGateRecord) : null;
       } catch {
         return null;
@@ -4541,7 +4540,7 @@ function enrichGateWithTaskOutcomes(
   const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
   let tasks: Array<Record<string, unknown>> = [];
   try {
-    const parsed = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(nextTasksPath);
     if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
   } catch {
     /* no task board — checks keep their declared params */
@@ -4705,7 +4704,7 @@ function syncPlanningArtifacts(missionId: string): void {
     });
   }
 
-  const nextTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+  const nextTasks = loadJson<unknown>(nextTasksPath);
   ledger.record('MISSION_PLAN_READY', {
     mission_id: missionId,
     role: 'planner',
@@ -4848,7 +4847,7 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
 function readProcessTemplateSeededTasks(nextTasksPath: string): Array<Record<string, unknown>> {
   if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    const parsed = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(nextTasksPath);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (task): task is Record<string, unknown> =>
@@ -4870,7 +4869,7 @@ function loadAllNextTasks(missionId: string): PlannedNextTask[] {
   const missionPath = missionDir(missionId, 'public');
   const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
-  const tasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as unknown;
+  const tasks = loadJson<unknown>(nextTasksPath);
   return validatePlannedNextTasks(tasks, missionId);
 }
 
@@ -4878,10 +4877,7 @@ function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
   const missionPath = missionDir(missionId, 'public');
   const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
   const existingTasks = safeExistsSync(nextTasksPath)
-    ? validatePlannedNextTasks(
-        JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as unknown,
-        missionId
-      )
+    ? validatePlannedNextTasks(loadJson<unknown>(nextTasksPath), missionId)
     : [];
   const existingById = new Map(existingTasks.map((task) => [task.task_id, task]));
   const mergedTasks = tasks.map((task) => {
@@ -5745,9 +5741,9 @@ function renderProcessTemplateSkeleton(missionId: string): string {
   if (!safeExistsSync(statePath)) return '';
   let processTemplate: { workflow_id?: string; phases?: string[] } | undefined;
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       process_template?: { workflow_id?: string; phases?: string[] };
-    };
+    }>(statePath);
     processTemplate = state.process_template;
   } catch {
     return '';
