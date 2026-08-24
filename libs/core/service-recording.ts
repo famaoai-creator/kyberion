@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
@@ -65,7 +65,7 @@ export interface ServiceRecording {
 let validator: ValidateFunction | null = null;
 function getValidator(): ValidateFunction {
   if (!validator) {
-    validator = ajv.compile(JSON.parse(safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string));
+    validator = ajv.compile(loadJson<Record<string, unknown>>(SCHEMA_PATH));
   }
   return validator;
 }

@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import { listKnownActuatorOps } from './actuator-op-registry.js';
 
 export interface ObservationOpMapping {
@@ -16,7 +16,7 @@ interface MappingFile {
 
 function load(): MappingFile {
   const path = pathResolver.knowledge('product/orchestration/observation-to-op-map.json');
-  return JSON.parse(safeReadFile(path, { encoding: 'utf8' }) as string) as MappingFile;
+  return loadJson<MappingFile>(path);
 }
 
 function splitOp(op: string): { domain: string; action: string } {

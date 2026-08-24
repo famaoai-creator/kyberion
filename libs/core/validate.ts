@@ -8,7 +8,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const schemasDir: string = path.resolve(currentDir, '../../schemas');
@@ -17,7 +17,7 @@ const schemaCache: Record<string, JsonSchema> = {};
 export function loadSchema(schemaName: string): JsonSchema {
   if (schemaCache[schemaName]) return schemaCache[schemaName];
   const filePath = path.join(schemasDir, `${schemaName}.schema.json`);
-  const schema: JsonSchema = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const schema = loadJson<JsonSchema>(filePath);
   schemaCache[schemaName] = schema;
   return schema;
 }
@@ -36,10 +36,13 @@ export function validate(data: Record<string, unknown>, schemaName: string): Val
 
   if (schema.anyOf) {
     const anyOfSatisfied = schema.anyOf.some((candidate) =>
-      (candidate.required || []).every((field) => data[field] !== undefined && data[field] !== null),
+      (candidate.required || []).every((field) => data[field] !== undefined && data[field] !== null)
     );
     if (!anyOfSatisfied) {
-      errors.push({ field: 'anyOf', message: 'At least one alternative required field set must be provided' });
+      errors.push({
+        field: 'anyOf',
+        message: 'At least one alternative required field set must be provided',
+      });
     }
   }
 

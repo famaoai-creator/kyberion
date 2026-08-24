@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 
@@ -15,11 +15,7 @@ const POLICY_PATH = pathResolver.knowledge(
 );
 
 export type ContextualClarificationExecutionShape =
-  | 'direct_reply'
-  | 'task_session'
-  | 'pipeline'
-  | 'mission'
-  | 'project_bootstrap';
+  'direct_reply' | 'task_session' | 'pipeline' | 'mission' | 'project_bootstrap';
 
 export interface ContextualIntentClarificationPolicyRule {
   id?: string;
@@ -68,7 +64,7 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 function loadPolicyFile(): ContextualIntentClarificationPolicyFile {
-  const value = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string) as ContextualIntentClarificationPolicyFile;
+  const value = loadJson<ContextualIntentClarificationPolicyFile>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])
@@ -88,7 +84,9 @@ function matchesRule(
   rule: ContextualIntentClarificationPolicyRule
 ): boolean {
   const intentMatch = !rule.intent_id || rule.intent_id === input.intentId;
-  const shapeMatch = !rule.shapes?.length || (input.executionShape ? rule.shapes.includes(input.executionShape) : false);
+  const shapeMatch =
+    !rule.shapes?.length ||
+    (input.executionShape ? rule.shapes.includes(input.executionShape) : false);
   return intentMatch && shapeMatch;
 }
 
@@ -101,12 +99,15 @@ export function assessContextualClarification(
   input: ContextualClarificationInput
 ): ContextualClarificationDecision {
   const policy = loadPolicyFile();
-  const missingInputs = Array.from(new Set(input.requiredInputs.map((value) => value.trim()).filter(Boolean)));
+  const missingInputs = Array.from(
+    new Set(input.requiredInputs.map((value) => value.trim()).filter(Boolean))
+  );
   const matchedRule = policy.intent_rules.find((rule) => matchesRule(input, rule));
   const maxMissing =
     matchedRule?.max_missing_inputs_without_clarification ??
     policy.defaults.max_missing_inputs_without_clarification;
-  const minConfidence = matchedRule?.min_confidence_to_skip ?? policy.defaults.min_confidence_to_skip;
+  const minConfidence =
+    matchedRule?.min_confidence_to_skip ?? policy.defaults.min_confidence_to_skip;
   const alwaysAskFor = toSet([
     ...policy.defaults.always_ask_for,
     ...(matchedRule?.always_ask_for || []),
@@ -118,7 +119,8 @@ export function assessContextualClarification(
   if (forceClarification) {
     return {
       shouldClarify: true,
-      reason: matchedRule?.rationale || 'The request matches a force-clarification ambiguity pattern.',
+      reason:
+        matchedRule?.rationale || 'The request matches a force-clarification ambiguity pattern.',
       matchedRule,
       missingInputs,
     };

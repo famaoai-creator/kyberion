@@ -1,4 +1,10 @@
-import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
+import {
+  loadJson,
+  safeReadFile,
+  safeAppendFileSync,
+  safeMkdir,
+  safeExistsSync,
+} from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
@@ -95,7 +101,11 @@ function isCostTier(value: any): value is CostTier {
 function readCostRegistry(filePath: string): ModelCostRegistry | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<{
+      models?: Record<string, unknown>;
+      aliases?: Record<string, string>;
+      default?: unknown;
+    }>(filePath);
     if (parsed && typeof parsed.models === 'object' && isCostEntry(parsed.default)) {
       const models: Record<string, ModelCostEntry> = {};
       for (const [id, rate] of Object.entries(parsed.models)) {
@@ -513,9 +523,15 @@ export class MetricsCollector {
       pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
     ];
     const sloPath = sloPathCandidates.find((candidate) => safeExistsSync(candidate));
-    const sloTargets = sloPath
-      ? JSON.parse(safeReadFile(sloPath, { encoding: 'utf8' }) as string)
-      : { default: { latency_ms: 5000, success_rate: 99 } };
+    const sloTargets: {
+      critical_path?: Record<string, { latency_ms: number }>;
+      default: { latency_ms: number };
+    } = sloPath
+      ? loadJson<{
+          critical_path?: Record<string, { latency_ms: number }>;
+          default: { latency_ms: number };
+        }>(sloPath)
+      : { default: { latency_ms: 5000 } };
 
     for (const entry of entries) {
       const componentName = entry.component || entry.skill || entry.capability;

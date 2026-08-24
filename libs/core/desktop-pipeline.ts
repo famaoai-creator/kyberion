@@ -3,7 +3,7 @@ import * as addFormatsModule from 'ajv-formats';
 import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
@@ -87,7 +87,7 @@ export function loadDesktopPipeline(
     };
   }
   try {
-    const raw = JSON.parse(safeReadFile(absolute, { encoding: 'utf8' }) as string);
+    const raw = loadJson<unknown>(absolute);
     return validateDesktopPipeline(raw);
   } catch (error) {
     return {

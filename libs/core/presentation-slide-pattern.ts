@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson, safeReadFile } from './secure-io.js';
 
 export interface SlidePatternSlot {
   slot_id: string;
@@ -109,7 +109,9 @@ const ROADMAP_PATTERN_IDS = new Set(['four-step-flow', 'milestone-timeline']);
 let cachedPack: SlidePatternPack | null = null;
 
 function normalize(value?: string | null): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 function isGenericLayoutKey(layoutKey?: string | null): boolean {
@@ -117,7 +119,7 @@ function isGenericLayoutKey(layoutKey?: string | null): boolean {
 }
 
 function loadPackFromPath(packPath: string): SlidePatternPack {
-  return JSON.parse(safeReadFile(packPath, { encoding: 'utf8' }) as string) as SlidePatternPack;
+  return loadJson<SlidePatternPack>(packPath);
 }
 
 export function resetSlidePatternPackCache(): void {
@@ -134,7 +136,7 @@ export function loadSlidePatternPack(packPath?: string): SlidePatternPack {
 
 function scorePattern(
   pattern: SlidePatternDefinition,
-  input: SelectSlidePatternInput,
+  input: SelectSlidePatternInput
 ): { score: number; reason: string; genericLayout: boolean } {
   const deckPurpose = normalize(input.deckPurpose);
   const semanticType = normalize(input.semanticType);
@@ -176,7 +178,7 @@ function scorePattern(
 function patternToSelection(
   pattern: SlidePatternDefinition,
   pack: SlidePatternPack,
-  reason: string,
+  reason: string
 ): SlidePatternSelection {
   return {
     pattern_id: pattern.pattern_id,
@@ -216,10 +218,11 @@ export function selectSlidePattern(input: SelectSlidePatternInput): SlidePattern
   const scored = patterns
     .map((pattern) => ({ pattern, ...scorePattern(pattern, input) }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) =>
-      b.score - a.score ||
-      Number(a.genericLayout) - Number(b.genericLayout) ||
-      a.pattern.pattern_id.localeCompare(b.pattern.pattern_id)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        Number(a.genericLayout) - Number(b.genericLayout) ||
+        a.pattern.pattern_id.localeCompare(b.pattern.pattern_id)
     );
   if (scored[0]) return patternToSelection(scored[0].pattern, pack, scored[0].reason);
 
@@ -260,14 +263,14 @@ function extractSlidePatternContent(slide: Record<string, unknown>): Record<stri
 function appendDiagnostic(
   diagnostics: SlidePatternDiagnostic[],
   diagnostic: SlidePatternDiagnostic,
-  limit = 8,
+  limit = 8
 ): void {
   if (diagnostics.length >= limit) return;
   diagnostics.push(diagnostic);
 }
 
 export function buildSlidePatternDiagnostics(
-  slides: Array<Record<string, unknown>>,
+  slides: Array<Record<string, unknown>>
 ): SlidePatternDiagnostic[] {
   const diagnostics: SlidePatternDiagnostic[] = [];
   const list = Array.isArray(slides) ? slides : [];
@@ -337,7 +340,7 @@ export function buildSlidePatternDiagnostics(
 
 export function applySlidePatternToSection(
   section: Record<string, unknown>,
-  input: SelectSlidePatternInput = {},
+  input: SelectSlidePatternInput = {}
 ): Record<string, unknown> {
   const selection = selectSlidePattern({
     ...input,
@@ -357,12 +360,16 @@ export function applySlidePatternToSection(
 
 export function validateSlidePatternContent(
   selection: SlidePatternSelection,
-  content: Record<string, unknown>,
+  content: Record<string, unknown>
 ): string[] {
   const warnings: string[] = [];
   for (const slot of selection.element_slots) {
     const value = content[slot.slot_id];
-    const values = Array.isArray(value) ? value.map(String).filter(Boolean) : value ? [String(value)] : [];
+    const values = Array.isArray(value)
+      ? value.map(String).filter(Boolean)
+      : value
+        ? [String(value)]
+        : [];
     if (slot.required && values.length === 0) {
       warnings.push(`${slot.slot_id} is required for ${selection.pattern_id}.`);
     }
@@ -382,7 +389,11 @@ export function validateSlidePatternContent(
     }
   }
   for (const constraint of selection.constraints) {
-    if (constraint.kind !== 'paired_item_counts_match' || !constraint.slots || constraint.slots.length < 2) {
+    if (
+      constraint.kind !== 'paired_item_counts_match' ||
+      !constraint.slots ||
+      constraint.slots.length < 2
+    ) {
       continue;
     }
     const counts = constraint.slots.map((slot) => {

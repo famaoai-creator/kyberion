@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -629,10 +630,7 @@ async function performReconcile(input: CodeAction) {
     input.strategy_path || 'knowledge/product/governance/code-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await retry(
-    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
-    buildRetryOptions()
-  );
+  const config = await retry(async () => loadJson<unknown>(strategyPath), buildRetryOptions());
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

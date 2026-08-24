@@ -27,6 +27,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeWriteFile,
   safeMkdir,
@@ -96,7 +97,7 @@ function loadSyncState(scope?: ScopeContext): SyncState {
     return { ingested: {}, supplied: {}, last_sync_at: '' };
   }
   try {
-    return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as SyncState;
+    return loadJson<SyncState>(resolved);
   } catch {
     return { ingested: {}, supplied: {}, last_sync_at: '' };
   }
@@ -142,7 +143,7 @@ interface SyncPolicy {
 function loadPolicy(): SyncPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
   try {
-    return JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string) as SyncPolicy;
+    return loadJson<SyncPolicy>(POLICY_PATH);
   } catch {
     return null;
   }
