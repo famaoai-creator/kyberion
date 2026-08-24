@@ -1,12 +1,8 @@
-import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 
-const ajv = createAjv();
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-clarification-policy.schema.json'
 );
@@ -55,24 +51,14 @@ export interface ContextualClarificationInput {
   contextualFrame?: ContextualIntentFrame;
 }
 
-let policyValidateFn: ValidateFunction | null = null;
-
-function ensurePolicyValidator(): ValidateFunction {
-  if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
-  return policyValidateFn;
-}
+const policyCatalog = defineCatalog<ContextualIntentClarificationPolicyFile>({
+  id: 'contextual-intent-clarification-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
 
 function loadPolicyFile(): ContextualIntentClarificationPolicyFile {
-  const value = loadJson<ContextualIntentClarificationPolicyFile>(POLICY_PATH);
-  const validate = ensurePolicyValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid contextual-intent-clarification-policy: ${errors}`);
-  }
-  return value;
+  return policyCatalog.load();
 }
 
 function toSet(values: string[] | undefined): Set<string> {
