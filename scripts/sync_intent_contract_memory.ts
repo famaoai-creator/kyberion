@@ -1,4 +1,3 @@
-import * as AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
   isValidTenantSlug,
@@ -9,10 +8,10 @@ import {
   safeExistsSync,
   safeWriteFile,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { readJsonFile } from './refactor/cli-input.js';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 
 const MEMORY_SCHEMA_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH ||

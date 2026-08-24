@@ -25,12 +25,8 @@
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadJson, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
-import * as AjvModule from 'ajv';
+import { createAjv } from '@agent/core/foundation';
 import * as path from 'node:path';
-
-const AjvCtor = ((AjvModule as { default?: unknown }).default ?? AjvModule) as new (
-  opts?: Record<string, unknown>
-) => { compile: (schema: unknown) => (data: unknown) => boolean & { errors?: unknown } };
 
 const CATALOG_REL = 'knowledge/product/governance/mission-workflow-catalog.json';
 const INTENTS_REL = 'knowledge/product/governance/standard-intents.json';
@@ -119,7 +115,7 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
 
 function validateRequest(req: unknown): void {
   const schema = loadJson<unknown>(abs(SCHEMA_REL));
-  const ajv = new AjvCtor({ allErrors: true, strict: false });
+  const ajv = createAjv({ strict: false });
   const validate = ajv.compile(schema);
   const ok = validate(req);
   if (!ok) {

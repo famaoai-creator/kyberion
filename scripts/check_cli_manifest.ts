@@ -1,4 +1,4 @@
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { loadJson, pathResolver, safeExistsSync } from '@agent/core';
 
 export interface CliEntrypoint {
   id: string;
@@ -12,13 +12,7 @@ export interface CliManifest {
 }
 
 export function loadCliManifest(): CliManifest {
-  return JSON.parse(
-    String(
-      safeReadFile(pathResolver.knowledge('product/governance/cli-commands.json'), {
-        encoding: 'utf8',
-      })
-    )
-  ) as CliManifest;
+  return loadJson<CliManifest>(pathResolver.knowledge('product/governance/cli-commands.json'));
 }
 
 export function checkCliManifest(manifest = loadCliManifest()): string[] {

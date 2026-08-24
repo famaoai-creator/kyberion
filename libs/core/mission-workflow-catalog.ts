@@ -1,5 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import type {
@@ -110,8 +110,6 @@ type WorkflowCatalogFile = {
   templates: WorkflowTemplate[];
 };
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-workflow-catalog.schema.json'
 );
@@ -123,7 +121,7 @@ let workflowCatalogValidateFn: ValidateFunction | null = null;
 
 function ensureWorkflowCatalogValidator(): ValidateFunction {
   if (workflowCatalogValidateFn) return workflowCatalogValidateFn;
-  workflowCatalogValidateFn = compileSchemaFromPath(ajv, WORKFLOW_CATALOG_SCHEMA_PATH);
+  workflowCatalogValidateFn = compileSchema(WORKFLOW_CATALOG_SCHEMA_PATH);
   return workflowCatalogValidateFn;
 }
 

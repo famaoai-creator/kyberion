@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -21,6 +20,7 @@ import {
   resolveOperatorLocale,
   isValidTenantSlug,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -34,7 +34,6 @@ import {
   readPersistedPersona,
 } from './reasoning_backend_selection.js';
 
-const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
@@ -427,7 +426,7 @@ export async function main() {
     return;
   }
 
-  const ajv = new AjvCtor({ allErrors: true });
+  const ajv = createAjv();
   addFormats(ajv);
   const validateState = compileSchemaFromPath(
     ajv,

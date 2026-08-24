@@ -118,7 +118,9 @@ export const doctor = {
     );
     if (safeExistsSync(inventoryPath)) {
       try {
-        const inventory = loadJson<{ systems?: Record<string, unknown> }>(inventoryPath);
+        const inventory = loadJson<{
+          systems?: Record<string, { projects?: Record<string, unknown> }>;
+        }>(inventoryPath);
         const systems = Object.keys(inventory.systems || {});
         if (systems.length > 0) {
           console.log(`✅ Known Systems: ${systems.join(', ')}`);

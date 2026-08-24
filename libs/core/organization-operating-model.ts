@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
@@ -12,6 +12,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { createAjv } from './foundation/ajv.js';
 import {
   safeExistsSync,
   loadJson,
@@ -22,9 +23,8 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 
 export type OrganizationTier = 'personal' | 'confidential' | 'public';

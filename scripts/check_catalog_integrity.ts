@@ -1,4 +1,3 @@
-import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import * as path from 'node:path';
 import {
@@ -12,6 +11,7 @@ import {
   safeReaddir,
   safeStat,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { readJsonFile } from './refactor/cli-input.js';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
@@ -22,8 +22,7 @@ import {
   renderKyberionTailwindColorsBlock,
 } from './design-token-utils.js';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 addFormats(ajv);
 
