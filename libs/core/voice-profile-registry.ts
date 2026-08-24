@@ -12,13 +12,6 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
-import { getRegisteredEnv } from './env-validator.js';
-
-function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
-}
 
 export interface VoiceProfileRecord {
   profile_id: string;
@@ -154,30 +147,30 @@ function writeRegistryDirectory(dirPath: string, registry: VoiceProfileRegistry)
 }
 
 function getRegistryPath(): string {
-  return kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
+  return process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
 }
 
 function getRegistryDir(): string {
-  return kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
+  return process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR?.trim() || DEFAULT_REGISTRY_DIR;
 }
 
 function getPersonalOverlayPath(): string | null {
-  if (kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) return null;
+  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) return null;
   const configured =
-    kyberionEnv('KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH;
   return safeExistsSync(configured) ? configured : null;
 }
 
 function getCustomerOverlayPath(): string | null {
-  if (kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) return null;
+  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) return null;
   const configured = customerResolver.customerRoot(DEFAULT_CUSTOMER_OVERLAY_PATH);
   return configured && safeExistsSync(configured) ? configured : null;
 }
 
 export function getPersonalVoiceProfileRegistryPath(): string {
   return (
-    kyberionEnv('KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH
   );
 }
@@ -222,7 +215,7 @@ function readRegistryFileIfPresent(
 function loadBaseVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
   const useCanonicalDirectory =
-    !kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
+    !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() ||
     registryPath === DEFAULT_REGISTRY_PATH;
   const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
 
@@ -254,7 +247,7 @@ export function getWritableVoiceProfileRegistryForTier(tier: VoiceProfileRecord[
   registry: VoiceProfileRegistry;
   registryPath: string;
 } {
-  if (tier === 'personal' && !kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) {
+  if (tier === 'personal' && !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) {
     const registryPath = getPersonalVoiceProfileRegistryPath();
     return {
       registry:
@@ -317,7 +310,7 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   const customerOverlayPath = getCustomerOverlayPath();
   const overlayPath = getPersonalOverlayPath();
   const useCanonicalDirectory =
-    !kyberionEnv('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim() ||
+    !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() ||
     registryPath === DEFAULT_REGISTRY_PATH;
   const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
   const cacheKey = [registryPath, registryDir, customerOverlayPath, overlayPath]

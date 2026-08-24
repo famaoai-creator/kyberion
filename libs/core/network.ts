@@ -11,13 +11,6 @@ import {
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
-import { getRegisteredEnv } from './env-validator.js';
-
-function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
-}
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -136,13 +129,13 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   const egressDecision = evaluateEgressPolicy(url, egressContext);
   if (egressDecision.verdict === 'deny') {
     recordGovernanceAction(
-      kyberionEnv('KYBERION_PERSONA') || 'unknown',
+      process.env.KYBERION_PERSONA || 'unknown',
       'egress',
       `${hostname}:denied`,
       true
     );
     auditChain.record({
-      agentId: kyberionEnv('KYBERION_PERSONA') || 'unknown',
+      agentId: process.env.KYBERION_PERSONA || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'failed',
@@ -169,7 +162,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   if (egressDecision.verdict === 'warn') {
     logger.warn(`[NETWORK_POLICY] ${egressDecision.reason}`);
     recordGovernanceAction(
-      kyberionEnv('KYBERION_PERSONA') || 'unknown',
+      process.env.KYBERION_PERSONA || 'unknown',
       'egress',
       `${hostname}:warn`,
       false
@@ -179,7 +172,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
     // produced no durable evidence for the warn→enforce decision. Mirror
     // the deny path into the audit chain (pnpm egress:report aggregates it).
     auditChain.record({
-      agentId: kyberionEnv('KYBERION_PERSONA') || 'unknown',
+      agentId: process.env.KYBERION_PERSONA || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'allowed',
@@ -213,7 +206,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
       headers: finalHeaders,
     });
     auditChain.record({
-      agentId: kyberionEnv('KYBERION_PERSONA') || 'unknown',
+      agentId: process.env.KYBERION_PERSONA || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'completed',
