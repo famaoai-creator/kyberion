@@ -28,6 +28,7 @@ vi.mock('./secure-io.js', () => ({
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;
   },
+  loadJson: <T>(p: string) => JSON.parse(files.get(p) || '{}') as T,
   safeWriteFile: (p: string, data: string) => {
     files.set(p, data);
   },

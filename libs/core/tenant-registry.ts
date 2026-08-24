@@ -6,6 +6,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
+  loadJson,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -291,7 +292,7 @@ export function tenantGroupPath(groupId: string): string {
 export function ensureDefaultTenantProfile(): TenantProfile {
   const file = tenantProfilePath('default');
   if (safeExistsSync(file)) {
-    return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as TenantProfile;
+    return loadJson<TenantProfile>(file);
   }
 
   const now = new Date().toISOString();

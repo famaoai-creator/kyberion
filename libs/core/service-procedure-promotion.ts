@@ -2,7 +2,7 @@ import path from 'node:path';
 import { compileServiceRecording } from './service-recording-compiler.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { validatePipelineAdf, type PipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validateServiceRecording } from './service-recording.js';
@@ -45,7 +45,7 @@ export function promoteServiceProcedure(
 
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  const raw = JSON.parse(safeReadFile(recordingAbs, { encoding: 'utf8' }) as string) as unknown;
+  const raw = loadJson<unknown>(recordingAbs);
   const validation = validateServiceRecording(raw);
   if (!validation.value) {
     throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);

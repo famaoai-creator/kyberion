@@ -2,7 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -227,9 +227,7 @@ function validateStore(store: unknown): ExecutionFeedbackStore {
 function loadStoreFromDisk(): ExecutionFeedbackStore {
   if (!safeExistsSync(FEEDBACK_STORE_PATH)) return defaultStore();
   try {
-    return validateStore(
-      JSON.parse(safeReadFile(FEEDBACK_STORE_PATH, { encoding: 'utf8' }) as string)
-    );
+    return validateStore(loadJson(FEEDBACK_STORE_PATH));
   } catch {
     return defaultStore();
   }
