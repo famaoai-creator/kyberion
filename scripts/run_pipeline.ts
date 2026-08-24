@@ -1,5 +1,6 @@
 import {
   attemptAutonomousRepair,
+  validateAndRepairAdf,
   recordGovernanceAction,
   TraceContext,
   finalizeAndPersist,
@@ -574,6 +575,8 @@ interface RunStepsOptions {
   runJournal?: PipelineRunJournalHandle;
   resumeState?: PipelineRunJournalState;
   runId?: string;
+  /** Prevent an invalid flow from re-entering the repair gate indefinitely. */
+  _adfRepairAttempted?: boolean;
 }
 
 function resolvePipelineHumanPresence(): boolean | undefined {
@@ -2931,6 +2934,21 @@ export async function runValidatedSteps(
         execute: (committed) => runSteps(committed, initialCtx, opts),
       })
     ).result;
+  }
+
+  // SX-11 / AGENTS.md: a pipeline with an invalid contract must pass through
+  // the canonical repair agent before execution is abandoned. The one-shot
+  // guard keeps a repair that did not change the ADF from becoming a retry
+  // loop; the refreshed file is validated again through the same lifecycle.
+  if (opts.pipelinePath && !opts._adfRepairAttempted) {
+    const repair = await validateAndRepairAdf(opts.pipelinePath, 'pipeline-adf');
+    if (repair.repaired) {
+      const repaired = await readValidatedWorkflowAdf(opts.pipelinePath);
+      return runValidatedSteps(repaired.steps, initialCtx, {
+        ...opts,
+        _adfRepairAttempted: true,
+      });
+    }
   }
 
   const error = formatFlowValidationErrors(flowErrors);

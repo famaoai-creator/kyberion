@@ -15,7 +15,7 @@ tags:
     adoption-plan,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # pi 分析・採択計画(PI-01〜19)

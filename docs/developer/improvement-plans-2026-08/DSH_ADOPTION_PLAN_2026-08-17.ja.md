@@ -14,7 +14,7 @@ tags:
     adoption-plan,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # DeepSeek Harness 分析・採択計画(DH-01〜16)

@@ -1,3 +1,10 @@
+---
+title: EVENT HANDLING UNIFICATION PLAN 2026 08 10
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # イベント処理統一計画(EV-01〜10)
 
 > **作成日**: 2026-08-10

@@ -16,6 +16,8 @@ import {
   safeMkdir,
   safeReadFile,
   runSurfaceMessageConversation,
+  runChannelTurn,
+  type ChannelAdapter,
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
   postBridgeError,
@@ -209,7 +211,6 @@ async function handleDiscordMessage(message: Message) {
     return;
   }
 
-  const threadContext = await collectDiscordThreadContext(message);
   appendDiscordThreadHistory({
     role: 'user',
     authorLabel: message.author.tag,
@@ -221,26 +222,38 @@ async function handleDiscordMessage(message: Message) {
   });
 
   // UX-02: keep the channel's typing indicator alive while we think.
-  const typing = startBridgeTypingLoop(
-    'discord-bridge',
-    () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
-    8000
-  );
+  const channelAdapter: ChannelAdapter = {
+    channel: 'discord',
+    actorId: message.author.id,
+    threadContext: () => collectDiscordThreadContext(message),
+    typing: () =>
+      startBridgeTypingLoop(
+        'discord-bridge',
+        () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
+        8000
+      ),
+    send: async () => undefined,
+  };
   try {
-    const result = await runSurfaceMessageConversation({
-      surface: 'discord',
-      text: message.content,
-      channel: message.channelId,
-      threadTs,
-      correlationId: `discord-${message.id}`,
-      receivedAt: message.createdAt.toISOString(),
-      actorId: message.author.id,
-      senderAgentId: 'kyberion:discord-bridge',
-      agentId: DISCORD_SURFACE_AGENT_ID,
-      threadContext: threadContext || undefined,
-      delegationSummaryInstruction:
-        'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
-    } as any);
+    const result = await runChannelTurn(
+      channelAdapter,
+      { text: message.content, channel: message.channelId, threadTs },
+      ({ threadContext }) =>
+        runSurfaceMessageConversation({
+          surface: 'discord',
+          text: message.content,
+          channel: message.channelId,
+          threadTs,
+          correlationId: `discord-${message.id}`,
+          receivedAt: message.createdAt.toISOString(),
+          actorId: message.author.id,
+          senderAgentId: 'kyberion:discord-bridge',
+          agentId: DISCORD_SURFACE_AGENT_ID,
+          threadContext,
+          delegationSummaryInstruction:
+            'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
+        } as any)
+    );
 
     // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
     // confirmation instead of a plain reply.
@@ -315,8 +328,6 @@ async function handleDiscordMessage(message: Message) {
       locale: resolveOperatorLocale(),
       post: (errorText) => replyDiscordText(message, errorText),
     });
-  } finally {
-    typing.stop();
   }
 }
 

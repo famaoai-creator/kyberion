@@ -2,7 +2,7 @@
 title: Project Management Control Plan 2026-08-03
 tags: [project, mission, track, task-session, control-plane, reconciliation, cli]
 last_updated: 2026-08-03
-status: implemented-reviewed
+status: completed
 ---
 
 # Project 管理統制計画

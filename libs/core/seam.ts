@@ -236,3 +236,12 @@ export function defineSeam<T>(definition: SeamDefinition<T>): Seam<T> {
   definition.catalog?.register(seam);
   return seam;
 }
+
+/**
+ * Canonical constructor name for new extension points. `defineSeam` remains a
+ * source-compatible alias for older callers, while new code can use the
+ * create-* naming shared by other foundation factories.
+ */
+export function createSeam<T>(definition: SeamDefinition<T>): Seam<T> {
+  return defineSeam(definition);
+}

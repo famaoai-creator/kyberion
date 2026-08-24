@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 2010,
+      "size": 2668,
       "type": "json"
     },
     {
@@ -1383,7 +1383,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 85871,
+      "size": 81888,
       "type": "json"
     },
     {

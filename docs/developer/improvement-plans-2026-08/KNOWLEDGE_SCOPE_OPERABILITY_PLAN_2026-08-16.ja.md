@@ -14,7 +14,7 @@ tags:
     governance,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # スコープ運用性計画 — UX・自律性・持続性(KO-01〜19)
