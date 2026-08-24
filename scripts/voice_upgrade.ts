@@ -25,6 +25,7 @@
 import * as path from 'node:path';
 import {
   pathResolver,
+  loadJson,
   customerResolver,
   probeNativeTts,
   classifyError,
@@ -32,7 +33,6 @@ import {
   getRegisteredEnv,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 
@@ -148,7 +148,7 @@ function writeTier(tier: Tier): string {
   let existing: Record<string, unknown> = {};
   if (safeExistsSync(out)) {
     try {
-      existing = JSON.parse(safeReadFile(out, { encoding: 'utf8' }) as string);
+      existing = loadJson<Record<string, unknown>>(out);
     } catch {
       existing = {};
     }

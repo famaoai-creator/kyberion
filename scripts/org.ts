@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   loadApprovalRequest,
@@ -325,7 +325,7 @@ function unique(values: string[]): string[] {
 }
 
 function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(filePath);
 }
 
 function readJsonIfExists<T>(filePath: string): T | null {
