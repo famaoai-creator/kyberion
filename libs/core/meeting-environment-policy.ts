@@ -1,9 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import type {
   MeetingBriefInput,
   MeetingPurpose,
@@ -11,8 +8,6 @@ import type {
 } from './meeting-operations-profile.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
-
-const ajv = createAjv();
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/meeting-environment-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge(
@@ -78,39 +73,28 @@ export interface MeetingEnvironmentPolicy {
 
 type MeetingEnvironmentSelection = MeetingOperationsBrief['environment'];
 
-let validateFn: ValidateFunction | null = null;
 let cachedPolicy: MeetingEnvironmentPolicy | null = null;
 let cachedPolicyPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const policyCatalog = defineCatalog<MeetingEnvironmentPolicy>({
+  id: 'meeting-environment-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+});
 
 export function validateMeetingEnvironmentPolicy(
   value: unknown,
   label = POLICY_PATH
 ): MeetingEnvironmentPolicy {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid meeting environment policy at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
+  try {
+    return policyCatalog.validate(value, label);
+  } catch (error) {
+    throw new Error(`Invalid meeting environment policy at ${label}: ${String(error)}`);
   }
-  return value as MeetingEnvironmentPolicy;
 }
 
 function loadPolicyFile(): MeetingEnvironmentPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  const parsed = loadJson<unknown>(POLICY_PATH);
-  return validateMeetingEnvironmentPolicy(parsed, POLICY_PATH);
+  return policyCatalog.load();
 }
 
 export function loadMeetingEnvironmentPolicy(): MeetingEnvironmentPolicy {

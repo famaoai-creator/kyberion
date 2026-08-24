@@ -14,6 +14,7 @@ export interface GovernedCatalogOptions<T> {
 export interface GovernedCatalog<T> {
   readonly id: string;
   path(): string;
+  validate(value: unknown, sourcePath?: string): T;
   load(): T;
   reset(): void;
 }
@@ -50,6 +51,9 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
   return {
     id: options.id,
     path: resolvePath,
+    validate(value: unknown, sourcePath = resolvePath()): T {
+      return validate(value, sourcePath);
+    },
     load(): T {
       const catalogPath = resolvePath();
       if (safeExistsSync(catalogPath)) {
