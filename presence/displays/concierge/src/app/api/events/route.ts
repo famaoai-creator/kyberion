@@ -1,4 +1,6 @@
-import { buildCeoSurfaceSummary } from '@agent/core';
+import type { NextRequest } from 'next/server';
+import { readConciergeHome } from '../../../lib/headless-projections';
+import { resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,7 +22,9 @@ function summaryEventChunk(serialized: string): string {
   return `event: summary\ndata: ${serialized}\n\n`;
 }
 
-export function GET(req: Request) {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   const encoder = new TextEncoder();
   let previousPayload = '';
   let summaryTimer: ReturnType<typeof setInterval> | null = null;
@@ -46,7 +50,13 @@ export function GET(req: Request) {
         if (closed) return;
         let serialized: string;
         try {
-          serialized = JSON.stringify(buildCeoSurfaceSummary());
+          serialized = JSON.stringify(
+            readConciergeHome(resolved.context, {
+              tenant: req.nextUrl.searchParams.get('tenant'),
+              organizationId: req.nextUrl.searchParams.get('organization_id'),
+              projectId: req.nextUrl.searchParams.get('project_id'),
+            })
+          );
         } catch (error) {
           console.warn(
             `[concierge] summary stream check failed: ${error instanceof Error ? error.message : String(error)}`

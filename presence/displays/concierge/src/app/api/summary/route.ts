@@ -1,16 +1,21 @@
-import { NextResponse } from 'next/server';
-import { buildCeoSurfaceSummary } from '@agent/core';
+import { NextRequest, NextResponse } from 'next/server';
+import { parseConciergeLimit, readConciergeHome } from '../../../lib/headless-projections';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
-    const summary = buildCeoSurfaceSummary();
+    const summary = readConciergeHome(resolved.context, {
+      tenant: req.nextUrl.searchParams.get('tenant'),
+      organizationId: req.nextUrl.searchParams.get('organization_id'),
+      projectId: req.nextUrl.searchParams.get('project_id'),
+      limit: parseConciergeLimit(req.nextUrl.searchParams.get('limit')),
+    });
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error);
   }
 }
