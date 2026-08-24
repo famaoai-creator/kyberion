@@ -40,7 +40,13 @@ export function defineScript<T>(options: {
   return async (argv = process.argv.slice(2)): Promise<T | undefined> => {
     const flags = parseScriptFlags(argv);
     const output = (value: unknown): void => {
-      if (!flags.quiet) console.log(flags.json ? JSON.stringify(value, null, 2) : String(value));
+      if (!flags.quiet) {
+        const rendered =
+          flags.json || (typeof value === 'object' && value !== null)
+            ? JSON.stringify(value, null, 2)
+            : String(value);
+        console.log(rendered);
+      }
     };
     try {
       return await options.run({ ...flags, name: options.name, argv, print: output });
@@ -83,7 +89,11 @@ export function defineGenerator(options: {
         });
       }
       const result = { changed, files };
-      context.print({ ok: changed.length === 0 || !context.check, ...result });
+      context.print({
+        ok: changed.length === 0 || !context.check,
+        changed,
+        files: files.map((file) => file.path),
+      });
       if (context.check && changed.length > 0) {
         process.exitCode = 1;
       }
