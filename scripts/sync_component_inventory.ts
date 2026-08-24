@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -203,9 +204,9 @@ interface DiscoveryOpsRecord {
 function loadDiscoveryOps(): DiscoveryOpsRecord[] {
   const discoveryPath = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
   try {
-    const parsed = JSON.parse(safeReadFile(discoveryPath, { encoding: 'utf8' }) as string) as {
+    const parsed = loadJson<{
       actuators?: DiscoveryOpsRecord[];
-    };
+    }>(discoveryPath);
     return parsed.actuators ?? [];
   } catch {
     return [];

@@ -1,4 +1,5 @@
 import {
+  loadJson,
   safeReadFile,
   safeExistsSync,
   safeMkdir,
@@ -375,7 +376,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);
     }
-    const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+    const catalog = loadJson<unknown>(catalogPath);
     const documentType = brief.document_type || 'invoice';
     const documentCatalog = catalog.documents?.[documentType];
     if (!documentCatalog) {
