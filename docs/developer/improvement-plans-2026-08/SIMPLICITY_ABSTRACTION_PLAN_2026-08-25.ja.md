@@ -283,7 +283,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
-> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は `JSON.parse(safeReadFile(` が **169 occurrences**、自前 `new Ajv(` が **86 non-test files**、`process.env.KYBERION_*` の non-test が **469 occurrences**、`defineCatalog` が **24 core files** となった。循環を増やすコア直読移行は戻し、目標未達の項目は引き続き PARTIAL とする。
+> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は `JSON.parse(safeReadFile(` が **161 occurrences**、自前 `new Ajv(` が **86 non-test files**、`process.env.KYBERION_*` の non-test が **469 occurrences**、`defineCatalog` が **24 core files** となった。循環を増やすコア直読移行は戻し、目標未達の項目は引き続き PARTIAL とする。
 
 | 指標                                    | 現状      | 目標   | 担当     |
 | --------------------------------------- | --------- | ------ | -------- |
