@@ -3,6 +3,7 @@ import {
   createAssistantCompilerRequest,
   createAssistantDelegationRequest,
   createTaskSession,
+  getRegisteredEnv,
   executeApprovedClaudeTaskSession,
   formatClarificationPacket,
   getTaskIntentBuilder,
@@ -182,8 +183,8 @@ async function main() {
     (context as any)?.tenantId ||
     (context as any)?.tenant_slug ||
     (context as any)?.tenantSlug ||
-    process.env.KYBERION_TENANT ||
-    process.env.KYBERION_CUSTOMER;
+    (getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined) ||
+    (getRegisteredEnv<string>('KYBERION_CUSTOMER') as string | undefined);
   const packet = resolveIntentResolutionPacket(intent, {
     tier,
     tenantId: typeof tenantId === 'string' ? tenantId : undefined,

@@ -1,6 +1,7 @@
 import {
   createStandardYargs,
   decideMeshHubRecipientProposal,
+  getRegisteredEnv,
   listMeshHubRecipientProposals,
   logger,
 } from '@agent/core';
@@ -13,7 +14,7 @@ async function main(): Promise<void> {
     .option('peer-id', { type: 'string', demandOption: true })
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: (getRegisteredEnv<string>('KYBERION_TENANT_ID') as string | undefined) || '',
       demandOption: true,
     })
     .option('proposal-id', { type: 'string' })

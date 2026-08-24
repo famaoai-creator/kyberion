@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   currentScope,
+  getRegisteredEnv,
   applyKnowledgeRankingWeightProposal,
   isValidTenantSlug,
   knowledgeWritePathFor,
@@ -83,7 +84,7 @@ if (args[0] === 'feedback') {
     document_path: documentPath,
     verdict,
     reason: flag(args, '--reason'),
-    actor: process.env.KYBERION_PERSONA || 'operator',
+    actor: (getRegisteredEnv<string>('KYBERION_PERSONA') as string) || 'operator',
     source: 'cli',
     scope: currentScope(),
   });
