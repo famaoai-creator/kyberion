@@ -11,6 +11,7 @@
  *   node_modules/.bin/tsx scripts/mission-alignment-gate/read-decision.ts <reviewed.html> <mission-brief.json>
  */
 import { safeReadFile, safeExistsSync } from '@agent/core/secure-io';
+import { loadJson } from '@agent/core';
 import { t as catalogT } from '@agent/core/t';
 
 const htmlPath = process.argv[2];
@@ -36,9 +37,7 @@ let mm: RegExpExecArray | null;
 while ((mm = reNote.exec(html)))
   comments.push(mm[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
 
-const b = safeExistsSync(jsonPath)
-  ? JSON.parse(safeReadFile(jsonPath, { encoding: 'utf8' }) as string)
-  : {};
+const b = safeExistsSync(jsonPath) ? loadJson<Record<string, unknown>>(jsonPath) : {};
 
 console.log(
   JSON.stringify(
