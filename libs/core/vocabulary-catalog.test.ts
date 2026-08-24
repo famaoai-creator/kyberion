@@ -4,6 +4,7 @@ import {
   loadVocabularyCatalog,
   resolveVocabularyEntry,
 } from './vocabulary-catalog.js';
+import { createBrowserVocabularyResolver } from './locale-normalize.js';
 import {
   renderBrowserVocabularyMessage,
   renderBrowserVocabularyText,
@@ -52,15 +53,22 @@ describe('vocabulary-catalog (I18N-02)', () => {
 });
 
 describe('browser vocabulary resolver', () => {
+  const resolver = createBrowserVocabularyResolver({
+    default_locale: 'en',
+    domains: {
+      concierge: { 'setup.briefing': { en: 'Prepare {name}.', ja: '{name}を準備します。' } },
+    },
+  });
+
   it('resolves qualified shared entries and interpolates values', () => {
-    const entry = resolveBrowserVocabularyEntry('concierge:setup.briefing');
+    const entry = resolver.resolveEntry('concierge:setup.briefing');
     expect(entry?.namespace).toBe('concierge');
-    expect(
-      renderBrowserVocabularyMessage('concierge:setup.briefing', { name: 'Aki' }, 'ja')
-    ).toContain('Aki');
+    expect(resolver.renderMessage('concierge:setup.briefing', { name: 'Aki' }, 'ja')).toContain(
+      'Aki'
+    );
   });
 
   it('keeps missing keys visible instead of inventing user-facing copy', () => {
-    expect(renderBrowserVocabularyText('missing:surface_key', 'ja')).toBe('missing:surface_key');
+    expect(resolver.renderText('missing:surface_key', 'ja')).toBe('missing:surface_key');
   });
 });
