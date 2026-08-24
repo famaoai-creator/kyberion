@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { loadActuatorManifestCatalog, loadJson } from '@agent/core';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 import { describeOps as describeSystemOps } from '@actuator/system';
 import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';
 import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
@@ -280,63 +280,18 @@ async function stringifyJson(value: unknown, filePath: string): Promise<string> 
   return prettierFormat(JSON.stringify(value, null, 2), { ...config, parser: 'json' });
 }
 
-function writeOutputs(registryJson: string, discoveryJson: string): void {
-  safeWriteFile(REGISTRY_PATH, registryJson);
-  safeWriteFile(DISCOVERY_PATH, discoveryJson);
-}
-
-function readCurrentFiles(): { registry: string; discovery: string | null } {
-  const registry = String(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) || '');
-  const discovery = safeExistsSync(DISCOVERY_PATH)
-    ? String(safeReadFile(DISCOVERY_PATH, { encoding: 'utf8' }) || '')
-    : null;
-  return { registry, discovery };
-}
-
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const shouldWrite = argv.includes('--write') || !shouldCheck;
-  // withExecutionContext restores env synchronously when its callback
-  // returns, so every secure-io access stays inside a sync callback and the
-  // async prettier formatting runs between the two context sections.
-  const built = withExecutionContext('ecosystem_architect', () => {
+export const main = defineGenerator({
+  id: 'op-registry',
+  outputs: [REGISTRY_PATH, DISCOVERY_PATH],
+  async render() {
     const manifestCatalog = loadActuatorManifestCatalog();
     const registry = buildGeneratedRegistry();
     const discovery = buildOpDiscoveryReport(manifestCatalog, registry);
-    return { registry, discovery };
-  });
-  const nextRegistry = await stringifyJson(built.registry, REGISTRY_PATH);
-  const nextDiscovery = await stringifyJson(built.discovery, DISCOVERY_PATH);
-  return withExecutionContext('ecosystem_architect', () => {
-    if (shouldCheck) {
-      const current = readCurrentFiles();
-      const registryMatches = current.registry === nextRegistry;
-      const discoveryMatches = current.discovery === nextDiscovery;
-      if (registryMatches && discoveryMatches) {
-        console.log('op registry is up to date');
-        return;
-      }
-      console.error('op registry drift detected');
-      if (!registryMatches)
-        console.error(`- ${path.relative(pathResolver.rootDir(), REGISTRY_PATH)} differs`);
-      if (!discoveryMatches)
-        console.error(`- ${path.relative(pathResolver.rootDir(), DISCOVERY_PATH)} differs`);
-      process.exitCode = 1;
-      return;
-    }
+    return [
+      { path: REGISTRY_PATH, content: await stringifyJson(registry, REGISTRY_PATH) },
+      { path: DISCOVERY_PATH, content: await stringifyJson(discovery, DISCOVERY_PATH) },
+    ];
+  },
+});
 
-    if (shouldWrite) {
-      writeOutputs(nextRegistry, nextDiscovery);
-      console.log(
-        `wrote ${path.relative(pathResolver.rootDir(), REGISTRY_PATH)} and ${path.relative(pathResolver.rootDir(), DISCOVERY_PATH)}`
-      );
-    }
-  });
-}
-
-if (process.argv[1] && /generate_op_registry\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (isDirectScript(import.meta.url, 'generate_op_registry.ts')) void main();
