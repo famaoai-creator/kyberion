@@ -123,7 +123,6 @@
     "libs/core/deployment-adapter.ts",
     "libs/core/deployment-adapters/mobile-beta.ts",
     "libs/core/desktop-event-feed.ts",
-    "libs/core/doctor_core.ts",
     "libs/core/email-bridge.ts",
     "libs/core/environment-capability.ts",
     "libs/core/gemini-cli-backend.ts",
