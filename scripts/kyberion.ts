@@ -27,10 +27,10 @@ function loadManifest(): CliManifest {
 }
 
 export function selectEntrypoint(command: string, manifest = loadManifest()): CliEntrypoint {
-  return (
-    manifest.entrypoints.find((entrypoint) => entrypoint.commands.includes(command)) ??
-    manifest.entrypoints.find((entrypoint) => entrypoint.id === 'operator-home')!
-  );
+  const entrypoint = manifest.entrypoints.find((candidate) => candidate.commands.includes(command));
+  if (entrypoint) return entrypoint;
+  if (!command) return manifest.entrypoints.find((candidate) => candidate.id === 'operator-home')!;
+  throw new Error(`Unknown kyberion command: ${command}`);
 }
 
 export function resolveCommand(command: string, manifest = loadManifest()): CliCommand | undefined {

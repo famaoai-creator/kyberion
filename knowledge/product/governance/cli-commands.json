@@ -90,6 +90,46 @@
       "audience": "user"
     },
     {
+      "id": "operator-home.mission",
+      "command": "mission",
+      "noun": "mission",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-home.app-preflight",
+      "command": "app:preflight",
+      "noun": "app:preflight",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-home.doctor",
+      "command": "doctor",
+      "noun": "doctor",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.dashboard",
+      "command": "dashboard",
+      "noun": "dashboard",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
+      "id": "operator-home.office",
+      "command": "office",
+      "noun": "office",
+      "verb": "default",
+      "entry": "operator-home",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.help",
       "command": "help",
       "noun": "help",
@@ -273,7 +313,12 @@
         "inbox",
         "approvals",
         "notify",
-        "deals"
+        "deals",
+        "mission",
+        "app:preflight",
+        "doctor",
+        "dashboard",
+        "office"
       ]
     },
     {
