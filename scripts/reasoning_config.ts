@@ -9,7 +9,13 @@ import {
   type ReasoningRouteUserConfig,
   inspectReasoningRoutes,
 } from '@agent/core';
-import { recordGovernanceAction, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import {
+  getRegisteredEnv,
+  recordGovernanceAction,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -62,7 +68,7 @@ function saveWithBackup(config: ReasoningRouteUserConfig, dryRun: boolean, chang
   }
   saveReasoningRouteUserConfig(nextConfig);
   recordGovernanceAction(
-    process.env.KYBERION_PERSONA || 'operator',
+    (getRegisteredEnv<string>('KYBERION_PERSONA') as string | undefined) || 'operator',
     'reasoning_route_config_update',
     change
   );

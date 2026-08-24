@@ -1,6 +1,7 @@
 import {
   createPeerRuntimeRecoveryApprovalRequest,
   createStandardYargs,
+  getRegisteredEnv,
   logger,
   resumePeerRuntimeFromQuarantine,
 } from '@agent/core';
@@ -11,7 +12,7 @@ async function main(): Promise<void> {
     .command('resume', 'Resume quarantined peer runtime after approval and heartbeat checks')
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: (getRegisteredEnv<string>('KYBERION_TENANT_ID') as string | undefined) || '',
       demandOption: true,
     })
     .option('quarantine-path', { type: 'string', demandOption: true })
