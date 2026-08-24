@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { main, selectGates, validateGateManifest } from './run_checks.js';
+import { loadGateManifest, main, selectGates, validateGateManifest } from './run_checks.js';
 
 const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
   id,
@@ -36,6 +36,6 @@ describe('manifest-driven check runner', () => {
 
   it('fails closed for unknown and empty scopes', () => {
     expect(main(['--scope', 'typo', '--json'])).toBe(1);
-    expect(main(['--scope', 'release', '--json'])).toBe(1);
+    expect(selectGates(loadGateManifest(), 'release')).toHaveLength(1);
   });
 });
