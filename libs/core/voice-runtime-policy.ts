@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
@@ -63,7 +64,7 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: VoiceRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return getRegisteredEnvText('KYBERION_VOICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
 }
 
 export function resetVoiceRuntimePolicyCache(): void {
