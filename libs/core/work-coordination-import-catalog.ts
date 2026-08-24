@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface WorkCoordinationImportCatalogEntry {
@@ -21,9 +21,15 @@ interface WorkCoordinationImportCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_CATALOG_PATH = pathResolver.knowledge('product/governance/work-coordination-import-catalog.json');
-const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/governance/work-coordination-import-catalog.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-coordination-import-catalog.schema.json');
+const PUBLIC_CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/work-coordination-import-catalog.json'
+);
+const PERSONAL_CATALOG_PATH = pathResolver.knowledge(
+  'personal/governance/work-coordination-import-catalog.json'
+);
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/work-coordination-import-catalog.schema.json'
+);
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: WorkCoordinationImportCatalog | null = null;
@@ -36,23 +42,30 @@ function ensureValidator(): ValidateFunction {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function validateCatalog(value: unknown, label: string): WorkCoordinationImportCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid work coordination import catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid work coordination import catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as WorkCoordinationImportCatalog;
 }
 
 function loadCatalogFile(catalogPath: string): WorkCoordinationImportCatalog | null {
   if (!safeExistsSync(catalogPath)) return null;
-  return validateCatalog(JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string), catalogPath);
+  return validateCatalog(loadJson(catalogPath), catalogPath);
 }
 
-function mergeCatalogs(base: WorkCoordinationImportCatalog, overlay: WorkCoordinationImportCatalog): WorkCoordinationImportCatalog {
+function mergeCatalogs(
+  base: WorkCoordinationImportCatalog,
+  overlay: WorkCoordinationImportCatalog
+): WorkCoordinationImportCatalog {
   const byId = new Map<string, WorkCoordinationImportCatalogEntry>();
   for (const entry of base.imports) byId.set(entry.id, entry);
   for (const entry of overlay.imports) byId.set(entry.id, entry);
@@ -79,10 +92,14 @@ export function listWorkCoordinationImportCatalogEntries(): WorkCoordinationImpo
   return loadWorkCoordinationImportCatalog().imports;
 }
 
-export function getWorkCoordinationImportCatalogEntryByCommand(command: string): WorkCoordinationImportCatalogEntry | null {
+export function getWorkCoordinationImportCatalogEntryByCommand(
+  command: string
+): WorkCoordinationImportCatalogEntry | null {
   const normalized = command.trim();
   if (!normalized) return null;
-  return listWorkCoordinationImportCatalogEntries().find((entry) => entry.command === normalized) || null;
+  return (
+    listWorkCoordinationImportCatalogEntries().find((entry) => entry.command === normalized) || null
+  );
 }
 
 export function resetWorkCoordinationImportCatalogCache(): void {

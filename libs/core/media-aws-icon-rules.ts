@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface MediaAwsIconRuleEntry {
@@ -168,7 +168,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): MediaAwsIconRuleCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid media aws icon rule catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid media aws icon rule catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MediaAwsIconRuleCatalog;
 }
@@ -176,14 +178,15 @@ function validateCatalog(value: unknown, label: string): MediaAwsIconRuleCatalog
 export function loadMediaAwsIconRuleCatalog(): MediaAwsIconRuleCatalog {
   if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
   if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = { version: '1.0.0', exact_resources: FALLBACK_EXACT_RESOURCES, rules: FALLBACK_RULES };
+    cachedCatalog = {
+      version: '1.0.0',
+      exact_resources: FALLBACK_EXACT_RESOURCES,
+      rules: FALLBACK_RULES,
+    };
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
@@ -196,7 +199,8 @@ export function resolveMediaAwsIconCandidates(resourceType: string): string[] {
   const exact = catalog.exact_resources[normalized];
   if (Array.isArray(exact) && exact.length > 0) return exact;
   for (const rule of catalog.rules) {
-    if (rule.match_type === 'starts_with' && normalized.startsWith(rule.match_value)) return rule.icons;
+    if (rule.match_type === 'starts_with' && normalized.startsWith(rule.match_value))
+      return rule.icons;
     if (rule.match_type === 'contains' && normalized.includes(rule.match_value)) return rule.icons;
   }
   return [];

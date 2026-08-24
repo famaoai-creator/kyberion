@@ -1,12 +1,22 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
 export interface MediaToneStyleMapEntry {
   tone: string;
-  style: 'base' | 'title' | 'subtitle' | 'header' | 'section' | 'info' | 'success' | 'warning' | 'danger' | 'body';
+  style:
+    | 'base'
+    | 'title'
+    | 'subtitle'
+    | 'header'
+    | 'section'
+    | 'info'
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | 'body';
 }
 
 interface MediaToneStyleMapCatalog {
@@ -46,7 +56,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): MediaToneStyleMapCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid media tone style map catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid media tone style map catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MediaToneStyleMapCatalog;
 }
@@ -61,17 +73,16 @@ export function loadMediaToneStyleMapCatalog(): MediaToneStyleMapCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
 }
 
 export function resolveMediaToneStyle(tone?: string): MediaToneStyleMapEntry['style'] {
-  const normalized = String(tone || '').trim().toLowerCase();
+  const normalized = String(tone || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return 'info';
   const catalog = loadMediaToneStyleMapCatalog();
   const resolved = catalog.tones.find((entry) => entry.tone === normalized)?.style;

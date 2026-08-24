@@ -1,10 +1,11 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
-export type VoiceTaskDistillTargetKind = 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
+export type VoiceTaskDistillTargetKind =
+  'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
 
 export interface VoiceTaskProfileEntry {
   id: string;
@@ -44,7 +45,9 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/voice-task-profile-catalog.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/voice-task-profile-catalog.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-task-profile-catalog.schema.json'
+);
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: VoiceTaskProfileCatalog | null = null;
@@ -65,7 +68,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): VoiceTaskProfileCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid voice task profile catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid voice task profile catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as VoiceTaskProfileCatalog;
 }
@@ -77,10 +82,7 @@ export function loadVoiceTaskProfileCatalog(): VoiceTaskProfileCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
@@ -109,7 +111,13 @@ export function resolveVoiceTaskProfile(input: {
       if (profile.analysis_kind && profile.analysis_kind === input.analysisKind) score += 8;
       if (profile.report_kind && profile.report_kind === input.reportKind) score += 8;
       if (profile.operation && profile.operation === input.operation) score += 8;
-      if (!profile.bootstrap_kind && !profile.analysis_kind && !profile.report_kind && !profile.operation) score += 1;
+      if (
+        !profile.bootstrap_kind &&
+        !profile.analysis_kind &&
+        !profile.report_kind &&
+        !profile.operation
+      )
+        score += 1;
       return { profile, score, index };
     })
     .sort((left, right) => right.score - left.score || left.index - right.index);
