@@ -2,6 +2,7 @@ import {
   distillTextObservation,
   executeLlmDecideOp,
   logger,
+  loadJson,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -976,7 +977,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             let state: any = null;
             if (safeExistsSync(statePath)) {
               try {
-                state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+                state = loadJson<unknown>(statePath);
               } catch (err) {
                 logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
               }
@@ -1012,7 +1013,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           const pkgPath = path.join(actuatorPath, 'package.json');
           if (safeExistsSync(pkgPath)) {
             try {
-              const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+              const pkg = loadJson<{
+                name?: unknown;
+                description?: unknown;
+                version?: unknown;
+              }>(pkgPath);
               capabilities.push({
                 id: entry,
                 name: pkg.name,
@@ -1202,7 +1207,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
       const results = sampled.map((s) => ({
         missionId: s.missionId,
-        trace: JSON.parse(safeReadFile(s.path, { encoding: 'utf8' }) as string),
+        trace: loadJson<unknown>(s.path),
       }));
       return { ...ctx, [params.export_as || 'sampled_traces']: results };
     }
