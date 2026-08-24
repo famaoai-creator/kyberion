@@ -9,6 +9,7 @@
  */
 import {
   formatNextAction,
+  loadJson,
   getGovernanceControlSummary,
   resolveOperatorDisplayName,
 } from '@agent/core';
@@ -475,7 +476,7 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
   }
   let raw: unknown;
   try {
-    raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+    raw = loadJson<unknown>(recordingPath);
   } catch (error) {
     return {
       error: ui('recorder:recorder_recording_read_failed', {
@@ -677,7 +678,7 @@ function loadDesktopRecording(ref: string): {
   if (!recordingPath)
     return { error: 'recording path is outside the allowlisted recording stores' };
   try {
-    const raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+    const raw = loadJson<unknown>(recordingPath);
     const validation = validateDesktopRecording(raw);
     return validation.value ? { value: validation.value } : { error: validation.errors.join('; ') };
   } catch (error) {
@@ -712,9 +713,7 @@ function loadDesktopIntent(
   }
   try {
     return {
-      intent: validateDesktopIntentDraft(
-        JSON.parse(safeReadFile(intentPath, { encoding: 'utf8' }) as string)
-      ),
+      intent: validateDesktopIntentDraft(loadJson<unknown>(intentPath)),
       intentPath,
       reconstructed: false,
     };
