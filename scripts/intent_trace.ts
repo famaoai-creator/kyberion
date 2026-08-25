@@ -15,7 +15,7 @@ import {
   loadMissionOrchestrationJournal,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
 type JsonRecord = Record<string, unknown> & { [key: string]: unknown };
@@ -541,8 +541,7 @@ async function main(): Promise<void> {
   const subcommand = normalizeIntentTraceText(argv._[0]);
   const correlationId = normalizeIntentTraceText(argv._[1]);
   if (subcommand !== 'trace' || !correlationId) {
-    console.error('Usage: pnpm intent trace <correlation_id> [--locale en|ja]');
-    process.exit(1);
+    throw new Error('Usage: pnpm intent trace <correlation_id> [--locale en|ja]');
   }
 
   const evidence = collectIntentTraceEvidence(correlationId, {
@@ -555,7 +554,13 @@ if (
   isDirectScript(import.meta.url, 'intent_trace.ts') ||
   isDirectScript(import.meta.url, 'intent_trace.js')
 ) {
-  void main();
+  void defineScript({
+    name: 'intent:trace',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();
 }
 
 export {
