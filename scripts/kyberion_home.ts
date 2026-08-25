@@ -67,7 +67,7 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectOperatorHomeSummary } from '@agent/core';
 import { collectDoctorReport, runDoctor } from './run_doctor.js';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -153,6 +153,16 @@ function printCommands(): void {
       ? ui(description.slice('i18n:'.length) as VocabularyKey)
       : description;
     console.log(`  ${command.padEnd(52)} ${rendered}`);
+  }
+  const registry = loadJson<{
+    commands: Array<{ command: string; noun: string; verb: string; audience: string }>;
+  }>(pathResolver.knowledge('product/governance/cli-commands.json'));
+  const registryCommands = registry.commands.filter((command) => command.audience === 'user');
+  console.log('');
+  console.log('  Registered user commands:');
+  for (const command of registryCommands) {
+    const label = command.command ? `pnpm kyberion ${command.command}` : 'pnpm kyberion';
+    console.log(`  ${label.padEnd(52)} ${command.noun} ${command.verb}`);
   }
 }
 
@@ -1511,11 +1521,15 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
   console.log(ui('recorder:recorder_deal_requirements_command'));
 }
 
-export async function main(args = process.argv.slice(2)): Promise<void> {
+export async function main(args: string[] = []): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
+  }
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    printCommands();
+    return;
   }
   const localeFlagIndex = args.indexOf('--locale');
   if (localeFlagIndex >= 0 && args[localeFlagIndex + 1]) {
@@ -1765,9 +1779,11 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
 if (
   isDirectScript(import.meta.url, 'kyberion_home.ts') ||
   isDirectScript(import.meta.url, 'kyberion_home.js')
-) {
-  void main().catch((error: unknown) => {
-    console.error(String(error));
-    process.exitCode = 1;
-  });
-}
+)
+  void defineScript({
+    name: 'kyberion',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();
