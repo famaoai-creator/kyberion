@@ -22,6 +22,8 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { loadJson, pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface GoldenRegistryEntry {
   /** Stable pipeline identifier (matches `id` field in the ADF JSON). */
@@ -73,9 +75,11 @@ function loadSnapshot(id: string): GoldenSnapshot | null {
 }
 
 function writeSnapshot(snapshot: GoldenSnapshot): void {
-  if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
-  const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
-  safeWriteFile(p, JSON.stringify(snapshot, null, 2) + '\n', { encoding: 'utf8' });
+  withExecutionContext('ecosystem_architect', () => {
+    if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
+    const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
+    safeWriteFile(p, JSON.stringify(snapshot, null, 2) + '\n', { encoding: 'utf8' });
+  });
 }
 
 function elidePath(obj: any, dotPath: string): void {
@@ -189,52 +193,57 @@ async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promis
   return diags;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  const rebaseline = args.includes('--rebaseline');
+export const runCheckGoldenOutput = defineScript({
+  name: 'check:golden',
+  flags: [],
+  async run(context) {
+    const args = context.argv;
+    const rebaseline = args.includes('--rebaseline');
 
-  const registry = loadRegistry();
-  if (registry.length === 0) {
-    console.log(
-      `📝 No golden registry yet. Create ${path.relative(ROOT, REGISTRY_PATH)} ` +
-        `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`
-    );
-    return;
-  }
+    const registry = loadRegistry();
+    if (registry.length === 0) {
+      context.print(
+        `📝 No golden registry yet. Create ${path.relative(ROOT, REGISTRY_PATH)} ` +
+          `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`
+      );
+      return;
+    }
 
-  const allDiags: Diagnostic[] = [];
-  for (const entry of registry) {
-    const diags = await checkOne(entry, rebaseline);
-    allDiags.push(...diags);
-    const status = diags.find((d) => d.severity === 'error')
-      ? '❌'
-      : diags.length > 0
-        ? '⚠️ '
-        : '✅';
-    console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
-  }
+    const allDiags: Diagnostic[] = [];
+    for (const entry of registry) {
+      const diags = await checkOne(entry, rebaseline);
+      allDiags.push(...diags);
+      const status = diags.find((d) => d.severity === 'error')
+        ? '❌'
+        : diags.length > 0
+          ? '⚠️ '
+          : '✅';
+      console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
+    }
 
-  const errors = allDiags.filter((d) => d.severity === 'error');
-  const warnings = allDiags.filter((d) => d.severity === 'warning');
+    const errors = allDiags.filter((d) => d.severity === 'error');
+    const warnings = allDiags.filter((d) => d.severity === 'warning');
 
-  if (warnings.length > 0) {
-    console.log('\nWarnings:');
-    for (const w of warnings) console.log(`  - ${w.pipeline_id}: ${w.message}`);
-  }
-  if (errors.length > 0) {
-    console.error('\nErrors:');
-    for (const e of errors) console.error(`  - ${e.pipeline_id}: ${e.message}`);
-    process.exit(1);
-  }
+    if (warnings.length > 0) {
+      console.log('\nWarnings:');
+      for (const w of warnings) console.log(`  - ${w.pipeline_id}: ${w.message}`);
+    }
+    if (errors.length > 0) {
+      console.error('\nErrors:');
+      for (const e of errors) console.error(`  - ${e.pipeline_id}: ${e.message}`);
+      throw new Error(`${errors.length} golden output violation(s)`);
+    }
 
-  if (rebaseline) {
-    console.log(`\n✅ Rebaselined ${registry.length} snapshots.`);
-  } else {
-    console.log(`\n✅ Golden output check passed (${registry.length} pipelines).`);
-  }
-}
-
-main().catch((err) => {
-  console.error('Fatal:', err);
-  process.exit(1);
+    if (rebaseline) {
+      context.print(`\n✅ Rebaselined ${registry.length} snapshots.`);
+    } else {
+      context.print(`\n✅ Golden output check passed (${registry.length} pipelines).`);
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'check_golden_output.ts') ||
+  isDirectScript(import.meta.url, 'check_golden_output.js')
+)
+  void runCheckGoldenOutput();
