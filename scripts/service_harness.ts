@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createStandardYargs, logger } from '@agent/core';
 import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type HarnessAction = 'describe' | 'plan' | 'verify' | 'receipt';
 
@@ -16,13 +17,13 @@ function parseObject(value: string, name: string): Record<string, unknown> {
   }
 }
 
-async function main(): Promise<void> {
+async function main(args: string[] = []): Promise<void> {
   // pnpm passes the conventional separator through to the script. Remove it
   // so `pnpm run service:harness -- --service ...` behaves like direct Node
   // execution while preserving yargs' normal option parsing.
-  if (process.argv[2] === '--') process.argv.splice(2, 1);
+  const normalizedArgs = args[0] === '--' ? args.slice(1) : args;
 
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(['node', 'service_harness', ...normalizedArgs])
     .option('service', { type: 'string', demandOption: true, describe: 'Service id' })
     .option('action', {
       type: 'string',
@@ -61,23 +62,23 @@ async function main(): Promise<void> {
     if (action === 'receipt') params.persist = Boolean(argv.persist);
   }
 
-  try {
-    const result = await handleAction({
-      service_id: String(argv.service),
-      mode: 'HARNESS',
-      action,
-      params,
-    });
-    console.log(JSON.stringify(result, null, 2));
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+  const result = await handleAction({
+    service_id: String(argv.service),
+    mode: 'HARNESS',
+    action,
+    params,
+  });
+  console.log(JSON.stringify(result, null, 2));
 }
 
-if (process.argv[1] && /service_harness\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
-}
+export const runServiceHarness = defineScript({
+  name: 'service:harness',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'service_harness.ts') ||
+  isDirectScript(import.meta.url, 'service_harness.js')
+)
+  void runServiceHarness();

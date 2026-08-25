@@ -12,6 +12,7 @@ import {
 import { appendJsonLine } from '@agent/core/foundation';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface SoakSample {
   cycle: number;
@@ -581,8 +582,8 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
   return options;
 }
 
-async function main(): Promise<number> {
-  const options = parseArgs(process.argv.slice(2));
+async function main(argv: string[] = []): Promise<number> {
+  const options = parseArgs(argv);
   const report = await runSoakEnduranceHarness(options);
   const validation = validateSoakEvidence(report);
 
@@ -601,13 +602,17 @@ async function main(): Promise<number> {
   return 0;
 }
 
-const isDirect = process.argv[1] && /soak_endurance\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().then(
-    (code) => process.exit(code),
-    (error) => {
-      logger.error(`[soak-endurance] failed: ${(error as Error).message ?? error}`);
-      process.exit(1);
-    }
-  );
-}
+export const runSoakEndurance = defineScript({
+  name: 'soak:endurance',
+  flags: [],
+  run: async ({ argv }) => {
+    const code = await main(argv);
+    if (code !== 0) throw new ScriptExitError(code, '', true);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'soak_endurance.ts') ||
+  isDirectScript(import.meta.url, 'soak_endurance.js')
+)
+  void runSoakEndurance();
