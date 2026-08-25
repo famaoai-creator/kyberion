@@ -8,6 +8,7 @@
 
 import { safeExec, pathResolver } from '@agent/core';
 import { checkTitle } from './check_pr_title.js';
+import { defineScript } from './lib/harness.js';
 
 interface PublishOptions {
   title?: string;
@@ -57,13 +58,16 @@ export function resolvePublishTitle(inputTitle?: string, headSubject?: string): 
         `${validation.source} is not valid: ${validation.value}`,
         validation.reason || 'PR title must use a Conventional Commit header.',
         'Use a title like `fix(scope): summary` or pass `--title` explicitly.',
-      ].join('\n'),
+      ].join('\n')
     );
   }
   return validation.value;
 }
 
-export function buildGhArgs(options: PublishOptions, context?: { head?: string; defaultBranch?: string }): string[] {
+export function buildGhArgs(
+  options: PublishOptions,
+  context?: { head?: string; defaultBranch?: string }
+): string[] {
   const title = resolvePublishTitle(options.title, context?.head);
   const base = options.base?.trim() || context?.defaultBranch?.trim() || readDefaultBranch();
   const head = context?.head?.trim() || readCurrentBranch();
@@ -81,8 +85,8 @@ export function buildGhArgs(options: PublishOptions, context?: { head?: string; 
   return args;
 }
 
-async function main(): Promise<void> {
-  const options = parsePublishArgs(process.argv.slice(2));
+async function main(argv: string[]): Promise<void> {
+  const options = parsePublishArgs(argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
   safeExec('gh', ['auth', 'status'], { cwd: pathResolver.rootDir() });
@@ -94,10 +98,8 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /publish_pull_request\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+void defineScript({
+  name: 'pr:publish',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
