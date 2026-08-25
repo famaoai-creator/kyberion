@@ -1,7 +1,12 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { extractSurfaceBearerToken, logger, narrowSurfaceViewerTenant } from '@agent/core';
+import {
+  extractSurfaceBearerToken,
+  logger,
+  matchesChronosToken,
+  narrowSurfaceViewerTenant,
+} from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const LOCALHOST_NAMES = new Set([
@@ -135,7 +140,7 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
       };
     }
     const presented = extractPresenceStudioToken(req);
-    if (presented === token) {
+    if (matchesChronosToken(presented, token)) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
@@ -148,7 +153,7 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   const token = getPresenceStudioAuthToken();
   if (token) {
     const presented = extractPresenceStudioToken(req);
-    if (presented === token) {
+    if (matchesChronosToken(presented, token)) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
