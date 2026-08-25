@@ -21,7 +21,7 @@ describe('validatePipelineGuardrails', () => {
     );
   });
 
-  it('blocks typed command plus args wrappers, not only shell command strings', () => {
+  it('blocks typed command plus args wrappers for node, pnpm, and npx', () => {
     const report = validatePipelineGuardrails({
       steps: [
         { op: 'system:exec', params: { command: 'node', args: ['dist/scripts/task.js'] } },
@@ -29,12 +29,27 @@ describe('validatePipelineGuardrails', () => {
           op: 'system:exec',
           params: { command: 'pnpm', args: ['exec', 'tsx', 'scripts/task.ts'] },
         },
+        { op: 'system:exec', params: { command: 'npx', args: ['tsx', 'scripts/task.ts'] } },
       ],
     });
     expect(report.ok).toBe(false);
     expect(
       report.findings.filter((finding) => finding.code === 'script-wrapper-forbidden')
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+  });
+
+  it('preserves raw command-string wrapper rejection', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        { op: 'system:exec', params: { command: 'node dist/scripts/task.js' } },
+        { op: 'system:shell', params: { cmd: 'pnpm exec tsx scripts/task.ts' } },
+        { op: 'system:shell', params: { cmd: 'npx tsx scripts/task.ts' } },
+      ],
+    });
+    expect(report.ok).toBe(false);
+    expect(
+      report.findings.filter((finding) => finding.code === 'script-wrapper-forbidden')
+    ).toHaveLength(3);
   });
 
   it('warns when a dynamic include cannot be expanded during preflight', () => {

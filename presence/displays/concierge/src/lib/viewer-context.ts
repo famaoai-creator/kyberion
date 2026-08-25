@@ -7,6 +7,7 @@ import {
   defaultSurfaceViewerTierAccess,
   narrowSurfaceViewerScope,
   resolveSurfaceViewerTierAccess,
+  extractSurfaceBearerToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
@@ -48,8 +49,7 @@ function isLoopbackRequest(req: NextRequest): boolean {
 }
 
 function bearerToken(req: NextRequest): string | null {
-  const value = req.headers.get('authorization') || '';
-  return value.startsWith('Bearer ') ? value.slice(7).trim() || null : null;
+  return extractSurfaceBearerToken(req.headers.get('authorization')) || null;
 }
 
 function registrations(): ChronosTokenRegistration[] | null {

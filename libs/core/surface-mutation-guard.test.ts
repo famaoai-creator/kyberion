@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   authorizeSurfaceMutation,
   defaultSurfaceViewerTierAccess,
+  extractSurfaceBearerToken,
   narrowSurfaceViewerScope,
   narrowSurfaceViewerTenant,
   narrowSurfaceViewerTier,
@@ -26,6 +27,15 @@ afterEach(() => {
 });
 
 describe('surface-mutation-guard', () => {
+  it('extracts bearer credentials without broadening the accepted header form', () => {
+    expect(extractSurfaceBearerToken('Bearer secret-token')).toBe('secret-token');
+    expect(extractSurfaceBearerToken('Bearer   secret-token  ')).toBe('secret-token');
+    expect(extractSurfaceBearerToken('bearer secret-token')).toBe('');
+    expect(extractSurfaceBearerToken('Basic secret-token')).toBe('');
+    expect(extractSurfaceBearerToken('Bearer')).toBe('');
+    expect(extractSurfaceBearerToken(undefined)).toBe('');
+  });
+
   it('does not trust a loopback request URL without request authentication', () => {
     for (const host of ['localhost', '127.0.0.1', '[::1]']) {
       const decision = authorizeSurfaceMutation(makeRequest(`http://${host}:3050/api/x`));
