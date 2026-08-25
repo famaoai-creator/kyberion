@@ -86,6 +86,7 @@ import {
   resolveVoiceSttServerConfig,
   runSurfaceConversation,
   runSurfaceMessageConversation,
+  resolveIntentResolutionContract,
   safeExec,
   buildSafeExecEnv,
   safeReadFile,
@@ -116,6 +117,7 @@ import {
   resolveVoiceTaskProfile,
   recordVoiceSample,
   type TaskSession,
+  type IntentResolutionContract,
 } from '@agent/core';
 
 interface VoiceHubRecord {
@@ -1504,13 +1506,16 @@ async function processIngest(input: {
     }
 
     let replyText: string | undefined;
+    let intentResolution: IntentResolutionContract | undefined;
     let replied = false;
     let replyError: string | undefined;
     let spoken = false;
     let speechError: string | undefined;
     if (autoReply) {
       try {
-        replyText = await generateReply(text, { sessionKey });
+        const generatedReply = await generateReply(text, { sessionKey });
+        replyText = generatedReply.text;
+        intentResolution = generatedReply.intentResolution;
         rememberConversationTurn(sessionKey, 'assistant', replyText);
         const speakingMs = estimateSpeechDurationMs(replyText);
         try {
@@ -1549,6 +1554,7 @@ async function processIngest(input: {
             : 'I could not process that. Please try again.';
         rememberConversationTurn(sessionKey, 'assistant', spokenFallback);
         replyText = spokenFallback;
+        intentResolution = resolveIntentResolutionContract(text);
         speakReplyManaged(spokenFallback)
           .then(() => {
             logger.info('[voice-hub] spoke error fallback');
@@ -1572,6 +1578,7 @@ async function processIngest(input: {
       replyError,
       spoken,
       speechError,
+      intentResolution,
     };
     return {
       statusCode: 201,
@@ -4356,7 +4363,10 @@ function processAsyncDelegation(params: {
  * approval path, delegation policy, and user-facing result shape apply to
  * voice, text, and headless surfaces alike.
  */
-async function generateReply(userText: string, context: { sessionKey: string }): Promise<string> {
+async function generateReply(
+  userText: string,
+  context: { sessionKey: string }
+): Promise<{ text: string; intentResolution?: IntentResolutionContract }> {
   try {
     const result = await runSurfaceMessageConversation(
       buildPresenceSurfaceConversationMessageInput(
@@ -4369,10 +4379,16 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       )
     );
     const text = (result.text || '').trim();
-    return text || buildVoiceFallbackReply(userText);
+    return {
+      text: text || buildVoiceFallbackReply(userText),
+      intentResolution: result.intentResolution,
+    };
   } catch (error: any) {
     logger.warn(`[voice-hub] Shared surface conversation failed: ${error?.message || error}`);
-    return buildVoiceFallbackReply(userText);
+    return {
+      text: buildVoiceFallbackReply(userText),
+      intentResolution: resolveIntentResolutionContract(userText),
+    };
   }
 }
 
