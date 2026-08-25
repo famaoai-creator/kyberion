@@ -9,6 +9,7 @@ import {
   slugify,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArtifactMap = {
   lifecycle: Array<{
@@ -158,7 +159,16 @@ async function main() {
   process.stdout.write(`${path.relative(pathResolver.rootDir(), targetDir)}\n`);
 }
 
-main().catch((err) => {
-  process.stderr.write(`${err.message}\n`);
-  process.exit(1);
+export const runGenerateProjectOs = defineScript({
+  name: 'generate:project-os',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'generate_project_os.ts') ||
+  isDirectScript(import.meta.url, 'generate_project_os.js')
+)
+  void runGenerateProjectOs();
