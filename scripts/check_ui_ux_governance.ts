@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type UiUxGovernanceViolation = {
   rule: 'hardcoded-color' | 'missing-semantic-token' | 'status-vocabulary-bypass';
@@ -117,20 +117,27 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
   };
 }
 
-function main(): void {
-  const report = collectUiUxGovernanceReport();
-  if (process.argv.includes('--json')) {
-    console.log(JSON.stringify(report, null, 2));
-  } else if (report.status === 'pass') {
-    console.log(`[check:ui-ux] OK (${report.checked_files} files, owner=${report.owner})`);
-  } else {
-    console.error(`[check:ui-ux] ${report.violations.length} violation(s) detected:`);
-    for (const violation of report.violations) {
-      console.error(`- ${violation.rule}: ${violation.path} — ${violation.detail}`);
+export const runCheckUiUxGovernance = defineScript({
+  name: 'check:ui-ux',
+  flags: ['json'],
+  run(context) {
+    const report = collectUiUxGovernanceReport();
+    if (context.json) {
+      context.print(report);
+    } else if (report.status === 'pass') {
+      context.print(`[check:ui-ux] OK (${report.checked_files} files, owner=${report.owner})`);
+    } else {
+      console.error(`[check:ui-ux] ${report.violations.length} violation(s) detected:`);
+      for (const violation of report.violations) {
+        console.error(`- ${violation.rule}: ${violation.path} — ${violation.detail}`);
+      }
     }
-  }
-  if (report.status === 'fail') process.exitCode = 1;
-}
+    if (report.status === 'fail') process.exitCode = 1;
+  },
+});
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
-if (isMainModule) main();
+if (
+  isDirectScript(import.meta.url, 'check_ui_ux_governance.ts') ||
+  isDirectScript(import.meta.url, 'check_ui_ux_governance.js')
+)
+  void runCheckUiUxGovernance();

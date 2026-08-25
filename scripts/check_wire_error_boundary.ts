@@ -1,6 +1,7 @@
 /** PI-02: reject raw exception interpolation in network-facing error replies. */
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const root = process.cwd();
 export const WIRE_ERROR_BOUNDARY_FILES = [
@@ -49,14 +50,23 @@ export function scanWireErrorBoundary(): string[] {
   });
 }
 
-const isDirect =
-  process.argv[1] != null && /check_wire_error_boundary\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  const findings = scanWireErrorBoundary();
-  if (findings.length > 0) {
-    console.error('[check_wire_error_boundary] FAILED');
-    for (const finding of findings) console.error(`- ${finding}`);
-    process.exit(1);
-  }
-  console.log('[check_wire_error_boundary] OK');
-}
+export const runCheckWireErrorBoundary = defineScript({
+  name: 'check:wire-error-boundary',
+  flags: [],
+  run(context) {
+    const findings = scanWireErrorBoundary();
+    if (findings.length > 0) {
+      console.error('[check_wire_error_boundary] FAILED');
+      for (const finding of findings) console.error(`- ${finding}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print('[check_wire_error_boundary] OK');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_wire_error_boundary.ts') ||
+  isDirectScript(import.meta.url, 'check_wire_error_boundary.js')
+)
+  void runCheckWireErrorBoundary();
