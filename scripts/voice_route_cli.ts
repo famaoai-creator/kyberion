@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { handleAction } from '../libs/actuators/voice-actuator/src/index.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 
-type Command = 'list' | 'probe' | 'test';
+type Command = 'list' | 'probe' | 'test' | 'help';
 
 interface CliOptions {
   bus: 'blackhole' | 'stub';
@@ -20,11 +21,19 @@ interface CliOptions {
 }
 
 function parseArgs(argv: string[]): { command: Command; options: CliOptions } {
-  const command = (argv.shift() || 'list') as Command;
+  const rawCommand = argv.shift() || 'list';
+  const options: CliOptions = { bus: 'blackhole', json: false, confirm: false, dryRun: false };
+  if (rawCommand === '--help' || rawCommand === '-h') {
+    console.log('voice route commands: list | probe | test');
+    console.log(
+      'test requires --text and --confirm; BlackHole live test also requires KYBERION_LIVE_BLACKHOLE_TEST=1'
+    );
+    return { command: 'help', options };
+  }
+  const command = rawCommand as Command;
   if (!['list', 'probe', 'test'].includes(command)) {
     throw new Error(`unknown voice route command '${command}'`);
   }
-  const options: CliOptions = { bus: 'blackhole', json: false, confirm: false, dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const value = (): string => {
@@ -79,8 +88,7 @@ function parseArgs(argv: string[]): { command: Command; options: CliOptions } {
         console.log(
           'test requires --text and --confirm; BlackHole live test also requires KYBERION_LIVE_BLACKHOLE_TEST=1'
         );
-        process.exit(0);
-        break;
+        return { command: 'help', options };
       default:
         throw new Error(`unknown option '${arg}'`);
     }
@@ -97,8 +105,9 @@ function routeParams(options: CliOptions): Record<string, unknown> {
   };
 }
 
-async function main(): Promise<void> {
-  const { command, options } = parseArgs(process.argv.slice(2));
+async function main(argv: string[]): Promise<void> {
+  const { command, options } = parseArgs(argv);
+  if (command === 'help') return;
   let result: unknown;
   if (command === 'list') {
     result = await handleAction({
@@ -149,10 +158,13 @@ async function main(): Promise<void> {
     typeof result === 'object' && result !== null && 'status' in result
       ? String((result as { status: unknown }).status)
       : 'succeeded';
-  if (status === 'error' || status === 'failed') process.exitCode = 1;
+  if (status === 'error' || status === 'failed') {
+    throw new ScriptExitError(1, `voice route returned status=${status}`);
+  }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+void defineScript({
+  name: 'voice:route',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
