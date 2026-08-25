@@ -143,8 +143,7 @@ export async function runActuatorCli(opts: {
 
   if (!argv.input) {
     console.error(`[${opts.name}] --input is required (or use --serve)`);
-    process.exit(1);
-    return;
+    throw new Error('--input is required (or use --serve)');
   }
   const inputPath = pathResolver.rootResolve(String(argv.input));
 
@@ -153,8 +152,7 @@ export async function runActuatorCli(opts: {
     inputContent = String(safeReadFile(inputPath, { encoding: 'utf8' }) || '');
   } catch (err: any) {
     console.error(`[${opts.name}] failed to read input: ${err?.message || err}`);
-    process.exit(1);
-    return;
+    throw new Error(`failed to read input: ${err?.message || err}`);
   }
 
   let input: unknown;
@@ -162,8 +160,7 @@ export async function runActuatorCli(opts: {
     input = JSON.parse(inputContent);
   } catch (err: any) {
     console.error(`[${opts.name}] invalid JSON input: ${err?.message || err}`);
-    process.exit(1);
-    return;
+    throw new Error(`invalid JSON input: ${err?.message || err}`);
   }
 
   const result = await actuator.dispatch('execute', input);
@@ -173,8 +170,7 @@ export async function runActuatorCli(opts: {
     console.error(
       `[${opts.name}] ${label}${label === 'invalid input' ? `: ${error.slice('invalid input:'.length).trim()}` : `: ${error}`}`
     );
-    process.exit(1);
-    return;
+    throw new Error(`${label}: ${error}`);
   }
   (opts.printResult || ((value) => console.log(JSON.stringify(value, null, 2))))(result.output);
 }
