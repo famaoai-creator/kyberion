@@ -15,12 +15,13 @@
  */
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { executePipelineFile } from '../run_pipeline.js';
+import { defineScript, ScriptExitError } from '../lib/harness.js';
 
-async function main(): Promise<void> {
-  const [input, outArg] = process.argv.slice(2);
+async function main(argv: string[]): Promise<void> {
+  const [input, outArg] = argv;
   if (!input) {
     console.error('usage: convert.ts <input.html> [output.pptx]');
-    process.exit(1);
+    throw new ScriptExitError(1, 'input HTML path is required');
   }
   const out = outArg || input.replace(/\.html?$/i, '.pptx');
   const tmp = 'active/shared/tmp/html-to-pptx';
@@ -64,9 +65,8 @@ async function main(): Promise<void> {
   console.error(`[html-to-pptx] wrote ${out}`);
 }
 
-main().catch((error: unknown) => {
-  console.error(
-    `[html-to-pptx] pipeline failed: ${error instanceof Error ? error.message : String(error)}`
-  );
-  process.exitCode = 1;
-});
+void defineScript({
+  name: 'media:html-to-pptx',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
