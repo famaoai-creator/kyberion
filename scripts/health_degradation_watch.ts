@@ -12,6 +12,7 @@
  */
 
 import { logger, resolveFinanceControllerDecision, runDegradationWatch } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 function main(): number {
   const { report, alert } = runDegradationWatch({
@@ -24,7 +25,9 @@ function main(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /health_degradation_watch\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'health_degradation_watch.ts') ||
+  isDirectScript(import.meta.url, 'health_degradation_watch.js')
+) {
   process.exit(main());
 }

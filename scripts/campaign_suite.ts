@@ -8,6 +8,7 @@
  * fatal to the rest of the campaign.
  */
 import * as path from 'node:path';
+import { isDirectScript } from './lib/harness.js';
 import {
   buildCampaignPlan,
   logger,
@@ -129,8 +130,10 @@ async function main(): Promise<void> {
   process.exit(failed.length > 0 ? 1 : 0);
 }
 
-const isDirect = process.argv[1] && /campaign_suite\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'campaign_suite.ts') ||
+  isDirectScript(import.meta.url, 'campaign_suite.js')
+) {
   main().catch((err) => {
     logger.error(err instanceof Error ? err.message : String(err));
     process.exit(1);

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger, probeServiceRuntime } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export type MediaRuntimePreflightReport = {
   serviceId: string;
@@ -11,9 +12,11 @@ export type MediaRuntimePreflightReport = {
   managedServicePath?: string;
 };
 
-export async function runMediaRuntimePreflight(options: {
-  serviceId?: string;
-} = {}): Promise<MediaRuntimePreflightReport> {
+export async function runMediaRuntimePreflight(
+  options: {
+    serviceId?: string;
+  } = {}
+): Promise<MediaRuntimePreflightReport> {
   const serviceId = options.serviceId?.trim() || 'comfyui';
   const resolution = await probeServiceRuntime(serviceId, 'trial');
 
@@ -40,7 +43,9 @@ export async function runMediaRuntimePreflight(options: {
     logger.info(`[media-preflight] managed_service_path=${resolution.managed_service_path}`);
   }
   if (!resolution.available) {
-    logger.info('[media-preflight] next step: provision or start the media service runtime, then rerun `pnpm service:preflight -- --service media-generation`.');
+    logger.info(
+      '[media-preflight] next step: provision or start the media service runtime, then rerun `pnpm service:preflight -- --service media-generation`.'
+    );
   }
   logger.info('');
 
@@ -65,8 +70,10 @@ async function main(): Promise<void> {
   process.exit(report.available ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /media_runtime_preflight\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'media_runtime_preflight.ts') ||
+  isDirectScript(import.meta.url, 'media_runtime_preflight.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
     process.exit(1);

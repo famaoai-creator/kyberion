@@ -16,6 +16,7 @@
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
  */
 import { createStandardYargs, importPluginPack, installPluginManaged, logger } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export function runPluginInstall(): number {
   const argv = createStandardYargs()
@@ -148,8 +149,10 @@ export function runPluginInstall(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /plugin_install\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'plugin_install.ts') ||
+  isDirectScript(import.meta.url, 'plugin_install.js')
+) {
   try {
     process.exit(runPluginInstall());
   } catch (error) {
