@@ -255,13 +255,13 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ### SX-14: UX 契約の執行(P2 / S)
 
-**症状**: `USER_EXPERIENCE_CONTRACT.md` §Contract Test Hook の「内部語を漏らさない」検査は誰も走らせていない。README は外部 4 語 0/4、`actuator` 11 回。`QUICKSTART.md:15-19` は初画面で Actuator/ADF を紹介。`OPERATOR_UX_GUIDE` §4 は「バックエンドモデルを説明する方法」(契約と逆)。`surface-roles.json` の `tagline_key` は 5 surface 中 1。`env-registry.json` は 426 変数中 documented 53、`required` 0(validator が構造的に error を出せない)、regex 由来の偽変数 7、`*_TOKENS` を secret 誤分類。
+**症状**: `USER_EXPERIENCE_CONTRACT.md` §Contract Test Hook の「内部語を漏らさない」検査は誰も走らせていない。README は外部 4 語 0/4、`actuator` 11 回。`QUICKSTART.md:15-19` は初画面で Actuator/ADF を紹介。`OPERATOR_UX_GUIDE` §4 は「バックエンドモデルを説明する方法」(契約と逆)。`surface-roles.json` の `tagline_key` は 5 surface 中 1。`env-registry.json` は 410 変数中 documented 59、`required` 0。TypeScript/JavaScript 走査だけでは Python 音声ブリッジの6変数を未登録のまま見逃し、registry 品質検査も required/documented/secret の不整合を十分に拘束していなかった。
 
 **実装**:
 
 1. `check:ux-contract-docs`: README / QUICKSTART / OPERATOR_UX_GUIDE に対し内部限定語(mission / actuator / ADF / packet / ledger / capability bundle)を fail、外部 4 語の出現を require。前扉 3 文書を書き直す(内部語は「開発者向け」節にのみ許可)。
 2. `surface-roles.json` 全 surface に `tagline_key`。
-3. `generate_env_registry.ts` の分類・偽変数を修正、`required: true` を実際に必須な変数へ付与し `validateEnv` を起動時に実行(diagnostics 専用を脱する)。
+3. `generate_env_registry.ts` の分類と走査漏れを修正し、Python runtime bridge も登録対象にする。`required: true` は実運用の全起動形態で必須と確認できた場合だけ使い、条件付き capability の `required_for` から推測しない。`required` は `documented` と説明を必須にし、secret は required/default/type の不整合を拒否する。`validateEnv` は既存の起動境界で実行する。
 
 **受入基準**: 3 文書が lint green、env validator が実際に error を出せる。
 
@@ -348,9 +348,9 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 > **SX-08 実装追記 (2026-08-25)**: shared surface conversationの最終UX contract検証へ、intentの`approval_required`、approval request、mission proposalの承認要求を伝播させ、承認待ちの結果説明・解除操作を検証対象にした。voice固有能力の完全なcatalog移行と全surfaceの本番描画監査は未完。
 > **SX-09 実装追記 (2026-08-25)**: 登録token/API token/localadmin tokenの認証判定をcoreの`resolveSurfaceViewerToken`へ集約し、Chronos role判定とConcierge viewer解決から共有境界を利用するようにした。surface固有のtenant/tier narrowingとpresence-studioの別HTTP adapter統合は未完。
 > **SX-13 実装追記 (2026-08-25)**: `docs/documentation-source-map.json` と `check:documentation-source-map` を追加し、状態・概念・オンボーディングのカテゴリ別正本、スコープ付き正本、補足/履歴資料、入口リンクを機械検証できるようにした。GlossaryはFirst-win / Contributor / FDEの3層へ再編した。完了statusの7計画をアーカイブし、`knowledge/_integrity-manifest.json` を integrity inventory として生成、frontmatter除外を明示した。残りは巨大god module、wrapper debt、catalog/script残差など計画全体の未完項目。
-> **SX-14 実装追記 (2026-08-25)**: `kyberion`起動境界でenv registryのrequired欠損をfail-closed検証する`validateKyberionStartupEnvironment`を追加し、値を出さないエラー契約をテストした。現行registryにrequired項目がないため、実運用の必須項目キュレーションは未完。生成時にはrequired/documentedの説明必須とsecret required禁止を執行。
+> **SX-14 実装追記 (2026-08-25)**: `kyberion`起動境界でenv registryのrequired欠損をfail-closed検証する`validateKyberionStartupEnvironment`を追加し、値を出さないエラー契約をテストした。現行registryにrequired項目がない状態は維持し、条件付きmanifest要件から必須設定を捏造していない。今回、Python音声ブリッジの6変数を走査対象へ追加し、`required` は `documented` と説明を要求、secret の registry default・非string型・required を拒否するchecker/test/docsを追加した。生成物検査は `pnpm run check -- --scope full --only env-registry` を正本コマンドとする。
 > **SX-06/SX-12 実装追記 (2026-08-25)**: production scriptsの直接`process.argv`/`process.exit()`を0件へ固定するscript-integrity ratchetを追加し、workerのpayload/task契約を`mission-orchestration-worker-contracts.ts`へ抽出した。さらにphase gate/progress境界をworkerから分離し、worker本体は6,036行まで減少したが、SX-12の1,500行目標および残存god module分割は未完。
-> | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。README/Quickstart/Operator UX Guideの外部4語（request/plan/result/next action）は4/4で揃った。今回、`validateEnvAgainstRegistry(..., { strict: true })` が未登録変数と型不正をwarningではなくerrorとして返し、`KYBERION_ENV_REGISTRY_STRICT=1` のCLI起動でfail-closedになるテストを追加した。env全件の品質是正は未完。 |
+> | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface 5件の `tagline_key` が語彙 catalog に存在することをPR gateで検査。README/Quickstart/Operator UX Guideの外部4語（request/plan/result/next action）は4/4で揃った。`validateEnvAgainstRegistry(..., { strict: true })` は未登録変数と型不正をwarningではなくerrorとして返し、`KYBERION_ENV_REGISTRY_STRICT=1` のCLI起動でfail-closedになる。Python音声設定の登録漏れとrequired/documented/secretの品質不整合を追加検出できるようにしたが、任意設定351件の段階的な文書キュレーションは未完。 |
 
 ## 参照
 
