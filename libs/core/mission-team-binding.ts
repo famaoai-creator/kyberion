@@ -1,10 +1,9 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
-import { readJson } from './foundation/json.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -441,10 +440,7 @@ function resolveMissionLedgerScope(
   const statePath = path.join(missionPath, 'mission-state.json');
   if (safeExistsSync(statePath)) {
     try {
-      state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-        string,
-        unknown
-      >;
+      state = readJson<Record<string, unknown>>(statePath);
     } catch {
       state = {};
     }

@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeFsyncFile, safeReadFile, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 import type {
@@ -142,7 +143,7 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
     if (!safeExistsSync(this.#storePath)) return;
     let parsed: PersistedLiveSessionState;
     try {
-      parsed = JSON.parse(String(safeReadFile(this.#storePath, { encoding: 'utf8' })));
+      parsed = readJson<PersistedLiveSessionState>(this.#storePath);
     } catch (error) {
       throw new ShareGrantLiveSessionValidationError(
         `live-session state could not be read: ${error instanceof Error ? error.message : String(error)}`

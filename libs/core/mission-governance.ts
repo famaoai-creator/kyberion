@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 /**
  * scripts/refactor/mission-governance.ts
  * Governance, trust, and observability helpers for mission orchestration.
@@ -15,7 +15,6 @@ import {
 import { evaluateDeliverableQuality, inferDeliverableKind } from './deliverable-quality.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { logger } from './core.js';
 import {
   safeAppendFileSync,
@@ -206,7 +205,7 @@ export function validateMissionArtifactReviewGate(input: {
 
   let tasks: ArtifactReviewPlannedTask[];
   try {
-    const raw = JSON.parse(String(safeReadFile(taskPath, { encoding: 'utf8' }))) as unknown;
+    const raw = readJson<unknown>(taskPath);
     if (!Array.isArray(raw)) return { ok: false, reason: 'NEXT_TASKS.json must contain an array.' };
     tasks = raw.filter((entry): entry is ArtifactReviewPlannedTask =>
       Boolean(entry && typeof entry === 'object')

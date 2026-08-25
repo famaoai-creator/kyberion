@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -181,7 +181,7 @@ export function readProvisionedEntry<TContent>(
 ): PersistedProvisionedEntry<TContent> {
   let persisted: unknown;
   try {
-    persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''));
+    persisted = readJson<unknown>(filePath);
   } catch {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
   }
@@ -272,7 +272,7 @@ export function writeProvisionedJson<TContent>(input: {
   safeWriteFile(input.filePath, `${JSON.stringify(input.provisioned.content, null, 2)}\n`);
   let content: unknown;
   try {
-    content = JSON.parse(String(safeReadFile(input.filePath, { encoding: 'utf8' }) || ''));
+    content = readJson<unknown>(input.filePath);
   } catch {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
   }
