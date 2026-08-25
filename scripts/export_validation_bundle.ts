@@ -54,6 +54,7 @@ import {
   findMissionPath,
   missionEvidenceDir,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface BundleManifest {
   mission_id: string;
@@ -74,7 +75,11 @@ function sha256OfFile(absPath: string): { bytes: number; sha256: string } {
   return { bytes: buf.length, sha256: sha };
 }
 
-function copyIntoBundle(srcAbs: string, bundleRoot: string, relIntoBundle: string): {
+function copyIntoBundle(
+  srcAbs: string,
+  bundleRoot: string,
+  relIntoBundle: string
+): {
   rel: string;
   bytes: number;
   sha256: string;
@@ -91,7 +96,7 @@ function copyIntoBundle(srcAbs: string, bundleRoot: string, relIntoBundle: strin
 function copyDirIntoBundle(
   srcDirAbs: string,
   bundleRoot: string,
-  relIntoBundleDir: string,
+  relIntoBundleDir: string
 ): Array<{ rel: string; bytes: number; sha256: string }> {
   if (!safeExistsSync(srcDirAbs)) return [];
   const out: Array<{ rel: string; bytes: number; sha256: string }> = [];
@@ -117,7 +122,7 @@ function copyDirIntoBundle(
 
 function filterAuditChainByMission(
   auditDir: string,
-  missionId: string,
+  missionId: string
 ): { allEvents: any[]; overrideEvents: any[] } {
   const allEvents: any[] = [];
   const overrideEvents: any[] = [];
@@ -141,7 +146,10 @@ function filterAuditChainByMission(
         event.mission_id === missionId;
       if (!matches) continue;
       allEvents.push(event);
-      if (event.action === 'rubric.override_accepted' || event.type === 'rubric.override_accepted') {
+      if (
+        event.action === 'rubric.override_accepted' ||
+        event.type === 'rubric.override_accepted'
+      ) {
         overrideEvents.push(event);
       }
     }
@@ -173,7 +181,7 @@ function exportBundle(missionId: string, outputBaseDir: string): string {
   const bundleRoot = path.join(outputBaseDir, `${upperId}-validation-bundle`);
   if (safeExistsSync(bundleRoot)) {
     throw new Error(
-      `Bundle already exists at ${bundleRoot}; refusing to overwrite. Move or delete the existing one first.`,
+      `Bundle already exists at ${bundleRoot}; refusing to overwrite. Move or delete the existing one first.`
     );
   }
   safeMkdir(bundleRoot, { recursive: true });
@@ -352,17 +360,19 @@ must not be handed to an external validator.
   return bundleRoot;
 }
 
-function main(): number {
-  const args = process.argv.slice(2);
+function main(args: string[]): number {
   const missionId = args.find((a) => !a.startsWith('--'));
   if (!missionId) {
-    logger.error('Usage: node dist/scripts/export_validation_bundle.js <MISSION_ID> [--output <dir>]');
+    logger.error(
+      'Usage: node dist/scripts/export_validation_bundle.js <MISSION_ID> [--output <dir>]'
+    );
     return 1;
   }
   const outputIdx = args.indexOf('--output');
-  const outputBase = outputIdx >= 0 && args[outputIdx + 1]
-    ? path.resolve(args[outputIdx + 1])
-    : pathResolver.rootResolve('active/shared/exports/validation-bundles');
+  const outputBase =
+    outputIdx >= 0 && args[outputIdx + 1]
+      ? path.resolve(args[outputIdx + 1])
+      : pathResolver.rootResolve('active/shared/exports/validation-bundles');
   safeMkdir(outputBase, { recursive: true });
   try {
     const bundlePath = exportBundle(missionId, outputBase);
@@ -375,9 +385,17 @@ function main(): number {
   }
 }
 
-const isDirect = process.argv[1] && /export_validation_bundle\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  process.exit(main());
-}
+if (
+  isDirectScript(import.meta.url, 'export_validation_bundle.ts') ||
+  isDirectScript(import.meta.url, 'export_validation_bundle.js')
+)
+  void defineScript({
+    name: 'export:validation-bundle',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`validation bundle export failed with exit code ${status}`);
+    },
+  })();
 
 export { exportBundle };
