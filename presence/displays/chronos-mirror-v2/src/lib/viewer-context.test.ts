@@ -67,6 +67,29 @@ describe('viewer-context', () => {
     expect(() => strictViewerTier(viewer, 'personal')).toThrow('viewer tier scope denied');
   });
 
+  it('cannot widen tenant or tier scope through client selections', async () => {
+    const { strictViewerScopeTenantSlugs, strictViewerTier } = await import('./viewer-context.js');
+    const viewer = {
+      role: 'readonly' as const,
+      tenantSlugs: ['tenant-a'],
+      tierAccess: ['public'],
+      source: 'token' as const,
+    };
+    const expectForbidden = (operation: () => unknown) => {
+      try {
+        operation();
+        throw new Error('expected viewer scope denial');
+      } catch (error) {
+        expect(error).toMatchObject({ status: 403 });
+      }
+    };
+
+    expect(strictViewerScopeTenantSlugs(viewer, 'tenant-a')).toEqual(['tenant-a']);
+    expectForbidden(() => strictViewerScopeTenantSlugs(viewer, 'tenant-b'));
+    expect(strictViewerTier(viewer, 'public')).toBe('public');
+    expectForbidden(() => strictViewerTier(viewer, 'confidential'));
+  });
+
   it('only allows organization and project selections inside the registered sets', async () => {
     const { strictViewerScopeOrganizationIds, strictViewerScopeProjectIds } =
       await import('./viewer-context.js');
