@@ -6,7 +6,7 @@ import type { ValidateFunction } from 'ajv';
 export interface GovernedCatalogOptions<T> {
   id: string;
   path: string | (() => string);
-  schema?: string | ValidateFunction<T>;
+  schema: string | ValidateFunction<T>;
   fallback?: T | (() => T);
   onFallback?: (error: unknown, fallback: T) => void;
 }
@@ -34,7 +34,6 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
     typeof options.path === 'function' ? options.path() : options.path;
 
   const validate = (value: unknown, sourcePath: string): T => {
-    if (!options.schema) return value as T;
     validator ||=
       typeof options.schema === 'string' ? compileSchema<T>(options.schema) : options.schema;
     if (!validator(value)) {
