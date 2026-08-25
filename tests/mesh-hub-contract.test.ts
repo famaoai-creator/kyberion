@@ -67,23 +67,35 @@ describe('Mesh Hub contract', () => {
   });
 
   it('ships the expected mesh hub schema files', () => {
-    expect(safeExistsSync('knowledge/product/schemas/mesh-peer-registration.schema.json')).toBe(true);
+    expect(safeExistsSync('knowledge/product/schemas/mesh-peer-registration.schema.json')).toBe(
+      true
+    );
     expect(safeExistsSync('knowledge/product/schemas/mesh-peer-presence.schema.json')).toBe(true);
-    expect(safeExistsSync('knowledge/product/schemas/mesh-capability-advertisement.schema.json')).toBe(true);
+    expect(
+      safeExistsSync('knowledge/product/schemas/mesh-capability-advertisement.schema.json')
+    ).toBe(true);
     expect(safeExistsSync('knowledge/product/schemas/mesh-request.schema.json')).toBe(true);
     expect(safeExistsSync('knowledge/product/schemas/mesh-delivery-record.schema.json')).toBe(true);
-    expect(safeExistsSync('knowledge/product/schemas/mesh-topic-subscription.schema.json')).toBe(true);
+    expect(safeExistsSync('knowledge/product/schemas/mesh-topic-subscription.schema.json')).toBe(
+      true
+    );
     expect(safeExistsSync('knowledge/product/governance/mesh-hub-policy.json')).toBe(true);
   });
 
   it('validates representative peer, presence, capability, request, delivery, and subscription contracts', () => {
     const ajv = makeAjv();
-    const peerRegistrationSchema = loadJson('knowledge/product/schemas/mesh-peer-registration.schema.json');
+    const peerRegistrationSchema = loadJson(
+      'knowledge/product/schemas/mesh-peer-registration.schema.json'
+    );
     const peerPresenceSchema = loadJson('knowledge/product/schemas/mesh-peer-presence.schema.json');
-    const capabilitySchema = loadJson('knowledge/product/schemas/mesh-capability-advertisement.schema.json');
+    const capabilitySchema = loadJson(
+      'knowledge/product/schemas/mesh-capability-advertisement.schema.json'
+    );
     const requestSchema = loadJson('knowledge/product/schemas/mesh-request.schema.json');
     const deliverySchema = loadJson('knowledge/product/schemas/mesh-delivery-record.schema.json');
-    const subscriptionSchema = loadJson('knowledge/product/schemas/mesh-topic-subscription.schema.json');
+    const subscriptionSchema = loadJson(
+      'knowledge/product/schemas/mesh-topic-subscription.schema.json'
+    );
 
     const validatePeerRegistration = ajv.compile(peerRegistrationSchema);
     const validatePeerPresence = ajv.compile(peerPresenceSchema);
@@ -103,7 +115,7 @@ describe('Mesh Hub contract', () => {
         registered_at: '2026-06-24T00:00:00.000Z',
         allowed_request_kinds: ['review.request', 'capability.query'],
       }),
-      ajv.errorsText(validatePeerRegistration.errors),
+      ajv.errorsText(validatePeerRegistration.errors)
     ).toBe(true);
 
     expect(
@@ -121,7 +133,7 @@ describe('Mesh Hub contract', () => {
         },
         receive_modes: ['request', 'topic'],
       }),
-      ajv.errorsText(validatePeerPresence.errors),
+      ajv.errorsText(validatePeerPresence.errors)
     ).toBe(true);
 
     expect(
@@ -141,7 +153,7 @@ describe('Mesh Hub contract', () => {
         visibility: 'tenant',
         advertised_at: '2026-06-24T00:02:00.000Z',
       }),
-      ajv.errorsText(validateCapability.errors),
+      ajv.errorsText(validateCapability.errors)
     ).toBe(true);
 
     expect(
@@ -173,7 +185,7 @@ describe('Mesh Hub contract', () => {
           },
         },
       }),
-      ajv.errorsText(validateRequest.errors),
+      ajv.errorsText(validateRequest.errors)
     ).toBe(true);
 
     expect(
@@ -215,7 +227,7 @@ describe('Mesh Hub contract', () => {
         },
         created_at: '2026-06-24T00:03:00.000Z',
       }),
-      ajv.errorsText(validateDelivery.errors),
+      ajv.errorsText(validateDelivery.errors)
     ).toBe(true);
 
     expect(
@@ -232,7 +244,7 @@ describe('Mesh Hub contract', () => {
         expires_at: '2026-06-24T01:03:00.000Z',
         policy_version: '1.0.0',
       }),
-      ajv.errorsText(validateSubscription.errors),
+      ajv.errorsText(validateSubscription.errors)
     ).toBe(true);
   });
 
@@ -269,13 +281,14 @@ describe('Mesh Hub contract', () => {
             storage_class: 'artifact_store',
           },
         },
-      }),
+      })
     ).toBe(false);
   });
 
   it('keeps the mesh hub policy closed and aligned with the allowlist', () => {
     const policy = loadJson('knowledge/product/governance/mesh-hub-policy.json');
     expect(Object.keys(policy).sort()).toEqual([
+      '$schema',
       'data_tier',
       'placement',
       'recipient_acceptance',

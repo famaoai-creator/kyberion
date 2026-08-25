@@ -11,10 +11,15 @@ import {
 import { summarizeMemoryPromotionQueue } from './summarize_memory_promotion_queue.js';
 
 describe('summarize_memory_promotion_queue', () => {
-  const queuePath = memoryPromotionQueuePath();
+  const TEST_QUEUE_OVERRIDE = 'active/shared/tmp/test-memory-promotion-summary.jsonl';
+  let queuePath: string;
+  let originalQueueOverride: string | undefined;
   let originalQueueRaw: string | null = null;
 
   beforeAll(() => {
+    originalQueueOverride = process.env.KYBERION_MEMORY_QUEUE_PATH;
+    process.env.KYBERION_MEMORY_QUEUE_PATH = TEST_QUEUE_OVERRIDE;
+    queuePath = memoryPromotionQueuePath();
     if (safeExistsSync(queuePath)) {
       originalQueueRaw = safeReadFile(queuePath, { encoding: 'utf8' }) as string;
     }
@@ -23,9 +28,11 @@ describe('summarize_memory_promotion_queue', () => {
   afterAll(() => {
     if (originalQueueRaw !== null) {
       safeWriteFile(queuePath, originalQueueRaw);
-      return;
+    } else if (safeExistsSync(queuePath)) {
+      safeRmSync(queuePath);
     }
-    if (safeExistsSync(queuePath)) safeRmSync(queuePath);
+    if (originalQueueOverride === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueueOverride;
   });
 
   it('summarizes queued candidates with age information', () => {

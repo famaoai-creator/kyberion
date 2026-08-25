@@ -76,11 +76,11 @@
     {
       "id": "parse_brief",
       "role": "transform",
-      "op": "core:transform",
+      "op": "core:parse_proposal_brief",
       "consumes": "deck_brief_raw",
       "produces": { "channel": "deck_brief", "type": "DeckBrief" },
       "params": {
-        "script": "const raw = ctx.deck_brief_raw; if (!raw) throw new Error('deck_brief_raw is missing from context'); const s = typeof raw === 'string' ? raw : JSON.stringify(raw); const jsonStr = s.includes('```json') ? s.split('```json')[1].split('```')[0] : s.includes('```') ? s.split('```')[1].split('```')[0] : s; const parsed = JSON.parse(jsonStr.trim()); return {...parsed, kind: 'proposal-brief', tenant_id: ctx.tenant_slug || parsed.tenant_slug};"
+        "source": "deck_brief_raw"
       }
     },
     {

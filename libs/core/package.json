@@ -19,6 +19,10 @@
       "types": "./dist/foundation/index.d.ts",
       "default": "./dist/foundation/index.js"
     },
+    "./foundation/env": {
+      "types": "./dist/foundation/env.d.ts",
+      "default": "./dist/foundation/env.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
