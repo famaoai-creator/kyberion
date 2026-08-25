@@ -18,25 +18,25 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 
-export async function main(argv: string[] = []): Promise<void> {
-  const devMode = argv.includes('--dev');
+export async function main(args: string[] = []): Promise<void> {
+  const devMode = args.includes('--dev');
   if (devMode) {
     process.argv = [
       process.argv[0] || 'node',
       process.argv[1] || 'scripts/tui.ts',
-      ...argv.filter((arg) => arg !== '--dev'),
+      ...args.filter((arg) => arg !== '--dev'),
     ];
     await import(SOURCE_ENTRY);
     return;
   }
 
-  const argv = await createStandardYargs()
+  const options = await createStandardYargs()
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })
     .strict()
-    .parse(argv);
+    .parse(args);
 
-  await runTui({ once: argv.once, panel: argv.panel });
+  await runTui({ once: options.once, panel: options.panel });
 }
 
 export const runTuiScript = defineScript({
