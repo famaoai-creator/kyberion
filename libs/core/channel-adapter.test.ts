@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { runChannelTurn, type ChannelAdapter } from './channel-adapter.js';
+import {
+  formatChannelThreadContext,
+  runChannelTurn,
+  type ChannelAdapter,
+} from './channel-adapter.js';
+
+describe('formatChannelThreadContext', () => {
+  it('normalizes recent provider messages while preserving speaker labels', () => {
+    expect(
+      formatChannelThreadContext('Slack', [
+        { role: 'user', authorLabel: 'alice', text: 'Hello' },
+        { role: 'assistant', authorLabel: 'bot', text: 'Hi there' },
+      ])
+    ).toBe('Recent Slack thread context:\nUser (alice): Hello\nAssistant: Hi there');
+  });
+
+  it('returns no context for empty or whitespace-only history', () => {
+    expect(
+      formatChannelThreadContext('Slack', [{ role: 'user', authorLabel: 'alice', text: '   ' }])
+    ).toBeUndefined();
+  });
+});
 
 describe('runChannelTurn', () => {
   it('keeps thread context, typing, conversation, delivery, and cleanup ordered', async () => {

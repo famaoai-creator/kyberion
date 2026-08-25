@@ -14,6 +14,7 @@ import {
   recordSlackSurfaceArtifact,
   runSurfaceMessageConversation,
   runChannelTurn,
+  formatChannelThreadContext,
   type ChannelAdapter,
   recordSlackDelivery,
   recordSlackKnowledgeReaction,
@@ -95,6 +96,48 @@ function recordSlackConversationOutcome(params: {
     mission_proposal_count: params.missionProposalCount || 0,
     source_text: params.sourceText.slice(0, 240),
   });
+}
+
+interface SlackThreadMessage {
+  text?: unknown;
+  bot_id?: unknown;
+  user?: unknown;
+  username?: unknown;
+  ts?: unknown;
+}
+
+interface SlackThreadRepliesClient {
+  conversations?: {
+    replies?: (input: {
+      channel: string;
+      ts: string;
+      limit: number;
+    }) => Promise<{ messages?: SlackThreadMessage[] }>;
+  };
+}
+
+async function collectSlackThreadContext(
+  client: SlackThreadRepliesClient,
+  channel: string,
+  threadTs: string,
+  currentTs: string
+): Promise<string | undefined> {
+  if (threadTs === currentTs || !client.conversations?.replies) return undefined;
+
+  try {
+    const response = await client.conversations.replies({ channel, ts: threadTs, limit: 8 });
+    const entries = (response.messages || [])
+      .filter((message) => String(message.ts || '') !== currentTs)
+      .map((message) => ({
+        role: message.bot_id ? ('assistant' as const) : ('user' as const),
+        authorLabel: String(message.username || message.user || 'unknown'),
+        text: String(message.text || ''),
+      }));
+    return formatChannelThreadContext('Slack', entries);
+  } catch (error: any) {
+    logger.warn(`⚠️ [SlackBridge] Failed to fetch thread history: ${error?.message || error}`);
+    return undefined;
+  }
 }
 
 async function postOnboardingReply(
@@ -578,6 +621,8 @@ async function start() {
       const channelAdapter: ChannelAdapter = {
         channel: 'slack',
         actorId: message.user,
+        threadContext: () =>
+          collectSlackThreadContext(client, message.channel, threadTs, message.ts),
         typing: () => ({ stop: clearTypingReaction }),
         send: async () => undefined,
       };
