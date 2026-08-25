@@ -153,7 +153,7 @@ type RunStepResult = {
 
 function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExecResult> {
   const fallbackEntry = pathResolver.rootResolve('scripts/run_pipeline.ts');
-  const tsxAvailable = safeExecResult('node', ['--import', 'tsx', '--eval', 'process.exit(0)'], {
+  const tsxAvailable = safeExecResult('node', ['--import', 'tsx', '--eval', 'process.exitCode=0'], {
     cwd: pathResolver.rootDir(),
     env: {
       KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
@@ -3198,7 +3198,7 @@ export async function main() {
   // leave their system microphone locked to BlackHole.
   const cleanupAndExit = (code: number) => {
     resetRouterSync();
-    process.exit(code);
+    process.exitCode = code;
   };
   process.once('SIGINT', () => cleanupAndExit(130));
   process.once('SIGTERM', () => cleanupAndExit(143));
@@ -3212,7 +3212,8 @@ export async function main() {
       overrideContext = JSON.parse(argv.context as string);
     } catch (err: any) {
       logger.error(`❌ [PIPELINE] Invalid --context JSON: ${err.message}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
   }
   const firstNonEmpty = (...candidates: (string | undefined)[]): string | undefined =>
@@ -3472,7 +3473,8 @@ export async function main() {
           '   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.'
         );
       } else {
-        process.exit(0);
+        process.exitCode = 0;
+        return;
       }
     } else {
       if (failed) {
@@ -3480,7 +3482,8 @@ export async function main() {
         logNextActionForPipelineFailure(failure!, String(argv.input));
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
   } catch (err: any) {
     if (err instanceof PipelineSuspendedError) {
@@ -3508,7 +3511,8 @@ export async function main() {
       logger.warn(
         `⏸️ [PIPELINE] Awaiting decision ${err.suspension.approval_request_id}. Resume with --resume ${runJournal?.runId || 'the run id'}.`
       );
-      process.exit(0);
+      process.exitCode = 0;
+      return;
     }
     const failure = formatPipelineFailure(err);
     const recovered = tryPermissionFallback(pipeline, failure, trace);
@@ -3544,7 +3548,8 @@ export async function main() {
       logger.info(
         `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
       );
-      process.exit(0);
+      process.exitCode = 0;
+      return;
     }
     trace.addEvent('pipeline.error', {
       error: err?.message ?? String(err),
@@ -3564,7 +3569,8 @@ export async function main() {
     );
     logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
     logNextActionForPipelineFailure(failure, String(argv.input));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 }
 
@@ -3575,6 +3581,6 @@ const isDirectRun =
 if (isDirectRun) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
