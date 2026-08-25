@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { createStandardYargs, listSurfaceDeadLetters, replaySurfaceDeadLetter } from '@agent/core';
+import {
+  createStandardYargs,
+  isSurfaceAsyncChannel,
+  listSurfaceDeadLetters,
+  replaySurfaceDeadLetter,
+} from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type SurfaceOutboxCommand = 'list' | 'replay';
@@ -38,6 +43,9 @@ export function runSurfaceOutbox(args: string[] = []): number {
   const surface = String(argv.surface || '')
     .trim()
     .toLowerCase();
+  if (!isSurfaceAsyncChannel(surface)) {
+    throw new Error(`Surface "${surface}" is not registered in the surface manifest.`);
+  }
   if (command === 'list') {
     const records = listSurfaceDeadLetters(surface);
     if (argv.json) {

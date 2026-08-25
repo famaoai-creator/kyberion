@@ -74,6 +74,7 @@ import type { MissionStatusView } from './mission-read-model.js';
 import type {
   SurfaceConversationInput,
   SurfaceConversationResult,
+  SurfaceAsyncChannel,
 } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 
@@ -185,7 +186,7 @@ export function classifySteeringMessage(rawText: string): SteeringMatch | null {
 // ---------------------------------------------------------------------------
 
 export interface SteeringThreadKey {
-  surface: string;
+  surface: SurfaceAsyncChannel;
   channel?: string;
   threadTs?: string;
 }
@@ -361,7 +362,7 @@ function handleStatusVerb(missionId: string): SurfaceConversationResult {
 async function handleCheckpointVerb(
   missionId: string,
   note: string | undefined,
-  surfaceTag: string
+  surfaceTag: SurfaceAsyncChannel
 ): Promise<SurfaceConversationResult> {
   const adapter = resolveLifecycleAdapter();
   const effectiveNote =
@@ -725,7 +726,7 @@ async function enqueueMissionSteeringInput(input: {
   missionId: string;
   delivery: 'steer' | 'follow_up';
   text: string;
-  surface: string;
+  surface: SurfaceAsyncChannel;
   channel?: string;
   threadTs?: string;
 }): Promise<SurfaceConversationResult> {

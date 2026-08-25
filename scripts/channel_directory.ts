@@ -4,6 +4,7 @@ import {
   formatChannelDirectoryEntry,
   getChannelDirectoryEntry,
   listChannelDirectoryEntries,
+  isSurfaceAsyncChannel,
 } from '@agent/core';
 import { isDirectScript } from './lib/harness.js';
 
@@ -19,7 +20,11 @@ async function main(): Promise<void> {
 
   const entries = argv.channel
     ? (() => {
-        const entry = getChannelDirectoryEntry(String(argv.channel));
+        const channel = String(argv.channel).trim().toLowerCase();
+        if (!isSurfaceAsyncChannel(channel)) {
+          throw new Error(`Channel "${channel}" is not registered in the surface manifest.`);
+        }
+        const entry = getChannelDirectoryEntry(channel);
         if (!entry) {
           throw new Error(
             `Channel "${String(argv.channel)}" was not found. Try one of: ${listChannelDirectoryEntries()
