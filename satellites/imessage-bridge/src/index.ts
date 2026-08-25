@@ -353,10 +353,9 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
           senderAgentId: 'kyberion:imessage-bridge',
           agentId: IMESSAGE_SURFACE_AGENT_ID,
           threadContext,
-          attachments: msg.attachments,
           delegationSummaryInstruction:
             'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
-        } as any)
+        })
     );
 
     // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
