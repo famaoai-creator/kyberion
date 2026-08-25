@@ -1,14 +1,14 @@
 import { createVirtualCameraBridge } from '@agent/core';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main() {
-  const outputPath = process.argv[2] || 'active/shared/tmp/user_face.jpg';
+async function main(argv: string[]) {
+  const outputPath = argv[0] || 'active/shared/tmp/user_face.jpg';
   const cameraBridge = createVirtualCameraBridge();
   const probe = await cameraBridge.probe();
 
   if (!probe.available) {
-    console.error(`Camera is not available: ${probe.reason || 'unknown'}`);
-    process.exit(1);
+    throw new Error(`Camera is not available: ${probe.reason || 'unknown'}`);
   }
 
   console.log(`Using camera backend: ${probe.backend}`);
@@ -21,12 +21,20 @@ async function main() {
     });
     console.log(`Successfully saved photo to: ${result.save_path}`);
   } catch (err: any) {
-    console.error(`Failed to capture photo: ${err.message}`);
-    process.exit(1);
+    throw new Error(`Failed to capture photo: ${err.message}`);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+export const runCapturePhoto = defineScript({
+  name: 'capture-photo',
+  flags: [],
+  run(context) {
+    return main(context.argv);
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'capture_photo.ts') ||
+  isDirectScript(import.meta.url, 'capture_photo.js')
+)
+  void runCapturePhoto();
