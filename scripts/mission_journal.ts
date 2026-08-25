@@ -11,6 +11,7 @@ import {
 } from '@agent/core';
 import chalk from 'chalk';
 import { readJsonFile } from './refactor/cli-input.js';
+import { defineScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -146,6 +147,14 @@ function renderJournal(tenantSlug?: string) {
   }
 }
 
-const tenantFlag = process.argv.indexOf('--tenant-slug');
-const tenantSlug = tenantFlag >= 0 ? process.argv[tenantFlag + 1]?.trim() : undefined;
-renderJournal(tenantSlug || undefined);
+export function main(argv: string[] = []): void {
+  const tenantFlag = argv.indexOf('--tenant-slug');
+  const tenantSlug = tenantFlag >= 0 ? argv[tenantFlag + 1]?.trim() : undefined;
+  renderJournal(tenantSlug || undefined);
+}
+
+void defineScript({
+  name: 'mission:journal',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
