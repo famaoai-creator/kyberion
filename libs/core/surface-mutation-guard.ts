@@ -84,6 +84,11 @@ export interface SurfaceViewerTokenResolution {
   registration?: ChronosTokenRegistration;
 }
 
+export interface SurfaceViewerConfiguredCredential {
+  token?: string;
+  role: ChronosAccessRole;
+}
+
 /**
  * Resolve the shared credential boundary used by HTTP surfaces.
  *
@@ -97,6 +102,7 @@ export function resolveSurfaceViewerToken(
     registrations?: readonly ChronosTokenRegistration[] | null;
     apiToken?: string;
     localadminToken?: string;
+    configuredCredentials?: readonly SurfaceViewerConfiguredCredential[];
   } = {}
 ): SurfaceViewerTokenResolution | null {
   if (!token) return null;
@@ -106,6 +112,10 @@ export function resolveSurfaceViewerToken(
   if (registration) return { role: registration.role, registration };
   if (matchesChronosToken(token, options.localadminToken)) return { role: 'localadmin' };
   if (matchesChronosToken(token, options.apiToken)) return { role: 'readonly' };
+  const configured = options.configuredCredentials?.find((credential) =>
+    matchesChronosToken(token, credential.token)
+  );
+  if (configured) return { role: configured.role };
   return null;
 }
 
