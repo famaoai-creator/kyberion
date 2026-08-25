@@ -2955,56 +2955,62 @@ async function runStepsInternal(
 }
 
 /** Validate Typed Flow channel integrity before allowing any step side effects. */
+class TypedFlowValidationError extends Error {
+  constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
+    super(formatFlowValidationErrors(flowErrors));
+    this.name = 'TypedFlowValidationError';
+  }
+}
+
 export async function runValidatedSteps(
   steps: PipelineAdfStep[],
   initialCtx: Record<string, unknown> = {},
   opts: RunStepsOptions = {}
 ) {
-  const flowErrors = validateFlow(steps, initialCtx);
-  if (flowErrors.length === 0) {
+  try {
     return (
       await runAdfLifecycle({
         draft: () => steps,
         preflight: (draft) => {
-          const errors = validateFlow(draft, initialCtx);
-          if (errors.length > 0) throw new Error(formatFlowValidationErrors(errors));
+          const flowErrors = validateFlow(draft, initialCtx);
+          if (flowErrors.length > 0) throw new TypedFlowValidationError(flowErrors);
           return draft;
         },
+        // SX-11 / AGENTS.md: invalid pipeline contracts use the canonical
+        // repair agent as the lifecycle's one auto-repair hook. The one-shot
+        // guard prevents an unchanged repair from becoming a retry loop.
+        autoRepair:
+          opts.pipelinePath && !opts._adfRepairAttempted
+            ? async (draft) => {
+                const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf');
+                if (!repair.repaired) {
+                  throw new TypedFlowValidationError(validateFlow(draft, initialCtx));
+                }
+                return (await readValidatedWorkflowAdf(opts.pipelinePath!)).steps;
+              }
+            : undefined,
         commit: (prepared) => prepared,
         execute: (committed) => runSteps(committed, initialCtx, opts),
       })
     ).result;
-  }
+  } catch (error) {
+    if (!(error instanceof TypedFlowValidationError)) throw error;
 
-  // SX-11 / AGENTS.md: a pipeline with an invalid contract must pass through
-  // the canonical repair agent before execution is abandoned. The one-shot
-  // guard keeps a repair that did not change the ADF from becoming a retry
-  // loop; the refreshed file is validated again through the same lifecycle.
-  if (opts.pipelinePath && !opts._adfRepairAttempted) {
-    const repair = await validateAndRepairAdf(opts.pipelinePath, 'pipeline-adf');
-    if (repair.repaired) {
-      const repaired = await readValidatedWorkflowAdf(opts.pipelinePath);
-      return runValidatedSteps(repaired.steps, initialCtx, {
-        ...opts,
-        _adfRepairAttempted: true,
-      });
+    const message = error.message;
+    for (const flowError of error.flowErrors) {
+      logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
     }
+    opts.trace?.addEvent('pipeline.validation_failed', {
+      validation_type: 'typed_flow',
+      error: message,
+      error_count: error.flowErrors.length,
+    });
+    return {
+      status: 'failed' as const,
+      results: [{ op: 'flow:validate', status: 'failed' as const, error: message }],
+      context: { ...initialCtx },
+    };
   }
-
-  const error = formatFlowValidationErrors(flowErrors);
-  for (const flowError of flowErrors) {
-    logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
-  }
-  opts.trace?.addEvent('pipeline.validation_failed', {
-    validation_type: 'typed_flow',
-    error,
-    error_count: flowErrors.length,
-  });
-  return {
-    status: 'failed' as const,
-    results: [{ op: 'flow:validate', status: 'failed' as const, error }],
-    context: { ...initialCtx },
-  };
 }
 
 export interface ExecutePipelineFileOptions {
