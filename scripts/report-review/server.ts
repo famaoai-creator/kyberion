@@ -27,209 +27,223 @@ import {
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
-const target = process.argv[2];
-const positionalPort =
-  process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : undefined;
-const option = (flag: string): string | undefined => {
-  const index = process.argv.indexOf(flag);
-  return index >= 0 ? process.argv[index + 1] : undefined;
-};
-const port = Number(positionalPort || 8137);
-if (!target) {
-  console.error(
-    'usage: server <report.html> [port] [--artifact-ref <ref>] [--tier <tier>] [--tenant <slug>]'
-  );
-  process.exit(1);
-}
-assertProtocolServiceRegistered('report-review');
-if (!safeExistsSync(target)) {
-  console.error(`report not found: ${target}`);
-  process.exit(1);
-}
-
-const tier = (option('--tier') || 'public') as 'public' | 'confidential' | 'personal';
-if (!['public', 'confidential', 'personal'].includes(tier)) {
-  console.error(`invalid tier: ${tier}`);
-  process.exit(1);
-}
-const reviewContext = createReportReviewContext({
-  artifact_ref: option('--artifact-ref') || target,
-  viewer_principal:
-    getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
-    getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
-    'local-reviewer',
-  tier,
-  tenant_slug: option('--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
-  organization_id: option('--organization-id'),
-  project_id: option('--project-id'),
-  mission_id: option('--mission-id'),
-});
-
-const TOKEN = randomBytes(16).toString('hex');
-const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
-const CFG_CLOSE = '<!--/RV-SAVE-CONFIG-->';
-const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const stripBetween = (html: string, o: string, c: string) =>
-  html.replace(new RegExp(re(o) + '[\\s\\S]*?' + re(c), 'g'), '');
-
-function stripInjected(html: string): string {
-  return stripBetween(stripBetween(html, CFG_OPEN, CFG_CLOSE), RV_LAYER_OPEN, RV_LAYER_CLOSE);
-}
-function serveHtml(): string {
-  let html = stripInjected(safeReadFile(target, { encoding: 'utf8' }) as string);
-  const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
-  html = /<head[^>]*>/i.test(html)
-    ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`)
-    : cfg + html;
-  // レイヤが未焼き込みの場合のみ、配信時にオーバーレイ注入する
-  if (!/id="rv-bar"/.test(html)) {
-    const layer = reviewLayerMarkup();
-    html = html.includes('</body>') ? html.replace('</body>', `${layer}\n</body>`) : html + layer;
+async function main(args: string[] = []): Promise<void> {
+  const target = args[0];
+  const positionalPort = args[1] && !args[1].startsWith('--') ? args[1] : undefined;
+  const option = (flag: string): string | undefined => {
+    const index = args.indexOf(flag);
+    return index >= 0 ? args[index + 1] : undefined;
+  };
+  const port = Number(positionalPort || 8137);
+  if (!target) {
+    throw new ScriptExitError(
+      1,
+      'usage: server <report.html> [port] [--artifact-ref <ref>] [--tier <tier>] [--tenant <slug>]'
+    );
   }
-  return html;
-}
-const ts = () => new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+  assertProtocolServiceRegistered('report-review');
+  if (!safeExistsSync(target)) {
+    throw new ScriptExitError(1, `report not found: ${target}`);
+  }
 
-const server = http.createServer((req, res) => {
-  try {
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-      });
-      res.end(serveHtml());
-      return;
+  const tier = (option('--tier') || 'public') as 'public' | 'confidential' | 'personal';
+  if (!['public', 'confidential', 'personal'].includes(tier)) {
+    throw new ScriptExitError(1, `invalid tier: ${tier}`);
+  }
+  const reviewContext = createReportReviewContext({
+    artifact_ref: option('--artifact-ref') || target,
+    viewer_principal:
+      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
+      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
+      'local-reviewer',
+    tier,
+    tenant_slug: option('--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
+    organization_id: option('--organization-id'),
+    project_id: option('--project-id'),
+    mission_id: option('--mission-id'),
+  });
+
+  const TOKEN = randomBytes(16).toString('hex');
+  const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
+  const CFG_CLOSE = '<!--/RV-SAVE-CONFIG-->';
+  const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripBetween = (html: string, o: string, c: string) =>
+    html.replace(new RegExp(re(o) + '[\\s\\S]*?' + re(c), 'g'), '');
+
+  function stripInjected(html: string): string {
+    return stripBetween(stripBetween(html, CFG_OPEN, CFG_CLOSE), RV_LAYER_OPEN, RV_LAYER_CLOSE);
+  }
+  function serveHtml(): string {
+    let html = stripInjected(safeReadFile(target, { encoding: 'utf8' }) as string);
+    const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
+    html = /<head[^>]*>/i.test(html)
+      ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`)
+      : cfg + html;
+    // レイヤが未焼き込みの場合のみ、配信時にオーバーレイ注入する
+    if (!/id="rv-bar"/.test(html)) {
+      const layer = reviewLayerMarkup();
+      html = html.includes('</body>') ? html.replace('</body>', `${layer}\n</body>`) : html + layer;
     }
-    if (req.method === 'GET' && req.url === '/health') {
-      res.writeHead(200);
-      res.end('ok');
-      return;
-    }
-    if (req.method === 'POST' && req.url === '/save') {
-      if (req.headers['x-rv-token'] !== TOKEN) {
-        res.writeHead(403);
-        res.end('bad token');
+    return html;
+  }
+  const ts = () => new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+
+  const server = http.createServer((req, res) => {
+    try {
+      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(serveHtml());
         return;
       }
-      const origin = req.headers.origin;
-      if (origin && !/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(origin)) {
-        res.writeHead(403);
-        res.end('bad origin');
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200);
+        res.end('ok');
         return;
       }
-      let data = '';
-      let aborted = false;
-      req.on('data', (c) => {
-        data += c;
-        if (data.length > 25 * 1024 * 1024) {
-          aborted = true;
-          req.destroy();
+      if (req.method === 'POST' && req.url === '/save') {
+        if (req.headers['x-rv-token'] !== TOKEN) {
+          res.writeHead(403);
+          res.end('bad token');
+          return;
         }
-      });
-      req.on('end', () => {
-        if (aborted) return;
-        try {
-          const html = stripInjected(data);
-          if (!/<\/html>\s*$/i.test(html.trim())) {
-            res.writeHead(400);
-            res.end('not a complete HTML document');
-            return;
+        const origin = req.headers.origin;
+        if (origin && !/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(origin)) {
+          res.writeHead(403);
+          res.end('bad origin');
+          return;
+        }
+        let data = '';
+        let aborted = false;
+        req.on('data', (c) => {
+          data += c;
+          if (data.length > 25 * 1024 * 1024) {
+            aborted = true;
+            req.destroy();
           }
-          const backup = `${target}.bak-${ts()}`;
-          safeWriteFile(backup, safeReadFile(target, { encoding: 'utf8' }) as string, {
-            mkdir: true,
-            encoding: 'utf8',
-          });
-          safeWriteFile(target, html, { mkdir: false, encoding: 'utf8' });
-          safeWriteFile(
-            reviewReceiptLogicalPath(reviewContext),
-            JSON.stringify(
-              {
-                review_session_id: reviewContext.review_session_id,
-                artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
-                viewer_principal: reviewContext.viewer_principal,
-                scope: reviewContext.scope,
-                saved_at: new Date().toISOString(),
-                bytes: html.length,
-                backup: backup.split('/').pop(),
-                comment_count: (html.match(/class=["']rv-cmt["']/g) || []).length,
-              },
-              null,
-              2
-            ),
-            { mkdir: true, encoding: 'utf8' }
-          );
-          res.writeHead(200);
-          res.end(
-            `saved (backup: ${backup.split('/').pop()}, review_session: ${reviewContext.review_session_id})`
-          );
-          console.log(
-            `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
-          );
-        } catch (e: unknown) {
-          res.writeHead(500);
-          res.end(e instanceof Error ? e.message : String(e));
-          console.error('[save]', e);
-        }
+        });
+        req.on('end', () => {
+          if (aborted) return;
+          try {
+            const html = stripInjected(data);
+            if (!/<\/html>\s*$/i.test(html.trim())) {
+              res.writeHead(400);
+              res.end('not a complete HTML document');
+              return;
+            }
+            const backup = `${target}.bak-${ts()}`;
+            safeWriteFile(backup, safeReadFile(target, { encoding: 'utf8' }) as string, {
+              mkdir: true,
+              encoding: 'utf8',
+            });
+            safeWriteFile(target, html, { mkdir: false, encoding: 'utf8' });
+            safeWriteFile(
+              reviewReceiptLogicalPath(reviewContext),
+              JSON.stringify(
+                {
+                  review_session_id: reviewContext.review_session_id,
+                  artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
+                  viewer_principal: reviewContext.viewer_principal,
+                  scope: reviewContext.scope,
+                  saved_at: new Date().toISOString(),
+                  bytes: html.length,
+                  backup: backup.split('/').pop(),
+                  comment_count: (html.match(/class=["']rv-cmt["']/g) || []).length,
+                },
+                null,
+                2
+              ),
+              { mkdir: true, encoding: 'utf8' }
+            );
+            res.writeHead(200);
+            res.end(
+              `saved (backup: ${backup.split('/').pop()}, review_session: ${reviewContext.review_session_id})`
+            );
+            console.log(
+              `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
+            );
+          } catch (e: unknown) {
+            res.writeHead(500);
+            res.end(e instanceof Error ? e.message : String(e));
+            console.error('[save]', e);
+          }
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end('not found');
+    } catch (e: unknown) {
+      res.writeHead(500);
+      res.end(e instanceof Error ? e.message : String(e));
+    }
+  });
+  server.listen(port, '127.0.0.1', () => {
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'report-review',
+        action: 'start',
+        status: 'started',
+        scope: reviewContext.scope,
+        actorRole: 'surface_runtime',
+        principal: { kind: 'human', id: reviewContext.viewer_principal },
+        requestedBy: reviewContext.viewer_principal,
+        correlationId: reviewContext.review_session_id,
+        metadata: {
+          port,
+          artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
+        },
+      });
+    } catch (error) {
+      console.error(`[report-review] start lifecycle receipt unavailable: ${error}`);
+      server.close(() => {
+        process.exitCode = 1;
       });
       return;
     }
-    res.writeHead(404);
-    res.end('not found');
-  } catch (e: unknown) {
-    res.writeHead(500);
-    res.end(e instanceof Error ? e.message : String(e));
-  }
-});
-server.listen(port, '127.0.0.1', () => {
-  try {
-    recordProtocolServiceLifecycle({
-      serviceId: 'report-review',
-      action: 'start',
-      status: 'started',
-      scope: reviewContext.scope,
-      actorRole: 'surface_runtime',
-      principal: { kind: 'human', id: reviewContext.viewer_principal },
-      requestedBy: reviewContext.viewer_principal,
-      correlationId: reviewContext.review_session_id,
-      metadata: { port, artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref) },
-    });
-  } catch (error) {
-    console.error(`[report-review] start lifecycle receipt unavailable: ${error}`);
-    server.close(() => process.exit(1));
-    return;
-  }
-  console.log(`Report review server → http://127.0.0.1:${port}/`);
-  console.log(`  target : ${target}`);
-  console.log(`  artifact: ${reviewContext.artifact_ref}`);
-  console.log(
-    `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
-  );
-  console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
-  console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+    console.log(`Report review server → http://127.0.0.1:${port}/`);
+    console.log(`  target : ${target}`);
+    console.log(`  artifact: ${reviewContext.artifact_ref}`);
+    console.log(
+      `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
+    );
+    console.log(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
+    console.log('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+  });
+
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    try {
+      recordProtocolServiceLifecycle({
+        serviceId: 'report-review',
+        action: 'stop',
+        status: 'stopped',
+        scope: reviewContext.scope,
+        actorRole: 'surface_runtime',
+        principal: { kind: 'human', id: reviewContext.viewer_principal },
+        requestedBy: reviewContext.viewer_principal,
+        correlationId: reviewContext.review_session_id,
+      });
+    } catch (error) {
+      console.error(`[report-review] stop lifecycle receipt unavailable: ${error}`);
+    } finally {
+      server.close();
+    }
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}
+
+export const runReportReviewServer = defineScript({
+  name: 'report-review:server',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
 
-let stopping = false;
-const shutdown = () => {
-  if (stopping) return;
-  stopping = true;
-  try {
-    recordProtocolServiceLifecycle({
-      serviceId: 'report-review',
-      action: 'stop',
-      status: 'stopped',
-      scope: reviewContext.scope,
-      actorRole: 'surface_runtime',
-      principal: { kind: 'human', id: reviewContext.viewer_principal },
-      requestedBy: reviewContext.viewer_principal,
-      correlationId: reviewContext.review_session_id,
-    });
-  } catch (error) {
-    console.error(`[report-review] stop lifecycle receipt unavailable: ${error}`);
-  } finally {
-    server.close(() => process.exit(0));
-  }
-};
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);
+if (isDirectScript(import.meta.url, 'server.ts') || isDirectScript(import.meta.url, 'server.js'))
+  void runReportReviewServer();
