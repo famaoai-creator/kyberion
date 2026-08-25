@@ -307,7 +307,7 @@ function handleApprovalsSubcommand(argv: {
   console.log(ui('recorder:recorder_approvals_summary'));
 }
 
-async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
+async function handleAskSubcommand(text: string, json: boolean, explain: boolean): Promise<void> {
   if (!text.trim()) {
     console.error(ui('recorder:recorder_ask_usage'));
     process.exitCode = 1;
@@ -334,6 +334,18 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
   if (json) {
     console.log(JSON.stringify({ ...result, intentResolution, improvement }, null, 2));
     return;
+  }
+  if (explain && intentResolution) {
+    console.log(`[intent] ${intentResolution.normalized_intent}`);
+    console.log(`  request_id: ${intentResolution.request_id}`);
+    console.log(`  shape: ${intentResolution.resolution_shape}`);
+    console.log(`  outcome: ${intentResolution.outcome_kind}`);
+    console.log(`  authority: ${intentResolution.authority_level}`);
+    console.log(`  missing_inputs: ${intentResolution.missing_inputs.join(', ') || '(none)'}`);
+    console.log(`  next_action: ${intentResolution.next_action.kind}`);
+    console.log(`  next_action_label: ${intentResolution.next_action.label}`);
+    console.log(`  consequence: ${intentResolution.next_action.consequence}`);
+    console.log('');
   }
   if (intentResolution && intentResolution.normalized_intent !== 'unresolved_intent') {
     console.log(
@@ -1516,6 +1528,11 @@ export async function main(): Promise<void> {
   }
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
+    .option('explain', {
+      type: 'boolean',
+      default: false,
+      description: 'show the shared intent-resolution contract before the reply',
+    })
     .option('locale', {
       type: 'string',
       choices: ['en', 'ja', 'qps-ploc'],
@@ -1632,7 +1649,11 @@ export async function main(): Promise<void> {
       handleDealsSubcommand(argv as { requirements?: string; json?: boolean });
       return;
     case 'ask':
-      await handleAskSubcommand(argv._.slice(1).map(String).join(' '), Boolean(argv.json));
+      await handleAskSubcommand(
+        argv._.slice(1).map(String).join(' '),
+        Boolean(argv.json),
+        Boolean(argv.explain)
+      );
       return;
     case 'intent':
       await handleIntentSubcommand(
