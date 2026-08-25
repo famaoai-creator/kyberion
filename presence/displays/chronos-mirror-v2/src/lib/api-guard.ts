@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   consumeTenantBudget,
+  extractSurfaceBearerToken,
   findChronosTokenRegistration,
   matchesChronosToken,
   readChronosTokenRegistrations,
@@ -85,9 +86,11 @@ function checkRateLimit(ip: string): boolean {
  * Returns null if OK, or a NextResponse error if rejected.
  */
 export function resolveChronosToken(req: NextRequest): string | null {
-  const authHeader = req.headers.get('authorization');
-  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  return bearer || req.cookies.get('kyberion_token')?.value || null;
+  return (
+    extractSurfaceBearerToken(req.headers.get('authorization')) ||
+    req.cookies.get('kyberion_token')?.value ||
+    null
+  );
 }
 
 function getRateLimitKey(req: NextRequest): string {

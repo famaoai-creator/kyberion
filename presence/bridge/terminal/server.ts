@@ -1,5 +1,5 @@
 import express from 'express';
-import { installProcessGuards } from '@agent/core';
+import { extractSurfaceBearerToken, installProcessGuards } from '@agent/core';
 import { appendJsonLine, getRegisteredEnvText } from '@agent/core/foundation';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -89,9 +89,8 @@ function isLoopback(ip: string): boolean {
 
 function extractToken(req: any): string | null {
   const authHeader = req.headers['authorization'];
-  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
+  const bearer = extractSurfaceBearerToken(authHeader);
+  if (bearer) return bearer;
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     return url.searchParams.get('token');
