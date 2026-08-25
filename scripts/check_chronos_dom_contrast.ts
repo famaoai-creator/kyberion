@@ -55,7 +55,7 @@ function contrastRatio(foreground: Rgba, background: Rgba): number {
 
 function argument(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function parsePort(url: string): number {
@@ -252,8 +252,7 @@ export const runCheckChronosDomContrast = defineScript({
             `- ${finding.tag} ${finding.ratio}:1 < ${finding.threshold}:1 ${finding.color} on ${finding.background} ${finding.text}`
           );
         }
-        process.exitCode = 1;
-        return;
+        throw new Error(`${findings.length} Chronos contrast violation(s)`);
       }
       context.print(`[check:chronos-dom-contrast] OK (${modes.join(' + ')}, reduced-motion)`);
     } finally {
