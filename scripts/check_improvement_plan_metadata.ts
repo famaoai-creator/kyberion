@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver, safeReadFile, safeWriteFile, withExecutionContext } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const IMPROVEMENT_PLAN_ROOT = 'docs/developer/improvement-plans-2026-08';
 const REQUIRED_KEYS = ['title', 'tags', 'last_updated', 'status'] as const;
@@ -130,31 +131,36 @@ export function checkImprovementPlanMetadata(): string[] {
   return failures;
 }
 
-export function main(argv = process.argv.slice(2)): number {
-  const files = listImprovementPlans();
-  if (argv.includes('--fix')) {
-    for (const filePath of files) {
-      const current = read(filePath);
-      const next = normalizePlanFrontmatter(current, path.basename(filePath));
-      if (next !== current) {
-        withExecutionContext(
-          'ecosystem_architect',
-          () => safeWriteFile(filePath, next),
-          'ecosystem_architect'
-        );
+export const runCheckImprovementPlanMetadata = defineScript({
+  name: 'check:improvement-plan-metadata',
+  flags: [],
+  run(context) {
+    const files = listImprovementPlans();
+    if (context.argv.includes('--fix')) {
+      for (const filePath of files) {
+        const current = read(filePath);
+        const next = normalizePlanFrontmatter(current, path.basename(filePath));
+        if (next !== current) {
+          withExecutionContext(
+            'ecosystem_architect',
+            () => safeWriteFile(filePath, next),
+            'ecosystem_architect'
+          );
+        }
       }
     }
-  }
-  const failures = checkImprovementPlanMetadata();
-  if (failures.length) {
-    console.error('[check:improvement-plan-metadata] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    return 1;
-  }
-  console.log(`[check:improvement-plan-metadata] OK (${files.length} documents)`);
-  return 0;
-}
+    const failures = checkImprovementPlanMetadata();
+    if (failures.length) {
+      console.error('[check:improvement-plan-metadata] FAILED');
+      for (const failure of failures) console.error(`- ${failure}`);
+      throw new Error(`${failures.length} improvement-plan metadata violation(s)`);
+    }
+    context.print(`[check:improvement-plan-metadata] OK (${files.length} documents)`);
+  },
+});
 
-if (process.argv[1]?.endsWith('check_improvement_plan_metadata.ts')) {
-  process.exitCode = main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_improvement_plan_metadata.ts') ||
+  isDirectScript(import.meta.url, 'check_improvement_plan_metadata.js')
+)
+  void runCheckImprovementPlanMetadata();
