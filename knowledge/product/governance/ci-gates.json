@@ -58,6 +58,13 @@
       "rationale": "Keeps improvement plans searchable and prevents a second undocumented status source."
     },
     {
+      "id": "documentation-source-map",
+      "scope": "pr",
+      "script": "check:documentation-source-map",
+      "owner": "documentation",
+      "rationale": "Keeps status, concept, and onboarding documentation anchored to one explicit source map."
+    },
+    {
       "id": "channel-adapter-adoption",
       "scope": "pr",
       "executable": "node",

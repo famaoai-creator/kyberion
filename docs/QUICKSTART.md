@@ -1,6 +1,6 @@
 # Quick Start
 
-**Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order.
+**Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order. The broader documentation source map is [`documentation-source-map.json`](./documentation-source-map.json).
 
 ---
 
