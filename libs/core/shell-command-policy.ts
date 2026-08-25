@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { isInjectionSuspected } from './untrusted-content.js';
 import { findSensitivePathInText } from './sensitive-path-policy.js';
 import {
@@ -61,31 +61,24 @@ export function shellCommandApprovalDescriptor(
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/shell-command-policy.json');
-let cachedPolicyPath: string | null = null;
-let cachedPolicy: ShellCommandPolicyFile | null = null;
 
 export function resetShellCommandPolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 function getPolicyPath(): string {
   return getRegisteredEnvText('KYBERION_SHELL_COMMAND_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
 }
 
+const policyCatalog = defineCatalog<ShellCommandPolicyFile>({
+  id: 'shell-command-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/shell-command-policy.schema.json'),
+  fallback: { version: 'missing-policy', allowlist: [], denylist: [] },
+});
+
 export function loadShellCommandPolicy(): ShellCommandPolicyFile {
-  const policyPath = getPolicyPath();
-  if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = { version: 'missing-policy', allowlist: [], denylist: [] };
-    return cachedPolicy;
-  }
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ShellCommandPolicyFile;
-  cachedPolicyPath = policyPath;
-  cachedPolicy = parsed;
-  return parsed;
+  return policyCatalog.load();
 }
 
 const regexCache = new Map<string, RegExp | null>();

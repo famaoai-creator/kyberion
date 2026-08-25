@@ -1,8 +1,7 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
 
 export interface VoiceRuntimePolicy {
   version: string;
@@ -60,38 +59,26 @@ const FALLBACK_POLICY: VoiceRuntimePolicy = {
   },
 };
 
-let cachedPolicyPath: string | null = null;
-let cachedPolicy: VoiceRuntimePolicy | null = null;
-
 function getPolicyPath(): string {
   return getRegisteredEnvText('KYBERION_VOICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
 }
 
+const policyCatalog = defineCatalog<VoiceRuntimePolicy>({
+  id: 'voice-runtime-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/voice-runtime-policy.schema.json'),
+  fallback: FALLBACK_POLICY,
+});
+
 export function resetVoiceRuntimePolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 export function getVoiceRuntimePolicy(): VoiceRuntimePolicy {
-  const policyPath = getPolicyPath();
-  if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
-
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
-
   try {
-    const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<VoiceRuntimePolicy>(raw, 'voice runtime policy');
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    return parsed;
+    return policyCatalog.load();
   } catch (error: any) {
-    logger.warn(`[VOICE_RUNTIME_POLICY] Failed to load policy at ${policyPath}: ${error.message}`);
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
+    logger.warn(`[VOICE_RUNTIME_POLICY] Failed to load policy: ${error.message}`);
+    return FALLBACK_POLICY;
   }
 }

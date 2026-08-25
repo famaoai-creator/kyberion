@@ -1,7 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type ServiceRuntimeMode = 'trial' | 'approved_install' | 'installed' | 'pinned';
 export type ServiceRuntimeModePreference = 'trial_first' | 'installed_first' | 'installed_only';
@@ -42,44 +41,28 @@ const FALLBACK_POLICY: ServiceRuntimePolicy = {
   },
 };
 
-let cachedPolicyPath: string | null = null;
-let cachedPolicy: ServiceRuntimePolicy | null = null;
-
 function getPolicyPath(): string {
   return (
     getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
   );
 }
 
-function loadPolicyFromPath(policyPath: string): ServiceRuntimePolicy {
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<ServiceRuntimePolicy>(raw, 'service runtime policy');
-}
+const policyCatalog = defineCatalog<ServiceRuntimePolicy>({
+  id: 'service-runtime-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/service-runtime-policy.schema.json'),
+  fallback: FALLBACK_POLICY,
+});
 
 export function resetServiceRuntimePolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 export function getServiceRuntimePolicy(): ServiceRuntimePolicy {
-  const policyPath = getPolicyPath();
-  if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
-
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
-
   try {
-    const parsed = loadPolicyFromPath(policyPath);
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    return parsed;
+    return policyCatalog.load();
   } catch {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
+    return FALLBACK_POLICY;
   }
 }
 
