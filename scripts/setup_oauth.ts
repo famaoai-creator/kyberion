@@ -10,61 +10,58 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const serviceId = String(
-  getRegisteredEnvText('KYBERION_OAUTH_SERVICE_ID') || process.argv[2] || ''
-).trim();
-const callbackHost = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
-const callbackPort = Number(getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PORT') || 8787);
-const callbackPath = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PATH') || '/oauth/callback';
-const redirectUri = `http://${callbackHost}:${callbackPort}${callbackPath}`;
+let activeCleanup: (() => void) | undefined;
 
-if (!serviceId) {
-  console.error(
-    'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
+async function main(args: string[] = []): Promise<void> {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(
+      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
+    );
+    throw new ScriptExitError(0, '', true);
+  }
+  const serviceId = String(
+    getRegisteredEnvText('KYBERION_OAUTH_SERVICE_ID') || args[0] || ''
+  ).trim();
+  if (!serviceId) {
+    console.error(
+      'Usage: KYBERION_OAUTH_SERVICE_ID=<service_name> node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts'
+    );
+    throw new ScriptExitError(1, '', true);
+  }
+  const callbackHost = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
+  const callbackPort = Number(getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PORT') || 8787);
+  const callbackPath = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PATH') || '/oauth/callback';
+  const redirectUri = `http://${callbackHost}:${callbackPort}${callbackPath}`;
+  const runtimeDir = pathResolver.sharedTmp('oauth/setup');
+  if (!safeExistsSync(runtimeDir)) safeMkdir(runtimeDir, { recursive: true });
+  const server = spawn(
+    'node',
+    ['--import', './scripts/ts-loader.mjs', 'scripts/oauth_callback_surface.ts'],
+    {
+      cwd: pathResolver.rootDir(),
+      env: { ...process.env, KYBERION_PERSONA: 'sovereign', AUTHORIZED_SCOPE: serviceId },
+      stdio: 'inherit',
+    }
   );
-  process.exit(1);
-}
+  let shuttingDown = false;
+  const cleanup = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (!server.killed) server.kill('SIGTERM');
+  };
+  activeCleanup = cleanup;
+  process.once('SIGINT', () => {
+    cleanup();
+    process.exitCode = 130;
+  });
+  process.once('SIGTERM', () => {
+    cleanup();
+    process.exitCode = 143;
+  });
+  process.once('exit', cleanup);
 
-const runtimeDir = pathResolver.sharedTmp('oauth/setup');
-if (!safeExistsSync(runtimeDir)) {
-  safeMkdir(runtimeDir, { recursive: true });
-}
-
-const server = spawn(
-  'node',
-  ['--import', './scripts/ts-loader.mjs', 'scripts/oauth_callback_surface.ts'],
-  {
-    cwd: pathResolver.rootDir(),
-    env: {
-      ...process.env,
-      KYBERION_PERSONA: 'sovereign',
-      AUTHORIZED_SCOPE: serviceId,
-    },
-    stdio: 'inherit',
-  }
-);
-
-let shuttingDown = false;
-const cleanup = () => {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  if (!server.killed) {
-    server.kill('SIGTERM');
-  }
-};
-
-process.on('SIGINT', () => {
-  cleanup();
-  process.exitCode = 130;
-});
-process.on('SIGTERM', () => {
-  cleanup();
-  process.exitCode = 143;
-});
-process.on('exit', cleanup);
-
-async function main(): Promise<void> {
   logger.info(`Starting OAuth callback surface on ${redirectUri}...`);
   await new Promise<void>((resolve, reject) => {
     const timeout = Date.now() + 10_000;
@@ -146,9 +143,23 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`OAuth setup failed: ${message}`);
-  cleanup();
-  process.exitCode = 1;
+export const runOAuthSetup = defineScript({
+  name: 'oauth:setup',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error) {
+      activeCleanup?.();
+      throw error;
+    } finally {
+      activeCleanup = undefined;
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'setup_oauth.ts') ||
+  isDirectScript(import.meta.url, 'setup_oauth.js')
+)
+  void runOAuthSetup();
