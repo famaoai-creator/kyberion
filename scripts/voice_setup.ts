@@ -280,6 +280,6 @@ if (
 ) {
   main().catch((error: any) => {
     console.error(error?.message ?? String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

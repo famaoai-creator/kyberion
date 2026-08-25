@@ -175,7 +175,7 @@ if (
 ) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

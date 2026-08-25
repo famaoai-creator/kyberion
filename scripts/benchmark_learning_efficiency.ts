@@ -1,9 +1,4 @@
-import {
-  compileUserIntentFlow,
-  logger,
-  safeUnlinkSync,
-  pathResolver
-} from '@agent/core';
+import { compileUserIntentFlow, logger, safeUnlinkSync, pathResolver } from '@agent/core';
 
 const CACHE_FILE = pathResolver.shared('runtime/intent-flow-cache.json');
 
@@ -26,9 +21,9 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
     askFn: async (prompt: string): Promise<string> => {
       llmCalls++;
       logger.info(`  -> [${trialName}] Intercepted LLM call #${llmCalls} in compiler...`);
-      
+
       const promptLower = prompt.toLowerCase();
-      
+
       // Mock Stage 1: ActuatorExecutionBrief
       if (promptLower.includes('execution brief compiler')) {
         logger.info(`  -> [${trialName}] Mocking ActuatorExecutionBrief Response...`);
@@ -51,7 +46,7 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
           recommended_next_step: 'Compile the intent contract and work loop.',
         });
       }
-      
+
       // Mock Stage 2: IntentContract
       if (promptLower.includes('intent contract compiler')) {
         logger.info(`  -> [${trialName}] Mocking IntentContract Response...`);
@@ -78,7 +73,7 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
           why: 'Explicit request for display surface inspection.',
         });
       }
-      
+
       // Mock Stage 3: OrganizationWorkLoopSummary
       if (promptLower.includes('work loop compiler')) {
         logger.info(`  -> [${trialName}] Mocking OrganizationWorkLoopSummary Response...`);
@@ -160,22 +155,27 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
 
       logger.warn(`  -> [${trialName}] Unhandled prompt schema, returning generic stub.`);
       return JSON.stringify({});
-    }
+    },
   };
 
   logger.info(`[${trialName}] Running compilation for: "${inputText}"`);
-  
-  const result = await compileUserIntentFlow({
-    text: inputText,
-    locale: 'ja',
-    tier: 'public',
-  }, options);
+
+  const result = await compileUserIntentFlow(
+    {
+      text: inputText,
+      locale: 'ja',
+      tier: 'public',
+    },
+    options
+  );
 
   const duration = Date.now() - startTime;
-  
+
   logger.success(`[${trialName}] Finished in ${duration}ms.`);
   logger.info(`[${trialName}] LLM Call Count: ${llmCalls}`);
-  logger.info(`[${trialName}] Cache Status: ${result.source === 'fallback' ? 'Fallback' : (llmCalls === 0 ? 'Cache HIT' : 'Cache MISS')}`);
+  logger.info(
+    `[${trialName}] Cache Status: ${result.source === 'fallback' ? 'Fallback' : llmCalls === 0 ? 'Cache HIT' : 'Cache MISS'}`
+  );
   logger.info(`[${trialName}] Resolved Intent: ${result.intentContract.intent_id}`);
   console.log('--------------------------------------------------');
 
@@ -195,40 +195,48 @@ async function main() {
   const results = [];
 
   // Trial 1: Cold Run
-  results.push(await runTrial(
-    'Trial 1: Cold Run (Unlearned)',
-    'inspect-workspace-surfaces',
-    true // Clear cache before
-  ));
+  results.push(
+    await runTrial(
+      'Trial 1: Cold Run (Unlearned)',
+      'inspect-workspace-surfaces',
+      true // Clear cache before
+    )
+  );
 
   // Trial 2: Warm Run (Same Prompt)
-  results.push(await runTrial(
-    'Trial 2: Warm Run (Same Intent - Learned)',
-    'inspect-workspace-surfaces',
-    false // Keep cache
-  ));
+  results.push(
+    await runTrial(
+      'Trial 2: Warm Run (Same Intent - Learned)',
+      'inspect-workspace-surfaces',
+      false // Keep cache
+    )
+  );
 
   // Trial 3: Warm Run 2 (Same Intent - Verification)
-  results.push(await runTrial(
-    'Trial 3: Warm Run 2 (Same Intent - Verification)',
-    'inspect-workspace-surfaces',
-    false // Keep cache
-  ));
+  results.push(
+    await runTrial(
+      'Trial 3: Warm Run 2 (Same Intent - Verification)',
+      'inspect-workspace-surfaces',
+      false // Keep cache
+    )
+  );
 
   logger.info('=== BENCHMARK RESULTS ===');
-  console.table(results.map(r => ({
-    'Trial': r.trialName,
-    'Input': r.inputText,
-    'LLM Calls': r.llmCalls,
-    'Latency (ms)': r.duration,
-    'Resolved Intent': r.intentId,
-    'Cache Status': r.cacheStatus,
-  })));
-  
+  console.table(
+    results.map((r) => ({
+      Trial: r.trialName,
+      Input: r.inputText,
+      'LLM Calls': r.llmCalls,
+      'Latency (ms)': r.duration,
+      'Resolved Intent': r.intentId,
+      'Cache Status': r.cacheStatus,
+    }))
+  );
+
   logger.success('=== BENCHMARK COMPLETED SUCCESSFULLY ===');
 }
 
-main().catch(err => {
+main().catch((err) => {
   logger.error(`Benchmark failed: ${err.message}`);
-  process.exit(1);
+  process.exitCode = 1;
 });

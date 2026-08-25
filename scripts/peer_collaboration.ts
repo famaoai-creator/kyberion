@@ -67,5 +67,5 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   logger.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

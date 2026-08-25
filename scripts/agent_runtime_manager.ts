@@ -234,5 +234,5 @@ if (
 )
   void main().catch((err: any) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });

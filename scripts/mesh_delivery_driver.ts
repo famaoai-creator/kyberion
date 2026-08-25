@@ -63,14 +63,14 @@ async function main(): Promise<void> {
     logger.error(
       "[mesh-delivery] KYBERION_MESH_PEER_ID is not set. Set it to this host's peer id from the peer network catalog."
     );
-    process.exit(2);
+    process.exitCode = 2;
   }
   const sharedSecret = getRegisteredEnvText('KYBERION_MESH_SHARED_SECRET') || undefined;
 
   const locked = await acquireLock(DRIVER_LOCK_ID, 1000);
   if (!locked) {
     logger.warn('[mesh-delivery] another driver instance holds the lock; exiting (single-writer).');
-    process.exit(0);
+    process.exitCode = 0;
   }
 
   let stopping = false;
@@ -104,6 +104,6 @@ if (
 ) {
   main().catch((err) => {
     logger.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

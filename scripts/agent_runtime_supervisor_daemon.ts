@@ -425,7 +425,7 @@ async function handleRequest(
           } catch (_) {
             /* best-effort drain */
           }
-          process.exit(0);
+          process.exitCode = 0;
         });
         return {
           id: request.id,
@@ -750,7 +750,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         logger.info(
           `[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`
         );
-        process.exit(0);
+        process.exitCode = 0;
       } catch (killErr: any) {
         // EPERM means the process exists but this launcher cannot inspect it
         // (common under a sandbox or across users). Treating that as ESRCH
@@ -759,7 +759,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         if (killErr?.code === 'EPERM') {
           const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
           logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
-          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
           throw new Error(message);
         }
         // Process does not exist, stale lock
@@ -802,7 +802,7 @@ export async function startAgentRuntimeSupervisorDaemon(
     if (healthy) {
       const message = `an existing healthy daemon is already bound at ${socketPath}`;
       logger.info(`[agent-runtime-supervisor-daemon] ${message}`);
-      if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+      if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
       throw new Error(message);
     }
     try {
@@ -859,7 +859,7 @@ export async function startAgentRuntimeSupervisorDaemon(
           logger.info(
             `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
           );
-          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
           return;
         }
         logger.warn(
@@ -874,7 +874,7 @@ export async function startAgentRuntimeSupervisorDaemon(
             `[agent-runtime-supervisor-daemon] retry after EADDRINUSE failed: ${retryError?.message || retryError}`
           );
         }
-        if (options.exitOnFatalError !== false) process.exit(1);
+        if (options.exitOnFatalError !== false) process.exitCode = 1;
       })();
       return;
     }
@@ -899,7 +899,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         `[agent-runtime-supervisor-daemon] failed to write ops alert: ${alertError?.message || alertError}`
       );
     }
-    if (options.exitOnFatalError !== false) process.exit(1);
+    if (options.exitOnFatalError !== false) process.exitCode = 1;
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -969,14 +969,14 @@ export async function startAgentRuntimeSupervisorDaemon(
   const stopDaemon = (exitCode: number) => {
     cleanup();
     if (!server.listening) {
-      process.exit(exitCode);
+      process.exitCode = exitCode;
       return;
     }
-    const forceExit = setTimeout(() => process.exit(exitCode), 1500);
+    const forceExit = setTimeout(() => (process.exitCode = exitCode), 1500);
     forceExit.unref?.();
     server.close(() => {
       clearTimeout(forceExit);
-      process.exit(exitCode);
+      process.exitCode = exitCode;
     });
   };
   process.once('SIGINT', () => stopDaemon(130));
@@ -1036,6 +1036,6 @@ if (isDirect) {
         `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
       );
     }
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

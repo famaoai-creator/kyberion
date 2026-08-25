@@ -359,10 +359,10 @@ if (
   isDirectScript(import.meta.url, 'apply_dependency_patch.js')
 ) {
   main().then(
-    (code) => process.exit(code),
+    (code) => (process.exitCode = code),
     (error) => {
       logger.error(`[patch] failed: ${(error as Error).message || error}`);
-      process.exit(1);
+      process.exitCode = 1;
     }
   );
 }

@@ -71,5 +71,5 @@ main().catch((err) => {
     recommendation: 'Restart the generation schedule daemon unit and inspect its logs.',
     dedupe_key: `${DAEMON_ID}:fatal`,
   });
-  process.exit(1);
+  process.exitCode = 1;
 });

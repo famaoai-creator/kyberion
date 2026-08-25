@@ -84,8 +84,8 @@ if (
   isDirectScript(import.meta.url, 'history_search.js')
 )
   try {
-    process.exit(runHistorySearch());
+    process.exitCode = runHistorySearch();
   } catch (error) {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   }

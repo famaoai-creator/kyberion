@@ -74,10 +74,10 @@ if (
   isDirectScript(import.meta.url, 'auto_checkpoint.js')
 ) {
   runAutoCheckpoint().then(
-    (code) => process.exit(code),
+    (code) => (process.exitCode = code),
     (error) => {
       logger.error(`[auto-checkpoint] failed: ${(error as Error).message ?? error}`);
-      process.exit(1);
+      process.exitCode = 1;
     }
   );
 }
