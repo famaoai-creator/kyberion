@@ -33,6 +33,7 @@ import {
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type SurfaceAction =
   | 'reconcile'
@@ -863,7 +864,7 @@ async function reconcileHealth(manifestPath: string) {
   return restarted;
 }
 
-const main = async () => {
+const main = async (args: string[] = []) => {
   const argv = await createStandardYargs()
     .option('action', {
       type: 'string',
@@ -890,7 +891,7 @@ const main = async () => {
     .option('args', { type: 'string' })
     .option('port', { type: 'number' })
     .option('description', { type: 'string' })
-    .parseSync();
+    .parseSync(args);
 
   const action = argv.action as SurfaceAction;
   const manifestPath = path.isAbsolute(argv.manifest as string)
@@ -966,15 +967,15 @@ const main = async () => {
   }
 };
 
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith('surface_runtime.ts') ||
-    process.argv[1].endsWith('surface_runtime.js') ||
-    process.argv[1].endsWith('surface_runtime.mts'));
+export const runSurfaceRuntime = defineScript({
+  name: 'surfaces:runtime',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
 
-if (isMain) {
-  main().catch((err: any) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'surface_runtime.ts') ||
+  isDirectScript(import.meta.url, 'surface_runtime.js') ||
+  isDirectScript(import.meta.url, 'surface_runtime.mts')
+)
+  void runSurfaceRuntime();
