@@ -67,6 +67,7 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectOperatorHomeSummary } from '@agent/core';
 import { collectDoctorReport, runDoctor } from './run_doctor.js';
+import { isDirectScript } from './lib/harness.js';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -140,7 +141,7 @@ const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ],
   ['pnpm mission create', 'i18n:recorder:recorder_help_mission'],
   ['pnpm app:preflight', 'i18n:recorder:recorder_help_preflight'],
-  ['pnpm doctor', 'i18n:recorder:recorder_help_doctor'],
+  ['pnpm kyberion doctor', 'i18n:recorder:recorder_help_doctor'],
   ['pnpm dashboard', 'i18n:recorder:recorder_help_dashboard'],
   ['pnpm office [-- --watch 30]', 'i18n:recorder:recorder_help_office'],
 ] as const;
@@ -1761,10 +1762,10 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isDirectRun =
-  process.argv[1] && /(?:^|[/\\])kyberion_home\.(?:ts|js)$/u.test(process.argv[1]);
-
-if (isDirectRun) {
+if (
+  isDirectScript(import.meta.url, 'kyberion_home.ts') ||
+  isDirectScript(import.meta.url, 'kyberion_home.js')
+) {
   void main().catch((error: unknown) => {
     console.error(String(error));
     process.exitCode = 1;
