@@ -1,6 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -100,7 +101,7 @@ let policyValidateFn: ValidateFunction | null = null;
 const memorySnapshotCache = new Map<string, IntentContractMemoryFile>();
 
 function globalRuntimeMemoryPath(): string {
-  const configured = process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH?.trim();
+  const configured = getRegisteredEnvText('KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH')?.trim();
   if (!configured) return MEMORY_RUNTIME_PATH;
   return path.isAbsolute(configured) ? configured : pathResolver.rootResolve(configured);
 }

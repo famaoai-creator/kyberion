@@ -11,6 +11,7 @@ import {
   type ChronosTokenRegistration,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 
 export interface ConciergeViewerContext {
@@ -96,8 +97,8 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
   const local = isLoopbackRequest(req);
   const token = bearerToken(req);
   const registration = token ? registeredViewer(token) : null;
-  const apiToken = process.env.KYBERION_API_TOKEN;
-  const localadminToken = process.env.KYBERION_LOCALADMIN_TOKEN;
+  const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
+  const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
 
   if (registration) {
     return {

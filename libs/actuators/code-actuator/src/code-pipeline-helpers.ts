@@ -23,6 +23,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
@@ -49,8 +50,10 @@ export function buildRetryOptions() {
  * Strictly compliant with Layer 2 (Shield).
  * Generic data pipeline engine for source code analysis with Control Flow and Safety Guards.
  */
-const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
-const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+const ALLOW_UNSAFE_SHELL =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
+const ALLOW_UNSAFE_JS =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_JS', { defaultValue: false }) === true;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
@@ -173,12 +176,7 @@ export async function executePipeline(
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };

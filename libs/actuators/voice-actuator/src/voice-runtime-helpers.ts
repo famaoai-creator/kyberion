@@ -24,6 +24,7 @@ import {
   VoiceGenerationRuntime,
   waitForJob,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -47,8 +48,10 @@ export function buildRetryOptions(override?: Record<string, any>) {
 type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'faster_whisper' | 'kokoro_tts' | 'pocket_tts';
 
 function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
-  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
-  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const configuredPythonBin = getRegisteredEnvText('KYBERION_PYTHON_BIN');
+  if (configuredPythonBin) return configuredPythonBin;
+  const configuredPython = getRegisteredEnvText('KYBERION_PYTHON');
+  if (configuredPython) return configuredPython;
   for (const toolId of [
     preferredTool,
     preferredTool === 'mlx_audio' ? 'mlx_whisper' : 'mlx_audio',

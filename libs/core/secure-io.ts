@@ -9,6 +9,7 @@ import {
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
@@ -224,24 +225,24 @@ export function safeWriteFile(
     _policyCheckInProgress = true;
     try {
       const policyDecision = policyEngine.evaluate({
-        agentId: process.env.KYBERION_PERSONA || 'unknown',
+        agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
         operation: 'file_write',
         target_tier: detectTier(resolved),
         // Root operator processes are sovereign-tier by default; subagent
         // spawns can downgrade via KYBERION_AGENT_TIER so sovereign-shield
         // (personal-tier isolation) has real firing context.
-        agent_tier: process.env.KYBERION_AGENT_TIER || 'sovereign',
+        agent_tier: getRegisteredEnvText('KYBERION_AGENT_TIER') || 'sovereign',
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
         recordGovernanceAction(
-          process.env.KYBERION_PERSONA || 'unknown',
+          getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
           'file_write',
           `${resolved}:denied`,
           true
         );
         auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'unknown',
+          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
           action: 'policy_violation',
           operation: 'file_write',
           result: 'failed',
@@ -558,23 +559,23 @@ export function safeExistsSync(filePath: string): boolean {
 // command scanning is shell-command-policy's job (SA-02), and duplicating
 // it here would double-regulate and false-positive on argument content.
 function assertExecPolicy(command: string): void {
-  const ringRaw = process.env.KYBERION_AGENT_RING;
+  const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
-    agentId: process.env.KYBERION_PERSONA || 'unknown',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
     operation: 'execute_command',
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
     recordGovernanceAction(
-      process.env.KYBERION_PERSONA || 'unknown',
+      getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       'execute_command',
       `${command}:denied`,
       true
     );
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       action: 'policy_violation',
       operation: 'execute_command',
       result: 'failed',
@@ -709,7 +710,8 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
     const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::', '::1'];
 
     const allowLocal =
-      options?.allowLocalNetwork === true || process.env.KYBERION_ALLOW_LOCAL_NETWORK === 'true';
+      options?.allowLocalNetwork === true ||
+      getRegisteredEnvText('KYBERION_ALLOW_LOCAL_NETWORK') === 'true';
 
     if (blockedHostnames.includes(normalizedHostname)) {
       if (allowLocal) return url;

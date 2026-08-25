@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
@@ -761,12 +762,7 @@ function listBrowserRuntimeSessions(): BrowserRuntimeSessionSummary[] {
   return safeExistsSync(dir)
     ? safeReaddir(dir)
         .filter((entry) => entry.endsWith('.json'))
-        .map(
-          (entry) =>
-            JSON.parse(
-              safeReadFile(path.join(dir, entry), { encoding: 'utf8' }) as string
-            ) as BrowserRuntimeSessionSummary
-        )
+        .map((entry) => readJson<BrowserRuntimeSessionSummary>(path.join(dir, entry)))
         .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
     : [];
 }
@@ -774,9 +770,7 @@ function listBrowserRuntimeSessions(): BrowserRuntimeSessionSummary[] {
 function loadBrowserSnapshotSummary(sessionId: string): BrowserSnapshotSummary | null {
   const filePath = pathResolver.shared(`runtime/browser/snapshots/${sessionId}.json`);
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as BrowserSnapshotSummary;
+  return readJson<BrowserSnapshotSummary>(filePath);
 }
 
 function pickPresenceBrowserRuntimeSession(
@@ -1325,9 +1319,7 @@ app.get('/api/surface-agents', (_req, res) => {
 app.get('/api/standard-intents', (_req, res) => {
   try {
     const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as StandardIntentCatalog;
+    const parsed = readJson<StandardIntentCatalog>(filePath);
     const items = Array.isArray(parsed?.intents)
       ? parsed.intents
           .filter((intent) => intent?.category === 'surface')

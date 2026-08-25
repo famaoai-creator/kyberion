@@ -18,6 +18,8 @@
  * remembers the reason — callers can inspect `degradedReason`.
  */
 
+import { getRegisteredEnvText } from './foundation/env.js';
+
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { buildSafeExecEnv } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
@@ -56,15 +58,15 @@ export function defaultSileroVadScriptPath(): string {
 function resolvePythonBin(opts: SileroVadOptions): string {
   return (
     opts.pythonBin ||
-    process.env.KYBERION_SILERO_VAD_PYTHON ||
-    process.env.KYBERION_PYTHON_BIN ||
+    getRegisteredEnvText('KYBERION_SILERO_VAD_PYTHON') ||
+    getRegisteredEnvText('KYBERION_PYTHON_BIN') ||
     resolveManagedToolPythonBin('silero_vad') ||
     'python3'
   );
 }
 
 function resolveModelPath(opts: SileroVadOptions): string | undefined {
-  return opts.modelPath || process.env.KYBERION_SILERO_VAD_MODEL || undefined;
+  return opts.modelPath || getRegisteredEnvText('KYBERION_SILERO_VAD_MODEL') || undefined;
 }
 
 export function probeSileroVad(opts: SileroVadOptions = {}): {

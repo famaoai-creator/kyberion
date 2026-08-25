@@ -25,12 +25,13 @@ import {
   type EnvironmentManifest,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const checkOnly = argv.includes('--check');
-  const signingKey = process.env.KYBERION_MANIFEST_SIGNING_KEY;
+  const signingKey = getRegisteredEnvText('KYBERION_MANIFEST_SIGNING_KEY');
   if (!signingKey) {
     logger.error(
       '[manifests:sign] KYBERION_MANIFEST_SIGNING_KEY is not set — refusing to sign/verify.'

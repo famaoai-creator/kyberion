@@ -11,9 +11,11 @@ import {
   safeExistsSync,
   safeMkdir,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const TOOL_ID = 'agy_sdk';
-const MANAGED_PYTHON_VERSION = process.env.KYBERION_MANAGED_PYTHON_VERSION?.trim() || '3.11';
+const MANAGED_PYTHON_VERSION =
+  getRegisteredEnvText('KYBERION_MANAGED_PYTHON_VERSION')?.trim() || '3.11';
 
 type SetupStatus = 'ready' | 'needs_install' | 'unsupported';
 

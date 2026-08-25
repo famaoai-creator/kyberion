@@ -4,7 +4,7 @@ import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import {
   firstJsonObject,
@@ -214,11 +214,11 @@ export function isInjectionSuspected(scope?: string): boolean {
  */
 export function setInjectionSuspected(suspected: boolean = true, scope: string = 'global'): void {
   if (suspected) {
-    process.env.KYBERION_INJECTION_SUSPECTED = 'true';
-    process.env.KYBERION_INJECTION_SCOPE = scope;
+    setRegisteredEnv('KYBERION_INJECTION_SUSPECTED', 'true');
+    setRegisteredEnv('KYBERION_INJECTION_SCOPE', scope);
   } else {
-    delete process.env.KYBERION_INJECTION_SUSPECTED;
-    delete process.env.KYBERION_INJECTION_SCOPE;
+    setRegisteredEnv('KYBERION_INJECTION_SUSPECTED', undefined);
+    setRegisteredEnv('KYBERION_INJECTION_SCOPE', undefined);
   }
   const signalPath = getSignalPath();
   try {

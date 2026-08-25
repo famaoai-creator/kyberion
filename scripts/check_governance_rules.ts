@@ -211,6 +211,41 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/product/schemas/mission-process-registry.schema.json',
     dataPath: 'knowledge/product/governance/mission-process-registry.json',
   },
+  {
+    id: 'security-policy',
+    schemaPath: 'knowledge/product/schemas/security-policy.schema.json',
+    dataPath: 'knowledge/product/governance/security-policy.json',
+  },
+  {
+    id: 'approval-policy',
+    schemaPath: 'knowledge/product/schemas/approval-policy.schema.json',
+    dataPath: 'knowledge/product/governance/approval-policy.json',
+  },
+  {
+    id: 'spend-policy',
+    schemaPath: 'knowledge/product/schemas/spend-policy.schema.json',
+    dataPath: 'knowledge/product/governance/spend-policy.json',
+  },
+  {
+    id: 'trust-policy',
+    schemaPath: 'knowledge/product/schemas/trust-policy.schema.json',
+    dataPath: 'knowledge/product/governance/trust-policy.json',
+  },
+  {
+    id: 'egress-policy',
+    schemaPath: 'knowledge/product/schemas/egress-policy.schema.json',
+    dataPath: 'knowledge/product/governance/egress-policy.json',
+  },
+  {
+    id: 'shell-command-policy',
+    schemaPath: 'knowledge/product/schemas/shell-command-policy.schema.json',
+    dataPath: 'knowledge/product/governance/shell-command-policy.json',
+  },
+  {
+    id: 'permission-presets',
+    schemaPath: 'knowledge/product/schemas/permission-presets.schema.json',
+    dataPath: 'knowledge/product/governance/permission-presets.json',
+  },
 ];
 
 export function findDeterministicCatalogViolations(): string[] {

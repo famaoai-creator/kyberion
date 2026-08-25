@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnclassifiedError } from './unclassified-error-registry.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
@@ -88,9 +88,7 @@ function loadClassifierRules(): ClassifierRule[] {
   if (_cachedRules) return _cachedRules;
   try {
     const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ErrorClassifierRulesFile;
+    const data = readJson<ErrorClassifierRulesFile>(filePath);
     _cachedRules = data.rules.map((entry) => ({
       id: entry.id,
       category: entry.category,
@@ -114,9 +112,7 @@ function loadPolicyViolationPatterns(): typeof POLICY_VIOLATION_PATTERNS {
   if (_cachedPolicyPatterns) return _cachedPolicyPatterns;
   try {
     const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ErrorClassifierRulesFile;
+    const data = readJson<ErrorClassifierRulesFile>(filePath);
     _cachedPolicyPatterns = data.policy_violation_patterns.map((entry) => ({
       pattern: new RegExp(entry.pattern, 'i'),
       violationType: entry.violation_type,

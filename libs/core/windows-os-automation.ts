@@ -1,4 +1,5 @@
 import { safeExec, safeExecResult } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import { escapeXml } from './text-escaping.js';
 
@@ -156,7 +157,7 @@ export function quitApplication(application: string): void {
 }
 export function systemNotify(title: string, message: string): void {
   try {
-    const appId = String(process.env.KYBERION_WINDOWS_AUMID || '').trim();
+    const appId = String(getRegisteredEnvText('KYBERION_WINDOWS_AUMID') || '').trim();
     if (appId) {
       const xml = `<toast><visual><binding template="ToastGeneric"><text>${escapeXml(title)}</text><text>${escapeXml(message)}</text></binding></visual></toast>`;
       const script = [

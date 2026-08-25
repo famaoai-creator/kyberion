@@ -11,6 +11,7 @@ import {
 } from '@agent/core';
 import { loadState } from '@agent/core/mission-state';
 import type { Trace, TraceSpan } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export const FIRST_WIN_LIFECYCLE_STAGES = [
   'onboard',
@@ -749,7 +750,7 @@ export function main(): void {
       identityFile: identityIndex >= 0 ? process.argv[identityIndex + 1] || '' : '',
       runId: runIdIndex >= 0 ? process.argv[runIdIndex + 1] || '' : '',
       confirm: confirmIndex >= 0 ? process.argv[confirmIndex + 1] || '' : '',
-      allowWrites: process.env.KYBERION_FIRST_WIN_LIVE,
+      allowWrites: getRegisteredEnvText('KYBERION_FIRST_WIN_LIVE'),
     };
     const report = runFirstWinLifecycleLive(options);
     console.log(JSON.stringify(report, null, 2));

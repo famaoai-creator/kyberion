@@ -9,7 +9,7 @@ import {
   safeReadFile,
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -739,12 +739,11 @@ function scopedDatabasePath(scope: MissionHistorySearchScope): string {
 
 function withDatabasePath<T>(database: string, callback: () => T): T {
   const previous = getRegisteredEnvText('KYBERION_HISTORY_SEARCH_DB');
-  process.env.KYBERION_HISTORY_SEARCH_DB = database;
+  setRegisteredEnv('KYBERION_HISTORY_SEARCH_DB', database);
   try {
     return callback();
   } finally {
-    if (previous === undefined) delete process.env.KYBERION_HISTORY_SEARCH_DB;
-    else process.env.KYBERION_HISTORY_SEARCH_DB = previous;
+    setRegisteredEnv('KYBERION_HISTORY_SEARCH_DB', previous);
   }
 }
 

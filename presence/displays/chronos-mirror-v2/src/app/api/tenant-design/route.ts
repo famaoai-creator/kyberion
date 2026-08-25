@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { resolveTenantDesign } from '@agent/core/tenant-design-resolver';
 import { webThemePackToCssVars } from '@agent/core/web-design-system';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { guardRequest } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     const designSystemId = url.searchParams.get('designSystemId') || undefined;
 
     const resolution = resolveTenantDesign({
-      rootDir: process.env.KYBERION_TENANT_DESIGN_ROOT || undefined,
+      rootDir: getRegisteredEnvText('KYBERION_TENANT_DESIGN_ROOT') || undefined,
       customerId,
       brandName,
       designSystemId,

@@ -609,9 +609,7 @@ function opRunGc(params: Record<string, unknown>): unknown {
       if (entry.endsWith('.volatile.json')) {
         let sidecar: VolatileSidecar;
         try {
-          sidecar = JSON.parse(
-            safeReadFile(fullPath, { encoding: 'utf8' }) as string
-          ) as VolatileSidecar;
+          sidecar = loadJson<VolatileSidecar>(fullPath);
         } catch {
           results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
           continue;
@@ -664,9 +662,7 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
       const fullPath = path.join(dir, entry);
       if (entry.endsWith('.volatile.json')) {
         try {
-          const sidecar = JSON.parse(
-            safeReadFile(fullPath, { encoding: 'utf8' }) as string
-          ) as VolatileSidecar;
+          const sidecar = loadJson<VolatileSidecar>(fullPath);
           faces.push({ mdPath: fullPath.replace(/\.volatile\.json$/, '.md'), sidecar });
         } catch {
           /* skip */

@@ -17,6 +17,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -303,7 +304,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
   // handler directly; the handler returns { status, results, context }.
   // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
   recordGovernanceAction(
-    process.env.KYBERION_PERSONA || 'unknown',
+    getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
     'actuator_dispatch',
     `${domain}:${action}`,
     false

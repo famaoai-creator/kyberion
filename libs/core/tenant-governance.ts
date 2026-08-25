@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { auditChain } from './audit-chain.js';
 import {
   defaultTenantKnowledgeRoot,
@@ -91,7 +92,7 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
     const saved = writeTenantProfile(profile, options);
     if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
     auditChain.record({
-      agentId: input.actor || process.env.KYBERION_PERSONA || 'operator',
+      agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
       action: `tenant.${input.verb}`,
       operation: `tenant:${profile.tenant_slug}`,
       result: 'completed',

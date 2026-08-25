@@ -5,6 +5,7 @@
 
 import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
@@ -87,8 +88,8 @@ export class TraceContext {
       knowledgeRefs: [],
       children: [],
     };
-    const customer = process.env.KYBERION_CUSTOMER?.trim() || undefined;
-    const tenant = process.env.KYBERION_TENANT?.trim() || undefined;
+    const customer = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined;
+    const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim() || undefined;
     this.trace = {
       traceId: randomUUID(),
       rootSpan,

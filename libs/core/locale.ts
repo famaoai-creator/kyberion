@@ -153,7 +153,7 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
  *    chronos header-toggle value read from localStorage by its caller).
  * 3. Onboarding identity `language` (`my-identity.json` under
  *    `resolveActiveProfileRoot()`).
- * 4. `process.env.KYBERION_LOCALE` (canonical), then the deprecated
+ * 4. the canonical `KYBERION_LOCALE` setting, then the deprecated
  *    `KYBERION_UI_LOCALE` alias (warns once).
  * 5. OS/browser locale: `process.env.LANG`, then `ctx.navigatorLanguage`
  *    when a browser caller supplies it.

@@ -3,6 +3,7 @@ import { fromJSONSchema, z } from 'zod';
 import { auditChain } from './audit-chain.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -271,7 +272,7 @@ interface PersistedGadget {
 const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
 
 function actor(input?: string): string {
-  return input?.trim() || process.env.KYBERION_PERSONA || 'cloudflare-os-control-plane';
+  return input?.trim() || getRegisteredEnvText('KYBERION_PERSONA') || 'cloudflare-os-control-plane';
 }
 
 function audit(

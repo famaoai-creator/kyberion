@@ -11,6 +11,7 @@ import {
   withExecutionContext,
   type A2UIMessage,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   getComputerSurfaceAccess,
   getComputerSurfaceGuardedSurfaceUrl,
@@ -54,10 +55,11 @@ function isLoopback(req: express.Request): boolean {
 function authorizeSurface(req: express.Request, res: express.Response): boolean {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const configured = process.env.KYBERION_LOCALADMIN_TOKEN || process.env.KYBERION_API_TOKEN;
+  const configured =
+    getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');
   if (
     tokenMatches(token, configured) ||
-    (isLoopback(req) && process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false')
+    (isLoopback(req) && getRegisteredEnvText('KYBERION_LOCALHOST_AUTOADMIN') !== 'false')
   ) {
     return true;
   }

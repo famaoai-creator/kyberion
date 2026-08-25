@@ -35,6 +35,7 @@ import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './wo
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
@@ -259,13 +260,12 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
 }
 
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
-  const previous = process.env.KYBERION_CUSTOMER;
-  process.env.KYBERION_CUSTOMER = customerSlug;
+  const previous = getRegisteredEnvText('KYBERION_CUSTOMER');
+  setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
   try {
     return fn();
   } finally {
-    if (previous === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = previous;
+    setRegisteredEnv('KYBERION_CUSTOMER', previous);
   }
 }
 

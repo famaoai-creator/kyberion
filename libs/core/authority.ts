@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { rawExistsSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
@@ -227,13 +228,13 @@ export function withExecutionContext<T>(
   tenantSlug?: string
 ): T {
   const previousRole = process.env.MISSION_ROLE;
-  const previousPersona = process.env.KYBERION_PERSONA;
+  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   process.env.MISSION_ROLE = role;
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
-    process.env.KYBERION_PERSONA = resolvedPersona;
+    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
   } else if (persona === undefined) {
-    delete process.env.KYBERION_PERSONA;
+    setRegisteredEnv('KYBERION_PERSONA', undefined);
   }
   try {
     return executionScopeStorage.run(
@@ -243,8 +244,7 @@ export function withExecutionContext<T>(
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = previousPersona;
+    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
 
@@ -260,13 +260,13 @@ export async function withExecutionContextAsync<T>(
   tenantSlug?: string
 ): Promise<T> {
   const previousRole = process.env.MISSION_ROLE;
-  const previousPersona = process.env.KYBERION_PERSONA;
+  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   process.env.MISSION_ROLE = role;
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
-    process.env.KYBERION_PERSONA = resolvedPersona;
+    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
   } else if (persona === undefined) {
-    delete process.env.KYBERION_PERSONA;
+    setRegisteredEnv('KYBERION_PERSONA', undefined);
   }
   try {
     return await executionScopeStorage.run(
@@ -276,13 +276,12 @@ export async function withExecutionContextAsync<T>(
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = previousPersona;
+    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
 
 function resolveSudoScope(): string[] | undefined {
-  const raw = process.env.KYBERION_SUDO_SCOPE;
+  const raw = getRegisteredEnvText('KYBERION_SUDO_SCOPE');
   if (!raw) return undefined;
   const scopes = raw
     .split(',')
@@ -327,7 +326,7 @@ const TASK_GRANT_AUTHORITY_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 function resolveTaskGrantsReadPath(): string {
-  const override = process.env.KYBERION_TASK_GRANTS_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_TASK_GRANTS_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('coordination/identity/task-grants.jsonl');
 }
@@ -344,7 +343,7 @@ function resolveTaskGrantsReadPath(): string {
  * Fail-closed: no resolvable actor identity means no task grants are served.
  */
 function resolveGrantActorNhiId(role: string | undefined): string | undefined {
-  const explicit = process.env.KYBERION_NHI_ID?.trim();
+  const explicit = getRegisteredEnvText('KYBERION_NHI_ID')?.trim();
   if (explicit) {
     return TASK_GRANT_NHI_ID_PATTERN.test(explicit) ? explicit : undefined;
   }
@@ -365,7 +364,7 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
   const missionId = process.env.MISSION_ID;
-  const envPersona = process.env.KYBERION_PERSONA;
+  const envPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const envRole = resolveRole();
 
   let persona: Persona = normalizePersona(envPersona);
@@ -373,7 +372,9 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const executionScope = executionScopeStorage.getStore();
   let tenantSlug: string | undefined = normalizeTenantSlug(
     tenantOverride ??
-      (executionScope?.tenantBound ? executionScope.tenantSlug : process.env.KYBERION_TENANT)
+      (executionScope?.tenantBound
+        ? executionScope.tenantSlug
+        : getRegisteredEnvText('KYBERION_TENANT'))
   );
   let brokeredTenants: string[] | undefined;
   let brokerApproval:
@@ -509,7 +510,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
             }
             const audience = grant.audience || {};
             const grantTenant = String(grant.scope?.tenant_slug || '').trim();
-            const actorTenant = process.env.KYBERION_TENANT?.trim();
+            const actorTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
             if (!grantTenant || !actorTenant || grantTenant !== actorTenant) {
               logger.debug(
                 `task grant ${grant.grant_id} skipped: tenant scope ${grantTenant || '<missing>'} != ${actorTenant || '<missing>'}`
@@ -545,7 +546,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   }
 
   // C. Environment Sudo Overrides
-  if (process.env.KYBERION_SUDO === 'true') {
+  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') {
     authorities.push('SUDO');
   }
 

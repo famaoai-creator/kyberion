@@ -4,6 +4,7 @@
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveIdentityContext } from './authority.js';
@@ -127,7 +128,7 @@ function checkProjectScope(
 }
 
 function expandPolicyPath(pattern: string, missionId?: string): string {
-  const customerSlug = process.env.KYBERION_CUSTOMER?.trim() || 'NONE';
+  const customerSlug = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || 'NONE';
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
     .replace('${KYBERION_CUSTOMER}', customerSlug);
@@ -186,7 +187,8 @@ function tenantScopeConfig(policy: any): {
     // server-resolved binding. Unpartitioned legacy roots remain governed by
     // the existing tier/persona checks until their storage migration lands.
     requireTenantBinding:
-      cfg.require_tenant_binding === true || process.env.KYBERION_TENANT_SCOPE_REQUIRED === 'true',
+      cfg.require_tenant_binding === true ||
+      getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') === 'true',
     slugPattern,
     brokerRequirements: {
       requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,

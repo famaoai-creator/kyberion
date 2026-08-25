@@ -9,6 +9,7 @@ import {
   type ReasoningRouteUserConfig,
   inspectReasoningRoutes,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import {
   getRegisteredEnv,
   recordGovernanceAction,
@@ -175,9 +176,7 @@ function rollback(): void {
   const path = reasoningRouteUserConfigPath();
   const backup = `${path}.previous`;
   if (!safeExistsSync(backup)) throw new Error(`No rollback snapshot at ${backup}`);
-  const restored = JSON.parse(
-    safeReadFile(backup, { encoding: 'utf8' }) as string
-  ) as ReasoningRouteUserConfig;
+  const restored = readJson<ReasoningRouteUserConfig>(backup);
   validateReasoningRouteUserConfig(restored, backup);
   validateConfigResolves(restored);
   if (hasFlag('--dry-run'))

@@ -16,6 +16,7 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
@@ -225,7 +226,7 @@ function probeAudioPermission(platform: NodeJS.Platform): MeetingPreflightItem {
       }
     );
   }
-  if (process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED === '1') {
+  if (getRegisteredEnvText('KYBERION_AUDIO_PERMISSION_CONFIRMED') === '1') {
     return item(
       'audio.permission',
       'pass',

@@ -3,7 +3,8 @@ import type { ValidateFunction } from 'ajv';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 
 const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-profile.schema.json'
@@ -83,9 +84,7 @@ export function loadOrganizationProfile(rootDir?: string): OrganizationProfile |
   for (const profilePath of candidatePaths) {
     if (!safeExistsSync(profilePath)) continue;
     try {
-      const parsed = JSON.parse(
-        safeReadFile(profilePath, { encoding: 'utf8' }) as string
-      ) as OrganizationProfile;
+      const parsed = readJson<OrganizationProfile>(profilePath);
       const validate = ensureOrganizationProfileValidator();
       if (!validate(parsed)) {
         throw new Error(`Invalid organization-profile: ${errorsFrom(validate).join('; ')}`);

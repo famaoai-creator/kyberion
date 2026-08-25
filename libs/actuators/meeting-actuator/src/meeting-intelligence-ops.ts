@@ -24,6 +24,7 @@ import { safeExistsSync, safeMkdir, safeWriteFile, pathResolver } from '@agent/c
 import * as path from 'node:path';
 import { z } from 'zod';
 import { delegateWorkItemWithReasoningBackend, getWorkItem } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 function writeJSON(rel: string, data: unknown): string {
   const abs = pathResolver.rootResolve(rel);
@@ -328,7 +329,7 @@ export async function extractActionItemsOp(input: {
         : {}),
       extractor: {
         backend: backend.name,
-        model: process.env.KYBERION_CLAUDE_CLI_MODEL || 'opus',
+        model: getRegisteredEnvText('KYBERION_CLAUDE_CLI_MODEL') || 'opus',
         extracted_at: extractedAt,
       },
     };

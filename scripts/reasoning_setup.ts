@@ -1,5 +1,6 @@
 import { loadEnvironmentManifest, logger, probeManifest } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 import { formatSetupSummaryLine } from './setup-report.js';
 
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
   // choice instead of re-discovering (possibly differently) on every start.
   const interactiveCapable = process.stdin.isTTY && process.stdout.isTTY;
   const persistedBackend =
-    process.env.KYBERION_REASONING_BACKEND?.trim() || readPersistedReasoningBackend();
+    getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim() || readPersistedReasoningBackend();
   if (
     interactiveCapable &&
     (counts.must > 0 || process.argv.includes('--interactive') || !persistedBackend)

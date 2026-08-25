@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
@@ -88,7 +89,7 @@ function tenantEvolutionRoot(scope?: MemoryScopeEnvelope): string | undefined {
 function resolveHintsPath(scope?: MemoryScopeEnvelope): string {
   const tenantRoot = tenantEvolutionRoot(scope);
   if (tenantRoot) return `${tenantRoot}/HINTS.md`;
-  const override = process.env.KYBERION_HINTS_PATH;
+  const override = getRegisteredEnvText('KYBERION_HINTS_PATH');
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.knowledge('product/governance/HINTS.md');
@@ -96,7 +97,7 @@ function resolveHintsPath(scope?: MemoryScopeEnvelope): string {
 function resolveHintsArchiveDir(scope?: MemoryScopeEnvelope): string {
   const tenantRoot = tenantEvolutionRoot(scope);
   if (tenantRoot) return `${tenantRoot}/hints-archive`;
-  const override = process.env.KYBERION_HINTS_ARCHIVE_DIR;
+  const override = getRegisteredEnvText('KYBERION_HINTS_ARCHIVE_DIR');
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.knowledge('product/hints/archive');

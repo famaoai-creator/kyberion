@@ -6439,6 +6439,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/approval-policy.schema.json",
+      "tier": "public",
+      "size": 1339,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/architecture-adf.example.json",
       "tier": "public",
       "size": 1928,
@@ -6736,6 +6742,12 @@
       "path": "product/schemas/document-outline-label-policy.schema.json",
       "tier": "public",
       "size": 290,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/egress-policy.schema.json",
+      "tier": "public",
+      "size": 800,
       "type": "json"
     },
     {
@@ -7645,6 +7657,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/permission-presets.schema.json",
+      "tier": "public",
+      "size": 759,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pilot-strategy-policy.schema.json",
       "tier": "public",
       "size": 1014,
@@ -7879,6 +7897,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/security-policy.schema.json",
+      "tier": "public",
+      "size": 1324,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/security-scope.schema.json",
       "tier": "public",
       "size": 1491,
@@ -7951,6 +7975,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/shell-command-policy.schema.json",
+      "tier": "public",
+      "size": 1182,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/skill-install-package-map.schema.json",
       "tier": "public",
       "size": 920,
@@ -8008,6 +8038,12 @@
       "path": "product/schemas/specialist-catalog.schema.json",
       "tier": "public",
       "size": 897,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/spend-policy.schema.json",
+      "tier": "public",
+      "size": 624,
       "type": "json"
     },
     {
@@ -8218,6 +8254,12 @@
       "path": "product/schemas/travel-planning-brief.schema.json",
       "tier": "public",
       "size": 5498,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/trust-policy.schema.json",
+      "tier": "public",
+      "size": 1627,
       "type": "json"
     },
     {

@@ -29,6 +29,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflightSync,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { VideoCompositionADF } from '@agent/core';
@@ -709,7 +710,7 @@ async function prepareVideoComposition(params: {
   const awaitCompletion = resolveAwaitCompletion(adf, policy);
   const bundlePreview = compileVideoCompositionADF(adf, { bundleDir: params.bundle_dir });
   const jobTicketPath = path.join(bundlePreview.bundle_dir, 'job-state.json');
-  const runMode = String(process.env.KYBERION_VIDEO_RENDER_RUN_MODE || 'foreground');
+  const runMode = String(getRegisteredEnvText('KYBERION_VIDEO_RENDER_RUN_MODE') || 'foreground');
   const detachedBackground =
     adf.output?.detached_background === true &&
     awaitCompletion === false &&

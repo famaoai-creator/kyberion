@@ -24,6 +24,7 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycle,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 
@@ -55,9 +56,11 @@ if (!['public', 'confidential', 'personal'].includes(tier)) {
 const reviewContext = createReportReviewContext({
   artifact_ref: option('--artifact-ref') || target,
   viewer_principal:
-    process.env.KYBERION_VIEWER_PRINCIPAL || process.env.KYBERION_MCP_PRINCIPAL || 'local-reviewer',
+    getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
+    getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
+    'local-reviewer',
   tier,
-  tenant_slug: option('--tenant') || process.env.KYBERION_TENANT,
+  tenant_slug: option('--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
   organization_id: option('--organization-id'),
   project_id: option('--project-id'),
   mission_id: option('--mission-id'),

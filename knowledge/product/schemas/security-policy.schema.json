@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "security-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "default_allow": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "volatile_face_policy": { "type": "object", "additionalProperties": true },
+    "tenant_scope": { "type": "object", "additionalProperties": true },
+    "tier_restrictions": { "type": "object", "additionalProperties": true },
+    "persona_permissions": { "type": "object", "additionalProperties": true },
+    "authority_role_permissions": { "type": "object", "additionalProperties": true },
+    "authority_permissions": { "type": "object", "additionalProperties": true },
+    "project_permissions": { "type": "object", "additionalProperties": true },
+    "network_guardrails": { "type": "object", "additionalProperties": true },
+    "a2a_policy": { "type": "object", "additionalProperties": true },
+    "quality_requirements": { "type": "object", "additionalProperties": true }
+  },
+  "required": [
+    "version",
+    "default_allow",
+    "volatile_face_policy",
+    "tenant_scope",
+    "tier_restrictions",
+    "persona_permissions",
+    "authority_role_permissions"
+  ]
+}

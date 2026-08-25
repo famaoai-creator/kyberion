@@ -1,4 +1,5 @@
 import { ACPMediator } from './acp-mediator.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import {
   runStructuredReasoningOp,
@@ -50,10 +51,10 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
   private bootPromise: Promise<void> | null = null;
 
   constructor(options: CopilotAcpReasoningBackendOptions = {}) {
-    const command = options.command || process.env.KYBERION_COPILOT_CLI_BIN || 'gh';
+    const command = options.command || getRegisteredEnvText('KYBERION_COPILOT_CLI_BIN') || 'gh';
     const model =
       options.model ||
-      process.env.KYBERION_COPILOT_MODEL ||
+      getRegisteredEnvText('KYBERION_COPILOT_MODEL') ||
       resolveRuntimeModelId('copilot-default');
     const args =
       options.args ||
