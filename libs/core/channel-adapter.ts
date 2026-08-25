@@ -63,6 +63,30 @@ export type ChannelTurnConversation = (
   }
 ) => SurfaceConversationResult | Promise<SurfaceConversationResult>;
 
+/**
+ * Keep approval and clarification outcomes visible on text-only channels.
+ * Autonomous replies remain untouched; the structured contract is already
+ * sufficient for surfaces that render cards.
+ */
+export function formatChannelTurnText(result: SurfaceConversationResult): string {
+  const text = result.text.trim();
+  const contract = result.intentResolution;
+  if (
+    !text ||
+    !contract ||
+    contract.authority_level === 'autonomous' ||
+    text.includes(contract.next_action.label)
+  ) {
+    return result.text;
+  }
+  return [
+    text,
+    '',
+    `Next action: ${contract.next_action.label}`,
+    `Consequence: ${contract.next_action.consequence}`,
+  ].join('\n');
+}
+
 /** Run the common thread-context, typing, conversation, and delivery sequence. */
 export async function runChannelTurn(
   adapter: ChannelAdapter,
@@ -78,15 +102,19 @@ export async function runChannelTurn(
       surface: adapter.channel,
       actorId: adapter.actorId,
     });
-    if (result.text.trim()) {
+    const deliveredResult = {
+      ...result,
+      text: formatChannelTurnText(result),
+    };
+    if (deliveredResult.text.trim()) {
       await adapter.send({
-        text: result.text,
+        text: deliveredResult.text,
         channel: input.channel,
         threadTs: input.threadTs,
-        result,
+        result: deliveredResult,
       });
     }
-    return result;
+    return deliveredResult;
   } finally {
     await typing?.stop();
   }

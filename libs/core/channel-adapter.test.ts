@@ -79,4 +79,41 @@ describe('runChannelTurn', () => {
     ).rejects.toThrow('failed');
     expect(calls).toEqual(['stop']);
   });
+
+  it('surfaces approval next action and consequence on text-only channels', async () => {
+    const sent: string[] = [];
+    const result = await runChannelTurn(
+      {
+        channel: 'slack',
+        actorId: 'operator-1',
+        send: (message) => sent.push(message.text),
+      },
+      { text: 'send it', channel: 'c', threadTs: 't' },
+      () => ({
+        text: 'The plan is ready.',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        intentResolution: {
+          request_id: 'ir_12345678',
+          normalized_intent: 'send_message',
+          missing_inputs: [],
+          resolution_shape: 'task_session',
+          outcome_kind: 'service_change',
+          authority_level: 'approval_required',
+          next_action: {
+            kind: 'request_approval',
+            label: 'Approve this plan to continue.',
+            consequence: 'The action waits for approval.',
+          },
+          rationale: 'approval is required',
+        },
+      })
+    );
+
+    expect(sent[0]).toContain('Next action: Approve this plan to continue.');
+    expect(sent[0]).toContain('Consequence: The action waits for approval.');
+    expect(result.text).toBe(sent[0]);
+  });
 });
