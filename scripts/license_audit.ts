@@ -30,6 +30,8 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface PackageLicenseInfo {
   name: string;
@@ -238,67 +240,77 @@ function buildReport(packages: PackageLicenseInfo[]): AuditReport {
 }
 
 function writeReport(report: AuditReport): void {
-  const dir = path.dirname(REPORT_PATH);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(REPORT_PATH, JSON.stringify(report, null, 2) + '\n', { encoding: 'utf8' });
+  withExecutionContext('ecosystem_architect', () => {
+    const dir = path.dirname(REPORT_PATH);
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    safeWriteFile(REPORT_PATH, JSON.stringify(report, null, 2) + '\n', { encoding: 'utf8' });
+  });
 }
 
 function printUsage(): void {
   console.log('Usage: pnpm license:audit [--check]');
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const checkMode = args.includes('--check');
-  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-    printUsage();
-    return;
-  }
-
-  console.log('🔍 Scanning third-party licenses...');
-  const packages = gatherPackages();
-  if (packages.length === 0) {
-    console.error('❌ No packages found. Run `pnpm install` first.');
-    process.exit(1);
-  }
-
-  const report = buildReport(packages);
-  writeReport(report);
-
-  console.log(`\n📊 Total packages: ${report.total_packages}`);
-  console.log('\nLicense breakdown (top 15):');
-  Object.entries(report.by_license)
-    .slice(0, 15)
-    .forEach(([lic, count]) => {
-      console.log(`  ${String(count).padStart(5)}  ${lic}`);
-    });
-
-  if (report.unknown_licenses.length > 0) {
-    console.log(`\n⚠️  ${report.unknown_licenses.length} packages with unknown license:`);
-    for (const p of report.unknown_licenses.slice(0, 10)) {
-      console.log(`     - ${p.name}@${p.version}`);
+export const runLicenseAudit = defineScript({
+  name: 'license:audit',
+  flags: [],
+  run(context) {
+    const args = context.argv;
+    const checkMode = args.includes('--check');
+    if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+      printUsage();
+      return;
     }
-    if (report.unknown_licenses.length > 10) {
-      console.log(`     ...and ${report.unknown_licenses.length - 10} more (see report).`);
+
+    console.log('🔍 Scanning third-party licenses...');
+    const packages = gatherPackages();
+    if (packages.length === 0) {
+      console.error('❌ No packages found. Run `pnpm install` first.');
+      throw new Error('No packages found. Run pnpm install first.');
     }
-  }
 
-  if (report.restrictive_licenses.length > 0) {
-    console.log(`\n🚨 ${report.restrictive_licenses.length} packages with restrictive licenses:`);
-    for (const p of report.restrictive_licenses.slice(0, 10)) {
-      console.log(`     - ${p.name}@${p.version}  (${p.license})`);
+    const report = buildReport(packages);
+    writeReport(report);
+
+    console.log(`\n📊 Total packages: ${report.total_packages}`);
+    console.log('\nLicense breakdown (top 15):');
+    Object.entries(report.by_license)
+      .slice(0, 15)
+      .forEach(([lic, count]) => {
+        console.log(`  ${String(count).padStart(5)}  ${lic}`);
+      });
+
+    if (report.unknown_licenses.length > 0) {
+      console.log(`\n⚠️  ${report.unknown_licenses.length} packages with unknown license:`);
+      for (const p of report.unknown_licenses.slice(0, 10)) {
+        console.log(`     - ${p.name}@${p.version}`);
+      }
+      if (report.unknown_licenses.length > 10) {
+        console.log(`     ...and ${report.unknown_licenses.length - 10} more (see report).`);
+      }
     }
-  }
 
-  console.log(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
-
-  if (checkMode) {
-    if (report.unknown_licenses.length > 0 || report.restrictive_licenses.length > 0) {
-      console.error('\n❌ License audit found issues (see above).');
-      process.exit(1);
+    if (report.restrictive_licenses.length > 0) {
+      console.log(`\n🚨 ${report.restrictive_licenses.length} packages with restrictive licenses:`);
+      for (const p of report.restrictive_licenses.slice(0, 10)) {
+        console.log(`     - ${p.name}@${p.version}  (${p.license})`);
+      }
     }
-    console.log('\n✅ License audit passed.');
-  }
-}
 
-main();
+    console.log(`\n📝 Full report: ${path.relative(ROOT, REPORT_PATH)}`);
+
+    if (checkMode) {
+      if (report.unknown_licenses.length > 0 || report.restrictive_licenses.length > 0) {
+        console.error('\n❌ License audit found issues (see above).');
+        throw new Error('License audit found issues (see above).');
+      }
+      console.log('\n✅ License audit passed.');
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'license_audit.ts') ||
+  isDirectScript(import.meta.url, 'license_audit.js')
+)
+  void runLicenseAudit();
