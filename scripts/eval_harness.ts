@@ -8,14 +8,8 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import {
-  pathResolver,
-  resolveFacets,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-} from '@agent/core';
+import { pathResolver, resolveFacets, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 import type { FacetRequest, FacetScope, ResolvedFacets } from '@agent/core';
 
 export interface EvalHarnessConfiguration {
@@ -150,11 +144,7 @@ function defaultExecutor(prompt: string, context: EvalHarnessContext): string {
 function appendRunRecord(runPath: string, result: EvalHarnessTableResult): void {
   const directory = path.dirname(runPath);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  safeAppendFileSync(
-    runPath,
-    `${JSON.stringify({ ...result, recorded_at: new Date().toISOString() })}\n`,
-    'utf8'
-  );
+  appendJsonLine(runPath, { ...result, recorded_at: new Date().toISOString() });
 }
 
 /** Run every named configuration against the same ordered multi-step brief. */

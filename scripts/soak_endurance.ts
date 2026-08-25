@@ -3,13 +3,13 @@ import {
   logger,
   MetricsCollector,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeStat,
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
@@ -266,14 +266,11 @@ export function detectResourceRegressions(samples: SoakSample[]): SoakRegression
 
 function appendLatencyHistory(metricsDir: string, metricsFile: string, durationMs: number): void {
   safeMkdir(metricsDir, { recursive: true });
-  safeAppendFileSync(
-    path.join(metricsDir, metricsFile),
-    JSON.stringify({
-      skill: 'ao-04-soak-cycle',
-      duration_ms: durationMs,
-      timestamp: new Date().toISOString(),
-    }) + '\n'
-  );
+  appendJsonLine(path.join(metricsDir, metricsFile), {
+    skill: 'ao-04-soak-cycle',
+    duration_ms: durationMs,
+    timestamp: new Date().toISOString(),
+  });
 }
 
 function renderEvidenceSummary(report: SoakReport): string {
@@ -352,24 +349,21 @@ function appendEvidenceBundle(report: SoakReport, evidenceRoot?: string): void {
   const { dir, logPath, summaryPath } = createEvidenceBundlePaths(report, evidenceRoot);
   safeMkdir(dir, { recursive: true });
   for (const sample of report.samples) {
-    safeAppendFileSync(
-      logPath,
-      JSON.stringify({
-        run_timestamp: report.timestamp,
-        cycle: sample.cycle,
-        timestamp: sample.timestamp,
-        maintenance_summary: report.maintenance_summary,
-        resource_snapshot: {
-          ...sample,
-          sampled_files: Object.fromEntries(
-            Object.entries(sample.sampled_files).map(([samplePath, size]) => [
-              sanitizeEvidenceLabel(path.basename(samplePath)),
-              size,
-            ])
-          ),
-        },
-      }) + '\n'
-    );
+    appendJsonLine(logPath, {
+      run_timestamp: report.timestamp,
+      cycle: sample.cycle,
+      timestamp: sample.timestamp,
+      maintenance_summary: report.maintenance_summary,
+      resource_snapshot: {
+        ...sample,
+        sampled_files: Object.fromEntries(
+          Object.entries(sample.sampled_files).map(([samplePath, size]) => [
+            sanitizeEvidenceLabel(path.basename(samplePath)),
+            size,
+          ])
+        ),
+      },
+    });
   }
   safeWriteFile(summaryPath, renderEvidenceSummary(report));
   report.evidence.run_log_path = logPath;

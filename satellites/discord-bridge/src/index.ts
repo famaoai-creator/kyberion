@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
 
@@ -11,7 +12,6 @@ import {
   logger,
   startBridgeTypingLoop,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -111,7 +111,7 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
   try {
     const resolved = resolveDiscordThreadHistoryPath(entry.threadTs);
     safeMkdir(path.dirname(resolved), { recursive: true });
-    safeAppendFileSync(resolved, `${JSON.stringify(entry)}\n`);
+    appendJsonLine(resolved, entry);
   } catch (error: any) {
     logger.warn(`⚠️ [DiscordBridge] Failed to persist thread history: ${error?.message || error}`);
   }

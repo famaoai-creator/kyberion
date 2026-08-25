@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { installProcessGuards } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -13,7 +13,6 @@ import {
   startBridgeTypingLoop,
   logger,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   runSurfaceMessageConversation,
@@ -183,7 +182,7 @@ function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
   try {
     const resolved = resolveTelegramThreadHistoryPath(entry.threadTs);
     safeMkdir(path.dirname(resolved), { recursive: true });
-    safeAppendFileSync(resolved, `${JSON.stringify(entry)}\n`);
+    appendJsonLine(resolved, entry);
   } catch (error: any) {
     logger.warn(`⚠️ [TelegramBridge] Failed to persist thread history: ${error?.message || error}`);
   }

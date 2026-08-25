@@ -1,5 +1,6 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
@@ -9,7 +10,6 @@ import {
   pathResolver,
   emitChannelSurfaceEvent,
   resolveServiceBinding,
-  safeAppendFileSync,
   prepareSlackSurfaceArtifact,
   recordSlackSurfaceArtifact,
   runSurfaceMessageConversation,
@@ -461,7 +461,7 @@ async function start() {
         `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
       );
       recordSlackSurfaceArtifact(artifact);
-      safeAppendFileSync(STIMULI_PATH, JSON.stringify(artifact.stimulus) + '\n', 'utf8');
+      appendJsonLine(STIMULI_PATH, artifact.stimulus);
 
       const initialized = isEnvironmentInitialized();
 

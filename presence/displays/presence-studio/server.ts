@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
@@ -73,7 +73,6 @@ import {
   loadJson,
   pathResolver,
   resolveWorkDesign,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeExec,
@@ -1920,7 +1919,7 @@ app.post('/api/voice/stimuli', (req, res) => {
     parsed.data.source_id || 'presence-studio',
     requestId
   );
-  safeAppendFileSync(STIMULI_PATH, `${JSON.stringify(stimulus)}\n`, 'utf8');
+  appendJsonLine(STIMULI_PATH, stimulus);
   rememberStimulus(stimulus as unknown as Record<string, unknown>);
   emitState();
   logger.info(
