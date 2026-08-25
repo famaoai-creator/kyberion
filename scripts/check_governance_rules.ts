@@ -257,6 +257,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/product/schemas/error-classifier-rules.schema.json',
     dataPath: 'knowledge/product/governance/error-classifier-rules.json',
   },
+  {
+    id: 'outcome-catalog',
+    schemaPath: 'knowledge/product/schemas/outcome-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/outcome-catalog.json',
+  },
 ];
 
 export function findDeterministicCatalogViolations(): string[] {
