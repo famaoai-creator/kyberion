@@ -14,7 +14,6 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   logger,
   pathResolver,
@@ -25,6 +24,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -123,12 +123,11 @@ function getFlag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-function main(): number {
+function main(argv: string[]): number {
   // Operator-run scaffolding CLI: same execution context as the onboarding
   // wizard, which also writes under customer/ (see scripts/onboarding_wizard.ts).
   process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
   setRegisteredEnv('KYBERION_PERSONA', getRegisteredEnvText('KYBERION_PERSONA') || 'sovereign');
-  const argv = process.argv.slice(2);
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');
   const companyName = getFlag(argv, '--name');
@@ -168,14 +167,15 @@ function main(): number {
   return 0;
 }
 
-const isDirectExecution = (() => {
-  try {
-    return process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-  } catch {
-    return false;
-  }
-})();
-
-if (isDirectExecution) {
-  process.exit(main());
-}
+if (
+  isDirectScript(import.meta.url, 'company_bootstrap.ts') ||
+  isDirectScript(import.meta.url, 'company_bootstrap.js')
+)
+  void defineScript({
+    name: 'company:bootstrap',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`company bootstrap failed with exit code ${status}`);
+    },
+  })();
