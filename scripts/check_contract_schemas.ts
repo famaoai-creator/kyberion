@@ -7,6 +7,8 @@ import {
   createNextActionContract,
   createOutcomeContract,
   createTaskSession,
+  safeExistsSync,
+  safeReaddir,
 } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
@@ -3981,6 +3983,15 @@ function main() {
   const ajv2020 = createAjv2020({ validateSchema: false });
   addFormats(ajv2020);
   const violations: string[] = [];
+  const legacySchemaRoot = pathResolver.rootResolve('schemas');
+  if (
+    safeExistsSync(legacySchemaRoot) &&
+    safeReaddir(legacySchemaRoot).some((entry) => entry.endsWith('.json'))
+  ) {
+    violations.push(
+      'schema-root: schemas/ is a retired compatibility path; place every JSON schema under knowledge/product/schemas/'
+    );
+  }
   const unmanagedGoldenScenarioCatalogs = findUnmanagedGoldenScenarioCatalogs();
   for (const catalogPath of unmanagedGoldenScenarioCatalogs) {
     violations.push(
