@@ -3246,7 +3246,7 @@
       "cli_help_intent": {
         "en": "  intent [--clarify] \"<utterance>\"   Deprecated: use `pnpm kyberion ask --explain \"<utterance>\"`",
         "ja": "  intent [--clarify] \"<発話>\"   非推奨: `pnpm kyberion ask --explain \"<発話>\"` を使用",
-        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Dėṗřėƈȧŧėḓ: ůşė `ṗñṗɱ ķẏɓėřïõñ ȧşķ --ėẋṗŀȧïñ` ŀőřėɱ⟧"
+        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Ḓėṗřėƈȧŧėḓ: ůşė `ṗñṗɱ ķẏƀėřïőñ ȧşķ --ėẋṗŀȧïñ \"<ůŧŧėřȧñƈė>\"` ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_task_summary": {
         "en": "  task <plan|start> \"<request>\"  Plan a cross-tool task or create a governed task session",
