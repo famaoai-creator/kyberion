@@ -4,6 +4,7 @@ import {
   readDaemonHeartbeat,
   type DaemonHeartbeatStatus,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core';
 import { createStandardYargs } from '@agent/core';
 import {
@@ -291,8 +292,10 @@ async function main(): Promise<void> {
   process.exit(report.ok ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /daemon_watchdog\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'daemon_watchdog.ts') ||
+  isDirectScript(import.meta.url, 'daemon_watchdog.js')
+) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

@@ -11,6 +11,7 @@
  */
 
 import * as path from 'node:path';
+import { isDirectScript } from './lib/harness.js';
 import {
   loadEgressPolicy,
   logger,
@@ -128,7 +129,9 @@ function main(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /egress_warn_report\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'egress_warn_report.ts') ||
+  isDirectScript(import.meta.url, 'egress_warn_report.js')
+) {
   process.exit(main());
 }
