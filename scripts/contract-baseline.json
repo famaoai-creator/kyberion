@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-25T01:23:07.062Z",
+  "generated_at": "2026-08-25T09:57:42.209Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -90,9 +90,9 @@
     },
     {
       "actuator_id": "email-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["create_draft", "send", "send_from_file"],
-      "contract_schema": "libs/actuators/email-actuator/knowledge/product/schemas/email-action.schema.json",
+      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
       "contract_schema_sha256": "0566c8073665c5ae983d46b709d15b510f09a67d2baa5b716ba38b364df10777"
     },
     {
@@ -132,7 +132,7 @@
     },
     {
       "actuator_id": "media-generation-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": [
         "capture_focused_window",
         "capture_screen",
@@ -148,7 +148,7 @@
         "wait_generation_job"
       ],
       "contract_schema": "knowledge/product/schemas/media-generation-action.schema.json",
-      "contract_schema_sha256": "a9c5389d254c8c261f13f97ffda9c3280bb50d8dc9fe73750fb9722f0904a2b6"
+      "contract_schema_sha256": "4581373cf3c85b598a002b25aef75c02f85bca4372a746c1973db4269611a0d1"
     },
     {
       "actuator_id": "meeting-actuator",
@@ -280,7 +280,7 @@
     },
     {
       "actuator_id": "voice-actuator",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "ops": [
         "collect_and_register_voice_profile",
         "collect_voice_samples",
@@ -296,7 +296,7 @@
         "verify_tts_loopback"
       ],
       "contract_schema": "knowledge/product/schemas/voice-action.schema.json",
-      "contract_schema_sha256": "ceb732326e672b84ecac029a8683d7929348cd3fe1edfc5e473937eb62687d26"
+      "contract_schema_sha256": "35d585642e001ec88f755c107423f875dcd30a6c9ca98beefb6e530baa576118"
     },
     {
       "actuator_id": "wisdom-actuator",

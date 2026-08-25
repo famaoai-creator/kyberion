@@ -26,7 +26,14 @@ export interface MissionStartCreateOptions {
 }
 
 export function extractMissionControllerPositionalArgs(argv: string[]): string[] {
-  const rawArgs = argv.slice(2);
+  // `defineScript` passes argv without the node/script prefixes, while legacy
+  // callers pass process.argv. Accept both shapes so the governed router sees
+  // the same command and mission id in direct CLI and harness execution.
+  const hasProcessPrefixes =
+    argv.length >= 2 &&
+    (argv[0] === process.execPath || /(?:^|[\\/])node(?:\.exe)?$/u.test(argv[0])) &&
+    /\.(?:[cm]?js|ts)$/u.test(argv[1]);
+  const rawArgs = hasProcessPrefixes ? argv.slice(2) : argv;
   const positionalArgs: string[] = [];
 
   for (let index = 0; index < rawArgs.length; index += 1) {
