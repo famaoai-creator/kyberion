@@ -6,9 +6,12 @@ import { handleAction } from './process-actuator-helpers.js';
 async function main() {
   const processActionSchema = JSON.parse(
     String(
-      safeReadFile(pathResolver.rootResolve('schemas/process-action.schema.json'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json'),
+        {
+          encoding: 'utf8',
+        }
+      )
     )
   );
   await runActuatorCli({

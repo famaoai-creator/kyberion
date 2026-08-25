@@ -2,7 +2,7 @@
   "actuator_id": "presence-actuator",
   "version": "1.0.0",
   "description": "Human Presence and Messaging Bridge",
-  "contract_schema": "schemas/presence-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/presence-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "slack_then_log",

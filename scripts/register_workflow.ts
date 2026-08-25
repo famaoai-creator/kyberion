@@ -18,7 +18,7 @@
  *                      by id (authority role: register_workflow). Run `pnpm validate`
  *                      (or the governance checks) afterwards to gate the change.
  *
- * The request is validated against schemas/workflow-registration-request.schema.json.
+ * The request is validated against knowledge/product/schemas/workflow-registration-request.schema.json.
  * All I/O goes through @agent/core secure-io. This tool never writes secrets or
  * customer-specific values; those belong in confidential-tier instantiations.
  */

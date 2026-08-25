@@ -11,7 +11,10 @@ describe('voice-actuator schema', () => {
   it('accepts supported voice actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/voice-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      pathResolver.rootResolve('knowledge/product/schemas/voice-action.schema.json')
+    );
 
     expect(
       validate({
@@ -34,7 +37,7 @@ describe('voice-actuator schema', () => {
           emit_progress_packets: true,
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -53,7 +56,7 @@ describe('voice-actuator schema', () => {
           { sample_id: 's2', path: 'Downloads/sample-2.wav', language: 'ja' },
         ],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -82,20 +85,23 @@ describe('voice-actuator schema', () => {
           },
         ],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported voice actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/voice-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      pathResolver.rootResolve('knowledge/product/schemas/voice-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 });

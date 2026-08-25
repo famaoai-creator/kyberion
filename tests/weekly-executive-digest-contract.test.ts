@@ -9,7 +9,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readJson(relativePath: string): unknown {
   return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string,
+    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string
   ) as unknown;
 }
 
@@ -17,10 +17,14 @@ describe('weekly executive digest contract', () => {
   it('keeps the weekly digest scenario aligned with the MVP workflow template', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schemaPath = pathResolver.rootResolve('schemas/task-scenario.schema.json');
+    const schemaPath = pathResolver.rootResolve(
+      'knowledge/product/schemas/task-scenario.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const scenario = readJson('knowledge/product/task-scenarios/weekly-executive-digest.json');
-    const template = readJson('knowledge/product/pipeline-templates/weekly-executive-digest.json') as {
+    const template = readJson(
+      'knowledge/product/pipeline-templates/weekly-executive-digest.json'
+    ) as {
       steps?: Array<{ id: string; params?: Record<string, unknown> }>;
     };
 
@@ -49,9 +53,11 @@ describe('weekly executive digest contract', () => {
     ]);
     expect(
       safeReadFile(
-        pathResolver.rootResolve('knowledge/product/pipeline-templates/weekly-executive-digest.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        pathResolver.rootResolve(
+          'knowledge/product/pipeline-templates/weekly-executive-digest.json'
+        ),
+        { encoding: 'utf8' }
+      ) as string
     ).toContain('## 今週の重要変化');
   });
 });

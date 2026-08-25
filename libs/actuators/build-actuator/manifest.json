@@ -2,7 +2,7 @@
   "actuator_id": "build-actuator",
   "version": "1.0.0",
   "description": "iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop",
-  "contract_schema": "schemas/build-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/build-pipeline.schema.json",
   "resilience_tier": "fail_fast",
   "recovery_policy": {
     "fallback_strategy": "report_error_summary",
@@ -18,12 +18,12 @@
   "capabilities": [
     {
       "op": "scaffold_app",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
     {
       "op": "ios_generate_project",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin"],
       "prerequisites": {
         "binaries": ["xcodegen"],
@@ -33,7 +33,7 @@
     },
     {
       "op": "ios_build",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin"],
       "prerequisites": {
         "binaries": ["xcodebuild"],
@@ -43,7 +43,7 @@
     },
     {
       "op": "ios_test",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin"],
       "prerequisites": {
         "binaries": ["xcodebuild", "xcrun"],
@@ -53,7 +53,7 @@
     },
     {
       "op": "ios_archive",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin"],
       "prerequisites": {
         "binaries": ["xcodebuild"],
@@ -63,7 +63,7 @@
     },
     {
       "op": "android_build",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"],
       "prerequisites": {
         "env": ["ANDROID_HOME"],
@@ -73,7 +73,7 @@
     },
     {
       "op": "android_test",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"],
       "prerequisites": {
         "env": ["ANDROID_HOME"],
@@ -83,7 +83,7 @@
     },
     {
       "op": "android_bundle",
-      "schema_ref": "schemas/build-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"],
       "prerequisites": {
         "env": ["ANDROID_HOME"],

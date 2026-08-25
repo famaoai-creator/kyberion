@@ -2,7 +2,7 @@
   "actuator_id": "system-actuator",
   "version": "1.5.0",
   "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
-  "contract_schema": "schemas/system-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "os_action_retry",
@@ -18,7 +18,7 @@
   "capabilities": [
     {
       "op": "pipeline",
-      "schema_ref": "schemas/system-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/system-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
@@ -32,7 +32,7 @@
     { "op": "summarize_task_model_routing", "platforms": ["darwin", "linux", "win32"] },
     {
       "op": "computer_interaction",
-      "schema_ref": "schemas/computer-interaction.schema.json",
+      "schema_ref": "knowledge/product/schemas/computer-interaction.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
     { "op": "record_screen", "platforms": ["darwin", "linux", "win32"] },

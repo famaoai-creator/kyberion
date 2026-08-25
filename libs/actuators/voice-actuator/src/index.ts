@@ -68,7 +68,7 @@ import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js
 import { runActuatorCli } from '@agent/core';
 
 const voiceActionValidate = compileSchema(
-  pathResolver.rootResolve('schemas/voice-action.schema.json')
+  pathResolver.rootResolve('knowledge/product/schemas/voice-action.schema.json')
 );
 
 type VoiceAction =

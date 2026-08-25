@@ -1,7 +1,7 @@
 /**
  * TypeScript version of the lightweight JSON Schema validation utility.
  *
- * Validates data against schemas in the schemas/ directory without external dependencies.
+ * Validates data against schemas in the knowledge/product/schemas/ directory without external dependencies.
  * Supports required fields, type constraints, and enum values.
  */
 

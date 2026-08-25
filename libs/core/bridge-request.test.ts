@@ -11,7 +11,10 @@ describe('bridge-request schema', () => {
   it('accepts valid bridge requests', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/bridge-request.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/bridge-request.schema.json')
+    );
 
     expect(
       validate({
@@ -23,14 +26,17 @@ describe('bridge-request schema', () => {
           language: 'ja',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects invalid bridge requests', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/bridge-request.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/bridge-request.schema.json')
+    );
 
     expect(validate({ context: {} })).toBe(false);
   });

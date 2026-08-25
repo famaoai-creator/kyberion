@@ -16,7 +16,7 @@ describe('artifact-actuator', () => {
     const ajv = new Ajv({ allErrors: true });
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/artifact-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/artifact-action.schema.json')
     );
     const action = {
       action: 'write_json',

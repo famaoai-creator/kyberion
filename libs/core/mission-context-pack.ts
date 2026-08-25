@@ -50,7 +50,9 @@ import {
 import { isSkillAllowed } from './skill-plugin-loader.js';
 import type { ScopeContext } from './scope-context.js';
 
-const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve('schemas/mission-state.schema.json');
+const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/mission-state.schema.json'
+);
 const MISSION_CONTEXT_PACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-context-pack.schema.json'
 );

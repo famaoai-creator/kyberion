@@ -11,7 +11,10 @@ describe('presence-actuator schema', () => {
   it('accepts supported presence actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/presence-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/presence-action.schema.json')
+    );
 
     expect(
       validate({
@@ -23,7 +26,7 @@ describe('presence-actuator schema', () => {
           },
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -36,20 +39,23 @@ describe('presence-actuator schema', () => {
           },
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported presence actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/presence-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/presence-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ const statMock = vi.fn(() => ({ mtimeMs: 1, size: 1 }));
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
   loadJsonMock.mockImplementation((filePath: string) => {
-    if (filePath.endsWith('schemas/actuator-manifest.schema.json')) {
+    if (filePath.endsWith('knowledge/product/schemas/actuator-manifest.schema.json')) {
       return actual.loadJson(filePath);
     }
     return manifestMock();

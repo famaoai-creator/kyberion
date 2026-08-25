@@ -12,7 +12,10 @@ describe('computer-surface a2ui messages', () => {
   it('emits A2UI messages that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true, validateSchema: false });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2ui-message.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/a2ui-message.schema.json')
+    );
 
     const messages = buildComputerSurfaceMessages({
       sessionId: 'session-schema-1',
@@ -31,14 +34,17 @@ describe('computer-surface a2ui messages', () => {
   it('rejects malformed A2UI messages', () => {
     const ajv = new Ajv({ allErrors: true, validateSchema: false });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2ui-message.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/a2ui-message.schema.json')
+    );
 
     expect(
       validate({
         createSurface: {
           catalogId: 'computer-surface',
         },
-      }),
+      })
     ).toBe(false);
   });
 });

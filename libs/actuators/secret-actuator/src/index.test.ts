@@ -135,7 +135,7 @@ describe('secret-actuator: governed mutation', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/secret-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/secret-action.schema.json')
     );
     const action = {
       action: 'set',

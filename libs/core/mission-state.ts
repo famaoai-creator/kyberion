@@ -30,7 +30,7 @@ let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 
 function getMissionStateValidator() {
   return (missionStateValidate ??= compileSchema(
-    pathResolver.rootResolve('schemas/mission-state.schema.json')
+    pathResolver.rootResolve('knowledge/product/schemas/mission-state.schema.json')
   ));
 }
 

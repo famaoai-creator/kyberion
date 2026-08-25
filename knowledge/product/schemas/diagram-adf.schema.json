@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Diagram ADF Protocol v1.1",
+  "description": "Integrated visual protocol using intent-driven routing and engine-based rendering.",
+  "type": "object",
+  "required": ["protocol", "intent", "elements"],
+  "properties": {
+    "protocol": { "const": "gemini-diagram-v1" },
+    "intent": {
+      "enum": [
+        "system_architecture",
+        "project_roadmap",
+        "api_sequence",
+        "strategy_map",
+        "logic_structure",
+        "db_schema",
+        "state_flow",
+        "ui_wireframe"
+      ]
+    },
+    "engine": {
+      "enum": ["mermaid", "salt", "d2", "html"],
+      "default": "mermaid"
+    },
+    "diagram_type": {
+      "enum": ["flowchart", "gantt", "sequence", "er", "state", "mindmap", "block"],
+      "description": "Specific diagram type for the mermaid engine."
+    },
+    "title": { "type": "string" },
+    "theme": { "enum": ["base", "dark", "forest"], "default": "base" },
+    "elements": {
+      "type": "object",
+      "properties": {
+        "nodes": { "type": "array" },
+        "edges": { "type": "array" },
+        "diagram": { "type": "string", "description": "Raw DSL code for the selected engine." },
+        "html_path": { "type": "string", "description": "Local path for html engine." }
+      }
+    },
+    "overrides": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "theme_variables": { "type": "object" },
+        "custom_style": { "type": "string" }
+      }
+    }
+  }
+}

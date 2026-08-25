@@ -19,7 +19,7 @@ describe('aws-cost-estimate-from-vendor-docs TaskScenario contract', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.rootResolve('schemas/task-scenario.schema.json')
+      pathResolver.rootResolve('knowledge/product/schemas/task-scenario.schema.json')
     );
     const scenario = readJson(
       'knowledge/product/task-scenarios/aws-cost-estimate-from-vendor-docs.json'

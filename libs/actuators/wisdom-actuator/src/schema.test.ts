@@ -13,7 +13,7 @@ describe('wisdom-actuator schema', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/wisdom-action.schema.json')
     );
 
     expect(
@@ -53,7 +53,7 @@ describe('wisdom-actuator schema', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/wisdom-action.schema.json')
     );
 
     expect(

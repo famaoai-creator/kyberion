@@ -157,7 +157,10 @@ describe('sdlc-artifact-store', () => {
     it('emits design specs that satisfy the schema', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
-      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/design-spec.schema.json'));
+      const validate = compileSchemaFromPath(
+        ajv,
+        path.resolve(process.cwd(), 'knowledge/product/schemas/design-spec.schema.json')
+      );
 
       const saved = saveDesignSpec({
         missionId: 'MSN-D-SCHEMA',
@@ -172,7 +175,10 @@ describe('sdlc-artifact-store', () => {
     it('rejects malformed design specs', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
-      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/design-spec.schema.json'));
+      const validate = compileSchemaFromPath(
+        ajv,
+        path.resolve(process.cwd(), 'knowledge/product/schemas/design-spec.schema.json')
+      );
 
       expect(
         validate({
@@ -180,7 +186,7 @@ describe('sdlc-artifact-store', () => {
           project_name: 'Broken',
           generated_at: new Date().toISOString(),
           components: [],
-        }),
+        })
       ).toBe(false);
     });
   });
@@ -280,7 +286,7 @@ describe('sdlc-artifact-store', () => {
       expect(gate.reasons.some((r) => r.toLowerCase().includes('cycle'))).toBe(true);
     });
 
-  it('TASK_PLAN_READY fails when must-priority tasks lack test_criteria', () => {
+    it('TASK_PLAN_READY fails when must-priority tasks lack test_criteria', () => {
       saveTaskPlan({
         missionId: 'MSN-TP4',
         projectName: 'X',
@@ -304,7 +310,10 @@ describe('sdlc-artifact-store', () => {
     it('emits task plans that satisfy the schema', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
-      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/task-plan.schema.json'));
+      const validate = compileSchemaFromPath(
+        ajv,
+        path.resolve(process.cwd(), 'knowledge/product/schemas/task-plan.schema.json')
+      );
 
       const saved = saveTaskPlan({
         missionId: 'MSN-TP5',
@@ -319,7 +328,10 @@ describe('sdlc-artifact-store', () => {
     it('rejects malformed task plans', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
-      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/task-plan.schema.json'));
+      const validate = compileSchemaFromPath(
+        ajv,
+        path.resolve(process.cwd(), 'knowledge/product/schemas/task-plan.schema.json')
+      );
 
       expect(
         validate({
@@ -327,7 +339,7 @@ describe('sdlc-artifact-store', () => {
           project_name: 'Broken',
           generated_at: new Date().toISOString(),
           tasks: [],
-        }),
+        })
       ).toBe(false);
     });
   });

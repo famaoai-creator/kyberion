@@ -9,7 +9,10 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('meeting-actuator', () => {
-  const SCHEMA_PATH = path.join(pathResolver.rootDir(), 'schemas/meeting-action.schema.json');
+  const SCHEMA_PATH = path.join(
+    pathResolver.rootDir(),
+    'knowledge/product/schemas/meeting-action.schema.json'
+  );
 
   it('emits a join action that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });

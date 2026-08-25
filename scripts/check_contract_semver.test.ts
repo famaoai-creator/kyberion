@@ -19,12 +19,13 @@ type BumpLevel = 'none' | 'patch' | 'minor' | 'major';
 function classifyBump(prev: Fingerprint, next: Fingerprint): BumpLevel {
   const prevOps = new Set(prev.ops);
   const nextOps = new Set(next.ops);
-  const removed = [...prevOps].filter(o => !nextOps.has(o));
-  const added = [...nextOps].filter(o => !prevOps.has(o));
+  const removed = [...prevOps].filter((o) => !nextOps.has(o));
+  const added = [...nextOps].filter((o) => !prevOps.has(o));
   if (removed.length > 0) return 'major';
   let level: BumpLevel = 'none';
   if (added.length > 0) level = 'minor';
-  if (prev.contract_schema_sha256 !== next.contract_schema_sha256 && level === 'none') level = 'minor';
+  if (prev.contract_schema_sha256 !== next.contract_schema_sha256 && level === 'none')
+    level = 'minor';
   if (prev.contract_schema !== next.contract_schema && level === 'none') level = 'minor';
   return level;
 }
@@ -55,7 +56,7 @@ const baseFp: Fingerprint = {
   actuator_id: 'demo',
   version: '1.0.0',
   ops: ['a', 'b'],
-  contract_schema: 'schemas/demo.schema.json',
+  contract_schema: 'knowledge/product/schemas/demo.schema.json',
   contract_schema_sha256: 'abc',
 };
 
@@ -77,14 +78,15 @@ describe('classifyBump', () => {
   });
 
   it('returns minor for schema content change', () => {
-    expect(
-      classifyBump(baseFp, { ...baseFp, contract_schema_sha256: 'def' }),
-    ).toBe('minor');
+    expect(classifyBump(baseFp, { ...baseFp, contract_schema_sha256: 'def' })).toBe('minor');
   });
 
   it('returns minor for schema path change', () => {
     expect(
-      classifyBump(baseFp, { ...baseFp, contract_schema: 'schemas/demo-v2.schema.json' }),
+      classifyBump(baseFp, {
+        ...baseFp,
+        contract_schema: 'knowledge/product/schemas/demo-v2.schema.json',
+      })
     ).toBe('minor');
   });
 });

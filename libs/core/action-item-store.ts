@@ -4,7 +4,7 @@ import { nowIso } from './foundation/time.js';
  * Action Item Store — persists meeting-derived action items to the
  * mission's evidence directory and supports query / update operations.
  *
- * Schema authority: `schemas/action-item.schema.json`.
+ * Schema authority: `knowledge/product/schemas/action-item.schema.json`.
  *
  * Storage:
  *   active/missions/{tier}/{mission_id}/evidence/action-items.jsonl
