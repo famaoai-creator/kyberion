@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SurfaceConversationResult } from '@agent/core/channel-surface';
+import type { IntentResolutionContract } from '@agent/core';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
 import type {
@@ -18,8 +19,9 @@ export const dynamic = 'force-dynamic';
  *
  *   Primary path  — voice-hub /api/ingest-text (richest experience: greeting
  *                   chit-chat, orchestrator, server-side TTS, presence
- *                   reflection). Bounded by a short abort timeout so the UI
- *                   never hangs on a stopped daemon.
+ *                   reflection, and the shared intent-resolution contract).
+ *                   Bounded by a short abort timeout so the UI never hangs
+ *                   on a stopped daemon.
  *   Fallback path — LAZILY import @agent/core and call
  *                   runSurfaceMessageConversation directly (the same entry
  *                   chronos uses), so knowledge queries and mission promotion
@@ -30,7 +32,10 @@ const VOICE_HUB_URL = process.env.VOICE_HUB_URL || 'http://127.0.0.1:3032';
 const VOICE_HUB_TIMEOUT_MS = 3000;
 
 /** Primary path: voice-hub (rich reply + TTS + presence reflection). */
-async function replyViaVoiceHub(text: string, speaker: string): Promise<string> {
+async function replyViaVoiceHub(
+  text: string,
+  speaker: string
+): Promise<{ reply: string; intentResolution?: IntentResolutionContract }> {
   const resp = await fetch(`${VOICE_HUB_URL}/api/ingest-text`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -45,12 +50,36 @@ async function replyViaVoiceHub(text: string, speaker: string): Promise<string> 
     signal: AbortSignal.timeout(VOICE_HUB_TIMEOUT_MS),
   });
   if (!resp.ok) throw new Error(`voice-hub responded ${resp.status}`);
-  const data = (await resp.json()) as { reply?: unknown; text?: unknown; response?: unknown };
-  const reply = String(data.reply ?? data.text ?? data.response ?? '').trim();
+  const data = (await resp.json()) as {
+    reply?: unknown;
+    replyText?: unknown;
+    text?: unknown;
+    response?: unknown;
+    intentResolution?: IntentResolutionContract;
+  };
+  const reply = String(data.reply ?? data.replyText ?? data.text ?? data.response ?? '').trim();
   // An empty reply is a silent failure from the user's perspective; degrade
   // to the orchestrator instead of returning nothing.
   if (!reply) throw new Error('empty voice-hub reply');
-  return reply;
+  return { reply, intentResolution: data.intentResolution };
+}
+
+function viewFromIntentResolution(
+  contract: IntentResolutionContract
+): Pick<ConversationMessageResponse, 'shape' | 'nextActions'> {
+  if (contract.authority_level === 'human_clarification_required') {
+    return {
+      shape: 'clarification',
+      nextActions: [{ id: 'provide_input', label: contract.next_action.label }],
+    };
+  }
+  if (contract.authority_level === 'approval_required') {
+    return {
+      shape: 'execution_preview',
+      nextActions: [{ id: 'approve', label: contract.next_action.label }],
+    };
+  }
+  return { shape: 'reply' };
 }
 
 /**
@@ -62,9 +91,8 @@ async function replyViaVoiceHub(text: string, speaker: string): Promise<string> 
  *   needs an explicit go-ahead → Execution Preview.
  * - `delegationResults` — delegated work completed and `text` summarizes the
  *   delivered responses → Delivery Summary.
- * - anything else (direct_reply) → plain `reply`. The result carries no
- *   dedicated clarification/status marker, so those shapes are never
- *   fabricated here.
+ * - `intentResolution` supplies the shared clarification/approval boundary;
+ *   anything else (direct_reply) → plain `reply`.
  */
 function deriveConversationView(
   conversation: SurfaceConversationResult,
@@ -131,7 +159,17 @@ async function replyViaOrchestrator(
   const reply = String(conversation?.text ?? '').trim();
   if (!reply) throw new Error('empty orchestrator reply');
   const view = deriveConversationView(conversation, locale);
-  return { reply, mode: 'orchestrator', ...view };
+  const intentView =
+    conversation.intentResolution && conversation.intentResolution.authority_level !== 'autonomous'
+      ? viewFromIntentResolution(conversation.intentResolution)
+      : undefined;
+  return {
+    reply,
+    mode: 'orchestrator',
+    ...view,
+    ...(conversation.intentResolution ? { intentResolution: conversation.intentResolution } : {}),
+    ...(intentView || {}),
+  };
 }
 
 // Primary conversation entrypoint. Tries voice-hub, then degrades to the
@@ -155,11 +193,19 @@ export async function POST(req: NextRequest) {
   const sessionId =
     typeof body.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim() : undefined;
 
-  // Try voice-hub first (rich path). It only returns a plain reply string, so
-  // no conversation shape can be honestly derived from it.
+  // Try voice-hub first (rich path). The bridge returns the same intent
+  // resolution contract as the in-process orchestrator path.
   try {
-    const reply = await replyViaVoiceHub(text, speaker);
-    const payload: ConversationMessageResponse = { reply, mode: 'voice-hub', shape: 'reply' };
+    const voiceReply = await replyViaVoiceHub(text, speaker);
+    const intentView = voiceReply.intentResolution
+      ? viewFromIntentResolution(voiceReply.intentResolution)
+      : { shape: 'reply' as const };
+    const payload: ConversationMessageResponse = {
+      reply: voiceReply.reply,
+      mode: 'voice-hub',
+      ...intentView,
+      ...(voiceReply.intentResolution ? { intentResolution: voiceReply.intentResolution } : {}),
+    };
     return NextResponse.json(payload);
   } catch (error) {
     console.warn(

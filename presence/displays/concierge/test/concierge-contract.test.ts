@@ -95,6 +95,10 @@ describe('concierge surface contract', () => {
     // Both paths failing must produce a loud, actionable 503 — never silence.
     expect(route).toContain("mode: 'unavailable'");
     expect(route).toContain('503');
+    expect(route).toContain('replyText');
+    expect(route).toContain('intentResolution');
+    expect(route).toContain("shape: 'clarification'");
+    expect(route).toContain("shape: 'execution_preview'");
   });
 
   it('streams summary changes over SSE with heartbeat and abort cleanup', () => {
