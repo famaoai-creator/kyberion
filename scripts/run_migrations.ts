@@ -26,7 +26,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface MigrationModule {
   id: string;
@@ -211,10 +211,13 @@ if (
   isDirectScript(import.meta.url, 'run_migrations.ts') ||
   isDirectScript(import.meta.url, 'run_migrations.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'migrations:run',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();
 }
 
 export { main as runMigrationsCli, listMigrationFiles, readState, writeState };
