@@ -6385,6 +6385,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/actuator-op-registry.schema.json",
+      "tier": "public",
+      "size": 1277,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/actuator-pipeline-bundle.schema.json",
       "tier": "public",
       "size": 1229,
