@@ -16,6 +16,15 @@ vi.mock('@agent/core', async (importOriginal) => {
         ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
         : ''
     ),
+    loadJson: vi.fn((filePath: string) =>
+      JSON.parse(
+        String(
+          String(filePath).includes('macro')
+            ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
+            : ''
+        )
+      )
+    ),
     safeWriteFile: vi.fn(),
     safeExec: vi.fn().mockReturnValue(''),
     safeExistsSync: vi.fn().mockReturnValue(true),
