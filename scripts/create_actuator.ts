@@ -19,15 +19,8 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  classifyError,
-  createStandardYargs,
-  formatClassification,
-  logger,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
+import { createStandardYargs, logger, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { defineScript } from './lib/harness.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -280,8 +273,8 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
   };
 }
 
-function parseCliArgs(): ActuatorScaffoldInput {
-  const argv = createStandardYargs()
+function parseCliArgs(args: string[]): ActuatorScaffoldInput {
+  const argv = createStandardYargs(['node', 'create_actuator', ...args])
     .option('name', { type: 'string', describe: 'Actuator name' })
     .option('desc', { type: 'string', describe: 'Human-readable description' })
     .parseSync();
@@ -298,31 +291,25 @@ function parseCliArgs(): ActuatorScaffoldInput {
   };
 }
 
-async function main(): Promise<void> {
-  try {
-    const scaffold = createActuatorScaffold(parseCliArgs());
-    logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
-    console.log('  Files created:');
-    for (const file of scaffold.files) {
-      console.log(`    ${file}`);
-    }
-    console.log('\nNext steps:');
-    console.log('  1. Implement the actuator-specific op logic in src/index.ts');
-    console.log('  2. Replace the schema stub with the real contract');
-    console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
-    console.log('  4. Run: pnpm build');
-    console.log(
-      '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
-    );
-  } catch (err: any) {
-    logger.error(formatClassification(classifyError(err)));
-    process.exit(1);
+async function main(args: string[]): Promise<void> {
+  const scaffold = createActuatorScaffold(parseCliArgs(args));
+  logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
+  console.log('  Files created:');
+  for (const file of scaffold.files) {
+    console.log(`    ${file}`);
   }
+  console.log('\nNext steps:');
+  console.log('  1. Implement the actuator-specific op logic in src/index.ts');
+  console.log('  2. Replace the schema stub with the real contract');
+  console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
+  console.log('  4. Run: pnpm build');
+  console.log(
+    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
+  );
 }
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  await main();
-}
+void defineScript({
+  name: 'create:actuator',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
