@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/skill-install-package-map.schema.json",
   "version": "1.0.0",
   "entries": [
     {

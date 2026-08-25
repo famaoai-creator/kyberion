@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/provider-cli-capability-report-policy.schema.json",
   "version": "1.0.0",
   "title": "Provider CLI Capability Report",
   "summary_title": "Summary",

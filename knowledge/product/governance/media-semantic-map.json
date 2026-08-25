@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-semantic-map.schema.json",
   "version": "1.0.0",
   "rules": [
     { "layout": "cover-statement", "semantic_type": "hero" },
@@ -43,8 +44,14 @@
   ],
   "proposal_section_keywords": [
     { "section_id": "why-change", "keywords": ["why", "change", "pain", "problem", "now"] },
-    { "section_id": "target-outcome", "keywords": ["target", "journey", "future", "outcome", "vision"] },
-    { "section_id": "solution-shape", "keywords": ["solution", "approach", "shape", "architecture"] },
+    {
+      "section_id": "target-outcome",
+      "keywords": ["target", "journey", "future", "outcome", "vision"]
+    },
+    {
+      "section_id": "solution-shape",
+      "keywords": ["solution", "approach", "shape", "architecture"]
+    },
     { "section_id": "governance", "keywords": ["governance", "control", "risk", "operation"] },
     { "section_id": "delivery-plan", "keywords": ["delivery", "plan", "roadmap", "phase"] }
   ]

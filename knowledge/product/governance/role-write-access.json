@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "default_allow": [
     "active/missions/${MISSION_ID}/",

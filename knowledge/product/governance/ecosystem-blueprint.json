@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "name": "Kyberion Ecosystem Blueprint",
   "version": "1.0.0",
   "infrastructure": {
@@ -22,8 +23,18 @@
     ],
     "commands": [
       { "name": "Install Dependencies", "command": "npm", "args": ["install"] },
-      { "name": "Generate Skill Index", "command": "node", "args": ["scripts/migrated/generate_skill_index.cjs"], "optional": true },
-      { "name": "Run Self Audit", "command": "node", "args": ["scripts/migrated/test_all_skills.cjs"], "optional": true }
+      {
+        "name": "Generate Skill Index",
+        "command": "node",
+        "args": ["scripts/migrated/generate_skill_index.cjs"],
+        "optional": true
+      },
+      {
+        "name": "Run Self Audit",
+        "command": "node",
+        "args": ["scripts/migrated/test_all_skills.cjs"],
+        "optional": true
+      }
     ]
   }
 }

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/contextual-intent-learning-seed.schema.json",
   "version": "1.0.0",
   "entries": [
     {

@@ -1,13 +1,10 @@
 {
+  "$schema": "../schemas/question-resolution-policy.schema.json",
   "version": "1.0.0",
   "defaults": {
     "max_questions_per_turn": 3,
     "min_confidence_to_skip": 0.55,
-    "always_ask_for": [
-      "goal_or_target",
-      "approval_boundary",
-      "execution_scope"
-    ]
+    "always_ask_for": ["goal_or_target", "approval_boundary", "execution_scope"]
   },
   "intent_rules": [
     {
@@ -46,7 +43,12 @@
       "intent_id": "schedule-coordination",
       "shapes": ["task_session"],
       "max_questions_per_turn": 3,
-      "always_ask_for": ["schedule_scope", "date_range", "fixed_constraints", "calendar_action_boundary"],
+      "always_ask_for": [
+        "schedule_scope",
+        "date_range",
+        "fixed_constraints",
+        "calendar_action_boundary"
+      ],
       "source_label": "schedule coordination intake",
       "questions": [
         {

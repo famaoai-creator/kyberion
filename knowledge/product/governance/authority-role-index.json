@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/authority-role-index.schema.json",
   "version": "1.0.0",
   "authority_roles": {
     "chronos_gateway": {

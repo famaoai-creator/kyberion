@@ -1047,25 +1047,25 @@
     {
       "path": "product/governance/active-services.json",
       "tier": "public",
-      "size": 293,
+      "size": 351,
       "type": "json"
     },
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7282,
+      "size": 7340,
       "type": "json"
     },
     {
       "path": "product/governance/actuator-dependency-bundles.json",
       "tier": "public",
-      "size": 1579,
+      "size": 1646,
       "type": "json"
     },
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16942,
+      "size": 17002,
       "type": "json"
     },
     {
@@ -1077,7 +1077,7 @@
     {
       "path": "product/governance/adf-execution-policy.json",
       "tier": "public",
-      "size": 201,
+      "size": 259,
       "type": "json"
     },
     {
@@ -1089,13 +1089,13 @@
     {
       "path": "product/governance/analysis-config.json",
       "tier": "public",
-      "size": 845,
+      "size": 903,
       "type": "json"
     },
     {
       "path": "product/governance/analysis-execution-contracts.json",
       "tier": "public",
-      "size": 2027,
+      "size": 2117,
       "type": "json"
     },
     {
@@ -1107,7 +1107,7 @@
     {
       "path": "product/governance/approval-policy.json",
       "tier": "public",
-      "size": 2911,
+      "size": 2966,
       "type": "json"
     },
     {
@@ -1119,7 +1119,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 11755,
+      "size": 11815,
       "type": "json"
     },
     {
@@ -1245,37 +1245,37 @@
     {
       "path": "product/governance/autonomous-ops-policy.json",
       "tier": "public",
-      "size": 2381,
+      "size": 2439,
       "type": "json"
     },
     {
       "path": "product/governance/capability-bundle-registry.json",
       "tier": "public",
-      "size": 5646,
+      "size": 5712,
       "type": "json"
     },
     {
       "path": "product/governance/capability-lifecycle-procedure.json",
       "tier": "public",
-      "size": 795,
+      "size": 865,
       "type": "json"
     },
     {
       "path": "product/governance/changelog-policy.json",
       "tier": "public",
-      "size": 543,
+      "size": 599,
       "type": "json"
     },
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 18126,
+      "size": 18174,
       "type": "json"
     },
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 7886,
+      "size": 7938,
       "type": "json"
     },
     {
@@ -1293,13 +1293,13 @@
     {
       "path": "product/governance/contextual-intent-clarification-policy.json",
       "tier": "public",
-      "size": 2372,
+      "size": 2490,
       "type": "json"
     },
     {
       "path": "product/governance/contextual-intent-learning-seed.json",
       "tier": "public",
-      "size": 2596,
+      "size": 2667,
       "type": "json"
     },
     {
@@ -1317,7 +1317,7 @@
     {
       "path": "product/governance/decision-rights.json",
       "tier": "public",
-      "size": 1275,
+      "size": 1272,
       "type": "json"
     },
     {
@@ -1335,19 +1335,19 @@
     {
       "path": "product/governance/document-contents-policy.json",
       "tier": "public",
-      "size": 136,
+      "size": 200,
       "type": "json"
     },
     {
       "path": "product/governance/document-inference-policy.json",
       "tier": "public",
-      "size": 3019,
+      "size": 4166,
       "type": "json"
     },
     {
       "path": "product/governance/document-outline-label-policy.json",
       "tier": "public",
-      "size": 99,
+      "size": 168,
       "type": "json"
     },
     {
@@ -1359,19 +1359,19 @@
     {
       "path": "product/governance/dynamic-policies.json",
       "tier": "public",
-      "size": 349,
+      "size": 407,
       "type": "json"
     },
     {
       "path": "product/governance/ecosystem-blueprint.json",
       "tier": "public",
-      "size": 926,
+      "size": 1060,
       "type": "json"
     },
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 659,
+      "size": 712,
       "type": "json"
     },
     {
@@ -1383,7 +1383,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 83609,
+      "size": 83667,
       "type": "json"
     },
     {
@@ -1437,19 +1437,19 @@
     {
       "path": "product/governance/error-classifier-rules.json",
       "tier": "public",
-      "size": 17826,
+      "size": 17888,
       "type": "json"
     },
     {
       "path": "product/governance/execution-boundary-profiles.json",
       "tier": "public",
-      "size": 3840,
+      "size": 3798,
       "type": "json"
     },
     {
       "path": "product/governance/execution-receipt-policy.json",
       "tier": "public",
-      "size": 641,
+      "size": 705,
       "type": "json"
     },
     {
@@ -1473,7 +1473,7 @@
     {
       "path": "product/governance/gateway-capability-registry.json",
       "tier": "public",
-      "size": 47,
+      "size": 114,
       "type": "json"
     },
     {
@@ -1491,7 +1491,7 @@
     {
       "path": "product/governance/governance-body-registry.json",
       "tier": "public",
-      "size": 19022,
+      "size": 19086,
       "type": "json"
     },
     {
@@ -1503,25 +1503,25 @@
     {
       "path": "product/governance/harness-adapter-registry.json",
       "tier": "public",
-      "size": 20145,
+      "size": 20204,
       "type": "json"
     },
     {
       "path": "product/governance/harness-capability-registry.json",
       "tier": "public",
-      "size": 35278,
+      "size": 35345,
       "type": "json"
     },
     {
       "path": "product/governance/health-thresholds.json",
       "tier": "public",
-      "size": 402,
+      "size": 460,
       "type": "json"
     },
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6454,
+      "size": 6512,
       "type": "json"
     },
     {
@@ -1533,91 +1533,91 @@
     {
       "path": "product/governance/ingest-quota-policy.json",
       "tier": "public",
-      "size": 633,
+      "size": 691,
       "type": "json"
     },
     {
       "path": "product/governance/ingestion-rules.json",
       "tier": "public",
-      "size": 140,
+      "size": 198,
       "type": "json"
     },
     {
       "path": "product/governance/install-script-allowlist.json",
       "tier": "public",
-      "size": 1679,
+      "size": 1737,
       "type": "json"
     },
     {
       "path": "product/governance/integrity-policy.json",
       "tier": "public",
-      "size": 435,
+      "size": 493,
       "type": "json"
     },
     {
       "path": "product/governance/intent-contract-memory.json",
       "tier": "public",
-      "size": 42,
+      "size": 104,
       "type": "json"
     },
     {
       "path": "product/governance/intent-contract-selection-policy.json",
       "tier": "public",
-      "size": 370,
+      "size": 442,
       "type": "json"
     },
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31763,
+      "size": 31821,
       "type": "json"
     },
     {
       "path": "product/governance/intent-domain-ontology.json",
       "tier": "public",
-      "size": 110970,
+      "size": 111032,
       "type": "json"
     },
     {
       "path": "product/governance/intent-execution-profile-registry.json",
       "tier": "public",
-      "size": 7912,
+      "size": 7969,
       "type": "json"
     },
     {
       "path": "product/governance/intent-outcome-patterns.json",
       "tier": "public",
-      "size": 28529,
+      "size": 27491,
       "type": "json"
     },
     {
       "path": "product/governance/intent-policy.json",
       "tier": "public",
-      "size": 5870,
+      "size": 5923,
       "type": "json"
     },
     {
       "path": "product/governance/intent-resolution-policy.json",
       "tier": "public",
-      "size": 1874,
+      "size": 1858,
       "type": "json"
     },
     {
       "path": "product/governance/intent-routing-map.json",
       "tier": "public",
-      "size": 4033,
+      "size": 4091,
       "type": "json"
     },
     {
       "path": "product/governance/japanese-contextual-intent-corpus.json",
       "tier": "public",
-      "size": 25175,
+      "size": 25248,
       "type": "json"
     },
     {
       "path": "product/governance/judgment-rules.json",
       "tier": "public",
-      "size": 1878,
+      "size": 2046,
       "type": "json"
     },
     {
@@ -1629,7 +1629,7 @@
     {
       "path": "product/governance/knowledge-feedback-policy.json",
       "tier": "public",
-      "size": 326,
+      "size": 384,
       "type": "json"
     },
     {
@@ -1641,7 +1641,7 @@
     {
       "path": "product/governance/knowledge-scope-check.json",
       "tier": "public",
-      "size": 802,
+      "size": 860,
       "type": "json"
     },
     {
@@ -1653,7 +1653,7 @@
     {
       "path": "product/governance/knowledge-sync-rules.json",
       "tier": "public",
-      "size": 4712,
+      "size": 4770,
       "type": "json"
     },
     {
@@ -1665,7 +1665,7 @@
     {
       "path": "product/governance/knowledge-weights.json",
       "tier": "public",
-      "size": 253,
+      "size": 311,
       "type": "json"
     },
     {
@@ -1677,7 +1677,7 @@
     {
       "path": "product/governance/legacy-media-ops.json",
       "tier": "public",
-      "size": 169,
+      "size": 225,
       "type": "json"
     },
     {
@@ -1689,13 +1689,13 @@
     {
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
-      "size": 241,
+      "size": 323,
       "type": "json"
     },
     {
       "path": "product/governance/marketing-risk-policy.json",
       "tier": "public",
-      "size": 1322,
+      "size": 1380,
       "type": "json"
     },
     {
@@ -1707,49 +1707,49 @@
     {
       "path": "product/governance/media-aws-icon-rules.json",
       "tier": "public",
-      "size": 8001,
+      "size": 8061,
       "type": "json"
     },
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 8965,
+      "size": 9023,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-boundary-policy.json",
       "tier": "public",
-      "size": 4833,
+      "size": 4901,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-edge-policy.json",
       "tier": "public",
-      "size": 950,
+      "size": 990,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-policy.json",
       "tier": "public",
-      "size": 1245,
+      "size": 1304,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-security-group-order.json",
       "tier": "public",
-      "size": 69,
+      "size": 142,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-sort-policy.json",
       "tier": "public",
-      "size": 545,
+      "size": 657,
       "type": "json"
     },
     {
       "path": "product/governance/media-drawio-tier-order.json",
       "tier": "public",
-      "size": 153,
+      "size": 264,
       "type": "json"
     },
     {
@@ -1761,85 +1761,85 @@
     {
       "path": "product/governance/media-semantic-map.json",
       "tier": "public",
-      "size": 2854,
+      "size": 2944,
       "type": "json"
     },
     {
       "path": "product/governance/media-signal-entry-policy.json",
       "tier": "public",
-      "size": 1457,
+      "size": 1522,
       "type": "json"
     },
     {
       "path": "product/governance/media-style-policy.json",
       "tier": "public",
-      "size": 381,
+      "size": 439,
       "type": "json"
     },
     {
       "path": "product/governance/media-theme-role-policy.json",
       "tier": "public",
-      "size": 377,
+      "size": 440,
       "type": "json"
     },
     {
       "path": "product/governance/media-tone-style-map.json",
       "tier": "public",
-      "size": 286,
+      "size": 346,
       "type": "json"
     },
     {
       "path": "product/governance/meeting-environment-policy.json",
       "tier": "public",
-      "size": 5541,
+      "size": 5577,
       "type": "json"
     },
     {
       "path": "product/governance/mesh-hub-policy.json",
       "tier": "public",
-      "size": 1324,
+      "size": 1424,
       "type": "json"
     },
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 25211,
+      "size": 25280,
       "type": "json"
     },
     {
       "path": "product/governance/mission-distill-markdown-policy.json",
       "tier": "public",
-      "size": 418,
+      "size": 489,
       "type": "json"
     },
     {
       "path": "product/governance/mission-journal-policy.json",
       "tier": "public",
-      "size": 301,
+      "size": 363,
       "type": "json"
     },
     {
       "path": "product/governance/mission-ledger-policy.json",
       "tier": "public",
-      "size": 333,
+      "size": 394,
       "type": "json"
     },
     {
       "path": "product/governance/mission-lifecycle.json",
       "tier": "public",
-      "size": 1400,
+      "size": 1397,
       "type": "json"
     },
     {
       "path": "product/governance/mission-management-config.json",
       "tier": "public",
-      "size": 1097,
+      "size": 1155,
       "type": "json"
     },
     {
       "path": "product/governance/mission-orchestration-scenario-pack.json",
       "tier": "public",
-      "size": 15533,
+      "size": 15608,
       "type": "json"
     },
     {
@@ -1851,49 +1851,49 @@
     {
       "path": "product/governance/mission-review-gate-registry.json",
       "tier": "public",
-      "size": 7625,
+      "size": 7693,
       "type": "json"
     },
     {
       "path": "product/governance/mission-task-classification-scenarios.json",
       "tier": "public",
-      "size": 25524,
+      "size": 25601,
       "type": "json"
     },
     {
       "path": "product/governance/mission-templates.json",
       "tier": "public",
-      "size": 4721,
+      "size": 4718,
       "type": "json"
     },
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 208803,
+      "size": 208867,
       "type": "json"
     },
     {
       "path": "product/governance/model-adaptation-policy.json",
       "tier": "public",
-      "size": 3885,
+      "size": 3948,
       "type": "json"
     },
     {
       "path": "product/governance/model-cost-registry.fallback.json",
       "tier": "public",
-      "size": 1328,
+      "size": 1386,
       "type": "json"
     },
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1950,
+      "size": 2008,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 15730,
+      "size": 15784,
       "type": "json"
     },
     {
@@ -2031,13 +2031,13 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 1073,
+      "size": 1131,
       "type": "json"
     },
     {
       "path": "product/governance/monitoring-rules.json",
       "tier": "public",
-      "size": 716,
+      "size": 774,
       "type": "json"
     },
     {
@@ -2055,7 +2055,7 @@
     {
       "path": "product/governance/onboarding-flow-policy.json",
       "tier": "public",
-      "size": 1301,
+      "size": 1363,
       "type": "json"
     },
     {
@@ -2073,25 +2073,25 @@
     {
       "path": "product/governance/onboarding-summary-policy.json",
       "tier": "public",
-      "size": 328,
+      "size": 393,
       "type": "json"
     },
     {
       "path": "product/governance/operator-learning-dispatch-registry.json",
       "tier": "public",
-      "size": 5605,
+      "size": 5680,
       "type": "json"
     },
     {
       "path": "product/governance/operator-learning-scenario-pack.json",
       "tier": "public",
-      "size": 18872,
+      "size": 18943,
       "type": "json"
     },
     {
       "path": "product/governance/orchestration-config.json",
       "tier": "public",
-      "size": 1717,
+      "size": 1835,
       "type": "json"
     },
     {
@@ -2157,31 +2157,31 @@
     {
       "path": "product/governance/outcome-catalog.json",
       "tier": "public",
-      "size": 32333,
+      "size": 32388,
       "type": "json"
     },
     {
       "path": "product/governance/package-governance.json",
       "tier": "public",
-      "size": 234,
+      "size": 292,
       "type": "json"
     },
     {
       "path": "product/governance/package-policy.json",
       "tier": "public",
-      "size": 225,
+      "size": 279,
       "type": "json"
     },
     {
       "path": "product/governance/path-scope-policy.json",
       "tier": "public",
-      "size": 2720,
+      "size": 2777,
       "type": "json"
     },
     {
       "path": "product/governance/permission-presets.json",
       "tier": "public",
-      "size": 454,
+      "size": 512,
       "type": "json"
     },
     {
@@ -2217,7 +2217,7 @@
     {
       "path": "product/governance/pilot-strategy-policy.json",
       "tier": "public",
-      "size": 439,
+      "size": 500,
       "type": "json"
     },
     {
@@ -2319,7 +2319,7 @@
     {
       "path": "product/governance/presentation-preference-registry.json",
       "tier": "public",
-      "size": 3914,
+      "size": 3950,
       "type": "json"
     },
     {
@@ -2331,43 +2331,43 @@
     {
       "path": "product/governance/production-evidence-register.json",
       "tier": "public",
-      "size": 5164,
+      "size": 5268,
       "type": "json"
     },
     {
       "path": "product/governance/production-evidence-summary-policy.json",
       "tier": "public",
-      "size": 230,
+      "size": 304,
       "type": "json"
     },
     {
       "path": "product/governance/promoted-report-template-policy.json",
       "tier": "public",
-      "size": 207,
+      "size": 258,
       "type": "json"
     },
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 5807,
+      "size": 5865,
       "type": "json"
     },
     {
       "path": "product/governance/provider-capability-scan-policy.json",
       "tier": "public",
-      "size": 6567,
+      "size": 6638,
       "type": "json"
     },
     {
       "path": "product/governance/provider-cli-capability-report-policy.json",
       "tier": "public",
-      "size": 375,
+      "size": 452,
       "type": "json"
     },
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1314,
+      "size": 1369,
       "type": "json"
     },
     {
@@ -2379,43 +2379,43 @@
     {
       "path": "product/governance/qa-rules.json",
       "tier": "public",
-      "size": 545,
+      "size": 603,
       "type": "json"
     },
     {
       "path": "product/governance/question-resolution-policy.json",
       "tier": "public",
-      "size": 7665,
+      "size": 7747,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 2925,
+      "size": 2989,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-level-policy.json",
       "tier": "public",
-      "size": 3958,
+      "size": 4020,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-provider-registry.json",
       "tier": "public",
-      "size": 7159,
+      "size": 7217,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 13520,
+      "size": 13582,
       "type": "json"
     },
     {
       "path": "product/governance/reporting-config.json",
       "tier": "public",
-      "size": 193,
+      "size": 251,
       "type": "json"
     },
     {
@@ -2427,13 +2427,13 @@
     {
       "path": "product/governance/restricted-capabilities.json",
       "tier": "public",
-      "size": 263,
+      "size": 321,
       "type": "json"
     },
     {
       "path": "product/governance/restricted-skills.json",
       "tier": "public",
-      "size": 348,
+      "size": 406,
       "type": "json"
     },
     {
@@ -2445,133 +2445,133 @@
     {
       "path": "product/governance/role-authority-map.json",
       "tier": "public",
-      "size": 3760,
+      "size": 3818,
       "type": "json"
     },
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3480,
+      "size": 3538,
       "type": "json"
     },
     {
       "path": "product/governance/runtime-design-profiles.json",
       "tier": "public",
-      "size": 1498,
+      "size": 1556,
       "type": "json"
     },
     {
       "path": "product/governance/sdlc-gate-catalog.json",
       "tier": "public",
-      "size": 4620,
+      "size": 4646,
       "type": "json"
     },
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21312,
+      "size": 21306,
       "type": "json"
     },
     {
       "path": "product/governance/service-authority-map.json",
       "tier": "public",
-      "size": 246,
+      "size": 307,
       "type": "json"
     },
     {
       "path": "product/governance/service-bootstrap-catalog.json",
       "tier": "public",
-      "size": 6235,
+      "size": 5900,
       "type": "json"
     },
     {
       "path": "product/governance/service-connection-readiness.json",
       "tier": "public",
-      "size": 441,
+      "size": 509,
       "type": "json"
     },
     {
       "path": "product/governance/service-onboarding-catalog.json",
       "tier": "public",
-      "size": 443,
+      "size": 509,
       "type": "json"
     },
     {
       "path": "product/governance/service-runtime-policy.json",
       "tier": "public",
-      "size": 364,
+      "size": 426,
       "type": "json"
     },
     {
       "path": "product/governance/service-runtime-registry.json",
       "tier": "public",
-      "size": 1474,
+      "size": 1538,
       "type": "json"
     },
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 13398,
+      "size": 13456,
       "type": "json"
     },
     {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
-      "size": 4350,
+      "size": 4410,
       "type": "json"
     },
     {
       "path": "product/governance/skill-index-aggregation.json",
       "tier": "public",
-      "size": 241,
+      "size": 238,
       "type": "json"
     },
     {
       "path": "product/governance/skill-install-package-map.json",
       "tier": "public",
-      "size": 797,
+      "size": 862,
       "type": "json"
     },
     {
       "path": "product/governance/skill-metadata-sync.json",
       "tier": "public",
-      "size": 504,
+      "size": 501,
       "type": "json"
     },
     {
       "path": "product/governance/skill-validation.json",
       "tier": "public",
-      "size": 380,
+      "size": 377,
       "type": "json"
     },
     {
       "path": "product/governance/software-test-viewpoints.json",
       "tier": "public",
-      "size": 4177,
+      "size": 4241,
       "type": "json"
     },
     {
       "path": "product/governance/spend-policy.json",
       "tier": "public",
-      "size": 309,
+      "size": 361,
       "type": "json"
     },
     {
       "path": "product/governance/spreadsheet-style-policy.json",
       "tier": "public",
-      "size": 217,
+      "size": 281,
       "type": "json"
     },
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 188228,
+      "size": 188284,
       "type": "json"
     },
     {
       "path": "product/governance/standard-policy.json",
       "tier": "public",
-      "size": 1992,
+      "size": 2050,
       "type": "json"
     },
     {
@@ -2583,19 +2583,19 @@
     {
       "path": "product/governance/surface-coordination-role-map.json",
       "tier": "public",
-      "size": 1310,
+      "size": 1379,
       "type": "json"
     },
     {
       "path": "product/governance/surface-policy.json",
       "tier": "public",
-      "size": 8911,
+      "size": 8965,
       "type": "json"
     },
     {
       "path": "product/governance/surface-provider-manifest-catalog.json",
       "tier": "public",
-      "size": 2268,
+      "size": 2341,
       "type": "json"
     },
     {
@@ -2649,19 +2649,19 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 35941,
+      "size": 36007,
       "type": "json"
     },
     {
       "path": "product/governance/surface-query-overlay-catalog.json",
       "tier": "public",
-      "size": 1264,
+      "size": 1333,
       "type": "json"
     },
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 2988,
+      "size": 3046,
       "type": "json"
     },
     {
@@ -2751,7 +2751,7 @@
     {
       "path": "product/governance/task-session-policy.json",
       "tier": "public",
-      "size": 51764,
+      "size": 51823,
       "type": "json"
     },
     {
@@ -2769,7 +2769,7 @@
     {
       "path": "product/governance/tenant-registry-exceptions.json",
       "tier": "public",
-      "size": 3888,
+      "size": 3946,
       "type": "json"
     },
     {
@@ -2781,7 +2781,7 @@
     {
       "path": "product/governance/tier-hygiene-policy.json",
       "tier": "public",
-      "size": 2394,
+      "size": 2440,
       "type": "json"
     },
     {
@@ -2793,37 +2793,37 @@
     {
       "path": "product/governance/tool-actuator-routing-policy.json",
       "tier": "public",
-      "size": 1493,
+      "size": 1561,
       "type": "json"
     },
     {
       "path": "product/governance/tool-runtime-policy.json",
       "tier": "public",
-      "size": 372,
+      "size": 431,
       "type": "json"
     },
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 22477,
+      "size": 22538,
       "type": "json"
     },
     {
       "path": "product/governance/track-creation-policy.json",
       "tier": "public",
-      "size": 10126,
+      "size": 10024,
       "type": "json"
     },
     {
       "path": "product/governance/tracker-sheet-policy.json",
       "tier": "public",
-      "size": 212,
+      "size": 272,
       "type": "json"
     },
     {
       "path": "product/governance/trust-policy.json",
       "tier": "public",
-      "size": 1194,
+      "size": 1243,
       "type": "json"
     },
     {
@@ -2835,19 +2835,19 @@
     {
       "path": "product/governance/video-composition-template-registry.json",
       "tier": "public",
-      "size": 2943,
+      "size": 3018,
       "type": "json"
     },
     {
       "path": "product/governance/video-render-runtime-policy.json",
       "tier": "public",
-      "size": 529,
+      "size": 596,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engine-registry.json",
       "tier": "public",
-      "size": 4821,
+      "size": 4882,
       "type": "json"
     },
     {
@@ -2901,7 +2901,7 @@
     {
       "path": "product/governance/voice-profile-registry.json",
       "tier": "public",
-      "size": 2272,
+      "size": 2230,
       "type": "json"
     },
     {
@@ -2943,19 +2943,19 @@
     {
       "path": "product/governance/voice-runtime-policy.json",
       "tier": "public",
-      "size": 584,
+      "size": 644,
       "type": "json"
     },
     {
       "path": "product/governance/voice-sample-ingestion-policy.json",
       "tier": "public",
-      "size": 435,
+      "size": 504,
       "type": "json"
     },
     {
       "path": "product/governance/voice-task-profile-catalog.json",
       "tier": "public",
-      "size": 16664,
+      "size": 16298,
       "type": "json"
     },
     {
@@ -2973,25 +2973,25 @@
     {
       "path": "product/governance/wisdom-reconcile-strategy.json",
       "tier": "public",
-      "size": 389,
+      "size": 579,
       "type": "json"
     },
     {
       "path": "product/governance/work-coordination-import-catalog.json",
       "tier": "public",
-      "size": 414,
+      "size": 486,
       "type": "json"
     },
     {
       "path": "product/governance/work-policy.json",
       "tier": "public",
-      "size": 7777,
+      "size": 7816,
       "type": "json"
     },
     {
       "path": "product/governance/work-scope-policy.json",
       "tier": "public",
-      "size": 1730,
+      "size": 1757,
       "type": "json"
     },
     {
@@ -6645,7 +6645,7 @@
     {
       "path": "product/schemas/cli-commands.schema.json",
       "tier": "public",
-      "size": 1585,
+      "size": 1622,
       "type": "json"
     },
     {
@@ -6958,6 +6958,12 @@
       "path": "product/schemas/governance-body-registry.schema.json",
       "tier": "public",
       "size": 4268,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/governance-catalog.schema.json",
+      "tier": "public",
+      "size": 496,
       "type": "json"
     },
     {

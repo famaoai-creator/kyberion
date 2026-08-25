@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-execution-profile-registry.schema.json",
   "version": "1.0.0",
   "profiles": [
     {
@@ -75,9 +76,7 @@
           "enabled_toolsets": ["video_generation", "artifact"]
         }
       },
-      "references": [
-        "knowledge/public/procedures/media/generate-video-from-adf.md"
-      ]
+      "references": ["knowledge/public/procedures/media/generate-video-from-adf.md"]
     },
     {
       "profile_id": "audio-transcribe-default",

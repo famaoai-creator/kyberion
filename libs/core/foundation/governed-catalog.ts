@@ -36,7 +36,14 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
   const validate = (value: unknown, sourcePath: string): T => {
     validator ||=
       typeof options.schema === 'string' ? compileSchema<T>(options.schema) : options.schema;
-    if (!validator(value)) {
+    // `$schema` is governance metadata, not part of the runtime contract.
+    // Keep it in the source artifact while excluding it from domain schemas
+    // that use additionalProperties=false.
+    const candidate =
+      value && typeof value === 'object' && !Array.isArray(value) && '$schema' in value
+        ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== '$schema'))
+        : value;
+    if (!validator(candidate)) {
       const errors = (validator.errors || [])
         .map((error) =>
           `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
@@ -44,7 +51,7 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
         .join('; ');
       throw new Error(`Invalid catalog ${options.id} at ${sourcePath}: ${errors}`);
     }
-    return value as T;
+    return candidate as T;
   };
 
   return {

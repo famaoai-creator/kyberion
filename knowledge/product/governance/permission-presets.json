@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/permission-presets.schema.json",
   "version": 1,
   "presets": {
     "readonly": {

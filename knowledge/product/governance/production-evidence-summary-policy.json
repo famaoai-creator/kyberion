@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/production-evidence-summary-policy.schema.json",
   "version": "1.0.0",
   "title_prefix": "production evidence",
   "invalid_entries_title": "invalid register entries",

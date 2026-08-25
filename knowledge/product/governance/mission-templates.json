@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/mission-template.schema.json",
+  "$schema": "../schemas/mission-template.schema.json",
   "templates": [
     {
       "name": "development",

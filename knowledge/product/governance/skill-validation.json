@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/capability-validation-contract.schema.json",
+  "$schema": "../schemas/capability-validation-contract.schema.json",
   "rules": [
     {
       "name": "actuator-metadata-completeness",

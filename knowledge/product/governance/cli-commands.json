@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/cli-commands.schema.json",
   "version": 1,
   "commands": [
     {

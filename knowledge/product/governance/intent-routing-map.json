@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-routing-map.schema.json",
   "version": "1.0.0",
   "description": "Static routing maps for resolveSurfaceIntent(). Each map drives a dispatch branch in router-contract.ts. Add entries here rather than editing source code.",
   "pipeline_intent_map": {

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-policy.schema.json",
   "version": "1.0.0",
   "delivery": {
     "rules": [

@@ -676,6 +676,47 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
   }
 }
 
+/**
+ * Every governance-root JSON file is a governed catalog or an explicitly
+ * documented compatibility artifact. Keeping this check directory-driven
+ * prevents new policy JSON from silently bypassing schema validation.
+ */
+function validateGovernanceCatalogMetadata(violations: string[]) {
+  const relativeRoot = 'knowledge/product/governance';
+  const root = pathResolver.rootResolve(relativeRoot);
+  for (const fileName of safeReaddir(root)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()) {
+    const relativePath = `${relativeRoot}/${fileName}`;
+    const filePath = pathResolver.rootResolve(relativePath);
+    let payload: Record<string, unknown>;
+    try {
+      payload = readJsonFile<Record<string, unknown>>(filePath);
+    } catch (error) {
+      violations.push(
+        `governance-catalog: ${relativePath} is not valid JSON (${error instanceof Error ? error.message : String(error)})`
+      );
+      continue;
+    }
+
+    const schemaRef = payload.$schema;
+    if (typeof schemaRef !== 'string' || schemaRef.trim() === '') {
+      if (payload.documentation_only !== true) {
+        violations.push(
+          `governance-catalog: ${relativePath} must declare $schema or documentation_only=true`
+        );
+      }
+      continue;
+    }
+
+    if (/^https?:\/\//u.test(schemaRef)) continue;
+    const schemaPath = pathResolver.rootResolve(path.join(relativeRoot, schemaRef));
+    if (!safeExistsSync(schemaPath)) {
+      violations.push(`governance-catalog: ${relativePath} references missing schema ${schemaRef}`);
+    }
+  }
+}
+
 export const runCheckCatalogIntegrity = defineScript({
   name: 'check:catalogs',
   flags: [],
@@ -685,6 +726,7 @@ export const runCheckCatalogIntegrity = defineScript({
     for (const check of CHECKS) {
       validateCatalog(check, violations, warnings);
     }
+    validateGovernanceCatalogMetadata(violations);
     validateDesignTokenCatalog(violations);
     validateCapabilitiesGuideDrift(violations);
 

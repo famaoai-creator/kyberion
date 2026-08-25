@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/operator-learning-dispatch-registry.schema.json",
   "version": "1.0.0",
   "rules": [
     {

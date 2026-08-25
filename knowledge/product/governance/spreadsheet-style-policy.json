@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/spreadsheet-style-policy.schema.json",
   "version": "1.0.0",
   "role_indices": {
     "base": 0,

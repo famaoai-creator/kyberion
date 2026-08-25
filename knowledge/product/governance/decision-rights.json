@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/decision-rights.schema.json",
+  "$schema": "../schemas/decision-rights.schema.json",
   "version": "1.0.0",
   "company_id": "default",
   "tenant_slug": null,

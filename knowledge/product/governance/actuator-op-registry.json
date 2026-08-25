@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/actuator-op-registry.schema.json",
   "version": "1.0.0",
   "description": "Actuator operation registry. Defines which ops belong to each domain and shared op pools. Read by actuator-op-registry.ts to classify pipeline step types (capture/transform/apply). Add new ops here rather than editing source code.",
   "shared_capture_ops": [

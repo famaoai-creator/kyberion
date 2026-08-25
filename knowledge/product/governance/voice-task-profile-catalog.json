@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/voice-task-profile-catalog.schema.json",
   "version": "1.0.0",
   "profiles": [
     {
@@ -19,9 +20,7 @@
         "Bootstrap Work Items",
         "Next Durable Work"
       ],
-      "applicability": [
-        "project bootstrap"
-      ],
+      "applicability": ["project bootstrap"],
       "reusable_steps": [
         "Capture the project brief, audience, and first deliverable.",
         "Translate the brief into the first bounded work items.",
@@ -41,15 +40,8 @@
       "accepted_reply_en": "I received the cross-project remediation request. {specialistLabel} will handle it. {learnedHint}{suggestedRefHint}I still need {missing}.",
       "progress_reply_ja": "依頼内容を更新しました。残りは {missing} です。{suggestedRefHint}",
       "progress_reply_en": "Updated. Remaining requirements: {missing}.{suggestedRefHint}",
-      "template_sections": [
-        "Scope",
-        "Signal",
-        "Gap Analysis",
-        "Propagation Plan"
-      ],
-      "applicability": [
-        "cross project remediation"
-      ],
+      "template_sections": ["Scope", "Signal", "Gap Analysis", "Propagation Plan"],
+      "applicability": ["cross project remediation"],
       "reusable_steps": [
         "Review requirements, incidents, and reusable findings.",
         "Identify propagation gaps across related projects.",
@@ -69,15 +61,8 @@
       "accepted_reply_en": "I received the incident-informed review request. {specialistLabel} will handle it. {learnedHint}{suggestedRefHint}I still need {missing}.",
       "progress_reply_ja": "依頼内容を更新しました。残りは {missing} です。{suggestedRefHint}",
       "progress_reply_en": "Updated. Remaining requirements: {missing}.{suggestedRefHint}",
-      "template_sections": [
-        "Incident Summary",
-        "Current Scope",
-        "Risk Assessment",
-        "Action Items"
-      ],
-      "applicability": [
-        "incident informed review"
-      ],
+      "template_sections": ["Incident Summary", "Current Scope", "Risk Assessment", "Action Items"],
+      "applicability": ["incident informed review"],
       "reusable_steps": [
         "Review the current scope against prior incidents.",
         "Surface known failures and recurring risks.",
@@ -98,15 +83,8 @@
       "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
       "missing_reply_ja": "PowerPoint 資料作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
       "missing_reply_en": "I received the presentation deck request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
-      "template_sections": [
-        "Story",
-        "Audience",
-        "Decision",
-        "Next Step"
-      ],
-      "applicability": [
-        "presentation delivery"
-      ],
+      "template_sections": ["Story", "Audience", "Decision", "Next Step"],
+      "applicability": ["presentation delivery"],
       "reusable_steps": [
         "Capture the user goal, audience, and success condition.",
         "Translate the request into an executive slide storyline.",
@@ -128,15 +106,8 @@
       "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
       "missing_reply_ja": "WBS 作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
       "missing_reply_en": "I received the work breakdown request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
-      "template_sections": [
-        "Scope",
-        "Work Packages",
-        "Dependencies",
-        "Milestones"
-      ],
-      "applicability": [
-        "work breakdown structure"
-      ],
+      "template_sections": ["Scope", "Work Packages", "Dependencies", "Milestones"],
+      "applicability": ["work breakdown structure"],
       "reusable_steps": [
         "Resolve the project scope and desired WBS granularity.",
         "Translate the work into a structured workbook layout.",
@@ -153,11 +124,7 @@
       "distill_target_kind": "report_template",
       "label_ja": "レポート作成",
       "label_en": "report document",
-      "template_sections": [
-        "Summary",
-        "Findings",
-        "Next Actions"
-      ],
+      "template_sections": ["Summary", "Findings", "Next Actions"],
       "audience": "internal stakeholders",
       "output_format": "docx"
     },
@@ -168,12 +135,7 @@
       "distill_target_kind": "report_template",
       "label_ja": "進捗レポート",
       "label_en": "status report",
-      "template_sections": [
-        "Summary",
-        "Current Status",
-        "Risks",
-        "Next Actions"
-      ],
+      "template_sections": ["Summary", "Current Status", "Risks", "Next Actions"],
       "audience": "internal stakeholders",
       "output_format": "docx"
     },
@@ -184,12 +146,7 @@
       "distill_target_kind": "report_template",
       "label_ja": "仕様書",
       "label_en": "specification document",
-      "template_sections": [
-        "Overview",
-        "Requirements",
-        "Constraints",
-        "Acceptance Criteria"
-      ],
+      "template_sections": ["Overview", "Requirements", "Constraints", "Acceptance Criteria"],
       "audience": "internal stakeholders",
       "output_format": "docx"
     },
@@ -200,12 +157,7 @@
       "distill_target_kind": "report_template",
       "label_ja": "提案書",
       "label_en": "proposal document",
-      "template_sections": [
-        "Summary",
-        "Context",
-        "Recommendation",
-        "Next Step"
-      ],
+      "template_sections": ["Summary", "Context", "Recommendation", "Next Step"],
       "audience": "decision makers",
       "output_format": "docx"
     },
@@ -221,12 +173,7 @@
       "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
       "missing_reply_ja": "レポート作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
       "missing_reply_en": "I received the report document request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
-      "template_sections": [
-        "Summary",
-        "Findings",
-        "Implications",
-        "Next Actions"
-      ],
+      "template_sections": ["Summary", "Findings", "Implications", "Next Actions"],
       "audience": "internal stakeholders",
       "output_format": "docx"
     },

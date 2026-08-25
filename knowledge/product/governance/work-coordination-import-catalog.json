@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/work-coordination-import-catalog.schema.json",
   "version": "1.0.0",
   "imports": [
     {

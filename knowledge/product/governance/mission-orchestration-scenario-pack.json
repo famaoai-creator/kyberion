@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-orchestration-scenario-pack.schema.json",
   "version": "1.0.0",
   "purpose": "regression-fixture",
   "scenarios": [
