@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   availableHeadlessOperationIds,
+  buildComputerSurfaceManifest,
   buildChronosHeadlessManifest,
   createHeadlessEnvelope,
 } from './headless-surface-contract.js';
@@ -23,6 +24,7 @@ describe('headless surface contract', () => {
     expect(update).toMatchObject({
       effect: 'write',
       required_role: 'localadmin',
+      required_permissions: ['surface.headless.write'],
       method: 'POST',
     });
     expect(update?.input_schema.required).toEqual(['item_id', 'status']);
@@ -68,5 +70,30 @@ describe('headless surface contract', () => {
       data: { status: 'ready' },
     });
     expect(envelope.available_operations).not.toContain('chronos.work_items.update_status');
+  });
+
+  it('publishes Computer Surface read/write operations with the same RBAC contract', () => {
+    const manifest = buildComputerSurfaceManifest();
+    expect(manifest.surface).toBe('computer-surface');
+
+    expect(availableHeadlessOperationIds('readonly', manifest)).toEqual([
+      'computer_surface.manifest.read',
+      'computer_surface.state.read',
+      'computer_surface.stream.read',
+      'computer_surface.os_control_plane.read',
+    ]);
+    expect(availableHeadlessOperationIds('localadmin', manifest)).toContain(
+      'computer_surface.a2ui.dispatch'
+    );
+
+    const dispatch = manifest.operations.find(
+      (operation) => operation.operation_id === 'computer_surface.a2ui.dispatch'
+    );
+    expect(dispatch).toMatchObject({
+      effect: 'write',
+      required_role: 'localadmin',
+      required_permissions: ['surface.headless.write'],
+      method: 'POST',
+    });
   });
 });

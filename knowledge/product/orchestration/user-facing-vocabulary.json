@@ -3244,9 +3244,9 @@
         "qps-ploc": "⟦  őṗėñ-ȧřŧïƒȧƈŧ <ṗȧŧħ> Őṗėñ ȧ ɠėñėřȧŧėḓ ȧřŧïƒȧƈŧ ẇïŧħ ŧħė ŐŞ ḓėƒȧůŀŧ ṽïėẇėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "cli_help_intent": {
-        "en": "  intent [--clarify] \"<utterance>\"   Deprecated: use `pnpm kyberion ask --explain \"<utterance>\"`",
-        "ja": "  intent [--clarify] \"<発話>\"   非推奨: `pnpm kyberion ask --explain \"<発話>\"` を使用",
-        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Ḓėṗřėƈȧŧėḓ: ůşė `ṗñṗɱ ķẏƀėřïőñ ȧşķ --ėẋṗŀȧïñ \"<ůŧŧėřȧñƈė>\"` ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+        "en": "  intent [--clarify] \"<utterance>\"   Resolve free text into an intent or clarification packet",
+        "ja": "  intent [--clarify] \"<発話>\"   自由文を intent または明確化パケットへ解決",
+        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Řėşőŀṽė ƒřėė ŧėẋŧ ïñŧő ȧñ ïñŧėñŧ őř ƈŀȧřïƒïƈȧŧïőñ ṗȧƈķėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_help_task_summary": {
         "en": "  task <plan|start> \"<request>\"  Plan a cross-tool task or create a governed task session",
@@ -5625,56 +5625,6 @@
         "en": "Handed to a dedicated work session: {label}",
         "ja": "担当セッションへ引き継ぎ: {label}",
         "qps-ploc": "⟦Ħȧñḓėḓ ŧő ȧ ḓėḓïƈȧŧėḓ ẇőřķ şėşşïőñ: {label} ŀőřėɱ ïṗşůɱ ḓő⟧"
-      },
-      "dock.intent_resolution.title": {
-        "en": "Request understanding",
-        "ja": "依頼の整理",
-        "qps-ploc": "⟦Řėɋůėşŧ ůñḓėřşŧȧñḓïñɠ ŀőřėɱ ⟧"
-      },
-      "dock.intent_resolution.understood": {
-        "en": "What I understood",
-        "ja": "理解した内容",
-        "qps-ploc": "⟦Ẇħȧŧ Ï ůñḓėřşŧőőḓ ŀőřėɱ⟧"
-      },
-      "dock.intent_resolution.missing": {
-        "en": "Missing information",
-        "ja": "不足している情報",
-        "qps-ploc": "⟦Ɱïşşïñɠ ïñƒőřɱȧŧïőñ ŀőřėɱ ⟧"
-      },
-      "dock.intent_resolution.none": {
-        "en": "Nothing else is needed",
-        "ja": "追加確認はありません",
-        "qps-ploc": "⟦Ñőŧħïñɠ ėŀşė ïş ñėėḓėḓ ŀőřėɱ ï⟧"
-      },
-      "dock.intent_resolution.next": {
-        "en": "Next step",
-        "ja": "次の一手",
-        "qps-ploc": "⟦Ñėẋŧ şŧėṗ ŀőř⟧"
-      },
-      "dock.intent_resolution.outcome": {
-        "en": "Expected result",
-        "ja": "見込みの成果",
-        "qps-ploc": "⟦Ėẋṗėƈŧėḓ řėşůŀŧ ŀőřė⟧"
-      },
-      "dock.intent_resolution.authority_autonomous": {
-        "en": "Can proceed",
-        "ja": "そのまま進められます",
-        "qps-ploc": "⟦Ƈȧñ ṗřőƈėėḓ ŀőř⟧"
-      },
-      "dock.intent_resolution.authority_approval": {
-        "en": "Approval required",
-        "ja": "承認が必要です",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůïřėḓ ŀőřėɱ⟧"
-      },
-      "dock.intent_resolution.authority_clarification": {
-        "en": "Your input is needed",
-        "ja": "確認が必要です",
-        "qps-ploc": "⟦Ẏőůř ïñṗůŧ ïş ñėėḓėḓ ŀőřėɱ ⟧"
-      },
-      "dock.intent_resolution.waiting_approval": {
-        "en": "Waiting for your approval; nothing has been executed.",
-        "ja": "承認待ちです。まだ実行していません。",
-        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ȧṗṗřőṽȧŀ; ñőŧħïñɠ ħȧş ƀėėñ ėẋėƈůŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "dock.confirm_proceed": {
         "en": "Yes, please proceed.",
@@ -8624,14 +8574,14 @@
         "qps-ploc": "⟦Ñėėḓş ȧŧŧėñŧïőñ ŀőřė⟧"
       },
       "tui_cockpit_voice_hint": {
-        "en": "v voice input · transcript is placed in the composer; review before sending",
-        "ja": "v 音声入力 · 文字起こしは送信前に入力欄で確認できます",
-        "qps-ploc": "⟦ṽ ṽőïƈė ïñṗůŧ · ŧřȧñşƈřïṗŧ ïş ṗŀȧƈėḓ ïñ ŧħė ƈőɱṗőşėř; řėṽïėẇ ƀėƒőřė şėñḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Ctrl+V voice input · transcript is placed in the composer; review before sending",
+        "ja": "Ctrl+V 音声入力 · 文字起こしは送信前に入力欄で確認できます",
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė ïñṗůŧ · ŧřȧñşƈřïṗŧ ïş ṗŀȧƈėḓ ïñ ŧħė ƈőɱṗőşėř; řėṽïėẇ ƀėƒőřė şėñḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "tui_cockpit_voice_recording": {
-        "en": "Recording… press v to stop",
-        "ja": "録音中… v で停止",
-        "qps-ploc": "⟦Řėƈőřḓïñɠ… ṗřėşş ṽ ŧő şŧőṗ ŀőřėɱ ïṗ⟧"
+        "en": "Recording… press Ctrl+V to stop",
+        "ja": "録音中… Ctrl+V で停止",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ṗřėşş Ƈŧřŀ+Ṽ ŧő şŧőṗ ŀőřėɱ ïṗşů⟧"
       },
       "tui_cockpit_voice_transcribing": {
         "en": "Transcribing voice input…",
@@ -8653,10 +8603,55 @@
         "ja": "実行形状",
         "qps-ploc": "⟦şħȧṗė ŀőř⟧"
       },
+      "tui_cockpit_shape_direct_answer": {
+        "en": "direct answer",
+        "ja": "直接回答",
+        "qps-ploc": "⟦ḓïřėƈŧ ȧñşẇėř ŀőřė⟧"
+      },
+      "tui_cockpit_shape_task_session": {
+        "en": "task session",
+        "ja": "タスク実行",
+        "qps-ploc": "⟦ŧȧşķ şėşşïőñ ŀőř⟧"
+      },
+      "tui_cockpit_shape_mission": {
+        "en": "mission",
+        "ja": "ミッション",
+        "qps-ploc": "⟦ɱïşşïőñ ŀőř⟧"
+      },
+      "tui_cockpit_shape_project_bootstrap": {
+        "en": "project setup",
+        "ja": "プロジェクト準備",
+        "qps-ploc": "⟦ṗřőĵėƈŧ şėŧůṗ ŀőřė⟧"
+      },
       "tui_cockpit_outcome": {
         "en": "outcome",
         "ja": "成果形状",
         "qps-ploc": "⟦őůŧƈőɱė ŀőř⟧"
+      },
+      "tui_cockpit_outcome_answer": {
+        "en": "answer",
+        "ja": "回答",
+        "qps-ploc": "⟦ȧñşẇėř ŀőř⟧"
+      },
+      "tui_cockpit_outcome_artifact": {
+        "en": "artifact",
+        "ja": "成果物",
+        "qps-ploc": "⟦ȧřŧïƒȧƈŧ ŀőř⟧"
+      },
+      "tui_cockpit_outcome_approval_ready_plan": {
+        "en": "approval-ready plan",
+        "ja": "承認可能な計画",
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀ-řėȧḓẏ ṗŀȧñ ŀőřėɱ ⟧"
+      },
+      "tui_cockpit_outcome_service_change": {
+        "en": "service change",
+        "ja": "サービス変更",
+        "qps-ploc": "⟦şėřṽïƈė ƈħȧñɠė ŀőřė⟧"
+      },
+      "tui_cockpit_outcome_status_report": {
+        "en": "status report",
+        "ja": "状況レポート",
+        "qps-ploc": "⟦şŧȧŧůş řėṗőřŧ ŀőřė⟧"
       },
       "tui_cockpit_authority": {
         "en": "authority",
@@ -8694,9 +8689,9 @@
         "qps-ploc": "⟦ñėẋŧ ȧƈŧïőñ ŀőř⟧"
       },
       "tui_cockpit_input_hint": {
-        "en": "v voice · Enter send · Esc cancel",
-        "ja": "v 音声 · Enter 送信 · Esc キャンセル",
-        "qps-ploc": "⟦ṽ ṽőïƈė · Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Ctrl+V voice · Enter send · Esc cancel",
+        "ja": "Ctrl+V 音声 · Enter 送信 · Esc キャンセル",
+        "qps-ploc": "⟦Ƈŧřŀ+Ṽ ṽőïƈė · Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "tui_tab_missions": {
         "en": "Missions",
@@ -9186,29 +9181,29 @@
     },
     "surface": {
       "concierge_surface_tagline": {
-        "en": "Your requests, approvals, outcomes, and exceptions in one place.",
-        "ja": "依頼・承認・成果・例外をひとつの場所で確認できます。",
-        "qps-ploc": "⟦Ẏőůř řėɋůėşŧş, ȧṗṗřőṽȧŀş, őůŧƈőɱėş, ȧñḓ ėẋƈėṗŧïőñş ïñ őñė ṗŀȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+        "en": "Executive secretary for requests, approvals, results, and exceptions.",
+        "ja": "CEO秘書 — 依頼・承認・成果・例外",
+        "qps-ploc": "⟦Ėẋėƈůŧïṽė şėƈřėŧȧřẏ ƒőř řėɋůėşŧş, ȧṗṗřőṽȧŀş, řėşůŀŧş, ȧñḓ ėẋƈėṗŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "presence_studio_surface_tagline": {
-        "en": "A shared workbench for working alongside Kyberion.",
-        "ja": "Kyberion と一緒に作業するワークベンチです。",
-        "qps-ploc": "⟦Ȧ şħȧřėḓ ẇőřķƀėñƈħ ƒőř ẇőřķïñɠ ȧŀőñɠşïḓė Ķẏƀėřïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "en": "A workbench for working together.",
+        "ja": "相棒 — いっしょに作業するワークベンチ",
+        "qps-ploc": "⟦Ȧ ẇőřķƀėñƈħ ƒőř ẇőřķïñɠ ŧőɠėŧħėř. ŀőřėɱ ïṗşůɱ⟧"
       },
       "chronos_surface_tagline": {
-        "en": "Check progress and step in only when needed.",
-        "ja": "進み具合を確認し、必要なときだけ対応します。",
-        "qps-ploc": "⟦Ƈħėƈķ ṗřőɠřėşş ȧñḓ şŧėṗ ïñ őñŀẏ ẇħėñ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "en": "Check mission status and step in only when needed.",
+        "ja": "ミッションの状況を確認し、必要なときだけ対応します。",
+        "qps-ploc": "⟦Ƈħėƈķ ɱïşşïőñ şŧȧŧůş ȧñḓ şŧėṗ ïñ őñŀẏ ẇħėñ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "operator_surface_tagline": {
-        "en": "A read-only view of current work and evidence.",
-        "ja": "現在の作業と証拠を読み取り専用で確認します。",
-        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ṽïėẇ őƒ ƈůřřėñŧ ẇőřķ ȧñḓ ėṽïḓėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+        "en": "Read-only audit monitor.",
+        "ja": "監査モニタ（読み取り専用）",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ ȧůḓïŧ ɱőñïŧőř. ŀőřėɱ ï⟧"
       },
       "computer_surface_tagline": {
-        "en": "A read-only mirror of the current browser and terminal.",
-        "ja": "現在のブラウザとターミナルを読み取り専用で映します。",
-        "qps-ploc": "⟦Ȧ řėȧḓ-őñŀẏ ɱïřřőř őƒ ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "A hands-on mirror for the current browser and terminal work.",
+        "ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
+        "qps-ploc": "⟦Ȧ ħȧñḓş-őñ ɱïřřőř ƒőř ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       }
     }
   }

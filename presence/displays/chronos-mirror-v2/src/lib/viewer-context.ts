@@ -23,6 +23,7 @@ import {
   type ChronosAccessRole,
 } from './api-guard';
 import type { ChronosTokenRegistration, OsKnowledgeTier } from '@agent/core';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 export interface ViewerContext extends Omit<
   SurfaceViewerScope,
@@ -104,6 +105,18 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
 /** Chronos roles currently expose public/confidential; personal remains masked. */
 export function defaultTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {
   return defaultSurfaceViewerTierAccess(role).filter((tier) => tier !== 'personal');
+}
+
+export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAuthorizationContext {
+  return {
+    role: viewer.role,
+    tenantSlugs: viewer.tenantSlugs,
+    organizationIds: viewer.organizationIds ?? 'all',
+    projectIds: viewer.projectIds ?? 'all',
+    tierAccess: viewer.tierAccess ?? defaultTierAccess(viewer.role),
+    principalId: viewer.principalId,
+    source: viewer.source,
+  };
 }
 
 export function resolveViewerTierAccess(

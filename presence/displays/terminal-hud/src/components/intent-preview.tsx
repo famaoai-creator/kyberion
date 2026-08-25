@@ -2,7 +2,11 @@ import { Box, Text } from 'ink';
 import type { IntentResolutionContract } from '@agent/core';
 import { useI18n } from '../i18n.js';
 import { theme } from '../theme.js';
-import { intentAuthorityVocabularyKey } from './intent-preview-model.js';
+import {
+  intentAuthorityVocabularyKey,
+  intentOutcomeVocabularyKey,
+  intentShapeVocabularyKey,
+} from './intent-preview-model.js';
 
 export interface IntentPreviewProps {
   contract: IntentResolutionContract;
@@ -28,9 +32,9 @@ export function IntentPreview({ contract }: IntentPreviewProps) {
         {contract.normalized_intent}
         <Text dimColor>
           {' · '}
-          {tr('tui:tui_cockpit_shape')}: {contract.resolution_shape}
+          {tr('tui:tui_cockpit_shape')}: {tr(intentShapeVocabularyKey(contract.resolution_shape))}
           {' · '}
-          {tr('tui:tui_cockpit_outcome')}: {contract.outcome_kind}
+          {tr('tui:tui_cockpit_outcome')}: {tr(intentOutcomeVocabularyKey(contract.outcome_kind))}
         </Text>
       </Text>
       <Text color={authorityColor}>

@@ -39,5 +39,12 @@ export function loadOperatorHome(): OperatorHomePacket {
 }
 
 export function operatorHomeWatchPaths(): string[] {
-  return [pathResolver.active('missions'), pathResolver.active('shared/runtime')];
+  return [
+    pathResolver.active('missions'),
+    pathResolver.active('shared/runtime'),
+    pathResolver.active('shared/coordination/channels'),
+    pathResolver.shared('inbox/entries.jsonl'),
+    pathResolver.active('shared/coordination/channels'),
+    pathResolver.shared('inbox/entries.jsonl'),
+  ];
 }

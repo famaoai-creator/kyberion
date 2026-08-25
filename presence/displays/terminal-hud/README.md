@@ -36,7 +36,7 @@ pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必
 - 起動時は入力欄にフォーカス済みです。自由文は `runSurfaceMessageConversation`（cli surface / channel `terminal-hud`）経由で推論バックエンドへ。`Esc` でパネル操作に戻り、`i` / `/` で再フォーカスできます。
 - 入力中は全 surface 共通の Intent Resolution Contract のプレビュー（意図、実行形状、成果形状、権限境界、不足情報）を表示します。送信後も同じ gateway 結果を保持し、プレビューは実行経路の承認・ADF・mission gate を置き換えません。
 - `:` でコマンドパレット（whitelist 動詞のみ、任意シェル不可）: `:panel` `:mission` `:task` `:schedule` `:surface`。
-- `v` で push-to-talk 音声入力: mic-capture（ffmpeg/arecord）→ STT ブリッジ → 入力欄へ転記（自動送信しない）。STT/mic 不在時は理由を表示して劣化。
+- 入力欄フォーカス中は `Ctrl+V`、パネル操作中は `v` で push-to-talk 音声入力: mic-capture（ffmpeg/arecord）→ STT ブリッジ → 入力欄へ転記（自動送信しない）。STT/mic 不在時は理由を表示して劣化。
 
 ## 設計上の制約
 

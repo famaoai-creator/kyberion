@@ -4,6 +4,7 @@ import {
   headlessEnvelope,
   headlessErrorResponse,
   parseHeadlessLimit,
+  authorizeHeadlessOperation,
 } from '../../../../lib/headless-response';
 import { readHeadlessCollaboration } from '../../../../lib/headless-projections';
 import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
@@ -19,6 +20,11 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
+    authorizeHeadlessOperation(resolvedViewer.context, 'chronos.collaboration.read', {
+      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
+      organizationId: req.nextUrl.searchParams.get('organization') || undefined,
+      projectId: req.nextUrl.searchParams.get('project') || undefined,
+    });
     const limit = parseHeadlessLimit(req.nextUrl.searchParams.get('limit'), 100, 500);
     const projection = readHeadlessCollaboration(resolvedViewer.context, {
       tenant: req.nextUrl.searchParams.get('tenant') || undefined,

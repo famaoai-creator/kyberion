@@ -165,6 +165,71 @@ describe('Computer Surface Cloudflare OS projection', () => {
     });
   });
 
+  it('enforces readonly versus localadmin operations at the route boundary', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'false');
+    vi.stubEnv('KYBERION_API_TOKEN', 'computer-read-token');
+    vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', 'computer-admin-token');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+
+    await withHttpApp(async (baseUrl) => {
+      const headers = { Authorization: 'Bearer computer-read-token' };
+      const stateResponse = await fetch(`${baseUrl}/api/state`, { headers });
+      expect(stateResponse.status).toBe(200);
+
+      const manifestResponse = await fetch(`${baseUrl}/api/headless/manifest`, { headers });
+      const manifest = await manifestResponse.json();
+      expect(manifestResponse.status).toBe(200);
+      expect(
+        manifest.operations.map((operation: { operation_id: string }) => operation.operation_id)
+      ).not.toContain('computer_surface.identity.read');
+
+      const identityResponse = await fetch(`${baseUrl}/api/identity`, { headers });
+      expect(identityResponse.status).toBe(403);
+
+      const dispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateDataModel: { surfaceId: 'computer-surface', data: {} } }),
+      });
+      expect(dispatchResponse.status).toBe(403);
+
+      const adminDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer computer-admin-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ updateDataModel: { surfaceId: 'computer-surface', data: {} } }),
+      });
+      expect(adminDispatchResponse.status).toBe(200);
+
+      const crossTenantDispatchResponse = await fetch(`${baseUrl}/a2ui/dispatch`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer computer-admin-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updateDataModel: {
+            surfaceId: 'computer-surface',
+            data: { metadata: { scope: { tenant_slug: 'tenant-b' } } },
+          },
+        }),
+      });
+      expect(crossTenantDispatchResponse.status).toBe(403);
+
+      const adminManifestResponse = await fetch(`${baseUrl}/api/headless/manifest`, {
+        headers: { Authorization: 'Bearer computer-admin-token' },
+      });
+      const adminManifest = await adminManifestResponse.json();
+      expect(
+        adminManifest.operations.map(
+          (operation: { operation_id: string }) => operation.operation_id
+        )
+      ).toContain('computer_surface.identity.read');
+    });
+  });
+
   it('keeps the route and browser panel read-only for OS actions', () => {
     const server = String(
       safeReadFile(pathResolver.rootResolve('presence/displays/computer-surface/server.ts'), {
@@ -181,7 +246,7 @@ describe('Computer Surface Cloudflare OS projection', () => {
     );
     expect(server).toMatch(/app\.get\(['"]\/api\/os\/control-plane['"]/);
     expect(server).not.toMatch(/app\.(post|put|patch|delete)\(['"]\/api\/os\/control-plane['"]/i);
-    expect(server).toContain('authorizeSurface(req, res)');
+    expect(server).toContain('authorizeSurface(req, res,');
     expect(server).toContain("Cache-Control', 'private, no-store'");
     expect(html).toContain("fetch('/api/os/control-plane'");
     expect(html).not.toMatch(/\/api\/os\/(?:approve|apply|decide|held-actions)/i);

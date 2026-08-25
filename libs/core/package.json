@@ -55,6 +55,10 @@
       "types": "./dist/headless-surface-contract.d.ts",
       "default": "./dist/headless-surface-contract.js"
     },
+    "./surface-authorization": {
+      "types": "./dist/surface-authorization.d.ts",
+      "default": "./dist/surface-authorization.js"
+    },
     "./acp-mediator": {
       "types": "./dist/acp-mediator.d.ts",
       "default": "./dist/acp-mediator.js"

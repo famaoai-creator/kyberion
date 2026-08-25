@@ -1,24 +1,46 @@
 import {
   buildChronosHeadlessManifest,
   createHeadlessEnvelope,
+  filterHeadlessManifestForViewer,
   type HeadlessApiManifest,
 } from '@agent/core/headless-surface-contract';
 import type { ViewerContext } from './viewer-context';
-import { viewerErrorResponse } from './viewer-context';
+import {
+  toSurfaceAuthorizationContext,
+  viewerErrorResponse,
+  ViewerContextError,
+} from './viewer-context';
 import { headlessViewerScope, HeadlessQueryError } from './headless-projections';
+import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
 
 export function headlessManifest(): HeadlessApiManifest {
   return buildChronosHeadlessManifest();
 }
 
 export function headlessManifestForViewer(viewer: ViewerContext): HeadlessApiManifest {
-  const manifest = headlessManifest();
-  return {
-    ...manifest,
-    operations: manifest.operations.filter(
-      (operation) => viewer.role === 'localadmin' || operation.required_role === 'readonly'
-    ),
-  };
+  return filterHeadlessManifestForViewer(toSurfaceAuthorizationContext(viewer), headlessManifest());
+}
+
+export function authorizeHeadlessOperation(
+  viewer: ViewerContext,
+  operationId: string,
+  resource?: { tenantSlug?: string; organizationId?: string; projectId?: string; tier?: string }
+): void {
+  const operation = headlessManifest().operations.find(
+    (candidate) => candidate.operation_id === operationId
+  );
+  if (!operation) throw new ViewerContextError(403, `unknown headless operation: ${operationId}`);
+  const decision = authorizeSurfaceOperation({
+    context: toSurfaceAuthorizationContext(viewer),
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource,
+  });
+  if (!decision.allowed) throw new ViewerContextError(403, decision.reason);
 }
 
 export function headlessEnvelope<T>(
@@ -32,6 +54,7 @@ export function headlessEnvelope<T>(
     data,
     scope: headlessViewerScope(viewer),
     manifest,
+    authorizationContext: toSurfaceAuthorizationContext(viewer),
   });
 }
 
