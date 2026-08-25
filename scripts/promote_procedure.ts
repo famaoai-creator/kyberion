@@ -30,6 +30,7 @@ import {
   pathResolver,
 } from '@agent/core';
 import type { ProcedureCatalog, ProcedureEntry } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -53,7 +54,7 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 function fail(message: string): never {
   process.stderr.write(`[promote-procedure] ${message}\n`);
-  process.exit(1);
+  throw new ScriptExitError(1, '', true);
 }
 
 function printUsage(): void {
@@ -62,11 +63,11 @@ function printUsage(): void {
   );
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
+export function main(argv: string[] = []): void {
+  const args = parseArgs(argv);
   if (args.help === 'true') {
     printUsage();
-    process.exit(0);
+    return;
   }
 
   const recordingRef = args['recording'];
@@ -176,4 +177,14 @@ function main(): void {
   );
 }
 
-main();
+export const runPromoteProcedure = defineScript({
+  name: 'procedure:promote',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'promote_procedure.ts') ||
+  isDirectScript(import.meta.url, 'promote_procedure.js')
+)
+  void runPromoteProcedure();
