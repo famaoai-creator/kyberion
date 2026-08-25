@@ -87,7 +87,7 @@ resolveIntentResolutionPacket → resolveMissionClassification
 - catalog schema を minor bump し、テンプレートに任意フィールド `playbook_ref`(repo 相対パス)を追加。既存 7 プレイブック参照を description 散文から移設(description の文章自体は残してよいが、参照の正はフィールド)。
 - playbook 側 frontmatter に `workflow_ids: [...]` を追加し、checker で双方向突合(catalog → playbook 実在、playbook → workflow_id 実在)。
 - `phases/*.md` frontmatter に `runtime_stages: [...]`(policy `stage_progression` の部分集合)を追加し、checker で突合。5 フェーズ md はあくまで人間向け手順書のまま(runtime parse はしない)。
-- `knowledge/_manifest.json` / frontmatter 規約(`title` / `tags` / `last_updated`)との整合を維持。
+- `knowledge/_integrity-manifest.json` / frontmatter 規約(`title` / `tags` / `last_updated`)との整合を維持。
 
 ### Phase 5 — Review
 

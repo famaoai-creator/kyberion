@@ -351,7 +351,7 @@ The charter assumes strict isolation between these tiers. Within the confidentia
 - `knowledge/product/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
 - `knowledge/product/architecture/multi-tenant-operations.md`: tenant isolation layers, brokered cross-tenant access, and tenant scope enforcement
 - `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`: viewer principal, scoped tokens, and `KYBERION_VIEWER_SCOPE` staging
-- `docs/developer/improvement-plans-2026-07/STATUS.ja.md`: the canonical implementation-status ledger for all improvement plans
+- `docs/developer/improvement-plans-2026-08/README.ja.md`: the current implementation-status index; 2026-07 STATUS is historical
 - `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries; also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `knowledge/product/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
 - `knowledge/product/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
