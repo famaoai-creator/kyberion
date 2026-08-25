@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   authorizeSurfaceMutation,
   defaultSurfaceViewerTierAccess,
@@ -6,6 +7,7 @@ import {
   narrowSurfaceViewerScope,
   narrowSurfaceViewerTenant,
   narrowSurfaceViewerTier,
+  resolveSurfaceViewerToken,
   resolveSurfaceViewerTierAccess,
 } from './surface-mutation-guard.js';
 
@@ -27,6 +29,31 @@ afterEach(() => {
 });
 
 describe('surface-mutation-guard', () => {
+  it('resolves registered and configured viewer credentials through one boundary', () => {
+    const registered = resolveSurfaceViewerToken('registered-token', {
+      registrations: [
+        {
+          token_hash: createHash('sha256').update('registered-token').digest('hex'),
+          role: 'readonly',
+          tenant_slugs: ['tenant-a'],
+          label: 'registered viewer',
+        },
+      ],
+      apiToken: 'registered-token',
+    });
+    expect(registered).toMatchObject({
+      role: 'readonly',
+      registration: { label: 'registered viewer' },
+    });
+
+    expect(resolveSurfaceViewerToken('api-token', { apiToken: 'api-token' })).toMatchObject({
+      role: 'readonly',
+    });
+    expect(
+      resolveSurfaceViewerToken('admin-token', { localadminToken: 'admin-token' })
+    ).toMatchObject({ role: 'localadmin' });
+  });
+
   it('extracts bearer credentials without broadening the accepted header form', () => {
     expect(extractSurfaceBearerToken('Bearer secret-token')).toBe('secret-token');
     expect(extractSurfaceBearerToken('Bearer   secret-token  ')).toBe('secret-token');

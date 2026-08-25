@@ -5,6 +5,7 @@ import {
   findChronosTokenRegistration,
   matchesChronosToken,
   readChronosTokenRegistrations,
+  resolveSurfaceViewerToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
@@ -104,16 +105,13 @@ function getRateLimitKey(req: NextRequest): string {
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveChronosToken(req);
   const isLocal = isChronosLoopbackRequest(req);
-
-  if (matchesChronosToken(token || '', LOCALADMIN_TOKEN)) {
-    return 'localadmin';
-  }
-  if (matchesChronosToken(token || '', API_TOKEN)) {
-    return 'readonly';
-  }
   if (token) {
-    const registration = resolveChronosTokenRegistration(token);
-    if (registration) return registration.role;
+    const resolution = resolveSurfaceViewerToken(token, {
+      registrations: loadChronosTokenRegistrations(),
+      apiToken: API_TOKEN,
+      localadminToken: LOCALADMIN_TOKEN,
+    });
+    if (resolution) return resolution.role;
   }
   // A supplied but invalid credential must not fall through to the
   // loopback auto-admin compatibility path.

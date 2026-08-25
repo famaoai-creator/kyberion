@@ -7,9 +7,14 @@
  * KYBERION_LOCALADMIN_TOKEN), allow same-origin, otherwise 403.
  */
 
-import { timingSafeEqual } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { isValidChronosScopeId, type ChronosAccessRole } from './chronos-access-registry.js';
+import {
+  findChronosTokenRegistration,
+  isValidChronosScopeId,
+  matchesChronosToken,
+  type ChronosAccessRole,
+  type ChronosTokenRegistration,
+} from './chronos-access-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 
@@ -35,22 +40,12 @@ function resolveBearerToken(request: SurfaceMutationRequest): string {
   return extractSurfaceBearerToken(request.getHeader('authorization'));
 }
 
-function matchesConfiguredToken(candidate: string, configured: string | undefined): boolean {
-  if (!candidate || !configured) return false;
-  const candidateBuffer = Buffer.from(candidate);
-  const configuredBuffer = Buffer.from(configured);
-  return (
-    candidateBuffer.length === configuredBuffer.length &&
-    timingSafeEqual(candidateBuffer, configuredBuffer)
-  );
-}
-
 export function authorizeSurfaceMutation(request: SurfaceMutationRequest): SurfaceMutationDecision {
   const url = new URL(request.url);
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
   const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
   const token = resolveBearerToken(request);
-  if (matchesConfiguredToken(token, apiToken) || matchesConfiguredToken(token, localadminToken)) {
+  if (matchesChronosToken(token, apiToken) || matchesChronosToken(token, localadminToken)) {
     return { ok: true, status: 200, reason: 'token' };
   }
 
@@ -82,6 +77,36 @@ export interface SurfaceViewerScope {
   tierAccess: OsKnowledgeTier[];
   source: 'token' | 'loopback' | 'anonymous';
   principalId?: string;
+}
+
+export interface SurfaceViewerTokenResolution {
+  role: ChronosAccessRole;
+  registration?: ChronosTokenRegistration;
+}
+
+/**
+ * Resolve the shared credential boundary used by HTTP surfaces.
+ *
+ * Registration-backed scopes remain authoritative; configured API tokens are
+ * only the compatibility fallback and never gain tenant or tier claims here.
+ * Surface-specific request handling must still narrow the returned scope.
+ */
+export function resolveSurfaceViewerToken(
+  token: string,
+  options: {
+    registrations?: readonly ChronosTokenRegistration[] | null;
+    apiToken?: string;
+    localadminToken?: string;
+  } = {}
+): SurfaceViewerTokenResolution | null {
+  if (!token) return null;
+  const registration = options.registrations
+    ? findChronosTokenRegistration(token, [...options.registrations])
+    : null;
+  if (registration) return { role: registration.role, registration };
+  if (matchesChronosToken(token, options.localadminToken)) return { role: 'localadmin' };
+  if (matchesChronosToken(token, options.apiToken)) return { role: 'readonly' };
+  return null;
 }
 
 export class SurfaceViewerScopeError extends Error {
