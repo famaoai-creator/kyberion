@@ -11,6 +11,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { appendJsonLine } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface RestartE2EReport {
   timestamp: string;
@@ -104,7 +105,9 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
 
   if (phase === 'bootstrap') {
     const bootstrapState = writeBootstrapState(root);
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
     const shutdown = () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       safeWriteFile(
         bootstrapState.journal_path,
         JSON.stringify(
@@ -113,11 +116,10 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
           2
         )
       );
-      process.exit(0);
     };
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
-    setInterval(() => {
+    heartbeatTimer = setInterval(() => {
       appendJsonLine(bootstrapState.heartbeat_path, {
         pid: process.pid,
         phase,
@@ -237,8 +239,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   };
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export async function main(args: string[] = []): Promise<void> {
   if (args[0] === '--worker') {
     const phase = args[1] === 'resume' ? 'resume' : 'bootstrap';
     const rootArgIndex = args.indexOf('--root');
@@ -254,10 +255,14 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(report, null, 2));
 }
 
-const isDirect = process.argv[1] && /soak_restart_e2e\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
-    logger.error(`[soak-restart-e2e] failed: ${(error as Error).message ?? error}`);
-    process.exit(1);
-  });
-}
+export const runSoakRestartScript = defineScript({
+  name: 'soak:restart-e2e',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'soak_restart_e2e.ts') ||
+  isDirectScript(import.meta.url, 'soak_restart_e2e.js')
+)
+  void runSoakRestartScript();
