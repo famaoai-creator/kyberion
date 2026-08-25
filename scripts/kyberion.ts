@@ -64,7 +64,8 @@ export function assertRequiredEnvironment(report: {
 export function validateKyberionStartupEnvironment(
   env: Record<string, string | undefined> = process.env
 ): void {
-  assertRequiredEnvironment(validateEnv(env));
+  const strict = /^(1|true|yes|on)$/i.test(env.KYBERION_ENV_REGISTRY_STRICT || '');
+  assertRequiredEnvironment(validateEnv(env, { strict }));
 }
 
 export async function main(args: string[] = []): Promise<void> {
