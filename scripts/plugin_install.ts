@@ -16,10 +16,10 @@
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
  */
 import { createStandardYargs, importPluginPack, installPluginManaged, logger } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-export function runPluginInstall(): number {
-  const argv = createStandardYargs()
+export function runPluginInstall(args: string[] = []): number {
+  const argv = createStandardYargs(['node', 'plugin_install', ...args])
     .scriptName('plugin_install')
     .option('source', {
       type: 'string',
@@ -153,10 +153,12 @@ if (
   isDirectScript(import.meta.url, 'plugin_install.ts') ||
   isDirectScript(import.meta.url, 'plugin_install.js')
 ) {
-  try {
-    process.exit(runPluginInstall());
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+  void defineScript({
+    name: 'plugin:install',
+    flags: [],
+    run(context) {
+      const status = runPluginInstall(context.argv);
+      if (status !== 0) throw new Error(`plugin:install failed with exit code ${status}`);
+    },
+  })();
 }

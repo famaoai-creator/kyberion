@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger, probeServiceRuntime } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type MediaRuntimePreflightReport = {
   serviceId: string;
@@ -52,8 +52,8 @@ export async function runMediaRuntimePreflight(
   return report;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'media_runtime_preflight', ...args])
     .option('service', {
       type: 'string',
       default: 'comfyui',
@@ -67,15 +67,19 @@ async function main(): Promise<void> {
     logger.info(JSON.stringify({ status: 'ok', report }, null, 2));
   }
 
-  process.exit(report.available ? 0 : 1);
+  return report.available ? 0 : 1;
 }
 
 if (
   isDirectScript(import.meta.url, 'media_runtime_preflight.ts') ||
   isDirectScript(import.meta.url, 'media_runtime_preflight.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'media:runtime-preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`media:runtime-preflight failed with exit code ${status}`);
+    },
+  })();
 }
