@@ -5,6 +5,7 @@ import {
   logger,
   resumePeerRuntimeFromQuarantine,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
@@ -61,7 +62,16 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error: unknown) => {
-  logger.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+export const runPeerRuntimeRecovery = defineScript({
+  name: 'peer:runtime-recovery',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_runtime_recovery.ts') ||
+  isDirectScript(import.meta.url, 'peer_runtime_recovery.js')
+)
+  void runPeerRuntimeRecovery();

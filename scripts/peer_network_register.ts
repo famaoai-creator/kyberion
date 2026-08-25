@@ -5,6 +5,7 @@ import {
   type PeerNetworkExposure,
   withExecutionContext,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean);
@@ -88,7 +89,16 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error: unknown) => {
-  logger.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+export const runPeerNetworkRegister = defineScript({
+  name: 'peer:network-register',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_network_register.ts') ||
+  isDirectScript(import.meta.url, 'peer_network_register.js')
+)
+  void runPeerNetworkRegister();
