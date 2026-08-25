@@ -7,6 +7,7 @@ import {
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -15,10 +16,10 @@ import {
  * Rate Limiting: Per-IP sliding window.
  */
 
-const API_TOKEN = process.env.KYBERION_API_TOKEN;
-const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
-const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
-const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false';
+const API_TOKEN = getRegisteredEnvText('KYBERION_API_TOKEN');
+const LOCALADMIN_TOKEN = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
+const ALLOW_UNAUTH_REMOTE = getRegisteredEnvText('KYBERION_ALLOW_UNAUTH_REMOTE') === '1';
+const ALLOW_LOCALHOST_AUTOADMIN = getRegisteredEnvText('KYBERION_LOCALHOST_AUTOADMIN') !== 'false';
 
 export type { ChronosAccessRole, ChronosTokenRegistration } from '@agent/core';
 export { matchesChronosToken } from '@agent/core';

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { currentScope, recordHumanKnowledgeFeedback } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -19,7 +20,7 @@ const target = recordHumanKnowledgeFeedback({
   document_path: documentPath,
   verdict,
   reason: flag(args, '--reason'),
-  actor: process.env.KYBERION_PERSONA || 'operator',
+  actor: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
   source: 'cli',
   scope: currentScope(),
 });

@@ -12,6 +12,7 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { metrics } from './metrics.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
@@ -99,7 +100,7 @@ export function loadSpendPolicy(): SpendPolicy {
  * tenant) keep the base policy.
  */
 export function resolveSpendPolicyForTenant(policy: SpendPolicy, tenantId?: string): SpendPolicy {
-  const id = tenantId ?? process.env.KYBERION_TENANT;
+  const id = tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
   const override = id ? policy.tenant_overrides?.[id] : undefined;
   if (!override) return policy;
   return {
@@ -164,7 +165,7 @@ export function checkSpendGuard(
   } = {}
 ): SpendGuardResult {
   const now = options.now ?? Date.now();
-  const tenantId = options.tenantId ?? process.env.KYBERION_TENANT;
+  const tenantId = options.tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
   const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
   const missionId = options.missionId || process.env.MISSION_ID || undefined;
@@ -224,7 +225,7 @@ export function checkSpendGuard(
 export function enforceSpendGuardForReasoning(missionId?: string): void {
   // Same VITEST pattern as provider-health persistence: unit tests must not
   // read the real metrics history / policy unless they opt in.
-  if (process.env.VITEST && process.env.KYBERION_SPEND_GUARD_TEST !== '1') return;
+  if (process.env.VITEST && getRegisteredEnvText('KYBERION_SPEND_GUARD_TEST') !== '1') return;
   const result = checkSpendGuard({ missionId });
   if (!result.allowed) {
     throw new SpendCapExceededError(result);

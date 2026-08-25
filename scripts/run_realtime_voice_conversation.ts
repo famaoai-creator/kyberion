@@ -44,6 +44,7 @@ import {
   type StreamingTextToSpeechBridge,
   type VadTurnState,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type DeliveryMode = 'none' | 'artifact' | 'artifact_and_playback';
 type PersonalVoiceMode = 'allow_fallback' | 'require_personal_voice';
@@ -451,7 +452,8 @@ export async function runRealtimeVoiceConversationLoop(
       : null;
 
   let streamingTts: StreamingTextToSpeechBridge | undefined;
-  const streamPlaybackCommand = process.env.KYBERION_TTS_PLAY_COMMAND?.split(',')
+  const streamPlaybackCommand = getRegisteredEnvText('KYBERION_TTS_PLAY_COMMAND')
+    ?.split(',')
     .map((part) => part.trim())
     .filter(Boolean);
   if (playbackEnabled) {
@@ -702,8 +704,8 @@ export async function main(): Promise<void> {
   // The general bootstrap probes Apple Speech asynchronously. Await it here so
   // the realtime CLI can use macOS-native STT before falling back to MLX.
   if (
-    !process.env.KYBERION_STT_COMMAND?.trim() &&
-    !process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+    !getRegisteredEnvText('KYBERION_STT_COMMAND')?.trim() &&
+    !getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
   ) {
     await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
   }

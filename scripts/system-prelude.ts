@@ -5,6 +5,7 @@
  */
 
 import { secretGuard, logger } from '@agent/core';
+import { setRegisteredEnv } from '@agent/core/foundation';
 
 export { secretGuard, logger };
 
@@ -13,15 +14,15 @@ export async function main() {
 
   // Use Secret Guard for Sudo Key acquisition
   const SUDO_KEY = secretGuard.getSecret('KYBERION_SUDO_KEY') || 'SOVEREIGN_BYPASS_' + Date.now();
-  
+
   // Note: We still set it to process.env for downstream legacy script compatibility
   // but the source of truth is now the Secret Guard.
-  process.env.KYBERION_SUDO_KEY = SUDO_KEY;
+  setRegisteredEnv('KYBERION_SUDO_KEY', SUDO_KEY);
 
   logger.success('✅ System Prelude complete.');
 }
 
-void main().catch(err => {
+void main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

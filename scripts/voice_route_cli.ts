@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { handleAction } from '../libs/actuators/voice-actuator/src/index.js';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type Command = 'list' | 'probe' | 'test';
 
@@ -117,7 +118,7 @@ async function main(): Promise<void> {
     if (
       !options.dryRun &&
       options.bus === 'blackhole' &&
-      process.env.KYBERION_LIVE_BLACKHOLE_TEST !== '1'
+      getRegisteredEnvText('KYBERION_LIVE_BLACKHOLE_TEST') !== '1'
     ) {
       result = {
         status: 'blocked',

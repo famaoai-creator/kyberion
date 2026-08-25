@@ -37,6 +37,7 @@ import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 import { defineScript, isDirectScript, type ScriptContext } from './lib/harness.js';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
 const MISSION_MANIFESTS = [
@@ -168,10 +169,10 @@ export function collectPipelineScheduleDoctorLines(): string[] {
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   try {
     const tenantId = String(
-      process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || ''
+      getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
     ).trim();
     const aliasNotice =
-      !process.env.KYBERION_TENANT && process.env.KYBERION_TENANT_ID
+      !getRegisteredEnvText('KYBERION_TENANT') && getRegisteredEnvText('KYBERION_TENANT_ID')
         ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)'
         : '';
     const report = await inspectMeshHub({

@@ -23,6 +23,7 @@
 
 import type { AudioBus } from './audio-bus.js';
 import { randomBytes } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
@@ -79,7 +80,8 @@ interface WsServerLike {
 }
 
 function resolveExtensionAuthToken(options: ChromeExtensionMeetingDriverOptions): string {
-  const token = options.wsAuthToken?.trim() || process.env.KYBERION_MEET_EXTENSION_TOKEN?.trim();
+  const token =
+    options.wsAuthToken?.trim() || getRegisteredEnvText('KYBERION_MEET_EXTENSION_TOKEN')?.trim();
   if (!token || token.length < 32) {
     throw new Error(
       'Meet extension authentication is not configured. Set KYBERION_MEET_EXTENSION_TOKEN (32+ characters) and the same meetCopilotAuthToken in Chrome storage.'

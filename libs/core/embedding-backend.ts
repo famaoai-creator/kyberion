@@ -60,7 +60,7 @@ function embedText(text: string): Float32Array {
 export function getEmbeddingBackend(): EmbeddingBackend | null {
   const registeredBackend = embeddingBackendSeam.getOptional();
   if (registeredBackend) return registeredBackend;
-  if (process.env.KYBERION_DISABLE_EMBEDDINGS === '1') return null;
+  if (getRegisteredEnvText('KYBERION_DISABLE_EMBEDDINGS') === '1') return null;
   return {
     name: 'local-hash-embedding',
     async embed(text: string): Promise<Float32Array> {
@@ -122,3 +122,4 @@ export function reciprocalRankFusion(
   }
   return scores;
 }
+import { getRegisteredEnvText } from './foundation/env.js';

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
@@ -112,7 +113,7 @@ function loadRegistryForPromotion(targetPath: string): VoiceProfileRegistry {
 }
 
 function resolvePromotionRegistryPath(tier: VoiceProfileRecord['tier']): string {
-  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) {
+  if (getRegisteredEnvText('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) {
     return getVoiceProfileRegistryPath();
   }
   return tier === 'personal'

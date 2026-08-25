@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
@@ -191,7 +192,7 @@ export function notifyOperatorSync(
   // Tests exercising real mission flows must not pollute the operator's
   // real inbox/channels (81 phantom entries taught us this). Suites that
   // genuinely test delivery mock this module or set the override.
-  if (process.env.VITEST && process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS !== '1') {
+  if (process.env.VITEST && getRegisteredEnvText('KYBERION_ALLOW_TEST_NOTIFICATIONS') !== '1') {
     return false;
   }
   try {

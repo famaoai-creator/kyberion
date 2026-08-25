@@ -45,3 +45,17 @@ export function getRegisteredEnvText(name: string): string | undefined {
   if (value === undefined) return undefined;
   return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
 }
+
+/**
+ * Set or clear a registered environment value at an explicit boundary.
+ * Runtime callers use this for scoped setup/restore; reads stay on the
+ * validated accessors above so direct KYBERION env access cannot spread.
+ */
+export function setRegisteredEnv(
+  name: string,
+  value: string | undefined,
+  env: Record<string, string | undefined> = process.env
+): void {
+  if (value === undefined) delete env[name];
+  else env[name] = value;
+}

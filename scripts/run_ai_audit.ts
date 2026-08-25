@@ -37,6 +37,7 @@ import {
   safeWriteFile,
   TraceContext,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export const AI_AUDIT_CASES_SCHEMA = z.object({
   cases: z
@@ -298,7 +299,7 @@ async function mapWithConcurrency<T, R>(
  * stub-env runs (and hermetic tests) never touch provider discovery.
  */
 export function detectBackendMode(): { mode: string | null; nonStub: boolean } {
-  if (process.env.KYBERION_REASONING_BACKEND === 'stub') {
+  if (getRegisteredEnvText('KYBERION_REASONING_BACKEND') === 'stub') {
     return { mode: 'stub', nonStub: false };
   }
   const nonStub = installReasoningBackends();

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
 
@@ -29,7 +30,9 @@ let cachedServicePresetsDir: string | null = null;
 let cachedServicePresets: ServicePresetsCatalog | null = null;
 
 function getServicePresetsDir(): string {
-  return process.env.KYBERION_SERVICE_PRESETS_DIR?.trim() || DEFAULT_SERVICE_PRESETS_DIR;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_PRESETS_DIR')?.trim() || DEFAULT_SERVICE_PRESETS_DIR
+  );
 }
 
 function loadPresetFromPath(presetPath: string): ServicePresetRecord {

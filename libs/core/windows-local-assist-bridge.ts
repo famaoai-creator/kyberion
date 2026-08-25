@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExecResult } from './secure-io.js';
 
 /** Availability of the optional Windows local-LLM assist adapter. */
@@ -21,17 +22,17 @@ const AVAILABILITY_TTL_MS = 60_000;
 let cached: { checkedAt: number; value: WindowsLocalAssistAvailability } | null = null;
 
 function disabledByEnv(): boolean {
-  const value = String(process.env.KYBERION_WINDOWS_AI || '').toLowerCase();
+  const value = String(getRegisteredEnvText('KYBERION_WINDOWS_AI') || '').toLowerCase();
   return value === '0' || value === 'false' || value === 'off';
 }
 
 function configuredEndpoint(): string | null {
-  const explicit = process.env.KYBERION_WINDOWS_AI_ENDPOINT;
+  const explicit = getRegisteredEnvText('KYBERION_WINDOWS_AI_ENDPOINT');
   return explicit ? explicit.replace(/\/$/, '') : null;
 }
 
 function configuredModel(): string {
-  return process.env.KYBERION_WINDOWS_AI_MODEL || DEFAULT_MODEL;
+  return getRegisteredEnvText('KYBERION_WINDOWS_AI_MODEL') || DEFAULT_MODEL;
 }
 
 async function requestJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {

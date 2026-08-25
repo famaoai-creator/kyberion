@@ -1,4 +1,5 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -78,7 +79,7 @@ function normalizeTenantId(tenantId: string): string {
 }
 
 function meshHubRuntimeRoot(tenantId: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const baseRoot = getRegisteredEnvText('KYBERION_MESH_HUB_RUNTIME_ROOT') || DEFAULT_RUNTIME_ROOT;
   return `${baseRoot}/tenants/${normalizeTenantId(tenantId)}`;
 }
 

@@ -18,6 +18,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeAppendFileSync,
@@ -62,7 +63,7 @@ export function resetConfiguredPostureCache(): void {
 }
 
 export function resolveConfiguredPosture(): SecurityPosture {
-  const envValue = process.env.KYBERION_SECURITY_POSTURE?.trim();
+  const envValue = getRegisteredEnvText('KYBERION_SECURITY_POSTURE')?.trim();
   const fromEnv = parsePosture(envValue);
   if (fromEnv) return fromEnv;
   if (envValue) {
@@ -274,7 +275,8 @@ export interface QuarantineRecord {
 
 function quarantineDir(): string {
   return (
-    process.env.KYBERION_SECURITY_QUARANTINE_DIR?.trim() || pathResolver.shared('runtime/security')
+    getRegisteredEnvText('KYBERION_SECURITY_QUARANTINE_DIR')?.trim() ||
+    pathResolver.shared('runtime/security')
   );
 }
 
@@ -291,7 +293,7 @@ export const MAX_QUARANTINE_CONTENT_CHARS = 32_000;
 const DEFAULT_MAX_QUARANTINE_FILE_BYTES = 5 * 1024 * 1024;
 
 function maxQuarantineFileBytes(): number {
-  const fromEnv = Number(process.env.KYBERION_SECURITY_QUARANTINE_MAX_BYTES);
+  const fromEnv = Number(getRegisteredEnvText('KYBERION_SECURITY_QUARANTINE_MAX_BYTES'));
   return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_MAX_QUARANTINE_FILE_BYTES;
 }
 

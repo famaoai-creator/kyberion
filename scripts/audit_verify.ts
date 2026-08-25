@@ -8,6 +8,7 @@ import {
   formatAuditVerifyReport,
   type AuditVerifyCliReport,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
   // KYBERION_AUDIT_CONTINUITY_ENFORCE=true (or drop --warn-only) to enforce.
   const warnOnly =
     (argv.warnOnly || hasArg('--warn-only')) &&
-    process.env.KYBERION_AUDIT_CONTINUITY_ENFORCE !== 'true';
+    getRegisteredEnvText('KYBERION_AUDIT_CONTINUITY_ENFORCE') !== 'true';
   if (!report.ok && warnOnly) {
     console.warn(
       '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'

@@ -73,6 +73,7 @@ import {
 } from '@agent/core';
 import { validateThemeContrast } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   distillPdfDesign,
   extractPptxSlides,
@@ -1791,8 +1792,10 @@ const PDF_PYPDF_OPS = new Set([
 ]);
 
 function resolvePdfBridgePythonBin(): string {
-  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
-  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const configuredPythonBin = getRegisteredEnvText('KYBERION_PYTHON_BIN');
+  if (configuredPythonBin) return configuredPythonBin;
+  const configuredPython = getRegisteredEnvText('KYBERION_PYTHON');
+  if (configuredPython) return configuredPython;
   const legacyVenvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(legacyVenvPython)) return legacyVenvPython;
   return 'python3';

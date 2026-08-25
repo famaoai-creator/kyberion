@@ -3,6 +3,7 @@ import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
 import {
   isInstanceDemoted,
@@ -57,7 +58,9 @@ interface PinFile {
 const PIN_FILE_VERSION = '1.0';
 
 function actorId(): string {
-  return process.env.KYBERION_PERSONA || process.env.MISSION_ROLE || 'capability-broker';
+  return (
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'capability-broker'
+  );
 }
 
 /**

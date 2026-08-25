@@ -1,4 +1,4 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
+import { loadJson, logger, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
@@ -6,11 +6,7 @@ import { handleAction } from './wisdom-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
-  const schema = JSON.parse(
-    safeReadFile(pathResolver.rootResolve('schemas/wisdom-action.schema.json'), {
-      encoding: 'utf8',
-    }) as string
-  ) as object;
+  const schema = loadJson<object>(pathResolver.rootResolve('schemas/wisdom-action.schema.json'));
   await runActuatorCli({
     name: 'wisdom-actuator',
     handleAction,

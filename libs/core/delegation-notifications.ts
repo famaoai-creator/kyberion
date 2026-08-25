@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 import {
@@ -57,7 +58,7 @@ export interface DelegationNotificationFilter {
 // Tests namespace the queue via KYBERION_DELEGATION_NOTIFICATIONS_PATH so
 // parallel suites never clobber the real queue file (resolved lazily per call).
 function resolveQueuePath(): string {
-  const override = process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_NOTIFICATIONS_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('runtime/delegations/notifications.jsonl');
 }

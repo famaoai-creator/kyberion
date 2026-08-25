@@ -48,6 +48,7 @@ import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
 import { resolveTenant } from './tenant-registry.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -77,7 +78,9 @@ let cachedPolicyPath: string | null = null;
 let cachedResult: PolicyLoadResult | null = null;
 
 function policyPath(): string {
-  return process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_PROVIDER_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
+  );
 }
 
 function ensureValidator(): ValidateFunction {

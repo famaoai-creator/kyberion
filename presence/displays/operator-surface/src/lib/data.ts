@@ -36,6 +36,7 @@ import {
   type SurfaceLauncherRecommendation,
 } from '@agent/core';
 import { logger } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export {
   getSurfaceDirectory,
@@ -53,7 +54,7 @@ export type {
 };
 
 export function getTenantScope(): string | undefined {
-  const slug = (process.env.KYBERION_TENANT || '').trim();
+  const slug = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   if (!slug) return undefined;
   return isValidTenantSlug(slug) ? slug : undefined;
 }
@@ -66,7 +67,7 @@ export function getTenantScope(): string | undefined {
  */
 export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
   const tenant = getTenantScope();
-  const configuredPrincipal = (process.env.KYBERION_MOS_PRINCIPAL || '').trim();
+  const configuredPrincipal = (getRegisteredEnvText('KYBERION_MOS_PRINCIPAL') || '').trim();
   if (tenant && !configuredPrincipal) {
     throw new Error(
       '[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL is required for tenant-scoped OS projection'
@@ -88,7 +89,7 @@ export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurface
 }
 
 export function getGuardedSurfaceUrl(): string | undefined {
-  const configured = (process.env.KYBERION_OS_GUARDED_SURFACE_URL || '').trim();
+  const configured = (getRegisteredEnvText('KYBERION_OS_GUARDED_SURFACE_URL') || '').trim();
   if (!configured) return undefined;
   try {
     const url = new URL(configured);

@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -1734,9 +1735,10 @@ function loadPasskeyProviderCatalog(): {
   );
   if (safeExistsSync(passkeyProviderCatalogPath)) {
     try {
-      const parsed = JSON.parse(
-        safeReadFile(passkeyProviderCatalogPath, { encoding: 'utf8' }) as string
-      );
+      const parsed = loadJson<{
+        default_provider?: string;
+        providers: Record<string, any>;
+      }>(passkeyProviderCatalogPath);
       if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
     } catch (err) {
       logger.warn(

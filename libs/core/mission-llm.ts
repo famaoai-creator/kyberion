@@ -6,6 +6,7 @@
 import { z, type ZodType } from 'zod';
 import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeExec } from './secure-io.js';
 import { runCodexCliQuery } from './codex-cli-query.js';
@@ -185,7 +186,7 @@ export function invokeShellProfile(prompt: string, profile: LlmProfile): string 
 function resolveCandidateProfileNames(purpose: string, policy?: LlmPolicyConfig): string[] {
   const purposeMap = policy?.purpose_map || {};
   const defaultName = policy?.default_profile || 'standard';
-  const overrideProfile = process.env.KYBERION_WISDOM_LLM_PROFILE?.trim();
+  const overrideProfile = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim();
   if (overrideProfile === 'stub') return ['stub'];
   const targetName = overrideProfile || purposeMap[purpose] || defaultName;
   const profiles = Object.keys(policy?.profiles || {});
@@ -205,7 +206,7 @@ export function inspectLlmResolution(
   const profiles = policy?.profiles || {};
   const checkedProfiles: LlmResolutionStatus['checkedProfiles'] = [];
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
-  const forceStubMode = process.env.KYBERION_WISDOM_LLM_PROFILE?.trim() === 'stub';
+  const forceStubMode = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
 
   for (const name of candidateNames) {
     if (name === 'stub') {

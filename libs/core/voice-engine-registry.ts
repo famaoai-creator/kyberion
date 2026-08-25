@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
@@ -69,11 +70,13 @@ let cachedRegistryDir: string | null = null;
 let cachedRegistry: VoiceEngineRegistry | null = null;
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  );
 }
 
 function getRegistryDir(): string {
-  return process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR?.trim() || DEFAULT_REGISTRY_DIR;
+  return getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
 }
 
 function loadRegistryFromPath(registryPath: string): VoiceEngineRegistry {

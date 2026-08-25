@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   buildBackgroundReviewPrompt,
   evaluateBackgroundReviewText,
@@ -450,7 +451,7 @@ export async function runBackgroundReviewFork(
     const raw = await withReasoningPayloadScope(
       {
         tier: input.missionId ? 'confidential' : 'personal',
-        tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+        tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
         purpose: 'background review snapshot',
       },
       async () => {

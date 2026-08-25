@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getProcessEnv } from './foundation/process-env.js';
 
 /**
  * Minimal low-level filesystem helpers for foundational modules that cannot
@@ -14,7 +15,7 @@ function foundationRoot(): string {
   // Keep in lockstep with path-resolver's findProjectRoot: an explicit
   // KYBERION_ROOT override wins, so governed writes resolve against the same
   // root the resolver produced paths from (test roots, sub-dir execution).
-  const envRoot = process.env.KYBERION_ROOT;
+  const envRoot = getProcessEnv('KYBERION_ROOT');
   if (envRoot && fs.existsSync(path.join(envRoot, 'package.json'))) {
     return path.resolve(envRoot);
   }

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { installProcessGuards } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -674,8 +675,7 @@ export async function handleTelegramUpdate(
 
 async function handleInputFile(inputPath: string, options: TelegramBridgeOptions): Promise<void> {
   const resolved = pathResolver.rootResolve(inputPath);
-  const parsed = JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as
-    TelegramBridgeInput | TelegramUpdate;
+  const parsed = readJson<TelegramBridgeInput | TelegramUpdate>(resolved);
 
   if ('action' in parsed && parsed.action === 'send') {
     const payload = await sendTelegramMessage(

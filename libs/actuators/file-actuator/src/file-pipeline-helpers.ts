@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -89,12 +90,7 @@ async function executePipeline(
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };

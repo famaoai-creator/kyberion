@@ -52,7 +52,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { compileSchema } from '@agent/core/foundation';
+import { compileSchema, getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -1112,11 +1112,15 @@ async function verifyTtsLoopback(
   const configuredSttBridge = stringParam(params, 'stt_bridge_id');
   const sttBridgeId =
     configuredSttBridge ||
-    (process.platform === 'win32' && process.env.KYBERION_WINDOWS_STT_BACKEND === 'faster_whisper'
+    (process.platform === 'win32' &&
+    getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper'
       ? 'faster_whisper'
       : undefined);
   registerVoiceLoopbackSttAdapter(sttBridgeId, { request_id: requestId, language });
-  if (sttBridgeId === 'shell' || process.env.KYBERION_STREAMING_STT_BRIDGE === 'shell') {
+  if (
+    sttBridgeId === 'shell' ||
+    getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') === 'shell'
+  ) {
     const installation = installShellStreamingSttBridgeFromEnv();
     if (!installation.installed) {
       throw new Error(`streaming STT shell bridge unavailable: ${installation.reason}`);

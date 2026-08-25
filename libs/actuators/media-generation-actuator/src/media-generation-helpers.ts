@@ -17,6 +17,7 @@ import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { GenerationJob } from '@agent/core';
@@ -61,7 +62,7 @@ export type GenerationBackend = {
 
 // External, operator-configured ComfyUI output dir; KYBERION_COMFY_OUTPUT_DIR overrides this default.
 const DEFAULT_COMFY_OUTPUT_DIR =
-  process.env.KYBERION_COMFY_OUTPUT_DIR || pathResolver.sharedTmp('comfy/output');
+  getRegisteredEnvText('KYBERION_COMFY_OUTPUT_DIR') || pathResolver.sharedTmp('comfy/output');
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/media-generation-actuator/manifest.json'

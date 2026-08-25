@@ -1,9 +1,11 @@
 import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
 import { createAjv } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import { type PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
 
 export interface PresentationPreferenceRegistry {
@@ -79,9 +81,7 @@ function errorsFrom(validate: ValidateFunction): string[] {
 }
 
 function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegistry {
-  const parsed = JSON.parse(
-    safeReadFile(registryPath, { encoding: 'utf8' }) as string
-  ) as PresentationPreferenceRegistry;
+  const parsed = readJson<PresentationPreferenceRegistry>(registryPath);
   const validate = ensureRegistryValidator();
   if (!validate(parsed)) {
     throw new Error(
@@ -93,14 +93,15 @@ function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegis
 
 function getRegistryPath(): string {
   return (
-    process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH
+    getRegisteredEnvText('KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
+    DEFAULT_REGISTRY_PATH
   );
 }
 
 function getPersonalOverlayPath(): string | null {
-  if (process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim()) return null;
   return (
-    process.env.KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH
   );
 }
@@ -128,7 +129,7 @@ export function getPresentationPreferenceRegistryPath(): string {
 
 export function getPersonalPresentationPreferenceRegistryPath(): string {
   return (
-    process.env.KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH
   );
 }

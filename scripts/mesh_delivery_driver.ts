@@ -15,6 +15,7 @@ import {
   type MeshDeliveryPassReport,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
 
@@ -56,14 +57,14 @@ async function main(): Promise<void> {
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const senderPeerId = (process.env.KYBERION_MESH_PEER_ID || '').trim();
+  const senderPeerId = (getRegisteredEnvText('KYBERION_MESH_PEER_ID') || '').trim();
   if (!senderPeerId) {
     logger.error(
       "[mesh-delivery] KYBERION_MESH_PEER_ID is not set. Set it to this host's peer id from the peer network catalog."
     );
     process.exit(2);
   }
-  const sharedSecret = process.env.KYBERION_MESH_SHARED_SECRET || undefined;
+  const sharedSecret = getRegisteredEnvText('KYBERION_MESH_SHARED_SECRET') || undefined;
 
   const locked = await acquireLock(DRIVER_LOCK_ID, 1000);
   if (!locked) {

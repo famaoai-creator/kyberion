@@ -16,6 +16,7 @@ import {
   type OpsAlertInput,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type HealthRow = {
   tenant_slug: string;
@@ -86,7 +87,7 @@ function legacyQuarantineTtlDays(): number {
 }
 
 function healthHistoryPath(): string {
-  const override = process.env.KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH')?.trim();
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('runtime/feedback-loop/knowledge-scope-health.json');

@@ -125,9 +125,7 @@ export async function executePipeline(
   let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(
-      safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string
-    );
+    const saved = loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path));
     ctx = { ...ctx, ...saved };
   }
 
@@ -224,10 +222,8 @@ async function opCapture(op: string, params: any, ctx: any) {
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: JSON.parse(
-          safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), {
-            encoding: 'utf8',
-          }) as string
+        [params.export_as || 'last_capture_data']: loadJson<unknown>(
+          path.resolve(rootDir, resolveVars(params.path, ctx))
         ),
       };
     case 'read_file':

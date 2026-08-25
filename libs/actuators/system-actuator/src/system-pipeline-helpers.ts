@@ -58,6 +58,7 @@ import {
   runTaskModelRoutingSummary,
   macosAutomationBridge,
 } from '@agent/core';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
@@ -103,8 +104,10 @@ import * as visionJudge from '@agent/shared-vision';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
-const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+const ALLOW_UNSAFE_SHELL =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
+const ALLOW_UNSAFE_JS =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_JS', { defaultValue: false }) === true;
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/system-actuator/manifest.json'
@@ -790,10 +793,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: JSON.parse(
-          safeReadFile(pathResolver.rootResolve(resolve(params.path)), {
-            encoding: 'utf8',
-          }) as string
+        [params.export_as || 'last_capture_data']: loadJson<unknown>(
+          pathResolver.rootResolve(resolve(params.path))
         ),
       };
     case 'probe': {
@@ -1787,9 +1788,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(
-      safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string
-    );
+    const saved = loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path));
     ctx = { ...ctx, ...saved };
   }
 

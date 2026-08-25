@@ -47,6 +47,7 @@ import {
   isValidTenantSlug,
   readCanonicalWorkGraph,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -327,7 +328,7 @@ function missionMatchesTenant(
 
 export function collectOfficeSnapshot(): OfficeSnapshot {
   const customerSlug = customerResolver.activeCustomer();
-  const requestedTenantSlug = normalizeTenantSlug(process.env.KYBERION_TENANT);
+  const requestedTenantSlug = normalizeTenantSlug(getRegisteredEnvText('KYBERION_TENANT'));
   const rootDir = pathResolver.rootDir();
   let tenantRegistryReadable = true;
   const tenantProfiles = (() => {

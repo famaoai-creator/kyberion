@@ -24,6 +24,7 @@ import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import {
   registerStreamingSttBridge,
@@ -184,9 +185,9 @@ export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): 
  * `KYBERION_STT_ARGS`, comma-separated) under the bridge id `shell`.
  */
 export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; reason?: string } {
-  const command = process.env.KYBERION_STT_COMMAND;
+  const command = getRegisteredEnvText('KYBERION_STT_COMMAND');
   if (!command) return { installed: false, reason: 'KYBERION_STT_COMMAND not set' };
-  const args = (process.env.KYBERION_STT_ARGS ?? '')
+  const args = (getRegisteredEnvText('KYBERION_STT_ARGS') ?? '')
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean);

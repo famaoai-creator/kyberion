@@ -18,6 +18,7 @@ import {
   tenantProfilePath,
 } from '@agent/core';
 import { applyOnboardingContextBinding, writeTenantProfile } from '@agent/core';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
@@ -217,8 +218,8 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     );
     let contextBindingPath: string | undefined;
     if (normalized.tenantSlug) {
-      const previousCustomer = process.env.KYBERION_CUSTOMER;
-      process.env.KYBERION_CUSTOMER = normalized.slug;
+      const previousCustomer = getRegisteredEnvText('KYBERION_CUSTOMER');
+      setRegisteredEnv('KYBERION_CUSTOMER', normalized.slug);
       const tenantPath = tenantProfilePath(normalized.tenantSlug, {
         rootDir,
         env: { ...process.env, KYBERION_CUSTOMER: normalized.slug },
@@ -267,8 +268,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         else safeWriteFile(tenantPath, previousTenantProfile, { encoding: 'utf8' });
         throw error;
       } finally {
-        if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-        else process.env.KYBERION_CUSTOMER = previousCustomer;
+        setRegisteredEnv('KYBERION_CUSTOMER', previousCustomer);
       }
     }
     return {

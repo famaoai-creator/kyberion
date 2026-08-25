@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
@@ -189,9 +189,7 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 function loadPolicyFile(): QuestionResolutionPolicyFile {
-  const parsed = JSON.parse(
-    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as QuestionResolutionPolicyFile;
+  const parsed = readJson<QuestionResolutionPolicyFile>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -351,25 +349,15 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
 }
 
 function getMeetingProfileFallback(): any {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  ) as any;
+  return readJson<any>(
+    pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json')
+  );
 }
 
 function getNarratedVideoProfileFallback(): any {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  ) as any;
+  return readJson<any>(
+    pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json')
+  );
 }
 
 export function resolveQuestionResolution(input: ResolveQuestionInput): QuestionResolutionResult {

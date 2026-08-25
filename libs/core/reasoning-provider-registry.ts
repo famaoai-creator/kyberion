@@ -13,7 +13,8 @@ import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
 import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 import { assertModuleInvariant } from './invariants.js';
 
 export interface ReasoningProviderCapabilities {
@@ -235,9 +236,7 @@ function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
   let parsed: RegistryFile;
   try {
-    parsed = JSON.parse(
-      safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string
-    ) as RegistryFile;
+    parsed = readJson<RegistryFile>(REGISTRY_PATH);
   } catch (error) {
     throw new Error(
       `Invalid reasoning provider registry at ${REGISTRY_PATH}: ${

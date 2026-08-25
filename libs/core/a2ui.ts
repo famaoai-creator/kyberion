@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
 
 /**
@@ -190,7 +191,8 @@ export const a2uiDispatcher = new A2UIDispatcher();
  * Bridge HTTP transport: forwards A2UI messages to the Bridge SSE relay.
  */
 function createBridgeTransport(
-  bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031,http://127.0.0.1:3040'
+  bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') ||
+    'http://127.0.0.1:3031,http://127.0.0.1:3040'
 ): A2UITransport {
   const targets = bridgeUrl
     .split(',')

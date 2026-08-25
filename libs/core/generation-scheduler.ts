@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readJson } from './foundation/json.js';
 import {
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -204,9 +204,7 @@ export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): 
 }
 
 export function readGenerationSchedule(logicalPath: string): GenerationSchedule {
-  const schedule = JSON.parse(
-    safeReadFile(logicalPath, { encoding: 'utf8' }) as string
-  ) as GenerationSchedule;
+  const schedule = readJson<GenerationSchedule>(logicalPath);
   return normalizeGenerationSchedule(schedule);
 }
 

@@ -21,7 +21,7 @@ export function recordTelemetryEvent(event: TelemetryEvent): void {
 }
 
 export function isTelemetryEnabled(): boolean {
-  return process.env.KYBERION_TELEMETRY === '1';
+  return getRegisteredEnvText('KYBERION_TELEMETRY') === '1';
 }
 
 export function readTelemetryStats(): TelemetryStats {
@@ -30,3 +30,4 @@ export function readTelemetryStats(): TelemetryStats {
     eventCount: telemetryEvents.length,
   };
 }
+import { getRegisteredEnvText } from './foundation/env.js';

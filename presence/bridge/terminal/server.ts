@@ -21,6 +21,7 @@ import {
   safeReaddir,
   safeAppendFileSync,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   buildSessionPaths,
   listPersistedSessionStates,
@@ -43,14 +44,16 @@ const wss = new WebSocketServer({ server });
 const ROOT_DIR = pathResolver.rootDir();
 const GLOBAL_STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
-const TERMINAL_TOKEN = process.env.KYBERION_TERMINAL_TOKEN || process.env.KYBERION_API_TOKEN;
-const ALLOW_REMOTE = process.env.KYBERION_TERMINAL_ALLOW_REMOTE === 'true';
+const TERMINAL_TOKEN =
+  getRegisteredEnvText('KYBERION_TERMINAL_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');
+const ALLOW_REMOTE = getRegisteredEnvText('KYBERION_TERMINAL_ALLOW_REMOTE') === 'true';
 const DISCONNECT_TIMEOUT_MS = Number(
-  process.env.KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS || 5 * 60 * 1000
+  getRegisteredEnvText('KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS') || 5 * 60 * 1000
 );
-const RESTORE_RUNTIME_ON_BOOT = process.env.KYBERION_TERMINAL_RESTORE_RUNTIME === 'true';
+const RESTORE_RUNTIME_ON_BOOT =
+  getRegisteredEnvText('KYBERION_TERMINAL_RESTORE_RUNTIME') === 'true';
 const SESSION_RETENTION_MS = Number(
-  process.env.KYBERION_TERMINAL_SESSION_RETENTION_MS || 7 * 24 * 60 * 60 * 1000
+  getRegisteredEnvText('KYBERION_TERMINAL_SESSION_RETENTION_MS') || 7 * 24 * 60 * 60 * 1000
 );
 
 interface Session {
@@ -609,7 +612,7 @@ app.post('/sessions', (req, res) => {
 });
 
 const PORT = Number(process.env.TERMINAL_PORT || 4000);
-const HOST = process.env.KYBERION_TERMINAL_HOST || '127.0.0.1';
+const HOST = getRegisteredEnvText('KYBERION_TERMINAL_HOST') || '127.0.0.1';
 server.listen(PORT, HOST, () => {
   logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`);
 

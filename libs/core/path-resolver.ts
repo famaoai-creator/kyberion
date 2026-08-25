@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { getProcessEnv } from './foundation/process-env.js';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)
@@ -9,7 +10,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 
 function findProjectRoot(startDir: string): string {
   // (d) Explicit override wins — robust for sub-directory / non-standard cwd execution.
-  const envRoot = process.env.KYBERION_ROOT;
+  const envRoot = getProcessEnv('KYBERION_ROOT');
   if (envRoot && rawExistsSync(path.join(envRoot, 'package.json'))) {
     return path.resolve(envRoot);
   }
@@ -397,7 +398,7 @@ export function tenantMissionDir(
 }
 
 function currentTenantSlug(): string | undefined {
-  const value = String(process.env.KYBERION_TENANT || '')
+  const value = String(getProcessEnv('KYBERION_TENANT') || '')
     .trim()
     .toLowerCase();
   return isValidTenantSlug(value) ? value : undefined;

@@ -26,7 +26,7 @@ import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -1061,9 +1061,9 @@ async function delegateSubagentTask(input: {
   };
 
   const wantsFiles = workItemExpectsFiles(input.item);
-  const previousTools = process.env.KYBERION_CLAUDE_AGENT_TOOLS;
+  const previousTools = getRegisteredEnvText('KYBERION_CLAUDE_AGENT_TOOLS');
   if (wantsFiles && previousTools === undefined) {
-    process.env.KYBERION_CLAUDE_AGENT_TOOLS = '1';
+    setRegisteredEnv('KYBERION_CLAUDE_AGENT_TOOLS', '1');
     input.notes.push('agentic tools auto-enabled (work item expects file output)');
   }
   try {
@@ -1099,7 +1099,7 @@ async function delegateSubagentTask(input: {
     };
   } finally {
     if (wantsFiles && previousTools === undefined) {
-      delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;
+      setRegisteredEnv('KYBERION_CLAUDE_AGENT_TOOLS', previousTools);
     }
   }
 }

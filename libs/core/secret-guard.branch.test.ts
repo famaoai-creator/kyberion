@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./secure-io.js', () => ({
   withSensitivePathMediation: <T>(fn: () => T) => fn(),
   safeReadFile: mocks.safeReadFile,
+  loadJson: <T>(filePath: string) =>
+    JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
   safeWriteFile: mocks.safeWriteFile,
   safeReaddir: mocks.safeReaddir,
   safeStat: mocks.safeStat,

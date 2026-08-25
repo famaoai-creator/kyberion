@@ -38,6 +38,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
@@ -105,8 +106,10 @@ export {
  * Strictly compliant with Layer 2 (Shield).
  * Standardized with Control Flow (if/while) and Safety Guards.
  */
-const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
-const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+const ALLOW_UNSAFE_SHELL =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
+const ALLOW_UNSAFE_JS =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_JS', { defaultValue: false }) === true;
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
 const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(

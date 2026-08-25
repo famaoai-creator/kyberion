@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards, slugify } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
@@ -128,8 +129,10 @@ interface VoiceHubRecord {
 }
 
 function resolveVoiceHubPythonBin(): string {
-  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
-  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const configuredPythonBin = getRegisteredEnvText('KYBERION_PYTHON_BIN');
+  if (configuredPythonBin) return configuredPythonBin;
+  const configuredPython = getRegisteredEnvText('KYBERION_PYTHON');
+  if (configuredPython) return configuredPython;
   const managedWhisperPython = resolveManagedToolPythonBin('mlx_whisper');
   if (managedWhisperPython) return managedWhisperPython;
   const managedAudioPython = resolveManagedToolPythonBin('mlx_audio');
@@ -1977,7 +1980,7 @@ async function tryBuildWebSearchReply(userText: string): Promise<string | null> 
 function loadBrowserRuntimeSessionForVoiceHub(sessionId: string): Record<string, any> | null {
   const filePath = pathResolver.shared(`runtime/browser/sessions/${sessionId}.json`);
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<string, any>;
+  return readJson<Record<string, any>>(filePath);
 }
 
 function listBrowserRuntimeSessionsForVoiceHub(): Array<Record<string, any>> {
@@ -2750,7 +2753,9 @@ function resolvePreferredLocale(input: {
   const projectLocale = String(input.project?.primary_locale || '').trim();
   if (projectLocale) return projectLocale;
   return String(
-    process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US'
+    getRegisteredEnvText('KYBERION_DEFAULT_LOCALE') ||
+      Intl.DateTimeFormat().resolvedOptions().locale ||
+      'en-US'
   );
 }
 
@@ -3490,7 +3495,9 @@ function tryHandleProjectBootstrap(userText: string): string | null {
   const trackId = inferDefaultTrackId(projectId);
   const trackName = inferDefaultTrackNameFromProjectName(projectName);
   const projectLocale = String(
-    process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US'
+    getRegisteredEnvText('KYBERION_DEFAULT_LOCALE') ||
+      Intl.DateTimeFormat().resolvedOptions().locale ||
+      'en-US'
   );
   const projectRootPath = inferProjectRootPath(projectId, projectName);
   if (!safeExistsSync(projectRootPath)) {

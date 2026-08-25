@@ -31,6 +31,7 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
 
 // ---------------------------------------------------------------------------
@@ -286,7 +287,8 @@ function cmdCreate(argv: string[]): void {
     change_id: instanceId,
     scope: scopeInput,
     target_kind: targetKind,
-    requested_by: getOption(argv, '--requested-by') || process.env.KYBERION_PERSONA || 'operator',
+    requested_by:
+      getOption(argv, '--requested-by') || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
     nhi_id: getOption(argv, '--nhi-id'),
     risk,
     before_hash: getOption(argv, '--before-hash'),
@@ -317,7 +319,7 @@ function cmdCreate(argv: string[]): void {
   safeWriteFile(briefPath(tenant, instanceId), JSON.stringify(brief, null, 2));
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'config_mission.create',
     operation: `${presetId}/${instanceId}`,
     result: 'completed',
@@ -348,9 +350,7 @@ function cmdRequestApproval(argv: string[]): void {
   if (!id) throw new Error('--id is required');
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
-  const brief = JSON.parse(
-    safeReadFile(bPath, { encoding: 'utf8' }) as string
-  ) as ConfigMissionBrief;
+  const brief = readJson<ConfigMissionBrief>(bPath);
   const existing = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
@@ -493,7 +493,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'completed',
@@ -521,7 +521,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'failed',

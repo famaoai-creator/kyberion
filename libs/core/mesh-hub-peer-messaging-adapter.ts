@@ -1,4 +1,5 @@
 import * as crypto from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -101,14 +102,15 @@ function normalizeTenantId(tenantId: string): string {
 }
 
 function meshHubRuntimeRoot(namespace: string | undefined, tenantId: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const baseRoot = getRegisteredEnvText('KYBERION_MESH_HUB_RUNTIME_ROOT') || DEFAULT_RUNTIME_ROOT;
   const suffix = normalizeNamespace(namespace);
   const namespaceRoot = suffix ? `${baseRoot}/${suffix}` : baseRoot;
   return `${namespaceRoot}/tenants/${normalizeTenantId(tenantId)}`;
 }
 
 function meshHubObservabilityRoot(namespace: string | undefined, tenantId: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
+  const baseRoot =
+    getRegisteredEnvText('KYBERION_MESH_HUB_OBSERVABILITY_ROOT') || DEFAULT_OBSERVABILITY_ROOT;
   const suffix = normalizeNamespace(namespace);
   const namespaceRoot = suffix ? `${baseRoot}/${suffix}` : baseRoot;
   return `${namespaceRoot}/tenants/${normalizeTenantId(tenantId)}`;
@@ -520,9 +522,10 @@ export function createMeshHubPeerMessagingAdapter(
 
 export function clearMeshHubPeerMessagingAdapterNamespace(namespace?: string): void {
   const normalized = normalizeNamespace(namespace);
-  const runtimeBase = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const runtimeBase =
+    getRegisteredEnvText('KYBERION_MESH_HUB_RUNTIME_ROOT') || DEFAULT_RUNTIME_ROOT;
   const observabilityBase =
-    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
+    getRegisteredEnvText('KYBERION_MESH_HUB_OBSERVABILITY_ROOT') || DEFAULT_OBSERVABILITY_ROOT;
   const root = normalized ? `${runtimeBase}/${normalized}` : runtimeBase;
   const obsRoot = normalized ? `${observabilityBase}/${normalized}` : observabilityBase;
   withExecutionContext(DEFAULT_WRITER_ROLE, () => {

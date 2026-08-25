@@ -20,7 +20,7 @@ import {
   resolveOperatorLocale,
   isValidTenantSlug,
 } from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
+import { createAjv, setRegisteredEnv } from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -416,7 +416,7 @@ export async function main() {
     .parse();
 
   process.env.MISSION_ROLE = 'sovereign_concierge';
-  process.env.KYBERION_PERSONA = 'sovereign';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 
   const input = await readInput(argv.identity as string | undefined);
   validateInput(input);
@@ -436,7 +436,7 @@ export async function main() {
   const now = new Date().toISOString();
   const persona = resolveInputPersona(input);
   const personaEnvPath = persistPersona(persona);
-  process.env.KYBERION_PERSONA = persona;
+  setRegisteredEnv('KYBERION_PERSONA', persona);
   console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
   await applyIdentity(input, now);
   const tenantEntries = await applyTenants(input, now);
@@ -448,7 +448,7 @@ export async function main() {
     const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
     if (backend) {
       const envLocal = persistReasoningBackend(backend);
-      process.env.KYBERION_REASONING_BACKEND = backend;
+      setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
       console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
     }
   }

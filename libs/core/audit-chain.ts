@@ -11,6 +11,7 @@ import {
 } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { rootDir } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 import {
@@ -526,7 +527,8 @@ function resolveAuditScope(
     return normalizeEventScope({
       ...(scope || {}),
       ...(tenantSlug && !scope?.tenant_slug ? { tenant_slug: tenantSlug } : {}),
-      tier: scope?.tier || (process.env.KYBERION_TIER as EventScope['tier']) || 'public',
+      tier:
+        scope?.tier || (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public',
     });
   } catch {
     return undefined;
@@ -551,7 +553,7 @@ function scopeForAuditEntry(entry: AuditEntry): EventScope | null | undefined {
  * and dependency-free to avoid circular imports with `authority.ts`.
  */
 function resolveCurrentTenantSlug(): string | undefined {
-  const fromEnv = (process.env.KYBERION_TENANT || '').trim();
+  const fromEnv = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   // A tier name is syntactically a valid slug, so the shape check alone lets
   // `KYBERION_TENANT=public` through and taints every audit entry it stamps.
   if (fromEnv && isValidTenantSlug(fromEnv)) {

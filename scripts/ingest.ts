@@ -35,6 +35,7 @@ import {
   safeExistsSync,
   scanContent,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   commitIngest,
   dedupContent,
@@ -217,7 +218,7 @@ function resolveFormat(args: CliArgs, filePath: string): IngestFormat {
 function resolveIdentity(args: CliArgs): string {
   const explicit = String(args.ingestedBy || '').trim();
   if (explicit) return explicit;
-  const persona = String(process.env.KYBERION_PERSONA || '').trim();
+  const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
   const role = String(process.env.MISSION_ROLE || '').trim();
   if (role) return role;

@@ -63,6 +63,7 @@ import {
   type PiiScrubApplication,
   type TierPromotionTargetRoot,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { DedupResult, IngestRegistryRecord } from './dedup.js';
 import type { NormalizeCardResult } from './normalize-card.js';
 import type { IngestSourceMeta } from './parse-document.js';
@@ -176,7 +177,7 @@ export function assertTargetInsideTenantRoot(
 function resolveIngestedBy(input: IngestCommitInput): string {
   const explicit = String(input.ingested_by || '').trim();
   if (explicit) return explicit;
-  const persona = String(process.env.KYBERION_PERSONA || '').trim();
+  const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
   const role = String(process.env.MISSION_ROLE || '').trim();
   if (role) return role;

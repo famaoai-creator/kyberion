@@ -32,6 +32,7 @@ import {
   recordProtocolServiceLifecycle,
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type SurfaceAction =
   | 'reconcile'
@@ -179,7 +180,9 @@ function recordProtocolSurfaceLifecycle(
     return;
   }
   if (registryEntry.lifecycle_owner === 'service') return;
-  const tenant = String(process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || '').trim();
+  const tenant = String(
+    getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
+  ).trim();
   try {
     recordProtocolServiceLifecycle({
       serviceId: surfaceId,
@@ -739,7 +742,7 @@ async function enableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = true;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'surface.enable',
       operation: surfaceId,
       result: 'completed',
@@ -762,7 +765,7 @@ async function disableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = false;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'surface.disable',
       operation: surfaceId,
       result: 'completed',
@@ -805,7 +808,7 @@ async function registerSurface(params: {
   saveSurfaceManifest(manifest, params.manifestPath);
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'surface.register',
     operation: params.id,
     result: 'completed',
@@ -827,7 +830,7 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   await stopSurfaceById(surfaceId);
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'surface.unregister',
     operation: surfaceId,
     result: 'completed',

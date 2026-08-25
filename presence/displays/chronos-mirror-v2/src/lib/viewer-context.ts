@@ -14,6 +14,7 @@ import {
   type SurfaceViewerScope,
 } from '@agent/core';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   isChronosLoopbackRequest,
   resolveChronosAccessRole,
@@ -171,7 +172,7 @@ export function authorizeViewerTenant(
   if (!requested || viewer.tenantSlugs === 'all') return requested;
   if (viewer.tenantSlugs.includes(requested)) return requested;
 
-  const mode = process.env.KYBERION_VIEWER_SCOPE || 'warn';
+  const mode = getRegisteredEnvText('KYBERION_VIEWER_SCOPE') || 'warn';
   const reason = `viewer tenant scope denied: ${requested}`;
   if (mode === 'enforce') throw new ViewerContextError(403, reason);
   if (mode === 'warn') {

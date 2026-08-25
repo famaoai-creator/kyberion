@@ -10,6 +10,7 @@ import {
   registerMeshPeer,
   type MeshRequest,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 async function main(): Promise<void> {
   assertProtocolServiceRegistered('peer-messaging');
@@ -21,32 +22,32 @@ async function main(): Promise<void> {
     })
     .option('port', {
       type: 'number',
-      default: Number(process.env.KYBERION_PEER_PORT || 4100),
+      default: Number(getRegisteredEnvText('KYBERION_PEER_PORT') || 4100),
       description: 'HTTP port to bind',
     })
     .option('host', {
       type: 'string',
-      default: process.env.KYBERION_PEER_HOST || '127.0.0.1',
+      default: getRegisteredEnvText('KYBERION_PEER_HOST') || '127.0.0.1',
       description: 'HTTP bind host (use 0.0.0.0 for LAN reachability)',
     })
     .option('shared-secret', {
       type: 'string',
-      default: process.env.KYBERION_PEER_SHARED_SECRET || '',
+      default: getRegisteredEnvText('KYBERION_PEER_SHARED_SECRET') || '',
       description: 'HMAC shared secret used to verify inbound messages',
     })
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: getRegisteredEnvText('KYBERION_TENANT_ID') || '',
       description: 'Enable Mesh presence for this same-tenant peer',
     })
     .option('key-ref', {
       type: 'string',
-      default: process.env.KYBERION_PEER_KEY_REF || 'env:KYBERION_PEER_SHARED_SECRET',
+      default: getRegisteredEnvText('KYBERION_PEER_KEY_REF') || 'env:KYBERION_PEER_SHARED_SECRET',
       description: 'Secret reference recorded in Mesh enrollment (never the secret value)',
     })
     .option('mesh-namespace', {
       type: 'string',
-      default: process.env.KYBERION_MESH_NAMESPACE || '',
+      default: getRegisteredEnvText('KYBERION_MESH_NAMESPACE') || '',
       description: 'Optional isolated Mesh Hub namespace',
     })
     .option('heartbeat-ms', {

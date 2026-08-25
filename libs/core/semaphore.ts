@@ -46,7 +46,8 @@ export class Semaphore {
   }
 }
 
-const parsedLimit = Number.parseInt(process.env.KYBERION_LLM_CONCURRENCY ?? '1', 10);
+const parsedLimit = Number.parseInt(getRegisteredEnvText('KYBERION_LLM_CONCURRENCY') ?? '1', 10);
 export const llmSemaphore = new Semaphore(
   Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 1
 );
+import { getRegisteredEnvText } from './foundation/env.js';

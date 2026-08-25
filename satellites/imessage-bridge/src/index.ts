@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
@@ -111,7 +112,7 @@ function isDarwin(): boolean {
 
 function parseInputFile(inputPath: string): BridgeInput {
   const resolved = pathResolver.rootResolve(inputPath);
-  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as BridgeInput;
+  return readJson<BridgeInput>(resolved);
 }
 
 async function handleSend(request: IMessageSendRequest) {

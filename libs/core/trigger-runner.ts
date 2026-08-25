@@ -19,6 +19,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { loadJson } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { auditChain } from './audit-chain.js';
 import { resolveRole } from './authority.js';
@@ -124,9 +125,7 @@ function readCanonicalAuthorityRole(role: string): CanonicalAuthorityRole | null
   const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
   if (safeExistsSync(rolePath)) {
     try {
-      const record = JSON.parse(
-        safeReadFile(rolePath, { encoding: 'utf8' }) as string
-      ) as CanonicalAuthorityRole;
+      const record = readJson<CanonicalAuthorityRole>(rolePath);
       if (record.role === role) return record;
     } catch {
       // Fall through to the synchronized role index.

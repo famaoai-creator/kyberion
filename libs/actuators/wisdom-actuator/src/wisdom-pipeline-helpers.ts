@@ -277,12 +277,7 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(pathResolver.rootResolve(contextPath))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(pathResolver.rootResolve(contextPath), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(pathResolver.rootResolve(contextPath)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -793,9 +788,7 @@ async function opApply(
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const targetTier = normalizeKnowledgeTier(params.tier);
-        const rawPackage: unknown = JSON.parse(
-          safeReadFile(pkgPath, { encoding: 'utf8' }) as string
-        );
+        const rawPackage: unknown = loadJson<unknown>(pkgPath);
         if (
           rawPackage &&
           typeof rawPackage === 'object' &&

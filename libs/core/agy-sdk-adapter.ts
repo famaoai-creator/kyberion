@@ -5,6 +5,7 @@ import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 interface BridgeResponse {
   id?: string;
@@ -72,7 +73,7 @@ export class AgySdkAdapter {
       this.bootReject = reject;
       const python =
         this.options.pythonBin ??
-        process.env.KYBERION_AGY_SDK_PYTHON ??
+        getRegisteredEnvText('KYBERION_AGY_SDK_PYTHON') ??
         resolveManagedToolPythonBin('agy_sdk') ??
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');

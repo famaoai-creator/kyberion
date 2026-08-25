@@ -9,6 +9,7 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 interface ManifestEntry {
   path: string;
@@ -121,13 +122,12 @@ export function generateIndex(checkOnly = false): boolean {
   // Index generation is a governance tool that must see every tier and write
   // the tier-root index files, so run it elevated (same pattern as scripts/clean.ts).
   return withExecutionContext('mission_controller', () => {
-    const previousSudo = process.env.KYBERION_SUDO;
-    process.env.KYBERION_SUDO = 'true';
+    const previousSudo = getRegisteredEnvText('KYBERION_SUDO');
+    setRegisteredEnv('KYBERION_SUDO', 'true');
     try {
       return generateIndexInner(checkOnly);
     } finally {
-      if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
-      else process.env.KYBERION_SUDO = previousSudo;
+      setRegisteredEnv('KYBERION_SUDO', previousSudo);
     }
   });
 }

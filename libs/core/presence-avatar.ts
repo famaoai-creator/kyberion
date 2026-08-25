@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface PresenceAvatarProfile {
   agentId: string;
@@ -33,7 +34,7 @@ let cachedAliases: Record<string, string> | null = null;
 let cachedDefaultAgentId: string | null = null;
 
 function getRegistryPath(): string {
-  const overridePath = process.env.KYBERION_PRESENCE_AVATAR_PROFILES_PATH?.trim();
+  const overridePath = getRegisteredEnvText('KYBERION_PRESENCE_AVATAR_PROFILES_PATH')?.trim();
   return overridePath || DEFAULT_REGISTRY_PATH;
 }
 
@@ -57,7 +58,12 @@ function loadRegistry(): {
   profiles: Record<string, PresenceAvatarProfile>;
 } {
   const registryPath = getRegistryPath();
-  if (cachedProfiles && cachedAliases && cachedDefaultAgentId && cachedRegistryPath === registryPath) {
+  if (
+    cachedProfiles &&
+    cachedAliases &&
+    cachedDefaultAgentId &&
+    cachedRegistryPath === registryPath
+  ) {
     return {
       defaultAgentId: cachedDefaultAgentId,
       aliases: cachedAliases,
@@ -76,11 +82,16 @@ function loadRegistry(): {
 
   try {
     const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<PresenceAvatarProfileRegistry>(raw, 'presence avatar profile registry');
+    const parsed = safeJsonParse<PresenceAvatarProfileRegistry>(
+      raw,
+      'presence avatar profile registry'
+    );
     const profiles = Object.fromEntries(
       (parsed.profiles || [])
-        .filter((profile) => profile && typeof profile.agentId === 'string' && profile.agentId.length > 0)
-        .map((profile) => [profile.agentId, profile]),
+        .filter(
+          (profile) => profile && typeof profile.agentId === 'string' && profile.agentId.length > 0
+        )
+        .map((profile) => [profile.agentId, profile])
     );
     const firstProfileAgentId = Object.keys(profiles)[0];
     const defaultAgentId =
@@ -122,7 +133,8 @@ export function resetPresenceAvatarRegistryCache(): void {
 
 export function getPresenceAvatarProfile(agentId?: string): PresenceAvatarProfile {
   const registry = loadRegistry();
-  const requestedAgentId = typeof agentId === 'string' && agentId.length > 0 ? agentId : registry.defaultAgentId;
+  const requestedAgentId =
+    typeof agentId === 'string' && agentId.length > 0 ? agentId : registry.defaultAgentId;
   const resolvedAgentId = registry.aliases[requestedAgentId] || requestedAgentId;
   const resolvedProfile = registry.profiles[resolvedAgentId];
 

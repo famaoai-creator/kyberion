@@ -5,6 +5,7 @@ import {
   resolvePeerDispatchTarget,
   sendPeerMessage,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 function parseJsonPayload(raw: string | undefined): unknown {
   if (!raw) return {};
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
     })
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: getRegisteredEnvText('KYBERION_TENANT_ID') || '',
       demandOption: true,
       description:
         'Tenant used to resolve knowledge/confidential/<tenant>/connections/peer-network.json',

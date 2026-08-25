@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import {
   canonicalA2AEnvelopeContent,
@@ -160,8 +161,8 @@ export class AgentBusyError extends Error {
 }
 
 // In-process fallback semaphores
-const GLOBAL_LIMIT = Number(process.env.KYBERION_GLOBAL_INFLIGHT_LIMIT || 8);
-const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
+const GLOBAL_LIMIT = Number(getRegisteredEnvText('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
+const AGENT_LIMIT = Number(getRegisteredEnvText('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
 
 const globalSemaphore = new Semaphore(GLOBAL_LIMIT);
 const agentSemaphores = new Map<string, Semaphore>();

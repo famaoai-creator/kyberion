@@ -1,3 +1,4 @@
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
   validateAndRepairAdf,
   recordGovernanceAction,
@@ -3090,8 +3091,8 @@ export async function main() {
   if (identity.role && !process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = identity.role;
   }
-  if (identity.persona && !process.env.KYBERION_PERSONA) {
-    process.env.KYBERION_PERSONA = identity.persona;
+  if (identity.persona && !getRegisteredEnvText('KYBERION_PERSONA')) {
+    setRegisteredEnv('KYBERION_PERSONA', identity.persona);
   }
 
   const argv = await createStandardYargs()

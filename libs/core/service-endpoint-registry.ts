@@ -2,6 +2,7 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { createLogger } from './logger.js';
 
@@ -49,11 +50,16 @@ let cachedServiceEndpointsDir: string | null = null;
 let cachedServiceEndpoints: ServiceEndpointsCatalog | null = null;
 
 function getServiceEndpointsPath(): string {
-  return process.env.KYBERION_SERVICE_ENDPOINTS_PATH?.trim() || DEFAULT_SERVICE_ENDPOINTS_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_ENDPOINTS_PATH')?.trim() ||
+    DEFAULT_SERVICE_ENDPOINTS_PATH
+  );
 }
 
 function getServiceEndpointsDir(): string {
-  return process.env.KYBERION_SERVICE_ENDPOINTS_DIR?.trim() || DEFAULT_SERVICE_ENDPOINTS_DIR;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_ENDPOINTS_DIR')?.trim() || DEFAULT_SERVICE_ENDPOINTS_DIR
+  );
 }
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {

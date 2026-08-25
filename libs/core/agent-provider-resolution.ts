@@ -1,4 +1,5 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from './provider-config.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
@@ -104,7 +105,7 @@ function pickBestModel(
 }
 
 function resolvePriority(preferredProvider: string): string[] {
-  const envPriority = (process.env.KYBERION_PROVIDER_PRIORITY || '')
+  const envPriority = (getRegisteredEnvText('KYBERION_PROVIDER_PRIORITY') || '')
     .split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);

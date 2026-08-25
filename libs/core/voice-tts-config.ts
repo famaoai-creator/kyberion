@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
@@ -17,7 +18,10 @@ interface VoiceTtsConfigRegistry {
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/presence/voice-hub-tts.json');
 
-const FALLBACK_REGISTRY: { defaultLanguage: string; languages: Record<string, VoiceTtsLanguageConfig> } = {
+const FALLBACK_REGISTRY: {
+  defaultLanguage: string;
+  languages: Record<string, VoiceTtsLanguageConfig>;
+} = {
   defaultLanguage: 'en',
   languages: {
     en: {
@@ -32,11 +36,14 @@ let cachedDefaultLanguage: string | null = null;
 let cachedLanguages: Record<string, VoiceTtsLanguageConfig> | null = null;
 
 function getRegistryPath(): string {
-  const overridePath = process.env.KYBERION_VOICE_HUB_TTS_CONFIG_PATH?.trim();
+  const overridePath = getRegisteredEnvText('KYBERION_VOICE_HUB_TTS_CONFIG_PATH')?.trim();
   return overridePath || DEFAULT_REGISTRY_PATH;
 }
 
-function loadRegistry(): { defaultLanguage: string; languages: Record<string, VoiceTtsLanguageConfig> } {
+function loadRegistry(): {
+  defaultLanguage: string;
+  languages: Record<string, VoiceTtsLanguageConfig>;
+} {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedDefaultLanguage && cachedLanguages) {
     return {

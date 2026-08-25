@@ -40,6 +40,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -181,7 +182,7 @@ function validateGrantedConsent(
 }
 
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
-  if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
+  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = process.env.MISSION_ID;
   if (!missionId) {
     return {

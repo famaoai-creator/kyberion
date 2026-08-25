@@ -20,6 +20,7 @@
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
@@ -120,7 +121,7 @@ export function checkMeetingParticipationConsent(input: {
   tenant_slug?: string;
   purpose: 'recording' | 'voice';
 }): { allowed: boolean; reason?: string } {
-  if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
+  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = normalizeOptionalString(input.mission_id);
   if (!missionId) {
     return {

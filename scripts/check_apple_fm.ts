@@ -14,6 +14,7 @@ import {
   transcribeAudioLocallyWithAppleSpeech,
 } from '@agent/core';
 import { safeExistsSync } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 async function main(): Promise<void> {
   const availability = await probeAppleIntelligence();
@@ -48,7 +49,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const sampleAudio = process.env.KYBERION_APPLE_FM_SAMPLE_AUDIO;
+  const sampleAudio = getRegisteredEnvText('KYBERION_APPLE_FM_SAMPLE_AUDIO');
   if (sampleAudio && safeExistsSync(sampleAudio)) {
     const transcript = await transcribeAudioLocallyWithAppleSpeech(sampleAudio);
     console.log(`[check:apple-fm] sample transcription: ${transcript}`);

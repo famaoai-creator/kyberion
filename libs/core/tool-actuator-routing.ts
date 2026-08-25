@@ -1,12 +1,16 @@
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/tool-actuator-routing-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge(
+  'product/governance/tool-actuator-routing-policy.json'
+);
 
 export interface ToolActuatorRouteRule {
   tool_name: string;
-  execution_mode: 'deterministic_pipeline' | 'llm_reasoning' | 'mission_command' | 'actuator_direct';
+  execution_mode:
+    'deterministic_pipeline' | 'llm_reasoning' | 'mission_command' | 'actuator_direct';
   intent_ids?: string[];
   preferred_actuators: string[];
   fallback_pipeline_id?: string;
@@ -45,7 +49,10 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolActuatorRoutingPolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH')?.trim() ||
+    DEFAULT_POLICY_PATH
+  );
 }
 
 export function resetToolActuatorRoutingPolicyCache(): void {
