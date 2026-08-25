@@ -1,24 +1,34 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { formatChannelDirectoryEntry, getChannelDirectoryEntry, listChannelDirectoryEntries } from '@agent/core';
+import {
+  formatChannelDirectoryEntry,
+  getChannelDirectoryEntry,
+  listChannelDirectoryEntries,
+} from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('channel', {
       type: 'string',
-      describe: 'Limit output to a single surface channel such as slack, imessage, discord, telegram, chronos, or presence',
+      describe:
+        'Limit output to a single surface channel such as slack, imessage, discord, telegram, chronos, or presence',
     })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
   const entries = argv.channel
     ? (() => {
-      const entry = getChannelDirectoryEntry(String(argv.channel));
-      if (!entry) {
-        throw new Error(`Channel "${String(argv.channel)}" was not found. Try one of: ${listChannelDirectoryEntries().map((item) => item.channel).join(', ')}`);
-      }
-      return [entry];
-    })()
+        const entry = getChannelDirectoryEntry(String(argv.channel));
+        if (!entry) {
+          throw new Error(
+            `Channel "${String(argv.channel)}" was not found. Try one of: ${listChannelDirectoryEntries()
+              .map((item) => item.channel)
+              .join(', ')}`
+          );
+        }
+        return [entry];
+      })()
     : listChannelDirectoryEntries();
 
   if (argv.json) {
@@ -40,10 +50,11 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /channel_directory\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
+if (
+  isDirectScript(import.meta.url, 'channel_directory.ts') ||
+  isDirectScript(import.meta.url, 'channel_directory.js')
+)
+  void main().catch((err) => {
     console.error(err?.message ?? String(err));
     process.exit(1);
   });
-}

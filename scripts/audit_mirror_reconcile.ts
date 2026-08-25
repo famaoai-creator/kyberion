@@ -28,6 +28,7 @@ import {
   type ApprovalRequestRecord,
   type AuditEntry,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
 export const AUDIT_MIRROR_EFFECT_BINDING = 'sa-01:audit-mirror-reconcile';
@@ -432,8 +433,7 @@ export function main(argv = process.argv.slice(2)): void {
 }
 
 if (
-  process.argv[1]?.endsWith('audit_mirror_reconcile.ts') ||
-  process.argv[1]?.endsWith('audit_mirror_reconcile.js')
-) {
+  isDirectScript(import.meta.url, 'audit_mirror_reconcile.ts') ||
+  isDirectScript(import.meta.url, 'audit_mirror_reconcile.js')
+)
   main();
-}

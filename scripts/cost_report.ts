@@ -14,6 +14,7 @@ import {
   logger,
   type EventScopeFilter,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 function main(): number {
@@ -62,7 +63,8 @@ function main(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /cost_report\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'cost_report.ts') ||
+  isDirectScript(import.meta.url, 'cost_report.js')
+)
   process.exit(main());
-}
