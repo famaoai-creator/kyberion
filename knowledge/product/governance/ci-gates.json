@@ -74,6 +74,62 @@
       "rationale": "Keeps manifest scopes connected to the PR, full, and release workflow entrypoints."
     },
     {
+      "id": "op-preflight-coverage",
+      "scope": "pr",
+      "script": "check:op-preflight-coverage",
+      "owner": "quality",
+      "rationale": "Keeps actuator operations covered by preflight contracts."
+    },
+    {
+      "id": "extension-order",
+      "scope": "pr",
+      "script": "check:extension-order",
+      "owner": "architecture",
+      "rationale": "Keeps extension registration deterministic and dependency-safe."
+    },
+    {
+      "id": "module-invariants",
+      "scope": "pr",
+      "script": "check:module-invariants",
+      "owner": "architecture",
+      "rationale": "Checks declared module invariants after the build."
+    },
+    {
+      "id": "seam-multiplicity",
+      "scope": "pr",
+      "script": "check:seam-multiplicity",
+      "owner": "architecture",
+      "rationale": "Prevents new duplicate capability seams."
+    },
+    {
+      "id": "capability-seams",
+      "scope": "pr",
+      "script": "check:capability-seams",
+      "owner": "architecture",
+      "rationale": "Checks capability seam registry coverage."
+    },
+    {
+      "id": "capability-seams-ast",
+      "scope": "pr",
+      "script": "check:capability-seams-ast",
+      "owner": "architecture",
+      "rationale": "Checks capability seam adoption at the AST boundary."
+    },
+    {
+      "id": "reasoning-provider-registry",
+      "scope": "pr",
+      "script": "check:reasoning-provider-registry",
+      "owner": "operations",
+      "rationale": "Keeps reasoning provider declarations aligned with the runtime registry."
+    },
+    {
+      "id": "packaging-contract",
+      "scope": "pr",
+      "script": "check:packaging-contract",
+      "owner": "quality",
+      "rationale": "Checks package and artifact contracts after the build."
+    },
+    {
       "id": "script-integrity",
       "scope": "full",
       "executable": "node",
@@ -83,7 +139,7 @@
     },
     {
       "id": "esm",
-      "scope": "full",
+      "scope": "pr",
       "script": "check:esm",
       "owner": "quality",
       "rationale": "Checks runtime ESM integrity."
@@ -146,7 +202,7 @@
     },
     {
       "id": "knowledge-scope",
-      "scope": "full",
+      "scope": "pr",
       "script": "check:knowledge-scope",
       "owner": "security",
       "rationale": "Checks tenant and knowledge scope boundaries."
@@ -181,7 +237,7 @@
     },
     {
       "id": "design-ledger",
-      "scope": "full",
+      "scope": "pr",
       "script": "check:design-ledger",
       "owner": "experience",
       "rationale": "Checks design decision ledger integrity."
@@ -332,6 +388,13 @@
       "script": "check:audit-continuity",
       "owner": "security",
       "rationale": "Checks audit continuity in warn-only observation mode."
+    },
+    {
+      "id": "tenant-registry",
+      "scope": "full",
+      "script": "check:tenant-registry",
+      "owner": "security",
+      "rationale": "Checks tenant profile, confidential index, and customer overlay consistency."
     },
     {
       "id": "entity-governance",

@@ -67,32 +67,8 @@ jobs:
       - name: Run manifest-driven PR checks
         run: pnpm run check -- --scope pr
 
-      # These checkers import @agent/core through its package entrypoint.
-      # Run them after the build so fresh runners have dist/index.js.
-      - name: Check operation preflight and seam bindings
-        run: |
-          pnpm run check:op-preflight-coverage
-          pnpm run check:extension-order
-          pnpm run check:design-ledger
-          pnpm run check:module-invariants
-          pnpm run check:seam-multiplicity
-          pnpm run check:capability-seams
-          pnpm run check:capability-seams-ast
-          pnpm run check:reasoning-provider-registry
-
       - name: Type check
         run: pnpm run typecheck
-
-      - name: Check ESM integrity
-        run: pnpm run check:esm
-
-      # KS-16 / KO-04: keep the knowledge scope checker on the PR gate as well
-      # as the broader CI validation job.
-      - name: Check knowledge scope boundaries
-        run: pnpm run check:knowledge-scope
-
-      - name: Check packaging contract
-        run: pnpm run check:packaging-contract
 
       - name: Lint check
         run: pnpm run lint
