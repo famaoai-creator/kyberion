@@ -29,6 +29,7 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
@@ -290,7 +291,7 @@ function intentScopes(source: string): {
 } {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(source, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(source);
   } catch (error) {
     return {
       disposition: 'invalid',
@@ -504,7 +505,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
     }
     let record: unknown;
     try {
-      record = JSON.parse(String(safeReadFile(candidate.source, { encoding: 'utf8' })));
+      record = readJson<unknown>(candidate.source);
     } catch (error) {
       items.push({
         kind,

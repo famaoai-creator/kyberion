@@ -10,7 +10,7 @@ import {
   listProjectRecords,
   withExecutionContext,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 
 export interface EntityGovernanceReport {
@@ -141,12 +141,12 @@ export function collectEntityGovernanceReport(
   let policy: any = null;
   let catalog: any = null;
   try {
-    policy = JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' })));
+    policy = readJson<unknown>(policyPath);
   } catch (error) {
     violations.push(`security policy unreadable: ${String(error)}`);
   }
   try {
-    catalog = JSON.parse(String(safeReadFile(catalogPath, { encoding: 'utf8' })));
+    catalog = readJson<unknown>(catalogPath);
   } catch (error) {
     violations.push(`retention catalog unreadable: ${String(error)}`);
   }

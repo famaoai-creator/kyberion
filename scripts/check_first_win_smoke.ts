@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 
 interface SmokeRule {
   file: string;
@@ -79,7 +80,7 @@ const RULES: SmokeRule[] = [
 function readJson(file: string): any | null {
   const abs = pathResolver.rootResolve(file);
   try {
-    return JSON.parse(String(safeReadFile(abs, { encoding: 'utf8' }) || ''));
+    return readFoundationJson<unknown>(abs);
   } catch {
     return null;
   }

@@ -23,6 +23,8 @@ import {
   type WorkItemSource,
   type WorkItemStatus,
   type WorkItemContext,
+  type GitHubIssueLike,
+  type JiraIssueLike,
   buildIntegratedHandoffHistory,
   formatIntegratedHandoffHistory,
   loadAiDlcPhaseState,
@@ -32,6 +34,7 @@ import {
   safeReaddir,
 } from '@agent/core';
 import { safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 function csv(value: unknown): string[] {
@@ -106,7 +109,7 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
         : path.join(root, entry, 'mission-state.json');
       if (safeExistsSync(candidate)) {
         try {
-          const state = JSON.parse(String(safeReadFile(candidate, { encoding: 'utf8' }) || '{}'));
+          const state = readJson<Record<string, unknown>>(candidate);
           const missionId = String(state?.mission_id || path.basename(path.dirname(candidate)));
           if (!seen.has(missionId)) {
             seen.add(missionId);
@@ -400,16 +403,14 @@ async function main(): Promise<void> {
         throw new Error(`unknown command '${command}'`);
       }
       if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = JSON.parse(
-        String(safeReadFile(String(argv.input), { encoding: 'utf8' }) || '{}')
-      );
+      const issue = readJson<GitHubIssueLike | JiraIssueLike>(String(argv.input));
       const projectId = argv.project
         ? String(argv.project)
         : importEntry.default_project_id || undefined;
       const result =
         importEntry.source === 'github'
-          ? importGitHubIssueWithEvent(issue, projectId || 'github')
-          : importJiraIssueWithEvent(issue, projectId);
+          ? importGitHubIssueWithEvent(issue as GitHubIssueLike, projectId || 'github')
+          : importJiraIssueWithEvent(issue as JiraIssueLike, projectId);
       print(result);
       break;
     }
