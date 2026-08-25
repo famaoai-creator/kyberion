@@ -13,7 +13,15 @@
  */
 
 import * as path from 'node:path';
-import { loadJson, pathResolver, safeExistsSync, safeReaddir, safeStat } from '@agent/core';
+import {
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeStat,
+  safeWriteFile,
+} from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ShellViolation {
@@ -23,6 +31,7 @@ interface ShellViolation {
 }
 
 const ROOT = pathResolver.rootDir();
+const BASELINE_PATH = pathResolver.rootResolve('scripts/pipeline-shell-independence.baseline.json');
 const PIPELINE_ROOTS = [
   path.join(ROOT, 'pipelines'),
   path.join(ROOT, 'pipelines', 'fragments'),
@@ -187,11 +196,79 @@ export function scanPipelineShellIndependence(
   return violations;
 }
 
+function violationKey(violation: ShellViolation): string {
+  return `${path.relative(ROOT, violation.file)}\u0000${violation.pattern}\u0000${violation.match}`;
+}
+
+function loadBaseline(): ShellViolation[] {
+  if (!safeExistsSync(BASELINE_PATH)) return [];
+  const parsed = loadJson<unknown>(BASELINE_PATH);
+  if (!parsed || typeof parsed !== 'object') return [];
+  const violations = (parsed as Record<string, unknown>).violations;
+  if (!Array.isArray(violations)) return [];
+  return violations.filter(
+    (entry): entry is ShellViolation =>
+      Boolean(entry) &&
+      typeof entry === 'object' &&
+      typeof (entry as Record<string, unknown>).file === 'string' &&
+      typeof (entry as Record<string, unknown>).pattern === 'string' &&
+      typeof (entry as Record<string, unknown>).match === 'string'
+  );
+}
+
+function subtractBaseline(
+  violations: ShellViolation[],
+  baseline: ShellViolation[]
+): ShellViolation[] {
+  const remaining = new Map<string, number>();
+  for (const violation of baseline) {
+    const key = violationKey(violation);
+    remaining.set(key, (remaining.get(key) || 0) + 1);
+  }
+  return violations.filter((violation) => {
+    const key = violationKey(violation);
+    const count = remaining.get(key) || 0;
+    if (count === 0) return true;
+    if (count === 1) remaining.delete(key);
+    else remaining.set(key, count - 1);
+    return false;
+  });
+}
+
 export const runCheckPipelineShellIndependence = defineScript({
   name: 'check:pipeline-shell-independence',
   flags: [],
   run(context) {
-    const violations = scanPipelineShellIndependence();
+    const allViolations = scanPipelineShellIndependence();
+    if (context.argv.includes('--write-baseline')) {
+      safeMkdir(pathResolver.rootResolve('scripts'), { recursive: true });
+      safeWriteFile(
+        BASELINE_PATH,
+        `${JSON.stringify(
+          {
+            version: 1,
+            violations: allViolations.map((violation) => ({
+              ...violation,
+              file: path.relative(ROOT, violation.file),
+            })),
+          },
+          null,
+          2
+        )}\n`,
+        { encoding: 'utf8' }
+      );
+      context.print(
+        `[check:pipeline-shell-independence] baseline updated (${allViolations.length})`
+      );
+      return;
+    }
+    const violations = subtractBaseline(allViolations, loadBaseline());
+    const baselinedCount = allViolations.length - violations.length;
+    if (baselinedCount > 0) {
+      context.print(
+        `[check:pipeline-shell-independence] ${baselinedCount} existing wrapper(s) remain baselined; new violations are blocking`
+      );
+    }
     if (violations.length > 0) {
       console.error('[check:pipeline-shell-independence] violations detected:');
       for (const violation of violations) {

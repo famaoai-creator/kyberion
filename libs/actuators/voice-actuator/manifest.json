@@ -1,6 +1,6 @@
 {
   "actuator_id": "voice-actuator",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Governed local voice generation actuator with native playback and artifact fallback",
   "contract_schema": "knowledge/product/schemas/voice-action.schema.json",
   "resilience_tier": "adaptive_retry",
