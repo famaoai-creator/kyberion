@@ -4,11 +4,12 @@ import {
   safeReadFile,
   safeWriteFile,
   safeExec,
-  pathResolver
+  pathResolver,
 } from '@agent/core';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 
 interface ActuatorCapability {
   op: string;
@@ -25,7 +26,7 @@ interface ActuatorManifest {
 
 const rl = readline.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
 function question(query: string): Promise<string> {
@@ -36,8 +37,7 @@ function question(query: string): Promise<string> {
   });
 }
 
-function parseCliArgs() {
-  const args = process.argv.slice(2);
+function parseCliArgs(args: string[]) {
   const parsed: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
@@ -63,7 +63,7 @@ function tryCoerceValue(val: string): any {
   return val;
 }
 
-async function runPlayground() {
+async function runPlayground(args: string[]) {
   console.log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
 
   // 1. Scan available actuators
@@ -82,7 +82,7 @@ async function runPlayground() {
           actuators.push({
             id: entry,
             manifestPath,
-            manifest
+            manifest,
           });
         }
       } catch (err: any) {
@@ -94,22 +94,26 @@ async function runPlayground() {
   if (actuators.length === 0) {
     console.log(chalk.red('❌ No valid actuators with manifest.json found in libs/actuators/'));
     rl.close();
-    process.exit(1);
+    throw new ScriptExitError(1, 'No valid actuators with manifest.json found');
   }
 
   // 2. Parse CLI args for non-interactive mode
-  const cliParams = parseCliArgs();
+  const cliParams = parseCliArgs(args);
   let targetActuatorId = cliParams.actuator;
   let targetOp = cliParams.op;
   let rawParamsStr = cliParams.params;
 
-  let selectedActuator = actuators.find(a => a.id === targetActuatorId || a.manifest.actuator_id === targetActuatorId);
+  let selectedActuator = actuators.find(
+    (a) => a.id === targetActuatorId || a.manifest.actuator_id === targetActuatorId
+  );
 
   // 3. Actuator Selection Wizard
   if (!selectedActuator) {
     console.log(chalk.white('Available Actuators:'));
     actuators.forEach((act, idx) => {
-      console.log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(act.manifest.actuator_id)} (v${act.manifest.version})`);
+      console.log(
+        `  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(act.manifest.actuator_id)} (v${act.manifest.version})`
+      );
       console.log(`     ${chalk.gray(act.manifest.description)}`);
     });
 
@@ -118,7 +122,7 @@ async function runPlayground() {
     if (isNaN(idx) || idx < 0 || idx >= actuators.length) {
       console.error(chalk.red('\n❌ Invalid selection.'));
       rl.close();
-      process.exit(1);
+      throw new ScriptExitError(1, 'Invalid actuator selection');
     }
     selectedActuator = actuators[idx];
   }
@@ -128,13 +132,13 @@ async function runPlayground() {
 
   // 4. Operation Selection Wizard
   const ops = manifest.capabilities || [];
-  let selectedOpObj = ops.find(o => o.op === targetOp);
+  let selectedOpObj = ops.find((o) => o.op === targetOp);
 
   if (!selectedOpObj) {
     if (ops.length === 0) {
       console.error(chalk.red(`\n❌ Actuator '${manifest.actuator_id}' defines no capabilities.`));
       rl.close();
-      process.exit(1);
+      throw new ScriptExitError(1, `Actuator '${manifest.actuator_id}' defines no capabilities`);
     }
 
     console.log(chalk.white('\nAvailable Operations (ops):'));
@@ -148,7 +152,7 @@ async function runPlayground() {
     if (isNaN(idx) || idx < 0 || idx >= ops.length) {
       console.error(chalk.red('\n❌ Invalid selection.'));
       rl.close();
-      process.exit(1);
+      throw new ScriptExitError(1, 'Invalid operation selection');
     }
     selectedOpObj = ops[idx];
   }
@@ -165,7 +169,7 @@ async function runPlayground() {
     } catch (err: any) {
       console.error(chalk.red(`\n❌ Failed to parse --params JSON: ${err.message}`));
       rl.close();
-      process.exit(1);
+      throw new ScriptExitError(1, `Failed to parse --params JSON: ${err.message}`);
     }
   } else {
     console.log(chalk.white('\nHow would you like to provide the operation parameters?'));
@@ -175,17 +179,23 @@ async function runPlayground() {
     const methodChoice = await question(chalk.bold.blue('\nChoose method (1 or 2): '));
 
     if (methodChoice === '2') {
-      console.log(chalk.yellow('\nPaste the full JSON value for "params" (e.g. {"channel": "slack", "text": "hello"}):'));
+      console.log(
+        chalk.yellow(
+          '\nPaste the full JSON value for "params" (e.g. {"channel": "slack", "text": "hello"}):'
+        )
+      );
       const jsonStr = await question('> ');
       try {
         paramsObject = JSON.parse(jsonStr);
       } catch (err: any) {
         console.error(chalk.red(`❌ Invalid JSON block: ${err.message}`));
         rl.close();
-        process.exit(1);
+        throw new ScriptExitError(1, `Invalid JSON block: ${err.message}`);
       }
     } else {
-      console.log(chalk.yellow('\nEnter parameter key-value pairs one by one. Leave key empty to finish.'));
+      console.log(
+        chalk.yellow('\nEnter parameter key-value pairs one by one. Leave key empty to finish.')
+      );
       while (true) {
         const key = await question(chalk.bold.magenta('\nParameter Key: '));
         if (!key) break;
@@ -200,7 +210,7 @@ async function runPlayground() {
   const payload = {
     action: op,
     op: op,
-    params: paramsObject
+    params: paramsObject,
   };
 
   // 7. Write to temp file inside active/shared/tmp/
@@ -222,7 +232,11 @@ async function runPlayground() {
   } else if (safeExistsSync(execPath2)) {
     execPath = execPath2;
   } else {
-    console.log(chalk.yellow(`\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`));
+    console.log(
+      chalk.yellow(
+        `\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`
+      )
+    );
     console.log(chalk.white('Attempting to compile actuators monorepo-wide first...'));
     try {
       safeExec('pnpm', ['run', 'build:actuators'], { cwd: pathResolver.rootDir() });
@@ -237,9 +251,11 @@ async function runPlayground() {
   }
 
   if (!execPath) {
-    console.error(chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`));
+    console.error(
+      chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`)
+    );
     rl.close();
-    process.exit(1);
+    throw new ScriptExitError(1, 'Actuator executable not found');
   }
 
   // 9. Execute Actuator
@@ -248,7 +264,7 @@ async function runPlayground() {
 
   try {
     const stdout = safeExec('node', [execPath, '--input', tempPath], {
-      cwd: pathResolver.rootDir()
+      cwd: pathResolver.rootDir(),
     });
     console.log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
     console.log(chalk.white(stdout.trim()));
@@ -268,8 +284,8 @@ async function runPlayground() {
   rl.close();
 }
 
-runPlayground().catch(err => {
-  console.error(chalk.red(`\n❌ Critical Error: ${err.message}`));
-  rl.close();
-  process.exit(1);
-});
+void defineScript({
+  name: 'actuator:playground',
+  flags: [],
+  run: ({ argv }) => runPlayground(argv),
+})();
