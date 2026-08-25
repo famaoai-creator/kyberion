@@ -6,6 +6,7 @@
  */
 import { safeExecResult, secretGuard } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
 
@@ -202,10 +203,11 @@ export async function main(): Promise<void> {
   process.exit(report.ready ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /app_preflight\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
+if (
+  isDirectScript(import.meta.url, 'app_preflight.ts') ||
+  isDirectScript(import.meta.url, 'app_preflight.js')
+)
+  void main().catch((err) => {
     console.error(err?.message ?? String(err));
     process.exit(1);
   });
-}
