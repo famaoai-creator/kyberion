@@ -9,7 +9,7 @@
     {
       "path": "README.md",
       "tier": "public",
-      "size": 2023,
+      "size": 2864,
       "type": "md"
     },
     {
@@ -1453,6 +1453,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/frontmatter-exclusions.json",
+      "tier": "public",
+      "size": 911,
+      "type": "json"
+    },
+    {
       "path": "product/governance/gate-profiles/gate-profile-registry.json",
       "tier": "public",
       "size": 13588,
@@ -2055,7 +2061,7 @@
     {
       "path": "product/governance/onboarding-flow.md",
       "tier": "public",
-      "size": 11827,
+      "size": 11835,
       "type": "md"
     },
     {
@@ -2307,7 +2313,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 11292,
+      "size": 11302,
       "type": "md"
     },
     {
@@ -3118,120 +3124,6 @@
       "path": "product/incidents/distill_msn-wip-takeover-20260427_2026_04_27.md",
       "tier": "public",
       "size": 1965,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772254971164.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772255083345.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772255133910.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772255286281.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772255487200.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772255677139.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772423205048.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772423477997.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772423697998.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772458283567.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772458319325.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772458353245.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772458539108.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772458573822.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772471547982.md",
-      "tier": "public",
-      "size": 750,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772473181891.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772474533342.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772474991822.md",
-      "tier": "public",
-      "size": 746,
-      "type": "md"
-    },
-    {
-      "path": "product/incidents/incident-UNKNOWN-mock-skill-1772475045487.md",
-      "tier": "public",
-      "size": 746,
       "type": "md"
     },
     {
@@ -5997,7 +5889,7 @@
     {
       "path": "product/roles/knowledge_steward/PROCEDURE.md",
       "tier": "public",
-      "size": 5099,
+      "size": 5109,
       "type": "md"
     },
     {

@@ -10,7 +10,7 @@ status: active
 > **作成日**: 2026-08-12
 > **優先度**: P1(CN-01/02/03/04)/ P2(CN-05/06)
 > **位置づけ**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25](../improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) CT-05 の Claude 側続き。Codex(app-server 共有)・AGY(公式 SDK bridge)・Grok(ACP 共有)で確立した `NativeSubagentAdopter` 契約を、Claude の2つの実行面へ適用する。
-> **実装状況の正本**: [STATUS.ja.md](../improvement-plans-2026-07/STATUS.ja.md)
+> **実装状況の索引**: [2026-08 README](./README.ja.md)
 
 ## 0. 要旨
 

@@ -146,7 +146,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   const VOLATILE_KNOWLEDGE_PATHS = new Set(['product/governance/HINTS.md']);
 
   for (const file of allFiles) {
-    if (file === '_index.md' || file === '_manifest.json') continue;
+    if (file === '_index.md' || file === '_integrity-manifest.json') continue;
     const fullPath = path.join(kbRoot, file);
     const stat = trySafeStat(fullPath);
     if (!stat) continue;
@@ -207,7 +207,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   const indexContent = md.trim() + '\n';
 
   if (checkOnly) {
-    const existingManifest = safeReadFile(path.join(kbRoot, '_manifest.json'), {
+    const existingManifest = safeReadFile(path.join(kbRoot, '_integrity-manifest.json'), {
       encoding: 'utf8',
     }) as string;
     const existingIndex = safeReadFile(path.join(kbRoot, '_index.md'), {
@@ -240,7 +240,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
     return true;
   }
 
-  safeWriteFile(path.join(kbRoot, '_manifest.json'), manifestContent);
+  safeWriteFile(path.join(kbRoot, '_integrity-manifest.json'), manifestContent);
   safeWriteFile(path.join(kbRoot, '_index.md'), indexContent);
   return true;
 }

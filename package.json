@@ -274,7 +274,7 @@
     ],
     "knowledge/**/*.{md,json}": [
       "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
-      "git add knowledge/_index.md knowledge/_manifest.json"
+      "git add knowledge/_index.md knowledge/_integrity-manifest.json"
     ]
   },
   "dependencies": {

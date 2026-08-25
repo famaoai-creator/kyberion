@@ -73,7 +73,7 @@ pnpm run check:pseudo-locale
 pnpm run check:vocabulary-types
 ```
 
-`knowledge/` を変更した場合、lint-stagedやcommit hookが `_index.md`、`_manifest.json` などを追加・更新することがある。commit後にもstaged diffとPR changed-filesを再確認する。
+`knowledge/` を変更した場合、lint-stagedやcommit hookが `_index.md`、`_integrity-manifest.json` などを追加・更新することがある。commit後にもstaged diffとPR changed-filesを再確認する。
 
 ## 2. buildを先に通す
 
