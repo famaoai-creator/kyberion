@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  loadJson,
+  pathResolver,
+  resolveActuatorOperation,
+  safeExistsSync,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import { scanPipelineShellIndependence } from './check_pipeline_shell_independence.js';
 
 const PROBE = pathResolver.sharedTmp('pipeline-shell-independence-probe.json');
@@ -170,5 +177,49 @@ describe('check_pipeline_shell_independence', () => {
     const violations = scanPipelineShellIndependence([PROBE]);
 
     expect(violations.filter((v) => v.pattern === 'script-wrapper')).toHaveLength(2);
+  });
+
+  it('locks the selected SX-11 migrations to their declared native actuator ops', () => {
+    const promoNarratedDemo = loadJson<any>(
+      pathResolver.rootResolve(
+        'knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json'
+      )
+    );
+    const vtuberSubmit = loadJson<any>(
+      pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json')
+    );
+    const selectedFiles = [
+      pathResolver.rootResolve(
+        'knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json'
+      ),
+      pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json'),
+    ];
+
+    expect(promoNarratedDemo.steps.find((step: any) => step.id === 'generate_voice')).toMatchObject(
+      { op: 'voice:generate_voice' }
+    );
+    expect(promoNarratedDemo.steps.find((step: any) => step.id === 'generate_video')).toMatchObject(
+      { op: 'video-composition:create_narrated_video_from_content_brief' }
+    );
+    expect(vtuberSubmit.steps.find((step: any) => step.id === 'generate_voice')).toMatchObject({
+      op: 'voice:generate_voice',
+    });
+
+    expect(resolveActuatorOperation('voice', 'generate_voice')).toMatchObject({
+      actuatorId: 'voice-actuator',
+      modulePath: 'dist/libs/actuators/voice-actuator/src/index.js',
+    });
+    expect(
+      resolveActuatorOperation('video-composition', 'create_narrated_video_from_content_brief')
+    ).toMatchObject({
+      actuatorId: 'video-composition-actuator',
+      modulePath: 'dist/libs/actuators/video-composition-actuator/src/index.js',
+    });
+
+    expect(
+      scanPipelineShellIndependence(selectedFiles).filter(
+        (violation) => violation.pattern === 'script-wrapper'
+      )
+    ).toEqual([]);
   });
 });
