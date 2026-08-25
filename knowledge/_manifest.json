@@ -6625,6 +6625,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/ci-gates.schema.json",
+      "tier": "public",
+      "size": 1057,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cli-commands.schema.json",
       "tier": "public",
       "size": 1585,

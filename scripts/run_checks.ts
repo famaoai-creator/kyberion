@@ -1,4 +1,5 @@
 import { loadJson, pathResolver, safeExecResult } from '@agent/core';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Gate = {
@@ -12,6 +13,12 @@ type Gate = {
 };
 
 type GateManifest = { version: number; gates: Gate[] };
+
+const gateManifestCatalog = defineCatalog<GateManifest>({
+  id: 'ci-gates',
+  path: () => pathResolver.knowledge('product/governance/ci-gates.json'),
+  schema: 'knowledge/product/schemas/ci-gates.schema.json',
+});
 
 const VALID_SCOPES = new Set<Gate['scope']>(['pr', 'full', 'release']);
 
@@ -58,9 +65,7 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
 }
 
 export function loadGateManifest(): GateManifest {
-  const manifest = loadJson<GateManifest>(
-    pathResolver.knowledge('product/governance/ci-gates.json')
-  );
+  const manifest = gateManifestCatalog.load();
   const packageJson = loadJson<{ scripts?: Record<string, string> }>(
     pathResolver.rootResolve('package.json')
   );

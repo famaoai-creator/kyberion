@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "gates"],
+  "properties": {
+    "version": { "const": 1 },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "scope", "owner", "rationale"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "scope": { "type": "string", "enum": ["pr", "full", "release"] },
+          "executable": { "type": "string", "minLength": 1 },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "script": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 }
+        },
+        "oneOf": [
+          { "required": ["script"], "not": { "required": ["executable"] } },
+          { "required": ["executable", "args"], "not": { "required": ["script"] } }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

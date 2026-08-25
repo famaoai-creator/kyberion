@@ -262,6 +262,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/product/schemas/outcome-catalog.schema.json',
     dataPath: 'knowledge/product/governance/outcome-catalog.json',
   },
+  {
+    id: 'ci-gates',
+    schemaPath: 'knowledge/product/schemas/ci-gates.schema.json',
+    dataPath: 'knowledge/product/governance/ci-gates.json',
+  },
 ];
 
 export function findDeterministicCatalogViolations(): string[] {
