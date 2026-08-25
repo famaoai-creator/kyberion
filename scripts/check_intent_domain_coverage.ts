@@ -1,5 +1,6 @@
 import { loadActuatorManifestCatalog, pathResolver, safeReaddir } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type StandardIntent = {
   id?: string;
@@ -35,20 +36,35 @@ function readJson<T>(relativePath: string): T {
   return readJsonFile(fullPath);
 }
 
-function pushIfMissing<T>(collection: Set<T>, value: T, message: string, violations: string[]): void {
+function pushIfMissing<T>(
+  collection: Set<T>,
+  value: T,
+  message: string,
+  violations: string[]
+): void {
   if (!collection.has(value)) violations.push(message);
 }
 
-function main(): void {
-  const standardIntents = readJson<{ intents: StandardIntent[] }>('knowledge/product/governance/standard-intents.json');
-  const ontology = readJson<{ intents: IntentDomainEntry[] }>('knowledge/product/governance/intent-domain-ontology.json');
+function main(): number {
+  const standardIntents = readJson<{ intents: StandardIntent[] }>(
+    'knowledge/product/governance/standard-intents.json'
+  );
+  const ontology = readJson<{ intents: IntentDomainEntry[] }>(
+    'knowledge/product/governance/intent-domain-ontology.json'
+  );
   const missionClassification = readJson<{
     defaults: { mission_class: string };
     mission_class_rules: Array<{ mission_class?: string }>;
   }>('knowledge/product/governance/mission-classification-policy.json');
-  const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>('knowledge/product/governance/mission-workflow-catalog.json');
-  const teamTemplates = readJson<{ templates: Record<string, unknown> }>('knowledge/product/orchestration/mission-team-templates.json');
-  const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>('knowledge/product/governance/outcome-catalog.json');
+  const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>(
+    'knowledge/product/governance/mission-workflow-catalog.json'
+  );
+  const teamTemplates = readJson<{ templates: Record<string, unknown> }>(
+    'knowledge/product/orchestration/mission-team-templates.json'
+  );
+  const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>(
+    'knowledge/product/governance/outcome-catalog.json'
+  );
   const manifests = pathResolver.rootResolve('knowledge/product/governance/environment-manifests');
 
   const readinessManifestIds = new Set(
@@ -121,7 +137,9 @@ function main(): void {
 
   for (const intentId of ontologyById.keys()) {
     if (!standardById.has(intentId)) {
-      violations.push(`intent-domain-ontology: unknown intent_id not found in standard-intents (${intentId})`);
+      violations.push(
+        `intent-domain-ontology: unknown intent_id not found in standard-intents (${intentId})`
+      );
     }
   }
 
@@ -129,9 +147,13 @@ function main(): void {
     missionClassification.defaults.mission_class,
     ...missionClassification.mission_class_rules.map((rule) => String(rule.mission_class || '')),
   ]);
-  const workflowIds = new Set((workflowCatalog.templates || []).map((template) => String(template.id || '')));
+  const workflowIds = new Set(
+    (workflowCatalog.templates || []).map((template) => String(template.id || ''))
+  );
   const teamTemplateIds = new Set(Object.keys(teamTemplates.templates || {}));
-  const actuatorIds = new Set(loadActuatorManifestCatalog().map((actuator) => String(actuator.n || '')));
+  const actuatorIds = new Set(
+    loadActuatorManifestCatalog().map((actuator) => String(actuator.n || ''))
+  );
   const outcomeIds = new Set(Object.keys(outcomeCatalog.outcomes || {}));
 
   for (const entry of ontology.intents || []) {
@@ -185,10 +207,25 @@ function main(): void {
     for (const violation of violations) {
       console.error(`- ${violation}`);
     }
-    process.exit(1);
+    return 1;
   }
 
   console.log(`[check:intent-domain-coverage] OK (${ontology.intents.length} intents)`);
+  return 0;
 }
 
-main();
+export const runCheckIntentDomainCoverage = defineScript({
+  name: 'check:intent-domain-coverage',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0)
+      throw new Error(`intent domain coverage check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_intent_domain_coverage.ts') ||
+  isDirectScript(import.meta.url, 'check_intent_domain_coverage.js')
+)
+  void runCheckIntentDomainCoverage();
