@@ -7,7 +7,7 @@ export interface FoundationEnvEntry {
   enum?: string[];
 }
 
-const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
+const REGISTRY_PATH = pathResolver.rootResolve('knowledge/product/governance/env-registry.json');
 let cachedEntries: FoundationEnvEntry[] | null = null;
 let loadingEntries = false;
 

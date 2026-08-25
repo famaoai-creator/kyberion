@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { ValidateFunction } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { compileSchema } from './ajv.js';
 import { defineCatalog } from './governed-catalog.js';
@@ -50,6 +51,13 @@ describe('foundation helpers', () => {
     const catalog = defineCatalog<{ version: number }>({
       id: 'foundation-catalog-test',
       path: catalogPath,
+      schema: ((value: unknown): value is { version: number } => {
+        return (
+          typeof value === 'object' &&
+          value !== null &&
+          typeof (value as { version?: unknown }).version === 'number'
+        );
+      }) as ValidateFunction<{ version: number }>,
       fallback: { version: 0 },
     });
 
