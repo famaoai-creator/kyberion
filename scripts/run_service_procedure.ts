@@ -23,6 +23,7 @@ import {
   loadProcedures,
   resolveAllowlistedRecordingRef,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -39,78 +40,89 @@ function parseArgs(argv: string[]): Record<string, string> {
   return out;
 }
 
-function printUsage(): void {
-  process.stdout.write(
-    '[run-service-procedure] Usage: node dist/scripts/run_service_procedure.js --procedure-id <id> --inputs <json> [--mission-id <id>]\n'
-  );
-}
-
-function fail(message: string): never {
-  process.stderr.write(`[run-service-procedure] ${message}\n`);
-  process.exit(1);
-}
-
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help === 'true') {
-    printUsage();
-    process.exit(0);
-  }
-  const procedureId = args['procedure-id'];
-  if (!procedureId) fail('--procedure-id is required');
-
-  const entry = loadProcedures().find((p) => p.procedure_id === procedureId);
-  if (!entry) fail(`procedure "${procedureId}" not found in catalog`);
-  if (entry!.substrate !== 'service')
-    fail(`procedure "${procedureId}" is not a service procedure (substrate=${entry!.substrate})`);
-
-  const recordingAbs = resolveAllowlistedRecordingRef(entry!.adapter.recording_ref);
-  if (!recordingAbs) fail(`procedure "${procedureId}" has no allowlisted recording_ref`);
-
-  let raw: unknown;
-  try {
-    raw = loadJson<unknown>(recordingAbs!);
-  } catch (err) {
-    return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  const recording = validateServiceRecording(raw);
-  if (!recording.value) fail(`service recording invalid: ${recording.errors.join('; ')}`);
-
-  let inputs: Record<string, unknown> = {};
-  if (args['inputs']) {
-    try {
-      const parsed = JSON.parse(args['inputs']);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) inputs = parsed;
-      else throw new Error('must be a JSON object');
-    } catch (err) {
-      return fail(`--inputs ${err instanceof Error ? err.message : String(err)}`);
+export const main = defineScript({
+  name: 'run-service-procedure',
+  flags: [],
+  async run(context) {
+    const args = parseArgs(context.positional);
+    if (args.help === 'true') {
+      context.print(
+        '[run-service-procedure] Usage: node dist/scripts/run_service_procedure.js --procedure-id <id> --inputs <json> [--mission-id <id>]'
+      );
+      return;
     }
-  }
+    const procedureId = args['procedure-id'];
+    if (!procedureId) throw new ScriptExitError(1, '--procedure-id is required');
 
-  const missionId = args['mission-id'] || process.env.MISSION_ID || `MSN-PROC-${procedureId}`;
-  const result = await withExecutionContext('surface_runtime', () =>
-    dispatchProcedure({
-      procedure: entry!,
-      serviceRecording: recording.value!,
-      serviceInputs: inputs,
-      agentId: 'run-service-procedure',
-      missionId,
-      channel: 'service',
-    })
-  );
+    const entry = loadProcedures().find((p) => p.procedure_id === procedureId);
+    if (!entry) throw new ScriptExitError(1, `procedure "${procedureId}" not found in catalog`);
+    if (entry!.substrate !== 'service')
+      throw new ScriptExitError(
+        1,
+        `procedure "${procedureId}" is not a service procedure (substrate=${entry!.substrate})`
+      );
 
-  if (result.status === 'approval_required') {
-    process.stdout.write(
-      `[run-service-procedure] approval required (request ${result.approvalRequestId ?? 'n/a'}). Approve in Kyberion and re-run.\n`
+    const recordingAbs = resolveAllowlistedRecordingRef(entry!.adapter.recording_ref);
+    if (!recordingAbs)
+      throw new ScriptExitError(1, `procedure "${procedureId}" has no allowlisted recording_ref`);
+
+    let raw: unknown;
+    try {
+      raw = loadJson<unknown>(recordingAbs!);
+    } catch (err) {
+      throw new ScriptExitError(
+        1,
+        `failed to read recording: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    const recording = validateServiceRecording(raw);
+    if (!recording.value)
+      throw new ScriptExitError(1, `service recording invalid: ${recording.errors.join('; ')}`);
+
+    let inputs: Record<string, unknown> = {};
+    if (args['inputs']) {
+      try {
+        const parsed = JSON.parse(args['inputs']);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) inputs = parsed;
+        else throw new Error('must be a JSON object');
+      } catch (err) {
+        throw new ScriptExitError(
+          1,
+          `--inputs ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+
+    const missionId = args['mission-id'] || process.env.MISSION_ID || `MSN-PROC-${procedureId}`;
+    const result = await withExecutionContext('surface_runtime', () =>
+      dispatchProcedure({
+        procedure: entry!,
+        serviceRecording: recording.value!,
+        serviceInputs: inputs,
+        agentId: 'run-service-procedure',
+        missionId,
+        channel: 'service',
+      })
     );
-    process.exit(2);
-  }
-  if (result.status !== 'executed') {
-    fail(`${result.status}: ${result.errors.join('; ')}`);
-  }
-  process.stdout.write(
-    `[run-service-procedure] executed "${procedureId}"\n${JSON.stringify(result.serviceResults, null, 2)}\n`
-  );
-}
 
-main().catch((err) => fail(err instanceof Error ? err.message : String(err)));
+    if (result.status === 'approval_required') {
+      context.print(
+        `[run-service-procedure] approval required (request ${result.approvalRequestId ?? 'n/a'}). Approve in Kyberion and re-run.`
+      );
+      throw new ScriptExitError(2);
+    }
+    if (result.status !== 'executed') {
+      throw new ScriptExitError(1, `${result.status}: ${result.errors.join('; ')}`);
+    }
+    context.print(
+      `[run-service-procedure] executed "${procedureId}"\n${JSON.stringify(result.serviceResults, null, 2)}`
+    );
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'run_service_procedure.ts') ||
+  isDirectScript(import.meta.url, 'run_service_procedure.js')
+) {
+  void main();
+}
