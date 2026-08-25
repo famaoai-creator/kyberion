@@ -12,6 +12,7 @@
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnv as getFoundationRegisteredEnv } from './foundation/env.js';
 
 export interface EnvRegistryValidationEntry {
   name: string;
@@ -122,36 +123,7 @@ export function getRegisteredEnv<T = string>(
   name: string,
   options: RegisteredEnvReadOptions<T> = {}
 ): string | number | boolean | T | undefined {
-  const env = options.env ?? process.env;
-  const raw = env[name];
-  if (raw === undefined || raw === '') return options.defaultValue;
-
-  const entry = loadEnvRegistryEntries().find((candidate) => candidate.name === name);
-  if (!entry) return raw;
-
-  const invalid = (): string | number | boolean | T | undefined => {
-    if (options.strict) {
-      throw new Error(`Invalid value for registered environment variable ${name}`);
-    }
-    return options.defaultValue;
-  };
-
-  switch (entry.type) {
-    case 'boolean':
-      if (/^(1|true|yes|on)$/i.test(raw)) return true;
-      if (/^(0|false|no|off)$/i.test(raw)) return false;
-      return invalid();
-    case 'number': {
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : invalid();
-    }
-    case 'enum':
-      return entry.enum?.includes(raw) ? raw : invalid();
-    case 'path':
-    case 'string':
-    default:
-      return raw;
-  }
+  return getFoundationRegisteredEnv(name, options) as string | number | boolean | T | undefined;
 }
 
 export function formatEnvValidationReport(report: EnvValidationReport): string[] {
