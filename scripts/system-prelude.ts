@@ -6,6 +6,7 @@
 
 import { secretGuard, logger } from '@agent/core';
 import { setRegisteredEnv } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { secretGuard, logger };
 
@@ -22,7 +23,16 @@ export async function main() {
   logger.success('✅ System Prelude complete.');
 }
 
-void main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+export const runSystemPrelude = defineScript({
+  name: 'system-prelude',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'system-prelude.ts') ||
+  isDirectScript(import.meta.url, 'system-prelude.js')
+)
+  void runSystemPrelude();
