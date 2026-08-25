@@ -44,19 +44,23 @@ describe('reference drift contract', () => {
 
   it('runs as part of the validation chain', () => {
     const pkg = read('package.json');
-    expect(pkg).toContain(
-      '"check:reference-drift": "vitest run tests/reference-drift-contract.test.ts"'
-    );
+    expect(pkg).not.toContain('"check:reference-drift"');
 
     const manifest = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
-      gates: Array<{ id: string; scope: string; script?: string }>;
+      gates: Array<{
+        id: string;
+        scope: string;
+        executable?: string;
+        args?: string[];
+      }>;
     };
-    expect(manifest.gates).toContainEqual({
-      id: 'reference-drift',
-      scope: 'full',
-      script: 'check:reference-drift',
-      owner: 'quality',
-      rationale: 'Checks reference drift contracts.',
-    });
+    expect(manifest.gates).toContainEqual(
+      expect.objectContaining({
+        id: 'reference-drift',
+        scope: 'full',
+        executable: 'pnpm',
+        args: ['exec', 'vitest', 'run', 'tests/reference-drift-contract.test.ts'],
+      })
+    );
   });
 });
