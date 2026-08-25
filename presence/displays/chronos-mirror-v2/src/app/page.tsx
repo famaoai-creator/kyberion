@@ -1024,7 +1024,7 @@ function ChronosMirrorV2Content() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: 'はい',
+          action: 'approve_mission',
           sessionId,
           locale,
           requesterId: 'chronos-ui',
