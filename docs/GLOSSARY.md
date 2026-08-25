@@ -14,38 +14,38 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to l
 
 ### Contributor vocabulary
 
-| Term | Canonical definition |
-| --- | --- |
-| Intent | The human request expressed in natural language. |
-| Resolution | The structured interpretation of an intent. |
-| Plan | A human-readable execution summary. |
-| Result | The user-facing outcome of execution. |
-| Mission | A bounded unit of work with lifecycle state and evidence. |
-| Task Session | A lighter-weight durable execution contract. |
-| Artifact | The concrete output of work. |
-| Work Shape | The operating mode of a work item. |
-| Execution Shape | The selected execution rung for an intent. |
-| WorkItem | The canonical unit of executable work. |
-| WorkItem Context | The typed identity chain on a work item. |
-| Mission Context Pack | The bounded context delivered to a mission task. |
-| Handoff Packet | The explicit transfer record between workers or phases. |
-| Knowledge Slice | A task-profile-driven knowledge placement rule. |
-| Knowledge Card | A concise, frontmatter-backed knowledge artifact. |
-| Semantic Brief | A content brief that leaves presentation choices to the design layer. |
-| Design Cascade | The ordered resolution of creative design defaults. |
-| Actuator | A concrete execution component. |
-| Procedure | Distilled operational knowledge or a reusable method. |
-| Pipeline | A declarative, governed execution graph. |
-| ADF | A human-readable structured execution contract. |
-| Tenant | An isolation boundary identified by a tenant slug. |
-| Viewer Context | The server-resolved principal and allowed tenant scope. |
-| Approval Contract | The human-approval boundary for consequential actions. |
-| Gateway | The generic delivery contract shared by surfaces. |
-| Trace | The root observability record for an execution. |
-| Span | A timed operation within a trace. |
-| Event | A point-in-time occurrence within a span. |
-| Lease | A durable authority grant with an expiry. |
-| Mission Controller | The governed mission lifecycle entry point. |
+| Term                 | Canonical definition                                                  |
+| -------------------- | --------------------------------------------------------------------- |
+| Intent               | The human request expressed in natural language.                      |
+| Resolution           | The structured interpretation of an intent.                           |
+| Plan                 | A human-readable execution summary.                                   |
+| Result               | The user-facing outcome of execution.                                 |
+| Mission              | A bounded unit of work with lifecycle state and evidence.             |
+| Task Session         | A lighter-weight durable execution contract.                          |
+| Artifact             | The concrete output of work.                                          |
+| Work Shape           | The operating mode of a work item.                                    |
+| Execution Shape      | The selected execution rung for an intent.                            |
+| WorkItem             | The canonical unit of executable work.                                |
+| WorkItem Context     | The typed identity chain on a work item.                              |
+| Mission Context Pack | The bounded context delivered to a mission task.                      |
+| Handoff Packet       | The explicit transfer record between workers or phases.               |
+| Knowledge Slice      | A task-profile-driven knowledge placement rule.                       |
+| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                     |
+| Semantic Brief       | A content brief that leaves presentation choices to the design layer. |
+| Design Cascade       | The ordered resolution of creative design defaults.                   |
+| Actuator             | A concrete execution component.                                       |
+| Procedure            | Distilled operational knowledge or a reusable method.                 |
+| Pipeline             | A declarative, governed execution graph.                              |
+| ADF                  | A human-readable structured execution contract.                       |
+| Tenant               | An isolation boundary identified by a tenant slug.                    |
+| Viewer Context       | The server-resolved principal and allowed tenant scope.               |
+| Approval Contract    | The human-approval boundary for consequential actions.                |
+| Gateway              | The generic delivery contract shared by surfaces.                     |
+| Trace                | The root observability record for an execution.                       |
+| Span                 | A timed operation within a trace.                                     |
+| Event                | A point-in-time occurrence within a span.                             |
+| Lease                | A durable authority grant with an expiry.                             |
+| Mission Controller   | The governed mission lifecycle entry point.                           |
 
 ### FDE full glossary
 
@@ -371,7 +371,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 ### ViewerContext / Viewer Scope
 
-The request-scoped principal resolved server-side by Chronos API routes: a viewer role (`readonly` | `localadmin`) plus allowed tenant, organization, and project sets (`tenant_slugs`, `organization_ids`, `project_ids`). Query parameters may only narrow the viewer's allowed set, never widen it. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
+The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel
 

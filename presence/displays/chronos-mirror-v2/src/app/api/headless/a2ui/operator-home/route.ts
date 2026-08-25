@@ -6,6 +6,7 @@ import {
   headlessEnvelope,
   headlessErrorResponse,
   parseHeadlessLimit,
+  authorizeHeadlessOperation,
 } from '../../../../../lib/headless-response';
 import { resolveViewerContextForRequest } from '../../../../../lib/viewer-context';
 
@@ -20,6 +21,11 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
+    authorizeHeadlessOperation(resolvedViewer.context, 'chronos.operator_home.read', {
+      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
+      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
+      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+    });
     const limit = parseHeadlessLimit(req.nextUrl.searchParams.get('limit'), 8, 50);
     const summary = readHeadlessOperatorHome(resolvedViewer.context, {
       tenant: req.nextUrl.searchParams.get('tenant') || undefined,

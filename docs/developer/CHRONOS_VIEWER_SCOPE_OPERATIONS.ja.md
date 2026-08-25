@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-08-06
+last_updated: 2026-08-24
 ---
 
 # Chronos viewer scope 運用手順
@@ -25,6 +25,10 @@ last_updated: 2026-08-06
 ファイル・成果物・runtime の読み取りは、可能な範囲で `withViewerExecutionContext` の内側で行い、単一 tenant viewer の境界を tier guard へ伝播します。tenant を選択できる可視化ルートは、viewer の許可集合を先に解決した後で query を交差させます。回帰防止として `src/app/api/route-contract.test.ts` が route module の viewer 契約を走査します。
 
 middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
+
+## headless / A2UI operation 認可
+
+headless route と A2UI route は、viewer scope のほかに共通 `SurfaceAuthorizationContext` で operation の `required_permissions` を評価します。manifest の `available_operations` も同じ判定から生成されるため、UI の表示可否と API の実行可否を別の role 比較で実装しません。`warn` は既存の非 headless 移行観測用であり、headless の tenant/org/project/tier scope や operation permission を拡大する bypass には使いません。
 
 ## scoped token の登録
 

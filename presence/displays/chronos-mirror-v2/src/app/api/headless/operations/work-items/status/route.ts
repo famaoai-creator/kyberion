@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest, requireChronosAccess } from '../../../../../../lib/api-guard';
-import { headlessEnvelope } from '../../../../../../lib/headless-response';
+import {
+  authorizeHeadlessOperation,
+  headlessEnvelope,
+} from '../../../../../../lib/headless-response';
 import { updateHeadlessWorkItemStatus } from '../../../../../../lib/headless-projections';
 import {
   resolveViewerContextForRequest,
@@ -19,6 +22,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    authorizeHeadlessOperation(resolvedViewer.context, 'chronos.work_items.update_status');
     const item = updateHeadlessWorkItemStatus(resolvedViewer.context, {
       itemId: body?.item_id,
       status: body?.status,
