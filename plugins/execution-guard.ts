@@ -1,5 +1,6 @@
-import { safeAppendFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 /**
@@ -38,7 +39,7 @@ export const afterSkill = (skillName: string, output: any) => {
     if (!safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
-    safeAppendFileSync(auditLog, JSON.stringify(entry) + '\n');
+    appendJsonLine(auditLog, entry);
   } catch (_e) {
     // Silent fail
   }

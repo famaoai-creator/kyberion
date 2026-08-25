@@ -16,6 +16,25 @@ describe('kyberion command router', () => {
     expect(() => selectEntrypoint('unknown-command')).toThrow('Unknown kyberion command');
   });
 
+  it('fails closed when the command registry and entrypoint map disagree', () => {
+    expect(() =>
+      selectEntrypoint('ask', {
+        version: 1,
+        commands: [
+          {
+            id: 'operator-home.ask',
+            command: 'ask',
+            noun: 'ask',
+            verb: 'default',
+            entry: 'operator-home',
+            audience: 'user',
+          },
+        ],
+        entrypoints: [{ id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] }],
+      })
+    ).toThrow('CLI command registry mismatch');
+  });
+
   it('exposes command metadata from the governed registry', () => {
     expect(resolveCommand('ask')).toMatchObject({
       noun: 'ask',

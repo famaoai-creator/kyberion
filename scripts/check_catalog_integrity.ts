@@ -88,6 +88,11 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/product/schemas/organization-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/organization-catalog.json',
   },
+  {
+    id: 'cli-commands',
+    schemaPath: 'knowledge/product/schemas/cli-commands.schema.json',
+    dataPath: 'knowledge/product/governance/cli-commands.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
