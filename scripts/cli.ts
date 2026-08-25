@@ -386,6 +386,19 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log(`${t('cli_help_indexed_actuators', locale)} ${actuators.length}`);
 }
 
+/**
+ * SX-08 compatibility route: the read-only legacy intent resolver now uses
+ * the operator's canonical surface entrypoint. Keep --run on the old branch
+ * because it has explicit inline-pipeline semantics that ask does not claim.
+ */
+export async function routeLegacyIntentToAsk(utterance: string): Promise<void> {
+  console.error(
+    '[DEPRECATED] `pnpm cli intent` is now routed to `pnpm kyberion ask --explain`; use the latter directly.'
+  );
+  const { main: operatorHomeMain } = await import('./kyberion_home.js');
+  await operatorHomeMain(['ask', utterance, '--explain']);
+}
+
 function printEmailHelp(locale = resolveLocale()): void {
   printHeader(locale);
   console.log(t('cli_help_email_usage', locale));
@@ -1971,6 +1984,11 @@ export async function main(args = process.argv.slice(2)) {
     }
     const doRun = flags.includes('--run');
     const doClarify = flags.includes('--clarify');
+
+    if (!doRun) {
+      await routeLegacyIntentToAsk(utterance);
+      return;
+    }
 
     const { resolveIntentResolutionPacket, loadStandardIntentCatalog } =
       await import('@agent/core/intent-resolution');
