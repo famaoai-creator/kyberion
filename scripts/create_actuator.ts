@@ -113,65 +113,23 @@ function buildPackage(description: string, name: string, fullName: string): stri
   );
 }
 
-function buildIndexTs(fullName: string, pascalName: string, name: string): string {
-  return `import { defineActuator, ensureDefaultOpPreflight, logger, classifyError, runOpPreflight } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
+  return `import { defineActuator, logger, runActuatorCli } from '@agent/core';
 
-// ── Op dispatch ─────────────────────────────────────────────────────────────
-
-export async function dispatch${pascalName}Op(
-  op: string,
-  params: Record<string, unknown>,
-  ctx: Record<string, unknown>,
-): Promise<{ handled: boolean; ctx: Record<string, unknown> }> {
-  try {
-    ensureDefaultOpPreflight();
-    const approvalGranted = params._approval_granted === true || ctx._approval_granted === true;
-    const preflight = await runOpPreflight({
-      op: '${fullName}:' + op,
-      params,
-      context: ctx,
-      source: 'actuator',
-      requiresApproval: params._approval_required === true || ctx._approval_required === true,
-      approvalGranted,
-    });
-    if (preflight.decision !== 'allow') {
-      throw new Error(
-        '[OP_PREFLIGHT_' + preflight.decision.toUpperCase() + '] ' +
-          (preflight.reason || 'Operation was not admitted.')
-      );
-    }
-    const admittedParams = preflight.input;
-    switch (op) {
-      case 'execute':
-        {
-          const result = await actuator.dispatch(op, admittedParams, ctx);
-          if (!result.ok) throw new Error(result.error || 'Actuator operation failed.');
-          return { handled: true, ctx: asRecord(result.output ?? ctx) };
-        }
-
-      default:
-        logger.warn(\`[${fullName}] Unknown op: \${op}\`);
-        return { handled: false, ctx };
-    }
-  } catch (err: any) {
-    const classification = classifyError(err);
-    logger.error(\`[${fullName}] \${op} failed (\${classification.category}): \${err.message}\`);
-    throw err;
-  }
-}
+const executeInputSchema = {
+  type: 'object',
+  description: 'Replace this scaffold contract with the actuator-specific input schema.',
+  additionalProperties: true,
+} as const;
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Actuator output must be an object.');
+    throw new Error('Actuator input must be an object.');
   }
   return value as Record<string, unknown>;
 }
 
-// Re-export under the generic name expected by run_pipeline.ts
-export const dispatchDecisionOp = dispatch${pascalName}Op;
-
-// ── Op implementations ──────────────────────────────────────────────────────
+// ── Op implementation ───────────────────────────────────────────────────────
 
 async function opExecute(
   params: Record<string, unknown>,
@@ -191,29 +149,27 @@ async function opExecute(
   };
 }
 
-const actuator = defineActuator({
+export const actuator = defineActuator({
   id: '${fullName}',
   ops: {
     execute: {
       kind: 'apply',
-      input_schema: { '$ref': 'schemas/${name}-action.schema.json' },
+      input_schema: executeInputSchema,
       validateInput: asRecord,
       handler: opExecute,
     },
   },
 });
 
-// ── CLI entry point ─────────────────────────────────────────────────────────
+export async function main(): Promise<void> {
+  await runActuatorCli({ name: '${fullName}', actuator });
+}
 
 if (process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('index.ts')) {
-  const argv = await createStandardYargs()
-    .option('op', { type: 'string', demandOption: true, describe: 'Operation to run' })
-    .option('params', { type: 'string', default: '{}', describe: 'JSON params' })
-    .parseAsync();
-
-  const params = JSON.parse(argv.params as string);
-  const result = await dispatch${pascalName}Op(argv.op as string, params, {});
-  console.log(JSON.stringify(result.ctx, null, 2));
+  main().catch((err: unknown) => {
+    logger.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
 }
 `;
 }
