@@ -66,7 +66,7 @@ import {
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectOperatorHomeSummary } from '@agent/core';
-import { collectDoctorReport } from './run_doctor.js';
+import { collectDoctorReport, runDoctor } from './run_doctor.js';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -1654,6 +1654,11 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         Boolean(argv.json),
         Boolean(argv.explain)
       );
+      return;
+    case 'doctor':
+      // Keep the user-facing single CLI as the canonical doctor entrypoint;
+      // runtime-specific checks remain options of the shared doctor command.
+      await runDoctor(args.slice(1));
       return;
     case 'intent':
       await handleIntentSubcommand(
