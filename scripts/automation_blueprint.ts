@@ -14,6 +14,7 @@ import {
   loadAutomationBlueprint,
   resolveAutomationBlueprint,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -42,28 +43,34 @@ function render(ref: string, valuesJson: string) {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  const command = argv[0];
-  if (!command) usage();
+export const main = defineScript({
+  name: 'automation:blueprint',
+  flags: [],
+  run(context) {
+    const argv = context.positional;
+    const command = argv[0];
+    if (!command) usage();
 
-  if (command === 'list') {
-    const blueprints = listAutomationBlueprintCatalog().map(({ blueprint }) => ({
-      blueprint_id: blueprint.blueprint_id,
-      name: blueprint.name,
-      pipeline_ref: blueprint.pipeline_ref,
-    }));
-    process.stdout.write(`${JSON.stringify({ blueprints }, null, 2)}\n`);
-    return;
-  }
+    if (command === 'list') {
+      const blueprints = listAutomationBlueprintCatalog().map(({ blueprint }) => ({
+        blueprint_id: blueprint.blueprint_id,
+        name: blueprint.name,
+        pipeline_ref: blueprint.pipeline_ref,
+      }));
+      context.print({ blueprints });
+      return;
+    }
 
-  if (command !== 'render') usage();
-  const ref = flag(argv, '--pipeline');
-  if (!ref) usage();
-  process.stdout.write(`${JSON.stringify(render(ref, flag(argv, '--values-json')), null, 2)}\n`);
-}
-
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+    if (command !== 'render') usage();
+    const ref = flag(argv, '--pipeline');
+    if (!ref) usage();
+    context.print(render(ref, flag(argv, '--values-json')));
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'automation_blueprint.ts') ||
+  isDirectScript(import.meta.url, 'automation_blueprint.js')
+) {
+  void main();
+}
