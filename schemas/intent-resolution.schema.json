@@ -10,6 +10,7 @@
     "resolution_shape",
     "outcome_kind",
     "authority_level",
+    "next_action",
     "rationale"
   ],
   "properties": {
@@ -36,6 +37,19 @@
     "authority_level": {
       "type": "string",
       "enum": ["autonomous", "approval_required", "human_clarification_required"]
+    },
+    "next_action": {
+      "type": "object",
+      "required": ["kind", "label", "consequence"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["request_approval", "provide_input", "continue"]
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "consequence": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
     },
     "project_context": {
       "type": "object",
