@@ -10,6 +10,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 interface CustomerEntry {
   slug: string;
@@ -77,7 +78,8 @@ function main(): void {
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'customer_list.ts') ||
+  isDirectScript(import.meta.url, 'customer_list.js')
+)
   main();
-}
