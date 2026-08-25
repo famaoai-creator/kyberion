@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import { fileURLToPath } from 'node:url';
 import { resolveActiveProfileRoot, safeExistsSync, safeRmSync } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface OnboardingResetOptions {
   force?: boolean;
@@ -97,8 +97,7 @@ export function formatResetSummary(result: OnboardingResetResult): string {
   ].join('\n');
 }
 
-export async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export async function main(args: string[] = []): Promise<void> {
   const force = args.includes('--force');
   const json = args.includes('--json');
 
@@ -115,11 +114,14 @@ export async function main(): Promise<void> {
   console.log(formatResetSummary(result));
 }
 
-const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'onboarding_reset.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_reset.js')
+)
+  void defineScript({
+    name: 'onboard:reset',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();
