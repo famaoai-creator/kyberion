@@ -32,6 +32,11 @@ export class ScriptExitError extends Error {
 
 const DEFAULT_SCRIPT_FLAGS: readonly ScriptFlag[] = ['json', 'dry-run', 'check', 'quiet'];
 
+/** Return the full process argv for legacy APIs whose parsers expect node/script prefixes. */
+export function currentProcessArgv(): string[] {
+  return [...process.argv];
+}
+
 export function parseScriptFlags(
   argv: string[],
   enabledFlags: readonly ScriptFlag[] = DEFAULT_SCRIPT_FLAGS
