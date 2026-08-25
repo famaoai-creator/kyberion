@@ -27,7 +27,8 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
 export const INGEST_QUOTA_POLICY_REPO_PATH =
@@ -141,9 +142,7 @@ export function loadIngestQuotaPolicy(options: IngestQuotaOptions = {}): IngestQ
   );
   if (!safeExistsSync(policyPath)) return { ...DEFAULT_INGEST_QUOTA_POLICY };
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(policyPath, { encoding: 'utf8' }) || '{}')
-    ) as Partial<IngestQuotaPolicy>;
+    const parsed = readJson<Partial<IngestQuotaPolicy>>(policyPath);
     const tenantOverrides: Record<string, IngestQuotaOverride> = {};
     for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
       if (!raw || typeof raw !== 'object') continue;
@@ -193,10 +192,10 @@ export function resolveIngestQuotaForTenant(
 function readUsage(counterPath: string): IngestQuotaUsage {
   if (!safeExistsSync(counterPath)) return { files: 0, bytes: 0 };
   try {
-    const parsed = JSON.parse(String(safeReadFile(counterPath, { encoding: 'utf8' }) || '{}')) as {
+    const parsed = readJson<{
       files?: unknown;
       bytes?: unknown;
-    };
+    }>(counterPath);
     return {
       files: isPositive(parsed.files) ? Math.floor(parsed.files as number) : 0,
       bytes: isPositive(parsed.bytes) ? Math.floor(parsed.bytes as number) : 0,
