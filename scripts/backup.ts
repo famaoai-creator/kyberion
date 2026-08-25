@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
   GENERATION_QUOTA_COUNTER_REPO_SUBPATH,
@@ -22,6 +21,7 @@ import {
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { defineScript } from './lib/harness.js';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
@@ -1226,7 +1226,7 @@ export function summarizeBackupStatus(
   };
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[]): void {
   assertProtocolServiceRegistered('backup-restore');
   const options = parseBackupArgs(argv);
   if (options.command === 'create') {
@@ -1305,15 +1305,8 @@ export function main(argv = process.argv.slice(2)): void {
   console.log(JSON.stringify({ ok: true, backups }, null, 2));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  try {
-    main();
-  } catch (err: any) {
-    const message = err?.message || String(err);
-    if (message.includes('Usage:')) console.error(message);
-    else console.error(`[backup] ${message}`);
-    process.exit(1);
-  }
-}
+void defineScript({
+  name: 'backup',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
