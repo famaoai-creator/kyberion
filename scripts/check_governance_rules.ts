@@ -11,6 +11,7 @@ import {
 } from '@agent/core';
 import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
 import { fileURLToPath } from 'node:url';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type GovernanceRuleCheck = {
   id: string;
@@ -2159,42 +2160,45 @@ function scanProductJsonForPlacementDrift(violations: string[]) {
   }
 }
 
-export function main() {
-  const violations: string[] = [];
-  for (const check of CHECKS) {
-    validateRuleFile(check, violations);
-  }
-  validateActuatorCatalogDirectoryConsistency(violations);
-  findMachineAbsolutePathViolations(violations);
-  scanProductJsonForPlacementDrift(violations);
-  try {
-    assertProcessDefinitionRegistry();
-  } catch (error) {
-    violations.push(
-      `process-definition-registry: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-  for (const deterministicCatalog of findDeterministicCatalogViolations()) {
-    violations.push(
-      `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`
-    );
-  }
-
-  if (violations.length > 0) {
-    console.error('[check:governance-rules] violations detected:');
-    for (const violation of violations.sort()) {
-      console.error(`- ${violation}`);
+export const runCheckGovernanceRules = defineScript({
+  name: 'check:governance-rules',
+  flags: [],
+  run(context) {
+    const violations: string[] = [];
+    for (const check of CHECKS) {
+      validateRuleFile(check, violations);
     }
-    process.exitCode = 1;
-    return;
-  }
+    validateActuatorCatalogDirectoryConsistency(violations);
+    findMachineAbsolutePathViolations(violations);
+    scanProductJsonForPlacementDrift(violations);
+    try {
+      assertProcessDefinitionRegistry();
+    } catch (error) {
+      violations.push(
+        `process-definition-registry: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    for (const deterministicCatalog of findDeterministicCatalogViolations()) {
+      violations.push(
+        `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`
+      );
+    }
 
-  console.log('[check:governance-rules] OK');
-}
+    if (violations.length > 0) {
+      console.error('[check:governance-rules] violations detected:');
+      for (const violation of violations.sort()) {
+        console.error(`- ${violation}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
 
-const isDirectRun =
-  process.argv[1] && pathResolver.rootResolve(process.argv[1]) === fileURLToPath(import.meta.url);
+    context.print('[check:governance-rules] OK');
+  },
+});
 
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_governance_rules.ts') ||
+  isDirectScript(import.meta.url, 'check_governance_rules.js')
+)
+  void runCheckGovernanceRules();
