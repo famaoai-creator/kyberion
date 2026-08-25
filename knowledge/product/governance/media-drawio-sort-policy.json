@@ -1,6 +1,19 @@
 {
+  "$schema": "../schemas/media-drawio-sort-policy.schema.json",
   "version": "1.0.0",
-  "group_order": ["edge", "web", "application", "app", "data", "database", "network", "security", "module", "control", "state"],
+  "group_order": [
+    "edge",
+    "web",
+    "application",
+    "app",
+    "data",
+    "database",
+    "network",
+    "security",
+    "module",
+    "control",
+    "state"
+  ],
   "type_order": [
     "aws_provider",
     "aws_availability_zones",

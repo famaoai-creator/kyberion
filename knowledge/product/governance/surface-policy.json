@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/surface-policy.schema.json",
   "_status": "deprecated",
   "_replacement": "knowledge/product/governance/surface-provider-manifests.json",
   "version": "1.0.0",

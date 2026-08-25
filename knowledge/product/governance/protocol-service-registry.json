@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "Lifecycle and scope registry for protocol gateways and control-plane services that are not human-facing surfaces.",
   "entries": [

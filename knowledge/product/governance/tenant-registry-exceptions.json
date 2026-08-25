@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "_meta": "DA-01 tenant registry consistency exceptions. Each entry documents an INTENTIONAL asymmetry between the tenant reference systems (tenant profiles / knowledge/confidential/tenants/index.json / customer/{slug}/ dirs) that check:tenant-registry would otherwise flag as drift. Every entry must carry a one-line reason. Entries matching no slug in the current checkout are reported as warnings, never failures (CI checkouts contain no gitignored tenant data).",
   "exceptions": [
     {

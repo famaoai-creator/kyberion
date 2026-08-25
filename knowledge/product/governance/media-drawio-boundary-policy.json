@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-drawio-boundary-policy.schema.json",
   "version": "1.0.0",
   "palette_overrides": [
     { "boundary": "lane", "tier": "edge", "fill": "#ECFDF5", "stroke": "#059669" },

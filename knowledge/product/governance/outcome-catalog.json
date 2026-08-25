@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/outcome-catalog.schema.json",
   "version": "1.0.0",
   "outcomes": {
     "browser_navigation": {

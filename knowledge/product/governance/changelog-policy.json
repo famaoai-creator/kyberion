@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/changelog-policy.schema.json",
   "version": "1.0.0",
   "breaking_changes_title": "⚠ BREAKING CHANGES",
   "uncategorized_title": "Uncategorized",

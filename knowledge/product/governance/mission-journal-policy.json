@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-journal-policy.schema.json",
   "version": "1.0.0",
   "title": "Mission Journal: Ecosystem Evolution",
   "summary_title": "Summary",

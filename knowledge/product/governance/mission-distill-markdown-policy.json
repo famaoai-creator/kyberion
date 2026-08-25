@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-distill-markdown-policy.schema.json",
   "version": "1.0.0",
   "title_suffix": "Completion Summary",
   "section_titles": {

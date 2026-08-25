@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "Semantic static baseline for tenant-aware knowledge scope choke points. Increase only through a reviewed migration that removes a direct env read.",
   "max_direct_tenant_env_reads": 26,

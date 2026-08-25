@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "profiles": {
     "default_governed_execution": {
@@ -15,12 +16,7 @@
         ]
       },
       "knowledge_zone": {
-        "owns": [
-          "intent definitions",
-          "process_design",
-          "outcome catalog",
-          "specialist routing"
-        ]
+        "owns": ["intent definitions", "process_design", "outcome catalog", "specialist routing"]
       },
       "compiler_zone": {
         "responsibilities": [
@@ -53,12 +49,7 @@
         ]
       },
       "knowledge_zone": {
-        "owns": [
-          "intent definitions",
-          "process_design",
-          "outcome catalog",
-          "specialist routing"
-        ]
+        "owns": ["intent definitions", "process_design", "outcome catalog", "specialist routing"]
       },
       "compiler_zone": {
         "responsibilities": [

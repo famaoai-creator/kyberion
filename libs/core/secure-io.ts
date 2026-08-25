@@ -187,7 +187,16 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
  */
 export function loadJson<T>(filePath: string): T {
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as T;
+  const parsed = JSON.parse(raw) as unknown;
+  // `$schema` is source-artifact metadata. Runtime consumers validate the
+  // domain payload, so normalize the root annotation away before callers see
+  // it. The raw file remains available to governance/index checks that need
+  // to inspect provenance metadata.
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && '$schema' in parsed) {
+    const { $schema: _schema, ...payload } = parsed as Record<string, unknown>;
+    return payload as T;
+  }
+  return parsed as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */

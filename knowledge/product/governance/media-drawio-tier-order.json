@@ -1,4 +1,17 @@
 {
+  "$schema": "../schemas/media-drawio-tier-order.schema.json",
   "version": "1.0.0",
-  "tier_order": ["network", "edge", "web", "application", "app", "data", "database", "security", "module", "control", "state"]
+  "tier_order": [
+    "network",
+    "edge",
+    "web",
+    "application",
+    "app",
+    "data",
+    "database",
+    "security",
+    "module",
+    "control",
+    "state"
+  ]
 }

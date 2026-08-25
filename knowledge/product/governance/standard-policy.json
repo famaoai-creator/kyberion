@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "name": "Kyberion Ecosystem Governance Policy",
   "version": "1.0.0",
   "rules": [
