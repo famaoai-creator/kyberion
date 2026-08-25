@@ -11,11 +11,13 @@ import {
   parseIso,
   setRegisteredEnv,
   slugify,
+  truncateNormalizedText,
 } from './index.js';
 
 describe('foundation helpers', () => {
   it('keeps deterministic text and numeric semantics in one place', () => {
     expect(normalizeText('  hello   world  ')).toBe('hello world');
+    expect(truncateNormalizedText('  hello   world  ', 8)).toBe('hello...');
     expect(slugify('Hello, World!')).toBe('hello-world');
     expect(clamp(12, 0, 10)).toBe(10);
     expect(parseIso('2026-08-25T00:00:00.000Z').toISOString()).toBe('2026-08-25T00:00:00.000Z');

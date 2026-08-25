@@ -30,6 +30,7 @@ import {
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { truncateNormalizedText } from './foundation/text.js';
 import type { ValidationResult } from './types.js';
 
 export interface AdfRepairResult {
@@ -177,13 +178,6 @@ function validateRepairTarget(
   }
 }
 
-function truncateKnowledgeExcerpt(value: string, max: number): string {
-  const text = String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ');
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
-}
-
 /**
  * KP-02: enrich the repair delegation's context with knowledge hints for
  * this schema/error topic.
@@ -253,7 +247,7 @@ async function buildAdfRepairKnowledgeContext(
       'Relevant knowledge:',
       ...entries.map(
         (entry) =>
-          `- ${entry.title} (${entry.path}): ${truncateKnowledgeExcerpt(entry.excerpt, ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX)}`
+          `- ${entry.title} (${entry.path}): ${truncateNormalizedText(entry.excerpt, ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX)}`
       ),
     ];
     recordKnowledgeDelivery({
