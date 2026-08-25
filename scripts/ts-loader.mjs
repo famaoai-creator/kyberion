@@ -7,6 +7,14 @@ import ts from 'typescript';
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_LIKE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 const ROOT_DIR = process.cwd();
+const PROJECT_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..');
+
+function isWorkspacePath(filePath) {
+  return (
+    (filePath.startsWith(ROOT_DIR) || filePath.startsWith(PROJECT_ROOT)) &&
+    !filePath.includes('/node_modules/')
+  );
+}
 
 function isFileUrl(specifier) {
   return specifier.startsWith('file:');
@@ -30,7 +38,7 @@ function resolveTsLike(specifier, context, nextResolve) {
 
   const parentPath =
     context.parentURL && isFileUrl(context.parentURL) ? fileURLToPath(context.parentURL) : ROOT_DIR;
-  if (!parentPath.startsWith(ROOT_DIR) || parentPath.includes('/node_modules/')) {
+  if (!isWorkspacePath(parentPath)) {
     return nextResolve(specifier, context);
   }
 
@@ -74,7 +82,7 @@ function loadTsLike(url, context, nextLoad) {
     return nextLoad(url, context);
   }
 
-  if (!filePath.startsWith(ROOT_DIR) || filePath.includes('/node_modules/')) {
+  if (!isWorkspacePath(filePath)) {
     return nextLoad(url, context);
   }
 
