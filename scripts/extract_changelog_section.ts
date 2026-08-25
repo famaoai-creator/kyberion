@@ -8,6 +8,7 @@
 
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface Args {
   ref: string;
@@ -16,7 +17,7 @@ interface Args {
   help?: boolean;
 }
 
-function parseArgs(argv: string[] = process.argv.slice(2)): Args {
+function parseArgs(argv: string[]): Args {
   let ref = '';
   let input = 'CHANGELOG.md';
   let output: string | undefined;
@@ -44,7 +45,9 @@ function parseArgs(argv: string[] = process.argv.slice(2)): Args {
 }
 
 function printUsage(): void {
-  console.log('Usage: pnpm extract-changelog-section --ref <tag-or-version> [--input CHANGELOG.md] [--output <file>]');
+  console.log(
+    'Usage: pnpm extract-changelog-section --ref <tag-or-version> [--input CHANGELOG.md] [--output <file>]'
+  );
 }
 
 function normalizeRef(ref: string): string {
@@ -83,8 +86,8 @@ function extractReleaseSection(changelog: string, ref: string): string {
   return lines.slice(startIndex, endIndex).join('\n').trimEnd() + '\n';
 }
 
-function main(): void {
-  const args = parseArgs();
+function main(argv: string[]): void {
+  const args = parseArgs(argv);
   if (args.help) {
     printUsage();
     return;
@@ -106,9 +109,16 @@ function main(): void {
   process.stdout.write(section);
 }
 
-const isDirect = process.argv[1] && /extract_changelog_section\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'extract_changelog_section.ts') ||
+  isDirectScript(import.meta.url, 'extract_changelog_section.js')
+)
+  void defineScript({
+    name: 'extract:changelog-section',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();
 
 export { extractReleaseSection, normalizeRef };
