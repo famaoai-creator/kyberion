@@ -6,6 +6,7 @@
 import { safeExistsSync } from '@agent/core';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
 import { readJsonFile } from './cli-input.js';
+import { currentProcessArgv } from '../lib/harness.js';
 
 export interface MissionStartCreateOptions {
   tier?: 'personal' | 'confidential' | 'public';
@@ -43,7 +44,10 @@ export function extractMissionControllerPositionalArgs(argv: string[]): string[]
   return positionalArgs;
 }
 
-export function getOptionValue(flag: string, argv: string[] = process.argv): string | undefined {
+export function getOptionValue(
+  flag: string,
+  argv: string[] = currentProcessArgv()
+): string | undefined {
   const index = argv.indexOf(flag);
   if (index === -1) return undefined;
   const value = argv[index + 1];
@@ -51,27 +55,51 @@ export function getOptionValue(flag: string, argv: string[] = process.argv): str
   return value;
 }
 
-export function parseCsvOption(flag: string, argv: string[] = process.argv): string[] | undefined {
+export function parseCsvOption(
+  flag: string,
+  argv: string[] = currentProcessArgv()
+): string[] | undefined {
   const raw = getOptionValue(flag, argv);
   if (!raw) return undefined;
-  return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
-export function extractProjectRelationshipOptionsFromArgv(argv: string[]): Partial<MissionRelationships> {
+export function extractProjectRelationshipOptionsFromArgv(
+  argv: string[]
+): Partial<MissionRelationships> {
   const projectId = getOptionValue('--project-id', argv);
   const projectPath = getOptionValue('--project-path', argv);
-  const relationshipType = getOptionValue('--project-relationship', argv) as MissionRelationships['project'] extends infer T
-    ? T extends { relationship_type: infer R } ? R : never
+  const relationshipType = getOptionValue(
+    '--project-relationship',
+    argv
+  ) as MissionRelationships['project'] extends infer T
+    ? T extends { relationship_type: infer R }
+      ? R
+      : never
     : never;
   const affectedArtifacts = parseCsvOption('--affected-artifacts', argv);
   const traceabilityRefs = parseCsvOption('--traceability-refs', argv);
-  const gateImpact = getOptionValue('--gate-impact', argv) as MissionRelationships['project'] extends infer T
-    ? T extends { gate_impact: infer G } ? G : never
+  const gateImpact = getOptionValue(
+    '--gate-impact',
+    argv
+  ) as MissionRelationships['project'] extends infer T
+    ? T extends { gate_impact: infer G }
+      ? G
+      : never
     : never;
   const note = getOptionValue('--project-note', argv);
 
   const hasProjectOptions = Boolean(
-    projectId || projectPath || relationshipType || affectedArtifacts?.length || traceabilityRefs?.length || gateImpact || note
+    projectId ||
+    projectPath ||
+    relationshipType ||
+    affectedArtifacts?.length ||
+    traceabilityRefs?.length ||
+    gateImpact ||
+    note
   );
 
   if (!hasProjectOptions) {
@@ -91,21 +119,39 @@ export function extractProjectRelationshipOptionsFromArgv(argv: string[]): Parti
   };
 }
 
-export function extractTrackRelationshipOptionsFromArgv(argv: string[]): Partial<MissionRelationships> {
+export function extractTrackRelationshipOptionsFromArgv(
+  argv: string[]
+): Partial<MissionRelationships> {
   const trackId = getOptionValue('--track-id', argv);
   const trackName = getOptionValue('--track-name', argv);
-  const trackType = getOptionValue('--track-type', argv) as MissionRelationships['track'] extends infer T
-    ? T extends { track_type: infer R } ? R : never
+  const trackType = getOptionValue(
+    '--track-type',
+    argv
+  ) as MissionRelationships['track'] extends infer T
+    ? T extends { track_type: infer R }
+      ? R
+      : never
     : never;
   const lifecycleModel = getOptionValue('--lifecycle-model', argv);
-  const relationshipType = getOptionValue('--track-relationship', argv) as MissionRelationships['track'] extends infer T
-    ? T extends { relationship_type: infer R } ? R : never
+  const relationshipType = getOptionValue(
+    '--track-relationship',
+    argv
+  ) as MissionRelationships['track'] extends infer T
+    ? T extends { relationship_type: infer R }
+      ? R
+      : never
     : never;
   const traceabilityRefs = parseCsvOption('--track-traceability-refs', argv);
   const note = getOptionValue('--track-note', argv);
 
   const hasTrackOptions = Boolean(
-    trackId || trackName || trackType || lifecycleModel || relationshipType || traceabilityRefs?.length || note,
+    trackId ||
+    trackName ||
+    trackType ||
+    lifecycleModel ||
+    relationshipType ||
+    traceabilityRefs?.length ||
+    note
   );
 
   if (!hasTrackOptions) {
@@ -126,16 +172,21 @@ export function extractTrackRelationshipOptionsFromArgv(argv: string[]): Partial
 }
 
 export function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
-  return extractProjectRelationshipOptionsFromArgv(process.argv);
+  return extractProjectRelationshipOptionsFromArgv(currentProcessArgv());
 }
 
-export function extractJsonRelationshipsOption(argv: string[] = process.argv): Partial<MissionRelationships> {
-  const raw = getOptionValue('--relationships-json', argv) || getOptionValue('--relationships', argv);
+export function extractJsonRelationshipsOption(
+  argv: string[] = currentProcessArgv()
+): Partial<MissionRelationships> {
+  const raw =
+    getOptionValue('--relationships-json', argv) || getOptionValue('--relationships', argv);
   if (!raw) return {};
   return JSON.parse(raw) as Partial<MissionRelationships>;
 }
 
-export function extractFileRelationshipsOption(argv: string[] = process.argv): Partial<MissionRelationships> {
+export function extractFileRelationshipsOption(
+  argv: string[] = currentProcessArgv()
+): Partial<MissionRelationships> {
   const filePath = getOptionValue('--relationships-file', argv);
   if (!filePath) return {};
   if (!safeExistsSync(filePath)) {
@@ -144,7 +195,9 @@ export function extractFileRelationshipsOption(argv: string[] = process.argv): P
   return readJsonFile<Partial<MissionRelationships>>(filePath);
 }
 
-export function extractMissionStartCreateOptionsFromArgv(argv: string[] = process.argv): MissionStartCreateOptions {
+export function extractMissionStartCreateOptionsFromArgv(
+  argv: string[] = currentProcessArgv()
+): MissionStartCreateOptions {
   const tenantSlug = getOptionValue('--tenant-slug', argv);
   return {
     tier: getOptionValue('--tier', argv) as MissionStartCreateOptions['tier'] | undefined,
