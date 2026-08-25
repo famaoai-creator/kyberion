@@ -26,7 +26,6 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   deriveAssetId,
   findAssetBySource,
@@ -36,6 +35,7 @@ import {
   scanContent,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript } from './lib/harness.js';
 import {
   commitIngest,
   dedupContent,
@@ -228,7 +228,7 @@ function resolveIdentity(args: CliArgs): string {
   );
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const args = parseArgs(argv);
   if (args.help || argv.length === 0) {
     console.log(USAGE);
@@ -375,11 +375,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(JSON.stringify(result.asset, null, 2));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(`[ingest] ERROR: ${error instanceof Error ? error.message : String(error)}`);
-    process.exitCode = 1;
-  });
-}
+void defineScript({
+  name: 'ingest',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
