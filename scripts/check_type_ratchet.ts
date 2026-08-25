@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import ts from 'typescript';
 import {
   loadJson,
@@ -199,23 +199,28 @@ export function checkTypeRatchet(
   };
 }
 
-export function main(): void {
-  const writeBaseline = process.argv.includes('--write-baseline');
-  const report = checkTypeRatchet({ writeBaseline });
+export const runCheckTypeRatchet = defineScript({
+  name: 'check:type-ratchet',
+  flags: [],
+  run(context) {
+    const writeBaseline = context.argv.includes('--write-baseline');
+    const report = checkTypeRatchet({ writeBaseline });
 
-  if (report.violations.length > 0) {
-    console.error('[check:type-ratchet] violations detected:');
-    for (const violation of report.violations) {
-      console.error(`- ${violation}`);
+    if (report.violations.length > 0) {
+      console.error('[check:type-ratchet] violations detected:');
+      for (const violation of report.violations) {
+        console.error(`- ${violation}`);
+      }
+      process.exitCode = 1;
+      return;
     }
-    process.exit(1);
-  }
 
-  console.log('[check:type-ratchet] OK');
-}
+    context.print('[check:type-ratchet] OK');
+  },
+});
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_type_ratchet.ts') ||
+  isDirectScript(import.meta.url, 'check_type_ratchet.js')
+)
+  void runCheckTypeRatchet();
