@@ -29,10 +29,16 @@
       "note": "PPT build staging dir"
     },
     {
-      "file": "libs/actuators/media-actuator/src/index.ts",
-      "count": 7,
+      "file": "libs/actuators/media-actuator/src/media-action-apply.ts",
+      "count": 2,
       "classification": "migrate-candidate",
-      "note": "mixed: temp asset/diagram staging (legit) plus pdf-ops fallback deliverable outputs (scoped)"
+      "note": "diagram staging directories; migrate scope-owned media artifacts"
+    },
+    {
+      "file": "libs/actuators/media-actuator/src/media-action-capture.ts",
+      "count": 5,
+      "classification": "migrate-candidate",
+      "note": "PDF and presentation staging directories; migrate scope-owned media artifacts"
     },
     {
       "file": "libs/actuators/media-generation-actuator/src/media-generation-helpers.ts",

@@ -60,7 +60,11 @@ pnpm company:onboard --vertical saas-product-company --slug acme-ai \
   --goal "Define the first customer outcome and launch plan"
 ```
 
+`pnpm onboard` uses `customer/{slug}/ preferred when KYBERION_CUSTOMER is set` for the customer stance overlay.
+
 The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding. Tenant activation is still a separate human-accepted gate.
+
+When `KYBERION_CUSTOMER` is set, `customer/{slug}/` is preferred for customer-specific identity and onboarding artifacts.
 
 Before starting the first work, activate the tenant after the readiness probes, then review its management unit:
 

@@ -150,6 +150,17 @@ export async function main(argv: string[] = []): Promise<void> {
   }
 
   const scenarios = listTaskScenarios();
+  if (scenarios.length === 0) {
+    // `task:list` is also the readiness probe used before `task:init`; an
+    // empty catalog is an actionable state, not an uncaught CLI exception.
+    console.error(
+      `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
+    );
+    console.error(
+      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
+    );
+    return;
+  }
   printTaskScenarios(scenarios);
 }
 

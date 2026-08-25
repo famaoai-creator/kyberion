@@ -2511,7 +2511,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 13456,
+      "size": 13686,
       "type": "json"
     },
     {
@@ -5397,7 +5397,7 @@
     {
       "path": "product/pipeline-templates/meeting-to-pptx-workflow.json",
       "tier": "public",
-      "size": 9041,
+      "size": 8627,
       "type": "json"
     },
     {
@@ -5511,7 +5511,7 @@
     {
       "path": "product/pipeline-templates/productivity-task-orchestration.json",
       "tier": "public",
-      "size": 3352,
+      "size": 2342,
       "type": "json"
     },
     {
@@ -6717,7 +6717,7 @@
     {
       "path": "product/schemas/contextual-intent-learning-seed.schema.json",
       "tier": "public",
-      "size": 2021,
+      "size": 2241,
       "type": "json"
     },
     {
@@ -8325,7 +8325,7 @@
     {
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
-      "size": 1414,
+      "size": 1451,
       "type": "json"
     },
     {
