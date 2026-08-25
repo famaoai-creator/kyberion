@@ -8,6 +8,7 @@ import {
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
+import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import {
   eventScopeMatches,
   normalizeEventScope,
@@ -158,7 +159,7 @@ export interface ApprovalSteeringAction {
   verb: 'verify' | 'finish';
   missionId: string;
   note?: string;
-  surface: string;
+  surface: SurfaceAsyncChannel;
   channel: string;
   threadTs: string;
   correlationId: string;

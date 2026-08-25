@@ -10,6 +10,7 @@ import {
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from './next-action.js';
 import type { SupportedLocale } from './locale-normalize.js';
+import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
 export interface SurfaceDirectoryRow {
   id: string;
@@ -566,8 +567,8 @@ export function buildSurfaceLauncherNextActions(params: {
   return actions.slice(0, 4);
 }
 
-function listKnownSurfaceChannels(): string[] {
-  const channels = new Set<string>(['presence']);
+function listKnownSurfaceChannels(): SurfaceAsyncChannel[] {
+  const channels = new Set<SurfaceAsyncChannel>(['presence']);
   for (const manifest of listSurfaceProviderManifests()) {
     if (manifest.id) channels.add(manifest.id);
   }

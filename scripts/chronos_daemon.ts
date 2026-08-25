@@ -25,6 +25,8 @@ import {
   createTriggerRunner,
   withExecutionContextAsync,
   withTriggerLeaderLease,
+  validateChronosDeliveryTarget,
+  type ChronosDeliveryTarget,
 } from '@agent/core';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
@@ -169,7 +171,9 @@ async function tickAsLeader(): Promise<void> {
                 runId: deliveryId,
                 status: result.status,
                 context: result.context,
-                target: scheduled.deliver_to,
+                target: validateChronosDeliveryTarget(
+                  scheduled.deliver_to as ChronosDeliveryTarget
+                ),
               });
               logger.info(`[CHRONOS] ✓ ${scheduled.id}: direct delivery queued (${messageId})`);
             } catch (deliveryError: any) {

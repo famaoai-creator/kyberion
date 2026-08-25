@@ -1,4 +1,5 @@
 import { a2aBridge, AgentBusyError } from './a2a-bridge.js';
+import { isSurfaceAsyncChannel, type SurfaceAsyncChannel } from './channel-surface-types.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import {
   buildMissionTeamView,
@@ -41,9 +42,7 @@ import {
   type PlanningReviewVerdict,
 } from './mission-planning-packet.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
-import {
-  renderStructuredOutputSchemaPrompt,
-} from './structured-output-contracts.js';
+import { renderStructuredOutputSchemaPrompt } from './structured-output-contracts.js';
 import {
   evaluateMissionGate,
   writeMissionGateRecord,
@@ -307,11 +306,11 @@ interface SlackPayload {
   teamRoles?: string[];
 }
 
-function payloadSurface(payload: SlackPayload): string {
+function payloadSurface(payload: SlackPayload): SurfaceAsyncChannel {
   const surface = String(payload.surface || '')
     .trim()
     .toLowerCase();
-  return surface || 'slack';
+  return isSurfaceAsyncChannel(surface) ? surface : 'slack';
 }
 
 interface MissionControlPayload {

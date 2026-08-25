@@ -4,6 +4,15 @@ import {
   runChannelTurn,
   type ChannelAdapter,
 } from './channel-adapter.js';
+import { isSurfaceAsyncChannel } from './channel-surface-types.js';
+
+describe('SurfaceAsyncChannel registry', () => {
+  it('accepts manifest channels and rejects unregistered values', () => {
+    expect(isSurfaceAsyncChannel('slack')).toBe(true);
+    expect(isSurfaceAsyncChannel('terminal')).toBe(true);
+    expect(isSurfaceAsyncChannel('unknown-surface')).toBe(false);
+  });
+});
 
 describe('formatChannelThreadContext', () => {
   it('normalizes recent provider messages while preserving speaker labels', () => {
