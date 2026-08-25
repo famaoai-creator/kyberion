@@ -31,7 +31,7 @@ import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker.
 
 const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
 
-type AnyCallback = (...args: any[]) => any;
+type AnyCallback = (...args: unknown[]) => unknown;
 
 export interface DispatchCoreDeps {
   ensureWorkerBackendsInstalled: () => void;
@@ -371,7 +371,7 @@ export async function dispatchMissionNextTasksCore(
         let outcome: DispatchMissionTaskOutcome | null | 'timeout' = null;
         let dispatchError: string | undefined;
         try {
-          outcome = await deps.withTaskDispatchTimeout(
+          outcome = (await deps.withTaskDispatchTimeout(
             task,
             deps.dispatchPlannedMissionTask({
               missionId,
@@ -382,7 +382,7 @@ export async function dispatchMissionNextTasksCore(
               iterationPolicy,
               upstreamHandoffs,
             })
-          );
+          )) as DispatchMissionTaskOutcome | null | 'timeout';
         } catch (error) {
           dispatchError = error instanceof Error ? error.message : String(error);
           task.status = 'blocked';
