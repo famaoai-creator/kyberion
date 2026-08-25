@@ -10,6 +10,7 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ManifestEntry {
   path: string;
@@ -244,19 +245,21 @@ function generateIndexInner(checkOnly: boolean): boolean {
   return true;
 }
 
-const isDirectExecution =
-  process.argv[1] != null &&
-  (process.argv[1].endsWith('generate_knowledge_index.ts') ||
-    process.argv[1].endsWith('generate_knowledge_index.js'));
-if (isDirectExecution) {
-  const checkOnly = process.argv.includes('--check');
-  const success = generateIndex(checkOnly);
-  if (!success && checkOnly) {
-    process.exit(1);
-  }
-  if (!checkOnly) {
-    console.log('[generate_knowledge_index] Index and manifest updated successfully.');
-  } else {
-    console.log('[generate_knowledge_index] Index and manifest are up-to-date.');
-  }
-}
+export const runGenerateKnowledgeIndex = defineScript({
+  name: 'generate:knowledge-index',
+  flags: [],
+  run: ({ argv }) => {
+    const checkOnly = argv.includes('--check');
+    const success = generateIndex(checkOnly);
+    if (!success && checkOnly) throw new ScriptExitError(1, '', true);
+    if (!checkOnly)
+      console.log('[generate_knowledge_index] Index and manifest updated successfully.');
+    else console.log('[generate_knowledge_index] Index and manifest are up-to-date.');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_knowledge_index.ts') ||
+  isDirectScript(import.meta.url, 'generate_knowledge_index.js')
+)
+  void runGenerateKnowledgeIndex();
