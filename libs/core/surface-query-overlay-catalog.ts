@@ -1,7 +1,6 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 
 export interface SurfaceQueryOverlayCatalogEntry {
   id: string;
@@ -28,40 +27,15 @@ const CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-query-overlay-catalog.schema.json'
 );
 
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: SurfaceQueryOverlayCatalog | null = null;
-let cachedCatalogPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(CATALOG_SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): SurfaceQueryOverlayCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid surface query overlay catalog at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as SurfaceQueryOverlayCatalog;
-}
+const catalog = defineCatalog<SurfaceQueryOverlayCatalog>({
+  id: 'surface-query-overlay-catalog',
+  path: CATALOG_PATH,
+  schema: CATALOG_SCHEMA_PATH,
+});
 
 export function loadSurfaceQueryOverlayCatalog(): SurfaceQueryOverlayCatalog | null {
   if (!safeExistsSync(CATALOG_PATH)) return null;
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-
-  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return cachedCatalog;
+  return catalog.load();
 }
 
 export function listSurfaceQueryOverlayCatalogEntries(): SurfaceQueryOverlayCatalogEntry[] {
@@ -77,6 +51,5 @@ export function getSurfaceQueryOverlayCatalogEntry(
 }
 
 export function resetSurfaceQueryOverlayCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }
