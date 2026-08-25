@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertRequiredEnvironment,
+  formatCliManifestHelp,
   resolveCommand,
   selectEntrypoint,
   validateKyberionStartupEnvironment,
@@ -47,6 +48,34 @@ describe('kyberion command router', () => {
       entry: 'operator-home',
       audience: 'user',
     });
+  });
+
+  it('renders help from every registered command instead of rejecting --help', () => {
+    const help = formatCliManifestHelp({
+      version: 1,
+      commands: [
+        {
+          id: 'home',
+          command: '',
+          noun: 'home',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user',
+        },
+        {
+          id: 'ask',
+          command: 'ask',
+          noun: 'ask',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user',
+        },
+      ],
+      entrypoints: [],
+    });
+    expect(help).toContain('<home>');
+    expect(help).toContain('ask');
+    expect(help).toContain('governed registry');
   });
 
   it('fails closed when the startup environment misses a required registered setting', () => {
