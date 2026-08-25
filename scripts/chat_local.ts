@@ -15,6 +15,7 @@ async function main() {
   if (!success) {
     logger.error('Failed to initialize local reasoning backend.');
     process.exitCode = 1;
+    return;
   }
 
   const backend = getReasoningBackend();

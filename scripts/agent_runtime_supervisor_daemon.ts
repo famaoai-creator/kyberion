@@ -98,6 +98,7 @@ const delegatedWorkerStarts = new Map<string, Promise<{ resourceId: string; pid?
 const delegatedWorkerRestartCounts = new Map<string, number>();
 const MAX_DELEGATED_WORKER_RESTARTS = 3;
 let delegatedWorkerShutdown = false;
+let requestShutdown: ((exitCode: number) => void) | undefined;
 
 setInterval(
   () => {
@@ -136,6 +137,13 @@ export interface AgentRuntimeSupervisorDaemonInstance {
   port?: number;
   lockPath: string;
   cleanup: () => void;
+}
+
+class DaemonExit extends Error {
+  constructor(public readonly code: number) {
+    super(`agent runtime supervisor exiting with code ${code}`);
+    this.name = 'DaemonExit';
+  }
 }
 
 type TcpListenTarget = { host: string; port: number };
@@ -425,7 +433,7 @@ async function handleRequest(
           } catch (_) {
             /* best-effort drain */
           }
-          process.exitCode = 0;
+          requestShutdown?.(0);
         });
         return {
           id: request.id,
@@ -750,7 +758,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         logger.info(
           `[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`
         );
-        process.exitCode = 0;
+        throw new DaemonExit(0);
       } catch (killErr: any) {
         // EPERM means the process exists but this launcher cannot inspect it
         // (common under a sandbox or across users). Treating that as ESRCH
@@ -759,7 +767,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         if (killErr?.code === 'EPERM') {
           const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
           logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
-          if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
+          if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
           throw new Error(message);
         }
         // Process does not exist, stale lock
@@ -802,7 +810,7 @@ export async function startAgentRuntimeSupervisorDaemon(
     if (healthy) {
       const message = `an existing healthy daemon is already bound at ${socketPath}`;
       logger.info(`[agent-runtime-supervisor-daemon] ${message}`);
-      if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
+      if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
       throw new Error(message);
     }
     try {
@@ -859,7 +867,10 @@ export async function startAgentRuntimeSupervisorDaemon(
           logger.info(
             `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
           );
-          if (options.exitOnExistingHealthyDaemon !== false) process.exitCode = 0;
+          if (options.exitOnExistingHealthyDaemon !== false) {
+            process.exitCode = 0;
+            if (server.listening) server.close();
+          }
           return;
         }
         logger.warn(
@@ -874,7 +885,10 @@ export async function startAgentRuntimeSupervisorDaemon(
             `[agent-runtime-supervisor-daemon] retry after EADDRINUSE failed: ${retryError?.message || retryError}`
           );
         }
-        if (options.exitOnFatalError !== false) process.exitCode = 1;
+        if (options.exitOnFatalError !== false) {
+          process.exitCode = 1;
+          if (server.listening) server.close();
+        }
       })();
       return;
     }
@@ -899,7 +913,10 @@ export async function startAgentRuntimeSupervisorDaemon(
         `[agent-runtime-supervisor-daemon] failed to write ops alert: ${alertError?.message || alertError}`
       );
     }
-    if (options.exitOnFatalError !== false) process.exitCode = 1;
+    if (options.exitOnFatalError !== false) {
+      process.exitCode = 1;
+      if (server.listening) server.close();
+    }
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -979,6 +996,7 @@ export async function startAgentRuntimeSupervisorDaemon(
       process.exitCode = exitCode;
     });
   };
+  requestShutdown = stopDaemon;
   process.once('SIGINT', () => stopDaemon(130));
   process.once('SIGTERM', () => stopDaemon(143));
   process.once('exit', cleanup);
@@ -1009,6 +1027,10 @@ const isDirect =
   isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.js');
 if (isDirect) {
   main().catch((error: any) => {
+    if (error instanceof DaemonExit) {
+      process.exitCode = error.code;
+      return;
+    }
     const message = error?.message || String(error);
     logger.error(message);
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
