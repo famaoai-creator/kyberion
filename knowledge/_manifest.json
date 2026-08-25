@@ -6753,7 +6753,7 @@
     {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
-      "size": 800,
+      "size": 889,
       "type": "json"
     },
     {

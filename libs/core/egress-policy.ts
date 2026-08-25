@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -47,10 +47,24 @@ let cachedPolicy: EgressPolicyFile | null = null;
 let cachedAllowedDomains: string[] | null = null;
 const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
+const policyCatalog = defineCatalog<EgressPolicyFile>({
+  id: 'egress-policy',
+  path: () => getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
+  schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
+  fallback: {
+    version: 'missing-policy',
+    mode: 'warn',
+    manual_allowed_domains: [],
+    blocked_domains: [],
+    tenant_allowed_domains: {},
+  },
+});
+
 export function resetEgressPolicyCache(): void {
   cachedPolicyPath = null;
   cachedPolicy = null;
   cachedAllowedDomains = null;
+  policyCatalog.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -168,19 +182,7 @@ export function loadEgressPolicy(): EgressPolicyFile {
   const policyPath =
     getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
   if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = {
-      version: 'missing-policy',
-      mode: 'warn',
-      manual_allowed_domains: [],
-      blocked_domains: [],
-      tenant_allowed_domains: {},
-    };
-    return cachedPolicy;
-  }
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as EgressPolicyFile;
+  const parsed = policyCatalog.load();
   const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
   cachedPolicyPath = policyPath;
   cachedPolicy = {
