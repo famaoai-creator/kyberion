@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCommand, selectEntrypoint } from './kyberion.js';
+import {
+  assertRequiredEnvironment,
+  resolveCommand,
+  selectEntrypoint,
+  validateKyberionStartupEnvironment,
+} from './kyberion.js';
 
 describe('kyberion command router', () => {
   it('routes operator-home commands through the home entrypoint', () => {
@@ -42,5 +47,14 @@ describe('kyberion command router', () => {
       entry: 'operator-home',
       audience: 'user',
     });
+  });
+
+  it('fails closed when the startup environment misses a required registered setting', () => {
+    expect(() =>
+      assertRequiredEnvironment({
+        errors: [{ name: 'KYBERION_REQUIRED_TOKEN', issue: 'required variable is not set' }],
+      })
+    ).toThrow('KYBERION_REQUIRED_TOKEN');
+    expect(() => validateKyberionStartupEnvironment({})).not.toThrow();
   });
 });
