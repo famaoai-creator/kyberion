@@ -42,9 +42,9 @@ import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governa
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface RawActuatorEntry {
   n?: string;
@@ -1758,7 +1758,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args: string[] = []) {
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
 
@@ -1938,8 +1938,7 @@ export async function main(args = process.argv.slice(2)) {
     const { previewPipeline } = await import('@agent/core');
     const filePath = firstArg;
     if (!filePath) {
-      console.error('Usage: pnpm cli preview <pipeline.json>');
-      process.exit(1);
+      throw new ScriptExitError(1, 'Usage: pnpm cli preview <pipeline.json>');
     }
     const content = readTextFile(pathResolver.rootResolve(filePath));
     const pipeline = JSON.parse(content);
@@ -1967,7 +1966,8 @@ export async function main(args = process.argv.slice(2)) {
     if (restArgs.includes('--preview-graph') && preview.graph) {
       console.log(`\n=== Effective Graph (Mermaid) ===\n${preview.graph.mermaid}`);
     }
-    process.exit(preview.valid ? 0 : 1);
+    if (!preview.valid) throw new ScriptExitError(1, '', true);
+    return;
   }
 
   if (command === 'intent') {
@@ -1977,10 +1977,10 @@ export async function main(args = process.argv.slice(2)) {
     const words = normalizedArgs.slice(1).filter((a) => !a.startsWith('--'));
     const utterance = words.join(' ').trim();
     if (!utterance) {
-      console.error('Usage: pnpm cli intent "<utterance>" [--run|--clarify]');
-      console.error('  --run  Execute the resolved pipeline immediately');
-      console.error('  --clarify  Print a clarification packet for the utterance');
-      process.exit(1);
+      throw new ScriptExitError(
+        1,
+        'Usage: pnpm cli intent "<utterance>" [--run|--clarify]\n  --run  Execute the resolved pipeline immediately\n  --clarify  Print a clarification packet for the utterance'
+      );
     }
     const doRun = flags.includes('--run');
     const doClarify = flags.includes('--clarify');
@@ -2024,7 +2024,7 @@ export async function main(args = process.argv.slice(2)) {
           '\nNext step: rephrase the utterance, or run `pnpm cli -- intent --clarify "<utterance>"` to inspect missing inputs.'
         );
       }
-      process.exit(0);
+      return;
     }
 
     const catalog = loadStandardIntentCatalog();
@@ -2090,7 +2090,7 @@ export async function main(args = process.argv.slice(2)) {
           cwd: pathResolver.rootDir(),
         });
       } catch {
-        process.exit(1);
+        throw new ScriptExitError(1, '', true);
       }
     } else if (doRun) {
       console.log(
@@ -2098,7 +2098,7 @@ export async function main(args = process.argv.slice(2)) {
       );
     }
 
-    process.exit(0);
+    return;
   }
 
   if (command === 'schedule') {
@@ -2127,8 +2127,10 @@ export async function main(args = process.argv.slice(2)) {
       // pnpm cli schedule register <id> <pipeline-path> <actuator> <cron>
       const [id, pipelinePath, actuator, cron] = restArgs;
       if (!id || !pipelinePath || !actuator || !cron) {
-        console.error('Usage: pnpm cli schedule register <id> <pipeline-path> <actuator> "<cron>"');
-        process.exit(1);
+        throw new ScriptExitError(
+          1,
+          'Usage: pnpm cli schedule register <id> <pipeline-path> <actuator> "<cron>"'
+        );
       }
       registerScheduledPipeline({
         id,
@@ -2142,26 +2144,24 @@ export async function main(args = process.argv.slice(2)) {
     } else if (subAction === 'remove') {
       const id = restArgs[0];
       if (!id) {
-        console.error('Usage: pnpm cli schedule remove <id>');
-        process.exit(1);
+        throw new ScriptExitError(1, 'Usage: pnpm cli schedule remove <id>');
       }
       unregisterScheduledPipeline(id);
       console.log(`Removed: ${id}`);
     } else {
       console.log('Usage: pnpm cli schedule [list|register|remove]');
     }
-    process.exit(0);
+    return;
   }
 
   throw new Error(t('cli_error_unknown_command', locale).replace('{command}', command));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+export const runCli = defineScript({
+  name: 'cli',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
 
-if (isDirectRun) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
-}
+if (isDirectScript(import.meta.url, 'cli.ts') || isDirectScript(import.meta.url, 'cli.js'))
+  void runCli();
