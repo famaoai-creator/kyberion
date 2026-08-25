@@ -23,6 +23,7 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { nowIso } from '@agent/core/foundation';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const DEFAULT_MIGRATION_ROOT = 'active/shared/runtime/migrations/peer-tenant';
@@ -87,10 +88,6 @@ const DEFAULT_ROOTS: PeerTenantMigrationRoot[] = [
   { kind: 'mesh-hub-runtime', root: 'active/shared/runtime/mesh-hub' },
   { kind: 'mesh-hub-observability', root: 'active/shared/observability/mesh-hub' },
 ];
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');

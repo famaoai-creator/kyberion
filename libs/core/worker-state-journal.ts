@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Event-sourced worker state restore contract (KD-03).
  *
@@ -126,7 +127,7 @@ export function appendValidatedJournalEvent<TEnvelope>(
     leasePath,
     fn: () => {
       ensureJournalDirectory(options.journalPath);
-      safeAppendFileSync(options.journalPath, `${JSON.stringify(envelope)}\n`);
+      appendJsonLine(options.journalPath, envelope);
       return envelope;
     },
   });

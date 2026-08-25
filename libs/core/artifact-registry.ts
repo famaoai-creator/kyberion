@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
@@ -134,7 +135,7 @@ export function appendArtifactOwnershipRecord(
 
   const registryDir = pathResolver.shared('runtime/artifacts');
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  safeAppendFileSync(ARTIFACT_REGISTRY_PATH, `${JSON.stringify(record)}\n`);
+  appendJsonLine(ARTIFACT_REGISTRY_PATH, record);
   return ARTIFACT_REGISTRY_PATH;
 }
 

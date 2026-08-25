@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -78,7 +79,7 @@ export function appendGovernedArtifactJsonl(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeAppendFileSync(logicalPath, JSON.stringify(value) + '\n', 'utf8');
+    appendJsonLine(logicalPath, value);
     return resolved;
   });
 }
@@ -340,7 +341,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
   const performWrite = (): void => {
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
     safeWriteFile(absolutePath, data);
-    safeAppendFileSync(indexPath, JSON.stringify(entry) + '\n', 'utf8');
+    appendJsonLine(indexPath, entry);
   };
   if (input.role) withRole(input.role, performWrite);
   else performWrite();

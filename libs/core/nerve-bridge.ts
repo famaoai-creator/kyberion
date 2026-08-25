@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * libs/core/nerve-bridge.ts
  * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
@@ -59,7 +60,7 @@ export function sendNerveMessage(input: {
   };
 
   try {
-    safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
+    appendJsonLine(STIMULI_PATH, msg);
     rotateStimuliJournalIfNeeded();
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
   } catch (err) {

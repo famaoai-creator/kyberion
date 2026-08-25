@@ -1,3 +1,4 @@
+import { appendJsonLine } from '../foundation/json.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
  * aggregation — the return half of the loop KP-01 opened up.
@@ -273,7 +274,7 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   const target = scopedFeedbackPath('human', input.scope);
   const dir = path.dirname(target);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeAppendFileSync(target, `${JSON.stringify(record)}\n`);
+  appendJsonLine(target, record);
   bumpUsageAggregate(
     documentPath,
     input.verdict === 'useful' ? { used_count: 1 } : { not_used_count: 1 },
@@ -317,7 +318,7 @@ export function recordKnowledgeGap(input: {
       priorCount = 0;
     }
   }
-  safeAppendFileSync(target, `${JSON.stringify(record)}\n`);
+  appendJsonLine(target, record);
   if (input.promoteOnCluster && priorCount + 1 === 3) {
     try {
       const candidate = createMemoryPromotionCandidate({
@@ -498,7 +499,7 @@ export function recordKnowledgeDelivery(input: {
   };
 
   try {
-    safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(filePath, record);
     for (const ref of refs) {
       bumpUsageAggregate(ref.path, { delivered_count: 1 }, now, input.scope);
     }

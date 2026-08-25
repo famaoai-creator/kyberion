@@ -5,6 +5,7 @@ import {
   type ManagedProcessHandle,
 } from './managed-process.js';
 import { rootResolve } from './path-resolver.js';
+import { isRecord } from './foundation/text.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
   createCoreAudioDeviceInventoryBridge,
@@ -230,10 +231,6 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     this.status = 'failed';
     this.reason = message;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function waitForStartup(child: ManagedProcessHandle['child'], timeoutMs: number): Promise<void> {

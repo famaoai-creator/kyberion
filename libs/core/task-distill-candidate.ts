@@ -13,7 +13,7 @@ export interface TaskDistillCandidateAssessment {
   targetKind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
 }
 
-function normalizeText(value: string | undefined): string {
+function normalizeTaskDistillText(value: string | undefined): string {
   return String(value || '').trim();
 }
 
@@ -35,10 +35,10 @@ function isGenericPresentationOrReport(goalSummary: string, previewText: string)
 export function assessTaskDistillCandidate(
   input: TaskDistillCandidateAssessmentInput
 ): TaskDistillCandidateAssessment {
-  const goalSummary = normalizeText(input.goalSummary);
-  const previewText = normalizeText(input.previewText);
-  const taskType = normalizeText(input.taskType);
-  const artifactId = normalizeText(input.artifactId);
+  const goalSummary = normalizeTaskDistillText(input.goalSummary);
+  const previewText = normalizeTaskDistillText(input.previewText);
+  const taskType = normalizeTaskDistillText(input.taskType);
+  const artifactId = normalizeTaskDistillText(input.artifactId);
 
   if (!artifactId) {
     return {

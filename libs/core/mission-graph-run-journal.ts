@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Durable graph-run journal for mission follow-up dispatch (GE-05).
  *
@@ -78,7 +79,7 @@ function appendEvent(
     timestamp: new Date().toISOString(),
     payload,
   };
-  safeAppendFileSync(filePath, `${JSON.stringify(envelope)}\n`);
+  appendJsonLine(filePath, envelope);
   return envelope;
 }
 

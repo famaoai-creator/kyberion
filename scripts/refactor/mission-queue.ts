@@ -3,7 +3,8 @@
  * Queue persistence and dispatch selection for mission orchestration.
  */
 
-import { logger, safeAppendFileSync, safeExistsSync, safeReadFile, safeWriteFile, withLock } from '@agent/core';
+import { logger, safeExistsSync, safeReadFile, safeWriteFile, withLock } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 export interface MissionQueueEntry {
   mission_id: string;
@@ -19,7 +20,7 @@ export async function enqueueMission(
   missionId: string,
   tier: string,
   priority = 5,
-  deps: string[] = [],
+  deps: string[] = []
 ): Promise<void> {
   const entry: MissionQueueEntry = {
     mission_id: missionId.toUpperCase(),
@@ -31,7 +32,7 @@ export async function enqueueMission(
   };
 
   await withLock('mission-queue', async () => {
-    safeAppendFileSync(queuePath, JSON.stringify(entry) + '\n');
+    appendJsonLine(queuePath, entry);
   });
   logger.success(`📥 Mission ${entry.mission_id} added to queue (Priority: ${priority}).`);
 }
@@ -39,7 +40,7 @@ export async function enqueueMission(
 export async function dispatchNextQueuedMission(
   queuePath: string,
   checkDependencies: (missionId: string) => { ok: boolean; missing: string[] },
-  onDispatch: (missionId: string, tier: string) => Promise<void>,
+  onDispatch: (missionId: string, tier: string) => Promise<void>
 ): Promise<void> {
   await withLock('mission-queue', async () => {
     if (!safeExistsSync(queuePath)) {
@@ -47,7 +48,9 @@ export async function dispatchNextQueuedMission(
       return;
     }
 
-    const lines = (safeReadFile(queuePath, { encoding: 'utf8' }) as string).split('\n').filter(Boolean);
+    const lines = (safeReadFile(queuePath, { encoding: 'utf8' }) as string)
+      .split('\n')
+      .filter(Boolean);
     const queue = lines.map((line) => JSON.parse(line) as MissionQueueEntry);
     const pending = queue.filter((mission) => mission.status === 'pending');
 

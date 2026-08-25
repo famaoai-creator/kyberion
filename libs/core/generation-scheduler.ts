@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   safeCopyFileSync,
   safeExistsSync,
@@ -39,10 +40,6 @@ export type ScopedGenerationSchedule = GenerationSchedule & { scope: EventScope 
 export interface GenerationScheduleTenantRegistryOptions {
   /** Test seam; production resolves the durable tenant registry. */
   resolveTenant?: (tenantSlug: string) => unknown;
-}
-
-function nowIso(date = new Date()): string {
-  return date.toISOString();
 }
 
 function ensureScheduleDir(): void {

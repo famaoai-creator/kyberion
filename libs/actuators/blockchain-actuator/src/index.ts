@@ -1,7 +1,6 @@
 import {
   logger,
   safeReadFile,
-  safeAppendFileSync,
   safeMkdir,
   safeExistsSync,
   createStandardYargs,
@@ -16,6 +15,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -166,7 +166,7 @@ async function verifyAnchor(params: any) {
 function _writeToMockChain(tx: any) {
   const dir = path.dirname(MOCK_CHAIN_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeAppendFileSync(MOCK_CHAIN_PATH, JSON.stringify(tx) + '\n');
+  appendJsonLine(MOCK_CHAIN_PATH, tx);
 }
 
 const main = async () => {

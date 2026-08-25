@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -139,7 +140,7 @@ function saveRegistry(registry: PluginPackRegistry, override?: string): void {
 
 function appendImportRecord(record: PackImportRecord, override?: string): void {
   safeMkdir(registryDir(override), { recursive: true });
-  safeAppendFileSync(importLogPath(override), `${JSON.stringify(record)}\n`);
+  appendJsonLine(importLogPath(override), record);
   try {
     auditChain.record({
       agentId: 'plugin-pack',

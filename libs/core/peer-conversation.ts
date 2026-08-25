@@ -1,3 +1,5 @@
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import type { ValidateFunction } from 'ajv';
 import { createAjv } from './foundation/ajv.js';
 import * as crypto from 'node:crypto';
@@ -153,10 +155,6 @@ const GOVERNED_ROLE = 'infrastructure_sentinel' as const;
 let sessionValidateFn: ValidateFunction | null = null;
 let messageValidateFn: ValidateFunction | null = null;
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
@@ -216,10 +214,12 @@ function recordEvent(tenantId: string, peerId: string, event: Record<string, unk
   ensurePeerDir(tenantId, peerId);
   const logicalPath = eventsPath(tenantId, peerId);
   return withExecutionContext(GOVERNED_ROLE, () => {
-    safeAppendFileSync(
-      pathResolver.resolve(logicalPath),
-      `${JSON.stringify({ ts: nowIso(), tenant_id: tenantId, peer_id: peerId, ...event })}\n`
-    );
+    appendJsonLine(pathResolver.resolve(logicalPath), {
+      ts: nowIso(),
+      tenant_id: tenantId,
+      peer_id: peerId,
+      ...event,
+    });
     return pathResolver.resolve(logicalPath);
   });
 }

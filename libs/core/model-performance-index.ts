@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -115,7 +116,7 @@ function readJsonl<T>(filePath: string): T[] {
 function appendJsonl(filePath: string, records: unknown[]): void {
   if (records.length === 0) return;
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeAppendFileSync(filePath, records.map((record) => JSON.stringify(record)).join('\n') + '\n');
+  for (const record of records) appendJsonLine(filePath, record);
 }
 
 export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
