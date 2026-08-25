@@ -247,6 +247,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/product/schemas/permission-presets.schema.json',
     dataPath: 'knowledge/product/governance/permission-presets.json',
   },
+  {
+    id: 'intent-routing-map',
+    schemaPath: 'knowledge/product/schemas/intent-routing-map.schema.json',
+    dataPath: 'knowledge/product/governance/intent-routing-map.json',
+  },
+  {
+    id: 'error-classifier-rules',
+    schemaPath: 'knowledge/product/schemas/error-classifier-rules.schema.json',
+    dataPath: 'knowledge/product/governance/error-classifier-rules.json',
+  },
 ];
 
 export function findDeterministicCatalogViolations(): string[] {

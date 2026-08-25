@@ -6763,6 +6763,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/error-classifier-rules.schema.json",
+      "tier": "public",
+      "size": 1710,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/execution-feedback.schema.json",
       "tier": "public",
       "size": 1478,
@@ -6952,6 +6958,12 @@
       "path": "product/schemas/intent-resolution-policy.schema.json",
       "tier": "public",
       "size": 4137,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/intent-routing-map.schema.json",
+      "tier": "public",
+      "size": 1315,
       "type": "json"
     },
     {

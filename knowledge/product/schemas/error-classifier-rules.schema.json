@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kyberion://schemas/error-classifier-rules",
+  "title": "Error Classifier Rules",
+  "type": "object",
+  "required": ["rules", "policy_violation_patterns"],
+  "properties": {
+    "version": { "type": ["string", "number"] },
+    "description": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "label", "remediation", "patterns"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "remediation": { "type": "string", "minLength": 1 },
+          "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "codes": { "type": "array", "items": { "type": "string" } },
+          "repairAction": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "policy_violation_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "violation_type", "explanation", "repair_steps"],
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1 },
+          "violation_type": { "type": "string", "minLength": 1 },
+          "explanation": { "type": "string", "minLength": 1 },
+          "required_role": { "type": "string" },
+          "required_authority": { "type": "string" },
+          "repair_steps": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": true
+}
