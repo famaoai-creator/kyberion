@@ -12,6 +12,7 @@ import {
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveCliInputPath } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
  * EV-01: this script used to carry a full second copy of the tick logic
@@ -115,14 +116,14 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith('scripts/run_generation_schedule.ts') ||
-    process.argv[1].endsWith('dist/scripts/run_generation_schedule.js'));
-
-if (isMain) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'run_generation_schedule.ts') ||
+  isDirectScript(import.meta.url, 'run_generation_schedule.js')
+)
+  void defineScript({
+    name: 'generation-schedule',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();

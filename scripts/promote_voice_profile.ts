@@ -1,4 +1,5 @@
 import { createStandardYargs, promoteVoiceProfileFromReceipt } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main() {
   const argv = await createStandardYargs()
@@ -22,7 +23,16 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+export const runPromoteVoiceProfile = defineScript({
+  name: 'voice:promote-profile',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'promote_voice_profile.ts') ||
+  isDirectScript(import.meta.url, 'promote_voice_profile.js')
+)
+  void runPromoteVoiceProfile();
