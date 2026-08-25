@@ -12,7 +12,7 @@
  */
 
 import { logger, resolveFinanceControllerDecision, runDegradationWatch } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function main(): number {
   const { report, alert } = runDegradationWatch({
@@ -29,5 +29,12 @@ if (
   isDirectScript(import.meta.url, 'health_degradation_watch.ts') ||
   isDirectScript(import.meta.url, 'health_degradation_watch.js')
 ) {
-  process.exit(main());
+  void defineScript({
+    name: 'health:degradation-watch',
+    flags: [],
+    run() {
+      const status = main();
+      if (status !== 0) throw new Error(`health:degradation-watch failed with exit code ${status}`);
+    },
+  })();
 }
