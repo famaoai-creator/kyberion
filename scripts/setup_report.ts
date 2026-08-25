@@ -4,7 +4,19 @@ import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
-import { formatSetupSummaryLine } from './setup-report.js';
+
+export type SetupCountEntry = [label: string, value: number];
+
+export function formatSetupSummaryLine(entries: SetupCountEntry[]): string {
+  const parts = entries
+    .filter(([, value]) => Number.isFinite(value))
+    .map(([label, value]) => `${value} ${label}`);
+  return `Setup summary: ${parts.join(', ')}`;
+}
+
+export function formatSetupHintLine(message: string): string {
+  return `  ↳ ${message}`;
+}
 
 type SetupPersona = 'operator' | 'first-time-user';
 
@@ -46,48 +58,64 @@ export async function runSetupReportWithPersona(options: {
   return { surfaces, services, reasoning, doctor, recommendedSurfaces, nextActions };
 }
 
-function buildFirstTimeUserNextActions(report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor'>): Array<ReturnType<typeof buildNextAction>> {
+function buildFirstTimeUserNextActions(
+  report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor'>
+): Array<ReturnType<typeof buildNextAction>> {
   const actions: Array<ReturnType<typeof buildNextAction>> = [];
   if (report.surfaces.summary.missing > 0 || report.surfaces.summary.disabled > 0) {
-    actions.push(buildNextAction({
-      title: 'Reconcile surface readiness',
-      reason: `${report.surfaces.summary.missing} surface auth gaps and ${report.surfaces.summary.disabled} disabled surfaces need attention.`,
-      next_action_type: 'run_command',
-      suggested_command: 'pnpm surfaces:reconcile',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Reconcile surface readiness',
+        reason: `${report.surfaces.summary.missing} surface auth gaps and ${report.surfaces.summary.disabled} disabled surfaces need attention.`,
+        next_action_type: 'run_command',
+        suggested_command: 'pnpm surfaces:reconcile',
+      })
+    );
   }
   if (report.services.summary.authMissing > 0 || report.services.summary.connectionMissing > 0) {
-    actions.push(buildNextAction({
-      title: 'Repair service setup',
-      reason: `${report.services.summary.authMissing} services are missing auth and ${report.services.summary.connectionMissing} are missing connections.`,
-      next_action_type: 'bootstrap_environment',
-      suggested_command: 'pnpm services:setup',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Repair service setup',
+        reason: `${report.services.summary.authMissing} services are missing auth and ${report.services.summary.connectionMissing} are missing connections.`,
+        next_action_type: 'bootstrap_environment',
+        suggested_command: 'pnpm services:setup',
+      })
+    );
   }
-  const doctorSummary = report.doctor.summaries.find((summary) => summary.counts.must + summary.counts.should > 0);
+  const doctorSummary = report.doctor.summaries.find(
+    (summary) => summary.counts.must + summary.counts.should > 0
+  );
   if (doctorSummary) {
-    actions.push(buildNextAction({
-      title: `Bootstrap ${doctorSummary.manifestId}`,
-      reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
-      next_action_type: 'bootstrap_environment',
-      suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
-    }));
+    actions.push(
+      buildNextAction({
+        title: `Bootstrap ${doctorSummary.manifestId}`,
+        reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
+        next_action_type: 'bootstrap_environment',
+        suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
+      })
+    );
   }
   if (actions.length === 0) {
-    actions.push(buildNextAction({
-      title: 'Re-run setup report after changes',
-      reason: 'Everything looks ready right now.',
-      next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm setup:report',
-    }));
+    actions.push(
+      buildNextAction({
+        title: 'Re-run setup report after changes',
+        reason: 'Everything looks ready right now.',
+        next_action_type: 'inspect_artifact',
+        suggested_command: 'pnpm setup:report',
+      })
+    );
   }
   return actions.slice(0, 4);
 }
 
-function buildRecommendedSurfaces(report: Pick<SetupReport, 'surfaces' | 'doctor'>): SurfaceRecommendation[] {
+function buildRecommendedSurfaces(
+  report: Pick<SetupReport, 'surfaces' | 'doctor'>
+): SurfaceRecommendation[] {
   const rows = report.surfaces.rows || [];
   const rowById = new Map(rows.map((row: any) => [row.surface, row]));
-  const doctorByManifest = new Map(report.doctor.summaries.map((summary) => [summary.manifestId, summary]));
+  const doctorByManifest = new Map(
+    report.doctor.summaries.map((summary) => [summary.manifestId, summary])
+  );
 
   const chronos = rowById.get('chronos-mirror-v2');
   const voiceHub = rowById.get('voice-hub');
@@ -104,7 +132,7 @@ function buildRecommendedSurfaces(report: Pick<SetupReport, 'surfaces' | 'doctor
 
   const voiceReadiness: SurfaceRecommendation['readiness'] =
     voiceHub?.enabled === 'enabled' && presenceStudio?.enabled === 'enabled'
-      ? meetingDoctor && (meetingDoctor.counts.must + meetingDoctor.counts.should > 0)
+      ? meetingDoctor && meetingDoctor.counts.must + meetingDoctor.counts.should > 0
         ? 'needs_setup'
         : 'ready'
       : 'unavailable';
@@ -120,7 +148,8 @@ function buildRecommendedSurfaces(report: Pick<SetupReport, 'surfaces' | 'doctor
     {
       id: 'chronos',
       title: 'Chronos control surface',
-      whenToUse: 'Open this first when you want to see what Kyberion is running and which runtime needs attention.',
+      whenToUse:
+        'Open this first when you want to see what Kyberion is running and which runtime needs attention.',
       surfaces: ['chronos-mirror-v2'],
       readiness: chronosReadiness,
       reason:
@@ -139,7 +168,8 @@ function buildRecommendedSurfaces(report: Pick<SetupReport, 'surfaces' | 'doctor
     {
       id: 'voice-first-win',
       title: 'Presence Studio + voice path',
-      whenToUse: 'Use this when you want a conversational surface with transcript and browser/voice feedback.',
+      whenToUse:
+        'Use this when you want a conversational surface with transcript and browser/voice feedback.',
       surfaces: ['presence-studio', 'voice-hub'],
       readiness: voiceReadiness,
       reason:
@@ -190,14 +220,16 @@ async function main(): Promise<void> {
   const report = await runSetupReportWithPersona({ persona: argv.persona as SetupPersona });
 
   console.log('');
-  console.log(formatSetupSummaryLine([
-    ['surface issues', report.surfaces.summary.missing],
-    ['service auth missing', report.services.summary.authMissing],
-    ['service connections missing', report.services.summary.connectionMissing],
-    ['reasoning must', report.reasoning.must],
-    ['reasoning should', report.reasoning.should],
-    ['doctor must', report.doctor.totalMissing],
-  ]));
+  console.log(
+    formatSetupSummaryLine([
+      ['surface issues', report.surfaces.summary.missing],
+      ['service auth missing', report.services.summary.authMissing],
+      ['service connections missing', report.services.summary.connectionMissing],
+      ['reasoning must', report.reasoning.must],
+      ['reasoning should', report.reasoning.should],
+      ['doctor must', report.doctor.totalMissing],
+    ])
+  );
 
   if (argv.persona === 'first-time-user') {
     console.log('Recommended surfaces:');
