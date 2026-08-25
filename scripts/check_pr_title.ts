@@ -8,7 +8,8 @@
  */
 
 import * as path from 'node:path';
-import { safeExec, safeReadFile, pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { safeExec, pathResolver } from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CheckResult {
@@ -16,6 +17,13 @@ interface CheckResult {
   source: string;
   value: string;
   reason?: string;
+}
+
+interface GitHubEventPayload {
+  pull_request?: {
+    title?: unknown;
+    head?: { commit?: { message?: unknown } };
+  };
 }
 
 const CONVENTIONAL_RE =
@@ -29,13 +37,9 @@ function isConventionalCommitTitle(value: string): boolean {
   return CONVENTIONAL_RE.test(normalizeTitle(value));
 }
 
-function readJson(filePath: string): any {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}'));
-}
-
 function readEventTitle(eventPath: string): string | null {
   try {
-    const event = readJson(eventPath);
+    const event = readJson<GitHubEventPayload>(eventPath);
     if (typeof event?.pull_request?.title === 'string') return event.pull_request.title;
     if (typeof event?.pull_request?.head?.commit?.message === 'string') {
       return event.pull_request.head.commit.message.split('\n', 1)[0];

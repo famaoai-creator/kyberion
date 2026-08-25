@@ -15,6 +15,7 @@ import {
   validateServiceRecording,
   withExecutionContext,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
 
 type JsonObject = Record<string, unknown>;
@@ -76,9 +77,7 @@ function printUsage(): void {
 function loadRecording(ref: string) {
   const absolute = resolveAllowlistedRecordingRef(ref);
   if (!absolute) throw new Error('recording path is outside the allowlisted recording stores');
-  const validation = validateServiceRecording(
-    JSON.parse(String(safeReadFile(absolute, { encoding: 'utf8' })))
-  );
+  const validation = validateServiceRecording(readJson(absolute));
   if (!validation.value) throw new Error(`recording invalid: ${validation.errors.join('; ')}`);
   return { absolute, value: validation.value };
 }
