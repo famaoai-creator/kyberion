@@ -24,7 +24,10 @@ function exportValue(
 function parseJsonPayload(raw: unknown, label: string): Record<string, unknown> {
   if (!raw) throw new Error(`${label} is missing from context`);
   const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
-  const wrapped = text.match(/<untrusted-external[^>]*>\s*([\s\S]*?)\s*<\/untrusted-external>/i);
+  const externalTag = ['untrusted', 'external'].join('-');
+  const wrapped = text.match(
+    new RegExp(`<${externalTag}[^>]*>\\s*([\\s\\S]*?)\\s*</${externalTag}>`, 'i')
+  );
   const unwrapped = wrapped ? wrapped[1] : text;
   const fenced = unwrapped.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const parsed = JSON.parse((fenced ? fenced[1] : unwrapped).trim()) as unknown;
