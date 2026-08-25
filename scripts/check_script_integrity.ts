@@ -141,8 +141,42 @@ function listPipelineFiles(roots: string[]): string[] {
   return files.sort((a, b) => a.localeCompare(b));
 }
 
-export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): string[] {
+function checkProductionScriptBoundaries(): string[] {
   const violations: string[] = [];
+  const processArgvLabel = ['process', 'argv'].join('.');
+  const processExitLabel = ['process', 'exit'].join('.');
+  const argvPattern = new RegExp(`\\b${['process', 'argv'].join('\\.')}\\b`);
+  const exitPattern = /\bprocess\.exit\s*\(/u;
+  const scriptRoot = pathResolver.rootResolve('scripts');
+  if (!safeExistsSync(scriptRoot)) return violations;
+
+  for (const file of getAllFiles(scriptRoot)) {
+    if (!/\.(?:ts|js)$/u.test(file)) continue;
+    const relative = toRepoRelative(file);
+    if (
+      relative.endsWith('.test.ts') ||
+      relative.startsWith('scripts/refactor/') ||
+      relative === 'scripts/lib/harness.ts'
+    ) {
+      continue;
+    }
+    const source = String(safeReadFile(file, { encoding: 'utf8' }));
+    if (argvPattern.test(source)) {
+      violations.push(
+        `${relative}: direct ${processArgvLabel} access; use the script harness boundary`
+      );
+    }
+    if (exitPattern.test(source)) {
+      violations.push(
+        `${relative}: direct ${processExitLabel}() call; use the script error boundary`
+      );
+    }
+  }
+  return violations;
+}
+
+export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): string[] {
+  const violations: string[] = checkProductionScriptBoundaries();
   const pathExists =
     options.pathExists ||
     ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
