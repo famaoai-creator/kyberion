@@ -42,6 +42,11 @@ export interface RegisteredEnvReadOptions<T = string> {
   strict?: boolean;
 }
 
+export interface EnvValidationOptions {
+  /** Promote unknown variables and type mismatches from warnings to errors. */
+  strict?: boolean;
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
 const BOOLEAN_VALUE_RE = /^(1|0|true|false|yes|no|on|off)$/i;
 
@@ -57,7 +62,8 @@ export function loadEnvRegistryEntries(): EnvRegistryValidationEntry[] {
 
 export function validateEnvAgainstRegistry(
   entries: EnvRegistryValidationEntry[],
-  env: Record<string, string | undefined>
+  env: Record<string, string | undefined>,
+  options: EnvValidationOptions = {}
 ): EnvValidationReport {
   const report: EnvValidationReport = {
     errors: [],
@@ -67,10 +73,17 @@ export function validateEnvAgainstRegistry(
     checked: 0,
   };
   const registered = new Set(entries.map((entry) => entry.name));
+  const addIssue = (issue: EnvValidationIssue, strictIssue = false): void => {
+    if (options.strict && strictIssue) report.errors.push(issue);
+    else report.warnings.push(issue);
+  };
 
   for (const key of Object.keys(env)) {
     if (key.startsWith('KYBERION_') && !registered.has(key)) {
       report.unknown.push(key);
+      if (options.strict) {
+        report.errors.push({ name: key, issue: 'variable is not registered' });
+      }
     }
   }
   report.unknown.sort((a, b) => a.localeCompare(b));
@@ -86,17 +99,23 @@ export function validateEnvAgainstRegistry(
     }
     report.checked += 1;
     if (entry.type === 'boolean' && !BOOLEAN_VALUE_RE.test(value)) {
-      report.warnings.push({
-        name: entry.name,
-        issue: 'expected a boolean value (1/0/true/false/yes/no/on/off)',
-      });
+      addIssue(
+        {
+          name: entry.name,
+          issue: 'expected a boolean value (1/0/true/false/yes/no/on/off)',
+        },
+        true
+      );
     } else if (entry.type === 'number' && Number.isNaN(Number(value))) {
-      report.warnings.push({ name: entry.name, issue: 'expected a numeric value' });
+      addIssue({ name: entry.name, issue: 'expected a numeric value' }, true);
     } else if (entry.type === 'enum' && entry.enum?.length && !entry.enum.includes(value)) {
-      report.warnings.push({
-        name: entry.name,
-        issue: `expected one of: ${entry.enum.join(', ')}`,
-      });
+      addIssue(
+        {
+          name: entry.name,
+          issue: `expected one of: ${entry.enum.join(', ')}`,
+        },
+        true
+      );
     }
   }
 
@@ -106,9 +125,10 @@ export function validateEnvAgainstRegistry(
 }
 
 export function validateEnv(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  options: EnvValidationOptions = {}
 ): EnvValidationReport {
-  return validateEnvAgainstRegistry(loadEnvRegistryEntries(), env);
+  return validateEnvAgainstRegistry(loadEnvRegistryEntries(), env, options);
 }
 
 /**

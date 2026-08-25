@@ -86,4 +86,13 @@ describe('kyberion command router', () => {
     ).toThrow('KYBERION_REQUIRED_TOKEN');
     expect(() => validateKyberionStartupEnvironment({})).not.toThrow();
   });
+
+  it('fails closed on unknown environment variables when strict registry mode is enabled', () => {
+    expect(() =>
+      validateKyberionStartupEnvironment({
+        KYBERION_ENV_REGISTRY_STRICT: '1',
+        KYBERION_MYSTERY: '1',
+      })
+    ).toThrow('KYBERION_MYSTERY');
+  });
 });
