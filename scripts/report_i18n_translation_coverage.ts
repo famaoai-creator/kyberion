@@ -34,9 +34,9 @@
  *     recording the new snapshot. Intended for the scheduled
  *     `pipelines/i18n-drift-audit.json` run, not routine local use.
  */
-import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   loadVocabularyCatalog,
   pathResolver,
@@ -304,9 +304,9 @@ export function runAlertOnRegression(
   return regressions;
 }
 
-export function main(): void {
-  const asJson = process.argv.includes('--json');
-  const alertOnRegression = process.argv.includes('--alert-on-regression');
+export function main(argv: string[] = []): void {
+  const asJson = argv.includes('--json');
+  const alertOnRegression = argv.includes('--alert-on-regression');
   const report = computeTranslationCoverageReport();
 
   let regressions: CoverageRegression[] = [];
@@ -335,8 +335,14 @@ export function main(): void {
   }
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+export const runReportI18nTranslationCoverage = defineScript({
+  name: 'report:i18n-coverage',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'report_i18n_translation_coverage.ts') ||
+  isDirectScript(import.meta.url, 'report_i18n_translation_coverage.js')
+)
+  void runReportI18nTranslationCoverage();

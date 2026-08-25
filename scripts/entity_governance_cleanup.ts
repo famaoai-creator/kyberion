@@ -19,6 +19,7 @@ import {
   withExecutionContext,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const CLEANUP_APPROVAL_CHANNEL = 'terminal';
 export const CLEANUP_EFFECT_BINDING = 'entity-governance-cleanup:soft-delete';
@@ -354,7 +355,7 @@ export function runCleanup(input: {
   return receipt;
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[] = []): void {
   const missionIndex = argv.indexOf('--mission-id');
   const missionId = missionIndex >= 0 ? argv[missionIndex + 1] : 'MSN-EG-20260809B';
   const apply = argv.includes('--apply');
@@ -366,15 +367,21 @@ export function main(argv = process.argv.slice(2)): void {
   if (requestApproval) {
     const result = openCleanupApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
     console.log(JSON.stringify(result, null, 2));
-    if (result.reason) process.exitCode = 1;
+    if (result.reason) throw new ScriptExitError(1, '', true);
     return;
   }
   const receipt = runCleanup({ missionId, apply, approvalRequestId });
   console.log(JSON.stringify(receipt, null, 2));
 }
 
+export const runEntityGovernanceCleanup = defineScript({
+  name: 'entity:cleanup',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
-  process.argv[1]?.endsWith('entity_governance_cleanup.ts') ||
-  process.argv[1]?.endsWith('entity_governance_cleanup.js')
+  isDirectScript(import.meta.url, 'entity_governance_cleanup.ts') ||
+  isDirectScript(import.meta.url, 'entity_governance_cleanup.js')
 )
-  main();
+  void runEntityGovernanceCleanup();
