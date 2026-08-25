@@ -8683,6 +8683,16 @@
         "ja": "不足情報",
         "qps-ploc": "⟦ɱïşşïñɠ ŀőř⟧"
       },
+      "tui_cockpit_none": {
+        "en": "none",
+        "ja": "なし",
+        "qps-ploc": "⟦ñőñė ŀőř⟧"
+      },
+      "tui_cockpit_next_action": {
+        "en": "next action",
+        "ja": "次のアクション",
+        "qps-ploc": "⟦ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
       "tui_cockpit_input_hint": {
         "en": "v voice · Enter send · Esc cancel",
         "ja": "v 音声 · Enter 送信 · Esc キャンセル",

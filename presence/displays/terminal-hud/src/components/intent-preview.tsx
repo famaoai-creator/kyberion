@@ -40,7 +40,16 @@ export function IntentPreview({ contract }: IntentPreviewProps) {
         <Text color={theme.warn}>
           {tr('tui:tui_cockpit_missing')}: {contract.missing_inputs.join(', ')}
         </Text>
-      ) : null}
+      ) : (
+        <Text dimColor>
+          {tr('tui:tui_cockpit_missing')}: {tr('tui:tui_cockpit_none')}
+        </Text>
+      )}
+      <Text>
+        <Text dimColor>{tr('tui:tui_cockpit_next_action')}: </Text>
+        {contract.next_action.label}
+      </Text>
+      <Text dimColor>{contract.next_action.consequence}</Text>
     </Box>
   );
 }

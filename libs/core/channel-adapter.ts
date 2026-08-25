@@ -71,19 +71,19 @@ export type ChannelTurnConversation = (
 export function formatChannelTurnText(result: SurfaceConversationResult): string {
   const text = result.text.trim();
   const contract = result.intentResolution;
-  if (
-    !text ||
-    !contract ||
-    contract.authority_level === 'autonomous' ||
-    text.includes(contract.next_action.label)
-  ) {
+  if (!text || !contract || text.includes('Intent:') || text.includes('Understanding:')) {
     return result.text;
   }
   return [
     text,
     '',
+    `Understanding: ${contract.normalized_intent}`,
+    `Missing input: ${
+      contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'none'
+    }`,
     `Next action: ${contract.next_action.label}`,
     `Consequence: ${contract.next_action.consequence}`,
+    `Outcome: ${contract.outcome_kind}`,
   ].join('\n');
 }
 

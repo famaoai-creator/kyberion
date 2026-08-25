@@ -86,6 +86,7 @@ import {
   resolveVoiceSttServerConfig,
   runSurfaceConversation,
   runSurfaceMessageConversation,
+  formatChannelTurnText,
   resolveIntentResolutionContract,
   safeExec,
   buildSafeExecEnv,
@@ -4378,7 +4379,7 @@ async function generateReply(
         }
       )
     );
-    const text = (result.text || '').trim();
+    const text = formatChannelTurnText(result).trim();
     return {
       text: text || buildVoiceFallbackReply(userText),
       intentResolution: result.intentResolution,
