@@ -1,8 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 import type {
   MissionClass,
   MissionDeliveryShape,
@@ -104,14 +103,13 @@ const REGISTRY_PATH = pathResolver.knowledge(
 );
 const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/review-gate-result.schema.json');
 
-let registryValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;
 
-function ensureRegistryValidator(): ValidateFunction {
-  if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchema(REGISTRY_SCHEMA_PATH);
-  return registryValidateFn;
-}
+const registryCatalog = defineCatalog<ReviewGateRegistry>({
+  id: 'mission-review-gate-registry',
+  path: REGISTRY_PATH,
+  schema: REGISTRY_SCHEMA_PATH,
+});
 
 function ensureResultValidator(): ValidateFunction {
   if (resultValidateFn) return resultValidateFn;
@@ -156,15 +154,7 @@ function matchRule(
 }
 
 function loadRegistry(): ReviewGateRegistry {
-  const parsed = readJson<ReviewGateRegistry>(REGISTRY_PATH);
-  const validate = ensureRegistryValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid mission-review-gate-registry: ${errors}`);
-  }
-  return parsed;
+  return registryCatalog.load();
 }
 
 export function resolveMissionReviewDesign(
