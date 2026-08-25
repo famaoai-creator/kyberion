@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /* eslint-disable no-restricted-imports */
 /**
  * ChromeExtensionMeetingJoinDriver — browser meeting attendance driven through
@@ -404,10 +405,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
                   ? { speaker: redactMeetingText(parsed.speaker) }
                   : {}),
               };
-              safeAppendFileSync(
-                captionsPath,
-                `${JSON.stringify({ ...safeCaption, ts: new Date().toISOString() })}\n`
-              );
+              appendJsonLine(captionsPath, { ...safeCaption, ts: new Date().toISOString() });
               pushCaption(
                 typeof safeCaption.text === 'string' ? safeCaption.text : '',
                 typeof safeCaption.speaker === 'string' ? safeCaption.speaker : undefined

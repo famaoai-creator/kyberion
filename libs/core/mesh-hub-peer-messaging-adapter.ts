@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -79,10 +80,6 @@ export interface MeshHubDispatchInput {
   recipient: PeerNetworkPeerRecord;
   request: MeshRequest;
   timeoutMs?: number;
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function normalizeNamespace(namespace?: string): string {

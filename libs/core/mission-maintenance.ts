@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * scripts/refactor/mission-maintenance.ts
  * Maintenance and recovery operations for missions.
@@ -947,11 +948,7 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   try {
     const auditPath = pathResolver.sharedLogsAudit('mission-purge.jsonl');
     safeMkdir(path.dirname(auditPath), { recursive: true });
-    safeAppendFileSync(
-      auditPath,
-      `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
-      { encoding: 'utf8' }
-    );
+    appendJsonLine(auditPath, { ts: new Date().toISOString(), ...record });
   } catch (err) {
     logger.warn(
       `Failed to record mission purge audit entry for ${String(record.mission)}: ${err instanceof Error ? err.message : String(err)}`

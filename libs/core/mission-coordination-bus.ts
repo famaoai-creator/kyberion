@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from './authority.js';
 import {
@@ -101,8 +102,7 @@ export class MissionCoordinationBus {
           if (!trimmed) continue;
           try {
             const event = JSON.parse(trimmed) as
-              | MissionCoordinationEvent
-              | MissionCoordinationMessage;
+              MissionCoordinationEvent | MissionCoordinationMessage;
             if ((event as MissionCoordinationEvent).kind === 'ack') {
               const ack = event as Extract<MissionCoordinationEvent, { kind: 'ack' }>;
               const message = messages.get(ack.message_id);
@@ -161,7 +161,7 @@ export class MissionCoordinationBus {
       if (this.countBusLines(this.busPath(missionId)) >= this.maxLinesPerFile) {
         this.rotateBusFile(missionId);
       }
-      safeAppendFileSync(this.busPath(missionId), `${JSON.stringify(event)}\n`);
+      appendJsonLine(this.busPath(missionId), event);
     });
   }
 

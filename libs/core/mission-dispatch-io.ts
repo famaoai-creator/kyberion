@@ -1,3 +1,4 @@
+import { appendJsonLine as appendFoundationJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import {
   safeAppendFileSync,
@@ -53,7 +54,7 @@ export function appendJsonLine(filePath: string, payload: Record<string, unknown
   withExecutionContext(
     'mission_controller',
     () => {
-      safeAppendFileSync(filePath, `${JSON.stringify(payload)}\n`, 'utf8');
+      appendFoundationJsonLine(filePath, payload);
     },
     'worker'
   );

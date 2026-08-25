@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * AL-03: mission finish / task completion artifact closure.
  *
@@ -153,7 +154,7 @@ function appendClosureAudit(record: Record<string, unknown>): string | undefined
   try {
     const auditPath = pathResolver.sharedLogsAudit(MISSION_CLOSURE_AUDIT_FILENAME);
     safeMkdir(path.dirname(auditPath), { recursive: true });
-    safeAppendFileSync(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8' });
+    appendJsonLine(auditPath, record);
     return auditPath;
   } catch (err) {
     logger.warn(

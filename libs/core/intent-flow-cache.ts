@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
+import { normalizeText } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type {
@@ -187,18 +189,8 @@ function sha256Hex(value: unknown): string {
   return `sha256:${createHash('sha256').update(stableStringify(value)).digest('hex')}`;
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function cacheExpiry(ttlMs: number): string {
   return new Date(Date.now() + ttlMs).toISOString();
-}
-
-function normalizeText(value: string): string {
-  return String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ');
 }
 
 function confidenceBand(confidence?: number): ConfidenceBand {

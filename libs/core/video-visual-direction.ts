@@ -54,7 +54,7 @@ export const DEFAULT_VISUAL_DIRECTION: VideoVisualDirection = {
   typography: { headline_px: 68, body_px: 23 },
 };
 
-function clamp(value: number, min: number, max: number): number {
+function clampVideoDirectionValue(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -100,10 +100,10 @@ export function normalizeVideoVisualDirection(
     palette: colors as VideoVisualDirection['palette'],
     typography: {
       headline_px: Number.isFinite(headline)
-        ? clamp(headline, headlineRange[0], headlineRange[1])
+        ? clampVideoDirectionValue(headline, headlineRange[0], headlineRange[1])
         : fallback.typography.headline_px,
       body_px: Number.isFinite(body)
-        ? clamp(body, bodyRange[0], bodyRange[1])
+        ? clampVideoDirectionValue(body, bodyRange[0], bodyRange[1])
         : fallback.typography.body_px,
     },
     ...(perScene && perScene.length > 0 ? { per_scene: perScene } : {}),

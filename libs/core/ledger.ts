@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
@@ -95,7 +96,7 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
       safeMkdir(dir, { recursive: true });
     }
 
-    safeAppendFileSync(ledgerPath, JSON.stringify(entry) + '\n');
+    appendJsonLine(ledgerPath, entry);
     return hash;
   });
 }

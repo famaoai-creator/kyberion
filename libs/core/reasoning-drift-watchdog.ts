@@ -43,7 +43,7 @@ const DEFAULT_CONFIG: Required<ReasoningDriftWatchdogConfig> = {
   maxCombinedChars: 24_000,
 };
 
-function normalizeText(value: unknown): string {
+function normalizeDriftText(value: unknown): string {
   return String(value ?? '')
     .replace(/\s+/gu, ' ')
     .trim()
@@ -51,12 +51,12 @@ function normalizeText(value: unknown): string {
 }
 
 function normalizeExcerpt(value: string, maxLength = 180): string {
-  const normalized = normalizeText(value);
+  const normalized = normalizeDriftText(value);
   return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
 }
 
 function uniqueNotes(notes?: string[]): string[] {
-  return Array.from(new Set((notes || []).map((note) => normalizeText(note)).filter(Boolean)));
+  return Array.from(new Set((notes || []).map((note) => normalizeDriftText(note)).filter(Boolean)));
 }
 
 export function createReasoningDriftWatchdogState(): ReasoningDriftWatchdogState {
@@ -66,26 +66,37 @@ export function createReasoningDriftWatchdogState(): ReasoningDriftWatchdogState
   };
 }
 
-export function hydrateReasoningDriftWatchdogState(metadata?: Record<string, unknown> | null): ReasoningDriftWatchdogState {
+export function hydrateReasoningDriftWatchdogState(
+  metadata?: Record<string, unknown> | null
+): ReasoningDriftWatchdogState {
   if (!metadata || typeof metadata !== 'object') return createReasoningDriftWatchdogState();
   const total = Number(metadata.drift_watchdog_total_attempts);
   const same = Number(metadata.drift_watchdog_consecutive_same_signature);
   return {
     total_attempts: Number.isFinite(total) && total >= 0 ? total : 0,
     consecutive_same_signature: Number.isFinite(same) && same >= 0 ? same : 0,
-    last_signature: typeof metadata.drift_watchdog_last_signature === 'string' ? metadata.drift_watchdog_last_signature : undefined,
-    last_observed_at: typeof metadata.drift_watchdog_last_observed_at === 'string' ? metadata.drift_watchdog_last_observed_at : undefined,
-    last_reason: typeof metadata.drift_watchdog_last_reason === 'string' ? metadata.drift_watchdog_last_reason : undefined,
+    last_signature:
+      typeof metadata.drift_watchdog_last_signature === 'string'
+        ? metadata.drift_watchdog_last_signature
+        : undefined,
+    last_observed_at:
+      typeof metadata.drift_watchdog_last_observed_at === 'string'
+        ? metadata.drift_watchdog_last_observed_at
+        : undefined,
+    last_reason:
+      typeof metadata.drift_watchdog_last_reason === 'string'
+        ? metadata.drift_watchdog_last_reason
+        : undefined,
   };
 }
 
 export function buildReasoningDriftSignature(input: ReasoningDriftObservation): string {
   const parts = [
-    normalizeText(input.mission_id),
-    normalizeText(input.item_id),
-    normalizeText(input.execution_mode),
-    normalizeText(input.ticket_state),
-    normalizeText(input.cognitive_route_summary),
+    normalizeDriftText(input.mission_id),
+    normalizeDriftText(input.item_id),
+    normalizeDriftText(input.execution_mode),
+    normalizeDriftText(input.ticket_state),
+    normalizeDriftText(input.cognitive_route_summary),
     normalizeExcerpt(input.response_text || ''),
     uniqueNotes(input.notes).join('|'),
   ].filter(Boolean);
@@ -95,7 +106,7 @@ export function buildReasoningDriftSignature(input: ReasoningDriftObservation): 
 export function advanceReasoningDriftWatchdog(
   state: ReasoningDriftWatchdogState,
   observation: ReasoningDriftObservation,
-  config: ReasoningDriftWatchdogConfig = {},
+  config: ReasoningDriftWatchdogConfig = {}
 ): ReasoningDriftWatchdogDecision {
   const limits = { ...DEFAULT_CONFIG, ...config };
   const signature = buildReasoningDriftSignature(observation);
@@ -105,9 +116,7 @@ export function advanceReasoningDriftWatchdog(
     consecutive_same_signature: repeatedSignature ? state.consecutive_same_signature + 1 : 1,
     last_signature: signature,
     last_observed_at: new Date().toISOString(),
-    last_reason: repeatedSignature
-      ? 'repeated signature detected'
-      : 'signature advanced',
+    last_reason: repeatedSignature ? 'repeated signature detected' : 'signature advanced',
   };
 
   const promptChars = (observation.prompt || '').length;
@@ -165,7 +174,9 @@ export function advanceReasoningDriftWatchdog(
   };
 }
 
-export function formatReasoningDriftWatchdogDecision(decision: ReasoningDriftWatchdogDecision): string {
+export function formatReasoningDriftWatchdogDecision(
+  decision: ReasoningDriftWatchdogDecision
+): string {
   const parts = [
     `attempts=${decision.state.total_attempts}`,
     `repeat=${decision.state.consecutive_same_signature}`,
@@ -177,7 +188,9 @@ export function formatReasoningDriftWatchdogDecision(decision: ReasoningDriftWat
   return parts.join('; ');
 }
 
-export function encodeReasoningDriftWatchdogState(state: ReasoningDriftWatchdogState): Record<string, unknown> {
+export function encodeReasoningDriftWatchdogState(
+  state: ReasoningDriftWatchdogState
+): Record<string, unknown> {
   return {
     drift_watchdog_total_attempts: state.total_attempts,
     drift_watchdog_consecutive_same_signature: state.consecutive_same_signature,

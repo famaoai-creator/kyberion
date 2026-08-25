@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Worker event stream (KC-02).
  *
@@ -188,7 +189,7 @@ export class WorkerEventStream {
 /** Append every envelope to a jsonl file; returns the detach function. */
 export function attachJsonlRecorder(stream: WorkerEventStream, filePath: string): () => void {
   return stream.subscribe((event) => {
-    safeAppendFileSync(filePath, `${JSON.stringify(event)}\n`);
+    appendJsonLine(filePath, event);
   });
 }
 
@@ -262,13 +263,10 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         // mission lifecycle state.
         const missionEventDir = `${dir}/missions/${missionId}`;
         safeMkdir(missionEventDir, { recursive: true });
-        safeAppendFileSync(
-          `${missionEventDir}/worker-events-${day}.jsonl`,
-          `${JSON.stringify(sharedEvent)}\n`
-        );
+        appendJsonLine(`${missionEventDir}/worker-events-${day}.jsonl`, sharedEvent);
         return;
       }
-      safeAppendFileSync(`${dir}/worker-events-${day}.jsonl`, `${JSON.stringify(sharedEvent)}\n`);
+      appendJsonLine(`${dir}/worker-events-${day}.jsonl`, sharedEvent);
     });
   } catch {
     // Observability wiring is best-effort; never block stream creation.

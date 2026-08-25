@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -195,7 +196,7 @@ export function appendAssetRecord(
   assertAssetRecord(record);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   safeMkdir(path.dirname(ledgerFile), { recursive: true });
-  safeAppendFile(ledgerFile, `${JSON.stringify(record)}\n`);
+  appendJsonLine(ledgerFile, record);
   return record;
 }
 

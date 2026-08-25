@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 
@@ -320,7 +321,7 @@ export function recordDefectCandidate(
 
 function appendDefectEvent(event: DefectTransitionEvent, filePath: string): DefectTransitionEvent {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeAppendFileSync(filePath, `${JSON.stringify(event)}\n`, { encoding: 'utf8' });
+  appendJsonLine(filePath, event);
   return event;
 }
 

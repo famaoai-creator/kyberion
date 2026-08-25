@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -134,7 +135,7 @@ function ensureTraceDir(): void {
 
 function appendTrace(record: DelegatedTaskTrace): void {
   ensureTraceDir();
-  safeAppendFileSync(resolveTracePath(), `${JSON.stringify(record)}\n`, 'utf8');
+  appendJsonLine(resolveTracePath(), record);
 }
 
 function recordPath(delegationId: string): string {

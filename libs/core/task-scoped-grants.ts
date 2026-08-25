@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -293,7 +294,7 @@ function appendGrantRecord(record: TaskScopedGrant): void {
     if (dir && dir !== storePath && !safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
-    safeAppendFileSync(storePath, `${JSON.stringify(validated)}\n`);
+    appendJsonLine(storePath, validated);
   });
 }
 

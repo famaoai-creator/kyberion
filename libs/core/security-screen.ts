@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Inbound security-screening primitives (QM-04, successor to SA-03).
  *
@@ -331,7 +332,7 @@ export function recordQuarantine(input: {
   };
   safeMkdir(quarantineDir());
   rotateQuarantineIfOversized();
-  safeAppendFileSync(quarantinePath(), `${JSON.stringify(record)}\n`);
+  appendJsonLine(quarantinePath(), record);
   try {
     auditChain.record({
       agentId: 'security-screen',
