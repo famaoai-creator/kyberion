@@ -17,6 +17,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
@@ -394,10 +395,11 @@ export async function main(): Promise<void> {
   process.exit(report.ready ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /meeting_preflight\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
+if (
+  isDirectScript(import.meta.url, 'meeting_preflight.ts') ||
+  isDirectScript(import.meta.url, 'meeting_preflight.js')
+)
+  void main().catch((err) => {
     console.error(err?.message ?? String(err));
     process.exit(1);
   });
-}
