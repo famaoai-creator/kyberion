@@ -84,6 +84,34 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
 }
 
 export function main(argv = process.argv.slice(2)): number {
+  const supportedFlags = new Set(['--scope', '--only', '--json']);
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index];
+    if (!flag?.startsWith('--')) continue;
+    if (!supportedFlags.has(flag)) {
+      const json = argv.includes('--json');
+      const message = `unknown check option: ${flag}`;
+      if (json)
+        console.log(
+          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
+        );
+      else console.error(`[check] ERROR ${message}`);
+      return 1;
+    }
+    if (
+      (flag === '--scope' || flag === '--only') &&
+      (!argv[index + 1] || argv[index + 1]!.startsWith('--'))
+    ) {
+      const json = argv.includes('--json');
+      const message = `${flag} requires a value`;
+      if (json)
+        console.log(
+          JSON.stringify({ scope: undefined, results: [], failed: 0, error: message }, null, 2)
+        );
+      else console.error(`[check] ERROR ${message}`);
+      return 1;
+    }
+  }
   const scopeIndex = argv.indexOf('--scope');
   const scopeValue = scopeIndex >= 0 ? argv[scopeIndex + 1] : 'pr';
   const onlyIndex = argv.indexOf('--only');
