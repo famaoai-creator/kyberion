@@ -90,6 +90,22 @@ describe('run_doctor', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
   });
 
+  it('emits the same doctor report as structured JSON when requested', async () => {
+    const yargsStub = {
+      option: vi.fn(() => yargsStub),
+      parseSync: vi.fn(() => ({ json: true })),
+    };
+    mocks.createStandardYargs.mockReturnValue(yargsStub);
+
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor(['--json']);
+
+    const payload = JSON.parse(String(logSpy.mock.calls[0]?.[0])) as { summaries?: unknown[] };
+    expect(payload.summaries).toEqual(expect.any(Array));
+    expect(process.exitCode).toBe(0);
+  });
+
   it('expands the meeting runtime preset to the meeting participation manifest', async () => {
     const { collectDoctorReport } = await import('./run_doctor.js');
 

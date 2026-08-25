@@ -431,6 +431,7 @@ async function parseDoctorArguments(args: string[]): Promise<{
   runtime?: string;
   all?: boolean;
   mission?: string;
+  json?: boolean;
 }> {
   return createStandardYargs(['node', 'run_doctor', ...args])
     .option('manifest', { type: 'string' })
@@ -440,14 +441,20 @@ async function parseDoctorArguments(args: string[]): Promise<{
     })
     .option('all', { type: 'boolean', default: false })
     .option('mission', { type: 'string' })
+    .option('json', { type: 'boolean', default: false })
     .parseSync();
 }
 
 function printDoctorReport(
   report: DoctorRunReport,
-  argv: { manifest?: string; runtime?: string; all?: boolean; mission?: string },
+  argv: { manifest?: string; runtime?: string; all?: boolean; mission?: string; json?: boolean },
   print: (value: unknown) => void
 ): void {
+  if (argv.json) {
+    print(report);
+    process.exitCode = report.totalMissing === 0 ? 0 : 1;
+    return;
+  }
   for (const line of report.rollupLines) {
     print(line);
   }
