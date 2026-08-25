@@ -1,9 +1,9 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { logger, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
  * Presence Controller v2.0 (Type-Safe TS Edition)
@@ -37,13 +37,15 @@ export function perceive(): Stimulus[] {
 
   try {
     const content = readTextFile(STIMULI_PATH);
-    const stimuli: Stimulus[] = content.trim().split('\n')
-      .filter(l => l.length > 0)
-      .map(line => JSON.parse(line))
-      .filter(s => s.status === 'PENDING' || s.status === 'INJECTED');
+    const stimuli: Stimulus[] = content
+      .trim()
+      .split('\n')
+      .filter((l) => l.length > 0)
+      .map((line) => JSON.parse(line))
+      .filter((s) => s.status === 'PENDING' || s.status === 'INJECTED');
 
     const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
-    const priorityMap = new Map(registry.channels.map(c => [c.id, c.priority]));
+    const priorityMap = new Map(registry.channels.map((c) => [c.id, c.priority]));
 
     return stimuli.sort((a, b) => {
       const pA = priorityMap.get(a.source_channel) || 0;
@@ -63,9 +65,12 @@ export function getSensoryContext(): string | null {
   if (pending.length === 0) return null;
 
   const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
-  
-  const formatted = pending.map(s => {
-    const channel = registry.channels.find(c => c.id === s.source_channel) || { name: 'Unknown', priority: 0 };
+
+  const formatted = pending.map((s) => {
+    const channel = registry.channels.find((c) => c.id === s.source_channel) || {
+      name: 'Unknown',
+      priority: 0,
+    };
     const priorityMark = channel.priority >= 8 ? ' [URGENT]' : '';
     return `- [Channel: ${channel.name}${priorityMark}] [Mode: ${s.delivery_mode}] Command: ${s.payload}`;
   });
@@ -81,16 +86,20 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
     const content = readTextFile(STIMULI_PATH);
     let stimulusToReply: Stimulus | null = null;
 
-    const lines = content.trim().split('\n').filter(l => l.length > 0).map(line => {
-      const s: Stimulus = JSON.parse(line);
-      if (s.timestamp === timestamp) {
-        s.status = 'PROCESSED';
-        s.resolved_at = new Date().toISOString();
-        s.agent_response = responseText;
-        stimulusToReply = s;
-      }
-      return JSON.stringify(s);
-    });
+    const lines = content
+      .trim()
+      .split('\n')
+      .filter((l) => l.length > 0)
+      .map((line) => {
+        const s: Stimulus = JSON.parse(line);
+        if (s.timestamp === timestamp) {
+          s.status = 'PROCESSED';
+          s.resolved_at = new Date().toISOString();
+          s.agent_response = responseText;
+          stimulusToReply = s;
+        }
+        return JSON.stringify(s);
+      });
 
     safeWriteFile(STIMULI_PATH, lines.join('\n') + '\n');
 
@@ -101,14 +110,20 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
           action: 'message',
           channel: s.metadata.channel_id,
           thread_ts: s.metadata.thread_ts,
-          input: responseText.replace(/\\n/g, '\n')
+          input: responseText.replace(/\\n/g, '\n'),
         };
 
         const tempInput = pathResolver.resolve(`active/shared/logs/slack_reply_${Date.now()}.json`);
         safeWriteFile(tempInput, JSON.stringify(replyPayload));
-        
+
         try {
-          safeExec('node', ['dist/scripts/cli.js', 'run', 'slack-communicator-pro', '--input', tempInput]);
+          safeExec('node', [
+            'dist/scripts/cli.js',
+            'run',
+            'slack-communicator-pro',
+            '--input',
+            tempInput,
+          ]);
           logger.success(`✅ [Presence Bridge] Reply sent via slack-communicator-pro.`);
         } catch (err: any) {
           logger.error(`❌ [Presence Bridge] Failed to send Slack reply: ${err.message}`);
@@ -127,16 +142,19 @@ export async function pruneStimuli(): Promise<void> {
   try {
     const content = readTextFile(STIMULI_PATH);
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const lines = content.trim().split('\n').filter(l => l.length > 0);
+    const lines = content
+      .trim()
+      .split('\n')
+      .filter((l) => l.length > 0);
     const remaining: string[] = [];
     const archived: string[] = [];
 
     for (const line of lines) {
       const s: Stimulus = JSON.parse(line);
       const ts = new Date(s.timestamp);
-      
+
       if (s.status === 'PROCESSED' && ts < oneDayAgo) {
         archived.push(line);
       } else {
@@ -146,8 +164,11 @@ export async function pruneStimuli(): Promise<void> {
 
     if (archived.length > 0) {
       const archiveDir = pathResolver.resolve('active/archive/presence');
-      const archiveFile = path.join(archiveDir, `stimuli_archive_${now.toISOString().split('T')[0]}.jsonl`);
-      
+      const archiveFile = path.join(
+        archiveDir,
+        `stimuli_archive_${now.toISOString().split('T')[0]}.jsonl`
+      );
+
       if (!safeExistsSync(archiveDir)) safeWriteFile(path.join(archiveDir, '.gitkeep'), '');
       safeAppendFile(archiveFile, archived.join('\n') + '\n');
       safeWriteFile(STIMULI_PATH, remaining.join('\n') + '\n');
@@ -162,8 +183,7 @@ function printUsage(): void {
   console.log('Usage: pnpm presence-controller <resolve|perceive|prune> [args]');
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+export async function main(args: string[] = []): Promise<void> {
   const action = args[0];
 
   if (!action || action === '--help' || action === '-h' || action === 'help') {
@@ -174,7 +194,7 @@ async function main() {
   if (action === 'resolve') {
     const ts = args[1];
     const resp = args[2] || '';
-    if (!ts) process.exit(1);
+    if (!ts) throw new ScriptExitError(1, 'resolve requires a stimulus timestamp');
     await resolveStimulus(ts, resp);
   } else if (action === 'perceive') {
     const pending = perceive();
@@ -184,12 +204,14 @@ async function main() {
   }
 }
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
+export const runPresenceController = defineScript({
+  name: 'presence:controller',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
 
-if ((entrypoint && modulePath === entrypoint) || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-  main().catch(err => {
-    console.error(err);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'presence-controller.ts') ||
+  isDirectScript(import.meta.url, 'presence-controller.js')
+)
+  void runPresenceController();
