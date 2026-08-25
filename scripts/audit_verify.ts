@@ -9,6 +9,7 @@ import {
   type AuditVerifyCliReport,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
@@ -97,10 +98,11 @@ async function main(): Promise<void> {
   process.exit(report.ok ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /audit_verify\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
+if (
+  isDirectScript(import.meta.url, 'audit_verify.ts') ||
+  isDirectScript(import.meta.url, 'audit_verify.js')
+)
+  void main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
-}
