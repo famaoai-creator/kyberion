@@ -46,4 +46,10 @@ describe('manifest-driven check runner', () => {
     expect(main(['--scope', 'typo', '--json'])).toBe(1);
     expect(selectGates(loadGateManifest(), 'release')).toHaveLength(1);
   });
+
+  it('fails closed for unknown options and missing option values', () => {
+    expect(main(['--unknown'])).toBe(1);
+    expect(main(['--scope'])).toBe(1);
+    expect(main(['--only'])).toBe(1);
+  });
 });

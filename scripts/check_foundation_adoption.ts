@@ -5,7 +5,20 @@ import { pathResolver, safeReadFile } from '@agent/core';
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
+const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;
+const JSONL_APPEND_PATTERN = new RegExp(
+  [
+    'safeAppendFile',
+    '(?:Sync)?',
+    '\\(',
+    '[\\s\\S]{0,280}?',
+    'JSON\\.stringify',
+    '[\\s\\S]{0,120}?',
+    '\\\\n',
+  ].join(''),
+  'gu'
+);
 
 function sourceFiles(): string[] {
   return SOURCE_ROOTS.flatMap((relativeRoot) => {
@@ -23,6 +36,7 @@ function sourceFiles(): string[] {
 export function checkFoundationAdoption(files = sourceFiles()): string[] {
   const failures: string[] = [];
   let jsonLoaderViolations = 0;
+  let jsonlAppendViolations = 0;
   let ajvViolations = 0;
   let envReads = 0;
   let catalogDefinitions = 0;
@@ -31,6 +45,12 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   for (const filePath of files) {
     const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
     jsonLoaderViolations += [...source.matchAll(/JSON\.parse\(\s*safeReadFile\(/gu)].length;
+    if (
+      !filePath.endsWith(`${path.sep}foundation${path.sep}json.ts`) &&
+      path.basename(filePath) !== 'check_foundation_adoption.ts'
+    ) {
+      jsonlAppendViolations += [...source.matchAll(JSONL_APPEND_PATTERN)].length;
+    }
     if (
       !filePath.endsWith(`${path.sep}foundation${path.sep}ajv.ts`) &&
       /new\s+\w*Ajv\w*\s*\(/u.test(source)
@@ -48,6 +68,11 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   if (jsonLoaderViolations > JSON_LOADER_RATCHET) {
     failures.push(
       `shared JSON loader pattern increased: ${jsonLoaderViolations} > ${JSON_LOADER_RATCHET}`
+    );
+  }
+  if (jsonlAppendViolations > JSONL_APPEND_RATCHET) {
+    failures.push(
+      `shared JSONL append pattern increased: ${jsonlAppendViolations} > ${JSONL_APPEND_RATCHET}`
     );
   }
   if (ajvViolations > 0) failures.push(`Ajv constructor outside foundation: ${ajvViolations}`);
