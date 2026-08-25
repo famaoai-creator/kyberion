@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 
 export interface WorkCoordinationImportCatalogEntry {
   id: string;
@@ -28,35 +26,25 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/work-coordination-import-catalog.schema.json'
 );
 
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: WorkCoordinationImportCatalog | null = null;
-let cachedCatalogKey: string | null = null;
+const publicCatalog = defineCatalog<WorkCoordinationImportCatalog>({
+  id: 'work-coordination-import-catalog.public',
+  path: PUBLIC_CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: { version: '1.0.0', imports: [] },
+});
+const personalCatalog = defineCatalog<WorkCoordinationImportCatalog>({
+  id: 'work-coordination-import-catalog.personal',
+  path: PERSONAL_CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: { version: '1.0.0', imports: [] },
+});
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): WorkCoordinationImportCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid work coordination import catalog at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as WorkCoordinationImportCatalog;
-}
-
-function loadCatalogFile(catalogPath: string): WorkCoordinationImportCatalog | null {
+function loadCatalogFile(
+  catalogPath: string,
+  catalog: GovernedCatalog<WorkCoordinationImportCatalog>
+): WorkCoordinationImportCatalog | null {
   if (!safeExistsSync(catalogPath)) return null;
-  return validateCatalog(loadJson(catalogPath), catalogPath);
+  return catalog.load();
 }
 
 function mergeCatalogs(
@@ -73,15 +61,15 @@ function mergeCatalogs(
 }
 
 export function loadWorkCoordinationImportCatalog(): WorkCoordinationImportCatalog {
-  const cacheKey = `${PUBLIC_CATALOG_PATH}::${PERSONAL_CATALOG_PATH}`;
-  if (cachedCatalog && cachedCatalogKey === cacheKey) return cachedCatalog;
-
-  const base = loadCatalogFile(PUBLIC_CATALOG_PATH) ?? { version: '1.0.0', imports: [] };
-  const personal = loadCatalogFile(PERSONAL_CATALOG_PATH) ?? { version: base.version, imports: [] };
+  const base = loadCatalogFile(PUBLIC_CATALOG_PATH, publicCatalog) ?? {
+    version: '1.0.0',
+    imports: [],
+  };
+  const personal = loadCatalogFile(PERSONAL_CATALOG_PATH, personalCatalog) ?? {
+    version: base.version,
+    imports: [],
+  };
   const merged = mergeCatalogs(base, personal);
-
-  cachedCatalog = merged;
-  cachedCatalogKey = cacheKey;
   return merged;
 }
 
@@ -100,6 +88,6 @@ export function getWorkCoordinationImportCatalogEntryByCommand(
 }
 
 export function resetWorkCoordinationImportCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogKey = null;
+  publicCatalog.reset();
+  personalCatalog.reset();
 }

@@ -1,8 +1,5 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface ServiceOnboardingCatalogEntry {
   service_id: string;
@@ -21,38 +18,15 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-onboarding-catalog.schema.json'
 );
 
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: ServiceOnboardingCatalog | null = null;
-let cachedCatalogPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
-
-function validateCatalog(value: unknown, label: string): ServiceOnboardingCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) =>
-      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-    );
-    throw new Error(`Invalid service onboarding catalog at ${label}: ${errors.join('; ')}`);
-  }
-  return value as ServiceOnboardingCatalog;
-}
+const catalog = defineCatalog<ServiceOnboardingCatalog>({
+  id: 'service-onboarding-catalog',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: { version: '1.0.0', services: [] },
+});
 
 export function loadServiceOnboardingCatalog(): ServiceOnboardingCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = { version: '1.0.0', services: [] };
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function listServiceOnboardingCatalogEntries(): ServiceOnboardingCatalogEntry[] {
