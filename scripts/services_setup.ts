@@ -17,7 +17,7 @@ import {
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
-import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report.js';
+import { formatSetupHintLine, formatSetupSummaryLine } from './setup_report.js';
 
 type ServiceSetupRow = {
   service: string;
