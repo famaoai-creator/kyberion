@@ -566,7 +566,7 @@ export async function handleTelegramUpdate(
           threadContext,
           delegationSummaryInstruction:
             'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-        } as any)
+        })
     );
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

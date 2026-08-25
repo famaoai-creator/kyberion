@@ -252,7 +252,7 @@ async function handleDiscordMessage(message: Message) {
           threadContext,
           delegationSummaryInstruction:
             'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
-        } as any)
+        })
     );
 
     // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
