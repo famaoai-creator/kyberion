@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -193,7 +194,7 @@ export function assertVisualReviewPathScope(input: {
         const statePath = path.join(missionPath, 'mission-state.json');
         if (safeExistsSync(statePath)) {
           try {
-            const state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }))) as any;
+            const state = readJson<Record<string, any>>(statePath);
             const recordedTenant = String(
               state?.context?.tenant_slug || state?.tenant_slug || state?.tenant_id || ''
             ).trim();

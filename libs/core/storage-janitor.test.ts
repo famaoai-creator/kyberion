@@ -14,6 +14,7 @@ vi.mock('./secure-io.js', async () => {
     safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
+    loadJson: (p: string) => JSON.parse(actual.readFileSync(p, 'utf8')),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
     safeWriteFile: (p: string, data: string) => {
       actual.mkdirSync(path.dirname(p), { recursive: true });

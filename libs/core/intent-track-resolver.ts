@@ -1,7 +1,8 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { createAjv } from './foundation/ajv.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson as readFoundationJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
 import { compileSchema } from './foundation/ajv.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
@@ -92,7 +93,7 @@ const ajv = createAjv();
 let overrideValidator: ValidateFunction | null = null;
 
 function readJson(filePath: string): JsonObject {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as JsonObject;
+  return readFoundationJson<JsonObject>(filePath);
 }
 
 function ensureOverrideValidator(): ValidateFunction {
