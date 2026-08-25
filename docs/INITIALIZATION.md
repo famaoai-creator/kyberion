@@ -1,6 +1,6 @@
 # 🚀 Kyberion Ecosystem: Onboarding & Initialization Guide
 
-この文書は、first-win 後の Day-2 初期化と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）を定義します。first-win の正本は [QUICKSTART.md](./QUICKSTART.md) です。
+この文書は、first-win 後の Day-2 初期化と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）を定義します。first-win の正本は [QUICKSTART.md](./QUICKSTART.md) です。文書カテゴリごとの正本・補足資料の対応は [documentation-source-map.json](./documentation-source-map.json) を参照してください。
 tenant・organization・activation・最初の仕事までの業務フローは、[オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md)を正本とします。
 
 > **first-win の手順は QUICKSTART.md が正本です。** README は要約のみを持ち、この文書は first-win 後の tenant / organization / activation 手順を扱います。

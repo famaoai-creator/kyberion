@@ -72,6 +72,7 @@
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
     "check:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts --check",
     "check:improvement-plan-metadata": "node --import ./scripts/ts-loader.mjs scripts/check_improvement_plan_metadata.ts",
+    "check:documentation-source-map": "node --import ./scripts/ts-loader.mjs scripts/check_documentation_source_map.ts",
     "check:channel-adapter-adoption": "node --import ./scripts/ts-loader.mjs scripts/check_channel_adapter_adoption.ts",
     "check:knowledge-scope": "node --import ./scripts/ts-loader.mjs scripts/check_knowledge_scope_boundaries.ts",
     "config:report": "node --import ./scripts/ts-loader.mjs scripts/env_config_report.ts",

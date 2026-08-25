@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_version": 1,
+  "last_reviewed": "2026-08-25",
+  "purpose": "Single navigation authority for overlapping status, concept, and onboarding documentation. Listed supporting documents remain useful but do not override the canonical source for their category or scope.",
+  "categories": [
+    {
+      "id": "status",
+      "canonical": "docs/developer/improvement-plans-2026-08/README.ja.md",
+      "canonical_scope": "Current improvement-plan status is indexed here; each plan owns its implementation-status details.",
+      "supporting": [
+        "docs/PRODUCTIZATION_ROADMAP.md",
+        "docs/ROADMAP.md",
+        "docs/ROADMAP_COMPLETION_LEDGER.md",
+        "CHANGELOG.md"
+      ],
+      "historical": [
+        "docs/developer/improvement-plans-2026-07/README.ja.md",
+        "docs/developer/improvement-plans-2026-07/STATUS.ja.md"
+      ]
+    },
+    {
+      "id": "concept",
+      "canonical": "knowledge/product/architecture/organization-work-loop.md",
+      "canonical_scope": "Parent model for how organizational intent becomes governed execution, evidence, and learning.",
+      "index": "knowledge/product/architecture/kyberion-canonical-concept-index.md",
+      "supporting": [
+        "knowledge/product/architecture/enterprise-operating-kernel.md",
+        "knowledge/product/architecture/kyberion-concept-map.md",
+        "docs/WHY.md",
+        "docs/INTENT_LOOP_CONCEPT.md"
+      ]
+    },
+    {
+      "id": "onboarding",
+      "canonical": "docs/QUICKSTART.md",
+      "canonical_scope": "First-win entry point. Later onboarding stages are canonical only within the explicit scopes below.",
+      "scoped_sources": [
+        {
+          "scope": "first_win",
+          "path": "docs/QUICKSTART.md"
+        },
+        {
+          "scope": "day_2_initialization",
+          "path": "docs/INITIALIZATION.md"
+        },
+        {
+          "scope": "tenant_organization_activation_and_first_work",
+          "path": "knowledge/product/governance/onboarding-flow.md"
+        }
+      ],
+      "supporting": ["knowledge/product/governance/phases/onboarding.md", "docs/operator/README.md"]
+    }
+  ],
+  "entrypoints": [
+    "README.md",
+    "docs/QUICKSTART.md",
+    "docs/INITIALIZATION.md",
+    "docs/developer/improvement-plans-2026-08/README.ja.md"
+  ]
+}

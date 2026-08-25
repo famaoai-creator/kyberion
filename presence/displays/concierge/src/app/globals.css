@@ -591,6 +591,60 @@ body {
   color: var(--kb-text-secondary, #6b7280);
 }
 
+.dock-intent-resolution {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e4dccb;
+  border-radius: 8px;
+  background: #fffaf0;
+  font-size: 11px;
+}
+
+.dock-intent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dock-intent-authority {
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 10px;
+}
+
+.dock-intent-resolution dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.dock-intent-resolution dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.dock-intent-resolution dt {
+  color: var(--kb-text-secondary, #6b7280);
+  font-size: 10px;
+}
+
+.dock-intent-resolution dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dock-intent-resolution small {
+  display: block;
+  margin-top: 2px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.dock-intent-waiting {
+  margin: 8px 0 0;
+  color: #795300;
+  font-weight: 600;
+}
+
 .dock-busy {
   font-size: 12px;
   color: var(--kb-text-secondary, #6b7280);

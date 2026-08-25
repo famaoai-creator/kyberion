@@ -128,10 +128,18 @@ describe('concierge surface contract', () => {
     expect(dock).toContain("fetch('/api/message'");
     // The four UX-contract conversation shapes render as labeled cards.
     expect(dock).toContain('execution_preview');
+    expect(dock).toContain('intentResolution: payload.intentResolution');
+    expect(dock).toContain('buildIntentResolutionView');
+    expect(dock).toContain('dock-intent-resolution');
+    expect(dock).toContain('dock.intent_resolution.waiting_approval');
     expect(messages).toContain('dock.shape.clarification');
     expect(messages).toContain('dock.shape.execution_preview');
     expect(messages).toContain('dock.shape.status_summary');
     expect(messages).toContain('dock.shape.delivery_summary');
+    expect(messages).toContain('dock.intent_resolution.understood');
+    expect(messages).toContain('dock.intent_resolution.missing');
+    expect(messages).toContain('dock.intent_resolution.next');
+    expect(messages).toContain('dock.intent_resolution.outcome');
     // ceo-ux.md: no internal execution vocabulary in dock copy.
     expect(dock).not.toMatch(/actuator|pipeline|ADF/i);
   });

@@ -1,3 +1,5 @@
+import type { IntentResolutionContract } from '@agent/core';
+
 /**
  * Shared request/response contract for the CS-02 voice tiers. Used by the
  * /api/voice/* proxy routes (server) and the use-voice hook (client) so the
@@ -60,6 +62,8 @@ export interface VoiceListenOnceResponse {
   replied?: boolean;
   /** The secretary reply text (already spoken server-side when spoken=true). */
   replyText?: string;
+  /** Shared intent/approval contract returned by the voice conversation path. */
+  intentResolution?: IntentResolutionContract;
   replyError?: string;
   spoken?: boolean;
   speechError?: string;

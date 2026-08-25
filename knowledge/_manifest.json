@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 12902,
+      "size": 13168,
       "type": "json"
     },
     {
@@ -5013,7 +5013,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 460306,
+      "size": 462453,
       "type": "json"
     },
     {
