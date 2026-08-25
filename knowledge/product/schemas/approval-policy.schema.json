@@ -23,7 +23,7 @@
             }
           },
           "requires_approval": { "type": "boolean" },
-          "missing_requirements": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+          "missing_requirements": { "type": "array", "items": { "type": "string" } }
         },
         "required": ["id", "requires_approval", "missing_requirements"]
       }
@@ -35,5 +35,5 @@
       "required": ["requires_approval"]
     }
   },
-  "required": ["version", "rules", "defaults"]
+  "required": ["rules", "defaults"]
 }

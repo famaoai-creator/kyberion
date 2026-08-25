@@ -6441,7 +6441,7 @@
     {
       "path": "product/schemas/approval-policy.schema.json",
       "tier": "public",
-      "size": 1339,
+      "size": 1313,
       "type": "json"
     },
     {
