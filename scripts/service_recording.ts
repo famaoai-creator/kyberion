@@ -17,6 +17,7 @@ import {
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -247,11 +248,11 @@ function promote(args: Record<string, string>): void {
   );
 }
 
-async function main(): Promise<void> {
-  const command = process.argv[2] === '--' ? process.argv[3] : process.argv[2];
-  const offset = process.argv[2] === '--' ? 4 : 3;
+async function main(argv: string[] = []): Promise<void> {
+  const normalizedArgs = argv[0] === '--' ? argv.slice(1) : argv;
+  const command = normalizedArgs[0];
   if (!command || command === 'help') return printUsage();
-  const args = argMap(process.argv.slice(offset));
+  const args = argMap(normalizedArgs.slice(1));
   if (command === 'capture') return capture(args);
   if (command === 'compile') return compile(args);
   if (command === 'candidate') return candidate(args);
@@ -260,7 +261,14 @@ async function main(): Promise<void> {
   throw new Error(`unknown command: ${command}`);
 }
 
-main().catch((error) => {
-  console.error(`[service-recording] ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
+export const runServiceRecording = defineScript({
+  name: 'service:recording',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'service_recording.ts') ||
+  isDirectScript(import.meta.url, 'service_recording.js')
+)
+  void runServiceRecording();
