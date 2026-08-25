@@ -1,7 +1,7 @@
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
 import { resolveConfiguredPosture } from './security-screen.js';
 
@@ -17,6 +17,7 @@ export interface ApprovalPolicyRule {
 }
 
 interface ApprovalPolicyFile {
+  version?: string;
   rules?: ApprovalPolicyRule[];
   defaults?: {
     requires_approval?: boolean;
@@ -29,7 +30,17 @@ export interface ApprovalPolicyResolution {
   matchedRuleId?: string;
 }
 
-let approvalPolicyCache: ApprovalPolicyFile | null = null;
+const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
+  id: 'approval-policy',
+  path: () => {
+    const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+    return customerPolicyPath && safeExistsSync(customerPolicyPath)
+      ? customerPolicyPath
+      : pathResolver.knowledge('product/governance/approval-policy.json');
+  },
+  schema: pathResolver.knowledge('product/schemas/approval-policy.schema.json'),
+  fallback: { version: '1.0.0', rules: [], defaults: { requires_approval: false } },
+});
 
 const HARD_CODED_DANGEROUS_RULES: Array<{
   id: string;
@@ -73,18 +84,11 @@ const HARD_CODED_DANGEROUS_RULES: Array<{
 ];
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
-  if (approvalPolicyCache) return approvalPolicyCache;
-  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
-  const filePath =
-    customerPolicyPath && safeExistsSync(customerPolicyPath)
-      ? customerPolicyPath
-      : pathResolver.knowledge('product/governance/approval-policy.json');
   try {
-    approvalPolicyCache = readJson<ApprovalPolicyFile>(filePath);
+    return approvalPolicyCatalog.load();
   } catch {
-    approvalPolicyCache = { rules: [], defaults: { requires_approval: false } };
+    return { version: '1.0.0', rules: [], defaults: { requires_approval: false } };
   }
-  return approvalPolicyCache;
 }
 
 export function resolveApprovalPolicy(input: {
