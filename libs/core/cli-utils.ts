@@ -87,35 +87,46 @@ async function runActuatorServeLoop(opts: {
 
 export async function runActuatorCli(opts: {
   name: string;
-  handleAction: (input: unknown) => Promise<unknown> | unknown;
+  handleAction?: (input: unknown) => Promise<unknown> | unknown;
   schema?: object;
+  /** Reuse an already-defined SDK actuator instead of creating a CLI-only ABI. */
+  actuator?: ActuatorDefinition;
   printResult?: (result: unknown) => void;
   args?: string[];
 }): Promise<void> {
-  const schemaValidator = opts.schema ? createAjv().compile(opts.schema) : undefined;
-  const actuator = defineActuator({
-    id: opts.name,
-    ops: {
-      execute: {
-        kind: 'apply',
-        ...(opts.schema ? { input_schema: opts.schema } : {}),
-        ...(schemaValidator
-          ? {
-              validateInput: (input: unknown): unknown => {
-                if (!schemaValidator(input)) {
-                  const details = (schemaValidator.errors || [])
-                    .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
-                    .join('; ');
-                  throw new Error(`invalid input: ${details}`);
+  const actuator =
+    opts.actuator ||
+    (() => {
+      if (!opts.handleAction) {
+        throw new Error('runActuatorCli requires handleAction when actuator is not provided');
+      }
+      const schemaValidator = opts.schema ? createAjv().compile(opts.schema) : undefined;
+      return defineActuator({
+        id: opts.name,
+        ops: {
+          execute: {
+            kind: 'apply',
+            ...(opts.schema ? { input_schema: opts.schema } : {}),
+            ...(schemaValidator
+              ? {
+                  validateInput: (input: unknown): unknown => {
+                    if (!schemaValidator(input)) {
+                      const details = (schemaValidator.errors || [])
+                        .map(
+                          (error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`
+                        )
+                        .join('; ');
+                      throw new Error(`invalid input: ${details}`);
+                    }
+                    return input;
+                  },
                 }
-                return input;
-              },
-            }
-          : {}),
-        handler: (input: unknown) => opts.handleAction(input),
-      },
-    },
-  });
+              : {}),
+            handler: (input: unknown) => opts.handleAction!(input),
+          },
+        },
+      });
+    })();
   const argv = await createStandardYargs(opts.args || process.argv)
     .option('input', { alias: 'i', type: 'string' })
     .option('serve', {
