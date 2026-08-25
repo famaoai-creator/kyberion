@@ -12,6 +12,7 @@ import {
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
 } from '@agent/core';
+import { defineScript } from './lib/harness.js';
 
 function value(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -86,7 +87,7 @@ function usage(): string {
   ].join('\n');
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[] = []): void {
   const command = argv.find((arg) => !arg.startsWith('--')) || 'help';
   if (command === 'help') {
     console.log(usage());
@@ -123,11 +124,8 @@ export function main(argv = process.argv.slice(2)): void {
   console.log(JSON.stringify(result, null, 2));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    main();
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
+void defineScript({
+  name: 'tenant:activation',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
