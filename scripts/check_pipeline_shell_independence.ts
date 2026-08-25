@@ -12,8 +12,8 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadJson, pathResolver, safeExistsSync, safeReaddir, safeStat } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ShellViolation {
   file: string;
@@ -101,22 +101,26 @@ export function scanPipelineShellIndependence(
   return violations;
 }
 
-export function main(): void {
-  const violations = scanPipelineShellIndependence();
-  if (violations.length > 0) {
-    console.error('[check:pipeline-shell-independence] violations detected:');
-    for (const violation of violations) {
-      console.error(
-        `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
-      );
+export const runCheckPipelineShellIndependence = defineScript({
+  name: 'check:pipeline-shell-independence',
+  flags: [],
+  run(context) {
+    const violations = scanPipelineShellIndependence();
+    if (violations.length > 0) {
+      console.error('[check:pipeline-shell-independence] violations detected:');
+      for (const violation of violations) {
+        console.error(
+          `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
+        );
+      }
+      throw new Error(`${violations.length} pipeline shell independence violation(s)`);
     }
-    process.exit(1);
-  }
-  console.log('[check:pipeline-shell-independence] OK');
-}
+    context.print('[check:pipeline-shell-independence] OK');
+  },
+});
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_pipeline_shell_independence.ts') ||
+  isDirectScript(import.meta.url, 'check_pipeline_shell_independence.js')
+)
+  void runCheckPipelineShellIndependence();

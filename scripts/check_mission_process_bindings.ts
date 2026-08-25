@@ -7,6 +7,7 @@ import {
   safeReadFile,
   safeReaddir,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type JsonRecord = Record<string, any>;
 
@@ -211,15 +212,26 @@ export function findMissionProcessBindingViolations(): string[] {
   return violations;
 }
 
-export function main(): void {
-  const violations = findMissionProcessBindingViolations();
-  if (violations.length) {
-    console.error('[check:mission-process-bindings] violations detected:');
-    for (const violation of violations.sort()) console.error(`- ${violation}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log('[check:mission-process-bindings] OK');
+export function checkMissionProcessBindings(): string[] {
+  return findMissionProcessBindingViolations();
 }
 
-if (process.argv[1] && /check_mission_process_bindings\.(ts|js)$/u.test(process.argv[1])) main();
+export const runCheckMissionProcessBindings = defineScript({
+  name: 'check:mission-process-bindings',
+  flags: [],
+  run(context) {
+    const violations = checkMissionProcessBindings();
+    if (violations.length) {
+      console.error('[check:mission-process-bindings] violations detected:');
+      for (const violation of violations.sort()) console.error(`- ${violation}`);
+      throw new Error(`${violations.length} mission process binding violation(s)`);
+    }
+    context.print('[check:mission-process-bindings] OK');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_mission_process_bindings.ts') ||
+  isDirectScript(import.meta.url, 'check_mission_process_bindings.js')
+)
+  void runCheckMissionProcessBindings();
