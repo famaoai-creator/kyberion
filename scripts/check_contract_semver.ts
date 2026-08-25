@@ -28,6 +28,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface Manifest {
   actuator_id: string;
@@ -255,50 +256,58 @@ function printUsage(): void {
   console.log('Usage: pnpm check:contract-semver [--rebaseline]');
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const rebaseline = args.includes('--rebaseline');
-  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-    printUsage();
-    return;
-  }
+export const runCheckContractSemver = defineScript({
+  name: 'check:contract-semver',
+  flags: [],
+  run(context) {
+    const args = context.argv;
+    const rebaseline = args.includes('--rebaseline');
+    if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+      printUsage();
+      return;
+    }
 
-  const manifests = listActuatorManifests()
-    .map(readManifest)
-    .filter((m) => m.actuator_id && m.version);
-  const fingerprints = manifests.map(fingerprint);
+    const manifests = listActuatorManifests()
+      .map(readManifest)
+      .filter((m) => m.actuator_id && m.version);
+    const fingerprints = manifests.map(fingerprint);
 
-  if (rebaseline) {
-    const baseline = buildBaseline(fingerprints);
-    writeBaseline(baseline);
-    console.log(`✅ Baseline updated: ${BASELINE_PATH}`);
-    console.log(`   Recorded ${baseline.actuators.length} actuators.`);
-    return;
-  }
+    if (rebaseline) {
+      const baseline = buildBaseline(fingerprints);
+      writeBaseline(baseline);
+      context.print(`✅ Baseline updated: ${BASELINE_PATH}`);
+      context.print(`   Recorded ${baseline.actuators.length} actuators.`);
+      return;
+    }
 
-  const baseline = loadBaseline();
-  if (!baseline) {
-    const initial = buildBaseline(fingerprints);
-    writeBaseline(initial);
-    console.log(`📝 No baseline existed. Created initial baseline: ${BASELINE_PATH}`);
-    console.log(`   Recorded ${initial.actuators.length} actuators. Commit this file.`);
-    return;
-  }
+    const baseline = loadBaseline();
+    if (!baseline) {
+      const initial = buildBaseline(fingerprints);
+      writeBaseline(initial);
+      context.print(`📝 No baseline existed. Created initial baseline: ${BASELINE_PATH}`);
+      context.print(`   Recorded ${initial.actuators.length} actuators. Commit this file.`);
+      return;
+    }
 
-  const diags = check(baseline, fingerprints);
-  const errors = diags.filter((d) => d.severity === 'error');
-  const warnings = diags.filter((d) => d.severity === 'warning');
+    const diags = check(baseline, fingerprints);
+    const errors = diags.filter((d) => d.severity === 'error');
+    const warnings = diags.filter((d) => d.severity === 'warning');
 
-  for (const w of warnings) console.log(`⚠️  ${w.message}`);
-  for (const e of errors) console.error(`❌ ${e.message}`);
+    for (const w of warnings) console.log(`⚠️  ${w.message}`);
+    for (const e of errors) console.error(`❌ ${e.message}`);
 
-  if (errors.length > 0) {
-    console.error(`\n${errors.length} contract-semver violations.`);
-    process.exit(1);
-  }
-  console.log(
-    `✅ Contract-semver check passed. ${fingerprints.length} actuators, ${warnings.length} warnings.`
-  );
-}
+    if (errors.length > 0) {
+      console.error(`\n${errors.length} contract-semver violations.`);
+      throw new Error(`${errors.length} contract-semver violation(s)`);
+    }
+    context.print(
+      `✅ Contract-semver check passed. ${fingerprints.length} actuators, ${warnings.length} warnings.`
+    );
+  },
+});
 
-main();
+if (
+  isDirectScript(import.meta.url, 'check_contract_semver.ts') ||
+  isDirectScript(import.meta.url, 'check_contract_semver.js')
+)
+  void runCheckContractSemver();
