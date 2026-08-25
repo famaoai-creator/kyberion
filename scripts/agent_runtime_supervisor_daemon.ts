@@ -1,7 +1,7 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import {
   appendSupervisorEvent,
   askAgentRuntime,
@@ -1005,7 +1005,8 @@ async function main() {
 }
 
 const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.ts') ||
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.js');
 if (isDirect) {
   main().catch((error: any) => {
     const message = error?.message || String(error);

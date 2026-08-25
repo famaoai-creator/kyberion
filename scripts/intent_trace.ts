@@ -15,6 +15,7 @@ import {
   loadMissionOrchestrationJournal,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
 type JsonRecord = Record<string, unknown> & { [key: string]: unknown };
@@ -550,7 +551,10 @@ async function main(): Promise<void> {
   console.log(formatTraceReport(evidence, normalizeIntentTraceText(argv.locale) || 'en'));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  isDirectScript(import.meta.url, 'intent_trace.ts') ||
+  isDirectScript(import.meta.url, 'intent_trace.js')
+) {
   void main();
 }
 

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { isDirectScript } from './lib/harness.js';
 
 import {
   pathResolver,
@@ -121,7 +122,7 @@ export async function runDs04VideoVisualProof(): Promise<{
   return { bundleDir, videoPath, screenshots };
 }
 
-if (path.basename(process.argv[1] || '') === 'ds04_video_visual_proof.ts') {
+if (isDirectScript(import.meta.url, 'ds04_video_visual_proof.ts')) {
   const result = await runDs04VideoVisualProof();
   console.log(JSON.stringify(result, null, 2));
 }
