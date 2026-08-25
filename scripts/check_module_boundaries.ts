@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import {
   pathResolver,
@@ -37,7 +38,7 @@ function matchesPattern(value: string, pattern: string): boolean {
 }
 
 function config(): BoundaryConfig {
-  return JSON.parse(String(safeReadFile(CONFIG_PATH, { encoding: 'utf8' }))) as BoundaryConfig;
+  return readJson<BoundaryConfig>(CONFIG_PATH);
 }
 
 function classify(filePath: string, manifest: BoundaryConfig): Layer {
@@ -149,7 +150,7 @@ export function checkModuleBoundaries(): {
   const cycles = findCycles(graph);
   const directionViolations = findDirectionViolations(graph, manifest);
   const baseline = safeExistsSync(BASELINE_PATH)
-    ? (JSON.parse(String(safeReadFile(BASELINE_PATH, { encoding: 'utf8' }))) as BoundaryBaseline)
+    ? readJson<BoundaryBaseline>(BASELINE_PATH)
     : {
         version: 1 as const,
         cycles: cycles.length,

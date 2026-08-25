@@ -16,7 +16,7 @@ import {
   type OpsAlertInput,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 
 type HealthRow = {
   tenant_slug: string;
@@ -74,9 +74,9 @@ export function evaluateLegacyQuarantine(
 function legacyQuarantineTtlDays(): number {
   const policyPath = pathResolver.knowledge('product/governance/knowledge-scope-check.json');
   try {
-    const parsed = JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' }))) as {
+    const parsed = readJson<{
       legacy_quarantine_ttl_days?: unknown;
-    };
+    }>(policyPath);
     return typeof parsed.legacy_quarantine_ttl_days === 'number' &&
       parsed.legacy_quarantine_ttl_days >= 0
       ? parsed.legacy_quarantine_ttl_days
@@ -116,9 +116,9 @@ function readPriorLegacyCount(): number | undefined {
   const filePath = healthHistoryPath();
   if (!safeExistsSync(filePath)) return undefined;
   try {
-    const value = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as {
+    const value = readJson<{
       legacy_unscoped_file_count?: unknown;
-    };
+    }>(filePath);
     return typeof value.legacy_unscoped_file_count === 'number'
       ? value.legacy_unscoped_file_count
       : undefined;

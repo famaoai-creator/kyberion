@@ -33,6 +33,7 @@ import {
   type EventScope,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 function flag(argv: string[], name: string): string {
@@ -50,13 +51,11 @@ function assertActiveMission(missionId: string): void {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) throw new Error(`Mission not found: ${missionId}`);
   const statePath = path.join(missionPath, 'mission-state.json');
-  const state = withExecutionContext(
-    'mission_controller',
-    () =>
-      JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }))) as {
-        mission_id?: string;
-        status?: string;
-      }
+  const state = withExecutionContext('mission_controller', () =>
+    readJson<{
+      mission_id?: string;
+      status?: string;
+    }>(statePath)
   );
   if (state.mission_id?.toUpperCase() !== missionId || state.status !== 'active') {
     throw new Error(`Mission must be active: ${missionId} (status=${state.status || 'unknown'})`);
@@ -213,9 +212,7 @@ async function main(): Promise<void> {
       approvalRef: approval.id,
     });
     backupRef = applied.backup_ref;
-    const patched = JSON.parse(String(safeReadFile(targetPath, { encoding: 'utf8' }))) as {
-      steps?: unknown[];
-    };
+    const patched = readJson<{ steps?: unknown[] }>(targetPath);
     if (patched.steps?.length !== 2) throw new Error('Mission E2E patch was not applied.');
 
     process.stdout.write(
