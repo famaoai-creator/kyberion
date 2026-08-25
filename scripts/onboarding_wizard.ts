@@ -32,6 +32,7 @@ import {
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
 import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
@@ -621,7 +622,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
           )
         );
         rl.close();
-        process.exit(2);
+        throw new ScriptExitError(2);
       }
     }
     reasoning = markReasoningStubAcknowledged(reasoning);
@@ -1064,7 +1065,7 @@ function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPha
   );
 }
 
-async function runOnboarding() {
+async function runOnboarding(args: string[] = []): Promise<void> {
   process.env.MISSION_ROLE = 'sovereign_concierge';
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
@@ -1138,7 +1139,7 @@ async function runOnboarding() {
       '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
     );
     rl.close();
-    process.exit(2);
+    throw new ScriptExitError(2);
   }
 
   console.log(
@@ -1176,17 +1177,17 @@ async function runOnboarding() {
     safeMkdir(onboardingRoot(), { recursive: true });
   }
 
-  const isMenuMode = process.argv.includes('--menu') || process.argv.includes('--reconfig');
+  const isMenuMode = args.includes('--menu') || args.includes('--reconfig');
 
   let state = loadState();
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
   }
 
-  const servicesOnly = process.argv.includes('--services-only');
-  const serviceArgIndex = process.argv.indexOf('--service');
+  const servicesOnly = args.includes('--services-only');
+  const serviceArgIndex = args.indexOf('--service');
   const selectedService =
-    serviceArgIndex >= 0 ? process.argv[serviceArgIndex + 1]?.trim() || undefined : undefined;
+    serviceArgIndex >= 0 ? args[serviceArgIndex + 1]?.trim() || undefined : undefined;
   if (servicesOnly) {
     state ??= createInitialState();
     await runServicesPhase(state, selectedService ? [selectedService] : undefined);
@@ -1343,8 +1344,14 @@ async function runOnboarding() {
   rl.close();
 }
 
-runOnboarding().catch((err) => {
-  console.error('Onboarding failed:', err);
-  rl.close();
-  process.exit(1);
+export const runOnboardingScript = defineScript({
+  name: 'onboard',
+  flags: [],
+  run: ({ argv }) => runOnboarding(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'onboarding_wizard.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_wizard.js')
+)
+  void runOnboardingScript();
