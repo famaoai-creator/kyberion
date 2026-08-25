@@ -21,7 +21,7 @@ import {
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
@@ -1305,8 +1305,9 @@ export function main(argv: string[]): void {
   console.log(JSON.stringify({ ok: true, backups }, null, 2));
 }
 
-void defineScript({
-  name: 'backup',
-  flags: [],
-  run: ({ argv }) => main(argv),
-})();
+if (isDirectScript(import.meta.url, 'backup.ts') || isDirectScript(import.meta.url, 'backup.js'))
+  void defineScript({
+    name: 'backup',
+    flags: [],
+    run: ({ argv }) => main(argv),
+  })();

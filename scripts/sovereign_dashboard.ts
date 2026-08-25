@@ -25,6 +25,7 @@ import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 import { activeCustomer } from '@agent/core/customer-resolver';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
  * Kyberion Sovereign Dashboard v1.0
@@ -44,11 +45,11 @@ function resolveDashboardTenantSlug(): string | null {
   return onboardingTenant || activeCustomer() || null;
 }
 
-function getDashboardFocus(): DashboardFocus {
-  const focusIndex = process.argv.indexOf('--focus');
+function getDashboardFocus(argv: string[] = []): DashboardFocus {
+  const focusIndex = argv.indexOf('--focus');
   const focusValue =
     focusIndex >= 0
-      ? String(process.argv[focusIndex + 1] || '')
+      ? String(argv[focusIndex + 1] || '')
           .trim()
           .toLowerCase()
       : '';
@@ -926,8 +927,8 @@ function drawTrustBoard() {
   console.log('');
 }
 
-function render() {
-  const focus = getDashboardFocus();
+function render(argv: string[] = []) {
+  const focus = getDashboardFocus(argv);
   clearScreen();
   drawHeader();
   drawCompanyOverview();
@@ -970,9 +971,17 @@ function render() {
   console.log(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));
 }
 
-if (process.argv.includes('--once')) {
-  render();
-} else {
-  render();
-  setInterval(render, 5000);
+export function main(argv: string[] = []): void {
+  if (argv.includes('--once')) {
+    render(argv);
+  } else {
+    render(argv);
+    setInterval(() => render(argv), 5000);
+  }
 }
+
+if (
+  isDirectScript(import.meta.url, 'sovereign_dashboard.ts') ||
+  isDirectScript(import.meta.url, 'sovereign_dashboard.js')
+)
+  void defineScript({ name: 'dashboard', flags: [], run: ({ argv }) => main(argv) })();
