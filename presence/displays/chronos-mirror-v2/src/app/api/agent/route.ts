@@ -134,18 +134,18 @@ function intentResolutionA2ui(contract: {
       props: {
         title: 'Intent resolution',
         items: [
-          { label: 'Intent', value: contract.normalized_intent },
-          { label: 'Outcome', value: contract.outcome_kind },
-          { label: 'Authority', value: contract.authority_level },
-          ...(contract.missing_inputs.length > 0
-            ? [{ label: 'Missing input', value: contract.missing_inputs.join(', ') }]
-            : []),
+          { label: 'Understanding', value: contract.normalized_intent },
+          {
+            label: 'Missing input',
+            value: contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'none',
+          },
           {
             label: 'Next action',
             value: contract.next_action.label,
             consequence: contract.next_action.consequence,
             action: contract.next_action.kind,
           },
+          { label: 'Outcome', value: contract.outcome_kind },
         ],
       },
     },

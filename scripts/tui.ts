@@ -6,11 +6,10 @@
  * operator input bar (text + voice). Implementation lives in
  * presence/displays/terminal-hud (@presence/terminal-hud).
  */
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runTui } from '@presence/terminal-hud';
 import { setRegisteredEnv } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 // Keep the interactive entrypoint in this process so stdin/stdout retain the
 // terminal's raw-mode capability. The old run_with_env wrapper used a
@@ -19,10 +18,14 @@ import { setRegisteredEnv } from '@agent/core/foundation';
 setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 
-export async function main(): Promise<void> {
-  const devMode = process.argv.includes('--dev');
+export async function main(argv: string[] = []): Promise<void> {
+  const devMode = argv.includes('--dev');
   if (devMode) {
-    process.argv = process.argv.filter((arg) => arg !== '--dev');
+    process.argv = [
+      process.argv[0] || 'node',
+      process.argv[1] || 'scripts/tui.ts',
+      ...argv.filter((arg) => arg !== '--dev'),
+    ];
     await import(SOURCE_ENTRY);
     return;
   }
@@ -31,17 +34,16 @@ export async function main(): Promise<void> {
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })
     .strict()
-    .parse();
+    .parse(argv);
 
   await runTui({ once: argv.once, panel: argv.panel });
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+export const runTuiScript = defineScript({
+  name: 'tui',
+  flags: [],
+  run: async ({ argv }) => main(argv),
+});
 
-if (isMainModule) {
-  main().catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`tui failed: ${message}\n`);
-    process.exit(1);
-  });
-}
+if (isDirectScript(import.meta.url, 'tui.ts') || isDirectScript(import.meta.url, 'tui.js'))
+  void runTuiScript();

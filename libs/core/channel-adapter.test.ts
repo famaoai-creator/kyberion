@@ -121,8 +121,11 @@ describe('runChannelTurn', () => {
       })
     );
 
+    expect(sent[0]).toContain('Understanding: send_message');
+    expect(sent[0]).toContain('Missing input: none');
     expect(sent[0]).toContain('Next action: Approve this plan to continue.');
     expect(sent[0]).toContain('Consequence: The action waits for approval.');
+    expect(sent[0]).toContain('Outcome: service_change');
     expect(result.text).toBe(sent[0]);
   });
 });
