@@ -27,6 +27,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { loadJson, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { createAjv } from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_REL = 'knowledge/product/governance/mission-workflow-catalog.json';
 const INTENTS_REL = 'knowledge/product/governance/standard-intents.json';
@@ -390,12 +391,11 @@ function proposeBundle(req: RegistrationRequest): string {
   return dirRel;
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
+function main(argv: string[]): void {
+  const args = parseArgs(argv);
   if (!args.request) {
     process.stderr.write('Usage: register_workflow --request <path> [--propose|--apply]\n');
-    process.exit(2);
-    return;
+    throw new ScriptExitError(2);
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
@@ -434,4 +434,8 @@ function main(): void {
   );
 }
 
-main();
+void defineScript({
+  name: 'workflow:register',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
