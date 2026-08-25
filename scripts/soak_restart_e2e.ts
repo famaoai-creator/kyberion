@@ -4,13 +4,13 @@ import {
   loadJson,
   spawnManagedProcess,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 export interface RestartE2EReport {
   timestamp: string;
@@ -118,11 +118,12 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
     setInterval(() => {
-      safeAppendFileSync(
-        bootstrapState.heartbeat_path,
-        JSON.stringify({ pid: process.pid, phase, alive: true, ts: new Date().toISOString() }) +
-          '\n'
-      );
+      appendJsonLine(bootstrapState.heartbeat_path, {
+        pid: process.pid,
+        phase,
+        alive: true,
+        ts: new Date().toISOString(),
+      });
     }, 100).unref?.();
     await new Promise<void>(() => {});
     return;

@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards, slugify } from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { appendJsonLine, getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
@@ -89,7 +89,6 @@ import {
   safeExec,
   buildSafeExecEnv,
   safeReadFile,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -1477,7 +1476,7 @@ async function processIngest(input: {
     });
 
     const stimulus = createPresenceVoiceStimulus(text, intent, sourceId, requestId);
-    safeAppendFileSync(STIMULI_PATH, `${JSON.stringify(stimulus)}\n`, 'utf8');
+    appendJsonLine(STIMULI_PATH, stimulus);
 
     recent.push({
       id: stimulus.id,
