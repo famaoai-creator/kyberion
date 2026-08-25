@@ -55,7 +55,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is a short overview; use Quickstart for the exact first-win command order. Day-2 tenant / organization / activation work is documented in [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).
+> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is a short overview; use Quickstart for the exact first-win command order. Day-2 tenant / organization / activation work is documented in [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). The category-level documentation map is [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
 
 Kyberion's first visible result comes in three short paths:
 
@@ -176,7 +176,7 @@ For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md)
 
 The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists. See `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list.
 
-Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. Implementation status per improvement plan is tracked in the canonical ledger: [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md).
+Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. Implementation status per improvement plan is tracked in the current status index: [`docs/developer/improvement-plans-2026-08/README.ja.md`](./docs/developer/improvement-plans-2026-08/README.ja.md).
 
 ---
 
@@ -196,7 +196,7 @@ Multi-tenant isolation, the organization operating model, and viewer-scoped surf
 | Pick a surface / entry point       | [`docs/SURFACES.md`](./docs/SURFACES.md)                                                                                                       |
 | Run multi-tenant isolation         | [`knowledge/product/architecture/multi-tenant-operations.md`](./knowledge/product/architecture/multi-tenant-operations.md)                     |
 | Operate viewer-scoped API access   | [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)                               |
-| Check what is actually implemented | [`docs/developer/improvement-plans-2026-07/STATUS.ja.md`](./docs/developer/improvement-plans-2026-07/STATUS.ja.md)                             |
+| Check what is actually implemented | [`docs/developer/improvement-plans-2026-08/README.ja.md`](./docs/developer/improvement-plans-2026-08/README.ja.md)                             |
 | Report a security issue            | [`SECURITY.md`](./SECURITY.md)                                                                                                                 |
 
 ## Community
