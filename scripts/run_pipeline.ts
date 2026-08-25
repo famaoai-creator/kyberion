@@ -6,7 +6,6 @@ import {
   finalizeAndPersist,
   persistTrace,
   classifyError,
-  formatClassification,
   logger,
   safeExec,
   safeReadFile,
@@ -46,8 +45,6 @@ import {
   recordAdhocPipelineRun,
   PROMOTION_CANDIDATE_MIN_RUNS,
   safeExecResult,
-  buildNextActionFromError,
-  formatNextAction,
   runJanitor,
   checkActuatorCapabilities,
   compactStepOutputContext,
@@ -113,6 +110,11 @@ import {
   type PipelineStepReasoning,
   ROLE_FROM_TYPE,
 } from '@agent/core/pipeline-contract';
+import {
+  formatPipelineFailure,
+  logNextActionForPipelineFailure,
+  type PipelineFailure,
+} from './pipeline-result-reporting.js';
 
 /** Resolve the effective step type from role/type. role takes precedence. */
 function resolveStepType(step: PipelineAdfStep): string {
@@ -175,8 +177,6 @@ function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExec
     },
   });
 }
-
-type PipelineFailure = ReturnType<typeof formatPipelineFailure>;
 
 export function recordFallbackOutcome(
   trace: TraceContext,
@@ -1011,29 +1011,7 @@ async function runParallelBatches<T>(
   await Promise.all(workers);
 }
 
-export function formatPipelineFailure(err: unknown): {
-  classification: ReturnType<typeof classifyError>;
-  summary: string;
-} {
-  const classification = classifyError(err);
-  return {
-    classification,
-    summary: formatClassification(classification).replace(/\n+/g, ' | '),
-  };
-}
-
-function logNextActionForPipelineFailure(
-  failure: ReturnType<typeof formatPipelineFailure>,
-  pipelinePath: string
-) {
-  const nextAction = buildNextActionFromError(failure.classification, {
-    source: 'pipeline',
-    pipelinePath,
-  });
-  for (const line of formatNextAction(nextAction)) {
-    logger.error(line);
-  }
-}
+export { formatPipelineFailure } from './pipeline-result-reporting.js';
 
 // ── AR-01 Phase A: leaf inline-op handlers ─────────────────────────────────
 // Extracted verbatim from the runSteps dispatch chain (design note in
