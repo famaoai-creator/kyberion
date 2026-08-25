@@ -45,6 +45,7 @@ import {
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ReadinessRule = {
   required_keys_any?: string[];
@@ -1107,16 +1108,21 @@ export async function runBaselineCheck() {
 
 // Keep the CLI entrypoint thin so the same governed check can be called by a
 // typed actuator operation without spawning a script from an ADF step.
-if (/run_baseline_check\.(?:js|ts)$/u.test(path.basename(process.argv[1] || ''))) {
-  runBaselineCheck()
-    .then((report) => {
-      console.log(JSON.stringify(report, null, 2));
-      if (report.status === 'needs_recovery' && report.circuit_broken) {
-        process.exitCode = 1;
-      }
-    })
-    .catch((err) => {
-      console.error(JSON.stringify({ status: 'fatal_error', error: err.message }));
-      process.exitCode = 1;
-    });
-}
+export const runBaselineCheckCli = defineScript({
+  name: 'baseline-check',
+  flags: [],
+  async run(context) {
+    const report = await runBaselineCheck();
+    context.print(report);
+    if (report.status === 'needs_recovery' && report.circuit_broken) {
+      throw new Error('baseline check requires recovery');
+    }
+    return report;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'run_baseline_check.ts') ||
+  isDirectScript(import.meta.url, 'run_baseline_check.js')
+)
+  void runBaselineCheckCli();
