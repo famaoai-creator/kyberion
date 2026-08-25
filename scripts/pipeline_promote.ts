@@ -33,6 +33,7 @@ import {
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 import * as nodePath from 'node:path';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface PromotionAdvice {
   name?: string;
@@ -147,14 +148,18 @@ function appendCatalogRow(slug: string, description: string, dryRun: boolean): v
   logger.info(`[promote] catalog row appended to pipelines/README.md`);
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
+function fail(message: string): never {
+  logger.error(message);
+  throw new ScriptExitError(1, '', true);
+}
+
+async function main(args: string[] = []): Promise<void> {
+  const argv = args;
   const inputPath = getFlag(argv, '--input');
   if (!inputPath) {
-    logger.error(
+    fail(
       'Usage: pipeline_promote --input <adf.json> [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]'
     );
-    process.exit(1);
   }
   const dryRun = argv.includes('--dry-run');
   const noLlm = argv.includes('--no-llm');
@@ -163,8 +168,7 @@ async function main(): Promise<void> {
 
   const resolvedInput = pathResolver.rootResolve(inputPath);
   if (!safeExistsSync(resolvedInput)) {
-    logger.error(`[promote] source ADF not found: ${resolvedInput}`);
-    process.exit(1);
+    fail(`[promote] source ADF not found: ${resolvedInput}`);
   }
   const raw = String(safeReadFile(resolvedInput, { encoding: 'utf8' }));
   const source = JSON.parse(raw);
@@ -173,12 +177,11 @@ async function main(): Promise<void> {
   const pipeline: any = validatePipelineAdf(source);
   const sourceGuardrails = validatePipelineGuardrails(pipeline, inputPath);
   if (!sourceGuardrails.ok) {
-    logger.error(
+    fail(
       `[promote] source ADF fails guardrails — fix it (or run it to success) before promoting:\n${sourceGuardrails.findings
         .map((finding) => `  - [${finding.severity}] ${finding.code}: ${finding.message}`)
         .join('\n')}`
     );
-    process.exit(1);
   }
 
   // 2. Advisory pass (placeholders + semantic flags).
@@ -230,13 +233,11 @@ async function main(): Promise<void> {
   const promoted = validatePipelineAdf(pipeline);
   const promotedGuardrails = validatePipelineGuardrails(promoted, `pipelines/${slug}.json`);
   if (!promotedGuardrails.ok) {
-    logger.error('[promote] transformed pipeline fails guardrails — aborting (source untouched).');
-    process.exit(1);
+    fail('[promote] transformed pipeline fails guardrails — aborting (source untouched).');
   }
   const targetPath = pathResolver.rootResolve(`pipelines/${slug}.json`);
   if (safeExistsSync(targetPath) && !force) {
-    logger.error(`[promote] pipelines/${slug}.json already exists — use --force to overwrite.`);
-    process.exit(1);
+    fail(`[promote] pipelines/${slug}.json already exists — use --force to overwrite.`);
   }
   if (dryRun) {
     logger.info(`[promote] (dry-run) would write pipelines/${slug}.json`);
@@ -261,7 +262,14 @@ async function main(): Promise<void> {
   appendCatalogRow(slug, description, dryRun);
 }
 
-main().catch((err) => {
-  logger.error(`[promote] ${err?.message || err}`);
-  process.exit(1);
+export const runPipelinePromotion = defineScript({
+  name: 'pipeline:promote',
+  flags: [],
+  run: async ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'pipeline_promote.ts') ||
+  isDirectScript(import.meta.url, 'pipeline_promote.js')
+)
+  void runPipelinePromotion();
