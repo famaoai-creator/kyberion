@@ -310,7 +310,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | `index.ts` barrel 行数                                   | 20                                                          | ≤300   | SX-12    |
 | 状態「正本」文書                                         | 6                                                           | 1      | SX-13    |
 | docs/developer 配下 md                                   | 240                                                         | <100   | SX-13    |
-| README の外部 4 語カバレッジ                             | 0/4                                                         | 4/4    | SX-14    |
+| README の外部 4 語カバレッジ                             | 4/4                                                         | 4/4    | SX-14    |
 
 ---
 
@@ -349,7 +349,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 > **SX-09 実装追記 (2026-08-25)**: 登録token/API token/localadmin tokenの認証判定をcoreの`resolveSurfaceViewerToken`へ集約し、Chronos role判定とConcierge viewer解決から共有境界を利用するようにした。surface固有のtenant/tier narrowingとpresence-studioの別HTTP adapter統合は未完。
 > **SX-13 実装追記 (2026-08-25)**: `docs/documentation-source-map.json` と `check:documentation-source-map` を追加し、状態・概念・オンボーディングのカテゴリ別正本、スコープ付き正本、補足/履歴資料、入口リンクを機械検証できるようにした。GlossaryはFirst-win / Contributor / FDEの3層へ再編した。完了計画のアーカイブとknowledgeコーパス整理は未完のためPARTIALを維持する。
 > **SX-14 実装追記 (2026-08-25)**: `kyberion`起動境界でenv registryのrequired欠損をfail-closed検証する`validateKyberionStartupEnvironment`を追加し、値を出さないエラー契約をテストした。現行registryにrequired項目がないため、実運用の必須項目キュレーションは未完。
-> | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。今回、`validateEnvAgainstRegistry(..., { strict: true })` が未登録変数と型不正をwarningではなくerrorとして返し、`KYBERION_ENV_REGISTRY_STRICT=1` のCLI起動でfail-closedになるテストを追加した。front-door文書の内部語彙排除とenv全件の品質是正は未完。 |
+> | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。README/Quickstart/Operator UX Guideの外部4語（request/plan/result/next action）は4/4で揃った。今回、`validateEnvAgainstRegistry(..., { strict: true })` が未登録変数と型不正をwarningではなくerrorとして返し、`KYBERION_ENV_REGISTRY_STRICT=1` のCLI起動でfail-closedになるテストを追加した。env全件の品質是正は未完。 |
 
 ## 参照
 
