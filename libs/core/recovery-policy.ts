@@ -1,8 +1,13 @@
 import { classifyError } from './error-classifier.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
 import type { RetryOptions } from './src/retry-utils.js';
 
 export type RecoveryPolicy = Record<string, any>;
+
+interface RecoveryManifest {
+  recovery_policy?: unknown;
+}
 
 export interface GovernedRetryOptionsInput {
   manifestPath: string;
@@ -21,6 +26,25 @@ const DEFAULT_FALLBACK_CATEGORIES = [
   'resource_unavailable',
 ] as const;
 
+const ACTUATOR_MANIFEST_SCHEMA_PATH = pathResolver.rootResolve(
+  'schemas/actuator-manifest.schema.json'
+);
+const manifestCatalogs = new Map<string, GovernedCatalog<RecoveryManifest>>();
+
+function getManifestCatalog(manifestPath: string): GovernedCatalog<RecoveryManifest> {
+  const existing = manifestCatalogs.get(manifestPath);
+  if (existing) return existing;
+
+  const catalog = defineCatalog<RecoveryManifest>({
+    id: 'actuator-manifest-recovery-policy',
+    path: manifestPath,
+    schema: ACTUATOR_MANIFEST_SCHEMA_PATH,
+    fallback: {},
+  });
+  manifestCatalogs.set(manifestPath, catalog);
+  return catalog;
+}
+
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -28,7 +52,7 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 /** Load only the recovery_policy envelope from an actuator manifest. */
 export function loadRecoveryPolicy(manifestPath: string): RecoveryPolicy {
   try {
-    const manifest = loadJson<{ recovery_policy?: unknown }>(manifestPath);
+    const manifest = getManifestCatalog(manifestPath).load();
     return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
   } catch {
     return {};

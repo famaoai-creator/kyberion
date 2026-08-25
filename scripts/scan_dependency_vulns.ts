@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import {
   logger,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeExecResult,
   safeMkdir,
@@ -12,6 +11,7 @@ import {
   decidePatchAction,
 } from '@agent/core';
 import { safeReaddir, safeLstat } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 type AuditVulnEntry = {
   name?: string;
@@ -373,7 +373,7 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   };
 
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  safeAppendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+  appendJsonLine(ledgerPath, result);
   return result;
 }
 

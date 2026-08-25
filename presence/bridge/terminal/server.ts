@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
+import { appendJsonLine, getRegisteredEnvText } from '@agent/core/foundation';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'node:path';
@@ -19,9 +20,7 @@ import {
   safeExistsSync,
   safeUnlinkSync,
   safeReaddir,
-  safeAppendFileSync,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   buildSessionPaths,
   listPersistedSessionStates,
@@ -262,7 +261,7 @@ function emitGlobalStimulus(text: string, session: Session) {
       control: { status: 'processed', feedback: 'silent', evidence: [] },
     };
     const stimuliFile = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-    safeAppendFileSync(stimuliFile, JSON.stringify(stimulus) + '\n');
+    appendJsonLine(stimuliFile, stimulus);
   } catch (err) {
     logger.warn(`[server] suppressed error in emitGlobalStimulus: ${err}`);
   }
