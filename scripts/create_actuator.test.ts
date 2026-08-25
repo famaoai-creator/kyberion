@@ -38,9 +38,9 @@ describe('create_actuator', () => {
     expect(indexSource).not.toContain('node:fs');
     expect(indexSource).toContain('received_params');
     expect(indexSource).toContain('defineActuator');
-    expect(indexSource).toContain('actuator.dispatch');
-    expect(indexSource).toContain('ensureDefaultOpPreflight');
-    expect(indexSource).toContain('runOpPreflight');
+    expect(indexSource).toContain('runActuatorCli');
+    expect(indexSource).toContain('export const actuator');
+    expect(indexSource).not.toContain('dispatchDecisionOp');
     expect(schemaSource).toContain('"execute"');
     expect(manifestSource).toContain('schemas/sample-feature-action.schema.json');
   });

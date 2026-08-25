@@ -778,7 +778,20 @@ async function loadActuatorDispatch(
       }
       const mod = moduleCache[domain];
 
-      if (typeof mod.dispatchDecisionOp === 'function') {
+      if (mod.actuator && typeof mod.actuator.dispatch === 'function') {
+        const sdkResult = await mod.actuator.dispatch(op, params, ctx);
+        if (!sdkResult.ok) {
+          throw new Error(sdkResult.error || `Actuator operation failed: ${domain}:${op}`);
+        }
+        const output = sdkResult.output;
+        result = {
+          handled: true,
+          ctx:
+            output && typeof output === 'object' && !Array.isArray(output)
+              ? (output as Record<string, unknown>)
+              : { ...ctx, last_actuator_result: output },
+        };
+      } else if (typeof mod.dispatchDecisionOp === 'function') {
         result = await mod.dispatchDecisionOp(op, params, ctx);
       }
 
