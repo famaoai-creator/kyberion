@@ -283,33 +283,34 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
-> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` と空白許容パターンがともに **0 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **0 occurrences**、`defineCatalog` が **31 core implementations**、import boundary は **177 cycles / 114 direction violations** となった。JSON/env/Ajv の foundation adoption は完了したが、JSONL append、私的 text helper、catalog統合・schema根統合・cycle削減は未完のため、SX-03/04は引き続き PARTIAL とする。
+> **2026-08-25 実測更新**: 以下の初期値は監査時点のスナップショットとして保持する。実装波後の検証値は、空白を含まない厳密な `JSON.parse(safeReadFile(` と空白許容パターンがともに **0 occurrences**、foundation 外の自前 `new Ajv(` が **0 occurrences**、`process.env.KYBERION_*` の non-test が **0 occurrences**、旧式JSONL append が **0 occurrences**、`defineCatalog` が **65 core implementations**、import boundary は **177 cycles / 114 direction violations** となった。JSON/env/Ajv/JSONL の foundation adoption とCLI未知コマンドのfail-closed化は完了したが、私的 text helperの意味統合、全catalogのschema根統合、cycle削減、CLI/harness全移行は未完のため、SX-03〜07は引き続き PARTIAL とする。
 
-| 指標                                      | 現状  | 目標   | 担当     |
-| ----------------------------------------- | ----- | ------ | -------- |
-| `JSON.parse(\s*safeReadFile(`（空白許容） | 0     | 0      | SX-03    |
-| 自前 `new Ajv(` (foundation 外)           | 0     | 0      | SX-03/04 |
-| `process.env.KYBERION_*` 直読             | 0     | 0      | SX-03    |
-| 手書き catalog loader                     | ~151  | 0      | SX-04    |
-| schema 無し governance catalog            | 70    | 0      | SX-04    |
-| npm scripts                               | 324   | ≤120   | SX-05    |
-| CLI 入口                                  | 5     | 1      | SX-05    |
-| doctor/preflight 実装                     | 11    | 1      | SX-05    |
-| `process.argv` 直読 script                | 197   | 0      | SX-06    |
-| `check:*` で CI 未実行                    | 32    | 0      | SX-07    |
-| PR 前に打つコマンド                       | 6     | 1      | SX-07    |
-| 自由文解釈の実装                          | 6     | 1      | SX-08    |
-| `IntentResolutionContract` 描画 surface   | 2/12  | 12/12  | SX-08    |
-| viewer/auth 実装                          | 5     | 1      | SX-09    |
-| vocabulary lookup 実装                    | 6     | 1      | SX-09    |
-| actuator ABI                              | 4     | 1      | SX-10    |
-| op 入力 schema カバレッジ                 | 13%   | 100%   | SX-10    |
-| `system:exec` スクリプト包み              | 68    | 0      | SX-11    |
-| 最大ファイル行数                          | 7,012 | ≤1,500 | SX-12    |
-| `index.ts` barrel 行数                    | 2,691 | ≤300   | SX-12    |
-| 状態「正本」文書                          | 6     | 1      | SX-13    |
-| docs/developer 配下 md                    | 240   | <100   | SX-13    |
-| README の外部 4 語カバレッジ              | 0/4   | 4/4    | SX-14    |
+| 指標                                                     | 現状  | 目標   | 担当     |
+| -------------------------------------------------------- | ----- | ------ | -------- |
+| `JSON.parse(\s*safeReadFile(`（空白許容）                | 0     | 0      | SX-03    |
+| 自前 `new Ajv(` (foundation 外)                          | 0     | 0      | SX-03/04 |
+| `process.env.KYBERION_*` 直読                            | 0     | 0      | SX-03    |
+| 旧式 JSONL append (`safeAppendFile*` + `JSON.stringify`) | 0     | 0      | SX-03    |
+| 手書き catalog loader                                    | ~151  | 0      | SX-04    |
+| schema 無し governance catalog (root)                    | 157   | 0      | SX-04    |
+| npm scripts                                              | 325   | ≤120   | SX-05    |
+| CLI 入口                                                 | 5     | 1      | SX-05    |
+| doctor/preflight 実装                                    | 11    | 1      | SX-05    |
+| `process.argv` 直読 script                               | 371   | 0      | SX-06    |
+| `check:*` で CI 未実行                                   | 32    | 0      | SX-07    |
+| PR 前に打つコマンド                                      | 6     | 1      | SX-07    |
+| 自由文解釈の実装                                         | 6     | 1      | SX-08    |
+| `IntentResolutionContract` 描画 surface                  | 2/12  | 12/12  | SX-08    |
+| viewer/auth 実装                                         | 5     | 1      | SX-09    |
+| vocabulary lookup 実装                                   | 6     | 1      | SX-09    |
+| actuator ABI                                             | 4     | 1      | SX-10    |
+| op 入力 schema カバレッジ                                | 13%   | 100%   | SX-10    |
+| `system:exec` スクリプト包み                             | 68    | 0      | SX-11    |
+| 最大ファイル行数                                         | 7,012 | ≤1,500 | SX-12    |
+| `index.ts` barrel 行数                                   | 2,691 | ≤300   | SX-12    |
+| 状態「正本」文書                                         | 6     | 1      | SX-13    |
+| docs/developer 配下 md                                   | 240   | <100   | SX-13    |
+| README の外部 4 語カバレッジ                             | 0/4   | 4/4    | SX-14    |
 
 ---
 
@@ -328,11 +329,11 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | ----- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SX-01 | IMPLEMENTED | `check:first-win-docs` と 3 文書の機械検証を追加。clean-clone の実行証跡は未完。                                                                                                                                                                                                                                                                                                                                                                     |
 | SX-02 | BASELINED   | 4 層宣言、cycle/方向チェッカー、baseline ratchet を追加。既存違反は baseline 内。                                                                                                                                                                                                                                                                                                                                                                    |
-| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し、旧 JSON 読み込みと env 読み取りの一部を foundation 経由へ移行。`new Ajv` は foundation 外 0 まで減少したが、空白を含む旧 JSON 読み込み 71 件、env 直読 368 件、JSONL append、私的 text helper の全 codemod は未完。                                                                                                                                                                                  |
-| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し drawio 系・media-style・media-theme-role・schema 付き5 policy loader を移行。mtime cache と schema 検証を共通化した。全 catalog/schema 統合と未参照 catalog 処分は未完。                                                                                                                                                                                                                                               |
-| SX-05 | PARTIAL     | command registry を `id/noun/verb/entry/audience` 単位へ拡張し、entrypoint route 整合性 checker・router の dynamic import・未知 command の fail-closed を追加。doctor/alias/script 削減は未完。                                                                                                                                                                                                                                                      |
+| SX-03 | PARTIAL     | `foundation/{ajv,json,env,text,time}` を追加し、旧JSON読み込み・env読み取り・JSONL appendをfoundation経由へ移行。foundation adoption checkはJSON/Ajv/env/JSONLを全て0で固定した。意味の異なる私的text/clamp helperの統合、secure-ioの残存低レベル経路整理は未完。                                                                                                                                                                                    |
+| SX-04 | PARTIAL     | `defineCatalog<T>()` を追加し、対象policy loaderをschema付きへ移行。CLI registryもschema付きcatalogへ移行した。coreの`defineCatalog`は65件だが、governance rootにはschemaまたはdocumentation_only分類のないJSONが157件残り、schema根統合・未参照catalog処分は未完。                                                                                                                                                                                  |
+| SX-05 | PARTIAL     | command registryを`id/noun/verb/entry/audience`単位へ拡張し、schema検証・entrypoint route整合性・未知commandのfail-closedを追加。doctor統合、alias削減、npm scripts 325→120以下は未完。                                                                                                                                                                                                                                                              |
 | SX-06 | PARTIAL     | `defineScript`/`defineGenerator` と harness test を追加し、script ごとの `flags` 宣言を可能にした。pseudo-locale / vocabulary-types / env-registry / op-registry / model-registry / intent-contract-memory / deterministic checkers / pii-rules / trace-docs / capability-seams / subagent-definitions / doctor / CLI manifest checker を共通 harness へ移行。生成器の出力宣言・比較正規化・実行コンテキストも共通化した。既存 script 全移行は未完。 |
-| SX-07 | PARTIAL     | manifest-driven `pnpm check` と PR workflow gate を追加し、未知 scope・空集合・scope 外 `--only` を fail-closed 化、release を production evidence gate に接続。`validate` は full manifest 集合へ統合済み。                                                                                                                                                                                                                                         |
+| SX-07 | PARTIAL     | manifest-driven `pnpm check` とPR workflow gateを追加し、未知scope・空集合・scope外`--only`・未知flagをfail-closed化。pnpm区切り`--`とJSON error出力も固定した。CIの個別checker重複と全checker集合のmanifest統合は未完。                                                                                                                                                                                                                             |
 | SX-08 | PARTIAL     | voice の旧梯子を削除し共有 `generateReply` を入口化。intent CLI 統合、全 surface 描画、approval 本番経路は未完。                                                                                                                                                                                                                                                                                                                                     |
 | SX-09 | PARTIAL     | `ChannelAdapter`/`runChannelTurn` を追加し、4 bridge の共通 turn lifecycle を移行。viewer の scope/tier narrowing とブラウザ vocabulary lookup を core に統合済み。認証 resolver・read-model・配送統合は未完。                                                                                                                                                                                                                                       |
 | SX-10 | PARTIAL     | `runActuatorCli` を SDK dispatch へ移行し、`executePipelineFile()` と html-to-pptx の in-process 経路を追加。全 ABI/schema 統合は未完。                                                                                                                                                                                                                                                                                                              |
