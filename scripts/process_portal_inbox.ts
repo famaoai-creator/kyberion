@@ -2,6 +2,7 @@ import chalk from 'chalk';
 // chalk imported dynamically
 import { pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
 import { readTextFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const inboxPath = pathResolver.shared('portal/inbox.json');
 const outboxPath = pathResolver.shared('portal/outbox.json');
@@ -74,7 +75,16 @@ async function processInbox(): Promise<void> {
   console.log(chalk.green('✔ Agent has responded to the portal.'));
 }
 
-processInbox().catch(err => {
-  console.error(err);
-  process.exit(1);
+export const runProcessPortalInbox = defineScript({
+  name: 'process-portal-inbox',
+  flags: [],
+  run() {
+    return processInbox();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'process_portal_inbox.ts') ||
+  isDirectScript(import.meta.url, 'process_portal_inbox.js')
+)
+  void runProcessPortalInbox();
