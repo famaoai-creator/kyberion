@@ -37,6 +37,11 @@ export function currentProcessArgv(): string[] {
   return [...process.argv];
 }
 
+/** Replace process argv for legacy child-entry modules that inspect it directly. */
+export function setCurrentProcessArgv(argv: string[]): void {
+  process.argv = [...argv];
+}
+
 export function parseScriptFlags(
   argv: string[],
   enabledFlags: readonly ScriptFlag[] = DEFAULT_SCRIPT_FLAGS
