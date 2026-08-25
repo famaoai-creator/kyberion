@@ -25,6 +25,7 @@ import {
   verifyReady,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
@@ -169,8 +170,10 @@ async function main(): Promise<void> {
   process.exit(totalMissing === 0 ? 0 : 1);
 }
 
-const isDirect = process.argv[1] && /bootstrap_environment\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'bootstrap_environment.ts') ||
+  isDirectScript(import.meta.url, 'bootstrap_environment.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
     process.exit(1);

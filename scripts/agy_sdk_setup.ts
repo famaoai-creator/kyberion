@@ -12,6 +12,7 @@ import {
   safeMkdir,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const TOOL_ID = 'agy_sdk';
 const MANAGED_PYTHON_VERSION =
@@ -158,8 +159,10 @@ async function main(): Promise<void> {
   if (report.status === 'needs_install') process.exitCode = argv.apply ? 1 : 0;
 }
 
-const isDirect = process.argv[1] && /agy_sdk_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'agy_sdk_setup.ts') ||
+  isDirectScript(import.meta.url, 'agy_sdk_setup.js')
+) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

@@ -14,6 +14,7 @@ import {
   type MarketingRiskLevel,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 interface ReviewPackage {
   run_id: string;
@@ -85,7 +86,10 @@ async function main(): Promise<void> {
   if (!result.ready_for_approval) process.exitCode = 1;
 }
 
-if (process.argv[1] && /marketing_review_aggregate\.(ts|js)$/.test(process.argv[1])) {
+if (
+  isDirectScript(import.meta.url, 'marketing_review_aggregate.ts') ||
+  isDirectScript(import.meta.url, 'marketing_review_aggregate.js')
+) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

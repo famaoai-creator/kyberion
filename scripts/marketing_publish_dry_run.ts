@@ -21,6 +21,7 @@ import {
   type PublicationApproval,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 function currentArtifactBindings(
   approved: Record<string, ArtifactBinding>
@@ -185,7 +186,10 @@ async function main(): Promise<void> {
   );
 }
 
-if (process.argv[1] && /marketing_publish_dry_run\.(ts|js)$/.test(process.argv[1])) {
+if (
+  isDirectScript(import.meta.url, 'marketing_publish_dry_run.ts') ||
+  isDirectScript(import.meta.url, 'marketing_publish_dry_run.js')
+) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

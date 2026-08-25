@@ -11,6 +11,7 @@ import {
   safeMkdir,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const VOICE_TOOL_IDS = [
   'mlx_audio',
@@ -273,8 +274,10 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /voice_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'voice_setup.ts') ||
+  isDirectScript(import.meta.url, 'voice_setup.js')
+) {
   main().catch((error: any) => {
     console.error(error?.message ?? String(error));
     process.exit(1);

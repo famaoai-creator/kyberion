@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import {
   buildSafeExecEnv,
   checkMeetingParticipationConsent,
@@ -818,7 +818,10 @@ export async function main(): Promise<void> {
   await runOneShotConversation(options);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+if (
+  isDirectScript(import.meta.url, 'run_realtime_voice_conversation.ts') ||
+  isDirectScript(import.meta.url, 'run_realtime_voice_conversation.js')
+) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

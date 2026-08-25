@@ -28,6 +28,7 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 import { safeExistsSync } from '@agent/core/secure-io';
 import {
   computeApprovalPayloadHash,
@@ -206,4 +207,8 @@ export async function main(): Promise<void> {
   process.exitCode = argv.strict && !report.satisfied ? 1 : 0;
 }
 
-if (process.argv[1] && /mission_alignment_decision\.(ts|js)$/u.test(process.argv[1])) void main();
+if (
+  isDirectScript(import.meta.url, 'mission_alignment_decision.ts') ||
+  isDirectScript(import.meta.url, 'mission_alignment_decision.js')
+)
+  void main();

@@ -19,6 +19,7 @@
 
 import { logger, MissionEvidenceDoc, resolveIdentityContext } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 interface VoiceConsentRecord {
   consent: 'granted' | 'revoked';
@@ -60,13 +61,13 @@ function grant(
   scope?: string,
   note?: string,
   force?: boolean,
-  expiresAt?: string,
+  expiresAt?: string
 ): void {
   const doc = consentDoc(missionId);
   const existing = doc.read();
   if (existing && existing.consent === 'granted' && !force) {
     throw new Error(
-      `voice-consent.json already declares consent=granted for mission ${missionId}. Use --force to overwrite.`,
+      `voice-consent.json already declares consent=granted for mission ${missionId}. Use --force to overwrite.`
     );
   }
   if (expiresAt && !Number.isFinite(Date.parse(expiresAt))) {
@@ -154,7 +155,7 @@ async function main(): Promise<void> {
         argv.scope ? String(argv.scope) : undefined,
         argv.note ? String(argv.note) : undefined,
         Boolean(argv.force),
-        argv.expiresAt ? String(argv.expiresAt) : undefined,
+        argv.expiresAt ? String(argv.expiresAt) : undefined
       );
       break;
     case 'revoke':
@@ -168,8 +169,10 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /voice_consent\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'voice_consent.ts') ||
+  isDirectScript(import.meta.url, 'voice_consent.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
     process.exit(1);
