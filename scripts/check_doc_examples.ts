@@ -30,6 +30,7 @@
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const DOCS_DIRS = [path.join(ROOT, 'docs'), path.join(ROOT, 'README.md')];
@@ -123,49 +124,59 @@ function printUsage(): void {
   console.log('Usage: pnpm check:doc-examples [--list]');
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const listMode = args.includes('--list');
-  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
-    printUsage();
-    return;
-  }
-  const files = listMarkdownFiles(DOCS_DIRS);
-  const allBlocks = files.flatMap(parseCodeBlocks);
-
-  if (listMode) {
-    for (const b of allBlocks) {
-      const fence = b.fence || '<empty>';
-      const tagged = /(bash|sh)\s+(check|check-syntax|skip)$/i.test(fence) ? '🏷' : '  ';
-      console.log(`${tagged}  ${path.relative(ROOT, b.file)}:${b.startLine}  [${fence}]`);
+export const runCheckDocExamples = defineScript({
+  name: 'check:doc-examples',
+  flags: [],
+  run(context) {
+    const args = context.argv;
+    const listMode = args.includes('--list');
+    if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+      printUsage();
+      return;
     }
-    console.log(`\nTotal: ${allBlocks.length} code blocks across ${files.length} markdown files.`);
-    return;
-  }
+    const files = listMarkdownFiles(DOCS_DIRS);
+    const allBlocks = files.flatMap(parseCodeBlocks);
 
-  const results = allBlocks.map(evaluate);
-  const failed = results.filter((r) => r.status === 'failed');
-  const ok = results.filter((r) => r.status === 'ok').length;
-  const skipped = results.filter((r) => r.status === 'skipped').length;
-  const notTagged = results.filter((r) => r.status === 'not-tagged').length;
-
-  console.log(`📚 Doc example check`);
-  console.log(`   Files scanned: ${files.length}`);
-  console.log(
-    `   Code blocks:   ${allBlocks.length} (${notTagged} untagged, ${ok} passed, ${skipped} skipped, ${failed.length} failed)`
-  );
-
-  if (failed.length > 0) {
-    console.error('\nFailures:');
-    for (const f of failed) {
-      console.error(
-        `  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`
+    if (listMode) {
+      for (const b of allBlocks) {
+        const fence = b.fence || '<empty>';
+        const tagged = /(bash|sh)\s+(check|check-syntax|skip)$/i.test(fence) ? '🏷' : '  ';
+        console.log(`${tagged}  ${path.relative(ROOT, b.file)}:${b.startLine}  [${fence}]`);
+      }
+      console.log(
+        `\nTotal: ${allBlocks.length} code blocks across ${files.length} markdown files.`
       );
-      console.error(`     ${f.detail}`);
+      return;
     }
-    process.exit(1);
-  }
-  console.log('\n✅ All tagged doc examples passed.');
-}
 
-main();
+    const results = allBlocks.map(evaluate);
+    const failed = results.filter((r) => r.status === 'failed');
+    const ok = results.filter((r) => r.status === 'ok').length;
+    const skipped = results.filter((r) => r.status === 'skipped').length;
+    const notTagged = results.filter((r) => r.status === 'not-tagged').length;
+
+    console.log(`📚 Doc example check`);
+    console.log(`   Files scanned: ${files.length}`);
+    console.log(
+      `   Code blocks:   ${allBlocks.length} (${notTagged} untagged, ${ok} passed, ${skipped} skipped, ${failed.length} failed)`
+    );
+
+    if (failed.length > 0) {
+      console.error('\nFailures:');
+      for (const f of failed) {
+        console.error(
+          `  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`
+        );
+        console.error(`     ${f.detail}`);
+      }
+      throw new Error(`${failed.length} documentation example(s) failed`);
+    }
+    context.print('\n✅ All tagged doc examples passed.');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_doc_examples.ts') ||
+  isDirectScript(import.meta.url, 'check_doc_examples.js')
+)
+  void runCheckDocExamples();
