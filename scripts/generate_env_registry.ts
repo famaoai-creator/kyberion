@@ -45,6 +45,7 @@ export interface EnvRegistryEntry {
 }
 
 export interface EnvRegistryFile {
+  $schema?: string;
   version: string;
   description: string;
   entries: EnvRegistryEntry[];
@@ -170,6 +171,7 @@ export function mergeRegistry(
     } satisfies EnvRegistryEntry;
   });
   return {
+    $schema: '../schemas/governance-catalog.schema.json',
     version: existing?.version || '1.0.0',
     description:
       existing?.description ||

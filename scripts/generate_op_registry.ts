@@ -98,6 +98,7 @@ interface DomainOpRegistry {
 }
 
 interface ActuatorOpRegistryFile {
+  $schema?: string;
   version: string;
   description: string;
   shared_capture_ops: string[];
@@ -171,6 +172,7 @@ function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOp
 function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
   const registry = loadJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
   return {
+    $schema: '../schemas/actuator-op-registry.schema.json',
     version: registry.version || '1.0.0',
     description:
       registry.description ||

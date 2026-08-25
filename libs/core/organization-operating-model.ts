@@ -585,8 +585,6 @@ import {
   loadOrganizationPurpose,
   saveOrganizationOperationalState,
   transitionOrganizationLifecycle,
-  retireOrganizationEntity,
-  removeOrganizationEntity,
   loadOrganizationOperationalState,
   saveOrganizationDomain,
   saveOrganizationCapability,
@@ -597,6 +595,8 @@ import {
   loadOrganizationService,
   loadOrganizationServiceState,
   operationDirectory,
+  organizationRecordFiles,
+  listOrganizationRecordFiles,
 } from './organization-operating-model-persistence.js';
 import {
   saveOrganizationOperation,
@@ -631,8 +631,6 @@ import {
   listOrganizationCadences,
   listOrganizationDecisions,
   listOrganizationLearningCandidates,
-  organizationRecordFiles,
-  listOrganizationRecordFiles,
   listOrganizationDomains,
   listOrganizationCapabilities,
   listOrganizationServices,
@@ -646,6 +644,7 @@ import {
   listOrganizationOperationalStates,
   buildOrganizationManagementView,
 } from './organization-operating-model-management.js';
+import type { OrganizationRetireKind } from './organization-operating-model-persistence.js';
 export type { OrganizationRecordKind } from './organization-operating-model-persistence.js';
 export type { OrganizationLifecycleVerb } from './organization-operating-model-persistence.js';
 export type { OrganizationRetireKind } from './organization-operating-model-persistence.js';
@@ -662,6 +661,168 @@ export type { BuildOrganizationCadenceInput } from './organization-operating-mod
 export type { BuildOrganizationDecisionInput } from './organization-operating-model-management.js';
 export type { OrganizationDecisionAddition } from './organization-operating-model-management.js';
 export type { BuildOrganizationProjectLinkInput } from './organization-operating-model-management.js';
+
+export function retireOrganizationEntity(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+  kind: OrganizationRetireKind;
+  recordId: string;
+  reason?: string;
+}): Record<string, unknown> {
+  const query = {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  };
+  let record: any;
+  if (input.kind === 'domain') record = loadOrganizationDomain(input.recordId, query);
+  else if (input.kind === 'capability') record = loadOrganizationCapability(input.recordId, query);
+  else if (input.kind === 'service') record = loadOrganizationService(input.recordId, query);
+  else if (input.kind === 'operation') record = loadOrganizationOperation(input.recordId, query);
+  else
+    record = listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
+  const catalog = loadOrganizationCatalog(query);
+  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
+  if (
+    input.kind === 'domain' &&
+    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
+  ) {
+    throw new Error(`Cannot retire domain '${input.recordId}' while child records remain.`);
+  }
+  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
+    throw new Error(
+      `Cannot retire capability '${input.recordId}' while service references remain.`
+    );
+  }
+  if (
+    input.kind === 'service' &&
+    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
+  ) {
+    throw new Error(`Cannot retire service '${input.recordId}' while a domain references it.`);
+  }
+  const next = {
+    ...record,
+    status: 'retired',
+    updated_at: new Date().toISOString(),
+    metadata: {
+      ...(record.metadata || {}),
+      ...(input.reason ? { retire_reason: input.reason } : {}),
+    },
+  };
+  if (input.kind === 'domain') saveOrganizationDomain(next, { rootDir: input.rootDir });
+  else if (input.kind === 'capability')
+    saveOrganizationCapability(next, { rootDir: input.rootDir });
+  else if (input.kind === 'service') saveOrganizationService(next, { rootDir: input.rootDir });
+  else if (input.kind === 'operation') saveOrganizationOperation(next, { rootDir: input.rootDir });
+  else saveOrganizationCadence(next, { rootDir: input.rootDir });
+  auditChain.record({
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    action: `organization.${input.kind}.retire`,
+    operation: `retire:${input.recordId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { organization_id: input.organizationId, reason: input.reason },
+  });
+  return next;
+}
+
+/**
+ * Destructive removal is an explicit, fail-closed lifecycle verb. Callers
+ * must choose it deliberately; ordinary lifecycle transitions use retire.
+ */
+export function removeOrganizationEntity(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+  kind: OrganizationRetireKind;
+  recordId: string;
+  reason?: string;
+}): { status: 'removed'; kind: OrganizationRetireKind; record_id: string } {
+  const query = {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  };
+  const record =
+    input.kind === 'domain'
+      ? loadOrganizationDomain(input.recordId, query)
+      : input.kind === 'capability'
+        ? loadOrganizationCapability(input.recordId, query)
+        : input.kind === 'service'
+          ? loadOrganizationService(input.recordId, query)
+          : input.kind === 'operation'
+            ? loadOrganizationOperation(input.recordId, query)
+            : listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
+
+  const catalog = loadOrganizationCatalog(query);
+  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
+  if (
+    input.kind === 'domain' &&
+    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
+  ) {
+    throw new Error(`Cannot remove domain '${input.recordId}' while child records remain.`);
+  }
+  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
+    throw new Error(
+      `Cannot remove capability '${input.recordId}' while service references remain.`
+    );
+  }
+  if (
+    input.kind === 'service' &&
+    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
+  ) {
+    throw new Error(`Cannot remove service '${input.recordId}' while a domain references it.`);
+  }
+
+  const fileName =
+    input.kind === 'domain'
+      ? 'domain.json'
+      : input.kind === 'capability'
+        ? 'capability.json'
+        : input.kind === 'service'
+          ? 'service.json'
+          : input.kind === 'operation'
+            ? 'operation.json'
+            : 'cadence.json';
+  const kindDirectory =
+    input.kind === 'domain'
+      ? 'domains'
+      : input.kind === 'capability'
+        ? 'capabilities'
+        : input.kind === 'service'
+          ? 'services'
+          : input.kind === 'operation'
+            ? 'operations'
+            : 'cadences';
+  safeRmSync(
+    recordPath(
+      kindDirectory,
+      input.recordId,
+      fileName,
+      input.organizationId,
+      input.tier,
+      recordTenant(record),
+      input.rootDir
+    ),
+    { force: true }
+  );
+  auditChain.record({
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    action: `organization.${input.kind}.remove`,
+    operation: `remove:${input.recordId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { organization_id: input.organizationId, reason: input.reason },
+  });
+  return { status: 'removed', kind: input.kind, record_id: input.recordId };
+}
 
 export {
   validatorFor,
@@ -700,8 +861,6 @@ export {
   loadOrganizationPurpose,
   saveOrganizationOperationalState,
   transitionOrganizationLifecycle,
-  retireOrganizationEntity,
-  removeOrganizationEntity,
   loadOrganizationOperationalState,
   saveOrganizationDomain,
   saveOrganizationCapability,
