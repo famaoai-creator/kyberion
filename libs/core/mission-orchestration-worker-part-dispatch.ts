@@ -229,80 +229,21 @@ import {
 } from './mission-orchestration-worker-contracts.js';
 
 import {
-  workerBackendsInstalled,
-  ensureWorkerBackendsInstalled,
-  emitWorkerTransitionSnapshot,
-  recordWorkerIntentDriftObservation,
-  emitWorkerKickoffSnapshot,
-  MISSION_CONTROLLER_TIMEOUT_MS,
-  missionProgressController,
-  areTaskDependenciesSatisfied,
-  buildUnassignedRoleSummary,
-  summarizeTaskResultForPrompt,
   buildUpstreamResultLines,
   buildGraphHandoffLines,
   buildTeamSnapshotLines,
   buildReviewFindingsLines,
-  dispatchCompactors,
-  compactionWorkingMemory,
-  buildDispatchCarryover,
   buildDelegationNotificationLines,
   maybeCompactDispatchSections,
-  TASK_EVENT_STATUS_MAP,
-  resolveMissionType,
-  runMissionController,
   recordMissionContextTask,
-  taskResultFilePath,
-  taskClarificationFilePath,
-  summarizeTaskResultObservability,
   buildMissionGoalLines,
   buildRejectionLessonLines,
   buildAuthorityRoleProcedureInjectionProvider,
   buildTaskExecutionPrompt,
-  NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT,
-  buildNeedsKnowledgeReinforcementLines,
-  buildTaskResultRetryPrompt,
-  parseTaskResultResponse,
-  buildTaskClarificationPacket,
-  looksLikePath,
-  evaluateTaskAcceptanceGate,
-  requestIndependentAcceptanceReview,
-} from './mission-orchestration-worker-part-context.js';
-import type {
-  DispatchMissionTaskOutcome,
-  OperatorInteractionPacket,
-  IndependentAcceptanceReview,
-} from './mission-orchestration-worker-part-context.js';
-import { dispatchPlannedMissionTaskCore } from './mission-orchestration-worker-part-core.js';
-import {
-  stampTaskResultProvenance,
   recordMissionVisiblePrompt,
-  taskResultResponseDeps,
-  obtainTaskResultResponse,
-  isDraftRefineCandidate,
-  applyDraftRefineToDeliverable,
-  isBestOfNCandidate,
-  BEST_OF_APPROACHES,
-  parseBestOfJudgeVerdict,
-  obtainBestOfTaskResultResponse,
-  publishTaskPrArtifacts,
-  REVIEW_DIFF_MAX_LINES,
   buildReviewDiffLines,
-  syncPlanningArtifacts,
-  persistPlanningPacket,
-  loadPlannedNextTasks,
-  loadAllNextTasks,
-  writeNextTasks,
-  restoreMissionGraphRunTaskSnapshots,
-  reconcileMissionProgress,
-  markTaskBoardInProgress,
-  dispatchCoreDeps,
-  dispatchMissionNextTasksCore,
-  dispatchMissionNextTasks,
-  summarizeMissionTaskOutcomes,
-  missionLifecycleHandlerDeps,
-  processMissionOrchestrationEventPath,
-} from './mission-orchestration-worker-part-results.js';
+} from './mission-orchestration-worker-part-context.js';
+import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker-part-context.js';
 
 export async function buildTaskDispatchContext(input: {
   missionId: string;
@@ -1354,6 +1295,8 @@ export async function dispatchPlannedMissionTask(
     // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
     // loop instead of the single-shot dispatch below. Default OFF — the rest
     // of dispatchPlannedMissionTaskCore is unchanged when `goal_driven` is unset.
+    const { dispatchPlannedMissionTaskCore } =
+      await import('./mission-orchestration-worker-part-core.js');
     outcome = input.task.goal_driven
       ? await dispatchGoalDrivenMissionTask(
           {

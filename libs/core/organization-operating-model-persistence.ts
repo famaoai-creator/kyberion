@@ -30,104 +30,64 @@ const addFormats =
 const ajv = createAjv();
 addFormats(ajv);
 
-import {
-  saveOrganizationOperation,
-  saveOrganizationOperationState,
-  saveOrganizationOperationRun,
-  loadOrganizationOperation,
-  loadOrganizationOperationState,
-  listOrganizationOperations,
-  listOrganizationOperationStates,
-  listOrganizationOperationRuns,
-  saveOrganizationIncident,
-  loadOrganizationIncident,
-  saveOrganizationCadence,
-  loadOrganizationCadence,
-  saveOrganizationDecision,
-  saveOrganizationLearningCandidate,
-  buildOrganizationLearningCandidate,
-  enqueueOrganizationLearningCandidate,
-  buildOrganizationScaffold,
-  buildOrganizationPurposeRecord,
-  buildOrganizationObjectiveAddition,
-  buildOrganizationDomainRecord,
-  buildOrganizationServiceAddition,
-  buildOrganizationServiceState,
-} from './organization-operating-model-operations.js';
-import type {
-  BuildOrganizationScaffoldInput,
-  OrganizationScaffold,
-  BuildOrganizationPurposeInput,
-  BuildOrganizationObjectiveInput,
-  BuildOrganizationDomainInput,
-  BuildOrganizationServiceInput,
-  OrganizationServiceAddition,
-  BuildOrganizationServiceStateInput,
-  BuildOrganizationOperationInput,
-} from './organization-operating-model-operations.js';
-import {
-  buildOrganizationOperationRecord,
-  buildOrganizationCadence,
-  buildOrganizationDecision,
-  buildOrganizationProjectLink,
-  listOrganizationIncidents,
-  listOrganizationCadences,
-  listOrganizationDecisions,
-  listOrganizationLearningCandidates,
-  organizationRecordFiles,
-  listOrganizationRecordFiles,
-  listOrganizationDomains,
-  listOrganizationCapabilities,
-  listOrganizationServices,
-  listOrganizationServiceStates,
-  loadOrganizationCatalog,
-  reconcileOrganizationCatalog,
-  reconcileOrganizationState,
-  buildOrganizationProjectLineage,
-  buildOrganizationLineage,
-  organizationStateFiles,
-  listOrganizationOperationalStates,
-  buildOrganizationManagementView,
-} from './organization-operating-model-management.js';
-import type {
-  BuildOrganizationCadenceInput,
-  BuildOrganizationDecisionInput,
-  OrganizationDecisionAddition,
-  BuildOrganizationProjectLinkInput,
-} from './organization-operating-model-management.js';
-import type {
-  OrganizationTier,
-  OrganizationWorkShape,
-  OrganizationRelationshipType,
-  OrganizationOperatingModelCatalog,
-  OrganizationPurposeObjective,
-  OrganizationPurposeRecord,
-  OrganizationServiceHealthSummary,
-  OrganizationOperationalState,
-  OrganizationDomainRecord,
-  OrganizationCapabilityRecord,
-  OrganizationServiceRecord,
-  OrganizationServiceState,
-  OrganizationOperationType,
-  OrganizationOperationRecord,
-  OrganizationOperationState,
-  OrganizationOperationRun,
-  OrganizationManagementUnit,
-  OrganizationWorkResolution,
-  OrganizationIncidentRecord,
-  OrganizationCadenceRecord,
-  OrganizationDecisionRecord,
-  OrganizationLearningSourceType,
-  OrganizationLearningCandidate,
-  QueueOrganizationLearningCandidateInput,
-  OrganizationCatalog,
-  OrganizationCatalogReconciliation,
-  OrganizationProjectLineage,
-  OrganizationLineage,
-  OrganizationReconciliationResult,
-  OrganizationManagementView,
-  ResolveOrganizationWorkInput,
-} from './organization-operating-model.js';
+type OrganizationTier = import('./organization-operating-model.js').OrganizationTier;
+type OrganizationWorkShape = import('./organization-operating-model.js').OrganizationWorkShape;
+type OrganizationRelationshipType =
+  import('./organization-operating-model.js').OrganizationRelationshipType;
+type OrganizationOperatingModelCatalog =
+  import('./organization-operating-model.js').OrganizationOperatingModelCatalog;
+type OrganizationPurposeObjective =
+  import('./organization-operating-model.js').OrganizationPurposeObjective;
+type OrganizationPurposeRecord =
+  import('./organization-operating-model.js').OrganizationPurposeRecord;
+type OrganizationServiceHealthSummary =
+  import('./organization-operating-model.js').OrganizationServiceHealthSummary;
+type OrganizationOperationalState =
+  import('./organization-operating-model.js').OrganizationOperationalState;
+type OrganizationDomainRecord =
+  import('./organization-operating-model.js').OrganizationDomainRecord;
+type OrganizationCapabilityRecord =
+  import('./organization-operating-model.js').OrganizationCapabilityRecord;
+type OrganizationServiceRecord =
+  import('./organization-operating-model.js').OrganizationServiceRecord;
+type OrganizationServiceState =
+  import('./organization-operating-model.js').OrganizationServiceState;
+type OrganizationOperationType =
+  import('./organization-operating-model.js').OrganizationOperationType;
+type OrganizationOperationRecord =
+  import('./organization-operating-model.js').OrganizationOperationRecord;
+type OrganizationOperationState =
+  import('./organization-operating-model.js').OrganizationOperationState;
+type OrganizationOperationRun =
+  import('./organization-operating-model.js').OrganizationOperationRun;
+type OrganizationManagementUnit =
+  import('./organization-operating-model.js').OrganizationManagementUnit;
+type OrganizationWorkResolution =
+  import('./organization-operating-model.js').OrganizationWorkResolution;
+type OrganizationIncidentRecord =
+  import('./organization-operating-model.js').OrganizationIncidentRecord;
+type OrganizationCadenceRecord =
+  import('./organization-operating-model.js').OrganizationCadenceRecord;
+type OrganizationDecisionRecord =
+  import('./organization-operating-model.js').OrganizationDecisionRecord;
+type OrganizationLearningSourceType =
+  import('./organization-operating-model.js').OrganizationLearningSourceType;
+type OrganizationLearningCandidate =
+  import('./organization-operating-model.js').OrganizationLearningCandidate;
+type QueueOrganizationLearningCandidateInput =
+  import('./organization-operating-model.js').QueueOrganizationLearningCandidateInput;
+type OrganizationCatalog = import('./organization-operating-model.js').OrganizationCatalog;
+type OrganizationCatalogReconciliation =
+  import('./organization-operating-model.js').OrganizationCatalogReconciliation;
+type OrganizationProjectLineage =
+  import('./organization-operating-model.js').OrganizationProjectLineage;
+type OrganizationLineage = import('./organization-operating-model.js').OrganizationLineage;
+type OrganizationReconciliationResult =
+  import('./organization-operating-model.js').OrganizationReconciliationResult;
+type OrganizationManagementView =
+  import('./organization-operating-model.js').OrganizationManagementView;
+type ResolveOrganizationWorkInput =
+  import('./organization-operating-model.js').ResolveOrganizationWorkInput;
 
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CATALOG_PATH = pathResolver.knowledge(
@@ -738,168 +698,6 @@ export function transitionOrganizationLifecycle(input: {
 
 export type OrganizationRetireKind = 'domain' | 'capability' | 'service' | 'operation' | 'cadence';
 
-export function retireOrganizationEntity(input: {
-  organizationId: string;
-  tier: OrganizationTier;
-  tenantSlug?: string;
-  rootDir?: string;
-  kind: OrganizationRetireKind;
-  recordId: string;
-  reason?: string;
-}): Record<string, unknown> {
-  const query = {
-    organizationId: input.organizationId,
-    tier: input.tier,
-    tenantSlug: input.tenantSlug,
-    rootDir: input.rootDir,
-  };
-  let record: any;
-  if (input.kind === 'domain') record = loadOrganizationDomain(input.recordId, query);
-  else if (input.kind === 'capability') record = loadOrganizationCapability(input.recordId, query);
-  else if (input.kind === 'service') record = loadOrganizationService(input.recordId, query);
-  else if (input.kind === 'operation') record = loadOrganizationOperation(input.recordId, query);
-  else
-    record = listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
-  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
-  const catalog = loadOrganizationCatalog(query);
-  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
-  if (
-    input.kind === 'domain' &&
-    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
-  ) {
-    throw new Error(`Cannot retire domain '${input.recordId}' while child records remain.`);
-  }
-  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
-    throw new Error(
-      `Cannot retire capability '${input.recordId}' while service references remain.`
-    );
-  }
-  if (
-    input.kind === 'service' &&
-    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
-  ) {
-    throw new Error(`Cannot retire service '${input.recordId}' while a domain references it.`);
-  }
-  const next = {
-    ...record,
-    status: 'retired',
-    updated_at: new Date().toISOString(),
-    metadata: {
-      ...(record.metadata || {}),
-      ...(input.reason ? { retire_reason: input.reason } : {}),
-    },
-  };
-  if (input.kind === 'domain') saveOrganizationDomain(next, { rootDir: input.rootDir });
-  else if (input.kind === 'capability')
-    saveOrganizationCapability(next, { rootDir: input.rootDir });
-  else if (input.kind === 'service') saveOrganizationService(next, { rootDir: input.rootDir });
-  else if (input.kind === 'operation') saveOrganizationOperation(next, { rootDir: input.rootDir });
-  else saveOrganizationCadence(next, { rootDir: input.rootDir });
-  auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
-    action: `organization.${input.kind}.retire`,
-    operation: `retire:${input.recordId}`,
-    result: 'completed',
-    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
-    metadata: { organization_id: input.organizationId, reason: input.reason },
-  });
-  return next;
-}
-
-/**
- * Destructive removal is an explicit, fail-closed lifecycle verb. Callers
- * must choose it deliberately; ordinary lifecycle transitions use retire.
- */
-export function removeOrganizationEntity(input: {
-  organizationId: string;
-  tier: OrganizationTier;
-  tenantSlug?: string;
-  rootDir?: string;
-  kind: OrganizationRetireKind;
-  recordId: string;
-  reason?: string;
-}): { status: 'removed'; kind: OrganizationRetireKind; record_id: string } {
-  const query = {
-    organizationId: input.organizationId,
-    tier: input.tier,
-    tenantSlug: input.tenantSlug,
-    rootDir: input.rootDir,
-  };
-  const record =
-    input.kind === 'domain'
-      ? loadOrganizationDomain(input.recordId, query)
-      : input.kind === 'capability'
-        ? loadOrganizationCapability(input.recordId, query)
-        : input.kind === 'service'
-          ? loadOrganizationService(input.recordId, query)
-          : input.kind === 'operation'
-            ? loadOrganizationOperation(input.recordId, query)
-            : listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
-  if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
-
-  const catalog = loadOrganizationCatalog(query);
-  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
-  if (
-    input.kind === 'domain' &&
-    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
-  ) {
-    throw new Error(`Cannot remove domain '${input.recordId}' while child records remain.`);
-  }
-  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
-    throw new Error(
-      `Cannot remove capability '${input.recordId}' while service references remain.`
-    );
-  }
-  if (
-    input.kind === 'service' &&
-    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
-  ) {
-    throw new Error(`Cannot remove service '${input.recordId}' while a domain references it.`);
-  }
-
-  const fileName =
-    input.kind === 'domain'
-      ? DOMAIN_FILE_NAME
-      : input.kind === 'capability'
-        ? CAPABILITY_FILE_NAME
-        : input.kind === 'service'
-          ? SERVICE_FILE_NAME
-          : input.kind === 'operation'
-            ? OPERATION_FILE_NAME
-            : CADENCE_FILE_NAME;
-  const kindDirectory =
-    input.kind === 'domain'
-      ? 'domains'
-      : input.kind === 'capability'
-        ? 'capabilities'
-        : input.kind === 'service'
-          ? 'services'
-          : input.kind === 'operation'
-            ? 'operations'
-            : 'cadences';
-  safeRmSync(
-    recordPath(
-      kindDirectory,
-      input.recordId,
-      fileName,
-      input.organizationId,
-      input.tier,
-      recordTenant(record),
-      input.rootDir
-    ),
-    { force: true }
-  );
-  auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
-    action: `organization.${input.kind}.remove`,
-    operation: `remove:${input.recordId}`,
-    result: 'completed',
-    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
-    metadata: { organization_id: input.organizationId, reason: input.reason },
-  });
-  return { status: 'removed', kind: input.kind, record_id: input.recordId };
-}
-
 export function loadOrganizationOperationalState(
   organizationId: string,
   query: { tier?: OrganizationTier; tenantSlug?: string; rootDir?: string } = {}
@@ -1125,6 +923,40 @@ export function loadOrganizationServiceState(
       return record;
   }
   return null;
+}
+
+export function organizationRecordFiles(rootDir: string, fileName: string): string[] {
+  if (!safeExistsSync(rootDir)) return [];
+  const files: string[] = [];
+  for (const entry of safeReaddir(rootDir)) {
+    const fullPath = path.join(rootDir, entry);
+    if (!safeExistsSync(fullPath)) continue;
+    if (safeStat(fullPath).isDirectory())
+      files.push(...organizationRecordFiles(fullPath, fileName));
+    else if (entry === fileName) files.push(fullPath);
+  }
+  return files;
+}
+
+export function listOrganizationRecordFiles(
+  kind: OrganizationRecordKind,
+  fileName: string,
+  query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
+): string[] {
+  if (query.organizationId) assertOrganizationId(query.organizationId);
+  const tenantSlug = recordQueryTenant(query.tenantSlug || getRegisteredEnvText('KYBERION_TENANT'));
+  const tiers = recordQueryTiers(query.tier);
+  return tiers.flatMap((tier) => {
+    const organizationRoot = path.resolve(
+      query.rootDir || pathResolver.rootDir(),
+      'active/organizations',
+      tier,
+      tenantSlug
+    );
+    return organizationRecordFiles(organizationRoot, fileName).filter((filePath) =>
+      query.organizationId ? filePath.includes(`/${query.organizationId}/`) : true
+    );
+  });
 }
 
 export function operationDirectory(

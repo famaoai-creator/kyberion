@@ -95,6 +95,8 @@ import {
  */
 
 import {
+  runWithWorkItemResponseDeadline,
+  getWorkItemTaskId,
   resolveRuntimeSecurityScope,
   DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS,
   resolveWorkItemResponseTimeoutMs,
@@ -127,25 +129,6 @@ import {
   workItemExpectsFiles,
   delegateSubagentTask,
 } from './mission-workitem-dispatch-review.js';
-import {
-  validateWorkItemGranularity,
-  resolveWorkItemProjectIds,
-  readMissionWorkGraph,
-  areMissionTaskDependenciesSatisfied,
-  selectWorkItems,
-  resolveAssigneePeerId,
-  buildDispatchResponseArtifact,
-  evaluateWorkItemDrift,
-  buildWorkItemPromptBody,
-  buildTaskResultRetryPrompt,
-  buildWorkItemDispatchContext,
-  summarizeDispatchObservability,
-  parseTaskResultResponse,
-  buildTaskResultClarificationPacket,
-  buildClarificationArtifactPath,
-  routeToAgentOrSubagent,
-  obtainTaskResultResponse,
-} from './mission-workitem-dispatch-execution.js';
 import type {
   MissionWorkItemDispatchMode,
   MissionWorkItemDispatchFinalStatus,
@@ -159,38 +142,6 @@ import type {
   WorkItemArtifactReviewContext,
   ResolvedWorkItemArtifactReviewContext,
 } from './mission-workitem-dispatch-review.js';
-
-export async function runWithWorkItemResponseDeadline<T>(
-  run: (signal: AbortSignal) => Promise<T>
-): Promise<T> {
-  const timeoutMs = resolveWorkItemResponseTimeoutMs();
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort(new WorkItemResponseTimeoutError(timeoutMs));
-  }, timeoutMs);
-  timer.unref?.();
-  try {
-    try {
-      return await run(controller.signal);
-    } catch (error) {
-      if (timedOut) throw new WorkItemResponseTimeoutError(timeoutMs);
-      throw error;
-    }
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export function getWorkItemTaskId(item: WorkItem): string | undefined {
-  const metadata = (item.metadata || {}) as Record<string, unknown>;
-  const taskId = metadata.task_id;
-  if (typeof taskId === 'string' && taskId.trim()) return taskId.trim();
-  const sourceRef = String(item.source_ref || '').trim();
-  const match = sourceRef.match(/^mission:[^:]+:(.+)$/u);
-  return match?.[1] || undefined;
-}
 
 export function extractGitHubIssueNumber(source: unknown): number | undefined {
   if (!source || typeof source !== 'object') return undefined;

@@ -229,79 +229,28 @@ import {
 } from './mission-orchestration-worker-contracts.js';
 
 import {
-  workerBackendsInstalled,
   ensureWorkerBackendsInstalled,
   emitWorkerTransitionSnapshot,
-  recordWorkerIntentDriftObservation,
   emitWorkerKickoffSnapshot,
-  MISSION_CONTROLLER_TIMEOUT_MS,
   missionProgressController,
-  areTaskDependenciesSatisfied,
   buildUnassignedRoleSummary,
-  summarizeTaskResultForPrompt,
   buildUpstreamResultLines,
-  buildGraphHandoffLines,
-  buildTeamSnapshotLines,
-  buildReviewFindingsLines,
-  dispatchCompactors,
-  compactionWorkingMemory,
-  buildDispatchCarryover,
-  buildDelegationNotificationLines,
-  maybeCompactDispatchSections,
-  TASK_EVENT_STATUS_MAP,
   resolveMissionType,
   runMissionController,
   recordMissionContextTask,
-  taskResultFilePath,
-  taskClarificationFilePath,
-  summarizeTaskResultObservability,
-  buildMissionGoalLines,
-  buildRejectionLessonLines,
-  buildAuthorityRoleProcedureInjectionProvider,
-  buildTaskExecutionPrompt,
-  NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT,
   buildNeedsKnowledgeReinforcementLines,
   buildTaskResultRetryPrompt,
   parseTaskResultResponse,
-  buildTaskClarificationPacket,
-  looksLikePath,
-  evaluateTaskAcceptanceGate,
-  requestIndependentAcceptanceReview,
-} from './mission-orchestration-worker-part-context.js';
-import type {
-  DispatchMissionTaskOutcome,
-  OperatorInteractionPacket,
-  IndependentAcceptanceReview,
+  recordMissionVisiblePrompt,
 } from './mission-orchestration-worker-part-context.js';
 import {
-  buildTaskDispatchContext,
-  TASK_DISPATCH_TIMEOUT_MS,
   resolveTaskDispatchTimeoutMs,
   withTaskDispatchTimeout,
   cascadeBlockedDependents,
-  goalDrivenObjective,
-  goalIdForWorkItem,
-  goalJournalPath,
-  resolveGoalBudget,
-  persistGoalTerminal,
-  runGoalDrivenWorkItem,
-  provisionGoalDrivenTaskKnowledge,
-  dispatchGoalDrivenMissionTask,
-  warnedMissionTaskTraceFailureOnce,
   missionTaskTraceDirOverride,
   warnMissionTaskTraceFailureOnce,
-  attachDeliveredKnowledgeRefs,
-  finalizeMissionTaskTrace,
-  resolveDispatchActorNhiId,
-  originateMissionDispatchDelegationChain,
   dispatchPlannedMissionTask,
 } from './mission-orchestration-worker-part-dispatch.js';
-import type {
-  GoalDrivenWorkItemSeams,
-  GoalDrivenWorkItemResult,
-  DispatchPlannedMissionTaskInput,
-} from './mission-orchestration-worker-part-dispatch.js';
-import { dispatchPlannedMissionTaskCore } from './mission-orchestration-worker-part-core.js';
 
 /**
  * XP-05 closeout: stamp `TaskResultBlock.provenance` at the worker's persist
@@ -346,28 +295,6 @@ export function stampTaskResultProvenance(taskResult: TaskResultBlock | undefine
  * prompt body. This is deliberately fail-closed: sending a prompt without a
  * durable visibility receipt would violate the model-visible/logged contract.
  */
-export function recordMissionVisiblePrompt(input: {
-  missionId: string;
-  taskId: string;
-  content: string;
-  form: string;
-  contextPackId?: string;
-  knowledgeRefs?: DeliveredKnowledgeRef[];
-  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
-}): void {
-  const tier = input.securityScope?.write_tier || 'public';
-  appendPromptVisibilityRecord({
-    missionPath: missionDir(input.missionId, tier),
-    missionId: input.missionId,
-    source: 'mission-orchestration-worker',
-    form: input.form,
-    content: input.content,
-    ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
-    taskId: input.taskId,
-    knowledgeRefs: (input.knowledgeRefs || []).map((ref) => ref.path),
-  });
-}
-
 export const taskResultResponseDeps: TaskResultResponseDeps = {
   recordMissionVisiblePrompt,
   resolveTaskDispatchTimeoutMs,
@@ -735,40 +662,6 @@ export function publishTaskPrArtifacts(input: {
     ),
   });
   return `evidence/prs/${input.task.task_id}/PR.md`;
-}
-
-export const REVIEW_DIFF_MAX_LINES = 2000;
-
-export function buildReviewDiffLines(missionId: string, task: PlannedNextTask): string[] {
-  const role = String(task.assigned_to?.role || '').toLowerCase();
-  if (role !== 'reviewer' && role !== 'qa') return [];
-  const target = resolveReviewTargetForTask(task);
-  if (!target) return [];
-  const diffPath = path.join(
-    missionDir(missionId, 'public'),
-    'evidence',
-    'prs',
-    target,
-    'diff.patch'
-  );
-  if (!safeExistsSync(diffPath)) return [];
-  const diff = String(safeReadFile(diffPath, { encoding: 'utf8' }) || '');
-  if (!diff.trim()) return [];
-  const lines = diff.split('\n');
-  const changedFiles = lines
-    .filter((line) => line.startsWith('diff --git '))
-    .map((line) => line.replace(/^diff --git a\/(\S+).*$/, '$1'));
-  if (lines.length > REVIEW_DIFF_MAX_LINES) {
-    return [
-      `- Diff under review (evidence/prs/${target}/diff.patch — truncated to first ${REVIEW_DIFF_MAX_LINES} of ${lines.length} lines):`,
-      '```diff',
-      ...lines.slice(0, REVIEW_DIFF_MAX_LINES),
-      '```',
-      `- Changed files (${changedFiles.length}):`,
-      ...changedFiles.map((file) => `  - ${file}`),
-    ];
-  }
-  return [`- Diff under review (evidence/prs/${target}/diff.patch):`, '```diff', ...lines, '```'];
 }
 
 export function syncPlanningArtifacts(missionId: string): void {
