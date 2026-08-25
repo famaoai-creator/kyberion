@@ -7,6 +7,7 @@
  */
 
 import { formatEnvValidationReport, loadEnvRegistryEntries, validateEnv } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export interface EnvConfigReport {
   generated_at: string;
@@ -72,6 +73,8 @@ export function main(argv = process.argv.slice(2)): number {
   return options.failOnUndocumented && report.registry.undocumented > 0 ? 1 : 0;
 }
 
-if (process.argv[1] && /env_config_report\.(ts|js)$/.test(process.argv[1])) {
+if (
+  isDirectScript(import.meta.url, 'env_config_report.ts') ||
+  isDirectScript(import.meta.url, 'env_config_report.js')
+)
   process.exitCode = main();
-}
