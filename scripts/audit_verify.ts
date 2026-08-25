@@ -9,7 +9,7 @@ import {
   type AuditVerifyCliReport,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
@@ -50,8 +50,8 @@ function hasArg(name: string): boolean {
   return process.argv.includes(name) || process.argv.some((arg) => arg.startsWith(`${name}=`));
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'audit_verify', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('since', { type: 'string', describe: 'Audit file lower bound in YYYY-MM-DD form' })
     .option('days', { type: 'number', describe: 'Verify only the last N days (overrides --since)' })
@@ -93,16 +93,20 @@ async function main(): Promise<void> {
     console.warn(
       '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'
     );
-    process.exit(0);
+    return 0;
   }
-  process.exit(report.ok ? 0 : 1);
+  return report.ok ? 0 : 1;
 }
 
 if (
   isDirectScript(import.meta.url, 'audit_verify.ts') ||
   isDirectScript(import.meta.url, 'audit_verify.js')
 )
-  void main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'audit:verify',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`audit:verify failed with exit code ${status}`);
+    },
+  })();

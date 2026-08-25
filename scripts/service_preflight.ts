@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   inspectServiceAuth,
   loadServiceEndpointsCatalog,
@@ -169,8 +169,8 @@ export async function runServicePreflight(options: {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'service_preflight', ...args])
     .option('service', { type: 'string', describe: 'Service id to preflight' })
     .option('all', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false })
@@ -194,14 +194,18 @@ async function main(): Promise<void> {
     logger.info(JSON.stringify({ status: 'ok', report }, null, 2));
   }
 
-  process.exit(report.ready ? 0 : 1);
+  return report.ready ? 0 : 1;
 }
 
 if (
   isDirectScript(import.meta.url, 'service_preflight.ts') ||
   isDirectScript(import.meta.url, 'service_preflight.js')
 )
-  void main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'service:preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`service:preflight failed with exit code ${status}`);
+    },
+  })();
