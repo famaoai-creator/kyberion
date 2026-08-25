@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
@@ -129,7 +130,7 @@ function readBinding(customerSlug: string, rootDir: string): Record<string, unkn
   const filePath = bindingPath(customerSlug, rootDir);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' })));
+    const parsed = readJson<unknown>(filePath);
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
@@ -280,7 +281,7 @@ export function loadTenantActivation(
   for (const filePath of candidates) {
     if (!safeExistsSync(filePath)) continue;
     try {
-      const value = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+      const value = readJson<unknown>(filePath);
       if (
         !isTenantActivationRecord(value) ||
         value.customer_slug !== input.customerSlug ||

@@ -15,6 +15,7 @@ import {
 import { auditChain } from './audit-chain.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson as readFoundationJson } from './foundation/json.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
@@ -177,7 +178,7 @@ function resolveInsideRoot(rawPath: string, label: string): string {
 function readJson<T>(filePath: string, label: string): T {
   if (!safeExistsSync(filePath)) throw new Error(`${label} not found: ${filePath}`);
   try {
-    return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    return readFoundationJson<T>(filePath);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`${label} is not valid JSON: ${message}`);
