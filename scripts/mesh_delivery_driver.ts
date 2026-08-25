@@ -16,6 +16,7 @@ import {
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
 
@@ -97,8 +98,10 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /mesh_delivery_driver\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'mesh_delivery_driver.ts') ||
+  isDirectScript(import.meta.url, 'mesh_delivery_driver.js')
+) {
   main().catch((err) => {
     logger.error(err instanceof Error ? err.message : String(err));
     process.exit(1);

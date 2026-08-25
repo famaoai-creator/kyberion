@@ -21,6 +21,7 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 import { loadJson } from '@agent/core';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -199,4 +200,8 @@ export async function main(): Promise<void> {
   process.exitCode = result.reason ? 1 : 0;
 }
 
-if (process.argv[1] && /mission_alignment_request\.(ts|js)$/u.test(process.argv[1])) void main();
+if (
+  isDirectScript(import.meta.url, 'mission_alignment_request.ts') ||
+  isDirectScript(import.meta.url, 'mission_alignment_request.js')
+)
+  void main();
