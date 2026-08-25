@@ -17,7 +17,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
@@ -376,8 +376,8 @@ function printMeetingPreflightReport(report: MeetingPreflightReport): void {
   console.log('');
 }
 
-export async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'meeting_preflight', ...args])
     .option('mission', { type: 'string' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
@@ -392,14 +392,18 @@ export async function main(): Promise<void> {
     printMeetingPreflightReport(report);
   }
 
-  process.exit(report.ready ? 0 : 1);
+  return report.ready ? 0 : 1;
 }
 
 if (
   isDirectScript(import.meta.url, 'meeting_preflight.ts') ||
   isDirectScript(import.meta.url, 'meeting_preflight.js')
 )
-  void main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'meeting:preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`meeting:preflight failed with exit code ${status}`);
+    },
+  })();
