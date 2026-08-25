@@ -346,6 +346,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 > **SX-11 実装追記 (2026-08-25)**: `runValidatedSteps` のtyped-flow validation failureを`runAdfLifecycle`のcanonical auto-repair hookへ接続し、repair後の再preflightと1回限りの失敗記録を同一ライフサイクルで扱うようにした。super-nerveの重複repairと語彙移行は未完。
 > **SX-08 実装追記 (2026-08-25)**: shared surface conversationの最終UX contract検証へ、intentの`approval_required`、approval request、mission proposalの承認要求を伝播させ、承認待ちの結果説明・解除操作を検証対象にした。voice固有能力の完全なcatalog移行と全surfaceの本番描画監査は未完。
+> **SX-09 実装追記 (2026-08-25)**: 登録token/API token/localadmin tokenの認証判定をcoreの`resolveSurfaceViewerToken`へ集約し、Chronos role判定とConcierge viewer解決から共有境界を利用するようにした。surface固有のtenant/tier narrowingとpresence-studioの別HTTP adapter統合は未完。
 > **SX-13 実装追記 (2026-08-25)**: `docs/documentation-source-map.json` と `check:documentation-source-map` を追加し、状態・概念・オンボーディングのカテゴリ別正本、スコープ付き正本、補足/履歴資料、入口リンクを機械検証できるようにした。完了計画のアーカイブ、Glossary 階層化、knowledge コーパス整理は未完のため PARTIAL を維持する。
 > **SX-14 実装追記 (2026-08-25)**: `kyberion`起動境界でenv registryのrequired欠損をfail-closed検証する`validateKyberionStartupEnvironment`を追加し、値を出さないエラー契約をテストした。現行registryにrequired項目がないため、実運用の必須項目キュレーションは未完。
 > | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。 |
