@@ -121,6 +121,37 @@ function scheduleChronosShutdown() {
   g.__kyberionChronosIdleTimer.unref?.();
 }
 
+function intentResolutionA2ui(contract: {
+  normalized_intent: string;
+  missing_inputs: string[];
+  authority_level: string;
+  outcome_kind: string;
+  next_action: { kind: string; label: string; consequence: string };
+}) {
+  return [
+    {
+      type: 'display:section',
+      props: {
+        title: 'Intent resolution',
+        items: [
+          { label: 'Intent', value: contract.normalized_intent },
+          { label: 'Outcome', value: contract.outcome_kind },
+          { label: 'Authority', value: contract.authority_level },
+          ...(contract.missing_inputs.length > 0
+            ? [{ label: 'Missing input', value: contract.missing_inputs.join(', ') }]
+            : []),
+          {
+            label: 'Next action',
+            value: contract.next_action.label,
+            consequence: contract.next_action.consequence,
+            action: contract.next_action.kind,
+          },
+        ],
+      },
+    },
+  ];
+}
+
 async function ensureChronosAgent(context?: {
   missionId?: string;
   teamRole?: string;
@@ -1237,7 +1268,13 @@ export async function POST(req: NextRequest) {
     };
     const body = await req.json();
     const locale = normalizeChronosLocale(body.locale);
-    const query = (body.query || body.intent || '').trim();
+    const action =
+      body.action === 'approve_mission' || body.action === 'reject_mission'
+        ? (body.action as 'approve_mission' | 'reject_mission')
+        : undefined;
+    const query =
+      (body.query || body.intent || '').trim() ||
+      (action === 'approve_mission' ? '1' : action === 'reject_mission' ? '2' : '');
     const sessionId =
       typeof body.sessionId === 'string' && body.sessionId.trim()
         ? body.sessionId
@@ -1418,6 +1455,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: 'ok',
         response: confirmationText,
+        intentResolution: conversation.intentResolution,
         a2ui: [
           {
             type: 'display:hero',
@@ -1463,6 +1501,9 @@ export async function POST(req: NextRequest) {
               ],
             },
           },
+          ...(conversation.intentResolution
+            ? intentResolutionA2ui(conversation.intentResolution)
+            : []),
         ],
         delegations: delegationResults.length > 0 ? delegationResults : undefined,
         timestamp: new Date().toISOString(),
@@ -1480,7 +1521,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       status: 'ok',
       response: conversation.text,
-      a2ui: conversation.a2uiMessages,
+      intentResolution: conversation.intentResolution,
+      a2ui: [
+        ...(conversation.intentResolution
+          ? intentResolutionA2ui(conversation.intentResolution)
+          : []),
+        ...(conversation.a2uiMessages || []),
+      ],
       delegations: delegationResults.length > 0 ? delegationResults : undefined,
       timestamp: new Date().toISOString(),
     });
