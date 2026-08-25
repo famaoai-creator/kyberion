@@ -30,6 +30,7 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
+import { defineScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
@@ -649,9 +650,8 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
   };
 }
 
-const isDirect = process.argv[1] && /migrate_physical_namespaces\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  const options = parseArgs(process.argv.slice(2));
+function main(argv: string[]): void {
+  const options = parseArgs(argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
       ? ['schedule', 'surface', 'feedback', 'intent', 'ledger', 'promotion']
@@ -661,5 +661,11 @@ if (isDirect) {
   );
   console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
 }
+
+void defineScript({
+  name: 'migrate:physical-namespaces',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
 
 export { buildPlan, feedbackScopes, intentScopes, ledgerScopes, promotionScopes, parseArgs };
