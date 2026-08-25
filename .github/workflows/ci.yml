@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The full gate set includes the browser-backed Chronos contrast check.
+      # Keep browser binaries out of dependency installation by default, then
+      # provision the exact Chromium runtime required by this CI job.
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Build project
         run: pnpm run build
 
