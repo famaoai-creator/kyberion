@@ -18,11 +18,16 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
   });
 
-  it('keeps validate on the docs example check as well as the other release gates', () => {
-    const packageJson = read('package.json');
-    expect(packageJson).toContain('pnpm run check:doc-examples');
-    expect(packageJson).toContain('pnpm run check:first-win-smoke');
-    expect(packageJson).toContain('pnpm run check:mos-no-write-api');
+  it('keeps the manifest-driven validator on the docs and read-only surface gates', () => {
+    const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
+      gates: Array<{ id: string; scope: string }>;
+    };
+    const fullGateIds = new Set(
+      gates.gates.filter((gate) => gate.scope === 'full').map((gate) => gate.id)
+    );
+    for (const id of ['doc-examples', 'first-win-smoke', 'mos-no-write-api']) {
+      expect(fullGateIds.has(id), id).toBe(true);
+    }
   });
 
   it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
