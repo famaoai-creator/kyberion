@@ -1,13 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
-  findChronosTokenRegistration,
   currentScope,
-  matchesChronosToken,
   readChronosTokenRegistrations,
   defaultSurfaceViewerTierAccess,
   narrowSurfaceViewerScope,
   resolveSurfaceViewerTierAccess,
   extractSurfaceBearerToken,
+  resolveSurfaceViewerToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
@@ -60,11 +59,6 @@ function registrations(): ChronosTokenRegistration[] | null {
   }
 }
 
-function registeredViewer(token: string): ChronosTokenRegistration | null {
-  const registry = registrations();
-  return registry ? findChronosTokenRegistration(token, registry) : null;
-}
-
 function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
   return defaultSurfaceViewerTierAccess(role);
 }
@@ -96,9 +90,17 @@ function resolveTierAccess(
 export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewerContext {
   const local = isLoopbackRequest(req);
   const token = bearerToken(req);
-  const registration = token ? registeredViewer(token) : null;
+  const registry = token ? registrations() : null;
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
   const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
+  const resolution = token
+    ? resolveSurfaceViewerToken(token, {
+        registrations: registry,
+        apiToken,
+        localadminToken,
+      })
+    : null;
+  const registration = resolution?.registration;
 
   if (registration) {
     return {
@@ -112,13 +114,8 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
     };
   }
 
-  if (
-    token &&
-    (matchesChronosToken(token, apiToken) || matchesChronosToken(token, localadminToken))
-  ) {
-    const role: ChronosAccessRole = matchesChronosToken(token, localadminToken)
-      ? 'localadmin'
-      : 'readonly';
+  if (token && resolution) {
+    const role: ChronosAccessRole = resolution.role;
     const tenant = serverTenant();
     if (!local && !tenant) {
       throw new ConciergeViewerError(
