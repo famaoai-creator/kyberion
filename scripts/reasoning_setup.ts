@@ -2,7 +2,7 @@ import { loadEnvironmentManifest, logger, probeManifest } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
-import { formatSetupSummaryLine } from './setup-report.js';
+import { formatSetupSummaryLine } from './setup_report.js';
 
 import '@agent/core/environment-capability-probes';
 import {
