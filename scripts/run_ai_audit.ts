@@ -18,7 +18,7 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
@@ -480,7 +480,8 @@ async function main(): Promise<void> {
 }
 
 const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'run_ai_audit.ts') ||
+  isDirectScript(import.meta.url, 'run_ai_audit.js');
 if (isDirectRun) {
   main().catch((error) => {
     console.error(`[ai-audit] fatal: ${error?.message ?? error}`);

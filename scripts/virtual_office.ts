@@ -18,6 +18,7 @@
  * on demand or with `--watch <seconds>`.
  */
 import * as path from 'node:path';
+import { isDirectScript } from './lib/harness.js';
 import {
   createStandardYargs,
   loadJson,
@@ -1302,7 +1303,8 @@ async function main(): Promise<void> {
 }
 
 const isDirectRun =
-  process.argv[1]?.endsWith('virtual_office.ts') || process.argv[1]?.endsWith('virtual_office.js');
+  isDirectScript(import.meta.url, 'virtual_office.ts') ||
+  isDirectScript(import.meta.url, 'virtual_office.js');
 if (isDirectRun) {
   main().catch((error) => {
     console.error(error);
