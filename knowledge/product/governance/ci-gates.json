@@ -414,8 +414,8 @@
     {
       "id": "reference-drift",
       "scope": "full",
-      "executable": "vitest",
-      "args": ["run", "tests/reference-drift-contract.test.ts"],
+      "executable": "pnpm",
+      "args": ["exec", "vitest", "run", "tests/reference-drift-contract.test.ts"],
       "owner": "quality",
       "rationale": "Checks reference drift contracts."
     },
@@ -430,8 +430,8 @@
     {
       "id": "production-evidence",
       "scope": "full",
-      "executable": "vitest",
-      "args": ["run", "tests/production-evidence-register-contract.test.ts"],
+      "executable": "pnpm",
+      "args": ["exec", "vitest", "run", "tests/production-evidence-register-contract.test.ts"],
       "owner": "release",
       "rationale": "Checks the production evidence register contract."
     },
