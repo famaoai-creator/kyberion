@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJson } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -169,7 +170,7 @@ function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
   const filePath = usageAggregatePath(scope);
   if (!filePath || !safeExistsSync(filePath)) return values;
   try {
-    const entries = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+    const entries = readJson<unknown>(filePath);
     if (!Array.isArray(entries)) return values;
     for (const entry of entries) {
       if (!entry || typeof entry !== 'object') continue;
