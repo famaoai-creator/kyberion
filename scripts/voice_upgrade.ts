@@ -35,6 +35,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Tier = 0 | 1 | 2;
 
@@ -55,11 +56,10 @@ function printUsage(): void {
   console.log('  pnpm voice:upgrade --tier 0');
 }
 
-function parseArgs(): Tier {
-  const args = process.argv.slice(2);
+function parseArgs(args: string[]): Tier {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
-    process.exit(0);
+    throw new ScriptExitError(0);
   }
   const tierIdx = args.indexOf('--tier');
   if (tierIdx >= 0 && args[tierIdx + 1]) {
@@ -196,13 +196,13 @@ function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
   }
 }
 
-async function main(): Promise<void> {
+async function main(args: string[]): Promise<void> {
   let tier: Tier;
   try {
-    tier = parseArgs();
+    tier = parseArgs(args);
   } catch (err: any) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(2);
+    if (err instanceof ScriptExitError) throw err;
+    throw new ScriptExitError(2, formatClassification(classifyError(err)));
   }
 
   console.log(`🎙️  Voice tier upgrade → tier ${tier}`);
@@ -239,12 +239,21 @@ async function main(): Promise<void> {
     console.error(
       `\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`
     );
-    process.exit(1);
+    throw new Error(`Voice tier ${tier} prerequisites are not fully satisfied`);
   }
   console.log(`\n✅ Voice tier ${tier} configured.`);
 }
 
-main().catch((err) => {
-  console.error('Fatal:', formatClassification(classifyError(err)));
-  process.exit(1);
+export const runVoiceUpgrade = defineScript({
+  name: 'voice:upgrade',
+  flags: [],
+  run(context) {
+    return main(context.argv);
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'voice_upgrade.ts') ||
+  isDirectScript(import.meta.url, 'voice_upgrade.js')
+)
+  void runVoiceUpgrade();
