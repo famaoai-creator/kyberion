@@ -1,4 +1,5 @@
 import { pathResolver, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const BRIDGES = [
   'satellites/slack-bridge/src/index.ts',
@@ -19,15 +20,23 @@ export function checkChannelAdapterAdoption(): string[] {
   return failures;
 }
 
-export function main(): number {
-  const failures = checkChannelAdapterAdoption();
-  if (failures.length) {
-    console.error('[check:channel-adapter-adoption] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    return 1;
-  }
-  console.log(`[check:channel-adapter-adoption] OK (${BRIDGES.length} bridges)`);
-  return 0;
-}
+export const runCheckChannelAdapterAdoption = defineScript({
+  name: 'check:channel-adapter-adoption',
+  flags: [],
+  run(context) {
+    const failures = checkChannelAdapterAdoption();
+    if (failures.length) {
+      console.error('[check:channel-adapter-adoption] FAILED');
+      for (const failure of failures) console.error(`- ${failure}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print(`[check:channel-adapter-adoption] OK (${BRIDGES.length} bridges)`);
+  },
+});
 
-if (process.argv[1]?.endsWith('check_channel_adapter_adoption.ts')) process.exitCode = main();
+if (
+  isDirectScript(import.meta.url, 'check_channel_adapter_adoption.ts') ||
+  isDirectScript(import.meta.url, 'check_channel_adapter_adoption.js')
+)
+  void runCheckChannelAdapterAdoption();

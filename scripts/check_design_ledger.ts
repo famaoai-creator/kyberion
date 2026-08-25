@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type DesignNoteStatus = 'proposed' | 'implemented' | 'rejected';
 
@@ -105,16 +106,24 @@ export function validateDesignLedger(root = pathResolver.rootDir()): DesignLedge
   return violations;
 }
 
-export function main(): void {
-  const violations = validateDesignLedger();
-  if (violations.length > 0) {
-    for (const violation of violations) {
-      console.error(`[check:design-ledger] ${violation.file}: ${violation.message}`);
+export const runCheckDesignLedger = defineScript({
+  name: 'check:design-ledger',
+  flags: [],
+  run(context) {
+    const violations = validateDesignLedger();
+    if (violations.length > 0) {
+      for (const violation of violations) {
+        console.error(`[check:design-ledger] ${violation.file}: ${violation.message}`);
+      }
+      process.exitCode = 1;
+      return;
     }
-    process.exitCode = 1;
-    return;
-  }
-  console.log('[check:design-ledger] OK');
-}
+    context.print('[check:design-ledger] OK');
+  },
+});
 
-if (process.argv[1]?.endsWith('check_design_ledger.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_design_ledger.ts') ||
+  isDirectScript(import.meta.url, 'check_design_ledger.js')
+)
+  void runCheckDesignLedger();

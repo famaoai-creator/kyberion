@@ -7,6 +7,7 @@
  */
 import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 // Do not traverse tenant/personal knowledge tiers: the checker is a public
 // repository-governance lint and those paths are intentionally role-scoped.
@@ -83,16 +84,24 @@ function loadMissionGateDocuments(): Record<string, string> {
   );
 }
 
-export function main(): void {
-  const violations = collectMissionGateDocViolations(loadMissionGateDocuments());
-  if (violations.length > 0) {
-    for (const violation of violations) console.error(`[check:mission-gate-docs] ${violation}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
-  );
-}
+export const runCheckMissionGateDocs = defineScript({
+  name: 'check:mission-gate-docs',
+  flags: [],
+  run(context) {
+    const violations = collectMissionGateDocViolations(loadMissionGateDocuments());
+    if (violations.length > 0) {
+      for (const violation of violations) console.error(`[check:mission-gate-docs] ${violation}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print(
+      `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
+    );
+  },
+});
 
-if (process.argv[1]?.endsWith('check_mission_gate_docs.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_mission_gate_docs.ts') ||
+  isDirectScript(import.meta.url, 'check_mission_gate_docs.js')
+)
+  void runCheckMissionGateDocs();
