@@ -21,6 +21,7 @@ import {
 // Mock @agent/core for cookie-store tests
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
+  const safeReadFile = vi.fn().mockReturnValue('[]');
   return {
     ...actual,
     logger: {
@@ -34,7 +35,8 @@ vi.mock('@agent/core', async (importOriginal) => {
       rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
     },
     safeExistsSync: vi.fn().mockReturnValue(false),
-    safeReadFile: vi.fn().mockReturnValue('[]'),
+    safeReadFile,
+    loadJson: vi.fn((filePath: string) => JSON.parse(String(safeReadFile(filePath)))),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
   };
@@ -162,25 +164,25 @@ describe('resolveMeetingPlatform', () => {
       resolveMeetingPlatform({
         url: 'https://meet.google.com/abc-defg-hij',
         platform: 'auto',
-      }),
+      })
     ).toBe('meet');
     expect(
       resolveMeetingPlatform({
         url: 'https://company.zoom.us/j/123',
         platform: 'auto',
-      }),
+      })
     ).toBe('zoom');
     expect(
       resolveMeetingPlatform({
         url: 'https://teams.microsoft.com/l/meetup-join/abc',
         platform: 'auto',
-      }),
+      })
     ).toBe('teams');
     expect(
       resolveMeetingPlatform({
         url: 'https://www.microsoft.com/ja-jp/microsoft-teams/join-a-meeting',
         platform: 'auto',
-      }),
+      })
     ).toBe('teams');
   });
 
@@ -189,7 +191,7 @@ describe('resolveMeetingPlatform', () => {
       resolveMeetingPlatform({
         url: 'https://example.com/meeting',
         platform: 'auto',
-      }),
+      })
     ).toThrow(/unsupported meeting URL/i);
   });
 
@@ -198,13 +200,13 @@ describe('resolveMeetingPlatform', () => {
       validateMeetingTarget({
         url: 'https://example.com/meeting',
         platform: 'meet',
-      }),
+      })
     ).toThrow(/not allow-listed/i);
   });
 
   it('redacts meeting urls down to host-only values', () => {
     expect(redactMeetingUrl('https://meet.google.com/abc-defg-hij?foo=bar')).toBe(
-      'meet.google.com',
+      'meet.google.com'
     );
   });
 });

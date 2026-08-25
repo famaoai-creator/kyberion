@@ -6583,6 +6583,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/calendar-action.schema.json",
+      "tier": "public",
+      "size": 1523,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/campaign-brief.schema.json",
       "tier": "public",
       "size": 1360,
@@ -8589,7 +8595,7 @@
     {
       "path": "product/schemas/system-pipeline.schema.json",
       "tier": "public",
-      "size": 10972,
+      "size": 11011,
       "type": "json"
     },
     {

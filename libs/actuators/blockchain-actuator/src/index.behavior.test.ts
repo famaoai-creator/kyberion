@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
+    success: vi.fn(),
   },
   createStandardYargs: vi.fn(() => ({
     option: vi.fn().mockReturnThis(),
@@ -44,6 +45,12 @@ vi.mock('@agent/core', async () => {
     retry: mocks.retry,
   };
 });
+
+vi.mock('@agent/core/foundation', () => ({
+  appendJsonLine: vi.fn((_target: string, data: string) => {
+    writes.push(JSON.stringify(data));
+  }),
+}));
 
 import { handleAction } from './index.js';
 

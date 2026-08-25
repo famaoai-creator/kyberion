@@ -37,6 +37,7 @@ vi.mock('@agent/core', () => ({
   ensureDefaultOpPreflight: vi.fn(),
   resolveServiceBinding: mocks.resolveServiceBinding,
   safeReadFile: mocks.safeReadFile,
+  loadJson: <T>(filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath))) as T,
   safeExistsSync: mocks.safeExistsSync,
   safeWriteFile: mocks.safeWriteFile,
   derivePipelineStatus: mocks.derivePipelineStatus,
@@ -61,6 +62,14 @@ vi.mock('@agent/core', () => ({
     recordObservation() {}
   },
 }));
+
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    appendJsonLine: vi.fn(),
+  };
+});
 
 describe('service-actuator: RECONCILE with auth check', () => {
   beforeEach(() => {
