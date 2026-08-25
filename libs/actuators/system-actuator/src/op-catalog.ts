@@ -16,6 +16,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'glob_files',
   'scan_directory',
   'pulse_status',
+  'baseline_check',
   'exec',
   'shell',
   'cli_health_check',

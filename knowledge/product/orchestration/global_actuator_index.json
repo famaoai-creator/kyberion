@@ -316,10 +316,11 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.4.0",
-      "capability_count": 25,
+      "version": "1.5.0",
+      "capability_count": 26,
       "ops": [
         "audit_verify",
+        "baseline_check",
         "computer_interaction",
         "control_media_devices",
         "cost_report",
