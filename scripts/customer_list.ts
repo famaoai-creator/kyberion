@@ -10,7 +10,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CustomerEntry {
   slug: string;
@@ -63,23 +63,23 @@ export function printText(entries: CustomerEntry[]): void {
   }
 }
 
-function main(): void {
-  const json = process.argv.includes('--json');
-  try {
-    const entries = listCustomers();
-    if (json) {
-      console.log(JSON.stringify(entries, null, 2));
-      return;
+export const main = defineScript({
+  name: 'customer:list',
+  flags: ['json'],
+  run(context) {
+    try {
+      const entries = listCustomers();
+      if (context.json) context.print(entries);
+      else printText(entries);
+    } catch (err) {
+      throw new Error(formatClassification(classifyError(err)));
     }
-    printText(entries);
-  } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
-  }
-}
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'customer_list.ts') ||
   isDirectScript(import.meta.url, 'customer_list.js')
-)
-  main();
+) {
+  void main();
+}
