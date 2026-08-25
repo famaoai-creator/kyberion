@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { validateEnv } from '@agent/core';
 import { loadCliManifest, type CliCommand } from './check_cli_manifest.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CliEntrypoint {
   id: string;
@@ -66,7 +67,7 @@ export function validateKyberionStartupEnvironment(
   assertRequiredEnvironment(validateEnv(env));
 }
 
-export async function main(args = process.argv.slice(2)): Promise<void> {
+export async function main(args: string[] = []): Promise<void> {
   if (args[0] === '--help' || args[0] === '-h') {
     console.log(formatCliManifestHelp());
     return;
@@ -80,18 +81,15 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
 
   const { main: operatorHomeMain } = await import('./kyberion_home.js');
-  const originalArgv = process.argv;
-  process.argv = [originalArgv[0] ?? 'node', 'kyberion', ...args];
-  try {
-    await operatorHomeMain();
-  } finally {
-    process.argv = originalArgv;
-  }
+  await operatorHomeMain(args);
 }
 
-if (process.argv[1]?.endsWith('kyberion.ts') || process.argv[1]?.endsWith('kyberion.js')) {
-  void main().catch((error: unknown) => {
-    console.error(String(error));
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'kyberion.ts') ||
+  isDirectScript(import.meta.url, 'kyberion.js')
+)
+  void defineScript({
+    name: 'kyberion',
+    flags: [],
+    run: ({ argv }) => main(argv),
+  })();
