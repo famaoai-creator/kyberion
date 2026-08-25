@@ -10,7 +10,7 @@ export function normalizeText(value: unknown): string {
   return asString(value).trim().replace(/\s+/gu, ' ');
 }
 
-/** Normalize whitespace and bound a user-facing excerpt without cutting a word-sized suffix. */
+/** Normalize whitespace and bound a user-facing excerpt with an ellipsis. */
 export function truncateNormalizedText(value: unknown, max: number): string {
   const text = normalizeText(value);
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
