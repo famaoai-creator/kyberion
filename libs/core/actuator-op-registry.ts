@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { suggestClosestStrings } from './op-suggestions.js';
 import { loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
@@ -61,6 +60,28 @@ const DEFAULT_CONTROL_OPS = [
 ];
 
 const pluginOperations = new Map<string, ResolvedActuatorOperation>();
+
+const DEFAULT_ACTUATOR_OP_REGISTRY: ActuatorOpRegistryFile = {
+  shared_capture_ops: [],
+  shared_transform_ops: [],
+  shared_apply_ops: [],
+  operation_timeouts_ms: {},
+  domains: {},
+};
+
+const actuatorOpCatalog = defineCatalog<ActuatorOpRegistryFile>({
+  id: 'actuator-op-registry',
+  path: pathResolver.knowledge('product/governance/actuator-op-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/actuator-op-registry.schema.json'),
+  fallback: DEFAULT_ACTUATOR_OP_REGISTRY,
+  onFallback: (error) => {
+    recordConfigFallback({
+      knowledgePath: 'product/governance/actuator-op-registry.json',
+      error,
+      defaults: DEFAULT_ACTUATOR_OP_REGISTRY,
+    });
+  },
+});
 
 export function registerPluginActuatorOperation(input: {
   domain: string;
@@ -148,24 +169,7 @@ function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): stri
 
 function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
   if (_cachedOpRegistry) return _cachedOpRegistry;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/actuator-op-registry.json');
-    _cachedOpRegistry = readJson<ActuatorOpRegistryFile>(filePath);
-  } catch (err) {
-    const defaults: ActuatorOpRegistryFile = {
-      shared_capture_ops: [],
-      shared_transform_ops: [],
-      shared_apply_ops: [],
-      operation_timeouts_ms: {},
-      domains: {},
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/actuator-op-registry.json',
-      error: err,
-      defaults,
-    });
-    _cachedOpRegistry = defaults;
-  }
+  _cachedOpRegistry = actuatorOpCatalog.load();
   return _cachedOpRegistry;
 }
 

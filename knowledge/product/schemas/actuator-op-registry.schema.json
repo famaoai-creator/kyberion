@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "actuator-op-registry.schema.json",
+  "title": "Actuator operation registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "shared_capture_ops",
+    "shared_transform_ops",
+    "shared_apply_ops",
+    "domains"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "shared_capture_ops": { "$ref": "#/$defs/operationNames" },
+    "shared_transform_ops": { "$ref": "#/$defs/operationNames" },
+    "shared_apply_ops": { "$ref": "#/$defs/operationNames" },
+    "operation_timeouts_ms": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 1 }
+    },
+    "domains": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/domain" }
+    }
+  },
+  "$defs": {
+    "operationNames": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capture": { "$ref": "#/$defs/operationNames" },
+        "transform": { "$ref": "#/$defs/operationNames" },
+        "apply": { "$ref": "#/$defs/operationNames" }
+      }
+    }
+  }
+}
