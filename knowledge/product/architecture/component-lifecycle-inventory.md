@@ -21,7 +21,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `approval-actuator`: Human approval request state transitions and decision handling (6 ops, v1.1.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Local Ledger Anchoring Simulation (3 ops, v1.1.0, schema schemas/blockchain-action.schema.json)
-- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema schemas/browser-pipeline.schema.json)
+- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema knowledge/product/schemas/browser-automation-pipeline.schema.json)
 - `build-actuator`: iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop (8 ops, v1.0.0, schema schemas/build-pipeline.schema.json)
 - `calendar-actuator`: Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws) (4 ops, v1.1.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema schemas/code-pipeline.schema.json)

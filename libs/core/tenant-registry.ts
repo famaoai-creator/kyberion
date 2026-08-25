@@ -13,7 +13,9 @@ import {
 } from './secure-io.js';
 
 const TENANT_GROUP_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
-const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve('schemas/tenant-group.schema.json');
+const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/tenant-group.schema.json'
+);
 let tenantGroupValidate: ReturnType<typeof compileSchema> | undefined;
 // Resolved at module load against the real repo root on purpose: the schema is
 // tracked source, not fixture data — hermetic tests that pass a fixture

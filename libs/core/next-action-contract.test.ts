@@ -63,7 +63,10 @@ describe('next-action-contract', () => {
 
   it('emits contracts that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/next-action.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/next-action.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const action = createNextActionContract({
       actionId: 'act-5',

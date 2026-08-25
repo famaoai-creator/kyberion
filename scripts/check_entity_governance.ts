@@ -134,7 +134,7 @@ export function collectEntityGovernanceReport(
   const violations: string[] = [];
   const warnings: string[] = [];
   const policyPath = path.join(rootDir, 'knowledge/product/governance/security-policy.json');
-  const schemaPath = path.join(rootDir, 'schemas/work-item.schema.json');
+  const schemaPath = path.join(rootDir, 'knowledge/product/schemas/governed-work-item.schema.json');
   const catalogPath = path.join(
     rootDir,
     'knowledge/product/governance/storage-retention-catalog.json'

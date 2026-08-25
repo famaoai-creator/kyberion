@@ -6,7 +6,9 @@ import { handleAction } from './wisdom-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
-  const schema = loadJson<object>(pathResolver.rootResolve('schemas/wisdom-action.schema.json'));
+  const schema = loadJson<object>(
+    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json')
+  );
   await runActuatorCli({
     name: 'wisdom-actuator',
     handleAction,

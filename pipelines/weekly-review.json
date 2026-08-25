@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/.",
   "_refs": {
-    "schema": "schemas/volatile-knowledge.schema.json",
+    "schema": "knowledge/product/schemas/volatile-knowledge.schema.json",
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
   },

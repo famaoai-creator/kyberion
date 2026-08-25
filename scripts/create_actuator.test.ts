@@ -25,7 +25,7 @@ describe('create_actuator', () => {
     const manifestPath = path.join(outDir, 'manifest.json');
 
     expect(result.outDir).toBe(outDir);
-    expect(result.files).toContain('schemas/sample-feature-action.schema.json');
+    expect(result.files).toContain('knowledge/product/schemas/sample-feature-action.schema.json');
     expect(safeExistsSync(schemaPath)).toBe(true);
     expect(safeExistsSync(indexPath)).toBe(true);
     expect(safeExistsSync(manifestPath)).toBe(true);
@@ -42,7 +42,7 @@ describe('create_actuator', () => {
     expect(indexSource).toContain('export const actuator');
     expect(indexSource).not.toContain('dispatchDecisionOp');
     expect(schemaSource).toContain('"execute"');
-    expect(manifestSource).toContain('schemas/sample-feature-action.schema.json');
+    expect(manifestSource).toContain('knowledge/product/schemas/sample-feature-action.schema.json');
   });
 
   it('refuses to overwrite an existing actuator directory', () => {

@@ -164,7 +164,7 @@ describe('wisdom public contract boundaries', () => {
 
   it('publishes pipeline and reconcile in the schema contract', () => {
     const schema = readJson<{ properties: { action: { enum?: string[] } } }>(
-      'schemas/wisdom-action.schema.json'
+      'knowledge/product/schemas/wisdom-action.schema.json'
     );
 
     expect(schema.properties.action.enum).toEqual(
@@ -196,7 +196,7 @@ describe('wisdom public contract boundaries', () => {
           }>;
         };
       };
-    }>('schemas/wisdom-action.schema.json');
+    }>('knowledge/product/schemas/wisdom-action.schema.json');
     const schemaOps = new Map<string, string>();
     for (const branch of schema.$defs?.pipelineStep?.oneOf || []) {
       const kind = branch.properties?.type?.const;

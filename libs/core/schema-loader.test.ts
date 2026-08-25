@@ -8,7 +8,10 @@ import { compileSchemaFromPath } from './schema-loader.js';
 const Ajv = (AjvModule as unknown as { default?: typeof AjvModule }).default ?? AjvModule;
 
 describe('schema-loader compatibility boundary', () => {
-  const schemaPath = path.resolve(process.cwd(), 'schemas/video-composition-action.schema.json');
+  const schemaPath = path.resolve(
+    process.cwd(),
+    'knowledge/product/schemas/video-composition-action.schema.json'
+  );
   const validRequest = { action: 'list_video_composition_templates', params: {} };
 
   it('delegates legacy compilation to the caller-owned Ajv instance', () => {

@@ -11,27 +11,27 @@ interface GenerationTarget {
 
 const targets: GenerationTarget[] = [
   {
-    schemaPath: 'schemas/wisdom-action.schema.json',
+    schemaPath: 'knowledge/product/schemas/wisdom-action.schema.json',
     outputPath: 'libs/core/src/types/wisdom-action.ts',
   },
   {
-    schemaPath: 'schemas/bridge-request.schema.json',
+    schemaPath: 'knowledge/product/schemas/bridge-request.schema.json',
     outputPath: 'libs/core/src/types/bridge-request.ts',
   },
   {
-    schemaPath: 'schemas/diagram-adf.schema.json',
+    schemaPath: 'knowledge/product/schemas/diagram-adf.schema.json',
     outputPath: 'libs/core/src/types/diagram-adf.ts',
   },
   {
-    schemaPath: 'schemas/mission-contract.schema.json',
+    schemaPath: 'knowledge/product/schemas/mission-contract.schema.json',
     outputPath: 'libs/core/src/types/mission-contract.ts',
   },
   {
-    schemaPath: 'schemas/skill-input.schema.json',
+    schemaPath: 'knowledge/product/schemas/skill-input.schema.json',
     outputPath: 'libs/core/src/types/skill-input.ts',
   },
   {
-    schemaPath: 'schemas/skill-output.schema.json',
+    schemaPath: 'knowledge/product/schemas/skill-output.schema.json',
     outputPath: 'libs/core/src/types/skill-output.ts',
   },
   {
