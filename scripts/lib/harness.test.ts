@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeRmSync, safeWriteFile } from '@agent/core';
-import { defineGenerator, parseScriptFlags } from './harness.js';
+import { defineGenerator, defineScript, parseScriptFlags, ScriptExitError } from './harness.js';
 
 const NORMALIZED_OUTPUT = pathResolver.sharedTmp('harness-test/generator-output.txt');
 
@@ -43,5 +43,20 @@ describe('script harness', () => {
 
     expect(result?.changed).toEqual([]);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('preserves governed non-zero exit codes without forcing process termination', async () => {
+    process.exitCode = undefined;
+    const main = defineScript({
+      name: 'harness-exit-test',
+      run: () => {
+        throw new ScriptExitError(2, 'approval required');
+      },
+    });
+
+    await main([]);
+
+    expect(process.exitCode).toBe(2);
+    process.exitCode = undefined;
   });
 });

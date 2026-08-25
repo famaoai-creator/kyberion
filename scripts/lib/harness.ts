@@ -19,6 +19,17 @@ export interface ScriptContext extends ScriptFlags {
 
 export type ScriptFlag = 'json' | 'dry-run' | 'check' | 'quiet';
 
+export class ScriptExitError extends Error {
+  constructor(
+    public readonly code: number,
+    message = '',
+    public readonly silent = message.length === 0
+  ) {
+    super(message);
+    this.name = 'ScriptExitError';
+  }
+}
+
 const DEFAULT_SCRIPT_FLAGS: readonly ScriptFlag[] = ['json', 'dry-run', 'check', 'quiet'];
 
 export function parseScriptFlags(
@@ -60,9 +71,14 @@ export function defineScript<T>(options: {
     try {
       return await options.run({ ...flags, name: options.name, argv, print: output });
     } catch (error) {
-      if (!flags.json) console.error(`[${options.name}] ${String(error)}`);
-      else console.error(JSON.stringify({ ok: false, error: String(error) }));
-      process.exitCode = 1;
+      const exitCode = error instanceof ScriptExitError ? error.code : 1;
+      const silent = error instanceof ScriptExitError && error.silent;
+      if (!silent) {
+        const message = error instanceof ScriptExitError ? error.message : String(error);
+        if (!flags.json) console.error(`[${options.name}] ${message}`);
+        else console.error(JSON.stringify({ ok: false, error: message }));
+      }
+      process.exitCode = exitCode;
       return undefined;
     }
   };
