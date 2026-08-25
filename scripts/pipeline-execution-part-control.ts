@@ -118,6 +118,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
+import {
+  runInlineProductivityDryRunValidation,
+  runInlineProposalBriefParse,
+} from './pipeline-domain-ops.js';
 
 import {
   registeredEnv,
@@ -504,6 +508,12 @@ export async function dispatchLeafOp(
   if (domain === 'core' && action === 'wait') return runInlineCoreWait(params, ctx);
   if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
     return runInlineCoreJanitor(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'parse_proposal_brief') {
+    return runInlineProposalBriefParse(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'validate_productivity_dry_run') {
+    return runInlineProductivityDryRunValidation(step, params, ctx);
   }
   if (domain === 'core' && action === 'transform') return runInlineCoreTransform(step, params, ctx);
   if (
