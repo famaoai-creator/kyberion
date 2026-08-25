@@ -272,7 +272,7 @@ export async function POST(req: NextRequest) {
             safeWriteFile(avatarPath, fileData);
             const identityPath = path.join(profileRoot, 'my-identity.json');
             const identity = safeExistsSync(identityPath)
-              ? JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'))
+              ? readJson<Record<string, unknown>>(identityPath)
               : { name: 'user', language: 'ja', interaction_style: 'Concierge' };
             identity.avatar_path = 'avatar.png';
             identity.avatar_source = avatarSource === 'camera' ? 'camera' : 'upload';
@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
       const result = withExecutionContext('sovereign_concierge', () =>
         secureIo.withSensitivePathMediation(() => {
           const currentIdentity = safeExistsSync(identityPath)
-            ? JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'))
+            ? readJson<Record<string, unknown>>(identityPath)
             : {};
           const currentTenant = readTenantProfile(activeSlug) || {
             tenant_slug: activeSlug,
@@ -338,7 +338,7 @@ export async function POST(req: NextRequest) {
           safeWriteFile(identityPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
           safeWriteFile(visionPath, `# Sovereign Vision\n\n${vision}\n`, { encoding: 'utf8' });
           const currentAgent = safeExistsSync(agentPath)
-            ? JSON.parse(String(safeReadFile(agentPath, { encoding: 'utf8' }) || '{}'))
+            ? readJson<Record<string, unknown>>(agentPath)
             : {};
           const agentId = String(
             agentInput.agent_id || currentAgent.agent_id || 'sovereign-agent'

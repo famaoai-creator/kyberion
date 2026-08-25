@@ -2,17 +2,14 @@ import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver, safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
 type Registry = { domains: Record<string, Record<PipelineKind, string[]>> };
 
-const registry = JSON.parse(
-  String(
-    safeReadFile(pathResolver.knowledge('product/governance/actuator-op-registry.json'), {
-      encoding: 'utf8',
-    })
-  )
-) as Registry;
+const registry = readJson<Registry>(
+  pathResolver.knowledge('product/governance/actuator-op-registry.json')
+);
 const forwarders = describeOps()
   .filter((entry) => entry.forward_to)
   .map((entry) => ({
@@ -28,8 +25,7 @@ for (const target of forwarders) {
   const domain = registry.domains[target.actuator];
   const kind = domain
     ? (Object.entries(domain).find(([, ops]) => ops.includes(target.op))?.[0] as
-        | PipelineKind
-        | undefined)
+        PipelineKind | undefined)
     : undefined;
   if (!kind) errors.push(`missing canonical target ${target.target} for wisdom:${target.source}`);
 }
@@ -40,7 +36,7 @@ for (const root of ['pipelines', 'knowledge/product/pipeline-templates']) {
   )) {
     let document: unknown;
     try {
-      document = JSON.parse(String(safeReadFile(file, { encoding: 'utf8' })));
+      document = readJson<unknown>(file);
     } catch {
       continue;
     }
@@ -69,8 +65,7 @@ function findTargetKind(target: { actuator: string; op: string }): PipelineKind 
   const domain = registry.domains[target.actuator];
   return domain
     ? (Object.entries(domain).find(([, ops]) => ops.includes(target.op))?.[0] as
-        | PipelineKind
-        | undefined)
+        PipelineKind | undefined)
     : undefined;
 }
 

@@ -17,7 +17,7 @@ import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { GenerationJob } from '@agent/core';
@@ -190,7 +190,7 @@ function readJob(jobId: string): GenerationJob {
   const jobPath = generationJobPath(jobId);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(jobPath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(jobPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`generation job JSON parse failed: ${message}`);

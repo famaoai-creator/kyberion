@@ -9,7 +9,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, resolveFacets, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import type { FacetRequest, FacetScope, ResolvedFacets } from '@agent/core';
 
 export interface EvalHarnessConfiguration {
@@ -214,7 +214,7 @@ export function loadEvalHarnessTable(
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(filePath);
   } catch {
     throw new Error(`[EVAL_HARNESS_CONFIG] invalid table JSON: ${filePath}`);
   }

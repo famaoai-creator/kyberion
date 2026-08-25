@@ -9,6 +9,7 @@ import {
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 type Palette = Record<string, string>;
 
@@ -20,7 +21,7 @@ type ContrastPair = {
 };
 
 function parseJson<T>(filePath: string): T {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) as string)) as T;
+  return readJson<T>(filePath);
 }
 
 function normalizeHex(value: string): string | null {
@@ -84,8 +85,7 @@ function opaqueRgb(value: string, base?: string): [number, number, number] {
   if (!rgba) throw new Error(`Unsupported color value: ${value}`);
   if (rgba[3] >= 1) return [rgba[0], rgba[1], rgba[2]];
   const baseRgba = (base ? parseRgba(base) : [255, 255, 255, 1]) as
-    | [number, number, number, number]
-    | null;
+    [number, number, number, number] | null;
   if (!baseRgba) throw new Error(`Unsupported base color value: ${base}`);
   return blendOver(rgba, baseRgba);
 }
