@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { main as backupMain } from './backup.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function translateArgs(argv: string[]): string[] {
   const translated = ['create', '--scope', 'tenant'];
@@ -18,12 +17,18 @@ function translateArgs(argv: string[]): string[] {
   return translated;
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[] = []): void {
   backupMain(translateArgs(argv));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+export const runTenantExport = defineScript({
+  name: 'tenant:export',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'tenant_export.ts') ||
+  isDirectScript(import.meta.url, 'tenant_export.js')
+)
+  void runTenantExport();
