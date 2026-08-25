@@ -4,7 +4,7 @@ import {
   readDaemonHeartbeat,
   type DaemonHeartbeatStatus,
 } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core';
 import { createStandardYargs } from '@agent/core';
 import {
@@ -264,8 +264,8 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
   return lines;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'daemon_watchdog', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('daemon', {
       type: 'array',
@@ -289,15 +289,19 @@ async function main(): Promise<void> {
   } else {
     for (const line of formatDaemonWatchdogReport(report)) console.log(line);
   }
-  process.exit(report.ok ? 0 : 1);
+  return report.ok ? 0 : 1;
 }
 
 if (
   isDirectScript(import.meta.url, 'daemon_watchdog.ts') ||
   isDirectScript(import.meta.url, 'daemon_watchdog.js')
 ) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+  void defineScript({
+    name: 'daemon:watchdog',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`daemon:watchdog failed with exit code ${status}`);
+    },
+  })();
 }
