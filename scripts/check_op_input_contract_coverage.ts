@@ -1,5 +1,6 @@
 import { pathResolver, safeReadFile } from '@agent/core';
 import { listOpInputContracts, type OpInputDomain } from '@agent/core/op-input-contracts';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type DiscoveryEntry = {
   n?: string;
@@ -102,19 +103,25 @@ export function findMissingOpInputContractCoverage(): string[] {
   return violations;
 }
 
-function main(): void {
-  const violations = findMissingOpInputContractCoverage();
-  if (violations.length > 0) {
-    console.error('[check:op-input-contract-coverage] FAILED');
-    for (const violation of violations) {
-      console.error(`- ${violation}`);
+export const runCheckOpInputContractCoverage = defineScript({
+  name: 'check:op-input-contract-coverage',
+  flags: [],
+  run(context) {
+    const violations = findMissingOpInputContractCoverage();
+    if (violations.length > 0) {
+      console.error('[check:op-input-contract-coverage] FAILED');
+      for (const violation of violations) {
+        console.error(`- ${violation}`);
+      }
+      throw new Error(`${violations.length} op input contract coverage violation(s)`);
     }
-    process.exit(1);
-  }
 
-  console.log('[check:op-input-contract-coverage] OK');
-}
+    context.print('[check:op-input-contract-coverage] OK');
+  },
+});
 
-if (process.argv[1] && /check_op_input_contract_coverage\.(ts|js)$/.test(process.argv[1])) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_op_input_contract_coverage.ts') ||
+  isDirectScript(import.meta.url, 'check_op_input_contract_coverage.js')
+)
+  void runCheckOpInputContractCoverage();
